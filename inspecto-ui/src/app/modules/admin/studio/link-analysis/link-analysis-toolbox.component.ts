@@ -10,8 +10,11 @@ import { MatSelectModule } from '@angular/material/select';
 import { ComponentsService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import {
+    BranchStage,
+    BranchingMatch,
     G6GraphData,
     GraphSelection,
+    LegThreshold,
     NodeScore,
     PatternStep,
     PredictedLink,
@@ -34,6 +37,7 @@ import {
     katzCentrality,
     linkPrediction,
     louvainCommunities,
+    matchBranchingPattern,
     matchPattern,
     maxFlow,
     maximumSpanningForest,
@@ -41,6 +45,7 @@ import {
     pageRank,
     shortestPath,
     suspicionScore,
+    thresholdLabel,
     triangleCount,
     patternNeedsTime,
     weightedShortestPath,
@@ -259,6 +264,12 @@ export class LinkAnalysisToolboxComponent {
      */
     readonly patternPacks = signal<PatternPack[]>(PATTERN_PACKS);
     readonly loadedPack = signal<PatternPack | null>(null);
+    /**
+     * LA-14b — the loaded BRANCHING motif (a copy, editable), or null when the builder holds a linear one.
+     * Its thresholds are rendered as editable fields so the band a match depends on is never hidden.
+     */
+    readonly branchStages = signal<BranchStage[] | null>(null);
+    readonly thresholdLabel = thresholdLabel;
     // ── V2 result state (each group keeps its own so results survive tab switches) ──
     readonly cycles = signal<GraphSelection[]>([]);
     readonly cutNodes = signal<string[]>([]);
@@ -515,6 +526,11 @@ export class LinkAnalysisToolboxComponent {
     loadPatternPack(id: string): void {
         const pack = this.patternPacks().find((p) => p.id === id) ?? null;
         this.loadedPack.set(pack);
+        this.branchStages.set(
+            pack?.stages
+                ? pack.stages.map((s) => ({ ...s, ...(s.threshold ? { threshold: { ...s.threshold } } : {}) }))
+                : null,
+        );
         if (!pack) return;
         this.patternSteps.set(pack.steps.map((s) => ({ ...s })));
         this.patternMatches.set([]);
@@ -533,10 +549,36 @@ export class LinkAnalysisToolboxComponent {
         this.patternSteps.update((s) => s.map((step, idx) => (idx === i ? { ...step, ...patch } : step)));
     }
 
+    /** Edit one branching stage (a fresh array, so the OnPush template re-renders; the catalog is untouched). */
+    updateBranchStage(i: number, patch: Partial<BranchStage>): void {
+        this.branchStages.update((st) => st?.map((s, idx) => (idx === i ? { ...s, ...patch } : s)) ?? null);
+    }
+
+    /** Edit one stage's threshold band. A blank bound is "no bound", never 0. */
+    updateBranchThreshold(i: number, patch: Partial<LegThreshold>): void {
+        this.branchStages.update(
+            (st) =>
+                st?.map((s, idx) =>
+                    idx === i && s.threshold ? { ...s, threshold: { ...s.threshold, ...patch } } : s,
+                ) ?? null,
+        );
+    }
+
+    /** A number input's value as a bound: blank / unparseable ⇒ undefined (no bound). */
+    boundOf(raw: string): number | undefined {
+        const n = raw.trim() === '' ? Number.NaN : Number(raw);
+        return Number.isFinite(n) ? n : undefined;
+    }
+
     runPattern(): void {
         const g = this.graph();
         if (!g) return;
         this.analysisError.set('');
+        const stages = this.branchStages();
+        if (stages) {
+            this.runBranching(g, stages);
+            return;
+        }
         const steps = this.patternSteps();
         const timeAttr = this.timeAttr();
         // LA-14a: say WHY nothing can be found. `matchPattern` fails closed on a temporal motif with no
@@ -563,12 +605,45 @@ export class LinkAnalysisToolboxComponent {
         });
     }
 
+    /**
+     * LA-14b — run a branching motif. Every refusal (no time column, a threshold nothing passes because the
+     * view filtered the legs away, the node cap) is shown as its own sentence, never as "No matches".
+     */
+    private runBranching(g: G6GraphData, stages: BranchStage[]): void {
+        const res = matchBranchingPattern(g, stages, { timeAttr: this.timeAttr() });
+        this.patternMatches.set(res.matches);
+        if (res.refusal || !res.matches.length) {
+            this.emphasisChange.emit(null);
+            this.analysisError.set(res.refusal ?? 'No matches for this pattern.');
+            return;
+        }
+        if (res.truncated) {
+            this.analysisError.set(`Showing the first ${res.matches.length} matches — there may be more.`);
+        }
+        this.emphasisChange.emit({
+            nodeIds: [...new Set(res.matches.flatMap((m) => m.nodeIds))],
+            edgeIds: [...new Set(res.matches.flatMap((m) => m.edgeIds))],
+        });
+    }
+
     focusMatch(m: GraphSelection): void {
         this.emphasisChange.emit({ nodeIds: m.nodeIds, edgeIds: m.edgeIds });
     }
 
-    /** The node labels of a match joined into a readable chain (`Acme → Bob → Store`). */
+    /**
+     * The node labels of a match joined into a readable chain (`Acme → Bob → Store`). A branching match
+     * (LA-14b) reads by LAYER instead — `SMURF-01, SMURF-02 +10 ⇒ MULE-HUB-01 ⇒ RELAY-01, RELAY-02 ⇒ OFFSHORE-77`.
+     */
     patternMatchLabel(m: GraphSelection): string {
+        const layers = (m as Partial<BranchingMatch>).layers;
+        if (layers) {
+            return layers
+                .map((layer) => {
+                    const shown = layer.slice(0, 2).map((id) => this.label(id));
+                    return layer.length > 2 ? `${shown.join(', ')} +${layer.length - 2}` : shown.join(', ');
+                })
+                .join(' ⇒ ');
+        }
         return m.nodeIds.map((id) => this.label(id)).join(' → ');
     }
 

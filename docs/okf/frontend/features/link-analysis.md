@@ -350,6 +350,33 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   timestamp de-folds a projection into one edge per instant. Temporal matching is therefore honest at demo
   cardinality and needs the SQL compiler (LA-14b) at call-record scale. Comparing values within one
   dataset is unaffected by the host-timezone question, because every value is parsed the same way.
+* **A pattern can BRANCH** (LA-14b, browser half, 2026-09-23). `inspecto/graph/branching-pattern-engine.ts`
+  (`matchBranchingPattern`) runs a motif of ordered **stages**, each a `fan-in` or `fan-out` with a minimum
+  number of DISTINCT counterparties, an optional per-leg `threshold` band (`min` inclusive, `max` exclusive —
+  a reporting threshold is crossed AT its value), an optional `windowHours`, and LA-14a's `afterPrevious` /
+  `maxGapHours`. It **extends** `matchPattern` rather than replacing it: linear packs still run there, and the
+  two share `followsInTime`, `edgeTimeIndex` and `baseEdgeKind`, so they cannot disagree about when a link
+  happened. Ordering is **per branch** (each leg against the time the match reached ITS tail node), and a
+  fan-in "arrives" when it reaches its minimum breadth — so a collector that wires out before enough deposits
+  landed is not structuring.
+* The built-in **Structuring** pack (`PatternPack.stages`, `steps: []`) is fan-in ≥ 5 legs in
+  `900 ≤ AMOUNT < 1000` within 24 h → fan-out ≥ 2 → re-converge ≥ 2, each ordered within 48 h. The band is
+  rendered as editable fields in the toolbox. 🔴 **A band, not an open "under 1 000"**: ordinary traffic is a
+  long tail below any threshold, and an open bound made every busy account a "collector". On the demo corpus
+  (`mule_structuring` view, 1 928 transfers, 170 accounts) it finds exactly the one planted ring in ~9 ms.
+* ⛔ **It REFUSES rather than answering "none"** — no time column · no link carrying the threshold
+  attribute · **no link passing the threshold at all** (plan §2.6: `mule_large_transfers`' `AMOUNT ≥ 5 000`
+  removed every leg before the matcher ran, and "no matches" would have declared the structuring absent) ·
+  a graph over `ANALYSIS_NODE_CAP`, returned as a refusal, never thrown. Work is budgeted
+  (`BRANCHING_WORK_BUDGET`) and the match list capped, both surfacing `truncated`.
+* ⚠ An authored branching pack is one FLAT TOON tabular row per stage
+  (`stages[n]{shape,minBranches,edgeKind,nodeKind,windowHours,afterPrevious,maxGapHours,thresholdAttr,thresholdMin,thresholdMax}`);
+  blank = wildcard / no bound, and ANY unusable row drops the whole pack. No TOON copy is seeded — the
+  built-in reaches every Space through the PACK-1 merge — so that shape has not yet been through
+  `ConfigCodec`'s round-trip. ⚠ `PatternQueryCompiler.java` (the server half) is **deferred**; see the plan row.
+* 🔴 **`followsInTime` also closed an LA-14a hole**: an un-ordered hop with no time was recorded as `NaN`, and
+  a later ordered hop compared against it with `t <= NaN` / `t - NaN > gap` — both false — so an unknown
+  time silently counted as "in order". Pinned by a spec that goes red on the old comparison.
 * **`POST /inv/schema/overlap-profile` measures what naming only guesses** (LA-15). The sibling
   `GET /inv/schema/relationships` infers a foreign key from a `<base>_id` column name; this one measures
   the real overlap of two columns' value sets, so an implicit join with no naming hint is visible and a

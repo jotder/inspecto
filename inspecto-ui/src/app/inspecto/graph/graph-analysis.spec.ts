@@ -701,6 +701,15 @@ describe('matchPattern temporal ordering (LA-14a)', () => {
         expect(matchPattern(late, chain, { timeAttr: 'AT' })).toHaveLength(1); // still ORDERED, just not close
     });
 
+    it('rejects an ordered hop whose PREVIOUS hop has no time — unknown cannot be "before"', () => {
+        // a→b carries no time; b→c is ordered against it. `t <= NaN` is false, so this used to pass.
+        const unknownFirst = {
+            nodes: ordered.nodes,
+            edges: [{ id: 'a->b', source: 'a', target: 'b', data: { kind: 'pays', attrs: {} } }, ordered.edges[1]],
+        } as G6GraphData;
+        expect(matchPattern(unknownFirst, chain, { timeAttr: 'AT' })).toHaveLength(0);
+    });
+
     it('leaves an untemporal motif behaving exactly as before, with or without a time column', () => {
         const plain = [{}, { direction: 'out' as const }, { direction: 'out' as const }];
         expect(matchPattern(backwards, plain)).toHaveLength(1);

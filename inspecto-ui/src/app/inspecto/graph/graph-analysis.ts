@@ -646,6 +646,49 @@ function baseKind(kind: unknown): string {
     return String(kind ?? '').split(' · ')[0];
 }
 
+/** {@link baseKind} for callers outside this file — the branching matcher (LA-14b) keys legs off it too. */
+export function baseEdgeKind(kind: unknown): string {
+    return baseKind(kind);
+}
+
+/**
+ * Edge id → event time off `timeAttr`. Same parse rule as {@link filterByTime}: the projection stringifies
+ * attributes, so this is the only place a time exists, and an unparseable one is ABSENT rather than zero.
+ * Shared by {@link matchPattern} (LA-14a) and the branching matcher (LA-14b) so the two can never disagree
+ * about when a link happened.
+ */
+export function edgeTimeIndex(g: G6GraphData, timeAttr: string | undefined): Map<string, number> {
+    const edgeTime = new Map<string, number>();
+    if (!timeAttr) return edgeTime;
+    for (const e of g.edges) {
+        const raw = e.data.attrs?.[timeAttr];
+        if (raw == null) continue;
+        const t = Date.parse(raw);
+        if (Number.isFinite(t)) edgeTime.set(e.id, t);
+    }
+    return edgeTime;
+}
+
+/**
+ * LA-14a's ordering rule for one hop, shared with the branching matcher: with `afterPrevious` the hop at
+ * `t` must be STRICTLY after `prev` (a simultaneous hop is not a forwarding) and, when `maxGapHours` is set,
+ * no further than that behind it. An unknown time on either side cannot be ordered, so it fails. Without
+ * `afterPrevious` every hop passes.
+ */
+export function followsInTime(
+    prev: number | undefined,
+    t: number | undefined,
+    step: { afterPrevious?: boolean; maxGapHours?: number },
+): boolean {
+    if (!step.afterPrevious) return true;
+    // ⚠ NaN counts as unknown too. `matchPattern` records an un-ordered hop with no time as NaN, and before
+    // this helper existed a LATER ordered hop compared against it with `t <= NaN` / `t - NaN > gap` — both
+    // false — so an unknown time silently counted as "in order" (LA-14b grounding, 2026-09-23).
+    if (t === undefined || prev === undefined || Number.isNaN(t) || Number.isNaN(prev)) return false;
+    if (t <= prev) return false;
+    return step.maxGapHours === undefined || t - prev <= step.maxGapHours * 3_600_000;
+}
+
 /**
  * Find every simple path matching an ordered node/edge-kind **motif** (a path pattern, not full
  * subgraph isomorphism — the deliberate MVP shape). Step 0 constrains the start node; each later step
@@ -672,17 +715,7 @@ export function matchPattern(g: G6GraphData, steps: PatternStep[], opts: MatchPa
     const nodeKind = new Map(g.nodes.map((nd) => [nd.id, nd.data.kind]));
     const edgeKind = new Map(g.edges.map((e) => [e.id, baseKind(e.data.kind)]));
     const nodeOk = (id: string, k?: string): boolean => !k || nodeKind.get(id) === k;
-    // Edge id → event time. Same parse rule as `filterByTime`: the projection stringifies attributes,
-    // so this is the only place a time exists, and an unparseable one is absent rather than zero.
-    const edgeTime = new Map<string, number>();
-    if (timeAttr) {
-        for (const e of g.edges) {
-            const raw = e.data.attrs?.[timeAttr];
-            if (raw == null) continue;
-            const t = Date.parse(raw);
-            if (Number.isFinite(t)) edgeTime.set(e.id, t);
-        }
-    }
+    const edgeTime = edgeTimeIndex(g, timeAttr);
 
     const results: GraphSelection[] = [];
     const nodePath: string[] = [];
@@ -702,12 +735,7 @@ export function matchPattern(g: G6GraphData, steps: PatternStep[], opts: MatchPa
             if (step.edgeKind && edgeKind.get(edgeId) !== step.edgeKind) continue;
             if (!nodeOk(next, step.nodeKind)) continue;
             const t = edgeTime.get(edgeId);
-            if (step.afterPrevious) {
-                const prev = timePath[timePath.length - 1];
-                if (t === undefined || prev === undefined) continue; // unknown time cannot be ordered
-                if (t <= prev) continue; // strictly after — a simultaneous hop is not a forwarding
-                if (step.maxGapHours !== undefined && t - prev > step.maxGapHours * 3_600_000) continue;
-            }
+            if (!followsInTime(timePath[timePath.length - 1], t, step)) continue;
             onPath.add(next);
             nodePath.push(next);
             edgePath.push(edgeId);

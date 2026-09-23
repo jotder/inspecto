@@ -306,6 +306,83 @@ describe('LinkAnalysisToolboxComponent', () => {
         expect(c.loadedPack()?.tool).toBe('cohesion');
     });
 
+    // ── LA-14b: the structuring pack runs through the branching matcher ──
+
+    /** Six sub-threshold deposits into a hub, a split to two relays, a re-convergence — with times and amounts. */
+    function structuringGraph(amount = 950): G6GraphData {
+        const legs: [string, string, number, string][] = [
+            ...['s1', 's2', 's3', 's4', 's5', 's6'].map(
+                (s, i) => [s, 'hub', amount, `2026-09-01 1${i}:00:00`] as [string, string, number, string],
+            ),
+            ['hub', 'r1', 2800, '2026-09-01 20:00:00'],
+            ['hub', 'r2', 2800, '2026-09-01 20:30:00'],
+            ['r1', 'off', 2750, '2026-09-01 22:00:00'],
+            ['r2', 'off', 2750, '2026-09-01 23:00:00'],
+        ];
+        const ids = [...new Set(legs.flatMap(([s, t]) => [s, t]))];
+        return {
+            nodes: ids.map((id) => ({ id, data: { label: id.toUpperCase(), kind: 'acct' } })),
+            edges: legs.map(([source, target, a, at], i) => ({
+                id: `tx${i}`,
+                source,
+                target,
+                data: { kind: 'pays', attrs: { AMOUNT: String(a), BOOKED_AT: at } },
+            })),
+        };
+    }
+
+    it('structuring pack: shows its threshold band and finds the branching motif, labelled by layer', () => {
+        const { fixture, c, last } = make(structuringGraph());
+        fixture.componentRef.setInput('timeAttr', 'BOOKED_AT');
+        c.tab.set('pattern');
+        c.loadPatternPack('structuring');
+        fixture.detectChanges();
+        expect(c.branchStages()).toHaveLength(3);
+        // the band is ON SCREEN, not buried in the pack
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('900 ≤ AMOUNT < 1000');
+
+        c.runPattern();
+        expect(c.analysisError()).toBe('');
+        expect(c.patternMatches()).toHaveLength(1);
+        expect(c.patternMatchLabel(c.patternMatches()[0])).toBe('S1, S2 +4 ⇒ HUB ⇒ R1, R2 ⇒ OFF');
+        expect(last()?.nodeIds).toContain('off');
+
+        // editing the band re-scopes the search — and never touches the shared catalog
+        c.updateBranchThreshold(0, { max: 900 });
+        c.runPattern();
+        expect(c.patternMatches()).toHaveLength(0);
+        expect(c.patternPacks().find((p) => p.id === 'structuring')!.stages![0].threshold!.max).toBe(1000);
+    });
+
+    it('structuring pack: says the legs were filtered away instead of "No matches" (§2.6 trap)', () => {
+        const { fixture, c } = make(structuringGraph(6000)); // every deposit above the band, as after AMOUNT ≥ 5 000
+        fixture.componentRef.setInput('timeAttr', 'BOOKED_AT');
+        c.loadPatternPack('structuring');
+        c.runPattern();
+        expect(c.analysisError()).toContain('removed before it ran');
+        expect(c.analysisError()).not.toBe('No matches for this pattern.');
+    });
+
+    it('loading a linear pack after a branching one returns the builder to linear steps', () => {
+        const { c } = make();
+        c.loadPatternPack('structuring');
+        expect(c.branchStages()).not.toBeNull();
+        c.loadPatternPack('pass-through');
+        expect(c.branchStages()).toBeNull();
+        expect(c.patternSteps()).toHaveLength(3);
+        c.loadPatternPack('');
+        expect(c.branchStages()).toBeNull();
+    });
+
+    it('renders the branching editor with no a11y violations', async () => {
+        const { fixture, c } = make(structuringGraph());
+        c.tab.set('pattern');
+        c.loadPatternPack('structuring');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
     it('renders with no a11y violations', async () => {
         const { fixture } = make();
         fixture.detectChanges();

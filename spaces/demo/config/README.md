@@ -133,6 +133,9 @@ to `OFFSHORE-77` (pass-through); `SHELL-A→B→C→D→A` circulate 24 000 with
 Pattern match with the `layering-chain`, `pass-through`, `inbound-collector` and `circular-flow` packs,
 Suspicion score, Communities (hulls on), and Shortest path SMURF-01 → OFFSHORE-77. `mule_large_transfers`
 applies `AMOUNT ≥ 5000`: the shells and relays remain, the smurf deposits vanish — the point of structuring.
+`mule_structuring` keeps every transfer, amount and time on the links: with `BOOKED_AT` as the time column the
+built-in **Structuring** pack (a branching motif, band `900 ≤ AMOUNT < 1000`) finds the one planted ring and
+nothing else; on `mule_large_transfers` it refuses instead, saying the legs were filtered away.
 
 ## Operational sample data (incidents / cases / tags in action)
 

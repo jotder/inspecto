@@ -617,77 +617,170 @@
                                     }
                                 </p>
                             }
-                            <div class="flex flex-col gap-2">
-                                @for (step of patternSteps(); track $index; let i = $index) {
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        @if (i === 0) {
-                                            <span class="w-16 text-sm font-medium">Start</span>
-                                        } @else {
-                                            <mat-button-toggle-group
-                                                class="shrink-0"
-                                                [value]="step.direction ?? 'out'"
-                                                (change)="updatePatternStep(i, { direction: $event.value })"
-                                                [attr.aria-label]="'Step ' + (i + 1) + ' direction'"
-                                            >
-                                                <mat-button-toggle value="out" aria-label="outgoing"
-                                                    >→</mat-button-toggle
+                            @if (branchStages(); as stages) {
+                                <!-- LA-14b: a branching motif. Every threshold is an editable field, never hidden. -->
+                                <ol class="flex flex-col gap-2" aria-label="Branching stages">
+                                    @for (st of stages; track $index; let i = $index) {
+                                        <li class="flex flex-wrap items-center gap-2 text-sm">
+                                            <span class="w-40 font-medium">
+                                                {{ i + 1 }}. {{ st.shape === 'fan-in' ? 'Fan-in from' : 'Fan-out to' }}
+                                            </span>
+                                            <mat-form-field subscriptSizing="dynamic" class="w-28">
+                                                <mat-label>At least</mat-label>
+                                                <input
+                                                    matInput
+                                                    type="number"
+                                                    min="1"
+                                                    [attr.aria-label]="
+                                                        'Stage ' + (i + 1) + ' minimum distinct counterparties'
+                                                    "
+                                                    [ngModel]="st.minBranches"
+                                                    (ngModelChange)="
+                                                        updateBranchStage(i, {
+                                                            minBranches: +$event >= 1 ? +$event : 1,
+                                                        })
+                                                    "
+                                                />
+                                            </mat-form-field>
+                                            <span class="text-secondary">distinct</span>
+                                            @if (st.threshold; as th) {
+                                                <mat-form-field subscriptSizing="dynamic" class="w-32">
+                                                    <mat-label>Link attribute</mat-label>
+                                                    <input
+                                                        matInput
+                                                        [attr.aria-label]="'Stage ' + (i + 1) + ' threshold attribute'"
+                                                        [ngModel]="th.attr"
+                                                        (ngModelChange)="
+                                                            updateBranchThreshold(i, { attr: $event.trim() })
+                                                        "
+                                                    />
+                                                </mat-form-field>
+                                                <mat-form-field subscriptSizing="dynamic" class="w-28">
+                                                    <mat-label>From (≥)</mat-label>
+                                                    <input
+                                                        matInput
+                                                        type="number"
+                                                        [attr.aria-label]="
+                                                            'Stage ' + (i + 1) + ' threshold lower bound'
+                                                        "
+                                                        [ngModel]="th.min ?? ''"
+                                                        (ngModelChange)="
+                                                            updateBranchThreshold(i, { min: boundOf('' + $event) })
+                                                        "
+                                                    />
+                                                </mat-form-field>
+                                                <mat-form-field subscriptSizing="dynamic" class="w-28">
+                                                    <mat-label>Under (&lt;)</mat-label>
+                                                    <input
+                                                        matInput
+                                                        type="number"
+                                                        [attr.aria-label]="
+                                                            'Stage ' + (i + 1) + ' threshold upper bound'
+                                                        "
+                                                        [ngModel]="th.max ?? ''"
+                                                        (ngModelChange)="
+                                                            updateBranchThreshold(i, { max: boundOf('' + $event) })
+                                                        "
+                                                    />
+                                                </mat-form-field>
+                                            }
+                                            <span class="text-secondary" data-testid="stage-summary">
+                                                @if (st.threshold; as th) {
+                                                    {{ thresholdLabel(th) }}
+                                                }
+                                                @if (st.windowHours) {
+                                                    · within {{ st.windowHours }} h
+                                                }
+                                                @if (st.afterPrevious) {
+                                                    · after the previous stage{{
+                                                        st.maxGapHours ? ', ≤ ' + st.maxGapHours + ' h' : ''
+                                                    }}
+                                                }
+                                            </span>
+                                        </li>
+                                    }
+                                </ol>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button mat-stroked-button (click)="runPattern()">
+                                        <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
+                                        Find matches
+                                    </button>
+                                </div>
+                            } @else {
+                                <div class="flex flex-col gap-2">
+                                    @for (step of patternSteps(); track $index; let i = $index) {
+                                        <div class="flex flex-wrap items-center gap-2">
+                                            @if (i === 0) {
+                                                <span class="w-16 text-sm font-medium">Start</span>
+                                            } @else {
+                                                <mat-button-toggle-group
+                                                    class="shrink-0"
+                                                    [value]="step.direction ?? 'out'"
+                                                    (change)="updatePatternStep(i, { direction: $event.value })"
+                                                    [attr.aria-label]="'Step ' + (i + 1) + ' direction'"
                                                 >
-                                                <mat-button-toggle value="in" aria-label="incoming"
-                                                    >←</mat-button-toggle
-                                                >
-                                                <mat-button-toggle value="both" aria-label="either direction"
-                                                    >↔</mat-button-toggle
-                                                >
-                                            </mat-button-toggle-group>
+                                                    <mat-button-toggle value="out" aria-label="outgoing"
+                                                        >→</mat-button-toggle
+                                                    >
+                                                    <mat-button-toggle value="in" aria-label="incoming"
+                                                        >←</mat-button-toggle
+                                                    >
+                                                    <mat-button-toggle value="both" aria-label="either direction"
+                                                        >↔</mat-button-toggle
+                                                    >
+                                                </mat-button-toggle-group>
+                                                <mat-form-field subscriptSizing="dynamic" class="w-40">
+                                                    <mat-label>Link kind</mat-label>
+                                                    <mat-select
+                                                        [value]="step.edgeKind ?? ''"
+                                                        (valueChange)="
+                                                            updatePatternStep(i, { edgeKind: $event || undefined })
+                                                        "
+                                                    >
+                                                        <mat-option [value]="''">Any</mat-option>
+                                                        @for (k of edgeKinds(); track k) {
+                                                            <mat-option [value]="k">{{ k }}</mat-option>
+                                                        }
+                                                    </mat-select>
+                                                </mat-form-field>
+                                            }
                                             <mat-form-field subscriptSizing="dynamic" class="w-40">
-                                                <mat-label>Link kind</mat-label>
+                                                <mat-label>Node kind</mat-label>
                                                 <mat-select
-                                                    [value]="step.edgeKind ?? ''"
+                                                    [value]="step.nodeKind ?? ''"
                                                     (valueChange)="
-                                                        updatePatternStep(i, { edgeKind: $event || undefined })
+                                                        updatePatternStep(i, { nodeKind: $event || undefined })
                                                     "
                                                 >
                                                     <mat-option [value]="''">Any</mat-option>
-                                                    @for (k of edgeKinds(); track k) {
+                                                    @for (k of nodeKinds(); track k) {
                                                         <mat-option [value]="k">{{ k }}</mat-option>
                                                     }
                                                 </mat-select>
                                             </mat-form-field>
-                                        }
-                                        <mat-form-field subscriptSizing="dynamic" class="w-40">
-                                            <mat-label>Node kind</mat-label>
-                                            <mat-select
-                                                [value]="step.nodeKind ?? ''"
-                                                (valueChange)="updatePatternStep(i, { nodeKind: $event || undefined })"
-                                            >
-                                                <mat-option [value]="''">Any</mat-option>
-                                                @for (k of nodeKinds(); track k) {
-                                                    <mat-option [value]="k">{{ k }}</mat-option>
-                                                }
-                                            </mat-select>
-                                        </mat-form-field>
-                                        @if (i > 0) {
-                                            <button
-                                                mat-icon-button
-                                                (click)="removePatternStep(i)"
-                                                [attr.aria-label]="'Remove step ' + (i + 1)"
-                                            >
-                                                <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
-                                            </button>
-                                        }
-                                    </div>
-                                }
-                            </div>
-                            <div class="flex flex-wrap items-center gap-2">
-                                <button mat-stroked-button (click)="addPatternStep()">
-                                    <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                                    Add step
-                                </button>
-                                <button mat-stroked-button (click)="runPattern()">
-                                    <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
-                                    Find matches
-                                </button>
-                            </div>
+                                            @if (i > 0) {
+                                                <button
+                                                    mat-icon-button
+                                                    (click)="removePatternStep(i)"
+                                                    [attr.aria-label]="'Remove step ' + (i + 1)"
+                                                >
+                                                    <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                                </button>
+                                            }
+                                        </div>
+                                    }
+                                </div>
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <button mat-stroked-button (click)="addPatternStep()">
+                                        <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                                        Add step
+                                    </button>
+                                    <button mat-stroked-button (click)="runPattern()">
+                                        <mat-icon svgIcon="heroicons_outline:magnifying-glass-circle"></mat-icon>
+                                        Find matches
+                                    </button>
+                                </div>
+                            }
                             @if (patternMatches().length) {
                                 <ul class="mt-1 flex flex-col gap-1 text-sm" aria-label="Pattern matches">
                                     @for (m of patternMatches(); track $index) {

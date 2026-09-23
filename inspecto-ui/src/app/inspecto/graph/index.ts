@@ -8,3 +8,4 @@ export * from './domain-profile';
 export * from './graph-filter';
 export * from './graph-snapshot';
 export * from './entity-key';
+export * from './branching-pattern-engine';

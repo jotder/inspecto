@@ -1,0 +1,18 @@
+name: mule_structuring
+description: "DEMO 2c — Structuring, found as a SHAPE (LA-14b): one link per transfer with BOOKED_AT and AMOUNT on the links and NO amount filter, so every sub-threshold deposit is still on the canvas (1 928 transfers is under the projection limit, nothing is truncated). Choose BOOKED_AT as the time column, open Pattern match and load the Structuring pack: its band 900 ≤ AMOUNT < 1000 is shown and editable. It finds exactly one match — twelve SMURF accounts → MULE-HUB-01 → RELAY-01/02 → OFFSHORE-77 — and nothing in the ordinary traffic. Run the same pack on mule_large_transfers and it refuses, saying the legs were filtered away, rather than reporting none."
+sourceId: entity-projection
+layout: force
+profile: finance
+query:
+  projection:
+    datasetId: mule_transfers_dataset
+    sourceCol: PAYER_ACCOUNT
+    targetCol: PAYEE_ACCOUNT
+    linkKindCol: CHANNEL
+    attrCols[2]: BOOKED_AT,AMOUNT
+view:
+  legend: true
+  workingSet: true
+  plugins:
+    minimap: true
+    behaviors[1]: hover-activate

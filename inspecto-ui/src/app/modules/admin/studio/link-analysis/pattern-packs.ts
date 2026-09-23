@@ -1,4 +1,4 @@
-import { PatternStep } from 'app/inspecto/graph';
+import { BranchStage, LegThreshold, PatternStep } from 'app/inspecto/graph';
 
 /**
  * **Link Analysis — pattern packs** (V2). A pattern pack is a named, parameterized investigation
@@ -16,8 +16,13 @@ export interface PatternPack {
     label: string;
     category: 'money' | 'telecom' | 'identity';
     description: string;
-    /** The motif loaded into the builder. Blank kinds are wildcards to be refined per graph. */
+    /** The motif loaded into the builder. Blank kinds are wildcards to be refined per graph. Empty on a branching pack. */
     steps: PatternStep[];
+    /**
+     * LA-14b — a BRANCHING motif (fan-in / fan-out stages), run by `matchBranchingPattern` instead of the
+     * linear matcher. Present ⇒ `steps` is empty. Its thresholds are shown and editable in the toolbox.
+     */
+    stages?: BranchStage[];
     /** A better-fit analysis tool for this shape, shown as a hint (no motif can express it as a path). */
     tool?: 'cycles' | 'cohesion' | 'similarity';
 }
@@ -60,8 +65,14 @@ export function patternPackFromContent(content: Record<string, unknown>): Patter
     const id = typeof content['name'] === 'string' ? content['name'] : '';
     const label = typeof content['label'] === 'string' ? content['label'] : '';
     const category = content['category'] as PatternPack['category'];
+    if (!id || !label || !CATEGORIES.has(category)) return null;
+    const description = typeof content['description'] === 'string' ? content['description'] : '';
+    if (content['stages'] !== undefined) {
+        const stages = stagesOf(content['stages']);
+        return stages ? { id, label, category, description, steps: [], stages } : null;
+    }
     const rawSteps = content['steps'];
-    if (!id || !label || !CATEGORIES.has(category) || !Array.isArray(rawSteps) || rawSteps.length === 0) return null;
+    if (!Array.isArray(rawSteps) || rawSteps.length === 0) return null;
 
     const steps: PatternStep[] = rawSteps.map((s) => {
         const step = (s as Record<string, unknown>) ?? {};
@@ -90,9 +101,57 @@ export function patternPackFromContent(content: Record<string, unknown>): Patter
         label,
         category,
         steps,
-        description: typeof content['description'] === 'string' ? content['description'] : '',
+        description,
         ...(TOOLS.has(tool) ? { tool } : {}),
     };
+}
+
+/** A TOON cell as a number, or `undefined` when blank / absent / unparseable. `0` is a real number here. */
+function numberOf(value: unknown): number | undefined {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+    if (typeof value !== 'string' || !value.trim()) return undefined;
+    const n = Number(value);
+    return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * LA-14b — an authored branching pack's `stages`, or `null` when ANY stage is unusable (a half-read motif
+ * would match something other than what was authored, which is worse than not offering the pack).
+ *
+ * The persisted shape is one FLAT tabular row per stage, because a TOON tabular array cannot nest an object:
+ * `stages[3]{shape,minBranches,edgeKind,nodeKind,windowHours,afterPrevious,maxGapHours,thresholdAttr,thresholdMin,thresholdMax}`.
+ * Blank strings are wildcards / absent; `windowHours` and `maxGapHours` of `0` mean "none" (the LA-14a
+ * convention — a zero-hour window would match nothing while looking authored), but a threshold bound of
+ * `0` is a real bound and only a blank cell means "no bound".
+ */
+function stagesOf(raw: unknown): BranchStage[] | null {
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+    const stages: BranchStage[] = [];
+    for (const s of raw) {
+        const row = (s as Record<string, unknown>) ?? {};
+        const shape = row['shape'];
+        const minBranches = numberOf(row['minBranches']);
+        if ((shape !== 'fan-in' && shape !== 'fan-out') || minBranches === undefined || minBranches < 1) return null;
+        const window = numberOf(row['windowHours']);
+        const attr = typeof row['thresholdAttr'] === 'string' ? row['thresholdAttr'].trim() : '';
+        let threshold: LegThreshold | undefined;
+        if (attr) {
+            const min = numberOf(row['thresholdMin']);
+            const max = numberOf(row['thresholdMax']);
+            if (min === undefined && max === undefined) return null; // a threshold with no bound is not a threshold
+            threshold = { attr, ...(min !== undefined ? { min } : {}), ...(max !== undefined ? { max } : {}) };
+        }
+        stages.push({
+            shape,
+            minBranches: Math.floor(minBranches),
+            ...kindOf(row['edgeKind'], 'edgeKind'),
+            ...kindOf(row['nodeKind'], 'nodeKind'),
+            ...(window !== undefined && window > 0 ? { windowHours: window } : {}),
+            ...temporalOf(row),
+            ...(threshold ? { threshold } : {}),
+        });
+    }
+    return stages;
 }
 
 export const PATTERN_PACKS: PatternPack[] = [
@@ -156,5 +215,21 @@ export const PATTERN_PACKS: PatternPack[] = [
             'Distinct identities that share the same devices/accounts. Use Similarity from a seed node, or Cohesive groups for the whole ring.',
         steps: [{}, { direction: 'both' }],
         tool: 'similarity',
+    },
+    {
+        id: 'structuring',
+        label: 'Structuring (smurfing)',
+        category: 'money',
+        description:
+            'Many deposits just under a reporting threshold converging on one collector within a day, which then splits the total across two or more intermediaries that re-converge on one exit — each move after the one before, within 48 hours. Set the threshold band to your reporting limit; the legs are matched INSIDE the band, so never filter the view to large amounts first.',
+        steps: [],
+        // LA-14b. The band is the point: `max` is the reporting threshold (a deposit AT it is reported) and
+        // `min` keeps the ordinary long tail of small payments out. 900–1 000 matches the demo corpus; a real
+        // deployment edits it to its own limit in the toolbox, where it is shown, not buried.
+        stages: [
+            { shape: 'fan-in', minBranches: 5, threshold: { attr: 'AMOUNT', min: 900, max: 1000 }, windowHours: 24 },
+            { shape: 'fan-out', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
+            { shape: 'fan-in', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
+        ],
     },
 ];

@@ -81,9 +81,80 @@ describe('PATTERN_PACKS', () => {
         const ids = PATTERN_PACKS.map((p) => p.id);
         expect(new Set(ids).size).toBe(ids.length); // ids address the packs — duplicates would shadow
         for (const p of PATTERN_PACKS) {
+            if (p.stages) {
+                // A branching pack runs through the branching matcher; it carries no linear steps.
+                expect(p.steps, p.id).toEqual([]);
+                expect(p.stages.length, p.id).toBeGreaterThan(0);
+                continue;
+            }
             // The start node has no incoming edge, so step 0 carries no direction by construction.
             expect(p.steps[0], p.id).toEqual({});
             expect(p.steps.length, p.id).toBeGreaterThan(1);
         }
+    });
+
+    it('ships the structuring pack with a VISIBLE threshold band, not an open-ended "under" (§2.6)', () => {
+        const pack = PATTERN_PACKS.find((p) => p.id === 'structuring')!;
+        expect(pack.stages![0]).toMatchObject({ shape: 'fan-in', threshold: { attr: 'AMOUNT', min: 900, max: 1000 } });
+        // the split and the re-convergence are both ordered after the step before, LA-14a's rule
+        expect(pack.stages!.slice(1).every((s) => s.afterPrevious && s.maxGapHours === 48)).toBe(true);
+    });
+});
+
+/** LA-14b — the authored (Space) spelling of a branching pack: one flat TOON tabular row per stage. */
+describe('patternPackFromContent — branching stages', () => {
+    const row = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+        shape: 'fan-in',
+        minBranches: 5,
+        edgeKind: '',
+        nodeKind: '',
+        windowHours: 24,
+        afterPrevious: false,
+        maxGapHours: 0,
+        thresholdAttr: 'AMOUNT',
+        thresholdMin: 900,
+        thresholdMax: 1000,
+        ...over,
+    });
+    const pack = (stages: unknown): Record<string, unknown> => ({
+        name: 'structuring',
+        label: 'Structuring',
+        category: 'money',
+        stages,
+    });
+
+    it('maps flat rows onto stages, blanks as wildcards and 0-hour windows/gaps as none', () => {
+        const p = patternPackFromContent(
+            pack([
+                row(),
+                row({
+                    shape: 'fan-out',
+                    minBranches: 2,
+                    windowHours: 0,
+                    afterPrevious: true,
+                    maxGapHours: 48,
+                    thresholdAttr: '',
+                    thresholdMin: '',
+                    thresholdMax: '',
+                }),
+            ]),
+        )!;
+        expect(p.steps).toEqual([]);
+        expect(p.stages).toEqual([
+            { shape: 'fan-in', minBranches: 5, windowHours: 24, threshold: { attr: 'AMOUNT', min: 900, max: 1000 } },
+            { shape: 'fan-out', minBranches: 2, afterPrevious: true, maxGapHours: 48 },
+        ]);
+    });
+
+    it('keeps a threshold bound of 0 — only a BLANK cell means "no bound"', () => {
+        const p = patternPackFromContent(pack([row({ thresholdMin: 0, thresholdMax: '' })]))!;
+        expect(p.stages![0].threshold).toEqual({ attr: 'AMOUNT', min: 0 });
+    });
+
+    it('refuses the WHOLE pack when any stage is unusable, rather than running half a motif', () => {
+        expect(patternPackFromContent(pack([row(), row({ shape: 'sideways' })]))).toBeNull();
+        expect(patternPackFromContent(pack([row({ minBranches: 0 })]))).toBeNull();
+        expect(patternPackFromContent(pack([row({ thresholdMin: '', thresholdMax: '' })]))).toBeNull();
+        expect(patternPackFromContent(pack([]))).toBeNull();
     });
 });
