@@ -419,8 +419,17 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   edge relation is expressible in the shape LA-11 would compile. 🔴 **But the executor's `LIMIT n+1` is
   applied OUTSIDE the derived table, so it does not bound the recursion** — it truncates an answer the
   walk has already paid for. A traversal fence must live INSIDE the recursion; on a cyclic graph the
-  in-recursion depth predicate is the only thing preventing an unbounded walk. ⚠ The test pins a
-  capability of the seam, not a shipped feature — nothing emits a recursive CTE today.
+  in-recursion depth predicate is the only thing preventing an unbounded walk.
+* **`POST /inv/traversal/recursive-paths` walks multi-hop paths server-side** (LA-11, backend shipped
+  2026-09-23). One recursive CTE over the edge Dataset returns the simple paths from `startNode`
+  (optionally only those ending at `targetNode`), with `direction`, `weightCol`, a `filter` validated
+  like LA-01's, and `temporalConstraint` (monotonic timestamps, total-duration bound). Every fence is
+  INSIDE the recursion: **depth** is a bound `?` (default 6, hard cap 10), **cycles** are refused by
+  `list_contains` on the path, **edge yield** is a bound `LIMIT` per recursion level (sets
+  `edgeYieldCapped` + `truncated`), and a **5 s timeout** comes from a route-local `SqlSandboxPolicy`
+  through the new `QueryExecutor.run(Request, policy)` overload. Audited as `LINK_TRAVERSED`. The body
+  uses this file's `dataset`/`sourceCol`/`targetCol` names, not §5.3's `edgeDataset`/`sourceColumn`.
+  ⚠ The SPA does not call it yet — wiring is a follow-up.
 
 * **Suspicion score carries its OWN cap, lower than the shared one** (D-S3, 750 by default, a third
   per-space setting beside the projection and analysis caps). Sizing one limit for 27 algorithms forces

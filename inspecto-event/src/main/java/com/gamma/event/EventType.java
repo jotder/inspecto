@@ -143,6 +143,10 @@ public final class EventType {
      *  ({@code POST /inv/projection/neighbors}) — a different analytic act from the initial projection.
      *  Adds the expanded {@code value} to {@link #LINK_PROJECTED}'s attributes. */
     public static final String LINK_EXPANDED = "LINK_EXPANDED";
+    /** A server-side multi-hop traversal was run over a Dataset ({@code POST /inv/traversal/recursive-paths},
+     *  LA-11). {@code startNode}, optional {@code targetNode}, {@code maxDepth}, {@code paths} and
+     *  {@code truncated} carry what was walked and whether a fence cut it short. */
+    public static final String LINK_TRAVERSED = "LINK_TRAVERSED";
     /** The cross-Dataset schema-relationship model was read ({@code GET /inv/schema/relationships}).
      *  {@code datasetsScanned}/{@code datasetsSkipped}/{@code relationships} carry the sweep's reach;
      *  it spans every Dataset, so it names no single one and cannot truncate. */

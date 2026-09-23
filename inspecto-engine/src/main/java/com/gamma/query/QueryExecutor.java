@@ -158,8 +158,16 @@ public final class QueryExecutor {
     static final String SHARED_CATALOG_ALIAS = "lake";
 
     public static Result run(Request req) throws SQLException, IOException {
+        return run(req, SqlSandboxPolicy.defaultPolicy());
+    }
+
+    /**
+     * {@link #run(Request)} under an explicit sandbox policy — for a caller that must fence its own statement
+     * tighter than the JVM-wide default (LA-11's traversal carries a per-route query timeout).
+     */
+    public static Result run(Request req, SqlSandboxPolicy policy) throws SQLException, IOException {
         long t0 = System.nanoTime();
-        try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {
+        try (SqlSandbox sandbox = SqlSandbox.open(policy)) {
             Connection conn = sandbox.connection();
             // Trusted registration: the ONLY place file-reading SQL runs (unsealed). The user query below
             // was SqlGuard-checked upstream, so it cannot itself read files.

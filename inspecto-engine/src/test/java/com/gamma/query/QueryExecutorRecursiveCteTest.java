@@ -120,4 +120,24 @@ class QueryExecutorRecursiveCteTest {
                 ((Number) r.rows().get(0).get("c")).intValue() == 7,
                 "the cycle should be walked exactly to the in-recursion depth fence, not to the outer LIMIT");
     }
+
+    /**
+     * LA-11's timeout fence: the route runs under its own sandbox policy, and that policy's statement timeout
+     * really cancels a runaway walk. Twin: the same policy admits a cheap statement.
+     */
+    @Test
+    void aRouteLocalPolicyTimeoutCancelsARunawayStatement() throws Exception {
+        com.gamma.sql.SqlSandboxPolicy oneSecond = com.gamma.sql.SqlSandboxPolicy.withCaps(null, 0, 1);
+        QueryExecutor.Result cheap = QueryExecutor.run(new QueryExecutor.Request(null, null,
+                "SELECT 1 AS n", 10, 0, List.of(), List.of()), oneSecond);
+        assertEquals(1, cheap.rowCount());
+
+        long t0 = System.nanoTime();
+        java.sql.SQLException timedOut = org.junit.jupiter.api.Assertions.assertThrows(java.sql.SQLException.class,
+                () -> QueryExecutor.run(new QueryExecutor.Request(null, null,
+                        "WITH RECURSIVE t(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 2000000000)"
+                                + " SELECT count(*) AS c FROM t", 10, 0, List.of(), List.of()), oneSecond));
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+        assertTrue(ms < 15_000, "the 1 s fence should cancel well before the walk ends, took " + ms + " ms: " + timedOut);
+    }
 }

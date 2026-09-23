@@ -17,6 +17,7 @@ import com.gamma.query.DatasetRelation;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
+import com.gamma.sql.SqlSandboxPolicy;
 import com.gamma.util.JsonAttributes;
 import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
@@ -81,6 +82,14 @@ public final class InvRoutes implements RouteModule {
     private static final int MAX_PAIRS = 500;
     /** The synthetic relation name a pair's {@code A UNION ALL B} is registered under (LA-15). */
     private static final String PAIR_RELATION = "__overlap_pair";
+    /** LA-11 fences (plan §3.3): depth default 6; the edge yield bounds each recursion LEVEL; the timeout is per statement. */
+    private static final int DEFAULT_DEPTH = 6;
+    private static final int MAX_DEPTH = 10;
+    private static final int DEFAULT_EDGE_YIELD = 10_000;
+    private static final int MAX_EDGE_YIELD = 100_000;
+    private static final int DEFAULT_PATHS = 1_000;
+    private static final int MAX_PATHS = 10_000;
+    private static final int TRAVERSAL_TIMEOUT_SECONDS = 5;
 
     @Override
     public void register(ApiContext api) {
@@ -89,6 +98,7 @@ public final class InvRoutes implements RouteModule {
         api.post("/inv/projection/multi", (e, m) -> projectMulti(api, e, api.body(e)));
         api.get("/inv/schema/relationships", (e, m) -> schemaRelationships(api, e));
         api.post("/inv/schema/overlap-profile", (e, m) -> overlapProfile(api, e, api.body(e)));
+        api.post("/inv/traversal/recursive-paths", (e, m) -> recursivePaths(api, e, api.body(e)));
         // ⛔ The two POSTs genuinely PERSIST, so unlike the projection routes above they cannot take the
         // "read-shaped" exemption — that exemption says "persists nothing", and claiming it here would be a
         // false declaration in the file whose whole job is to say what each route is gated on. They are gated
@@ -810,6 +820,179 @@ public final class InvRoutes implements RouteModule {
             out.put("attrs", attrs);
         }
         return out;
+    }
+
+    /**
+     * {@code POST /inv/traversal/recursive-paths} (LA-11, D-S2) — the simple paths from {@code startNode}
+     * over an edge Dataset, walked server-side by ONE DuckDB recursive CTE. Body
+     * {@code {dataset, sourceCol, targetCol, startNode, targetNode?, maxDepth?, direction?, weightCol?,
+     * temporalConstraint?: {timestampCol, monotonic?, maxTotalDurationHours?}, filter?, maxEdgeYield?, limit?}}
+     * → {@code {paths:[{nodes, hops, weight}], truncated, edgeYieldCapped, fences:{maxDepth, maxEdgeYield, timeoutMs}}}.
+     *
+     * <p>⛔ <b>Every fence lives INSIDE the recursion</b>, because the executor's {@code LIMIT n+1} sits outside
+     * the derived table and bounds the RESULT, never the WORK ({@code QueryExecutorRecursiveCteTest}):
+     * <ul>
+     *   <li><b>depth</b> — a BOUND {@code ?} in the recursive member (clamped to {@value #MAX_DEPTH}); the
+     *       caller's number never becomes statement text;</li>
+     *   <li><b>cycles</b> — a step onto a node already on the path is refused ({@code list_contains}), so
+     *       only simple paths are walked and a cycle cannot re-feed the frontier;</li>
+     *   <li><b>edge yield</b> — a bound {@code LIMIT} on each recursion level, so total work is at most
+     *       depth × yield rows; a level that reached it sets {@code edgeYieldCapped} (and {@code truncated});</li>
+     *   <li><b>timeout</b> — a {@value #TRAVERSAL_TIMEOUT_SECONDS} s statement timeout via a route-local
+     *       sandbox policy, tighter than the JVM-wide default.</li>
+     * </ul>
+     * With {@code targetNode}, a path stops extending once it reaches the target and only paths ending
+     * there are returned. Every named column is checked against the relation's actual columns first.
+     */
+    private Object recursivePaths(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "recursive traversal");
+        String datasetId = ApiContext.str(body, "dataset");
+        if (datasetId == null) throw new ApiException(422, "body must include 'dataset'");
+        String sourceCol = ident(body, "sourceCol", true);
+        String targetCol = ident(body, "targetCol", true);
+        String weightCol = ident(body, "weightCol", false);
+        String startNode = ApiContext.str(body, "startNode");
+        if (startNode == null) throw new ApiException(422, "body must include 'startNode'");
+        String targetNode = ApiContext.str(body, "targetNode");
+        if (startNode.equals(targetNode)) throw new ApiException(422, "'targetNode' must differ from 'startNode'");
+        String direction = ApiContext.str(body, "direction");
+        if (direction == null) direction = "DIRECTED";
+        if (!direction.equals("DIRECTED") && !direction.equals("UNDIRECTED"))
+            throw new ApiException(422, "'direction' must be DIRECTED or UNDIRECTED");
+        String tsCol = null;
+        boolean monotonic = false;
+        Double maxHours = null;
+        if (body.get("temporalConstraint") instanceof Map<?, ?> tc) {
+            @SuppressWarnings("unchecked") Map<String, Object> t = (Map<String, Object>) tc;
+            tsCol = ident(t, "timestampCol", true);
+            monotonic = Boolean.TRUE.equals(t.get("monotonic"));
+            if (t.get("maxTotalDurationHours") instanceof Number h) {
+                if (h.doubleValue() <= 0) throw new ApiException(422, "'maxTotalDurationHours' must be positive");
+                maxHours = h.doubleValue();
+            }
+        }
+        int maxDepth = clamp(body.get("maxDepth"), DEFAULT_DEPTH, MAX_DEPTH);
+        int maxEdges = clamp(body.get("maxEdgeYield"), DEFAULT_EDGE_YIELD, MAX_EDGE_YIELD);
+        int limit = clamp(body.get("limit"), DEFAULT_PATHS, MAX_PATHS);
+
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        Map<String, Object> dataset = store.get("dataset", datasetId)
+                .map(ComponentRegistry.Component::content)
+                .orElseThrow(() -> new ApiException(404, "no dataset '" + datasetId + "'"));
+        String relationSql;
+        try {
+            relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(),
+                    new ViewStore(writeRoot.resolve("views")));
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, bad.getMessage());
+        }
+
+        // Every identifier is checked against the REAL columns before any statement text is assembled.
+        List<String> columns = relationColumns(datasetId, relationSql);
+        for (String col : java.util.Arrays.asList(sourceCol, targetCol, weightCol, tsCol)) {
+            if (col != null && !containsIgnoreCase(columns, col))
+                throw new ApiException(422, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
+        }
+        String filterSql = "TRUE";
+        if (body.get("filter") != null) {
+            checkFilterFields(body.get("filter"), columns, datasetId);
+            filterSql = ConditionSql.predicate(body.get("filter"));
+        }
+
+        String src = q(sourceCol), tgt = q(targetCol);
+        String wSel = weightCol != null ? "TRY_CAST(" + q(weightCol) + " AS DOUBLE)" : "CAST(NULL AS DOUBLE)";
+        String tsSel = tsCol != null ? "CAST(" + q(tsCol) + " AS TIMESTAMP)" : "CAST(NULL AS TIMESTAMP)";
+        List<String> binds = new ArrayList<>();
+        StringBuilder sql = new StringBuilder("WITH RECURSIVE __e0 AS (SELECT CAST(").append(src)
+                .append(" AS VARCHAR) AS s, CAST(").append(tgt).append(" AS VARCHAR) AS t, ").append(wSel)
+                .append(" AS w, ").append(tsSel).append(" AS ts FROM ").append(q(datasetId))
+                .append(" WHERE ").append(src).append(" IS NOT NULL AND ").append(tgt).append(" IS NOT NULL AND (")
+                .append(filterSql).append(")), __e AS (SELECT s, t, w, ts FROM __e0");
+        if (direction.equals("UNDIRECTED")) sql.append(" UNION ALL SELECT t, s, w, ts FROM __e0");
+        sql.append("), __walk(node, path, depth, weight, first_ts, last_ts) AS (")
+           .append("SELECT CAST(? AS VARCHAR), list_value(CAST(? AS VARCHAR)), 0, CAST(0 AS DOUBLE),")
+           .append(" CAST(NULL AS TIMESTAMP), CAST(NULL AS TIMESTAMP)")
+           .append(" UNION ALL SELECT * FROM (SELECT e.t, list_append(w.path, e.t), w.depth + 1,")
+           .append(" w.weight + COALESCE(e.w, 0), COALESCE(w.first_ts, e.ts), e.ts")
+           .append(" FROM __walk w JOIN __e e ON e.s = w.node")
+           .append(" WHERE w.depth < CAST(? AS INTEGER) AND NOT list_contains(w.path, e.t)");
+        binds.add(startNode);
+        binds.add(startNode);
+        binds.add(String.valueOf(maxDepth));
+        if (targetNode != null) {
+            sql.append(" AND w.node <> ?");
+            binds.add(targetNode);
+        }
+        if (tsCol != null) sql.append(" AND e.ts IS NOT NULL");
+        if (monotonic) sql.append(" AND (w.last_ts IS NULL OR e.ts >= w.last_ts)");
+        if (maxHours != null) {
+            sql.append(" AND (w.first_ts IS NULL OR epoch(e.ts) - epoch(w.first_ts) <= CAST(? AS DOUBLE) * 3600)");
+            binds.add(String.valueOf(maxHours));
+        }
+        sql.append(" LIMIT CAST(? AS BIGINT))), __lv AS (SELECT count(*) AS n FROM __walk GROUP BY depth)")
+           .append(" SELECT CAST(to_json(path) AS VARCHAR) AS path_json, depth AS hops, weight,")
+           .append(" (SELECT max(n) FROM __lv) AS widest FROM __walk WHERE depth > 0");
+        binds.add(String.valueOf(maxEdges));
+        if (targetNode != null) {
+            sql.append(" AND node = ?");
+            binds.add(targetNode);
+        }
+        sql.append(" ORDER BY hops, path_json");
+
+        try {
+            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
+                    datasetId, relationSql, sql.toString(), limit, 0, List.of(), List.of(), binds),
+                    SqlSandboxPolicy.withCaps(null, 0, TRAVERSAL_TIMEOUT_SECONDS));
+            List<Map<String, Object>> paths = new ArrayList<>(r.rows().size());
+            boolean yieldCapped = false;
+            for (Map<String, Object> row : r.rows()) {
+                Map<String, Object> out = new LinkedHashMap<>();
+                out.put("nodes", ApiContext.JSON.readValue(String.valueOf(row.get("path_json")), List.class));
+                out.put("hops", row.get("hops"));
+                out.put("weight", weightCol != null ? row.get("weight") : null);
+                paths.add(out);
+                yieldCapped |= num(row.get("widest")) >= maxEdges;
+            }
+            Map<String, Object> fences = new LinkedHashMap<>();
+            fences.put("maxDepth", maxDepth);
+            fences.put("maxEdgeYield", maxEdges);
+            fences.put("timeoutMs", TRAVERSAL_TIMEOUT_SECONDS * 1000);
+            boolean truncated = r.truncated() || yieldCapped;
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("paths", paths);
+            out.put("truncated", truncated);
+            out.put("edgeYieldCapped", yieldCapped);
+            out.put("fences", fences);
+            auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated);
+            return out;
+        } catch (SQLException e) {
+            throw new ApiException(422, "traversal failed: " + e.getMessage());
+        }
+    }
+
+    /** An optional positive integer body field, defaulted when absent and clamped to {@code max}. */
+    private static int clamp(Object raw, int def, int max) {
+        return raw instanceof Number n ? Math.max(1, Math.min(max, n.intValue())) : def;
+    }
+
+    /** Best-effort audit of one traversal (LA-04 pattern): a multi-hop walk is its own analytic act. */
+    private static void auditTraversal(HttpExchange ex, String datasetId, String startNode, String targetNode,
+                                       int maxDepth, int paths, boolean truncated) {
+        try {
+            Event.Builder b = Event.builder(EventType.LINK_TRAVERSED)
+                    .source("inv")
+                    .message("link.traversed " + datasetId + " from " + startNode + " — " + paths + " paths"
+                            + (truncated ? " (truncated)" : ""))
+                    .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                    .action("link.traversed").actionCategory("analysis")
+                    .target("dataset", datasetId)
+                    .attr("dataset", datasetId).attr("startNode", startNode).attr("maxDepth", maxDepth)
+                    .attr("paths", paths).attr("truncated", truncated);
+            if (targetNode != null) b.attr("targetNode", targetNode);
+            EventLog.current().emit(b);
+        } catch (RuntimeException ignore) {
+            // best effort — the audit must never fail the analyst's query
+        }
     }
 
     /**
