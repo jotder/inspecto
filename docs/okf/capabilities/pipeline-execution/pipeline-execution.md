@@ -524,7 +524,8 @@ carries — through the same `ProvenanceStores` seam, marked the way the job/gra
 no sink file, marker, status CSV, backup, quarantine — and no commit log (its constructor wrote the CSV
 header, so `CollectorProcessor.ingest` now passes it no commit-log path on a dry run). ⚠ **The counts are
 zeros, truthfully**: the strategy was skipped whole, so nothing was parsed and nothing landed — the row
-makes the dry run *visible*, it does not estimate it. With provenance disabled (no store registered, the
+makes the dry run *visible*, it does not estimate it (real counts would need a parse pass on a dry run —
+`FLAT-DRYRUN-COUNTS-ZERO-1`, demand-gated). With provenance disabled (no store registered, the
 `-Dprovenance.backend` default) nothing is written at all, the same as a real run. Half (b), the UI
 marking, shipped 2026-09-23 (`e02eeab2`): `GET /provenance/batches` carries a per-batch `simulated`, and
 the Pipeline editor's run overlay labels, dashes and annotates a dry-run batch

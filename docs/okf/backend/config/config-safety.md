@@ -193,6 +193,9 @@ Pinned by `ShippedPipelinesWriteUnderTheirSpaceDirectoryTest` (inspecto-engine: 
 `spaces/demo` RUNS the orders Pipeline and its output + status land under the copy; every shipped
 Pipeline / Enrichment / local Connection's data paths resolve under their Space; nothing appears under the
 CWD) and `DataPathResolutionTest` (inspecto-config: the resolver, `spaceDirOf`, the refusal, the gate).
+The open residuals (the silent doubled path, `TarInboxPreparer.main`, the absolute `base_path` a UI re-save
+stores, the multi-Space job `data_dir`, `SchemaExtractor`'s `inbox/<x>`) are `DATA-PATH-RESIDUALS-1` in
+`docs/BACKLOG.md`.
 
 ## The allowed roots are a union: declared ∪ discovered (tier 3, shipped 2026-08-14)
 

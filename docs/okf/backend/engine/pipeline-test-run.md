@@ -225,7 +225,7 @@ because only the multi-member lane fails the BATCH on a transform error.
 ⚠ **The single-member native lane files a TRANSFORM failure as the input being unreadable**: `streamingIngest`
 holds `streamUnit`'s `materialize` inside the catch that quarantines `QUARANTINED_UNREADABLE`, so the same bad
 `partitionKey` over one file quarantines a readable file — in production that moves it out of the inbox.
-Reported as its own row; the write half was split out by `WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, the
+Reported as its own row (`SINGLE-MEMBER-TRANSFORM-FAILURE-QUARANTINES-1`, `docs/BACKLOG.md`); the write half was split out by `WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, the
 transform half was not.
 
 ✅ **A failed partition write fails the batch; it never quarantines the input**
