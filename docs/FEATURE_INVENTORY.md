@@ -174,7 +174,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 
 | Feature | TOON skeleton / flag | Doc |
 |---|---|---|
-| Alert rule (`*_alert.toon`) | `alert: { name, metric: error_rate, comparator: gt, threshold: 0.05, window: 1h, severity: WARNING, onPipeline: events }` | `ADVANCED_GUIDE §5.5` · `AlertRule` |
+| Alert Rule (`alert-rule` component, `registry/alert-rules/<name>.toon`) | `{ name, metric: error_rate, comparator: gt, threshold: 0.05, window: 1h, severity: WARNING, onPipeline: events }` | `ADVANCED_GUIDE §5.5` · `AlertRule` |
 | Alert metrics | `error_rate`, `failed_batches`, `rejected_files`, `duration_ms` | `AlertService` |
 | Alert batch window | `window: 20b` (last 20 batches) | `AlertRuleTest` |
 | Gap → ALERT object (auto) | via `EventObjectBridge` when objects backend on | `ADVANCED_GUIDE §5.5` |

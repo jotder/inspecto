@@ -47,7 +47,7 @@ chart, a board, a graph, a map — and where an investigator asks *who connects 
   scheduled export delivery through the `report` Job Type.
 * **Curated templates** — `GET /bi/templates` and the all-or-nothing apply.
 * **Public embed** — HMAC share tokens, the anonymous fenced query, the shell-less viewer.
-* **Measure alerting** — `*_alert.toon` measure rules evaluated headlessly.
+* **Measure alerting** — measure-shape Alert Rules (`alert-rule` components) evaluated headlessly.
 * **Link Analysis** — Entity Projection, the shared G6 host, the layout and algorithm toolboxes,
   pattern packs, saved Link-Analysis Views.
 * **Geo Map Analysis** — the offline MapLibre basemap, GeoSource/GeoQuery, the intelligence
@@ -576,7 +576,7 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 | Studio panes | `inspecto-ui/src/app/modules/admin/studio/studio.routes.ts`; `queries/`, `widgets/`, `dashboards/`, `templates/`, `link-analysis/`, `geo-map/` | [`studio.md`](../../frontend/features/studio.md) |
 | Dashboards | `inspecto-ui/src/app/modules/admin/studio/dashboards/dashboard-types.ts`, `dashboard-editor.component.ts`, `dashboard-filter-bar.component.ts`, `dashboard-drill-drawer.component.ts` | [`dashboard.md`](../../frontend/features/dashboard.md) |
 | KPIs, Reports, delivery | `inspecto-ui/src/app/modules/admin/kpi-reports/kpi-reports.component.ts`; `inspecto-engine/src/main/java/com/gamma/job/ReportJob.java`, `TablePngRenderer.java`, `PdfRenderer.java` | [`kpi-reports.md`](../../frontend/features/kpi-reports.md) |
-| Measure alerting | `inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`, `AlertService.java`; `inspecto-engine/src/main/java/com/gamma/query/DatasetMeasureProbe.java`; `spaces/demo/config/orders/orders_volume_alert.toon` | `INC` §3 (the Alert object) |
+| Measure alerting | `inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`, `AlertService.java`; `inspecto-engine/src/main/java/com/gamma/query/DatasetMeasureProbe.java`; `spaces/demo/config/registry/alert-rules/orders_low_volume.toon` | `INC` §3 (the Alert object) |
 | Link Analysis | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java`; `inspecto-ui/src/app/inspecto/api/inv.service.ts`; `inspecto-ui/src/app/inspecto/graph/graph-analysis.ts`, `graph-source.ts`, `graph-export.ts`, `graph-history.ts` (pure libs); `inspecto-ui/src/app/modules/admin/catalog/graph-view.component.ts` (**the host component + `GRAPH_LAYOUTS`**); `inspecto-ui/src/app/modules/admin/studio/link-analysis/entity-projection.ts`, `graph-sources.ts`, `pattern-packs.ts`, `link-analysis-toolbox.component.ts`, `link-view-widget.component.ts` | [`link-analysis.md`](../../frontend/features/link-analysis.md) |
 | Geo Map Analysis | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java`; `inspecto-ui/src/app/inspecto/api/geo.service.ts`; `inspecto-ui/src/app/modules/admin/studio/geo-map/geo-projection.ts`, `geo-map.component.ts`, `geo-view-widget.component.ts`, `colocation-graph.dialog.ts` | [`geo-map.md`](../../frontend/features/geo-map.md) |
 | Edition gate | `inspecto/src/main/java/com/gamma/control/AbsentGeoLinkRoutes.java`, `ApiContext.java`, `BootstrapRoutes.java`; `inspecto-geo-link/src/main/resources/META-INF/services/com.gamma.control.RouteModule`; `inspecto-ui/src/app/inspecto/api/session.service.ts` | `EDITIONS.md` `CP-09`; `PKG` |

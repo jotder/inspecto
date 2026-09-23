@@ -212,10 +212,11 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
 ## Alert-rule authoring (shipped 2026-07-09)
 
 * `AlertRoutes` — `POST/PUT/DELETE /alerts/rules[/{name}]` per the `endpoint` skill's fail-closed
-  gate order; writes/deletes `<name>_alert.toon` via `ConfigCodec` + `AtomicFiles` under the write
-  root, gated on the `canAuthorAlertRules` capability. The engine does **not** hot-load
-  `*_alert.toon`: the write routes arm rules in the running `AlertService` **in-process** (always
-  present, empty until armed); a restart re-arms from the persisted files.
+  gate order; writes/deletes an `alert-rule` component (`ComponentStore`) under
+  `<write-root>/registry/alert-rules/` (moved off `<name>_alert.toon` files 2026-07-18), gated on the
+  `canAuthorAlertRules` capability. The engine does **not** hot-load the registry: the write routes arm
+  rules in the running `AlertService` **in-process** (always present, empty until armed); a restart
+  re-arms from the persisted components via `ServiceBootstrap.loadAlerts`.
   Gate coverage: `ControlApiAlertRuleWriteTest`.
 * **Alert → Incident promotion** (2026-07-19) — `AlertService.persistAlertObject` still always opens an
   `ObjectType.ALERT`; a **critical or error** severity rule additionally opens a deduped

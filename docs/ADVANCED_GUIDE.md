@@ -232,7 +232,8 @@ Each sub-section: **Responsibility · Process · Events · Metrics · State · C
   (`inspecto_events_total`) + notifies subscribers (inline). Backends: in-memory ring (default, cap 8192) or
   durable Parquet (`-Devents.backend=parquet`, root `-Devents.dir`). Queried via `EventQuery` (same `matches`
   drives in-mem + SQL). SLF4J records are captured as `LOG` events via an appender.
-- **Alerts (`com.gamma.alert`):** `AlertRule` (`*_alert.toon`: metric ∈ {error_rate, failed_batches,
+- **Alerts (`com.gamma.alert`):** `AlertRule` (an `alert-rule` component under `<write-root>/registry/alert-rules/`, armed at boot by
+  `ServiceBootstrap.loadAlerts`; a `*_alert.toon` file is read by nothing. Fields: metric ∈ {error_rate, failed_batches,
   rejected_files, duration_ms}, comparator, threshold, window `Ns/m/h/d` or `Nb`, severity, onPipeline).
   `AlertService` evaluates on every terminal `ConsignmentEvent` over the ledger window, with a per-rule cooldown; on
   breach emits `ALERT_FIRED` and (if `ObjectService` wired) opens a managed `ALERT` object (dup-suppressed).
@@ -583,7 +584,8 @@ unioned/joined via `transform.merge` since Phase C).
 pipeline **or** an in-flight FLOW job (T32). Event attrs `activeProducers`/`activeConsumers` name them. Fix: delete
 in a quiet window, or make slices disjoint. (Non-blocking — it warns/alerts, doesn't stop the delete.)
 
-**Alerts not firing.** Any `*_alert.toon` armed? (`GET /alerts/rules`; `POST /alerts/evaluate` returns 503 if
+**Alerts not firing.** Any Alert Rule armed? (Rules live under `<write-root>/registry/alert-rules/`; a
+stray `*_alert.toon` is never loaded.) (`GET /alerts/rules`; `POST /alerts/evaluate` returns 503 if
 none.) Alerts evaluate on terminal `ConsignmentEvent`s; a per-rule cooldown suppresses re-fires within the window.
 
 **Write endpoint returns 503.** `-Dassist.write.root` is unset. This gates all config/connection/flow/component
