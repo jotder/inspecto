@@ -121,6 +121,22 @@ describe('PipelineCollectionDefinitionComponent', () => {
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('Duplicate handling');
     });
 
+    /**
+     * DUPLICATE-CHECK-GRAIN-UNSTATED-1: the switch is FILE-grain, and a builder read "dedup" as
+     * covering records (a re-emitted record passed with it on, correctly). The rendered label and its
+     * info tooltip must name the grain and point at the record-grain alternative.
+     */
+    it('states the marker switch is file-grain and names the record-grain Step', async () => {
+        const fixture = await create({ id: 'acq', type: 'acquisition', config: { duplicate_check: true } });
+        const row = (fixture.nativeElement as HTMLElement).querySelector('.sf-row[data-key="duplicate_check"]')!;
+        expect(row).not.toBeNull();
+        expect(row.textContent).toContain('Marker dedup (file)');
+        const help = row.querySelector('mat-icon[aria-label]')!.getAttribute('aria-label')!;
+        expect(help).toContain('File-grain');
+        expect(help).toContain('Duplicate records still pass');
+        expect(help).toContain('Dedup (record) Step (transform.dedup)');
+    });
+
     it('carries both surfaces into the applied node, and the group seeds from the node', async () => {
         const fixture = await create({
             id: 'acq',

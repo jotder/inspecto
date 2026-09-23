@@ -273,6 +273,10 @@ poll cycle; `transform.dedup.marker` is retired read-compat). Config keys unchan
   `retention_days` is NOT the switch (clearing a detail field must not silently disable dedup), and
   an explicit `false` must not fall through to a legacy marker Step. One statement of the rule,
   `PipelineLift.markerHome`, is called by all three readers.
+- The switch's label states its grain — **Marker dedup (file)** — and its help names the record-grain
+  alternative (the `dedup` Step, `transform.dedup`, at rest via `output_store:`): a builder read the
+  bare "Marker dedup" as covering duplicate records, which pass through it by design
+  (`DUPLICATE-CHECK-GRAIN-UNSTATED-1`, 2026-09-23).
 - The marker keys are their own `MARKER_DEDUP` list, NOT part of `COLLECTOR_ATTRIBUTES` — they live
   in `processing:`/`dirs:` and are only borrowed by the Step; folding them into the block table
   would hand the other adopter fields it writes to a block nothing reads.

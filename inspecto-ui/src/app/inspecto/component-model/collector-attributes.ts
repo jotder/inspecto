@@ -204,14 +204,14 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
 export const MARKER_DEDUP_ATTRIBUTES: AttributeSpec[] = [
     {
         key: 'duplicate_check',
-        label: 'Marker dedup',
+        label: 'Marker dedup (file)',
         type: 'boolean',
         // ⚠ `required` tier + `required: false` — always visible, never mandatory. As `optional` the
         // switch hid behind the schema form's disclosure and the drawer's group rendered as a heading
         // over nothing (caught in-preview). The three detail keys below stay advanced.
         tier: 'required',
         required: false,
-        help: "Skip a file whose marker already exists beside it — the local poll path's re-processing guard.",
+        help: "File-grain: skip a whole input file whose marker already exists beside it — the local poll path's re-processing guard. Duplicate records still pass; for those add a Dedup (record) Step (transform.dedup), which runs at rest and needs a top-level output_store.",
     },
     {
         key: 'marker_extension',

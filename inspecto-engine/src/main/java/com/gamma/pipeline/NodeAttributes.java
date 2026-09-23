@@ -170,8 +170,10 @@ public final class NodeAttributes {
             // rendered as a heading over "Optional settings (1)" and NOTHING else (caught in-preview,
             // invisible to a unit test asserting the heading). The group's whole point is that this
             // switch is visible; the three detail keys below it stay advanced.
-            NodeAttribute.of("duplicate_check", "Marker dedup", "boolean", "required").required(false)
-                    .help("Skip a file whose marker already exists beside it — the local poll path's re-processing guard."),
+            NodeAttribute.of("duplicate_check", "Marker dedup (file)", "boolean", "required").required(false)
+                    .help("File-grain: skip a whole input file whose marker already exists beside it — the local poll path's"
+                            + " re-processing guard. Duplicate records still pass; for those add a Dedup (record) Step"
+                            + " (transform.dedup), which runs at rest and needs a top-level output_store."),
             NodeAttribute.of("marker_extension", "Marker extension", "string", "advanced")
                     .placeholder(".processed")
                     .help("Suffix of the per-file marker written beside a processed input; a file whose marker exists is skipped."),
