@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.safety.ConfigSafetyValidator;
+import com.gamma.config.safety.PathJail;
 import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.config.spec.ConfigSpec;
 import com.gamma.config.spec.ConfigSpecs;
@@ -13,6 +14,8 @@ import com.gamma.etl.TypeFlow;
 import com.gamma.pipeline.exec.ComponentPreview;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -130,6 +133,7 @@ final class ConfigPreviewRoutes implements RouteModule {
     private Object validate(ApiContext api, Map<String, Object> body) throws IOException {
         String configPath = ApiContext.str(body, "configPath");
         if (configPath != null) {
+            configPath = jailedConfigPath(api, configPath);
             PipelineConfig cfg;
             try {
                 cfg = PipelineConfig.load(configPath);
@@ -195,6 +199,30 @@ final class ConfigPreviewRoutes implements RouteModule {
         r.put("safetyChecked", safety);
         r.put("clean", findings.isEmpty());
         return r;
+    }
+
+    /**
+     * {@code VALIDATE-CONFIGPATH-UNJAILED-1}: jail the caller-named file BEFORE any filesystem access —
+     * escape → 403 (identical for a present and a missing file, so there is no existence oracle), then
+     * not-a-file → 404. The roots are {@link PathJail#allowedRoots()}, the same roots the load already
+     * enforces on the config's own schema refs, so nothing loadable is refused. A relative value
+     * resolves against the write root, as {@code POST /runs} does — never the working directory.
+     */
+    private static String jailedConfigPath(ApiContext api, String configPath) {
+        Path candidate = Path.of(configPath.trim());
+        if (!candidate.isAbsolute()) {
+            if (api.writeRoot() == null)
+                throw new ApiException(400, "a relative 'configPath' needs a write root to resolve against; pass an absolute path");
+            candidate = api.writeRoot().resolve(candidate);
+        }
+        Path resolved;
+        try {
+            resolved = PathJail.requireUnderAny(PathJail.allowedRoots(), candidate.toString(), "configPath");
+        } catch (PathJail.Escape | IllegalArgumentException refused) {
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "'configPath' is outside the allowed roots");
+        }
+        if (!Files.isRegularFile(resolved)) throw new ApiException(404, "no config file at 'configPath'");
+        return resolved.toString();
     }
 
     /** Character cap on {@code sample_text} — a preview sample, not a data upload. */

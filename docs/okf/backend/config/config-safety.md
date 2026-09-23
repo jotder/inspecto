@@ -104,9 +104,14 @@ reading; a narrower "stay under `configDir`" rule beside the jail would be a pat
 ⚠ **Data paths are the third resolver** — `dirs.*`, `sinks[].database`, enrichment and `local` connection
 paths resolve under the Space directory; see *Decision 2026-09-23* below.
 
-⚠ **Unverified, filed for reproduction:** `POST /validate {configPath}` appears to load whatever server
-path the caller names with no path jail on `configPath` itself → BACKLOG `VALIDATE-CONFIGPATH-UNJAILED-1`
-(security; reproduce before building against it).
+⚠ **`POST /validate {configPath}` is jailed under `PathJail.allowedRoots()`** (`VALIDATE-CONFIGPATH-UNJAILED-1`,
+reproduced and fixed 2026-09-23). Until then it loaded any server path the caller named: a file outside
+every root was read and parsed (422 with the parser's message), a missing one answered 500 naming the full
+path — an existence oracle. Now, before any filesystem access: relative value with no write root → 400
+(it resolves against the write root, like `POST /runs`, never the CWD) · outside the roots → 403
+`PATH_JAIL_VIOLATION`, identical for a present and a missing file · inside but not a file → 404. The roots
+are the load-time ones, not the write root: the load already refuses a config whose schema refs sit
+outside them, so a config with satellites was never loadable from outside them anyway. Pinned by `ControlApiValidateConfigPathJailTest`.
 
 ⚠ **Containment does not require the file to exist.** A ref resolved from the wrong working directory
 still passes the jail while pointing at nothing — so a parser-level unit test proves nothing about

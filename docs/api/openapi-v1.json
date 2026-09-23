@@ -189,7 +189,7 @@
             "application/json" : {
               "schema" : {
                 "type" : "object",
-                "description" : "Either {configPath} (a file on the server) or {type, config} (an unsaved draft map); optional {safety:true} adds the hard-fail safety gate.",
+                "description" : "Either {configPath} (a file on the server, under the allowed roots — absolute, or relative to the write root) or {type, config} (an unsaved draft map); optional {safety:true} adds the hard-fail safety gate.",
                 "properties" : {
                   "configPath" : {
                     "type" : "string"
@@ -229,6 +229,9 @@
           },
           "400" : {
             "$ref" : "#/components/responses/BadRequest"
+          },
+          "403" : {
+            "$ref" : "#/components/responses/PathJail"
           },
           "404" : {
             "$ref" : "#/components/responses/NotFound"
