@@ -125,6 +125,23 @@ class ControlApiValidateConfigPathJailTest {
         }
     }
 
+    /**
+     * {@code VALIDATE-CONFIGPATH-SKIPS-SAVEGATE-1}: the {@code configPath} branch must run the SAME
+     * {@link SaveGate} as every save path. A stray block no component reads is refused by the gate
+     * ({@code ERR_UNKNOWN_CONFIG_KEY}, a silent loss) but is invisible to spec validation + arming, the only checks this
+     * branch ran until 2026-09-23 — so a file on disk validated clean that its own save would refuse.
+     */
+    @Test
+    void aConfigPathRunsTheSaveGate() throws Exception {
+        Path dir = Files.createDirectories(cfg.resolve("gated"));
+        Path toon = PipelineConfigBatchTest.writePipeline(dir,
+                "bogus_block:\n  x: 1\n", false);
+        HttpResponse<String> r = validate(toon.toString());
+        assertEquals(200, r.statusCode(), r.body());
+        assertTrue(r.body().contains("\"" + com.gamma.config.spec.FindingCodes.ERR_UNKNOWN_CONFIG_KEY + "\""),
+                "the save gate's unknown-key refusal must reach /validate {configPath}: " + r.body());
+    }
+
     @Test
     void aMissingFileInsideTheRootsIs404() throws Exception {
         HttpResponse<String> r = validate(cfg.resolve("nope.toon").toString());

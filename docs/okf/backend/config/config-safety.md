@@ -132,7 +132,7 @@ already made), and the draft/preview paths use the pure `fromMap()`. Two non-rou
 `CollectorService.requireDistinctPipelineIds` (boot pre-check; the registry build right after runs `load()`
 on the same files) and `PipelineRenameRoutes` resume (a mutating route over an already-registered Pipeline).
 
-⚠ **Open (filed 2026-09-23):** `VALIDATE-CONFIGPATH-SKIPS-SAVEGATE-1` — `/validate {configPath}` still runs only spec validation + arming, not the shared `SaveGate`; G3 (`ccda98a8`) moved only the draft branch onto it.
+⚠ **`/validate {configPath}` runs the shared `SaveGate` too** (`VALIDATE-CONFIGPATH-SKIPS-SAVEGATE-1`, fixed 2026-09-23). Until then that branch ran spec validation + arming only (G3 `ccda98a8` moved just the draft branch), so a file carrying a fault the gate refuses, such as an unread block (`ERR_UNKNOWN_CONFIG_KEY`), validated with no ERROR. It now calls `SaveGate.check` over the decoded file, judged from the file's own directory (`Referents.MUST_EXIST`), after the load. ⚠ A fault the LOADER already refuses (e.g. an authored `webhook.url:`) still answers 422 from the load, not a finding: that ordering is unchanged. Pinned by `ControlApiValidateConfigPathJailTest#aConfigPathRunsTheSaveGate`.
 
 ⚠ **Containment does not require the file to exist.** A ref resolved from the wrong working directory
 still passes the jail while pointing at nothing — so a parser-level unit test proves nothing about
@@ -376,7 +376,7 @@ when `-Dassist.write.root` is set, writes are jailed to that root and validated 
 `SaveGate.check` (`inspecto/src/main/java/com/gamma/control/SaveGate.java`) is **the** list of content
 checks a config save runs, and every Pipeline-config door calls it: `POST /config/write`,
 `POST /config/patch`, `PUT /pipelines/{name}/graph`, `POST /pipelines/import`, and `POST /validate`
-(draft branch — it reports what a save would refuse; it never refuses). A caller refuses on any ERROR
+(both branches — it reports what a save would refuse; it never refuses). A caller refuses on any ERROR
 (`SaveGate.refuses`). The list, in order: spec validate · `ConfigSafetyValidator` (a job judged from the
 Space config root, everything else from its own directory) · schema-file resolution (WARNING) · the five
 arming checks · unknown collector Connection · the `webhook:` block · `AcceptedConfigKeys` census ·

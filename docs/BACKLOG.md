@@ -168,8 +168,6 @@ pending decisions and "simply unbuilt" list (§3/§4, 2026-08-29 — that regist
 > headings, and nothing else is authoritative. ⚠ The P3 pattern is the looser one on purpose: one row
 > spells its rank `- **P3 · RELEASE-GATED …**`, and `^- \*\*P3\*\*` silently undercounts by one.
 >
-> ⚠ **Only the 0<!--count:backlog-p1--> P1 + 33<!--count:backlog-p2--> P2 rows are queued work.** §0 defines **P3 as demand-gated — "build only when
-> someone asks by name"** — so those 37<!--count:backlog-p3--> are mostly a list of things deliberately *not* being built, not a
 > backlog to burn down. Reading all 70<!--count:backlog-rows--> as pending work overstates what is owed by roughly half.
 > ✅ **These four figures are now DERIVED and build-enforced** (`tools/check-doc-counts.mjs`, markers
 > `backlog-rows` / `-p1` / `-p2` / `-p3`) — a hand-recount can no longer drift, which is what this block
@@ -2835,7 +2833,6 @@ The residuals of the 2026-09-23 drain that closed the domain-demo rows above (`e
 - **P3** · **`ENRICHMENT-MIDWALK-LANES-DISAGREE-1` — an enrichment authored mid-walk runs differently in the two lanes.** `PipelineExecutor.execute` skips it (the graph lane starves downstream sinks) while `PipelineEditable.lower` drops the node (the flat lane feeds them). The save gate should refuse a mid-walk enrichment, or one lane should change. → `okf/backend/engine/pipeline-test-run.md`.
 - **P2** · **`RATE-LIMIT-OVERSIZE-HANGS-1` — a remote file larger than one second of `collector.fetch.rate_limit` hangs acquisition forever.** `RateLimiter.acquire` loops until the bucket holds `bytes` tokens, but refill caps it at one second of rate (its javadoc claims it never deadlocks) — e.g. `rate_limit` 50MBps + a 60 MB file. The fix is a semantics choice (debt / proportional wait). Repro: `CollectorProcessorRemoteCycleTest#aFileLargerThanOneSecondOfRateIsThrottledNotHung` (disabled). → `okf/backend/pipeline-graph/step-catalog.md`.
 - **P3** · **`DOC-DRIFT-COLLECTOR-ALERT-1` — Collector / Alert Rule doc drift.** `configuration.md` documents a `collector.integrity:` block nothing reads; `incidents.md` §3.2 says Alert Rules are `*_alert.toon` (they are alert-rule components under `<write-root>/registry`); `output.ducklake.*` is undeclared in `ConfigSpecs`; `COLLECTOR_ATTRIBUTES` / `OUTPUT_ATTRIBUTES` are dead SPA mirrors (see `STEP-TYPES-DEAD-CLIENT-MIRRORS-1`). Also: the retired edition name "Standard+" still appears in ~10 OKF docs (`embedded-intelligence.md`, `build-test.md`, `jobs.md`, `studio.md` …). → `okf/backend/config/configuration.md`.
-- **P3** · **`VALIDATE-CONFIGPATH-SKIPS-SAVEGATE-1` — `/validate {configPath}` still runs only spec validation + arming, not `SaveGate`** (G3 of `PROCESSOR-RELEASE-READINESS-1`, `ccda98a8`, scoped the draft branch only). → `okf/backend/config/config-safety.md`.
 - **P3** · **`CONNECTOR-TESTS-HIDE-DROPPED-ROWS-1` — two connector tests hide or misstate row handling.** `DbExportConnectorTest#endToEndDbExportIsIngested` sets `skip_header_lines: 1` (the header is already skipped by default → it silently drops the first data row; its "output file exists" assert hides it); `SftpConnectorTest#endToEndParallelFetchWithMovePostAction`'s comment wrongly says files move after ingest (they move after fetch). → `okf/backend/pipeline-graph/step-catalog.md`.
 
 ### Filed from the multi-domain workbench sweep, 2026-09-22

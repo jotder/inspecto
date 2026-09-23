@@ -145,13 +145,12 @@ final class ConfigPreviewRoutes implements RouteModule {
             }
             List<String> warnings = ConfigValidator.validate(cfg);
             Map<String, Object> decoded = ConfigLoader.filesystem().decode(configPath);
-            List<Finding> findings =
-                    new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), decoded));
-            // The SAME arming predicate the write gate uses (WB-03). Until 2026-09-22 neither branch of
-            // this route ran it at all, so an active pipeline the gate would refuse validated with no
-            // ERROR — one config, two answers (SAVE-GATE-VS-VALIDATE-DISAGREE-1). Calling the gate's own
-            // method, not a copy of its rules, is the point: a copy drifts.
-            findings.addAll(ConfigRoutes.armedWithoutSchemaFindings("pipeline", decoded));
+            // The SAME gate every save path runs (SaveGate), judged from the file's own directory — the
+            // home a save of it would have. 🔴 Until 2026-09-23 this branch ran spec validation + arming
+            // only, so a file carrying a fault the gate refuses (e.g. an unread block) validated with no
+            // ERROR (VALIDATE-CONFIGPATH-SKIPS-SAVEGATE-1). Calling the gate, not a copy, is the point.
+            List<Finding> findings = SaveGate.check(api, "pipeline", decoded, api.writeRoot(),
+                    Path.of(configPath).getParent(), SaveGate.Referents.MUST_EXIST);
             Map<String, Object> r = new LinkedHashMap<>();
             r.put("pipeline", cfg.identity().pipelineName());
             r.put("warnings", warnings);     // legacy string form (back-compat)
