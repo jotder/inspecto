@@ -92,6 +92,79 @@ class StepConfigSaveFindingsTest {
                 List.of(Map.of("filter", Map.of("where", " "))))), "steps[0].filter", "where");
     }
 
+    @Test
+    void aFilterOverAnUndeclaredColumnIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true,
+                List.of(Map.of("filter", Map.of("where", "AMOUNT > 0"))))), "steps[0].filter", "AMOUNT");
+    }
+
+    @Test
+    void aFilterOverALookupTargetIsClean(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("lookup", Map.of("column", "ID", "target", "ID_NAME", "mappings", List.of("1=one"))),
+                Map.of("filter", Map.of("where", "ID_NAME <> 'x' AND lower(ID) LIKE 'a%'"))))));
+    }
+
+    @Test
+    void aFilterAfterAnSqlStepIsNotJudged(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("sql", Map.of("sql", "SELECT ID, QTY * 2 AS DOUBLED FROM input")),
+                Map.of("filter", Map.of("where", "DOUBLED > 4"))))));
+    }
+
+    // ── route branch sub-chains ──────────────────────────────────────────────────
+
+    private static Map<String, Object> routeStep(List<Object> branchSteps) {
+        return Map.of("route", Map.of("branches", List.of(
+                Map.of("key", "all", "where", "true", "steps", branchSteps))));
+    }
+
+    @Test
+    void aBranchStepIsCheckedLikeATopLevelStep(@TempDir Path dir) {
+        assertOneRefusal(check(dir, pipeline(null, true, List.of(routeStep(List.of(
+                Map.of("dedup", Map.of("keys", List.of()))))))), "steps[0].route.branches[0].steps[0].dedup", "keys");
+    }
+
+    @Test
+    void aBranchStepStartsFromTheColumnsKnownAtTheRoutePoint(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(
+                Map.of("lookup", Map.of("column", "ID", "target", "ID_NAME", "mappings", List.of("1=one"))),
+                routeStep(List.of(
+                        Map.of("filter", Map.of("where", "ID_NAME <> 'x'")),   // the lookup target: known
+                        Map.of("dedup", Map.of("keys", List.of("ID_NAME", "MSISDN")))))))),
+                "steps[1].route.branches[0].steps[1].dedup", "MSISDN");
+    }
+
+    @Test
+    void aBranchFilterOverAnUndeclaredColumnIsRefused(@TempDir Path dir) throws Exception {
+        assertOneRefusal(check(dir, pipeline(schemaFile(dir), true, List.of(routeStep(List.of(
+                Map.of("filter", Map.of("where", "QTY > 0 AND MSISDN = '1'"))))))),
+                "steps[0].route.branches[0].steps[0].filter", "MSISDN");
+    }
+
+    @Test
+    void aLegacyRouteBlockBranchStepIsChecked(@TempDir Path dir) throws Exception {
+        Map<String, Object> draft = pipeline(schemaFile(dir), true, List.of());
+        draft.remove("steps");
+        draft.put("route", Map.of("branches", List.of(Map.of("key", "a", "where", "true",
+                "steps", List.of(Map.of("dedup", Map.of("keys", List.of("NOPE"))))))));
+        assertOneRefusal(check(dir, draft), "route.branches[0].steps[0].dedup", "NOPE");
+    }
+
+    @Test
+    void aValidBranchSubChainIsClean(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(routeStep(List.of(
+                Map.of("filter", Map.of("where", "QTY > 0")),
+                Map.of("dedup", Map.of("keys", List.of("ID")))))))));
+    }
+
+    @Test
+    void aBranchStepAfterAnSqlStepInsideTheBranchIsNotJudged(@TempDir Path dir) throws Exception {
+        assertEquals(List.of(), check(dir, pipeline(schemaFile(dir), true, List.of(routeStep(List.of(
+                Map.of("sql", Map.of("sql", "SELECT ID AS K FROM input")),
+                Map.of("filter", Map.of("where", "K = 'a'"))))))));
+    }
+
     // ── dedup ────────────────────────────────────────────────────────────────────
 
     @Test

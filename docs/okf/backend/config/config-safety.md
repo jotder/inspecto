@@ -423,7 +423,7 @@ run. It reads the `steps:` chain and the legacy `processing.dedup` / `processing
 | Step | refused at save |
 |---|---|
 | `lookup` | no `column`; no `mappings`; a mapping that is not `key=value` (named); a `column` the schema does not declare |
-| `filter` | a blank `where` |
+| `filter` | a blank `where`; a `where` that does not bind against the known columns (or is not a safe read-only expression) |
 | `dedup` | an empty or absent `keys` list; a key the schema does not declare |
 | `profile` | a named column the schema does not declare (an empty block still means "every column") |
 
@@ -431,8 +431,16 @@ Codes `ERR_STEP_CONFIG_INVALID` (active) / `WARN_STEP_CONFIG_INVALID` (inactive 
 severity split the arming checks use. ⚠ **Columns are judged only while the row is still the schema's.**
 From the first `sql`, `join`, `summarize`, `profile` or `route` step on, the inbound columns are unknown
 here, and unknown is not wrong. A `lookup` with a `target` adds that column. An unreadable schema says
-nothing, as with the TypeFlow checks. ⚠ **Not covered:** a `route:` branch's own `steps[]` sub-chain is
-not walked. Pinned by `StepConfigSaveFindingsTest`.
+nothing, as with the TypeFlow checks.
+
+**Branch sub-chains are walked** (as-built 2026-09-23): a `route:` branch's own `steps[]` — under a
+`route` step in the chain (`steps[i].route.branches[b].steps[j].<kind>`) or under the legacy top-level
+`route:` block (`route.branches[b].steps[j].<kind>`) — gets the same checks. Each branch starts from a
+copy of the columns known at the route point, and the same reshaping rule applies inside it. **The filter
+`where` column check reuses the route-predicate bind** of `routeColumnFindings`: `SqlGuard.check` on the
+assembled `SELECT * FROM "input" WHERE …` probe, then `TypeFlow.describe` against the known columns, so
+DuckDB's binder decides (no second predicate parser). The legacy `processing.filter` block is not
+checked here. Pinned by `StepConfigSaveFindingsTest`.
 
 ## Decision 2026-09-06 — job configs get a save-time spec; the depth rule stays
 

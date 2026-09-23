@@ -270,33 +270,25 @@ final class ConfigRoutes {
      * <p>Columns are judged only while the row is still the schema's: from the first {@code sql},
      * {@code join}, {@code summarize}, {@code profile} or {@code route} step on, the inbound columns are no
      * longer known here, and unknown is not wrong. A {@code lookup} with a {@code target} adds that column.
-     * An unreadable schema says nothing about columns (see {@link #declaredColumns}). Branch
-     * {@code steps[]} sub-chains inside {@code route:} are not walked.
+     * An unreadable schema says nothing about columns (see {@link #declaredColumns}).
+     *
+     * <p>A {@code route:} branch's own {@code steps[]} sub-chain (MIDBRANCH-1) is walked with the same
+     * checks, each branch starting from the columns known at the route point - both for a {@code route}
+     * step in the {@code steps:} chain and for the legacy top-level {@code route:} block. A filter's
+     * {@code where} is bound against the known columns exactly as {@link #routeColumnFindings} binds a
+     * branch predicate ({@code SqlGuard} on the assembled probe, then {@code TypeFlow.describe}).
      */
     static List<Finding> stepConfigFindings(String type, Map<String, Object> draft, Path configDir) {
         if (!"pipeline".equals(type)) return List.of();
         boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
-        List<String> known = new ArrayList<>();
-        for (TypeFlow.Column c : declaredColumns(draft, configDir)) known.add(c.name());
-        List<String> columns = known.isEmpty() ? null : known;   // null = the row's columns are unknown
+        List<TypeFlow.Column> known = new ArrayList<>(declaredColumns(draft, configDir));
+        List<TypeFlow.Column> columns = known.isEmpty() ? null : known;   // null = the row's columns are unknown
         List<String> refusals = new ArrayList<>();
         List<String> fields = new ArrayList<>();
-        if (draft.get("steps") instanceof List<?> steps) {
-            for (int i = 0; i < steps.size(); i++) {
-                if (!(steps.get(i) instanceof Map<?, ?> entry) || entry.size() != 1) continue;
-                String kind = String.valueOf(entry.keySet().iterator().next());
-                Map<?, ?> cfg = entry.values().iterator().next() instanceof Map<?, ?> m ? m : Map.of();
-                String refusal = stepRefusal(kind, cfg, columns);
-                if (refusal != null) { refusals.add(refusal); fields.add("steps[" + i + "]." + kind); }
-                if (PipelineConfig.Step.LOOKUP.equals(kind)) {
-                    if (columns != null && cfg.get("target") != null) columns.add(String.valueOf(cfg.get("target")));
-                } else if (!PipelineConfig.Step.FILTER.equals(kind) && !PipelineConfig.Step.DEDUP.equals(kind)) {
-                    columns = null;
-                }
-            }
-        }
+        if (draft.get("steps") instanceof List<?> steps)
+            columns = walkSteps(steps, "steps", columns, refusals, fields);
         Map<?, ?> proc = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
-        // Legacy projection order: filter, join, dedup, summarize, profile.
+        // Legacy projection order: filter, join, dedup, summarize, profile, route.
         if (proc.get("join") != null) columns = null;
         if (proc.get("dedup") instanceof Map<?, ?> dd) {
             String refusal = stepRefusal(PipelineConfig.Step.DEDUP, dd, columns);
@@ -306,7 +298,10 @@ final class ConfigRoutes {
         if (proc.get("profile") instanceof Map<?, ?> pf) {
             String refusal = stepRefusal(PipelineConfig.Step.PROFILE, pf, columns);
             if (refusal != null) { refusals.add(refusal); fields.add("processing.profile"); }
+            columns = null;
         }
+        if (draft.get("route") instanceof Map<?, ?> route)
+            walkBranches(route, "route", columns, refusals, fields);
         List<Finding> out = new ArrayList<>();
         for (int i = 0; i < refusals.size(); i++)
             out.add(new Finding(active ? Severity.ERROR : Severity.WARNING, fields.get(i), refusals.get(i),
@@ -315,8 +310,39 @@ final class ConfigRoutes {
         return out;
     }
 
+    /** Walks one {@code steps[]} chain at {@code prefix}; returns the columns known after it (null = unknown). */
+    private static List<TypeFlow.Column> walkSteps(List<?> steps, String prefix, List<TypeFlow.Column> columns,
+                                                   List<String> refusals, List<String> fields) {
+        for (int i = 0; i < steps.size(); i++) {
+            if (!(steps.get(i) instanceof Map<?, ?> entry) || entry.size() != 1) continue;
+            String kind = String.valueOf(entry.keySet().iterator().next());
+            Map<?, ?> cfg = entry.values().iterator().next() instanceof Map<?, ?> m ? m : Map.of();
+            String at = prefix + "[" + i + "]." + kind;
+            String refusal = stepRefusal(kind, cfg, columns);
+            if (refusal != null) { refusals.add(refusal); fields.add(at); }
+            if (PipelineConfig.Step.ROUTE.equals(kind)) walkBranches(cfg, at, columns, refusals, fields);
+            if (PipelineConfig.Step.LOOKUP.equals(kind)) {
+                if (columns != null && cfg.get("target") != null)
+                    columns.add(new TypeFlow.Column(String.valueOf(cfg.get("target")), "VARCHAR"));
+            } else if (!PipelineConfig.Step.FILTER.equals(kind) && !PipelineConfig.Step.DEDUP.equals(kind)) {
+                columns = null;
+            }
+        }
+        return columns;
+    }
+
+    /** Walks each branch's {@code steps[]} of one route config, each from its own copy of {@code columns}. */
+    private static void walkBranches(Map<?, ?> route, String prefix, List<TypeFlow.Column> columns,
+                                     List<String> refusals, List<String> fields) {
+        if (!(route.get("branches") instanceof List<?> branches)) return;
+        for (int b = 0; b < branches.size(); b++)
+            if (branches.get(b) instanceof Map<?, ?> branch && branch.get("steps") instanceof List<?> sub)
+                walkSteps(sub, prefix + ".branches[" + b + "].steps",
+                        columns == null ? null : new ArrayList<>(columns), refusals, fields);
+    }
+
     /** The first refusal the run would raise for one step's config, or {@code null}; {@code columns} null = unknown. */
-    private static String stepRefusal(String kind, Map<?, ?> cfg, List<String> columns) {
+    private static String stepRefusal(String kind, Map<?, ?> cfg, List<TypeFlow.Column> columns) {
         switch (kind) {
             case PipelineConfig.Step.LOOKUP -> {
                 String column = cfg.get("column") == null ? "" : String.valueOf(cfg.get("column")).trim();
@@ -330,8 +356,20 @@ final class ConfigRoutes {
             }
             case PipelineConfig.Step.FILTER -> {
                 Object where = cfg.get("where");
-                return where == null || String.valueOf(where).isBlank()
-                        ? "transform.filter needs a non-blank 'where' predicate" : null;
+                if (where == null || String.valueOf(where).isBlank())
+                    return "transform.filter needs a non-blank 'where' predicate";
+                if (columns == null) return null;
+                // Same bind as routeColumnFindings: guard the ASSEMBLED probe, then DuckDB's binder judges.
+                String probe = "SELECT * FROM \"input\" WHERE " + where;
+                if (!SqlGuard.check(probe).isEmpty())
+                    return "transform.filter: 'where' is not a safe read-only expression - it cannot be analysed";
+                try {
+                    TypeFlow.describe(columns, probe);
+                    return null;
+                } catch (IllegalArgumentException doesNotBind) {
+                    return "transform.filter: 'where' does not bind against the declared schema - "
+                            + doesNotBind.getMessage();
+                }
             }
             case PipelineConfig.Step.DEDUP -> {
                 if (!(cfg.get("keys") instanceof List<?> keys) || keys.isEmpty())
@@ -347,8 +385,9 @@ final class ConfigRoutes {
     }
 
     /** The first of {@code names} the declared {@code columns} do not carry (case-insensitive, as DuckDB binds). */
-    private static String undeclared(String what, List<?> names, List<String> columns) {
-        if (columns == null) return null;
+    private static String undeclared(String what, List<?> names, List<TypeFlow.Column> known) {
+        if (known == null) return null;
+        List<String> columns = known.stream().map(TypeFlow.Column::name).toList();
         for (Object o : names) {
             if (o == null || o.toString().isBlank()) continue;
             String name = o.toString().trim();
