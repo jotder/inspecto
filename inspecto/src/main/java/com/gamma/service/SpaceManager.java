@@ -292,10 +292,7 @@ public final class SpaceManager implements AutoCloseable {
             if (Files.exists(base))
                 throw new IllegalStateException("Space directory already exists: " + base);
             for (String sub : SPACE_SUBDIRS) Files.createDirectories(base.resolve(sub));
-            BundleImporter.Unpacked unpacked = BundleImporter.writeConfig(bundle, base.resolve("config"));
-            if (!unpacked.rebased().isEmpty())
-                log.info("Space '{}': rebased {} config file(s) from the source space's paths: {}",
-                        id.value(), unpacked.rebased().size(), unpacked.rebased());
+            BundleImporter.writeConfig(bundle, base.resolve("config"));
             Path manifest = base.resolve("space.toon");
             if (bundle.spaceToon() != null) Files.write(manifest, bundle.spaceToon());
             else new SpaceContext.SpaceManifest(id.value(), "", Instant.now().toString()).write(manifest);
@@ -349,7 +346,8 @@ public final class SpaceManager implements AutoCloseable {
     /**
      * Create a new space seeded from a shipped template: mint the convention dirs, copy the template's
      * {@code config/} tree with every {@code ${SPACE}} token in a {@code .toon} rewritten to the new id
-     * (template configs address their own space as {@code spaces/${SPACE}/…}), copy {@code data/} verbatim
+     * (a data path needs no token — {@code data/…} already resolves under the new Space,
+     * {@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}), copy {@code data/} verbatim
      * (pristine samples), then boot + register — the fresh {@link SpaceBootstrap} discovers every copied
      * config uniformly, exactly like {@link #createFromBundle}. Serialised with {@link #create}/{@link #delete}.
      *

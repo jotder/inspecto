@@ -3,15 +3,15 @@ active: true
 description: "Link Analysis demo feed — account-to-account transfers with a planted money-mule layering ring (structuring, pass-through, circular financing). Synthetic; regenerate with data/samples/gen-link-analysis-demos.py."
 
 dirs:
-  poll:       spaces/demo/data/inbox/mule_transfers
-  database:   spaces/demo/data/mule_transfers/database
-  backup:     spaces/demo/data/mule_transfers/backup
-  temp:       spaces/demo/data/mule_transfers/temp
-  errors:     spaces/demo/data/mule_transfers/errors
-  quarantine: spaces/demo/data/mule_transfers/quarantine
-  markers:    spaces/demo/data/mule_transfers/markers
-  status_dir: spaces/demo/data/mule_transfers/status
-  log_dir:    spaces/demo/data/mule_transfers/logs
+  poll:       data/inbox/mule_transfers
+  database:   data/mule_transfers/database
+  backup:     data/mule_transfers/backup
+  temp:       data/mule_transfers/temp
+  errors:     data/mule_transfers/errors
+  quarantine: data/mule_transfers/quarantine
+  markers:    data/mule_transfers/markers
+  status_dir: data/mule_transfers/status
+  log_dir:    data/mule_transfers/logs
 
 output:
   format: PARQUET

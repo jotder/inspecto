@@ -2,15 +2,15 @@ name: sink_step
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/sink_step
-  database:   spaces/default/data/sink_step/database
-  backup:     spaces/default/data/sink_step/backup
-  temp:       spaces/default/data/sink_step/temp
-  errors:     spaces/default/data/sink_step/errors
-  quarantine: spaces/default/data/sink_step/quarantine
-  markers:    spaces/default/data/sink_step/markers
-  status_dir: spaces/default/data/sink_step/status
-  log_dir:    spaces/default/data/sink_step/logs
+  poll:       data/inbox/sink_step
+  database:   data/sink_step/database
+  backup:     data/sink_step/backup
+  temp:       data/sink_step/temp
+  errors:     data/sink_step/errors
+  quarantine: data/sink_step/quarantine
+  markers:    data/sink_step/markers
+  status_dir: data/sink_step/status
+  log_dir:    data/sink_step/logs
 
 output:
   format: CSV

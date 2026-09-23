@@ -3,32 +3,32 @@ active: false
 description: "Pre-mediation event feed: one mixed stream of switch events routed by record type into a store per type. The domain-shaped counterpart to the synthetic route_step example, and the shape a multi-record-type feed actually has."
 
 dirs:
-  poll:       spaces/demo/data/inbox/premed_events
-  database:   spaces/demo/data/premed_events/voice
-  backup:     spaces/demo/data/premed_events/backup
-  temp:       spaces/demo/data/premed_events/temp
-  errors:     spaces/demo/data/premed_events/errors
-  quarantine: spaces/demo/data/premed_events/quarantine
-  markers:    spaces/demo/data/premed_events/markers
-  status_dir: spaces/demo/data/premed_events/status
-  log_dir:    spaces/demo/data/premed_events/logs
+  poll:       data/inbox/premed_events
+  database:   data/premed_events/voice
+  backup:     data/premed_events/backup
+  temp:       data/premed_events/temp
+  errors:     data/premed_events/errors
+  quarantine: data/premed_events/quarantine
+  markers:    data/premed_events/markers
+  status_dir: data/premed_events/status
+  log_dir:    data/premed_events/logs
 
 output:
   format: PARQUET
   compression: snappy
 
 sinks[3]{database,format}:
-  spaces/demo/data/premed_events/voice,PARQUET
-  spaces/demo/data/premed_events/sms,PARQUET
-  spaces/demo/data/premed_events/other,PARQUET
+  data/premed_events/voice,PARQUET
+  data/premed_events/sms,PARQUET
+  data/premed_events/other,PARQUET
 
 route:
   mode: case
   default: other
   branches[3]{key,where,database}:
-    voice,"EVENT_TYPE = 'VOICE'",spaces/demo/data/premed_events/voice
-    sms,"EVENT_TYPE = 'SMS'",spaces/demo/data/premed_events/sms
-    other,"EVENT_TYPE NOT IN ('VOICE', 'SMS')",spaces/demo/data/premed_events/other
+    voice,"EVENT_TYPE = 'VOICE'",data/premed_events/voice
+    sms,"EVENT_TYPE = 'SMS'",data/premed_events/sms
+    other,"EVENT_TYPE NOT IN ('VOICE', 'SMS')",data/premed_events/other
 
 processing:
   threads: 1

@@ -1,5 +1,6 @@
 package com.gamma.inspector;
 
+import com.gamma.config.safety.PathJail;
 import com.gamma.util.*;
 import dev.toonformat.jtoon.JToon;
 
@@ -129,7 +130,7 @@ public class MainApp {
                         System.err.println("Usage: prepare-inbox <pipeline.toon>");
                         System.exit(1);
                     }
-                    new TarInboxPreparer(subArgs[0], dryRun).run();
+                    new TarInboxPreparer(loadToon(subArgs, command), subArgs[0], dryRun).run();
                     break;
                 }
 
@@ -235,7 +236,10 @@ public class MainApp {
 
     /**
      * Expects {@code subArgs[0]} to be a path to a pipeline {@code .toon} file.
-     * Parses it and returns the top-level map.
+     * Parses it and returns the top-level map, its {@code dirs.*} resolved under the file's Space directory
+     * through {@link PathJail#dataPath} — the loader's rule ({@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}), so
+     * {@code ura.sh backup spaces/ucc/config/voucher/voucher_pipeline.toon} from the bundle root reads the
+     * same directories the engine writes.
      */
     @SuppressWarnings("unchecked")
     private static Map<String, Object> loadToon(String[] subArgs, String command)
@@ -247,8 +251,16 @@ public class MainApp {
         String path = subArgs[0];
         if (!Files.exists(Paths.get(path)))
             throw new IOException("Pipeline toon not found: " + path);
-        return (Map<String, Object>) JToon.decode(
+        Map<String, Object> toon = (Map<String, Object>) JToon.decode(
                 Files.readString(Paths.get(path), StandardCharsets.UTF_8));
+        if (toon.get("dirs") instanceof Map<?, ?> dirs) {
+            java.nio.file.Path configDir = Paths.get(path).toAbsolutePath().getParent();
+            Map<String, Object> resolved = new java.util.LinkedHashMap<>();
+            dirs.forEach((k, v) -> resolved.put(String.valueOf(k),
+                    v instanceof String s ? PathJail.dataPath(configDir, s, "dirs." + k) : v));
+            toon.put("dirs", resolved);
+        }
+        return toon;
     }
 
     // ── usage ─────────────────────────────────────────────────────────────────

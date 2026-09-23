@@ -10,15 +10,14 @@ describe('enrichmentWiringDefaults', () => {
     const seed = {
         enrichName: 'orders_enrich',
         pipelineId: 'orders',
-        base: 'spaces/demo',
-        inputDatabase: 'spaces/demo/data/orders/database',
+        inputDatabase: 'data/orders/database',
         inputFormat: 'parquet',
     };
 
     it('reads the Stage-1 output and writes under the space enriched/ convention', () => {
         const w = enrichmentWiringDefaults(seed);
-        expect(w.input['database']).toBe('spaces/demo/data/orders/database');
-        expect(w.output['database']).toBe('spaces/demo/data/enriched/orders_enrich');
+        expect(w.input['database']).toBe('data/orders/database');
+        expect(w.output['database']).toBe('data/enriched/orders_enrich');
         expect(w.triggers).toEqual({ on_pipeline: 'orders' });
     });
 

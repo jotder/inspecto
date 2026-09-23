@@ -567,7 +567,7 @@ final class RunRoutes implements RouteModule {
             throw new ApiException(422, "config does not parse: " + parse.getMessage());
         }
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), raw));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.defaultPolicy()));
+        findings.addAll(ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.defaultPolicy(), resolved.getParent()));
         // ERROR here: registration loads the config for real, so an unresolvable schema_file is a
         // guaranteed failure — block with a structured, field-anchored finding instead of letting
         // PipelineConfig.load() surface it as an opaque "config is not a valid pipeline" 422.

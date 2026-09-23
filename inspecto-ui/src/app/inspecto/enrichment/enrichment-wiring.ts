@@ -22,8 +22,6 @@ export interface EnrichmentWiringSeed {
     enrichName: string;
     /** The engine's normalized pipeline id — what `ConsignmentEvent.pipeline()` carries. */
     pipelineId: string;
-    /** Space-relative root: `spaces/<id>`, or `.` when single-tenant. */
-    base: string;
     /** The Stage-1 output store the transform reads as the `input` view; blank when unresolvable. */
     inputDatabase?: string;
     /** Its format; `EnrichmentConfig.fromMap` defaults to PARQUET, and so does the pipeline scaffold. */
@@ -52,7 +50,7 @@ export function enrichmentWiringDefaults(seed: EnrichmentWiringSeed): Enrichment
             partitions: [...(seed.inputPartitions ?? ENRICHMENT_DEFAULT_PARTITIONS)],
         },
         output: {
-            database: `${seed.base}/data/enriched/${seed.enrichName}`,
+            database: `data/enriched/${seed.enrichName}`,
             format: 'PARQUET',
             partitions: [...ENRICHMENT_DEFAULT_PARTITIONS],
         },

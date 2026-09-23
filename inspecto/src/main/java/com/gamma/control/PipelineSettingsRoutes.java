@@ -106,10 +106,10 @@ final class PipelineSettingsRoutes implements RouteModule {
         // — so re-punishing it here would make any pipeline whose data lives outside the default allowed
         // roots impossible to rename, which is most of them in a real deployment.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy()));
+        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy(), srcPath.getParent()));
         Set<String> preExisting = new HashSet<>();
         ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
-        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy())
+        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy(), srcPath.getParent())
                 .forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
         List<Finding> introduced = findings.stream()
                 .filter(f -> f.severity() == Severity.ERROR)
@@ -179,10 +179,10 @@ final class PipelineSettingsRoutes implements RouteModule {
         }
 
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy()));
+        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy(), srcPath.getParent()));
         Set<String> preExisting = new HashSet<>();
         ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
-        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy())
+        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy(), srcPath.getParent())
                 .forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
         List<Finding> introduced = findings.stream()
                 .filter(f -> f.severity() == Severity.ERROR)
@@ -214,7 +214,7 @@ final class PipelineSettingsRoutes implements RouteModule {
      * <p>Two halves make that true. The written config carries {@code template: true}, which
      * {@link com.gamma.service.CollectorService} refuses to run and {@code PipelineScheduler} skips; and
      * every <em>environment binding</em> is repointed by {@link #neutralizeForTemplate} into a
-     * {@code templates/<id>/} sandbox, so even after the flag is cleared the copy reads its own inbox and
+     * {@code data/templates/<id>/} sandbox, so even after the flag is cleared the copy reads its own inbox and
      * writes its own output, audit trail and ledger keys. Belt (the flag) and braces (the bindings) —
      * because the flag is what the operator clears when promoting, and at that moment the bindings are all
      * that stands between a fresh pipeline and the original's data.
@@ -256,7 +256,7 @@ final class PipelineSettingsRoutes implements RouteModule {
 
         // The same gate POST /config/write runs — a template is still a real config and must be safe.
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), tpl));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", tpl, SafetyPolicy.defaultPolicy()));
+        findings.addAll(ConfigSafetyValidator.check("pipeline", tpl, SafetyPolicy.defaultPolicy(), target.getParent()));
         // W3: against the template's own directory — see saveGraph. `neutralizeForTemplate` copies the
         // schema next to the template and re-points `schema_file` at it, so it resolves exactly there.
         findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", tpl, Severity.WARNING, target.getParent()));
@@ -286,7 +286,9 @@ final class PipelineSettingsRoutes implements RouteModule {
 
     /**
      * Build the template config from {@code src}: a verbatim copy with its identity replaced and every
-     * <b>environment binding</b> repointed into a {@code templates/<id>/} sandbox.
+     * <b>environment binding</b> repointed into a {@code data/templates/<id>/} sandbox — Space-relative like
+     * every data path ({@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}), and under {@code data/} so a Space's tree keeps
+     * to its layout contract (a top-level {@code templates/} is not one of its entries).
      *
      * <p>Repointed (each one is a way a naive copy would collide with the original): {@code dirs.*} —
      * chiefly {@code poll}, whose reuse would make two pipelines race for the same inbox, and
@@ -306,7 +308,7 @@ final class PipelineSettingsRoutes implements RouteModule {
                                                              Path writeRoot, List<String> notes)
             throws IOException {
         Map<String, Object> t = new LinkedHashMap<>(src);
-        String sandbox = "templates/" + id;
+        String sandbox = PipelineBundleRoutes.dataPrefix(writeRoot) + "data/templates/" + id;
 
         t.put("name", displayName);
         t.put("id", id);            // explicit identity, so a later display-name edit is a relabel

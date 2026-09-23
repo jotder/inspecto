@@ -2,15 +2,15 @@ name: sql_step
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/sql_step
-  database:   spaces/default/data/sql_step/database
-  backup:     spaces/default/data/sql_step/backup
-  temp:       spaces/default/data/sql_step/temp
-  errors:     spaces/default/data/sql_step/errors
-  quarantine: spaces/default/data/sql_step/quarantine
-  markers:    spaces/default/data/sql_step/markers
-  status_dir: spaces/default/data/sql_step/status
-  log_dir:    spaces/default/data/sql_step/logs
+  poll:       data/inbox/sql_step
+  database:   data/sql_step/database
+  backup:     data/sql_step/backup
+  temp:       data/sql_step/temp
+  errors:     data/sql_step/errors
+  quarantine: data/sql_step/quarantine
+  markers:    data/sql_step/markers
+  status_dir: data/sql_step/status
+  log_dir:    data/sql_step/logs
 
 output:
   format: PARQUET

@@ -2,15 +2,15 @@ name: asn1_example
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/asn1_example
-  database:   spaces/default/data/asn1_example/database
-  backup:     spaces/default/data/asn1_example/backup
-  temp:       spaces/default/data/asn1_example/temp
-  errors:     spaces/default/data/asn1_example/errors
-  quarantine: spaces/default/data/asn1_example/quarantine
-  markers:    spaces/default/data/asn1_example/markers
-  status_dir: spaces/default/data/asn1_example/status
-  log_dir:    spaces/default/data/asn1_example/logs
+  poll:       data/inbox/asn1_example
+  database:   data/asn1_example/database
+  backup:     data/asn1_example/backup
+  temp:       data/asn1_example/temp
+  errors:     data/asn1_example/errors
+  quarantine: data/asn1_example/quarantine
+  markers:    data/asn1_example/markers
+  status_dir: data/asn1_example/status
+  log_dir:    data/asn1_example/logs
 
 output:
   format: PARQUET

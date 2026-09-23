@@ -46,24 +46,6 @@ export function configPipelineId(config: Record<string, unknown>, fallback: stri
 }
 
 /**
- * The path base a space's data directories hang off: `spaces/<id>` for a named space, `.` for the
- * un-prefixed default namespace.
- *
- * ⚠ Load-bearing, not cosmetic. `ConfigSafetyValidator` resolves every `dirs.*` value **CWD-relative**
- * (its own words: "config values are CWD-relative") and jails the result under the allowed roots, which
- * are the per-space directories. So a bare `data/<name>` resolves next to the server's working directory
- * — outside every root — and the write is refused with nine ERROR findings before a byte is written.
- * Every committed pipeline on disk is space-qualified for exactly this reason.
- *
- * The one place that knows the convention: it was hand-copied into the Onboarding dialog, and the
- * Pipelines editor's "New pipeline" had no copy at all, which is why that surface could never create
- * a pipeline (2026-08-25).
- */
-export function spaceBase(spaceId: string | null | undefined): string {
-    return spaceId ? `spaces/${spaceId}` : '.';
-}
-
-/**
  * The **home directory** a pipeline's dirs hang off: its `database` less the conventional `/database`
  * leaf, or `data/<name>` when nothing declares one. The one place that knows the convention — a second
  * copy would let a branch store land outside the pipeline home, and that path is load-bearing (a route
@@ -89,8 +71,6 @@ export function pipelineScaffold(
         database?: string;
         description?: string;
         reference?: boolean;
-        /** Active space id; scopes the derived dirs so the write clears the path jail. See {@link spaceBase}. */
-        space?: string | null;
         /**
          * The parse format this pipeline reads, written as `parsing.frontend` (decision D3).
          *
@@ -106,12 +86,11 @@ export function pipelineScaffold(
         frontend?: string;
     } = {},
 ): Record<string, unknown> {
-    const base = spaceBase(opts.space);
     // Decision 2026-09-06 (NAME-DIRS-1): every dir hangs off the SLUG id, not the display name — one
     // identity for id, file and paths, so a name with spaces never puts spaces on disk. Existing
     // pipelines are untouched: dirs are stored, never re-derived.
     const id = pipelineId(name);
-    const home = pipelineHome(id, opts.database || `${base}/data/${id}/database`);
+    const home = pipelineHome(id, opts.database);
     const config: Record<string, unknown> = {
         name,
         // Stamp identity at CREATION so `name` is a display label from day one: a later relabel is then
@@ -125,8 +104,8 @@ export function pipelineScaffold(
         id,
         active: false,
         dirs: {
-            poll: opts.poll || `${base}/data/inbox/${id}`,
-            database: opts.database || `${base}/data/${id}/database`,
+            poll: opts.poll || `data/inbox/${id}`,
+            database: opts.database || `${home}/database`,
             backup: `${home}/backup`,
             temp: `${home}/temp`,
             errors: `${home}/errors`,

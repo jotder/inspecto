@@ -29,8 +29,8 @@ import java.util.List;
  * <p><b>{@link #require} resolves a relative value against the working directory, not against the
  * root</b> — it is a containment verdict, not a resolver. A caller holding a relative value resolves it
  * FIRST, against the base that value means: {@link #resolveConfigRef} (a config's refs to other config
- * files, beside the referring config) or {@link #resolveJobPath} (a job's paths, against the Space config
- * root). ⚠ Until 2026-09-23 the shipped configs spelled their refs from the server root
+ * files, beside the referring config), {@link #resolveDataPath} (a config's data paths, under its Space
+ * directory) or {@link #resolveJobPath} (a job's paths, against the Space config root). ⚠ Until 2026-09-23 the shipped configs spelled their refs from the server root
  * ({@code schema_file: spaces/default/config/…}) and relied on this working-directory reading, so a server
  * launched from any other directory could not load them ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}).
  *
@@ -194,7 +194,66 @@ public final class PathJail {
         return resolveAgainst(configDir, value, field, "a relative config reference resolves beside its own config file");
     }
 
-    /** The one relative-path rule behind {@link #resolveJobPath} and {@link #resolveConfigRef}. */
+    /**
+     * <b>Resolve a config's DATA path</b> — {@code dirs.*}, {@code processing.duckdb.temp_directory},
+     * {@code output.ducklake.data_path}, {@code sinks[].database} (+ its {@code ducklake.data_path}),
+     * {@code route.branches[].database}, a join step's {@code reference} path, an enrichment's
+     * {@code input.database} / {@code output.database} / {@code references.<n>.path}, and a {@code local}
+     * connection's {@code base_path} ({@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}, operator decision
+     * 2026-09-23). A relative data path resolves under the <b>Space directory</b> ({@code spaces/<id>/}) the
+     * config belongs to — so a config says {@code data/orders/database} — and never against the process
+     * working directory.
+     *
+     * <p>⛔ Same rule — and the same code — as {@link #resolveConfigRef} and {@link #resolveJobPath}, with a
+     * third base: the ambiguous case (nothing under the Space dir, but the old working-directory spelling
+     * exists) is REFUSED, naming both paths.
+     *
+     * <p><b>No Space</b> ({@link #spaceDirOf} is {@code null}: a single-tenant example or bundle, a draft with
+     * no home) keeps the working-directory reading. That is the Space-dir equivalent of a single-tenant
+     * deployment, by the same rule {@code SpaceConfigRoot.jobPathBase} gives a job's {@code data_dir} there:
+     * the launch directory ({@code serve-example.sh} / {@code run-example.sh} {@code cd} into the example).
+     *
+     * @param configDir the directory of the config file that authored {@code value}; the Space dir is derived
+     *                  from it by {@link #spaceDirOf}
+     */
+    public static Path resolveDataPath(Path configDir, String value, String field) {
+        return resolveAgainst(spaceDirOf(configDir), value, field,
+                "a relative data path resolves under its Space directory");
+    }
+
+    /**
+     * {@link #resolveDataPath} for a config READER that carries the value on as a string: the resolved
+     * absolute path, or {@code value} exactly as authored when there is nothing to resolve against — blank,
+     * a URI (a DuckLake {@code data_path} may be an object-store location; containment refuses a URI where it
+     * must), or no Space ({@link #spaceDirOf} is {@code null}). Leaving it relative there IS the
+     * working-directory reading, byte-identically, and keeps a draft's lift/lower round-trip showing what the
+     * author wrote.
+     */
+    public static String dataPath(Path configDir, String value, String field) {
+        if (value == null || value.isBlank() || isUri(value) || spaceDirOf(configDir) == null) return value;
+        return resolveDataPath(configDir, value.trim(), field).toString();
+    }
+
+    /**
+     * The Space directory a config in {@code configDir} belongs to — the parent of the nearest
+     * ancestor-or-self directory named {@code config}, which is how a Space is discovered
+     * ({@code SpaceManager.discover}: a directory with a {@code config/} subtree) and how
+     * {@code SpaceRoot.under} lays one out ({@code <base>/config}). {@code null} when there is none (a
+     * single-tenant example directory, an in-memory draft) — see {@link #resolveDataPath}.
+     *
+     * <p>⚠ The NEAREST {@code config} wins, so a Space nested under some unrelated {@code …/config/…}
+     * directory still resolves to its own base.
+     */
+    public static Path spaceDirOf(Path configDir) {
+        if (configDir == null) return null;
+        for (Path p = configDir.toAbsolutePath().normalize(); p != null; p = p.getParent()) {
+            Path name = p.getFileName();
+            if (name != null && "config".equals(name.toString())) return p.getParent();
+        }
+        return null;
+    }
+
+    /** The one relative-path rule behind {@link #resolveJobPath}, {@link #resolveConfigRef} and {@link #resolveDataPath}. */
     private static Path resolveAgainst(Path base, String value, String field, String rule) {
         String s = value == null ? "" : value.trim();
         if (s.isEmpty()) throw new Escape(field, value == null ? "null" : value, "is blank");

@@ -2,15 +2,15 @@ name: join_step
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/join_step
-  database:   spaces/default/data/join_step/database
-  backup:     spaces/default/data/join_step/backup
-  temp:       spaces/default/data/join_step/temp
-  errors:     spaces/default/data/join_step/errors
-  quarantine: spaces/default/data/join_step/quarantine
-  markers:    spaces/default/data/join_step/markers
-  status_dir: spaces/default/data/join_step/status
-  log_dir:    spaces/default/data/join_step/logs
+  poll:       data/inbox/join_step
+  database:   data/join_step/database
+  backup:     data/join_step/backup
+  temp:       data/join_step/temp
+  errors:     data/join_step/errors
+  quarantine: data/join_step/quarantine
+  markers:    data/join_step/markers
+  status_dir: data/join_step/status
+  log_dir:    data/join_step/logs
 
 output:
   format: PARQUET
@@ -33,7 +33,7 @@ output_store: join_step_rollup
 
 steps[1]:
   - join:
-      reference: spaces/default/data/ref/region_dim.csv
+      reference: data/ref/region_dim.csv
       on[1]: REGION
 
 collector:

@@ -124,7 +124,7 @@ export interface EnrichmentEditorValue {
                                         <input
                                             matInput
                                             formControlName="path"
-                                            placeholder="spaces/demo/data/ref/region_dim.csv"
+                                            placeholder="data/ref/region_dim.csv"
                                         />
                                     </mat-form-field>
                                     <mat-form-field class="w-32" subscriptSizing="dynamic">

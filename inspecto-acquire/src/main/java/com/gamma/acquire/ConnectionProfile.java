@@ -1,6 +1,7 @@
 package com.gamma.acquire;
 
 import com.gamma.config.io.ConfigCodec;
+import com.gamma.config.safety.PathJail;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -97,7 +98,24 @@ public record ConnectionProfile(String id, String connector, String host, int po
         Map<String, Object> root = ConfigCodec.toMap(Files.readString(path));
         Object conn = root.get("connection");
         if (!(conn instanceof Map)) throw new IllegalArgumentException(path + " has no 'connection' block");
-        return fromMap((Map<String, Object>) conn);
+        return fromMap((Map<String, Object>) conn).resolvedBeside(path.toAbsolutePath().getParent());
+    }
+
+    /**
+     * This profile with a {@code local} connection's {@code base_path} — a DATA path on this host — resolved
+     * under the Space directory of {@code configDir} through {@link PathJail#dataPath}
+     * ({@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}), so {@code base_path: data/samples/orders} means the Space's
+     * own {@code data/samples/orders} wherever the server was launched. A remote connector's
+     * {@code base_path} is a path on the REMOTE system and is returned untouched.
+     *
+     * @param configDir the directory of the {@code *_connection.toon} that authored this profile
+     */
+    public ConnectionProfile resolvedBeside(Path configDir) {
+        if (!"local".equals(connector) || basePath == null) return this;
+        String resolved = PathJail.dataPath(configDir, basePath, "connection.base_path");
+        if (resolved.equals(basePath)) return this;
+        return new ConnectionProfile(id, connector, host, port, database, resolved, username, password,
+                options, tunnel, proxy);
     }
 
     /** Parse + validate from a decoded {@code connection { … }} map. */

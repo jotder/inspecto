@@ -288,7 +288,8 @@ final class ConnectionRoutes implements RouteModule {
         Path target = connectionFile(api, p.id());
         byte[] bytes = ConfigCodec.toToon(Map.of("connection", connectionDoc(p))).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".conn-");
-        api.service().registerConnection(p);
+        // Registered exactly as a reload would load it: a local base_path resolved under the Space dir.
+        api.service().registerConnection(p.resolvedBeside(target.getParent()));
         log.info("[CONNECTION-WRITE] wrote {} ({} bytes)",
                 api.writeRoot().relativize(target).toString().replace('\\', '/'), bytes.length);
     }

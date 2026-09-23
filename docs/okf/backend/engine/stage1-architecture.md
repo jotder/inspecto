@@ -309,10 +309,10 @@ may appear at the Space root. `_shared/` under `-Dspaces.root` is **not** a Spac
 dirs with a `config/` subtree, so it is skipped) — see
 [storage-layout-and-sharing-plan](../../../archived-documents/plans-archive/storage-layout-and-sharing-plan.md) §2.
 
-⚠️ **All `dirs.*` paths in pipeline configs resolve against the JVM working directory, not the Space
-root** — write them bundle-root-relative (`spaces/<id>/config/…`, `spaces/<id>/data/…`). Only the
-Space *discovery* layer (`-Dspaces.root`, `SpaceRoot`) is Space-relative; `SpaceMigrator` cannot
-rewrite absolute or author-relative paths for the same reason.
+⚠️ **A relative `dirs.*` path resolves under the Space directory, not the JVM working directory** —
+write it Space-relative (`data/<pipeline>/database`); a config ref sits beside its config
+(`DATA-DIRS-RESOLVE-AGAINST-CWD-1` / `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1`, 2026-09-23 — see
+[config safety](../config/config-safety.md)). `SpaceMigrator` still cannot rewrite absolute paths.
 
 ---
 

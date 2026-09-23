@@ -2,15 +2,15 @@ name: topups
 active: true
 
 dirs:
-  poll:       spaces/ucc/data/inbox/topups
-  database:   spaces/ucc/data/topups/database
-  backup:     spaces/ucc/data/topups/backup
-  temp:       spaces/ucc/data/topups/temp
-  errors:     spaces/ucc/data/topups/errors
-  quarantine: spaces/ucc/data/topups/quarantine
-  markers:    spaces/ucc/data/topups/markers
-  status_dir: spaces/ucc/data/topups/status
-  log_dir:    spaces/ucc/data/topups/logs
+  poll:       data/inbox/topups
+  database:   data/topups/database
+  backup:     data/topups/backup
+  temp:       data/topups/temp
+  errors:     data/topups/errors
+  quarantine: data/topups/quarantine
+  markers:    data/topups/markers
+  status_dir: data/topups/status
+  log_dir:    data/topups/logs
 
 output:
   format: PARQUET

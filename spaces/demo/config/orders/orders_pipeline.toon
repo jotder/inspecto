@@ -2,15 +2,15 @@ name: orders
 active: true
 
 dirs:
-  poll:       spaces/demo/data/inbox/orders
-  database:   spaces/demo/data/orders/database
-  backup:     spaces/demo/data/orders/backup
-  temp:       spaces/demo/data/orders/temp
-  errors:     spaces/demo/data/orders/errors
-  quarantine: spaces/demo/data/orders/quarantine
-  markers:    spaces/demo/data/orders/markers
-  status_dir: spaces/demo/data/orders/status
-  log_dir:    spaces/demo/data/orders/logs
+  poll:       data/inbox/orders
+  database:   data/orders/database
+  backup:     data/orders/backup
+  temp:       data/orders/temp
+  errors:     data/orders/errors
+  quarantine: data/orders/quarantine
+  markers:    data/orders/markers
+  status_dir: data/orders/status
+  log_dir:    data/orders/logs
 
 output:
   format: PARQUET

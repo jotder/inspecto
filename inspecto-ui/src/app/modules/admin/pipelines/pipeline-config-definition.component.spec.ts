@@ -432,13 +432,13 @@ describe('PipelineConfigDefinitionComponent', () => {
             node: { id: 'enrich1', type: 'enrichment' },
             enrichmentHost: {
                 pipelineId: 'orders',
-                inputDatabase: 'spaces/demo/data/orders/database',
+                inputDatabase: 'data/orders/database',
                 inputFormat: 'PARQUET',
             },
         });
         const wiring = form(fixture);
-        expect(wiring.form.get('input__database')?.value).toBe('spaces/demo/data/orders/database');
-        expect(wiring.form.get('output__database')?.value).toBe('spaces/demo/data/enriched/enrich1');
+        expect(wiring.form.get('input__database')?.value).toBe('data/orders/database');
+        expect(wiring.form.get('output__database')?.value).toBe('data/enriched/enrich1');
         expect(wiring.form.get('triggers__on_pipeline')?.value).toBe('orders');
         expect(wiring.form.get('input__partitions')?.value).toEqual(['year', 'month', 'day']);
     });
@@ -479,15 +479,15 @@ describe('PipelineConfigDefinitionComponent', () => {
         const out = applied(fixture);
         editor(fixture).onSqlChange('SELECT * FROM input');
         const wiring = form(fixture);
-        wiring.form.get('input__database')?.setValue('spaces/demo/data/orders/database');
-        wiring.form.get('output__database')?.setValue('spaces/demo/data/enriched/enrich1');
+        wiring.form.get('input__database')?.setValue('data/orders/database');
+        wiring.form.get('output__database')?.setValue('data/enriched/enrich1');
         fixture.componentInstance.submit();
 
         const [type, draft] = write.mock.calls[0] as [string, Record<string, unknown>];
         expect(type).toBe('enrichment');
         expect(draft['name']).toBe('enrich1');
         expect(draft['transform']).toBe('SELECT * FROM input');
-        expect((draft['input'] as Record<string, unknown>)['database']).toBe('spaces/demo/data/orders/database');
+        expect((draft['input'] as Record<string, unknown>)['database']).toBe('data/orders/database');
         expect(registerEnrichment).toHaveBeenCalledWith('enrich1.toon');
         // The node binds by reference — the companion file is the single truth, never mirrored.
         expect(out()?.use).toBe('enrichment/enrich1');
@@ -839,7 +839,7 @@ describe('PipelineConfigDefinitionComponent', () => {
      * reading/writing the companion schema toon directly.
      */
     describe('partitioning (moved from the Parse pane)', () => {
-        const SINK_NODE: AuthoredNode = { id: 'out', type: 'sink.file', config: { database: 'spaces/demo/data/x' } };
+        const SINK_NODE: AuthoredNode = { id: 'out', type: 'sink.file', config: { database: 'data/x' } };
         const SCHEMA_CONFIG = {
             raw: {
                 name: 'record',

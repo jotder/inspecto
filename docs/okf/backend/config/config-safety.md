@@ -58,7 +58,7 @@ keeps its `PathEscape` → 403 contract), nine operator-supplied path fields acr
 this validator.
 
 ⚠ **`PathJail.require` reads a relative value against the working directory — so every caller holding a
-relative value RESOLVES it first, against the base that value means, and then jails it once.** Two
+relative value RESOLVES it first, against the base that value means, and then jails it once.** Three
 resolvers, one rule (`resolveAgainst`):
 
 * **`PathJail.resolveConfigRef(configDir, …)`** — a config's reference to ANOTHER config file resolves
@@ -66,13 +66,18 @@ resolvers, one rule (`resolveAgainst`):
   `processing.schema_file`, every `schemas[].schema_file`, `processing.mapping_file`,
   `parsing.grammar` / `processing.grammar`, every `segments` value (`parsing.plugin.*`, `processing.*`,
   `asn1.*`), and Asn1RecordIngester's `ingester_config.grammar` (= `asn1.grammar_file`). Callers:
-  `PipelineConfigParser.resolveSchemaRef` (load), `ConfigSafetyValidator.resolveRef` (422 gate),
+  `PipelineConfigParser.resolveSchemaRef` (load), `ConfigSafetyValidator.checkPathValue` (422 gate, handed the same resolver),
   `ConfigRoutes.resolvedPath` (the schema-file WARNING and `declaredColumns`),
   `PipelineSettingsRoutes.copySchemaFile` (template copy), and `com.gamma.parse.Asn1GrammarSource` (the
   ASN.1 grammar file: the parser resolves `ingester_config.grammar` beside the config WITHOUT jailing it,
   and this one resolver — shared with the stand-alone preview, whose base is the Space config root —
   checks the `.asn`/`.asn1` extension and jails it once, at use). Before this they were hand-kept copies
   of one rule.
+* **`PathJail.resolveDataPath(configDir, …)`** — a config's DATA path resolves **under its Space
+  directory** (`spaces/<id>/`), derived from the config's own directory by `PathJail.spaceDirOf` (the parent
+  of the nearest `config/` ancestor — the layout `SpaceRoot.under` and `SpaceManager.discover` use)
+  (`DATA-DIRS-RESOLVE-AGAINST-CWD-1`, 2026-09-23). `PathJail.dataPath` is the reader's form (a string:
+  resolved, or as authored when blank / a URI / no Space). See the decision below.
 * **`PathJail.resolveJobPath(spaceConfigRoot, …)`** — a job's path values, against the Space config root
   (`JOB-DIR-CWD-CONTAINMENT-1`; see [jobs](../control-plane/jobs.md)).
 
@@ -96,13 +101,8 @@ simply *not found*. Both fail closed; neither reads the wrong file.
 a config-relative candidate that climbed out of `configDir` and fell through to the (then unjailed) CWD
 reading; a narrower "stay under `configDir`" rule beside the jail would be a path jailed twice.
 
-⚠ **Still working-directory-relative — same cause, NOT fixed here:** every data path — `dirs.*`,
-`output.ducklake.data_path`, `processing.duckdb.temp_directory`, enrichment `references.<n>.path`,
-connection `base_path`. The shipped configs spell these `spaces/<space>/data/…` too, so the
-`inspecto-deploy/` launch mode now REGISTERS the demo Pipelines but their data directories still resolve
-under the launch directory. That is a data-root question, not a config-ref one → BACKLOG
-`DATA-DIRS-RESOLVE-AGAINST-CWD-1`. A `null` `configDir` (an in-memory draft: `PipelineConfig.fromMap`)
-also keeps the CWD reading — a draft has no directory to resolve against.
+⚠ **Data paths are the third resolver** — `dirs.*`, `sinks[].database`, enrichment and `local` connection
+paths resolve under the Space directory; see *Decision 2026-09-23* below.
 
 ⚠ **Unverified, filed for reproduction:** `POST /validate {configPath}` appears to load whatever server
 path the caller names with no path jail on `configPath` itself → BACKLOG `VALIDATE-CONFIGPATH-UNJAILED-1`
@@ -136,6 +136,63 @@ falsified the doc; the constructor now keeps empty empty, `PathJail.requireUnder
 `DiscoveredRootsTest` pins it. Fail-closed for real now; configuring the roots is a deployment step.
 ⚠ Surefire sets the roots to `<repo>;<temp>`, so **nothing under a `@TempDir` escapes by default** — a
 containment test that does not narrow the roots passes vacuously.
+
+## Decision 2026-09-23 — a relative DATA path resolves under the Space directory
+
+**Operator decision (`DATA-DIRS-RESOLVE-AGAINST-CWD-1`):** a config's relative data paths resolve under the
+**Space directory**, so a config says `data/orders/database`, never `spaces/<space>/data/…`. Chosen over
+the Space *data* root (`spaces/<id>/data/`) so a path reads the same as the tree on disk and a config can
+still name a sibling of `data/`. Same cause and same shape as the config-ref rule above: the shipped configs
+spelled every data path from the server root and it resolved against the working directory, so a bundle
+launched from `inspecto-deploy/` wrote its data under the launch dir, and a test loading a shipped config
+littered the module dir (`inspecto/spaces`, `inspecto/out`, `inspecto/templates`), which fooled repo-root
+walkers like `MappingMigrationTest`.
+
+**Keys** — every one through `PathJail.resolveDataPath` / `PathJail.dataPath`, resolved ONCE at load and
+carried as an absolute string, so the ~100 typed readers of `dirs()` / `sinks()` need no base of their own:
+
+| Key | Resolved by |
+|---|---|
+| `dirs.*` (all of them, `status_file` included), `processing.duckdb.temp_directory`, `output.ducklake.data_path`, `sinks[].database`, `sinks[].ducklake.data_path`, `route.branches[].database` (it pairs with a sink BY VALUE, so it must resolve identically), a join's path `reference` (`processing.join`, a `steps[]` / branch `join` step; a by-name `reference/<id>` is an id and untouched) | `PipelineConfigParser` (load) |
+| enrichment `input.database`, `output.database`, `references.<n>.path` | `EnrichmentConfig.load` (`fromMap(raw, sql, configDir)`) |
+| a **`local`** connection's `base_path` (a remote connector's is a path on the remote system — untouched) | `ConnectionProfile.load` / `resolvedBeside` (and `ConnectionRoutes.persistConnection` registers it resolved) |
+| the same keys at the 422 gate | `ConfigSafetyValidator.check(…, configDir)` — every caller that knows the config's location passes it |
+| a pipeline's owned dirs at deletion | `PipelineDataDirs` (conflicts, removal, the sharing scan) |
+| the `ura` CLI's `dirs.*` (`search` / `copy` / `copy-tars` / `extract` / `backup` / `prepare-inbox`) | `MainApp.loadToon` |
+| a store-authored graph's join path `reference` | `PipelineJobRunner.references()`, against `SpaceConfigRoot.current()` |
+
+**No Space → the working-directory reading, by design.** `spaceDirOf` is `null` for a single-tenant example
+(`inspecto/examples/…` has no `config/` ancestor), for `SpaceManager.single()`, and for an in-memory draft
+(`PipelineConfig.fromMap`). The value is then left as authored — relative, i.e. the launch directory. That
+IS the single-tenant Space-dir equivalent, and the same answer `SpaceConfigRoot.jobPathBase` gives a job's
+`data_dir` there (the config READ root = `LegacySpaceRoot.base()` = the launch dir; `serve-example.sh` /
+`run-example.sh` `cd` into the example, so `out/inbox` is the example's own). ⚠ In a multi-Space server a
+job's `data_dir` still resolves against the Space **config** root (`jobPathBase`), not the Space dir — a
+different base for a different key family; no shipped Space job sets it.
+
+⛔ **The ambiguous value is REFUSED, not relocated** — the shared rule: nothing under the Space dir while the
+old working-directory spelling exists throws naming both paths. ⚠ And, as for config refs, **only then**: a
+config still spelled `spaces/demo/data/…` loaded where that CWD path does not exist silently resolves to
+`spaces/demo/spaces/demo/data/…`. Every shipped config was respelled (302 values in 34 files, the
+`_templates` `spaces/${SPACE}/data/…` ones included); the SPA's scaffolds (`pipeline-scaffold.ts`, the
+stream import) write `data/…` too.
+
+**Retired with it:** the whole-space bundle's "space rebasing" (`BundleImporter` rewrote `spaces/<src>/` to
+the target's prefix — there is nothing space-qualified left to rewrite, so bytes now travel verbatim and the
+`rebased` response fields are gone), the pipeline bundle's `source_prefix` manifest key and `spacePrefix`
+derivation, and the pipeline template sandbox moved `templates/<id>` → `data/templates/<id>` (Space-relative
+now, and a top-level `templates/` is not a Space layout-contract entry). ⚠ With **no Space** (a single-tenant write root) these two writers — pipeline import and the template
+sandbox — prefix the write root's parent, absolute (`PipelineBundleRoutes.dataPrefix`): there `data/…` would mean
+the launch dir, which need not be inside the allowed roots the new config is judged against.
+
+**Not data paths, left alone:** a view's `derived_sql` (`read_parquet('spaces/ucc/data/…')`) is SQL DuckDB
+reads against the process CWD; an enrichment's `transform_file` is a config ref still read from the CWD by
+`EnrichmentConfig.load` (the 422 gate judges it from there too, so the two agree).
+
+Pinned by `ShippedPipelinesWriteUnderTheirSpaceDirectoryTest` (inspecto-engine: a relocated verbatim copy of
+`spaces/demo` RUNS the orders Pipeline and its output + status land under the copy; every shipped
+Pipeline / Enrichment / local Connection's data paths resolve under their Space; nothing appears under the
+CWD) and `DataPathResolutionTest` (inspecto-config: the resolver, `spaceDirOf`, the refusal, the gate).
 
 ## The allowed roots are a union: declared ∪ discovered (tier 3, shipped 2026-08-14)
 

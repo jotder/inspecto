@@ -45,7 +45,6 @@ import {
     LensService,
     apiErrorMessage,
     datasetManualHint,
-    SpacesService,
 } from 'app/inspecto/api';
 import {
     type AttributeSpec,
@@ -229,7 +228,6 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private components = inject(ComponentsService);
     private datasets = inject(DatasetRegistrationService);
     private iconMapApi = inject(IconMapService);
-    private spaces = inject(SpacesService);
     private fb = inject(FormBuilder);
     private router = inject(Router);
     private toast = inject(ToastrService);
@@ -1299,7 +1297,6 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             .write(
                 'pipeline',
                 pipelineScaffold(name, {
-                    space: this.spaces.currentSpaceId(),
                     frontend: this.newFrontend.value,
                 }),
             )

@@ -29,7 +29,7 @@ import { hashContent } from './content-hash';
  * per-segment schema of a plugin parser, and the `<name>_enrich` sibling.
  * Does NOT travel: `name` (the target names its own), `active` (an import is ALWAYS a draft —
  * importing something as live would start processing on someone else's server), and `dirs` (every
- * path is space- and name-specific; they are re-derived from the target's convention, exactly as the
+ * path is name-specific; they are re-derived as Space-relative `data/...` from the target's convention, exactly as the
  * create dialog derives them). A Connection referenced by `collector.connection` cannot travel
  * either — it carries credentials — so it is reported as a **requirement** instead.
  */
@@ -213,8 +213,8 @@ export interface StreamImportPlan {
  * Pure — the caller performs the writes. Every rewrite that changes behaviour is reported in
  * `notes`, because an import that silently re-pointed directories would be a trap.
  */
-export function planStreamImport(bundle: StreamBundle, opts: { name: string; space: string | null }): StreamImportPlan {
-    const { name, space } = opts;
+export function planStreamImport(bundle: StreamBundle, opts: { name: string }): StreamImportPlan {
+    const { name } = opts;
     // The IDENTITY the import registers under, stamped from the typed name exactly as a fresh create
     // would. ⚠ Set explicitly rather than trusted from the bundle: an older bundle still carries the
     // SOURCE's `id`, and spreading that would register the draft under the source's identity — the
@@ -227,9 +227,9 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string; spa
 
     // dirs are always re-derived: the source paths name the source space and the source's own
     // pipeline name, so carrying them over would point the draft at directories that do not exist.
-    const home = `${space ? `spaces/${space}` : '.'}/data/${name}`;
+    const home = `data/${name}`;
     pipeline['dirs'] = {
-        poll: `${space ? `spaces/${space}` : '.'}/data/inbox/${name}`,
+        poll: `data/inbox/${name}`,
         database: `${home}/database`,
         backup: `${home}/backup`,
         temp: `${home}/temp`,
@@ -279,7 +279,7 @@ export function planStreamImport(bundle: StreamBundle, opts: { name: string; spa
             // enrichment reads what the pipeline wrote, so the two must be the same string. `dirs` are
             // keyed off the display name while identity keys off `id`, and once those two diverge any
             // second derivation points the enrichment at a directory nothing ever writes to.
-            config: retargetEnrichment(bundle.enrichment, bundle.source.name, id, space, `${home}/database`),
+            config: retargetEnrichment(bundle.enrichment, bundle.source.name, id, `${home}/database`),
         };
     }
 
@@ -310,10 +310,13 @@ function renameRaw(schema: Record<string, unknown>, name: string): unknown {
     return isRecord(raw) ? { ...raw, name } : raw;
 }
 
-/** Re-root a space-relative config path into the target space, keeping everything after the root. */
-function reRoot(path: string, base: string): string {
-    const relative = path.replace(/^spaces\/[^/]+\//, '').replace(/^\.\//, '');
-    return `${base}/${relative}`;
+/**
+ * The Space-relative remainder of a data path: strips a leading `spaces/<x>/` or `./`. Data paths resolve
+ * under the Space directory on the server (DATA-DIRS-RESOLVE-AGAINST-CWD-1), so a bundle exported with a
+ * space-embedded path would otherwise double the prefix in the target.
+ */
+function reRoot(path: string): string {
+    return path.replace(/^spaces\/[^/]+\//, '').replace(/^\.\//, '');
 }
 
 /**
@@ -325,10 +328,8 @@ function retargetEnrichment(
     enrichment: Record<string, unknown>,
     sourceName: string,
     name: string,
-    space: string | null,
     inputDatabase: string,
 ): Record<string, unknown> {
-    const base = space ? `spaces/${space}` : '.';
     const out: Record<string, unknown> = { ...enrichment, name: `${name}_enrich` };
     if (isRecord(out['input'])) {
         // The pipeline's own `dirs.database`, passed in — ⛔ never re-derived from `name`, which is the
@@ -339,13 +340,13 @@ function retargetEnrichment(
         const dbPath = String(out['output']['database'] ?? '');
         out['output'] = {
             ...out['output'],
-            // Keep the author's own intermediate layout (…/data/enriched/…), but re-root it in the
-            // TARGET space and re-point the stream-specific leaf. Swapping only the leaf would
+            // Keep the author's own intermediate layout (…/data/enriched/…), but strip any space prefix
+            // (data paths are Space-relative) and re-point the stream-specific leaf. Swapping only the leaf would
             // leave the path inside the SOURCE space — an imported enrichment writing into someone
             // else's space (caught by spec, 2026-07-31).
             database: dbPath
-                ? reRoot(dbPath, base).split(`${sourceName}_enrich`).join(`${name}_enrich`)
-                : `${base}/data/enriched/${name}_enrich`,
+                ? reRoot(dbPath).split(`${sourceName}_enrich`).join(`${name}_enrich`)
+                : `data/enriched/${name}_enrich`,
         };
     }
     if (isRecord(out['triggers']) && out['triggers']['on_pipeline'] !== undefined) {

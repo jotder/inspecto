@@ -76,7 +76,16 @@ public class TarInboxPreparer {
      * @param dryRun         when {@code true}, log intended actions without modifying files
      */
     public TarInboxPreparer(String toonConfigPath, boolean dryRun) throws IOException {
-        Map<String, Object> config = ToonHelper.load(toonConfigPath);
+        this(ToonHelper.load(toonConfigPath), toonConfigPath, dryRun);
+    }
+
+    /**
+     * From an already-loaded config — the engine CLI ({@code MainApp prepare-inbox}) passes one whose
+     * {@code dirs.*} it has resolved under the Space directory, which this module cannot do itself.
+     *
+     * @param toonConfigPath the config's path, for error messages only
+     */
+    public TarInboxPreparer(Map<String, Object> config, String toonConfigPath, boolean dryRun) throws IOException {
         Map<String, Object> dirs   = ToonHelper.requireSection(config, "dirs");
 
         this.sourceDir = Paths.get(ToonHelper.require(dirs, "poll",   "dirs")).toAbsolutePath();

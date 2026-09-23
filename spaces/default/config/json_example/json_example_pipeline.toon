@@ -2,15 +2,15 @@ name: json_example
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/json_example
-  database:   spaces/default/data/json_example/database
-  backup:     spaces/default/data/json_example/backup
-  temp:       spaces/default/data/json_example/temp
-  errors:     spaces/default/data/json_example/errors
-  quarantine: spaces/default/data/json_example/quarantine
-  markers:    spaces/default/data/json_example/markers
-  status_dir: spaces/default/data/json_example/status
-  log_dir:    spaces/default/data/json_example/logs
+  poll:       data/inbox/json_example
+  database:   data/json_example/database
+  backup:     data/json_example/backup
+  temp:       data/json_example/temp
+  errors:     data/json_example/errors
+  quarantine: data/json_example/quarantine
+  markers:    data/json_example/markers
+  status_dir: data/json_example/status
+  log_dir:    data/json_example/logs
 
 output:
   format: PARQUET

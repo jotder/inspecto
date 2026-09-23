@@ -2,6 +2,7 @@ package com.gamma.job;
 
 import com.gamma.api.PublicApi;
 import com.gamma.config.safety.PathJail;
+import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.enrich.ReferenceReader;
 import com.gamma.etl.ConsignmentEvent;
 import com.gamma.etl.DuckLakeRegistrar;
@@ -422,8 +423,13 @@ public final class PipelineJobRunner implements Job {
     private RowShaper.ReferenceResolver references() {
         return (conn, reference) -> {
             String view = REF_VIEW_PREFIX + "_" + safe(reference);
-            String sql = ReferenceReader.sqlFor(ReferenceReader.parse(reference),
-                    pipelines == null ? null : pipelines.get());
+            EnrichmentConfig.Reference parsed = ReferenceReader.parse(reference);
+            // A path reference is a DATA path: it resolves under this Space's directory, exactly as the flat
+            // config's join reference does at load (DATA-DIRS-RESOLVE-AGAINST-CWD-1). A by-name one is an id.
+            if (!parsed.byName())
+                parsed = ReferenceReader.parse(PathJail.dataPath(SpaceConfigRoot.current(), reference,
+                        "transform.join.reference"));
+            String sql = ReferenceReader.sqlFor(parsed, pipelines == null ? null : pipelines.get());
             try (Statement st = conn.createStatement()) {
                 st.execute("CREATE OR REPLACE VIEW \"" + view + "\" AS SELECT * FROM " + sql);
             }

@@ -3,15 +3,15 @@ active: false
 description: "End-of-day warehouse stock-movement export: one XML document per warehouse per business day holding a mixed sequence of receipts, dispatches and transfers, each kind landed in its own store. Stock-count adjustments are not declared and are skipped as junk. The domain-shaped counterpart to the synthetic xml_example."
 
 dirs:
-  poll:       spaces/demo/data/inbox/stock_movements
-  database:   spaces/demo/data/stock_movements/database
-  backup:     spaces/demo/data/stock_movements/backup
-  temp:       spaces/demo/data/stock_movements/temp
-  errors:     spaces/demo/data/stock_movements/errors
-  quarantine: spaces/demo/data/stock_movements/quarantine
-  markers:    spaces/demo/data/stock_movements/markers
-  status_dir: spaces/demo/data/stock_movements/status
-  log_dir:    spaces/demo/data/stock_movements/logs
+  poll:       data/inbox/stock_movements
+  database:   data/stock_movements/database
+  backup:     data/stock_movements/backup
+  temp:       data/stock_movements/temp
+  errors:     data/stock_movements/errors
+  quarantine: data/stock_movements/quarantine
+  markers:    data/stock_movements/markers
+  status_dir: data/stock_movements/status
+  log_dir:    data/stock_movements/logs
 
 output:
   format: PARQUET

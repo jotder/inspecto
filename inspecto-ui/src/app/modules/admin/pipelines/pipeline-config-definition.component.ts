@@ -29,7 +29,6 @@ import {
     ConfigService,
     LensService,
     RelationsPreview,
-    SpacesService,
 } from 'app/inspecto/api';
 import { AttributeSpec, KEY_SEP, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
@@ -306,7 +305,6 @@ export class PipelineConfigDefinitionComponent {
     private configApi = inject(ConfigService);
     private catalog = inject(CatalogService);
     private lens = inject(LensService);
-    private spaces = inject(SpacesService);
     private toastr = inject(ToastrService);
 
     /** The node being configured (identity fixed; config/use editable). */
@@ -539,7 +537,6 @@ export class PipelineConfigDefinitionComponent {
         const w = enrichmentWiringDefaults({
             enrichName: this.enrichName.value.trim() || this.node().id,
             pipelineId: host.pipelineId,
-            base: this.spaces.currentSpaceId() ? `spaces/${this.spaces.currentSpaceId()}` : '.',
             inputDatabase: host.inputDatabase,
             inputFormat: host.inputFormat,
         });

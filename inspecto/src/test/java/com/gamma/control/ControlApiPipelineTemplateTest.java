@@ -135,7 +135,7 @@ class ControlApiPipelineTemplateTest {
             for (Object k : srcDirs.keySet()) {
                 assertNotEquals(String.valueOf(srcDirs.get(k)), String.valueOf(tplDirs.get(k)),
                         "dirs." + k + " must not be shared with the source");
-                assertTrue(String.valueOf(tplDirs.get(k)).startsWith("templates/mini_etl_copy"),
+                assertTrue(String.valueOf(tplDirs.get(k)).replace('\\', '/').contains("data/templates/mini_etl_copy"),
                         "dirs." + k + " must land in the template sandbox, was " + tplDirs.get(k));
             }
 

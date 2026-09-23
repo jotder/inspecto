@@ -2,29 +2,29 @@ name: route_step
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/route_step
-  database:   spaces/default/data/route_step/domestic
-  backup:     spaces/default/data/route_step/backup
-  temp:       spaces/default/data/route_step/temp
-  errors:     spaces/default/data/route_step/errors
-  quarantine: spaces/default/data/route_step/quarantine
-  markers:    spaces/default/data/route_step/markers
-  status_dir: spaces/default/data/route_step/status
-  log_dir:    spaces/default/data/route_step/logs
+  poll:       data/inbox/route_step
+  database:   data/route_step/domestic
+  backup:     data/route_step/backup
+  temp:       data/route_step/temp
+  errors:     data/route_step/errors
+  quarantine: data/route_step/quarantine
+  markers:    data/route_step/markers
+  status_dir: data/route_step/status
+  log_dir:    data/route_step/logs
 
 output:
   format: CSV
 
 sinks[2]{database,format}:
-  spaces/default/data/route_step/domestic,CSV
-  spaces/default/data/route_step/other,CSV
+  data/route_step/domestic,CSV
+  data/route_step/other,CSV
 
 route:
   mode: case
   default: other
   branches[2]{key,where,database}:
-    domestic,"REGION IN ('NORTH', 'SOUTH')",spaces/default/data/route_step/domestic
-    other,"REGION IN ('EAST', 'WEST')",spaces/default/data/route_step/other
+    domestic,"REGION IN ('NORTH', 'SOUTH')",data/route_step/domestic
+    other,"REGION IN ('EAST', 'WEST')",data/route_step/other
 
 processing:
   threads: 1

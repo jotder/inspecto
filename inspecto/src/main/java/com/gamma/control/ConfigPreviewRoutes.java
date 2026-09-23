@@ -187,7 +187,7 @@ final class ConfigPreviewRoutes implements RouteModule {
         // /validate response is byte-for-byte unchanged for existing callers.
         boolean safety = "true".equalsIgnoreCase(String.valueOf(body.get("safety")));
         if (safety) {
-            findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy()));
+            findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy(), api.writeRoot()));
         }
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("type", type);

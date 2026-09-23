@@ -408,10 +408,10 @@ final class PipelineRenameRoutes implements RouteModule {
         });
 
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy()));
+        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy(), newPath.getParent()));
         Set<String> preExisting = new HashSet<>();
         ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
-        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy())
+        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy(), srcPath.getParent())
                 .forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
         List<Finding> introduced = findings.stream()
                 .filter(f -> f.severity() == Severity.ERROR)

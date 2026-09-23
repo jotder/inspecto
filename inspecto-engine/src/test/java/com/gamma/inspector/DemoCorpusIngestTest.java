@@ -35,11 +35,10 @@ import static org.junit.jupiter.api.Assertions.*;
  * walk with the WRITTEN, already-mapped rows. Fixed 2026-09-23 — it seeds with the raw parsed rows, and
  * {@code ControlApiPipelineTestRunDemoTest} pins the test run against this real ingest.)
  *
- * <p>The committed config is staged into a temp root: every {@code spaces/demo/data/…} path is
- * re-pointed at the temp copy (the demo's own data dirs are never touched), and the pipeline's directory —
- * its COMMITTED schemas beside it — is copied with it, because a satellite ref resolves beside its config
- * ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}). A path inside a TOON array row is quoted, because an
- * absolute Windows path begins {@code C:} and would otherwise parse as a key.
+ * <p>The committed config is staged VERBATIM into a temp Space ({@code <tmp>/config/<pipeline dir>/}, its
+ * COMMITTED schemas beside it, because a satellite ref resolves beside its config —
+ * {@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}). Its {@code data/…} paths then resolve under the temp Space
+ * ({@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}), so the demo's own data dirs are never touched.
  */
 class DemoCorpusIngestTest {
 
@@ -125,7 +124,7 @@ class DemoCorpusIngestTest {
      * ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}).
      */
     private static PipelineConfig stageWithGrammarFile(Path dir, String pipeline) throws Exception {
-        stage(dir, pipeline);   // writes the re-pointed copy beside the temp data
+        stage(dir, pipeline);   // writes the verbatim copy into the temp Space
         Path toon = dir.resolve(pipeline);
         List<String> out = new ArrayList<>();
         boolean moved = false;
@@ -240,30 +239,14 @@ class DemoCorpusIngestTest {
     }
 
     private static PipelineConfig stage(Path dir, String space, String pipeline) throws Exception {
-        String data = dir.resolve("data").toString().replace('\\', '/') + "/";
         Path source = REPO.resolve("spaces/" + space).resolve(pipeline);
         Path toon = dir.resolve(pipeline);
         Files.createDirectories(toon.getParent());
         try (var siblings = Files.list(source.getParent())) {
             for (Path f : siblings.filter(Files::isRegularFile).toList())
-                if (!f.equals(source)) Files.copy(f, toon.getParent().resolve(f.getFileName()));
+                Files.copy(f, toon.getParent().resolve(f.getFileName()));
         }
-        List<String> out = new ArrayList<>();
-        for (String line : Files.readAllLines(source))
-            out.add(rewrite(line, "spaces/" + space + "/data/", data));
-        Files.write(toon, out);
         return PipelineConfig.load(toon.toString());
-    }
-
-    /** Replace {@code from} with {@code to}, quoting the path field when the line is a TOON array row. */
-    private static String rewrite(String line, String from, String to) {
-        if (!line.contains(from)) return line;
-        String r = line.replace(from, to);
-        if (line.stripLeading().matches("^[A-Za-z_][A-Za-z0-9_]*\\s*:.*")) return r;
-        int at = r.indexOf(to);
-        int end = r.indexOf(',', at);
-        if (end < 0) end = r.length();
-        return r.substring(0, at) + '"' + r.substring(at, end) + '"' + r.substring(end);
     }
 
     private static void seed(PipelineConfig cfg, String sample) throws Exception {

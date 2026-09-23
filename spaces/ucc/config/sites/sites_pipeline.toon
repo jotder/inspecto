@@ -2,15 +2,15 @@ name: sites
 active: true
 
 dirs:
-  poll:       spaces/ucc/data/inbox/sites
-  database:   spaces/ucc/data/sites/database
-  backup:     spaces/ucc/data/sites/backup
-  temp:       spaces/ucc/data/sites/temp
-  errors:     spaces/ucc/data/sites/errors
-  quarantine: spaces/ucc/data/sites/quarantine
-  markers:    spaces/ucc/data/sites/markers
-  status_dir: spaces/ucc/data/sites/status
-  log_dir:    spaces/ucc/data/sites/logs
+  poll:       data/inbox/sites
+  database:   data/sites/database
+  backup:     data/sites/backup
+  temp:       data/sites/temp
+  errors:     data/sites/errors
+  quarantine: data/sites/quarantine
+  markers:    data/sites/markers
+  status_dir: data/sites/status
+  log_dir:    data/sites/logs
 
 output:
   format: PARQUET

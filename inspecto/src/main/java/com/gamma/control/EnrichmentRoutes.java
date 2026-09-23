@@ -99,7 +99,8 @@ final class EnrichmentRoutes implements RouteModule {
         }
         List<Finding> findings = new ArrayList<>(
                 ConfigLoader.filesystem().validate(ConfigSpecs.enrichment(), raw));
-        findings.addAll(ConfigSafetyValidator.check("enrichment", raw, SafetyPolicy.defaultPolicy()));
+        findings.addAll(ConfigSafetyValidator.check("enrichment", raw, SafetyPolicy.defaultPolicy(),
+                resolved.getParent()));
         if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR)) {
             return ApiContext.respondJson(ex, 422, Map.of("registered", false,
                     "error", "config has ERROR-level findings; not registered", "findings", findings));
@@ -141,7 +142,8 @@ final class EnrichmentRoutes implements RouteModule {
         Map<String, Object> configMap = mapAt(body, "config");
         EnrichmentConfig cfg;
         try {
-            cfg = EnrichmentConfig.fromMap(configMap, null);   // inline transform; no file I/O
+            // inline transform; no file I/O. Data paths resolve under this Space, as the saved config's would.
+            cfg = EnrichmentConfig.fromMap(configMap, null, api.writeRoot());
         } catch (RuntimeException invalid) {
             throw new ApiException(422, "config is not a valid enrichment: " + invalid.getMessage());
         }

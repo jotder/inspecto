@@ -26,7 +26,7 @@ export const ENRICHMENT_WIRING_ATTRIBUTES: AttributeSpec[] = [
         label: 'Input store',
         type: 'string',
         tier: 'required',
-        placeholder: 'spaces/demo/data/orders_feed/database',
+        placeholder: 'data/orders_feed/database',
         help: 'The Stage-1 output directory the transform reads as the `input` view.',
     },
     {
@@ -55,7 +55,7 @@ export const ENRICHMENT_WIRING_ATTRIBUTES: AttributeSpec[] = [
         label: 'Output store',
         type: 'string',
         tier: 'required',
-        placeholder: 'spaces/demo/data/enriched/orders_feed_enrich',
+        placeholder: 'data/enriched/orders_feed_enrich',
         help: 'Where the enriched output lands.',
     },
     {

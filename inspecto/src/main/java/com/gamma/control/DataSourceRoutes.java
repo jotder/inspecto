@@ -111,7 +111,9 @@ final class DataSourceRoutes implements RouteModule {
         boolean valid = true;
         for (Map.Entry<String, byte[]> entry : bundle.configEntries().entrySet()) {
             if (!entry.getKey().endsWith("_pipeline.toon")) continue;
-            List<Finding> fs = new ArrayList<>(validatePipeline(entry.getValue()));
+            // judged from where the entry would land, so its data paths resolve under this Space
+            List<Finding> fs = new ArrayList<>(validatePipeline(entry.getValue(),
+                    config.resolve(entry.getKey()).getParent()));
             String conn = connectionRefOf(entry.getValue());
             if (conn != null && !knownConnections.contains(conn))
                 fs.add(new Finding(Severity.ERROR, "collector.connection",
@@ -127,8 +129,6 @@ final class DataSourceRoutes implements RouteModule {
         r.put("files", new TreeSet<>(bundle.configEntries().keySet()));
         r.put("hasSpaceToon", bundle.spaceToon() != null);
         r.put("conflicts", conflicts);
-        // What the commit would rewrite, shown before the operator commits to it.
-        r.put("rebased", BundleImporter.rebaseTargets(bundle, config));
         r.put("findings", findings);
         r.put("valid", valid);
         return r;
@@ -139,7 +139,7 @@ final class DataSourceRoutes implements RouteModule {
      * default {@code /validate}: spec validation only — the path-jail safety gate is a deploy-environment
      * concern (paths in a bundle belong to the source space) and is opt-in there, so it is not applied here.
      */
-    private static List<Finding> validatePipeline(byte[] toon) {
+    private static List<Finding> validatePipeline(byte[] toon, Path configDir) {
         Map<String, Object> map;
         try {
             map = ConfigCodec.toMap(new String(toon, StandardCharsets.UTF_8));
@@ -151,7 +151,7 @@ final class DataSourceRoutes implements RouteModule {
         // here — jailing a path value needs the roots, not the filesystem — so preview and commit can and
         // must agree about an escaping schema_file/grammar/mapping_file. Only *existence* is unanswerable
         // before the files land.
-        fs.addAll(ConfigSafetyValidator.check("pipeline", map, SafetyPolicy.defaultPolicy()));
+        fs.addAll(ConfigSafetyValidator.check("pipeline", map, SafetyPolicy.defaultPolicy(), configDir));
         return fs;
     }
 
@@ -205,7 +205,7 @@ final class DataSourceRoutes implements RouteModule {
             // bundle whose schema_file/grammar/mapping_file escapes the allowed roots passed here and was
             // then refused one file at a time by registerPipeline below — the exact mid-walk partial
             // registration this whole gate exists to prevent.
-            fs.addAll(ConfigSafetyValidator.check("pipeline", map, SafetyPolicy.defaultPolicy()));
+            fs.addAll(ConfigSafetyValidator.check("pipeline", map, SafetyPolicy.defaultPolicy(), file.getParent()));
             String conn = connectionRef(map);
             if (conn != null && !knownConnections.contains(conn))
                 fs.add(new Finding(Severity.ERROR, "collector.connection",
@@ -308,8 +308,6 @@ final class DataSourceRoutes implements RouteModule {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("kind", bundle.kind());
         body.put("imported", written);
-        // Named, not silent: these files had the source space's paths rewritten to this space's.
-        body.put("rebased", unpacked.rebased());
         body.put("pipelines", pipelines);
         body.put("overwritten", overwrite && !conflicts.isEmpty());
         return body;

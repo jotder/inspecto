@@ -2,15 +2,15 @@ name: dedup_step
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/dedup_step
-  database:   spaces/default/data/dedup_step/database
-  backup:     spaces/default/data/dedup_step/backup
-  temp:       spaces/default/data/dedup_step/temp
-  errors:     spaces/default/data/dedup_step/errors
-  quarantine: spaces/default/data/dedup_step/quarantine
-  markers:    spaces/default/data/dedup_step/markers
-  status_dir: spaces/default/data/dedup_step/status
-  log_dir:    spaces/default/data/dedup_step/logs
+  poll:       data/inbox/dedup_step
+  database:   data/dedup_step/database
+  backup:     data/dedup_step/backup
+  temp:       data/dedup_step/temp
+  errors:     data/dedup_step/errors
+  quarantine: data/dedup_step/quarantine
+  markers:    data/dedup_step/markers
+  status_dir: data/dedup_step/status
+  log_dir:    data/dedup_step/logs
 
 output:
   format: PARQUET

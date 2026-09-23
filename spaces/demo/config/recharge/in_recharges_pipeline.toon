@@ -3,30 +3,30 @@ active: false
 description: "Prepaid recharge export from an IN platform as fixed-width text: a short header, one 57-character detail per top-up, a short trailer carrying the count. min_record_length drops the header and trailer, the mapping undoes the implied two decimals, and each recharge is routed by STATUS into accepted or rejected. The domain-shaped counterpart to the synthetic fixedwidth_example. Sample and layout: data/samples/gen-in-recharges.py."
 
 dirs:
-  poll:       spaces/demo/data/inbox/in_recharges
-  database:   spaces/demo/data/in_recharges/accepted
-  backup:     spaces/demo/data/in_recharges/backup
-  temp:       spaces/demo/data/in_recharges/temp
-  errors:     spaces/demo/data/in_recharges/errors
-  quarantine: spaces/demo/data/in_recharges/quarantine
-  markers:    spaces/demo/data/in_recharges/markers
-  status_dir: spaces/demo/data/in_recharges/status
-  log_dir:    spaces/demo/data/in_recharges/logs
+  poll:       data/inbox/in_recharges
+  database:   data/in_recharges/accepted
+  backup:     data/in_recharges/backup
+  temp:       data/in_recharges/temp
+  errors:     data/in_recharges/errors
+  quarantine: data/in_recharges/quarantine
+  markers:    data/in_recharges/markers
+  status_dir: data/in_recharges/status
+  log_dir:    data/in_recharges/logs
 
 output:
   format: PARQUET
   compression: snappy
 
 sinks[2]{database,format}:
-  spaces/demo/data/in_recharges/accepted,PARQUET
-  spaces/demo/data/in_recharges/rejected,PARQUET
+  data/in_recharges/accepted,PARQUET
+  data/in_recharges/rejected,PARQUET
 
 route:
   mode: case
   default: rejected
   branches[2]{key,where,database}:
-    accepted,"STATUS = 'OK'",spaces/demo/data/in_recharges/accepted
-    rejected,"STATUS <> 'OK'",spaces/demo/data/in_recharges/rejected
+    accepted,"STATUS = 'OK'",data/in_recharges/accepted
+    rejected,"STATUS <> 'OK'",data/in_recharges/rejected
 
 processing:
   threads: 1

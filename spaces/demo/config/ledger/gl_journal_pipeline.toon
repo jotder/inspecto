@@ -3,15 +3,15 @@ active: false
 description: "Month-end general-ledger journal export from a finance team's workbook: a titled sheet whose header and lines are read through an explicit range (the totals row under them is not a journal line), landed per account class. The domain-shaped counterpart to the synthetic excel_example."
 
 dirs:
-  poll:       spaces/demo/data/inbox/gl_journal
-  database:   spaces/demo/data/gl_journal/database
-  backup:     spaces/demo/data/gl_journal/backup
-  temp:       spaces/demo/data/gl_journal/temp
-  errors:     spaces/demo/data/gl_journal/errors
-  quarantine: spaces/demo/data/gl_journal/quarantine
-  markers:    spaces/demo/data/gl_journal/markers
-  status_dir: spaces/demo/data/gl_journal/status
-  log_dir:    spaces/demo/data/gl_journal/logs
+  poll:       data/inbox/gl_journal
+  database:   data/gl_journal/database
+  backup:     data/gl_journal/backup
+  temp:       data/gl_journal/temp
+  errors:     data/gl_journal/errors
+  quarantine: data/gl_journal/quarantine
+  markers:    data/gl_journal/markers
+  status_dir: data/gl_journal/status
+  log_dir:    data/gl_journal/logs
 
 output:
   format: PARQUET

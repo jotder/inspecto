@@ -689,13 +689,29 @@ public final class PipelineEditable {
     }
 
     /** The raw top-level {@code sinks[]} entry whose {@code database} equals {@code database}, or
-     *  {@code null} — absent list or no match means the single-{@code output:} shorthand applies. */
+     *  {@code null} — absent list or no match means the single-{@code output:} shorthand applies.
+     *
+     *  <p>⚠ The lifted {@code database} is RESOLVED (absolute, under the Space dir —
+     *  {@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}) while the raw entry is as authored ({@code data/x}), so a
+     *  relative entry matches when the resolved path ends with it; an exact match wins first. */
     private static Map<?, ?> sinkEntryForDatabase(Map<String, Object> raw, Object database) {
         if (database == null || !(raw.get("sinks") instanceof List<?> sinks)) return null;
         for (Object o : sinks)
             if (o instanceof Map<?, ?> m
                     && String.valueOf(database).equals(String.valueOf(m.get("database")))) return m;
+        for (Object o : sinks)
+            if (o instanceof Map<?, ?> m && m.get("database") != null && endsWith(database, m.get("database")))
+                return m;
         return null;
+    }
+
+    private static boolean endsWith(Object resolved, Object authored) {
+        try {
+            java.nio.file.Path a = java.nio.file.Path.of(String.valueOf(authored).trim()).normalize();
+            return !a.isAbsolute() && java.nio.file.Path.of(String.valueOf(resolved)).normalize().endsWith(a);
+        } catch (RuntimeException notAPath) {
+            return false;
+        }
     }
 
     // ═════════════════════════════ editable lower ═════════════════════════════

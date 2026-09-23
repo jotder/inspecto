@@ -12,9 +12,9 @@ const PIPELINE = {
     active: true,
     description: 'Nightly orders',
     dirs: {
-        poll: 'spaces/demo/data/inbox/orders_feed',
-        database: 'spaces/demo/data/orders_feed/database',
-        status_dir: 'spaces/demo/data/orders_feed/status',
+        poll: 'data/inbox/orders_feed',
+        database: 'data/orders_feed/database',
+        status_dir: 'data/orders_feed/status',
     },
     processing: {
         threads: 1,
@@ -146,16 +146,16 @@ describe('stream-bundle — parse', () => {
 });
 
 describe('stream-bundle — import plan', () => {
-    const planFor = (name = 'orders_copy', space: string | null = 'prod') => planStreamImport(build(), { name, space });
+    const planFor = (name = 'orders_copy') => planStreamImport(build(), { name });
 
     it('names the target, forces a draft, and re-derives every directory', () => {
         const p = planFor();
         expect(p.pipeline['name']).toBe('orders_copy');
         expect(p.pipeline['active']).toBe(false); // NEVER import as live
         const dirs = p.pipeline['dirs'] as Record<string, string>;
-        expect(dirs['poll']).toBe('spaces/prod/data/inbox/orders_copy');
-        expect(dirs['database']).toBe('spaces/prod/data/orders_copy/database');
-        expect(dirs['status_dir']).toBe('spaces/prod/data/orders_copy/status');
+        expect(dirs['poll']).toBe('data/inbox/orders_copy');
+        expect(dirs['database']).toBe('data/orders_copy/database');
+        expect(dirs['status_dir']).toBe('data/orders_copy/status');
         expect(p.notes.join(' ')).toContain('re-derived');
         expect(p.notes.join(' ')).toContain('inactive draft');
     });
@@ -168,11 +168,10 @@ describe('stream-bundle — import plan', () => {
         expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe('orders_copy_schema.toon');
     });
 
-    it('handles a single-space (no space id) target', () => {
-        const p = planFor('orders_copy', null);
-        expect((p.pipeline['dirs'] as Record<string, string>)['poll']).toBe('./data/inbox/orders_copy');
-        // Identical to the spaced target — that portability is the whole point of the bare form.
-        expect((p.pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe('orders_copy_schema.toon');
+    it('never embeds a space prefix in the derived dirs', () => {
+        const dirs = planFor().pipeline['dirs'] as Record<string, string>;
+        // Space-relative: one spelling serves a Space and single-tenant mode alike.
+        for (const v of Object.values(dirs)) expect(v).toMatch(/^data\//);
     });
 
     it('rewires every segment path and sanitizes the derived names', () => {
@@ -181,7 +180,7 @@ describe('stream-bundle — import plan', () => {
             parsing: { frontend: 'plugin', plugin: { ingester: 'X', segments: { 'mo-call': 'old/path.toon' } } },
         };
         const bundle = build({ pipeline: plugin, segments: { 'mo-call': { raw: { name: 'old' } } } });
-        const p = planStreamImport(bundle, { name: 'cdr', space: 'prod' });
+        const p = planStreamImport(bundle, { name: 'cdr' });
         expect(p.segments).toHaveLength(1);
         expect(p.segments[0].name).toBe('cdr_mo_call'); // '-' is not identifier-safe
         const built = (p.pipeline['parsing'] as Record<string, unknown>)['plugin'] as Record<string, unknown>;
@@ -200,7 +199,7 @@ describe('stream-bundle — import plan', () => {
      */
     it("registers under an id stamped from the TYPED name, never the source bundle's", () => {
         const b = build({ pipeline: { ...PIPELINE, id: 'orders_feed' } });
-        const p = planStreamImport(b, { name: 'Orders-EU', space: 'prod' });
+        const p = planStreamImport(b, { name: 'Orders-EU' });
         expect(p.pipeline['id']).toBe('orders_eu');
         expect(p.pipeline['name']).toBe('Orders-EU');
         // Export strips it too, so a NEW bundle never carries identity in the first place.
@@ -222,7 +221,7 @@ describe('stream-bundle — import plan', () => {
             segments: { 'mo-call': { raw: { name: 'old' } } },
             enrichment: { joins: [] },
         });
-        const p = planStreamImport(b, { name: 'Orders-EU', space: 'prod' });
+        const p = planStreamImport(b, { name: 'Orders-EU' });
         expect(p.schema?.name).toBe('orders_eu_schema');
         expect(p.segments[0].name).toBe('orders_eu_mo_call');
         expect(p.enrichment?.name).toBe('orders_eu_enrich');
@@ -238,13 +237,13 @@ describe('stream-bundle — import plan', () => {
 
     it('warns about masked values so the operator knows to re-enter them', () => {
         const b = build({ pipeline: { ...PIPELINE, collector: { password: 'literal' } } });
-        const p = planStreamImport(b, { name: 'x', space: null });
+        const p = planStreamImport(b, { name: 'x' });
         expect(p.notes.join(' ')).toContain('masked');
     });
 
     it('names the enrichment companion by the target convention', () => {
         const b = build({ enrichment: { joins: [] } });
-        expect(planStreamImport(b, { name: 'orders_copy', space: 'prod' }).enrichment?.name).toBe('orders_copy_enrich');
+        expect(planStreamImport(b, { name: 'orders_copy' }).enrichment?.name).toBe('orders_copy_enrich');
     });
 
     // REGRESSION (live round-trip, 2026-07-31): `ConfigService.write` derives the target file from
@@ -253,7 +252,7 @@ describe('stream-bundle — import plan', () => {
     // the imported stream with none.
     it('writes each satellite under the TARGET identity, inside the config body', () => {
         const b = build({ enrichment: { name: 'orders_feed_enrich', joins: [] } });
-        const p = planStreamImport(b, { name: 'orders_copy', space: 'prod' });
+        const p = planStreamImport(b, { name: 'orders_copy' });
         expect(p.enrichment?.config['name']).toBe('orders_copy_enrich'); // body, not just the label
         expect(p.schema?.config['raw']).toMatchObject({ name: 'orders_copy_schema' });
         expect(p.enrichment?.name).toBe(p.enrichment?.config['name']); // label agrees with body
@@ -263,16 +262,17 @@ describe('stream-bundle — import plan', () => {
         const b = build({
             enrichment: {
                 name: 'orders_feed_enrich',
-                input: { database: 'spaces/demo/data/orders_feed/database', format: 'PARQUET' },
+                input: { database: 'data/orders_feed/database', format: 'PARQUET' },
+                // A legacy space-embedded path: the import strips the prefix to the Space-relative remainder.
                 output: { database: 'spaces/demo/data/enriched/orders_feed_enrich', format: 'PARQUET' },
                 transform: 'SELECT * FROM input',
                 triggers: { on_pipeline: 'orders_feed' },
             },
         });
-        const e = planStreamImport(b, { name: 'orders_copy', space: 'prod' }).enrichment!.config;
-        expect((e['input'] as Record<string, unknown>)['database']).toBe('spaces/prod/data/orders_copy/database');
+        const e = planStreamImport(b, { name: 'orders_copy' }).enrichment!.config;
+        expect((e['input'] as Record<string, unknown>)['database']).toBe('data/orders_copy/database');
         expect((e['output'] as Record<string, unknown>)['database']).toBe(
-            'spaces/prod/data/enriched/orders_copy_enrich',
+            'data/enriched/orders_copy_enrich',
         );
         expect((e['triggers'] as Record<string, unknown>)['on_pipeline']).toBe('orders_copy');
         expect(e['transform']).toBe('SELECT * FROM input'); // the author's logic is untouched
@@ -289,10 +289,10 @@ describe('stream-bundle — import plan', () => {
         const b = build({
             enrichment: {
                 name: 'orders_feed_enrich',
-                input: { database: 'spaces/demo/data/orders_feed/database', format: 'PARQUET' },
+                input: { database: 'data/orders_feed/database', format: 'PARQUET' },
             },
         });
-        const p = planStreamImport(b, { name: 'Orders-Daily', space: 'prod' });
+        const p = planStreamImport(b, { name: 'Orders-Daily' });
         expect(p.pipeline['id']).toBe('orders_daily'); // narrowed — no longer the typed name
         const dirs = p.pipeline['dirs'] as Record<string, string>;
         expect((p.enrichment!.config['input'] as Record<string, unknown>)['database']).toBe(dirs['database']);
@@ -305,7 +305,7 @@ describe('stream-bundle — import plan', () => {
             kind: 'stream',
             pipeline: { name: 'a', processing: { threads: 1 } },
         });
-        const p = planStreamImport(bare, { name: 'b', space: null });
+        const p = planStreamImport(bare, { name: 'b' });
         expect(p.schema).toBeUndefined();
         expect(p.segments).toEqual([]);
         expect(p.enrichment).toBeUndefined();

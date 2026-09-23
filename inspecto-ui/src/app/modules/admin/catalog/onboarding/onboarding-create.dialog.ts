@@ -7,9 +7,9 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
-import { ConfigService, SpacesService, apiErrorMessage } from 'app/inspecto/api';
+import { ConfigService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { configPipelineId, pipelineScaffold, spaceBase } from 'app/inspecto/component-model';
+import { configPipelineId, pipelineScaffold } from 'app/inspecto/component-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { StreamBundle, parseStreamBundle, planStreamImport } from 'app/inspecto/transfer/stream-bundle';
@@ -44,7 +44,7 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
  * asked exactly at artifact-creation time. Submitting writes a minimal, spec-valid,
  * `active:false` draft (`POST /config/write`) and registers it (`POST /runs`) so it is
  * catalog-visible immediately; the caller then opens the guided editor. Directory defaults
- * follow the space convention and sit behind Advanced — never blocking the first write.
+ * follow the Space-relative `data/...` convention and sit behind Advanced — never blocking the first write.
  *
  * **Import (2026-07-31)** is the same entry point, pre-loaded: pick a file exported by the
  * onboarding shell's *Export config* and the draft is created from it — pipeline body, schema,
@@ -212,7 +212,6 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
 export class OnboardingCreateDialog {
     private fb = inject(FormBuilder);
     private configApi = inject(ConfigService);
-    private spaces = inject(SpacesService);
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
     private transfer = inject(StreamTransferService);
@@ -244,7 +243,7 @@ export class OnboardingCreateDialog {
     readonly importNotes = computed<string[]>(() => {
         const b = this.imported();
         if (!b) return [];
-        return planStreamImport(b, { name: this.plannedName(), space: this.spaces.currentSpaceId() }).notes;
+        return planStreamImport(b, { name: this.plannedName() }).notes;
     });
 
     private readonly nameValue = signal('');
@@ -269,16 +268,15 @@ export class OnboardingCreateDialog {
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
 
     constructor() {
-        // Directory defaults follow the space convention, live while the author hasn't overridden.
+        // Directory defaults follow the Space-relative `data/...` convention, live while the author hasn't overridden.
         this.form.controls.name.valueChanges.subscribe((name) => {
             const slug = String(name ?? '').trim();
             this.nameValue.set(slug);
             if (!slug) return;
-            const base = spaceBase(this.spaces.currentSpaceId());
             if (this.form.controls.poll.pristine)
-                this.form.controls.poll.setValue(`${base}/data/inbox/${slug}`, { emitEvent: false });
+                this.form.controls.poll.setValue(`data/inbox/${slug}`, { emitEvent: false });
             if (this.form.controls.database.pristine)
-                this.form.controls.database.setValue(`${base}/data/${slug}/database`, { emitEvent: false });
+                this.form.controls.database.setValue(`data/${slug}/database`, { emitEvent: false });
         });
     }
 
@@ -375,7 +373,7 @@ export class OnboardingCreateDialog {
         if (!bundle) return;
         const v = this.form.getRawValue();
         const name = String(v.name ?? '').trim();
-        const plan = planStreamImport(bundle, { name, space: this.spaces.currentSpaceId() });
+        const plan = planStreamImport(bundle, { name });
 
         // The Advanced fields still win if the operator touched them — same contract as a fresh create.
         const dirs = plan.pipeline['dirs'] as Record<string, string>;

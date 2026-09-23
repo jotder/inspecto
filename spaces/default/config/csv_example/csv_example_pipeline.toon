@@ -2,15 +2,15 @@ name: csv_example
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/csv_example
-  database:   spaces/default/data/csv_example/database
-  backup:     spaces/default/data/csv_example/backup
-  temp:       spaces/default/data/csv_example/temp
-  errors:     spaces/default/data/csv_example/errors
-  quarantine: spaces/default/data/csv_example/quarantine
-  markers:    spaces/default/data/csv_example/markers
-  status_dir: spaces/default/data/csv_example/status
-  log_dir:    spaces/default/data/csv_example/logs
+  poll:       data/inbox/csv_example
+  database:   data/csv_example/database
+  backup:     data/csv_example/backup
+  temp:       data/csv_example/temp
+  errors:     data/csv_example/errors
+  quarantine: data/csv_example/quarantine
+  markers:    data/csv_example/markers
+  status_dir: data/csv_example/status
+  log_dir:    data/csv_example/logs
 
 output:
   format: PARQUET

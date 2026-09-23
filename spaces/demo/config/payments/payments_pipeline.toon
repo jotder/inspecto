@@ -2,15 +2,15 @@ name: payments
 active: true
 
 dirs:
-  poll:       spaces/demo/data/inbox/payments
-  database:   spaces/demo/data/payments/database
-  backup:     spaces/demo/data/payments/backup
-  temp:       spaces/demo/data/payments/temp
-  errors:     spaces/demo/data/payments/errors
-  quarantine: spaces/demo/data/payments/quarantine
-  markers:    spaces/demo/data/payments/markers
-  status_dir: spaces/demo/data/payments/status
-  log_dir:    spaces/demo/data/payments/logs
+  poll:       data/inbox/payments
+  database:   data/payments/database
+  backup:     data/payments/backup
+  temp:       data/payments/temp
+  errors:     data/payments/errors
+  quarantine: data/payments/quarantine
+  markers:    data/payments/markers
+  status_dir: data/payments/status
+  log_dir:    data/payments/logs
 
 output:
   format: PARQUET

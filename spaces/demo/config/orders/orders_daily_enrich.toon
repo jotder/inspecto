@@ -1,17 +1,17 @@
 name: ORDERS_DAILY
 
 input:
-  database: spaces/demo/data/orders/database
+  database: data/orders/database
   format: PARQUET
   partitions[3]: year, month, day
 
 references:
   region_dim:
-    path: spaces/demo/data/ref/region_dim.csv
+    path: data/ref/region_dim.csv
     format: CSV
 
 output:
-  database: spaces/demo/data/reports/orders_daily
+  database: data/reports/orders_daily
   format: PARQUET
   compression: snappy
   partitions[3]: year, month, day

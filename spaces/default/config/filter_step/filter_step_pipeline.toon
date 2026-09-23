@@ -2,15 +2,15 @@ name: filter_step
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/filter_step
-  database:   spaces/default/data/filter_step/database
-  backup:     spaces/default/data/filter_step/backup
-  temp:       spaces/default/data/filter_step/temp
-  errors:     spaces/default/data/filter_step/errors
-  quarantine: spaces/default/data/filter_step/quarantine
-  markers:    spaces/default/data/filter_step/markers
-  status_dir: spaces/default/data/filter_step/status
-  log_dir:    spaces/default/data/filter_step/logs
+  poll:       data/inbox/filter_step
+  database:   data/filter_step/database
+  backup:     data/filter_step/backup
+  temp:       data/filter_step/temp
+  errors:     data/filter_step/errors
+  quarantine: data/filter_step/quarantine
+  markers:    data/filter_step/markers
+  status_dir: data/filter_step/status
+  log_dir:    data/filter_step/logs
 
 output:
   format: PARQUET

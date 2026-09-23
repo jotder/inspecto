@@ -2,15 +2,15 @@ name: lookup_step
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/lookup_step
-  database:   spaces/default/data/lookup_step/database
-  backup:     spaces/default/data/lookup_step/backup
-  temp:       spaces/default/data/lookup_step/temp
-  errors:     spaces/default/data/lookup_step/errors
-  quarantine: spaces/default/data/lookup_step/quarantine
-  markers:    spaces/default/data/lookup_step/markers
-  status_dir: spaces/default/data/lookup_step/status
-  log_dir:    spaces/default/data/lookup_step/logs
+  poll:       data/inbox/lookup_step
+  database:   data/lookup_step/database
+  backup:     data/lookup_step/backup
+  temp:       data/lookup_step/temp
+  errors:     data/lookup_step/errors
+  quarantine: data/lookup_step/quarantine
+  markers:    data/lookup_step/markers
+  status_dir: data/lookup_step/status
+  log_dir:    data/lookup_step/logs
 
 output:
   format: PARQUET

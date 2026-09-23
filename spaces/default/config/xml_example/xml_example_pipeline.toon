@@ -2,15 +2,15 @@ name: xml_example
 active: true
 
 dirs:
-  poll:       spaces/default/data/inbox/xml_example
-  database:   spaces/default/data/xml_example/database
-  backup:     spaces/default/data/xml_example/backup
-  temp:       spaces/default/data/xml_example/temp
-  errors:     spaces/default/data/xml_example/errors
-  quarantine: spaces/default/data/xml_example/quarantine
-  markers:    spaces/default/data/xml_example/markers
-  status_dir: spaces/default/data/xml_example/status
-  log_dir:    spaces/default/data/xml_example/logs
+  poll:       data/inbox/xml_example
+  database:   data/xml_example/database
+  backup:     data/xml_example/backup
+  temp:       data/xml_example/temp
+  errors:     data/xml_example/errors
+  quarantine: data/xml_example/quarantine
+  markers:    data/xml_example/markers
+  status_dir: data/xml_example/status
+  log_dir:    data/xml_example/logs
 
 output:
   format: PARQUET

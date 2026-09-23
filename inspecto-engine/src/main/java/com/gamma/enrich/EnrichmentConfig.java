@@ -1,6 +1,7 @@
 package com.gamma.enrich;
 
 import com.gamma.api.PublicApi;
+import com.gamma.config.safety.PathJail;
 import com.gamma.etl.Identifiers;
 import com.gamma.util.ToonHelper;
 
@@ -8,6 +9,7 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
@@ -152,7 +154,12 @@ public record EnrichmentConfig(String name,
                 throw new FileNotFoundException("transform_file not found: " + transformFile);
             transform = Files.readString(Paths.get(transformFile), StandardCharsets.UTF_8);
         }
-        return fromMap(raw, transform);
+        return fromMap(raw, transform, Paths.get(configPath).toAbsolutePath().getParent());
+    }
+
+    /** {@link #fromMap(Map, String, Path)} for a config with no home — its data paths stay as authored. */
+    public static EnrichmentConfig fromMap(Map<String, Object> raw, String resolvedTransformSql) {
+        return fromMap(raw, resolvedTransformSql, null);
     }
 
     /**
@@ -160,22 +167,28 @@ public record EnrichmentConfig(String name,
      * SQL — a <b>pure</b> parse with no file I/O. {@code resolvedTransformSql} is the SQL read from a
      * {@code transform_file} (or {@code null} to use the inline {@code transform} key in {@code raw}).
      *
+     * <p>The DATA paths — {@code input.database}, {@code output.database}, {@code references.<n>.path} —
+     * resolve under the Space directory of {@code configDir} through {@link PathJail#dataPath}
+     * ({@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}), exactly as a Pipeline's {@code dirs.*} do; with no Space they
+     * stay as authored (the working-directory reading).
+     *
+     * @param configDir the config file's directory, or {@code null} for a config with no home
      * @throws IllegalArgumentException if neither an inline transform nor resolved SQL is present
      */
     @SuppressWarnings("unchecked")
-    public static EnrichmentConfig fromMap(Map<String, Object> raw, String resolvedTransformSql) {
+    public static EnrichmentConfig fromMap(Map<String, Object> raw, String resolvedTransformSql, Path configDir) {
         String name = String.valueOf(raw.get("name"));
 
         Map<String, Object> in = ToonHelper.requireSection(raw, "input");
         Input input = new Input(
-                req(in, "database", "input.database"),
+                PathJail.dataPath(configDir, req(in, "database", "input.database"), "input.database"),
                 String.valueOf(in.getOrDefault("format", "PARQUET")).toUpperCase(),
                 strList(in.get("partitions"), "input.partitions"));
         input.partitions().forEach(c -> Identifiers.validate(c, "input.partitions"));
 
         Map<String, Object> out = ToonHelper.requireSection(raw, "output");
         Output output = new Output(
-                req(out, "database", "output.database"),
+                PathJail.dataPath(configDir, req(out, "database", "output.database"), "output.database"),
                 String.valueOf(out.getOrDefault("format", "PARQUET")).toUpperCase(),
                 (String) out.get("compression"),
                 partitionColumns(out.get("partitions"), "output.partitions"),
@@ -206,7 +219,8 @@ public record EnrichmentConfig(String name,
                     if (asOf != null && !hasRef)
                         throw new IllegalArgumentException("references." + rname
                                 + ".as_of needs a by-name 'ref' — a plain 'path' file carries no version history");
-                    refs.add(new Reference(rname, hasPath ? path : null,
+                    refs.add(new Reference(rname,
+                            hasPath ? PathJail.dataPath(configDir, path, "references." + rname + ".path") : null,
                             (fmt == null ? "PARQUET" : fmt.toString()).toUpperCase(),
                             hasRef ? ref : null, asOf));
                 }

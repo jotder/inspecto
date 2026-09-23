@@ -183,8 +183,6 @@ final class PipelineBundleRoutes implements RouteModule {
         manifest.put("pipeline", id);
         manifest.put("pipeline_file", pipelineEntry);
         manifest.put("exported_at", java.time.Instant.now().toString());
-        String sourcePrefix = spacePrefix(api.writeRoot());
-        if (!sourcePrefix.isEmpty()) manifest.put("source_prefix", sourcePrefix);
         if (!satellites.isEmpty()) manifest.put("satellites", satellites);
         if (!enrichments.isEmpty()) manifest.put("enrichments", enrichments);
         if (!requirements.isEmpty()) manifest.put("requirements", requirements);
@@ -290,8 +288,8 @@ final class PipelineBundleRoutes implements RouteModule {
             WriteGates.jail(destDir, destDir.resolve(String.valueOf(en)), "bundle entry '" + en + "'");
 
         // Retarget INSIDE the pipeline body, then run the FULL saveGraph gate over the result.
-        String prefix = spacePrefix(writeRoot);
-        Map<String, Object> retargeted = retargetPipeline(sourceMap, sourceId, newId, prefix, satelliteNames);
+        Map<String, Object> retargeted = retargetPipeline(sourceMap, sourceId, newId, dataPrefix(writeRoot),
+                satelliteNames);
 
         // Satellites land FIRST (the client bundle's ordering rule — the pipeline never names a file
         // that does not exist yet). They must also land BEFORE the safety gate: a config ref resolves
@@ -337,7 +335,6 @@ final class PipelineBundleRoutes implements RouteModule {
         // Companion enrichment(s): retargeted inside the body, written before the pipeline too.
         List<String> notes = new ArrayList<>();
         List<Path> enrichTargets = new ArrayList<>();
-        String sourcePrefix = ApiContext.str(manifest, "source_prefix");
         Object sourceDb = sourceMap.get("dirs") instanceof Map<?, ?> d ? d.get("database") : null;
         Object targetDb = retargeted.get("dirs") instanceof Map<?, ?> d ? d.get("database") : null;
         for (Object en : asStringList(manifest.get("enrichments"))) {
@@ -350,7 +347,7 @@ final class PipelineBundleRoutes implements RouteModule {
             } catch (RuntimeException bad) {
                 throw new ApiException(422, "bundle companion '" + en + "' does not parse: " + bad.getMessage());
             }
-            String newName = retargetEnrichment(enrich, sourceId, newId, sourcePrefix, prefix,
+            String newName = retargetEnrichment(enrich, sourceId, newId,
                     sourceDb == null ? null : String.valueOf(sourceDb),
                     targetDb == null ? null : String.valueOf(targetDb));
             Path et = WriteGates.jail(destDir, destDir.resolve(
@@ -402,8 +399,9 @@ final class PipelineBundleRoutes implements RouteModule {
 
     /**
      * The imported pipeline map: identity, stream, collector id and every {@code dirs.*} path
-     * re-derived from the target space's convention ({@code <prefix>data/inbox/<id>} /
-     * {@code <prefix>data/<id>/<leaf>} — the layout the sample spaces and the create surface write),
+     * re-derived from the target space's convention ({@code data/inbox/<id>} / {@code data/<id>/<leaf>} —
+     * Space-relative, the layout the sample spaces and the create surface write; a relative data path
+     * resolves under the Space directory, {@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}, so no per-space prefix),
      * satellite refs rewritten to the bare basenames landing beside the file, and ALWAYS
      * {@code active: false} — importing as live would start processing on someone else's server.
      */
@@ -534,11 +532,10 @@ final class PipelineBundleRoutes implements RouteModule {
      * Retarget a companion enrichment in place — on exactly the leaves the client bundle learned
      * (the hard way) it must rewrite: {@code name} (a config's own identity field decides its file),
      * {@code triggers.on_pipeline}, {@code input.database} (the imported pipeline's own database) and
-     * {@code output.database} (source space prefix and enrichment name re-pointed, the author's
+     * {@code output.database} (enrichment name re-pointed, the author's
      * intermediate layout preserved). Returns the new enrichment name.
      */
     private static String retargetEnrichment(Map<String, Object> enrich, String oldId, String newId,
-                                             String sourcePrefix, String targetPrefix,
                                              String sourceDb, String targetDb) {
         String oldName = String.valueOf(enrich.getOrDefault("name", oldId + "_enrich"));
         String swapped = Pattern.compile(Pattern.quote(oldId), Pattern.CASE_INSENSITIVE)
@@ -558,26 +555,24 @@ final class PipelineBundleRoutes implements RouteModule {
                     && (sourceDb == null || String.valueOf(db).equals(sourceDb) || sourceDb.isBlank()))
                 in.put("database", targetDb);
             else if (db != null) in.put("database", repointPath(String.valueOf(db),
-                    sourcePrefix, targetPrefix, oldName, newName, oldId, newId));
+                    oldName, newName, oldId, newId));
             enrich.put("input", in);
         }
         if (enrich.get("output") instanceof Map<?, ?>) {
             Map<String, Object> out = new LinkedHashMap<>(mapAt(enrich, "output"));
             if (out.get("database") != null)
                 out.put("database", repointPath(String.valueOf(out.get("database")),
-                        sourcePrefix, targetPrefix, oldName, newName, oldId, newId));
+                        oldName, newName, oldId, newId));
             enrich.put("output", out);
         }
         return newName;
     }
 
-    /** Re-point a data path: source space prefix → target's, and the old identity leaves (enrichment
+    /** Re-point a data path's old identity leaves (enrichment
      *  name / pipeline id) → the new ones. Intermediate layout stays the author's. */
-    private static String repointPath(String path, String sourcePrefix, String targetPrefix,
+    private static String repointPath(String path,
                                       String oldName, String newName, String oldId, String newId) {
         String p = path;
-        if (sourcePrefix != null && !sourcePrefix.isEmpty() && p.startsWith(sourcePrefix))
-            p = targetPrefix + p.substring(sourcePrefix.length());
         p = Pattern.compile(Pattern.quote(oldName), Pattern.CASE_INSENSITIVE)
                 .matcher(p).replaceAll(java.util.regex.Matcher.quoteReplacement(newName.toLowerCase()));
         p = Pattern.compile(Pattern.quote(oldId), Pattern.CASE_INSENSITIVE)
@@ -711,18 +706,15 @@ final class PipelineBundleRoutes implements RouteModule {
     }
 
     /**
-     * The space's own path prefix as a config spells it ({@code spaces/<id>/}, or absolute when the
-     * space lives outside the working directory; empty for a single-tenant root) — the write root's
-     * parent relative to the working directory, the same derivation {@code BundleImporter.targetPrefix}
-     * uses on the whole-tree zip path.
+     * The prefix an imported pipeline's data paths carry: none in a Space (a relative data path resolves under
+     * the Space dir, {@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}); with no Space (single-tenant, a write root with no
+     * {@code config/} ancestor) the write root's parent, absolute — there a relative path means the launch
+     * directory, which need not be inside the allowed roots the imported config is judged against.
      */
-    private static String spacePrefix(Path configRoot) {
-        if (configRoot == null) return "";
-        Path base = configRoot.toAbsolutePath().normalize().getParent();
-        if (base == null) return "";
-        Path cwd = Path.of("").toAbsolutePath().normalize();
-        String s = (base.startsWith(cwd) ? cwd.relativize(base) : base).toString().replace('\\', '/');
-        return s.isEmpty() ? "" : s + "/";
+    static String dataPrefix(Path writeRoot) {
+        if (writeRoot == null || com.gamma.config.safety.PathJail.spaceDirOf(writeRoot) != null) return "";
+        Path base = writeRoot.toAbsolutePath().normalize().getParent();
+        return base == null ? "" : base.toString().replace('\\', '/') + "/";
     }
 
     private static byte[] zip(Map<String, Object> manifest, Map<String, byte[]> entries) throws IOException {

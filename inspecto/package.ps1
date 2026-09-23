@@ -649,8 +649,8 @@ if (Test-Path $uiDistRoot) {
 }
 
 # ── step 4: copy the multi-space config tree (configs + space.toon) ───────────
-# Each space's pipeline configs use repo-root-relative paths (spaces/<id>/config|data/...), which
-# resolve identically from the bundle root — no path rewrite needed. Runtime state
+# Each space's configs are relocatable: a config ref resolves beside its config and a data path
+# (data/...) under its Space dir, whatever the launch dir — no path rewrite needed. Runtime state
 # (data/audit/duckdb/flows) is created on first run and is intentionally NOT bundled.
 #
 # The excluded trees are SKIPPED AT COPY TIME, not copied-then-pruned (2026-07-31): a locally running

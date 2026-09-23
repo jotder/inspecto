@@ -3,15 +3,15 @@ active: false
 description: "MSC switch CDRs as ASN.1 BER: one file mixes voice-originating, voice-terminating, SMS and supplementary-service records, told apart by the CHOICE alternative. Three alternatives land in a store each; supplementary-service records are not collected and count as junk. The domain-shaped counterpart to the synthetic asn1_example. Sample bytes and the readable grammar: data/samples/gen-msc-cdr.py."
 
 dirs:
-  poll:       spaces/demo/data/inbox/msc_cdr
-  database:   spaces/demo/data/msc_cdr/database
-  backup:     spaces/demo/data/msc_cdr/backup
-  temp:       spaces/demo/data/msc_cdr/temp
-  errors:     spaces/demo/data/msc_cdr/errors
-  quarantine: spaces/demo/data/msc_cdr/quarantine
-  markers:    spaces/demo/data/msc_cdr/markers
-  status_dir: spaces/demo/data/msc_cdr/status
-  log_dir:    spaces/demo/data/msc_cdr/logs
+  poll:       data/inbox/msc_cdr
+  database:   data/msc_cdr/database
+  backup:     data/msc_cdr/backup
+  temp:       data/msc_cdr/temp
+  errors:     data/msc_cdr/errors
+  quarantine: data/msc_cdr/quarantine
+  markers:    data/msc_cdr/markers
+  status_dir: data/msc_cdr/status
+  log_dir:    data/msc_cdr/logs
 
 output:
   format: PARQUET

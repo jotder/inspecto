@@ -2,15 +2,15 @@ name: shipments
 active: true
 
 dirs:
-  poll:       spaces/demo/data/inbox/shipments
-  database:   spaces/demo/data/shipments/database
-  backup:     spaces/demo/data/shipments/backup
-  temp:       spaces/demo/data/shipments/temp
-  errors:     spaces/demo/data/shipments/errors
-  quarantine: spaces/demo/data/shipments/quarantine
-  markers:    spaces/demo/data/shipments/markers
-  status_dir: spaces/demo/data/shipments/status
-  log_dir:    spaces/demo/data/shipments/logs
+  poll:       data/inbox/shipments
+  database:   data/shipments/database
+  backup:     data/shipments/backup
+  temp:       data/shipments/temp
+  errors:     data/shipments/errors
+  quarantine: data/shipments/quarantine
+  markers:    data/shipments/markers
+  status_dir: data/shipments/status
+  log_dir:    data/shipments/logs
 
 output:
   format: PARQUET

@@ -93,7 +93,7 @@ public final class PipelineDataDirs {
         for (Map.Entry<String, String> e : ownedDirs(raw).entrySet()) {
             Path dir;
             try {
-                dir = Path.of(e.getValue()).toAbsolutePath().normalize();
+                dir = PathJail.resolveDataPath(dirOf(selfPath), e.getValue(), "dirs." + e.getKey());
             } catch (RuntimeException notAPath) {
                 continue;   // the removal's own jail reports this one
             }
@@ -126,7 +126,9 @@ public final class PipelineDataDirs {
             String value = e.getValue();
             Path dir;
             try {
-                dir = PathJail.requireUnderAny(roots, value, "dirs." + key);
+                // Resolved the way the loader resolves it (under the Space dir), then jailed once.
+                dir = PathJail.requireUnderAny(roots,
+                        PathJail.resolveDataPath(dirOf(selfPath), value, "dirs." + key).toString(), "dirs." + key);
             } catch (RuntimeException escapes) {
                 retained.put(value, "outside the allowed roots — refused (" + key + ")");
                 continue;
@@ -187,7 +189,8 @@ public final class PipelineDataDirs {
                     String owner = String.valueOf(other.getOrDefault("name", idOf(p)));
                     for (Object v : dirs.values()) {
                         if (v == null || String.valueOf(v).isBlank()) continue;
-                        String abs = Path.of(String.valueOf(v).trim()).toAbsolutePath().normalize().toString();
+                        String abs = PathJail.resolveDataPath(p.getParent(), String.valueOf(v).trim(), "dirs")
+                                .toString();
                         out.computeIfAbsent(abs, k -> new ArrayList<>()).add(owner);
                     }
                 } catch (RuntimeException unreadable) {
@@ -202,6 +205,11 @@ public final class PipelineDataDirs {
             log.warn("[PIPELINE-DATA-DELETE] could not scan {} for shared directories: {}", writeRoot, io.getMessage());
         }
         return out;
+    }
+
+    /** The directory of a config file, which bases its data paths ({@link PathJail#resolveDataPath}); {@code null} for none. */
+    private static Path dirOf(Path configFile) {
+        return configFile == null ? null : configFile.toAbsolutePath().getParent();
     }
 
     /** A pipeline config's id from its filename, for naming the owner of a shared directory. */

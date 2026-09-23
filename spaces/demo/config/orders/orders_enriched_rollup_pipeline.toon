@@ -2,10 +2,10 @@ name: orders_enriched_rollup
 active: false
 
 dirs:
-  poll:       spaces/demo/data/inbox/orders
-  database:   spaces/demo/data/orders/rollup_draft
-  errors:     spaces/demo/data/orders/errors
-  quarantine: spaces/demo/data/orders/quarantine
+  poll:       data/inbox/orders
+  database:   data/orders/rollup_draft
+  errors:     data/orders/errors
+  quarantine: data/orders/quarantine
 
 output:
   format: PARQUET
@@ -17,7 +17,7 @@ processing:
     keys[1]: ORDER_ID
     order_by: ORDER_DATE DESC
   join:
-    reference: spaces/demo/data/ref/region_dim.csv
+    reference: data/ref/region_dim.csv
     on[1]: REGION
   summarize:
     group_by[1]: REGION

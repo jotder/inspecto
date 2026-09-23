@@ -3,15 +3,15 @@ active: true
 description: "Link Analysis demo feed — inter-operator roaming (TAP) charge records between partner operators. Synthetic; regenerate with data/samples/gen-link-analysis-demos.py."
 
 dirs:
-  poll:       spaces/demo/data/inbox/roaming_tap
-  database:   spaces/demo/data/roaming_tap/database
-  backup:     spaces/demo/data/roaming_tap/backup
-  temp:       spaces/demo/data/roaming_tap/temp
-  errors:     spaces/demo/data/roaming_tap/errors
-  quarantine: spaces/demo/data/roaming_tap/quarantine
-  markers:    spaces/demo/data/roaming_tap/markers
-  status_dir: spaces/demo/data/roaming_tap/status
-  log_dir:    spaces/demo/data/roaming_tap/logs
+  poll:       data/inbox/roaming_tap
+  database:   data/roaming_tap/database
+  backup:     data/roaming_tap/backup
+  temp:       data/roaming_tap/temp
+  errors:     data/roaming_tap/errors
+  quarantine: data/roaming_tap/quarantine
+  markers:    data/roaming_tap/markers
+  status_dir: data/roaming_tap/status
+  log_dir:    data/roaming_tap/logs
 
 output:
   format: PARQUET

@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -30,16 +29,16 @@ import static org.junit.jupiter.api.Assertions.*;
  * absolute path, so the only thing that can make a ref miss is a ref that means something relative to the
  * CWD.
  *
- * <p>⚠ The copy re-points the DATA paths ({@code spaces/<space>/data/…}) into the temp dir, and nothing else: loading
- * creates each Pipeline's status dir, and those are still working-directory-relative (a separate row,
- * {@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}) — left as authored, the sweep would litter the module dir with a
- * {@code spaces/} tree that other tests then mistake for the repo root. Config refs are NOT rewritten; a
- * config ref still spelled {@code spaces/<space>/config/…} would fail here, which is the point.
+ * <p>The copy is VERBATIM. Loading creates each Pipeline's status dir, and a data path resolves under the
+ * Space directory ({@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}), so it lands inside the temp copy; until that
+ * row the copy had to re-point every {@code spaces/<space>/data/…} path, or the sweep littered the module dir
+ * with a {@code spaces/} tree that other tests then mistook for the repo root. A config ref still spelled
+ * {@code spaces/<space>/config/…} would fail here, which is the point.
  */
 class ShippedPipelinesLoadFromAnyWorkingDirectoryTest {
 
-    /** Runtime state (gitignored) and templates carrying a {@code ${SPACE}} placeholder — not loadable as-is. */
-    private static final Set<String> NOT_SHIPPED_SPACES = Set.of("_templates", "_shared", "uat");
+    /** Runtime state (gitignored) — not shipped. */
+    private static final Set<String> NOT_SHIPPED_SPACES = Set.of("_shared", "uat");
 
     private static Path spacesRoot() {
         return Path.of("..", "spaces").toAbsolutePath().normalize();
@@ -60,7 +59,7 @@ class ShippedPipelinesLoadFromAnyWorkingDirectoryTest {
             for (Path space : spaces.filter(Files::isDirectory).toList()) {
                 String name = space.getFileName().toString();
                 if (NOT_SHIPPED_SPACES.contains(name)) continue;
-                pipelines.addAll(copySpace(space, tmp.resolve(name), name, tmp));
+                pipelines.addAll(copySpace(space, tmp.resolve(name)));
             }
         }
         assertTrue(pipelines.size() >= 30, "found only " + pipelines.size()
@@ -77,28 +76,17 @@ class ShippedPipelinesLoadFromAnyWorkingDirectoryTest {
                 + " shipped Pipelines do not load outside the repo root:\n" + String.join("\n", failures));
     }
 
-    /** Copy one space's {@code config/} tree, rewriting only its data paths; returns the copied pipelines. */
-    private static List<Path> copySpace(Path space, Path into, String name, Path tmp) throws IOException {
+    /** Copy one space's {@code config/} tree verbatim; returns the copied pipelines. */
+    private static List<Path> copySpace(Path space, Path into) throws IOException {
         Path config = space.resolve("config");
         List<Path> out = new ArrayList<>();
         if (!Files.isDirectory(config)) return out;
-        String dataPrefix = "spaces/" + name + "/data/";
-        // RELATIVE to the CWD, into the temp dir: an absolute Windows path carries a `C:` that breaks an
-        // unquoted cell of a TOON tabular row (`sinks[2]{database,format}:`), which would fail for a reason
-        // that has nothing to do with this test.
-        String dataAbs = Path.of("").toAbsolutePath().relativize(tmp.resolve("data").resolve(name))
-                .toString().replace('\\', '/') + "/";
         try (Stream<Path> all = Files.walk(config)) {
             for (Path f : all.filter(Files::isRegularFile).toList()) {
                 Path dest = into.resolve(space.relativize(f));
                 Files.createDirectories(dest.getParent());
-                if (f.toString().endsWith(".toon")) {
-                    String s = Files.readString(f, StandardCharsets.UTF_8).replace(dataPrefix, dataAbs);
-                    Files.writeString(dest, s, StandardCharsets.UTF_8);
-                    if (f.getFileName().toString().endsWith("_pipeline.toon")) out.add(dest);
-                } else {
-                    Files.copy(f, dest);
-                }
+                Files.copy(f, dest);
+                if (f.getFileName().toString().endsWith("_pipeline.toon")) out.add(dest);
             }
         }
         return out;

@@ -3,15 +3,15 @@ active: true
 description: "Post-mediated xDR stream — voice/SMS/data usage records normalised and rated by the mediation platform, dropped into a local inbox one file per collection interval. Synthetic; regenerate with data/samples/gen-postmed-xdr.py."
 
 dirs:
-  poll:       spaces/demo/data/inbox/postmed_xdr
-  database:   spaces/demo/data/postmed_xdr/database
-  backup:     spaces/demo/data/postmed_xdr/backup
-  temp:       spaces/demo/data/postmed_xdr/temp
-  errors:     spaces/demo/data/postmed_xdr/errors
-  quarantine: spaces/demo/data/postmed_xdr/quarantine
-  markers:    spaces/demo/data/postmed_xdr/markers
-  status_dir: spaces/demo/data/postmed_xdr/status
-  log_dir:    spaces/demo/data/postmed_xdr/logs
+  poll:       data/inbox/postmed_xdr
+  database:   data/postmed_xdr/database
+  backup:     data/postmed_xdr/backup
+  temp:       data/postmed_xdr/temp
+  errors:     data/postmed_xdr/errors
+  quarantine: data/postmed_xdr/quarantine
+  markers:    data/postmed_xdr/markers
+  status_dir: data/postmed_xdr/status
+  log_dir:    data/postmed_xdr/logs
 
 output:
   format: PARQUET

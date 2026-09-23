@@ -12,14 +12,14 @@ collector:
   discovery: poll
 
 dirs:
-  poll:       spaces/demo/data/inbox/orders_by_region_feed
-  database:   spaces/demo/data/orders_by_region_feed/database
-  backup:     spaces/demo/data/orders_by_region_feed/backup
-  temp:       spaces/demo/data/orders_by_region_feed/temp
-  errors:     spaces/demo/data/orders_by_region_feed/errors
-  quarantine: spaces/demo/data/orders_by_region_feed/quarantine
-  status_dir: spaces/demo/data/orders_by_region_feed/status
-  log_dir:    spaces/demo/data/orders_by_region_feed/logs
+  poll:       data/inbox/orders_by_region_feed
+  database:   data/orders_by_region_feed/database
+  backup:     data/orders_by_region_feed/backup
+  temp:       data/orders_by_region_feed/temp
+  errors:     data/orders_by_region_feed/errors
+  quarantine: data/orders_by_region_feed/quarantine
+  status_dir: data/orders_by_region_feed/status
+  log_dir:    data/orders_by_region_feed/logs
 
 output:
   format: PARQUET

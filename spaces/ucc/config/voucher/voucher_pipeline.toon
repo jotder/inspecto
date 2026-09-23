@@ -2,15 +2,15 @@ name: VOUCHER_UNKNOWN_ETL
 active: true
 
 dirs:
-  poll:       spaces/ucc/data/inbox/voucher/unknown
-  database:   spaces/ucc/data/voucher/database
-  backup:     spaces/ucc/data/voucher/backup
-  temp:       spaces/ucc/data/voucher/temp
-  errors:     spaces/ucc/data/voucher/errors
-  quarantine: spaces/ucc/data/voucher/quarantine
-  markers:    spaces/ucc/data/voucher/markers
-  status_dir: spaces/ucc/data/voucher/status
-  log_dir:    spaces/ucc/data/voucher/logs
+  poll:       data/inbox/voucher/unknown
+  database:   data/voucher/database
+  backup:     data/voucher/backup
+  temp:       data/voucher/temp
+  errors:     data/voucher/errors
+  quarantine: data/voucher/quarantine
+  markers:    data/voucher/markers
+  status_dir: data/voucher/status
+  log_dir:    data/voucher/logs
 
 output:
   format: CSV

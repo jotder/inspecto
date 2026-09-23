@@ -53,16 +53,16 @@ describe('OnboardingCreateDialog', () => {
         expect(config['active']).toBe(false);
         expect(config['produces']).toBeUndefined();
         expect(config['dirs']).toEqual({
-            poll: 'spaces/demo/data/inbox/orders_feed',
-            database: 'spaces/demo/data/orders_feed/database',
+            poll: 'data/inbox/orders_feed',
+            database: 'data/orders_feed/database',
             // Derived silently (never asked): without status_dir the Runs history stays empty.
-            backup: 'spaces/demo/data/orders_feed/backup',
-            temp: 'spaces/demo/data/orders_feed/temp',
-            errors: 'spaces/demo/data/orders_feed/errors',
-            quarantine: 'spaces/demo/data/orders_feed/quarantine',
-            markers: 'spaces/demo/data/orders_feed/markers',
-            status_dir: 'spaces/demo/data/orders_feed/status',
-            log_dir: 'spaces/demo/data/orders_feed/logs',
+            backup: 'data/orders_feed/backup',
+            temp: 'data/orders_feed/temp',
+            errors: 'data/orders_feed/errors',
+            quarantine: 'data/orders_feed/quarantine',
+            markers: 'data/orders_feed/markers',
+            status_dir: 'data/orders_feed/status',
+            log_dir: 'data/orders_feed/logs',
         });
         // The LOCAL poll path's real dedup — collector-level `duplicate:` is engine-only.
         // retention_days is deliberately absent — PipelineConfigParser's own default (90) governs;
@@ -185,8 +185,8 @@ describe('OnboardingCreateDialog', () => {
         const pipeline = calls.find((c2) => c2[0] === 'pipeline')![1];
         expect(pipeline['name']).toBe('orders_copy');
         expect(pipeline['active']).toBe(false);
-        expect((pipeline['dirs'] as Record<string, string>)['poll']).toBe('spaces/demo/data/inbox/orders_copy');
-        // W3: portable bare ref. `dirs` above still embeds the space — dirs are NOT config-relative.
+        expect((pipeline['dirs'] as Record<string, string>)['poll']).toBe('data/inbox/orders_copy');
+        // W3: portable bare ref. `dirs` above are Space-relative `data/...` (DATA-DIRS-RESOLVE-AGAINST-CWD-1).
         expect((pipeline['processing'] as Record<string, unknown>)['schema_file']).toBe('orders_copy_schema.toon');
         expect((pipeline['processing'] as Record<string, unknown>)['threads']).toBe(2); // body preserved
         expect(ref.close).toHaveBeenCalledWith({ name: 'orders_copy' });

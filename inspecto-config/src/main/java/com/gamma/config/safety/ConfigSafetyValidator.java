@@ -88,8 +88,11 @@ public final class ConfigSafetyValidator {
      * "outside the allowed roots" for a file sitting right beside the config, and the two gates that
      * resolve correctly never got to run. Creating a pipeline from the UI could not be saved at all.
      *
-     * <p>⚠ {@code configDir} is used <b>only</b> for config refs. {@code dirs.*} are data directories
-     * and stay working-directory-relative, which is what every config in this repo relies on.
+     * <p>{@code configDir} also bases the <b>data paths</b> ({@code dirs.*}, {@code sinks[].database}, an
+     * enrichment's {@code input/output.database} and {@code references.<n>.path}, ...): they resolve under the
+     * Space directory it belongs to, through the same {@link PathJail#resolveDataPath} the loader uses
+     * ({@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}). Until 2026-09-23 they were working-directory-relative here
+     * and in the loader alike.
      *
      * @param configDir the config file's own directory, or {@code null} to keep the CWD-only behaviour
      */
@@ -101,7 +104,7 @@ public final class ConfigSafetyValidator {
         String type = (configType == null) ? "" : configType.toLowerCase();
         switch (type) {
             case "pipeline" -> checkPipeline(raw, p, configDir, out);
-            case "enrichment" -> checkEnrichment(raw, p, out);
+            case "enrichment" -> checkEnrichment(raw, p, configDir, out);
             case "job" -> checkJob(raw, p, k -> configDir, out);
             default -> { /* schema / meta: no path/numeric/output surface to gate */ }
         }
@@ -176,20 +179,20 @@ public final class ConfigSafetyValidator {
                 out.add(Finding.error(field, ex.getMessage()));
                 continue;
             }
-            checkPathValue(field, resolved.toString(), p, out);
+            checkPathValue(field, resolved.toString(), p, PathJail::resolveConfigRef, null, out);
         }
     }
 
     // ── pipeline ─────────────────────────────────────────────────────────────────────
 
     private static void checkPipeline(Map<String, Object> raw, SafetyPolicy p, Path configDir, List<Finding> out) {
-        for (String f : PIPELINE_DIRS) checkPath(raw, f, p, out);
-        checkPath(raw, "output.ducklake.data_path", p, out);
+        for (String f : PIPELINE_DIRS) checkDataPath(raw, f, p, configDir, out);
+        checkDataPath(raw, "output.ducklake.data_path", p, configDir, out);
         // ROADMAP §3.5 "jail the database temp directory". The fallback `dirs.temp` is in PIPELINE_DIRS,
         // but `ConsignmentIngestStrategy.scratchDir` PREFERS this explicit spill dir and returned it raw,
         // and neither the loader nor the run path contains it — so the one knob that can point
         // multi-hundred-GB spill data anywhere was the one path this gate never looked at.
-        checkPath(raw, "processing.duckdb.temp_directory", p, out);
+        checkDataPath(raw, "processing.duckdb.temp_directory", p, configDir, out);
         // S5: the refs the parser resolves and jails at LOAD time (PipelineConfigParser's
         // resolveSchemaRef / resolveGrammarRef). Without these the 422 write gate would accept a
         // config that the loader then refuses — the operator learns at run time what authoring
@@ -272,7 +275,7 @@ public final class ConfigSafetyValidator {
         if (raw.get("sinks") instanceof List<?> sinks) {
             for (int i = 0; i < sinks.size(); i++) {
                 if (sinks.get(i) instanceof Map<?, ?> sink) {
-                    checkSink(i, sink, p, out);
+                    checkSink(i, sink, p, configDir, out);
                 } else {
                     out.add(Finding.error("sinks[" + i + "]", "each sinks[] entry must be a map"));
                 }
@@ -319,10 +322,11 @@ public final class ConfigSafetyValidator {
     }
 
     /** Path-jail + format/compression/ducklake allow-list for one {@code sinks[i]} destination entry. */
-    private static void checkSink(int i, Map<?, ?> sink, SafetyPolicy p, List<Finding> out) {
+    private static void checkSink(int i, Map<?, ?> sink, SafetyPolicy p, Path configDir, List<Finding> out) {
         String prefix = "sinks[" + i + "]";
         Object db = sink.get("database");
-        if (db != null && !db.toString().isBlank()) checkPathValue(prefix + ".database", db.toString(), p, out);
+        if (db != null && !db.toString().isBlank())
+            checkPathValue(prefix + ".database", db.toString(), p, PathJail::resolveDataPath, configDir, out);
 
         Object fmt = sink.get("format");
         if (fmt != null && !fmt.toString().isBlank()
@@ -339,7 +343,8 @@ public final class ConfigSafetyValidator {
         if (sink.get("ducklake") instanceof Map<?, ?> dl) {
             Object dp = dl.get("data_path");
             if (dp != null && !dp.toString().isBlank()) {
-                checkPathValue(prefix + ".ducklake.data_path", dp.toString(), p, out);
+                checkPathValue(prefix + ".ducklake.data_path", dp.toString(), p, PathJail::resolveDataPath,
+                        configDir, out);
             }
             if (Boolean.TRUE.equals(dl.get("enabled"))) {
                 for (String k : new String[]{"catalog_url", "data_path", "table"}) {
@@ -355,16 +360,19 @@ public final class ConfigSafetyValidator {
 
     // ── enrichment ───────────────────────────────────────────────────────────────────
 
-    private static void checkEnrichment(Map<String, Object> raw, SafetyPolicy p, List<Finding> out) {
-        checkPath(raw, "input.database", p, out);
-        checkPath(raw, "output.database", p, out);
-        checkPath(raw, "transform_file", p, out);
+    private static void checkEnrichment(Map<String, Object> raw, SafetyPolicy p, Path configDir, List<Finding> out) {
+        checkDataPath(raw, "input.database", p, configDir, out);
+        checkDataPath(raw, "output.database", p, configDir, out);
+        // transform_file is NOT a data path, and EnrichmentConfig.load still reads it from the working
+        // directory - so it is judged from there too (a gate must resolve the way its reader does).
+        checkPathValue("transform_file", RawConfig.str(raw, "transform_file"), p, PathJail::resolveConfigRef,
+                null, out);
 
         Object refs = RawConfig.at(raw, "references");
         if (refs instanceof Map<?, ?> m) {
             for (Map.Entry<?, ?> e : m.entrySet()) {
                 if (e.getValue() instanceof Map<?, ?> ref) {
-                    checkReference(String.valueOf(e.getKey()), ref, p, out);
+                    checkReference(String.valueOf(e.getKey()), ref, p, configDir, out);
                 } else {
                     out.add(Finding.error("references." + e.getKey(),
                             "each references.<name> entry must be a map"));
@@ -381,7 +389,8 @@ public final class ConfigSafetyValidator {
      * The identifier and {@code as_of} checks are safety-proper: both values are spliced into the
      * as-of view's SQL downstream.
      */
-    private static void checkReference(String name, Map<?, ?> ref, SafetyPolicy p, List<Finding> out) {
+    private static void checkReference(String name, Map<?, ?> ref, SafetyPolicy p, Path configDir,
+                                       List<Finding> out) {
         String prefix = "references." + name;
         if (!SQL_IDENTIFIER.matcher(name).matches()) {
             out.add(Finding.error(prefix, "reference name '" + name
@@ -394,7 +403,8 @@ public final class ConfigSafetyValidator {
         if (hasPath == hasRef) {
             out.add(Finding.error(prefix, prefix + " needs exactly one of 'path' or 'ref'"));
         }
-        if (hasPath) checkPathValue(prefix + ".path", pathV.toString(), p, out);
+        if (hasPath)
+            checkPathValue(prefix + ".path", pathV.toString(), p, PathJail::resolveDataPath, configDir, out);
         if (hasRef && !SQL_IDENTIFIER.matcher(refV.toString().trim()).matches()) {
             out.add(Finding.error(prefix + ".ref", "reference id '" + refV.toString().trim()
                     + "' is not a valid SQL identifier ([A-Za-z_][A-Za-z0-9_]*)"));
@@ -453,7 +463,7 @@ public final class ConfigSafetyValidator {
             checkRegistryId(field, v.trim(), prefix, out);
             return;
         }
-        checkPathValue(field, v, p, configDir, out);
+        checkPathValue(field, v, p, PathJail::resolveConfigRef, configDir, out);
     }
 
     /**
@@ -482,17 +492,29 @@ public final class ConfigSafetyValidator {
         return REGISTRY_REF_PREFIXES.stream().filter(s::startsWith).findFirst().orElse(null);
     }
 
-    private static void checkPath(Map<String, Object> raw, String field, SafetyPolicy p, List<Finding> out) {
-        String v = RawConfig.str(raw, field);
-        if (v != null && !v.isBlank()) checkPathValue(field, v, p, out);
+    /** A data path key, resolved as the loader resolves it - {@link PathJail#resolveDataPath}. */
+    private static void checkDataPath(Map<String, Object> raw, String field, SafetyPolicy p, Path configDir,
+                                      List<Finding> out) {
+        checkPathValue(field, RawConfig.str(raw, field), p, PathJail::resolveDataPath, configDir, out);
     }
 
-    private static void checkPathValue(String field, String value, SafetyPolicy p, List<Finding> out) {
-        checkPathValue(field, value, p, null, out);
+    /** How a kind of path key resolves before it is jailed - the loader's own resolver, never a copy of it. */
+    @FunctionalInterface
+    private interface Resolver {
+        Path resolve(Path configDir, String value, String field);
     }
 
-    private static void checkPathValue(String field, String value, SafetyPolicy p, Path configDir,
-                                       List<Finding> out) {
+    /**
+     * Jail one path value, resolved first by the SAME {@link PathJail} resolver its loader calls - beside the
+     * config for a config ref ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}), under the Space directory for a
+     * data path ({@code DATA-DIRS-RESOLVE-AGAINST-CWD-1}). A {@code null} {@code configDir} keeps the
+     * working-directory reading. This gate must never be more permissive than the loader; one resolver is
+     * how the two stop being able to diverge. The ambiguous value a resolver refuses (it names both paths)
+     * becomes a finding.
+     */
+    private static void checkPathValue(String field, String value, SafetyPolicy p, Resolver resolver,
+                                       Path configDir, List<Finding> out) {
+        if (value == null || value.isBlank()) return;
         String s = value.trim();
         if (s.startsWith("\\\\") || s.startsWith("//")) {
             out.add(Finding.error(field, "path '" + s + "' is a UNC/network path, which is not allowed"));
@@ -508,7 +530,7 @@ public final class ConfigSafetyValidator {
         }
         Path norm;
         try {
-            norm = resolveRef(s, configDir, field);
+            norm = resolver.resolve(configDir, s, field);
         } catch (PathJail.Escape ambiguous) {
             out.add(Finding.error(field, ambiguous.getMessage()));
             return;
@@ -527,22 +549,6 @@ public final class ConfigSafetyValidator {
                         + "' escapes the allowed roots via a symlink (resolves to " + norm + ")")
                 : Finding.error(field, "path '" + s + "' resolves to " + norm
                         + ", outside the allowed roots " + p.allowedRoots()));
-    }
-
-    /**
-     * Resolve a path value the way the LOADER resolves it — through the SAME
-     * {@link PathJail#resolveConfigRef} {@code PipelineConfigParser.resolveSchemaRef} calls: beside the
-     * config, never against the working directory ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}). A
-     * {@code null} {@code configDir} — a data dir, or a draft with no home — keeps the working-directory
-     * reading, which is what {@code dirs.*} still mean.
-     *
-     * <p>⛔ This gate must never be more permissive than the loader. It used to carry its own byte-for-byte
-     * copy of the loader's rule; one resolver is how the two stop being able to diverge.
-     *
-     * @throws PathJail.Escape for the ambiguous ref the resolver refuses (it names both paths)
-     */
-    private static Path resolveRef(String value, Path configDir, String field) {
-        return PathJail.resolveConfigRef(configDir, value, field);
     }
 
     /**

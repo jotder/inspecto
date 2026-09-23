@@ -168,7 +168,9 @@ final class PipelineConfigParser {
         if (trig != null) b.trigger = trig;
 
         // ── dirs ──────────────────────────────────────────────────────────────
-        Map<String, Object> dirs = ToonHelper.requireSection(raw, "dirs");
+        // Every dirs.* value resolves under the Space directory (DATA-DIRS-RESOLVE-AGAINST-CWD-1) — a copy,
+        // so the decoded map the editor round-trips keeps what was authored.
+        Map<String, Object> dirs = dataPaths(ToonHelper.requireSection(raw, "dirs"), configDir, "dirs.");
         b.pollDir       = require(dirs, "poll");
         b.databaseDir   = require(dirs, "database");
         b.backupDir     = (String) dirs.get("backup");
@@ -268,7 +270,8 @@ final class PipelineConfigParser {
         Map<String, Object> duck = castMapAt(proc, "duckdb");
         if (duck != null) {
             b.duckMemoryLimit   = trimToNull(duck.get("memory_limit"));
-            b.duckTempDirectory = trimToNull(duck.get("temp_directory"));
+            b.duckTempDirectory = dataPath(configDir, trimToNull(duck.get("temp_directory")),
+                    "processing.duckdb.temp_directory");
             b.duckMaxTempSize   = trimToNull(duck.get("max_temp_directory_size"));
         }
 
@@ -311,13 +314,13 @@ final class PipelineConfigParser {
                             ? d.dataExtensions() : strList(unpack.get("data_extensions")));
         }
 
-        parseTransformBlocks(raw, proc, b);
+        parseTransformBlocks(raw, proc, configDir, b);
 
         Grammar g = parseParsing(raw, proc, configDir, b);
 
-        parseOutputAndSinks(raw, b);
+        parseOutputAndSinks(raw, configDir, b);
 
-        parseSteps(raw, b);
+        parseSteps(raw, configDir, b);
 
         parsePlugin(g, proc, configDir, declaredColumns, b);
 
@@ -530,7 +533,7 @@ final class PipelineConfigParser {
      * builder ({@code b.rowWhere} / {@code join} / {@code dedup} / {@code summarize} / {@code route}).
      */
     @SuppressWarnings("unchecked")
-    private static void parseSteps(Map<String, Object> raw, Builder b) {
+    private static void parseSteps(Map<String, Object> raw, Path configDir, Builder b) {
         // ── steps (the ordered transform chain) ─────────────────────────────────
         // A top-level `steps:` list, each entry a single-key map of kind → that kind's own config:
         //
@@ -573,7 +576,7 @@ final class PipelineConfigParser {
                     got: """ + rawSteps);
         }
         if (rawSteps instanceof List<?> stepList) {
-            b.steps.addAll(parseStepEntries(stepList, "steps[]"));
+            b.steps.addAll(parseStepEntries(joinReferences(stepList, configDir, "steps[]"), "steps[]"));
             // Mutually exclusive with the legacy spellings: there is no non-arbitrary position at which a
             // legacy block would join an authored sequence, and choosing one silently is the reordering
             // this whole change exists to remove.
@@ -756,7 +759,8 @@ final class PipelineConfigParser {
      * {@code join}'s columns later, once the schema has declared them.
      */
     @SuppressWarnings("unchecked")
-    private static void parseTransformBlocks(Map<String, Object> raw, Map<String, Object> proc, Builder b) {
+    private static void parseTransformBlocks(Map<String, Object> raw, Map<String, Object> proc, Path configDir,
+                                             Builder b) {
         // ── duplicate check ───────────────────────────────────────────────────
         Map<String, Object> dup = castMapAt(proc, "duplicate_check");
         if (dup != null) {
@@ -816,7 +820,8 @@ final class PipelineConfigParser {
                 for (Object o : os) on.add(String.valueOf(o));
             else if (recJoin.get("on") != null)
                 on.add(String.valueOf(recJoin.get("on")));   // single-key shorthand: on: k
-            b.join = new PipelineConfig.Join(trimToNull(recJoin.get("reference")), on);
+            b.join = new PipelineConfig.Join(
+                    referencePath(configDir, trimToNull(recJoin.get("reference")), "processing.join.reference"), on);
         }
 
         // ── map (AUTHOR-1 (a) — the authored half of a transform.map node) ──
@@ -844,9 +849,20 @@ final class PipelineConfigParser {
             // here; PipelineLift/RouteArming re-read it typed via PipelineConfig.Step.branchSteps).
             // ⚠ A branch steps: written without the [N] arity decodes as a map — refused loudly with
             // the spelling that works, exactly like the top-level rule above.
+            // A branch's database pairs it with a sinks[] entry BY VALUE (RouteArming), so it resolves exactly
+            // as the sink's does — and so does a join step's reference path inside the branch.
             if (copy.get("branches") instanceof List<?> branches) {
+                List<Object> resolvedBranches = new ArrayList<>(branches.size());
                 for (int i = 0; i < branches.size(); i++) {
-                    if (!(branches.get(i) instanceof Map<?, ?> branch)) continue;
+                    if (!(branches.get(i) instanceof Map<?, ?> branchIn)) {
+                        resolvedBranches.add(branches.get(i));
+                        continue;
+                    }
+                    Map<String, Object> branch = new LinkedHashMap<>();
+                    branchIn.forEach((k, v) -> branch.put(String.valueOf(k), v));
+                    resolvedBranches.add(branch);
+                    if (branch.get("database") instanceof String db)
+                        branch.put("database", dataPath(configDir, db, "route.branches[" + i + "].database"));
                     Object branchSteps = branch.get("steps");
                     if (branchSteps == null) continue;
                     String context = "route.branches[" + i + "].steps[]";
@@ -854,8 +870,11 @@ final class PipelineConfigParser {
                         throw new IllegalArgumentException(context.replace("[]", "") + " must be a LIST — "
                                 + "in .toon that needs an explicit element count (steps[N]:) plus a block "
                                 + "per entry; got: " + branchSteps);
-                    parseStepEntries(stepList, context);
+                    List<Object> resolvedSteps = joinReferences(stepList, configDir, context);
+                    branch.put("steps", resolvedSteps);
+                    parseStepEntries(resolvedSteps, context);
                 }
+                copy.put("branches", resolvedBranches);
             }
             b.route = copy;
         }
@@ -873,13 +892,13 @@ final class PipelineConfigParser {
      * load-bearing and is why the check is not moved in here.
      */
     @SuppressWarnings("unchecked")
-    private static void parseOutputAndSinks(Map<String, Object> raw, Builder b) {
+    private static void parseOutputAndSinks(Map<String, Object> raw, Path configDir, Builder b) {
         // ── output ────────────────────────────────────────────────────────────
         Map<String, Object> out = castMapAt(raw, "output");
         if (out != null) {
             b.outputFormat = String.valueOf(out.getOrDefault("format", "CSV")).toUpperCase();
             b.compression  = (String) out.get("compression");
-            b.duckLakeCfg  = castMapAt(out, "ducklake");
+            b.duckLakeCfg  = duckLakeDataPath(castMapAt(out, "ducklake"), configDir, "output.ducklake.data_path");
             // B4: source-filename lineage as an output-row column. Validated as an identifier here;
             // collision with a declared schema column is checked after the schemas load below.
             b.filenameColumn = trimToNull(out.get("filename_column"));
@@ -894,7 +913,9 @@ final class PipelineConfigParser {
         // destination is parsed + liftable but REFUSED when loaded for execution (PipelineConfig.prepare)
         // until the branch-aware executor is wired — see docs/superpower/sinks-config-format-plan.md.
         if (raw.get("sinks") instanceof List<?> sinkList) {
+            int i = 0;
             for (Object entry : sinkList) {
+                String at = "sinks[" + i++ + "]";
                 if (!(entry instanceof Map<?, ?> sm)) {
                     throw new IllegalArgumentException("each sinks[] entry must be a map with a 'database' key");
                 }
@@ -907,12 +928,12 @@ final class PipelineConfigParser {
                 if (sinkFilenameCol != null)
                     Identifiers.validate(sinkFilenameCol, "sinks[].filename_column");
                 b.sinks.add(new PipelineConfig.Sink(
-                        db.toString(),
+                        dataPath(configDir, db.toString(), at + ".database"),
                         // absent stays null: output: is this entry's default layer, applied in
                         // PipelineConfig.resolveSinks (SINKS-ENTRY-IGNORES-OUTPUT-DEFAULTS-1)
                         sink.get("format") == null ? null : String.valueOf(sink.get("format")).toUpperCase(),
                         (String) sink.get("compression"),
-                        castMapAt(sink, "ducklake"),
+                        duckLakeDataPath(castMapAt(sink, "ducklake"), configDir, at + ".ducklake.data_path"),
                         sinkFilenameCol));
             }
         }
@@ -1348,6 +1369,63 @@ final class PipelineConfigParser {
                         "Config error in %s: dirs.%s (%s) must be outside the poll directory (%s)",
                         configPath, key, dir, poll));
         }
+    }
+
+    // ── data paths (DATA-DIRS-RESOLVE-AGAINST-CWD-1) ───────────────────────────
+
+    /**
+     * A config's DATA path resolved under its Space directory, through the one resolver
+     * {@link PathJail#dataPath}; an absolute string, so the ~100 typed readers of
+     * {@code dirs()}/{@code sinks()}/… downstream need no base of their own. As authored when there is no
+     * Space (an in-memory draft, a single-tenant example) — see {@link PathJail#dataPath}.
+     */
+    private static String dataPath(Path configDir, String value, String field) {
+        return PathJail.dataPath(configDir, value, field);
+    }
+
+    /** {@link #dataPath} over every string value of a {@code dirs:} block — a copy; the input is untouched. */
+    private static Map<String, Object> dataPaths(Map<String, Object> dirs, Path configDir, String prefix) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        dirs.forEach((k, v) -> out.put(k, v instanceof String s ? dataPath(configDir, s, prefix + k) : v));
+        return out;
+    }
+
+    /** A copy of a {@code ducklake:} block with its {@code data_path} resolved; {@code null} stays {@code null}. */
+    private static Map<String, Object> duckLakeDataPath(Map<String, Object> lake, Path configDir, String field) {
+        if (lake == null || !(lake.get("data_path") instanceof String dp)) return lake;
+        Map<String, Object> out = new LinkedHashMap<>(lake);
+        out.put("data_path", dataPath(configDir, dp, field));
+        return out;
+    }
+
+    /**
+     * A join's {@code reference} as a data path — unless it binds a Reference Dataset BY NAME
+     * ({@code reference/<pipeline>}, or the recipe's {@code references/<name>}), which is an id, not a path.
+     */
+    private static String referencePath(Path configDir, String reference, String field) {
+        if (reference == null) return null;
+        String s = reference.trim();
+        if (s.startsWith("reference/") || s.startsWith("references/")) return reference;
+        return dataPath(configDir, reference, field);
+    }
+
+    /** A copy of a step list with each {@code join} step's {@code reference} path resolved (see {@link #referencePath}). */
+    @SuppressWarnings("unchecked")
+    private static List<Object> joinReferences(List<?> steps, Path configDir, String context) {
+        List<Object> out = new ArrayList<>(steps.size());
+        for (Object entry : steps) {
+            if (entry instanceof Map<?, ?> sm && sm.size() == 1 && sm.get("join") instanceof Map<?, ?> jm
+                    && jm.get("reference") instanceof String ref) {
+                Map<String, Object> join = new LinkedHashMap<>((Map<String, Object>) jm);
+                join.put("reference", referencePath(configDir, ref, context + ".join.reference"));
+                Map<String, Object> step = new LinkedHashMap<>();
+                step.put("join", join);
+                out.add(step);
+            } else {
+                out.add(entry);
+            }
+        }
+        return out;
     }
 
     // ── tiny helpers ──────────────────────────────────────────────────────────
