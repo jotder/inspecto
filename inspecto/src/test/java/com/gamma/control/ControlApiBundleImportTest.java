@@ -75,6 +75,76 @@ class ControlApiBundleImportTest {
         }
     }
 
+    /**
+     * W4/W5 — Alert Rules and Expectations that reference the data source travel with it, next to the
+     * Decision Rules and Datasets W3 already bundles. An Alert Rule references the pipeline through
+     * {@code onPipeline}, or a BUNDLED Dataset through {@code dataset}; an Expectation through
+     * {@code targetType}/{@code target}. A global Alert Rule (no {@code onPipeline}) and another
+     * pipeline's components stay behind.
+     */
+    @Test
+    void anExportCarriesTheAlertRulesAndExpectationsThatReferenceItAndAnImportRoundTripsThem(
+            @TempDir Path root) throws Exception {
+        Path reg = root.resolve("alpha").resolve("config").resolve("registry");
+        java.util.Map<String, String> ours = new java.util.LinkedHashMap<>();
+        ours.put("datasets/test_ds.toon", "name: test_ds\nphysicalRef: test_etl\n");
+        ours.put("alert-rules/test_errors.toon", """
+                name: test_errors
+                metric: error_rate
+                comparator: gt
+                threshold: 0.05
+                window: 1h
+                severity: WARNING
+                onPipeline: TEST_ETL
+                """);
+        ours.put("alert-rules/test_low_rows.toon", """
+                name: test_low_rows
+                dataset: test_ds
+                measure: count
+                comparator: lt
+                threshold: 1
+                severity: WARNING
+                """);
+        ours.put("expectations/test_id_non_null.toon",
+                "name: test_id_non_null\ntargetType: pipeline\ntarget: test_etl\ncolumn: ID\nkind: non_null\n");
+        java.util.Map<String, String> theirs = new java.util.LinkedHashMap<>();
+        theirs.put("alert-rules/global_errors.toon",   // no onPipeline = every pipeline: nobody's to carry
+                "name: global_errors\nmetric: error_rate\ncomparator: gt\nthreshold: 0.5\nwindow: 1h\nseverity: WARNING\n");
+        theirs.put("alert-rules/other_errors.toon",
+                "name: other_errors\nmetric: error_rate\ncomparator: gt\nthreshold: 0.5\nwindow: 1h\nseverity: WARNING\nonPipeline: other_etl\n");
+        theirs.put("alert-rules/other_ds_rows.toon",   // a Dataset this bundle does not carry
+                "name: other_ds_rows\ndataset: other_ds\nmeasure: count\ncomparator: lt\nthreshold: 1\nseverity: WARNING\n");
+        theirs.put("expectations/other_id_non_null.toon",
+                "name: other_id_non_null\ntargetType: pipeline\ntarget: other_etl\ncolumn: ID\nkind: non_null\n");
+        for (var m : java.util.List.of(ours, theirs)) {
+            for (var e : m.entrySet()) {
+                Path p = reg.resolve(e.getKey());
+                Files.createDirectories(p.getParent());
+                Files.writeString(p, e.getValue());
+            }
+        }
+
+        try (Ctx c = open(root)) {
+            byte[] bundle = getBytes(c.port, "/spaces/alpha/datasources/test_etl/export").body();
+            java.util.Set<String> names = new java.util.HashSet<>();
+            try (var zis = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(bundle))) {
+                for (var e = zis.getNextEntry(); e != null; e = zis.getNextEntry()) names.add(e.getName());
+            }
+            for (String k : ours.keySet()) assertTrue(names.contains("registry/" + k), k + " in " + names);
+            for (String k : theirs.keySet()) assertFalse(names.contains("registry/" + k), k + " in " + names);
+
+            HttpResponse<String> imp = post(c.port, "/spaces/beta/import", bundle);
+            assertEquals(200, imp.statusCode(), imp.body());
+
+            // FILE-level truth: each component landed in beta's registry byte-for-byte, the others did not.
+            Path betaReg = root.resolve("beta").resolve("config").resolve("registry");
+            for (var e : ours.entrySet()) {
+                assertEquals(e.getValue(), Files.readString(betaReg.resolve(e.getKey())), e.getKey());
+            }
+            for (String k : theirs.keySet()) assertFalse(Files.exists(betaReg.resolve(k)), k);
+        }
+    }
+
     @Test
     void previewsAnImportWithoutWriting(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

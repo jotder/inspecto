@@ -158,7 +158,14 @@ Space stays allowed. The eight paths the SPA never prefixes are `SERVER_GLOBAL`:
 /spaces/{id}/export` (the whole config tree + `space.toon`, manifest `bundle.toon` — `BundleExporter`),
 `POST /spaces/{id}/import/preview` (the **dry run**: contents, `hasSpaceToon`, per-item conflicts, findings,
 `valid` — writes nothing) and `POST /spaces/{id}/import[?on_conflict=overwrite]` (`BundleImporter`); a
-per-data-source export exists beside it (`GET /spaces/{id}/datasources/{ds}/export`). `BundleImporter`
+per-data-source export exists beside it (`GET /spaces/{id}/datasources/{ds}/export`). Its closure
+(`DataSourceBundleResolver.findComponentsFor`) carries the registry components that **reverse-reference** the
+Pipeline: Decision Rules and Expectations whose `targetType`/`target` name it (or a bundled job), Datasets
+whose `physicalRef` reads its store, and Alert Rules whose `onPipeline` names it or whose `dataset` names a
+bundled Dataset (W4/W5, 2026-09-23 — `ControlApiBundleImportTest.anExportCarriesTheAlertRulesAndExpectations…`).
+An Alert Rule with no `onPipeline` watches every Pipeline and stays behind; **forward** references out of a
+bundled component (an Expectation's `refDataset`, reference Datasets) are deliberately not chased — an open
+operator decision. `BundleImporter`
 **jails every zip entry** — an entry resolving outside `configDir` throws (`:84-104`, the zip-slip pin, tested
 with a re-packed archive) — and **rebases** `spaces/<source>/…` path prefixes to the target Space (W3).
 `POST /spaces/import` reuses the same importer to seed a brand-new Space. ⚠ `multi-space.md` enumerates the
@@ -474,7 +481,7 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 | `ControlApiSpacesTest` (4) | `/spaces` CRUD; `authenticatedCreateSucceedsWhenNoSpaceIsHostedYet`; `purgingTheLastSpaceOnDiskIsRefused` |
 | `ControlApiSpaceTemplatesTest` (2) | the gallery and `createFromTemplate` |
 | `ControlApiMultiSpaceTest` (1) | a multi-Space server smoke |
-| `ControlApiBundleTest` (11) · `ControlApiBundleImportTest` (9) · `ControlApiBundleNewKindsTest` (10) · `ControlApiPipelineBundleTest` (7) | export / preview / import contract, ordering, the newer kinds, the `authored-pipeline` round trip |
+| `ControlApiBundleTest` (11) · `ControlApiBundleImportTest` (10) · `ControlApiBundleNewKindsTest` (10) · `ControlApiPipelineBundleTest` (7) | export / preview / import contract, ordering, the newer kinds, the `authored-pipeline` round trip |
 | `ExchangeAttributeScopeTest` · `NoExchangeShipsInThePersonalBuildTest` | exchange attributes private by default; Personal carries no exchange module |
 | `PostgresStateStoreTest` (opt-in, `-Dinspecto.test.pg.url`; 11 skipped otherwise) | the DB-backed stores against a real Postgres |
 

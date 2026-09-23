@@ -21,8 +21,9 @@ import java.util.stream.Stream;
 /**
  * Resolves a data source (a pipeline) to its cohesive {@link DataSourceBundle} — the pipeline config plus
  * everything it references: the connection profile it binds to, the schema / grammar files it read at parse
- * time, any job that targets it, and the registry components bound to it (Decision Rules targeting it,
- * Datasets reading its store — see {@link #findComponentsFor}).
+ * time, any job that targets it, and the registry components bound to it (Decision Rules and Expectations
+ * targeting it, Datasets reading its store, Alert Rules watching it or one of those Datasets — see
+ * {@link #findComponentsFor}).
  *
  * <p>Scoped to one space: parsed configs come from that space's {@link ReadModel}; the connection / job
  * files are found by scanning that space's {@code config/} tree, because they are addressed by their in-file
@@ -104,15 +105,16 @@ public final class DataSourceBundleResolver {
     }
 
     /**
-     * The registry components bound to this data source (W3, 2026-08-01): the **Decision Rules** that
-     * target it and the **Datasets** that read its store. Both live in the component registry
-     * ({@code config/registry/<type-dir>/<id>.toon}, discovered by <em>directory</em> —
+     * The registry components bound to this data source: the **Decision Rules** that target it and the
+     * **Datasets** that read its store (W3, 2026-08-01), plus the **Expectations** that target it and the
+     * **Alert Rules** that watch it or one of those Datasets (W4/W5, 2026-09-23). All live in the component
+     * registry ({@code config/registry/<type-dir>/<id>.toon}, discovered by <em>directory</em> —
      * {@code ComponentRegistry.TYPE_BY_DIR} — never by a filename suffix), which is why the suffix scans
      * above could never have found them. They are inside {@code config/}, so once they are in the bundle
      * the import side already handles them: {@code BundleImporter.writeConfig} unpacks anything
      * config-relative, and a fresh {@link SpaceBootstrap} boot re-scans the registry.
      *
-     * <p>Both are <b>reverse</b> references — the component names the pipeline, not the other way round —
+     * <p>All are <b>reverse</b> references — the component names the pipeline, not the other way round —
      * exactly like {@link #findJobsFor}. Matching is deliberately narrow:
      * <ul>
      *   <li><b>Decision Rule</b> — {@code target} matched case-insensitively (as
@@ -125,6 +127,14 @@ public final class DataSourceBundleResolver {
      *       {@code DbBrowserRoutes.pipelineDatabaseDir} resolves a store name by calling
      *       {@code configFor(storeName)} directly, and a deeper ref ({@code orders/database}) still names
      *       the same store in its first segment.</li>
+     *   <li><b>Expectation</b> — the same {@code targetType}/{@code target} shape as a Decision Rule
+     *       ({@code pipeline} default, or a bundled {@code job}), so the same matcher.</li>
+     *   <li><b>Alert Rule</b> — {@code onPipeline} names this pipeline (case-insensitively, a space read as
+     *       {@code _}, as {@code AlertService} matches it), or {@code dataset} names a Dataset <em>this
+     *       bundle already carries</em> (by its in-file {@code name}/{@code id}, falling back to the file
+     *       stem — {@code ComponentRegistry}'s identity rule). A rule with <b>no</b> {@code onPipeline} and
+     *       no {@code dataset} watches every pipeline; it belongs to the space, not to this data source, and
+     *       stays behind.</li>
      * </ul>
      *
      * <p><b>Deliberately NOT matched</b>, so the omissions are known rather than accidental:
@@ -132,8 +142,9 @@ public final class DataSourceBundleResolver {
      * {@code config/}, so the thing it depends on cannot ride in a config bundle at all); a Dataset over a
      * bundled <em>job's</em> output store ({@code orders_rollup_dataset}'s {@code physicalRef: rollup} —
      * resolving a job's output store means following job → pipeline → sink, which nothing here reads today);
-     * and Alert Rules / Expectations, which are the same shape and the same one-line addition, but were
-     * not in this change's scope.
+     * and every <b>forward</b> reference out of a bundled component — an Expectation's {@code refDataset},
+     * a Dataset's reference Datasets — which would pull in components that do not reference this data
+     * source at all (whether an export should chase them is an open operator decision).
      *
      * <p>A <b>disabled</b> Decision Rule still travels. {@code DecisionRules} filters {@code enabled} at
      * <em>evaluation</em> time; an export is a promotion of the config as authored, and silently dropping
@@ -143,11 +154,42 @@ public final class DataSourceBundleResolver {
         List<String> jobNames = jobs.stream().map(this::jobNameOf).filter(Objects::nonNull).toList();
         List<Path> out = new ArrayList<>();
         out.addAll(componentFiles("decision-rules", c -> ruleTargets(c, pipelineName, jobNames)));
-        out.addAll(componentFiles("datasets", c -> datasetReadsStore(c, pipelineName)));
+        List<Path> datasets = componentFiles("datasets", c -> datasetReadsStore(c, pipelineName));
+        out.addAll(datasets);
+        List<String> datasetNames = datasets.stream().map(DataSourceBundleResolver::componentNameOf)
+                .filter(Objects::nonNull).toList();
+        out.addAll(componentFiles("alert-rules", c -> alertWatches(c, pipelineName, datasetNames)));
+        out.addAll(componentFiles("expectations", c -> ruleTargets(c, pipelineName, jobNames)));
         return out;
     }
 
-    /** Whether a Decision Rule's {@code targetType}/{@code target} names this pipeline or a bundled job. */
+    /** Whether an Alert Rule's {@code onPipeline} names this pipeline, or its {@code dataset} a bundled one. */
+    private static boolean alertWatches(Map<String, Object> alert, String pipelineName, List<String> datasets) {
+        String on = alert.get("onPipeline") == null ? "" : String.valueOf(alert.get("onPipeline")).trim();
+        if (!on.isEmpty() && (on.equalsIgnoreCase(pipelineName) || on.replace(' ', '_').equalsIgnoreCase(pipelineName))) {
+            return true;
+        }
+        String ds = alert.get("dataset") == null ? "" : String.valueOf(alert.get("dataset")).trim();
+        return !ds.isEmpty() && datasets.stream().anyMatch(ds::equalsIgnoreCase);
+    }
+
+    /** A registry component's identity — in-file {@code name}, else {@code id}, else the file stem. */
+    private static String componentNameOf(Path p) {
+        try {
+            Map<String, Object> c = ConfigCodec.toMap(Files.readString(p));
+            for (String key : new String[]{"name", "id"}) {
+                Object v = c.get(key);
+                if (v != null && !v.toString().isBlank()) return v.toString().trim();
+            }
+        } catch (RuntimeException | IOException bad) {
+            log.warn("skipping unreadable dataset component {}: {}", p, bad.toString());
+            return null;
+        }
+        String f = p.getFileName().toString();
+        return f.substring(0, f.length() - ".toon".length());
+    }
+
+    /** Whether a Decision Rule's (or an Expectation's) {@code targetType}/{@code target} names this pipeline or a bundled job. */
     private static boolean ruleTargets(Map<String, Object> rule, String pipelineName, List<String> jobNames) {
         String target = rule.get("target") == null ? "" : String.valueOf(rule.get("target")).trim();
         if (target.isEmpty()) return false;
