@@ -90,7 +90,7 @@ acquisition path (`CollectorProcessor.acquire`); a `local` inbox never reaches i
 |---|---|---|---|
 | `connector` | string · `local` | — (derived) | `local`, `dataset`, or the named Connection's connector. The form derives it at save and never asks. |
 | `connection` | string | `connection` (writes `use: connection/<name>`) | The saved Connection profile — host, credentials and the connector's own options (below). |
-| `dataset` | string | `dataset` | Dataset entry: the Dataset whose snapshots each cycle copies in. Only with `connector: dataset`. |
+| `dataset` | string | `dataset` | Dataset entry: the Dataset whose snapshots each cycle copies in. Only with `connector: dataset`. ⚠ A plain component id (`orders_by_region`), never a path: `ComponentStore.get` refuses a `/` as an unsafe id — the shipped `orders_by_region_feed` still says `datasets/orders_by_region` (`DEMO-DATASET-FEED-UNSAFE-ID-1`). |
 | `id` | string · the pipeline name | — | The Collector's id. Circuit-breaker state is keyed by it. |
 | `include` | list · `processing.file_pattern` | `include` | Discovery patterns (`glob:` or `regex:` over the relative path). |
 | `exclude` | list | `exclude` | Patterns removed from discovery. |
