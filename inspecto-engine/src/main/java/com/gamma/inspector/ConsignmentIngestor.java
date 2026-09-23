@@ -114,6 +114,10 @@ public final class ConsignmentIngestor {
                             + "registration, backup moves, markers, the fingerprint ledger and any DB-export "
                             + "watermark all skipped (run {})", batch.batchId(), runId);
             log.info("dry run: would clear the COMMIT-retry record for consignment {}", batch.batchId());
+        } else if (!"SUCCESS".equals(status)) {
+            // PARKED-BRANCH-LEAK-ON-FAILED-BATCH-1: a branch may have parked before the batch failed or was
+            // quarantined; drain its entry so the static registry never outlives the batch. A re-run re-parks.
+            ParkedBranches.drain(batch.batchId());
         } else if ("SUCCESS".equals(status)) {
             // Phase 4 S4b: the graph lane parked one or more disabled branch sinks — the batch is
             // deliberately UNCOMMITTED. Parked finalisation (manifest + park-home move, nothing

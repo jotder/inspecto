@@ -189,6 +189,25 @@ class ChunkedStreamingTest {
     }
 
     /**
+     * PARKED-BRANCH-LEAK-ON-FAILED-BATCH-1: a branch parked earlier in the batch (recorded before the torn
+     * chunk) must not outlive a non-SUCCESS outcome - the registry is drained on every real outcome.
+     */
+    @Test
+    void parkedBranchEntryIsDrainedWhenTheBatchDoesNotSucceed(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = chunkedPipeline(dir, "30");
+        Path gz = Path.of(cfg.dirs().poll()).resolve("corrupt.csv.gz");
+        Files.write(gz, "this is not gzip-compressed data, but long enough to be chunked".getBytes());
+        String batchId = cfg.identity().runTimestamp() + "_mini_0001";
+        ParkedBranches.record(batchId, "sink_parked", dir.resolve("parked.parquet"));
+
+        process(cfg, new Consignment(batchId, "mini", null, List.of(member(cfg, gz.toFile(), 0))));
+
+        assertTrue(Files.readString(Path.of(cfg.dirs().statusFilePath())).contains("QUARANTINED_UNREADABLE"));
+        assertTrue(ParkedBranches.drain(batchId).isEmpty(),
+                "a non-SUCCESS batch must drain its parked-branch entries, not leak them");
+    }
+
+    /**
      * The other half of the split: a READABLE chunked file whose TRANSFORM fails (a {@code partitionKey}
      * naming an absent column) fails the BATCH, named, and stays in the inbox — never quarantined.
      */
