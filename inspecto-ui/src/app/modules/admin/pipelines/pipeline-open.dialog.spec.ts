@@ -5,7 +5,7 @@ import { Router, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { PipelineSummary, PipelinesService } from 'app/inspecto/api';
+import { BrokenPipeline, PipelineSummary, PipelinesService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { PipelineOpenDialog, PipelineOpenData } from './pipeline-open.dialog';
 
@@ -198,5 +198,50 @@ describe('PipelineOpenDialog', () => {
         localStorage.setItem(PINNED_KEY, JSON.stringify(['a']));
         const { fixture } = make();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    /** PIPELINE-LOAD-FAILURE-INVISIBLE-1: a file that did not load is a broken ENTRY, not a missing one. */
+    describe('a Pipeline that does not load', () => {
+        const BROKEN: BrokenPipeline = {
+            name: 'orders',
+            path: '/space/config/orders_pipeline.toon',
+            loadError: {
+                file: '/space/config/orders_schema.toon',
+                line: 7,
+                message:
+                    "/space/config/orders_schema.toon: line 7: a row of tabular array 'fields' {name,selector,type} " +
+                    'has 4 values but its header declares 3 columns',
+            },
+        };
+
+        it('is listed with a status badge, the message and the file — and cannot be ticked open', async () => {
+            const { fixture, c, ref } = make({ broken: [BROKEN] });
+            const el = fixture.nativeElement as HTMLElement;
+            const rows = Array.from(el.querySelectorAll('[data-testid="broken-pipeline"]'));
+            expect(rows).toHaveLength(1);
+            const row = rows[0] as HTMLElement;
+            expect(row.textContent).toContain('orders');
+            expect(row.querySelector('inspecto-status-badge')?.textContent).toContain('Does not load');
+            expect(row.textContent).toContain('line 7');
+            expect(row.textContent).toContain('/space/config/orders_pipeline.toon');
+            // Not openable: no checkbox, no pin/export buttons in the broken row, and never in the result.
+            expect(row.querySelector('mat-checkbox, button')).toBeNull();
+            c.confirm();
+            expect(ref.close).toHaveBeenCalledWith(['b']);
+            await expectNoA11yViolations(fixture.nativeElement);
+        });
+
+        it('is filtered by the search like the healthy rows, and alone suppresses the empty message', () => {
+            const { fixture, c } = make({ pipelines: [], broken: [BROKEN] });
+            const el = fixture.nativeElement as HTMLElement;
+            expect(el.textContent).not.toContain('No authored pipelines yet');
+            c.query.set('zzz');
+            fixture.detectChanges();
+            expect(el.querySelectorAll('[data-testid="broken-pipeline"]')).toHaveLength(0);
+            expect(el.textContent).toContain("No pipeline matches 'zzz'");
+            c.query.set('ord');
+            fixture.detectChanges();
+            expect(el.querySelectorAll('[data-testid="broken-pipeline"]')).toHaveLength(1);
+        });
     });
 });

@@ -32,9 +32,27 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   declares 3 columns — a ',' inside a value splits it; double-quote that value, e.g. "DECIMAL(18,2)""*, and
   `PipelineConfigParser.readToon` prefixes the file — the one decode for the pipeline file and every
   schema / segment / grammar file it references. `POST /validate {configPath}` answers that as **422**
-  (it was a 500). ⚠ Still only a WARN on the registry path: a Pipeline that does not load is absent from
-  `GET /pipelines`, with no load-error surface in the API or the SPA (BACKLOG
-  `PIPELINE-LOAD-FAILURE-INVISIBLE-1`).
+  (it was a 500).
+  **A Pipeline that does not load stays a ROW in `GET /pipelines`** (`PIPELINE-LOAD-FAILURE-INVISIBLE-1`,
+  operator decision 2026-09-23; it used to vanish behind a registry WARN). `ConfigRegistry.rebuild` still
+  WARNs and still keeps the file out of its index, but now also records a `LoadFailure` per path (the
+  registry is one per Space, so the failures are too), replaced wholesale on every rebuild so a fixed file
+  drops out on the next tick. `GET /pipelines` appends one `{name, path, loadError: {file, line?, message}}`
+  row per failure **after** the healthy rows, with no graph fields: `name` is the file-name stem
+  (`orders_pipeline.toon` → `orders`, since the declared name never parsed), `message` is the loader's own
+  text verbatim, and `file`/`line` are parsed out of its `<file>.toon: line N:` prefix — so `file` is the
+  **schema** when the bad row is in the schema — falling back to the pipeline file with no `line`.
+  🔴 **Decision: broken rows exist on that ONE route only.** `CollectorService.pipelines()`, `configs()`,
+  `all()`, `configForPath()` — everything the scheduler, the run/trigger routes, `/runs`, `/ready` and
+  `/health` counts, `/pipelines/combined`, lineage, metrics and the catalog read — are unchanged and never
+  see a failure, so nothing can schedule, run or count it (`POST /runs/<stem>/trigger` and
+  `GET /pipelines/<stem>/graph` are 404). No new route. In the SPA, `PipelinesService.list()` drops broken
+  rows for every picker/count consumer; only the Pipelines editor reads `listWithBroken()` and shows them
+  in its Open dialog ([pipeline editor](../../frontend/features/pipeline-editor.md)). Pinned by
+  `ControlApiPipelineLoadErrorTest` (real HTTP, an unquoted `DECIMAL(18,2)` schema row) +
+  `ConfigRegistryTest`. ⚠ The file/line split reads the message TEXT: a loader that changes the
+  `readToon`/`ConfigCodec` prefix silently degrades `file` to the pipeline path (the message is still
+  shown verbatim).
   ⚠ Other readers that call `JToon.decode` directly (`ToonHelper.load`, `SchemaExtractor`, `MainApp`,
   `inspecto-exchange`) still get the bare message.
   🔴 **`toMap` is not lenient.** JToon 1.0.9's `decode(String)` uses `DecodeOptions.DEFAULT`, which is

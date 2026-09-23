@@ -7,11 +7,14 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * An in-memory, thread-safe index of loaded pipeline configs keyed by their <b>in-file identity</b>
@@ -44,6 +47,29 @@ public final class ConfigRegistry {
     public record Entry(String id, Path path, PipelineConfig config) {}
 
     /**
+     * A registered pipeline file that did not load (PIPELINE-LOAD-FAILURE-INVISIBLE-1): kept so the read
+     * surface can list it as broken, but deliberately <b>outside</b> the index — every lookup, {@link #all},
+     * {@link #configs} and {@link #configForPath} still see only loaded configs, so nothing schedules, runs
+     * or counts it.
+     *
+     * @param path    the registered pipeline file
+     * @param name    the file-name stem ({@code orders_pipeline.toon} → {@code orders}); the in-file identity
+     *                is unknown because the file never parsed
+     * @param file    the file the loader refused — a referenced schema/segment/grammar when the loader's
+     *                message names one, else {@code path}
+     * @param line    the 1-based line the message names, or {@code null}
+     * @param message the loader's own message, verbatim
+     */
+    public record LoadFailure(Path path, String name, String file, Integer line, String message) {}
+
+    /**
+     * {@code <file>.toon: line N: } — the prefix {@code PipelineConfigParser.readToon} + {@code ConfigCodec} put
+     * on a decode refusal (the line part is optional). The file part admits a drive letter but no other colon,
+     * so a message that wraps the prefix ({@code "…: C:\x\y.toon: line 7: …"}) still yields just the path.
+     */
+    private static final Pattern FILE_AND_LINE = Pattern.compile("((?:[A-Za-z]:)?[^:\\n]*?\\.toon): (?:line (\\d+): )?");
+
+    /**
      * A cached parse keyed by pipeline file path: the indexed {@link Entry} plus the modification-time
      * fingerprint of every file that contributed to it (the pipeline {@code .toon} and each referenced
      * schema/grammar/segment file). A subsequent {@link #rebuild} reuses this entry verbatim while the
@@ -56,6 +82,8 @@ public final class ConfigRegistry {
     private final AtomicReference<Map<String, Entry>> index = new AtomicReference<>(Map.of());
     /** Parse cache keyed by pipeline file path (rebuild-only; not read concurrently with mutation). */
     private final AtomicReference<Map<Path, Cached>> cache = new AtomicReference<>(Map.of());
+    /** Paths that failed to load at the last {@link #rebuild}, in registration order; replaced wholesale. */
+    private final AtomicReference<List<LoadFailure>> failures = new AtomicReference<>(List.of());
     private final Runnable onRebuild;
 
     public ConfigRegistry() {
@@ -74,9 +102,9 @@ public final class ConfigRegistry {
      * Re-index every path, <b>parsing only what changed on disk</b>. For each path whose pipeline file
      * and every referenced schema/grammar/segment file are unchanged since the last rebuild (by
      * modification time), the previously-parsed config is reused with no disk read; otherwise the file
-     * is re-parsed and its fingerprint refreshed. Unloadable configs are warned and skipped (matching
-     * the prior behaviour); a duplicate in-file identity warns and the later path wins. Fires the
-     * rebuild callback on completion.
+     * is re-parsed and its fingerprint refreshed. Unloadable configs are warned, kept out of the index and
+     * recorded in {@link #failures} (PIPELINE-LOAD-FAILURE-INVISIBLE-1); a duplicate in-file identity warns
+     * and the later path wins. Fires the rebuild callback on completion.
      *
      * <p>This is what lets the poll cycle call {@code rebuild} every tick cheaply: a steady-state cycle
      * re-reads nothing and emits no "Loaded N schema(s)" churn, yet an edit to a pipeline or any of its
@@ -86,6 +114,7 @@ public final class ConfigRegistry {
         Map<Path, Cached> prevCache = cache.get();
         Map<String, Entry> next = new LinkedHashMap<>();
         Map<Path, Cached> nextCache = new LinkedHashMap<>();
+        List<LoadFailure> nextFailures = new ArrayList<>();
         for (Path p : paths) {
             try {
                 Cached cached = prevCache.get(p);
@@ -101,13 +130,31 @@ public final class ConfigRegistry {
                 }
             } catch (Exception e) {
                 log.warn("Could not load config {}: {}", p, e.getMessage());
+                nextFailures.add(failure(p, e));
             }
         }
         index.set(Map.copyOf(next));
         cache.set(Map.copyOf(nextCache));
+        failures.set(List.copyOf(nextFailures));
         if (onRebuild != null) {
             onRebuild.run();
         }
+    }
+
+    /** Describe a load refusal: the file + line the loader's message names, else the pipeline file itself. */
+    private static LoadFailure failure(Path p, Exception e) {
+        String message = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+        String file = p.toString();
+        Integer line = null;
+        Matcher m = FILE_AND_LINE.matcher(message);
+        if (m.find()) {
+            file = m.group(1).strip();
+            if (m.group(2) != null) line = Integer.valueOf(m.group(2));
+        }
+        String stem = p.getFileName().toString();
+        if (stem.endsWith(PIPELINE_SUFFIX)) stem = stem.substring(0, stem.length() - PIPELINE_SUFFIX.length());
+        else if (stem.endsWith(".toon")) stem = stem.substring(0, stem.length() - ".toon".length());
+        return new LoadFailure(p, stem, file, line, message);
     }
 
     /** Parse a pipeline file fresh and snapshot the mtime fingerprint of it + its referenced files. */
@@ -179,6 +226,11 @@ public final class ConfigRegistry {
     /** All indexed entries in registration order. */
     public List<Entry> all() {
         return List.copyOf(index.get().values());
+    }
+
+    /** The registered pipeline files that did not load at the last {@link #rebuild}, in registration order. */
+    public List<LoadFailure> failures() {
+        return failures.get();
     }
 
     public int size() {

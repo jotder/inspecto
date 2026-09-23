@@ -37,6 +37,8 @@ import {
     PipelineRunResult,
     PipelinesService,
     PipelineSummary,
+    BrokenPipeline,
+    splitPipelineRows,
     ProvenanceBatch,
     IconMap,
     IconMapService,
@@ -289,6 +291,8 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private focusedFromUrl = false;
 
     readonly flows = signal<PipelineSummary[]>([]);
+    /** Registered files that did not load — listed (broken) in the Open dialog, never openable. */
+    readonly brokenPipelines = signal<BrokenPipeline[]>([]);
 
     // ── open set (tabs) ───────────────────────────────────────────────────────────────────────────
     /** The open tabs, in strip order. Nothing is open until the user opens something. */
@@ -695,9 +699,11 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     load(): void {
         this.loading.set(true);
         // W5: the editor lists REGISTERED pipelines (the canonical *_pipeline.toon), not authored flows.
-        this.api.list().subscribe({
-            next: (fs) => {
+        this.api.listWithBroken().subscribe({
+            next: (rows) => {
+                const { pipelines: fs, broken } = splitPipelineRows(rows);
                 this.flows.set(fs);
+                this.brokenPipelines.set(broken);
                 this.loading.set(false);
                 // Deliberately opens nothing. Listing is cheap; lifting a graph is not, and auto-opening
                 // one arbitrary pipeline both cost a fetch nobody asked for and made the tab strip lie
@@ -708,6 +714,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             },
             error: () => {
                 this.flows.set([]);
+                this.brokenPipelines.set([]);
                 this.loading.set(false);
                 // Deliberately does NOT arm the persist mirror: with no list nothing can be opened,
                 // and an armed mirror would overwrite the stored tab set with `[]` — a backend-down
@@ -946,7 +953,12 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         this.dialog
             .open(PipelineOpenDialog, {
                 width: '30rem',
-                data: { pipelines: this.flows(), open: this.openIds(), dirty: [...this.dirtyIds()] },
+                data: {
+                    pipelines: this.flows(),
+                    broken: this.brokenPipelines(),
+                    open: this.openIds(),
+                    dirty: [...this.dirtyIds()],
+                },
             })
             .afterClosed()
             .subscribe((next?: string[]) => {

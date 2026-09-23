@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { HttpHeaders, HttpResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { PipelineBundleImportResult, PipelinesService } from './pipelines.service';
+import {
+    PipelineBundleImportResult,
+    PipelineListRow,
+    PipelineSummary,
+    PipelinesService,
+    splitPipelineRows,
+} from './pipelines.service';
 import { environment } from '../../../environments/environment';
 
 const base = environment.apiBaseUrl + '/v1'; // W7: apiUrl() builds /api/v1 paths
@@ -66,5 +72,41 @@ describe('PipelinesService (server bundle, R2)', () => {
 
         expect(received!.pipeline).toBe('demo_copy');
         expect(received!.active).toBe(false);
+    });
+});
+
+/** PIPELINE-LOAD-FAILURE-INVISIBLE-1: `GET /pipelines` also lists files that did not load (`loadError`). */
+describe('PipelinesService (broken rows)', () => {
+    let svc: PipelinesService;
+    let httpMock: HttpTestingController;
+    const rows = [
+        { name: 'good', active: true, nodeCount: 4, edgeCount: 3, produces: ['good'], consumes: [] },
+        { name: 'orders', path: '/c/orders_pipeline.toon', loadError: { file: '/c/s.toon', line: 7, message: 'm' } },
+    ];
+
+    beforeEach(() => {
+        TestBed.configureTestingModule({
+            providers: [PipelinesService, provideHttpClient(withXhr()), provideHttpClientTesting()],
+        });
+        svc = TestBed.inject(PipelinesService);
+        httpMock = TestBed.inject(HttpTestingController);
+    });
+
+    afterEach(() => httpMock.verify());
+
+    it('list() drops broken rows, so no consumer that picks or counts Pipelines ever sees one', () => {
+        let got: PipelineSummary[] | undefined;
+        svc.list().subscribe((r) => (got = r));
+        httpMock.expectOne(`${base}/pipelines`).flush(rows);
+        expect(got!.map((p) => p.name)).toEqual(['good']);
+    });
+
+    it('listWithBroken() keeps them, and splitPipelineRows separates the two in served order', () => {
+        let got: PipelineListRow[] | undefined;
+        svc.listWithBroken().subscribe((r) => (got = r));
+        httpMock.expectOne(`${base}/pipelines`).flush(rows);
+        const { pipelines, broken } = splitPipelineRows(got!);
+        expect(pipelines.map((p) => p.name)).toEqual(['good']);
+        expect(broken.map((b) => [b.name, b.loadError.line])).toEqual([['orders', 7]]);
     });
 });

@@ -59,7 +59,8 @@ let combinedCalls = 0;
 function build() {
     combinedCalls = 0;
     const stub = {
-        list: () => of([{ name: 'cdr_etl', active: true, nodeCount: 1, edgeCount: 0, produces: [], consumes: [] }]),
+        listWithBroken: () =>
+            of([{ name: 'cdr_etl', active: true, nodeCount: 1, edgeCount: 0, produces: [], consumes: [] }]),
         nodeTypes: () => of(TYPES),
         stepTypes: () => of([]),
         processorCatalog: () => of({ families: [], processors: [] }),

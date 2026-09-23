@@ -64,6 +64,49 @@ class ConfigRegistryTest {
         assertEquals(2, rebuilds.get(), "callback fires on every rebuild");
     }
 
+    /**
+     * PIPELINE-LOAD-FAILURE-INVISIBLE-1: a Pipeline that does not load is KEPT as a load failure (file, line,
+     * the loader's own message) instead of vanishing behind a WARN — and it never enters the index, so
+     * nothing that runs, schedules or counts Pipelines can see it.
+     */
+    @Test
+    void anUnloadablePipelineIsKeptAsALoadFailureOutsideTheIndex(@TempDir Path dir) throws Exception {
+        Path good = PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("good")), "");
+        Path badDir = Files.createDirectories(dir.resolve("bad"));
+        Path bad = Files.move(PipelineConfigBatchTest.writePipeline(badDir, ""), badDir.resolve("orders_pipeline.toon"));
+        Files.writeString(badDir.resolve("mini_schema.toon"), PipelineConfigBatchTest.miniSchema()
+                .replace("AMT,\"1\",DOUBLE", "AMT,\"1\",DECIMAL(18,2)"));
+        ConfigRegistry reg = new ConfigRegistry();
+
+        reg.rebuild(List.of(good, bad));
+        assertEquals(1, reg.size(), "the broken Pipeline is not indexed");
+        assertTrue(reg.configForPath(bad).isEmpty());
+        assertEquals(1, reg.failures().size(), "but it is not forgotten either");
+        ConfigRegistry.LoadFailure f = reg.failures().get(0);
+        assertEquals(bad, f.path());
+        assertEquals("orders", f.name(), "named after its file, since its declared name never parsed");
+        assertTrue(f.file().endsWith("mini_schema.toon"), "the file holding the bad row, not the pipeline: " + f.file());
+        assertEquals(7, f.line());
+        assertTrue(f.message().contains("\"DECIMAL(18,2)\""), f.message());
+
+        Files.writeString(badDir.resolve("mini_schema.toon"), PipelineConfigBatchTest.miniSchema());
+        reg.rebuild(List.of(good, bad));
+        assertTrue(reg.failures().isEmpty(), "a fixed file drops out of the failures");
+        assertEquals(1, reg.size(), "and loads (same MINI_ETL identity as the good one, so still one id)");
+        assertTrue(reg.configForPath(bad).isPresent());
+    }
+
+    @Test
+    void aFailureWithNoLineFallsBackToThePipelineFile(@TempDir Path dir) throws Exception {
+        Path missing = dir.resolve("nope_pipeline.toon"); // never written
+        ConfigRegistry reg = new ConfigRegistry();
+        reg.rebuild(List.of(missing));
+        ConfigRegistry.LoadFailure f = reg.failures().get(0);
+        assertEquals(missing.toString(), f.file());
+        assertNull(f.line());
+        assertEquals("nope", f.name());
+    }
+
     @Test
     void unchangedFilesReuseTheParsedConfig(@TempDir Path dir) throws Exception {
         Path p = PipelineConfigBatchTest.writePipeline(dir, "");
@@ -124,5 +167,6 @@ class ConfigRegistryTest {
         assertTrue(reg.idForPath(Path.of("whatever")).isEmpty());
         assertTrue(reg.configs().isEmpty());
         assertTrue(reg.all().isEmpty());
+        assertTrue(reg.failures().isEmpty());
     }
 }

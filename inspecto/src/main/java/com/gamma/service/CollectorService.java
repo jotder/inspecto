@@ -1526,6 +1526,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return out;
     }
 
+    /**
+     * The registered pipeline files that did not load (PIPELINE-LOAD-FAILURE-INVISIBLE-1) — for
+     * {@code GET /pipelines} alone. They are deliberately NOT in {@link #pipelines()}, so nothing that
+     * schedules, runs or counts Pipelines sees them.
+     */
+    public List<ConfigRegistry.LoadFailure> pipelineLoadFailures() {
+        return configRegistry.failures();
+    }
+
     /** The {@link PipelineConfig} for a registered pipeline by its (normalised) name — O(1). */
     public Optional<PipelineConfig> configFor(String pipelineName) {
         return configRegistry.get(pipelineName);

@@ -7,12 +7,18 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { PipelineSummary, PipelinesService, apiErrorMessage } from 'app/inspecto/api';
+import { BrokenPipeline, PipelineSummary, PipelinesService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
+import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 
 export interface PipelineOpenData {
     /** Every pipeline the server lists — names only; no graph is fetched to build this. */
     pipelines: PipelineSummary[];
+    /**
+     * Registered files that did not load (PIPELINE-LOAD-FAILURE-INVISIBLE-1) — listed after the rest as
+     * broken entries: the loader's message and the file, but no checkbox, since there is no graph to open.
+     */
+    broken?: BrokenPipeline[];
     /** Already-open ids, pre-ticked so the dialog reads as "what is open" rather than "what to add". */
     open: string[];
     /** Open ids with unsaved edits — a per-row export refuses these (an export carries SAVED state). */
@@ -39,6 +45,7 @@ export interface PipelineOpenData {
         MatTooltipModule,
         NgTemplateOutlet,
         InspectoDialogResizeDirective,
+        StatusBadgeComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -138,13 +145,28 @@ export interface PipelineOpenData {
                 @for (p of filtered(); track p.name) {
                     <ng-container *ngTemplateOutlet="row; context: { $implicit: p }" />
                 } @empty {
-                    <p class="px-1 py-3 text-sm opacity-60">
-                        @if (data.pipelines.length) {
-                            No pipeline matches '{{ query() }}'.
-                        } @else {
-                            No authored pipelines yet.
-                        }
-                    </p>
+                    @if (!brokenRows().length) {
+                        <p class="px-1 py-3 text-sm opacity-60">
+                            @if (data.pipelines.length || broken.length) {
+                                No pipeline matches '{{ query() }}'.
+                            } @else {
+                                No authored pipelines yet.
+                            }
+                        </p>
+                    }
+                }
+                <!-- Broken rows: a file that did not load has no graph, so there is nothing to tick. The
+                     message is the loader's own (it names the refused file + line); the path is the
+                     registered Pipeline file. -->
+                @for (b of brokenRows(); track b.path) {
+                    <div class="flex items-start gap-2 rounded px-1 py-1 text-sm" data-testid="broken-pipeline">
+                        <span class="flex min-w-0 flex-auto flex-col">
+                            <span class="truncate">{{ b.name }}</span>
+                            <span class="text-secondary break-all text-xs">{{ b.loadError.message }}</span>
+                            <span class="text-secondary break-all font-mono text-xs">{{ b.path }}</span>
+                        </span>
+                        <inspecto-status-badge value="error" label="Does not load" />
+                    </div>
                 }
             </div>
         </mat-dialog-content>
@@ -209,6 +231,14 @@ export class PipelineOpenDialog {
     readonly pinned = signal<ReadonlySet<string>>(
         new Set(PipelineOpenDialog.readStrings(PipelineOpenDialog.PINNED_KEY)),
     );
+
+    readonly broken: readonly BrokenPipeline[] = this.data.broken ?? [];
+
+    /** Broken rows, search-filtered by name like the healthy ones. */
+    readonly brokenRows = computed<readonly BrokenPipeline[]>(() => {
+        const q = this.query().trim().toLowerCase();
+        return q ? this.broken.filter((b) => b.name.toLowerCase().includes(q)) : this.broken;
+    });
 
     readonly filtered = computed<PipelineSummary[]>(() => {
         const q = this.query().trim().toLowerCase();

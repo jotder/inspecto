@@ -5,12 +5,14 @@ import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineProjection;
 import com.gamma.pipeline.PipelineStore;
+import com.gamma.service.ConfigRegistry;
 import com.gamma.service.PipelineView;
 import com.gamma.service.SpaceRoot;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +63,20 @@ final class PipelineListRoutes implements RouteModule {
                 if (!c.description().isEmpty()) s.put("description", c.description());
                 out.add(s);
             });
+        }
+        // PIPELINE-LOAD-FAILURE-INVISIBLE-1 (operator decision 2026-09-23): a registered file that does not
+        // load stays a ROW, after the healthy ones, carrying the loader's message. It has no graph fields —
+        // it never lifted — and it is listed HERE only: every run/schedule/count surface reads pipelines().
+        for (ConfigRegistry.LoadFailure f : api.service().pipelineLoadFailures()) {
+            Map<String, Object> loadError = new LinkedHashMap<>();
+            loadError.put("file", f.file());
+            if (f.line() != null) loadError.put("line", f.line());
+            loadError.put("message", f.message());
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("name", f.name());
+            row.put("path", f.path().toString());
+            row.put("loadError", loadError);
+            out.add(row);
         }
         return out;
     }

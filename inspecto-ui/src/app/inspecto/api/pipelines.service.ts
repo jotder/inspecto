@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { apiUrl } from './api-base';
 import type { AttributeSpec } from 'app/inspecto/component-model/attribute-spec';
 
@@ -25,6 +25,42 @@ export interface PipelineSummary {
     displayName?: string;
     /** Free-text note on what the pipeline is for, sent only when set. Display only — the row subtitle. */
     description?: string;
+}
+
+/** Why a registered pipeline file did not load — the loader's own message, verbatim. */
+export interface PipelineLoadError {
+    /** The file the loader refused: a referenced schema/segment/grammar file when named, else the pipeline file. */
+    file: string;
+    /** 1-based line the message names; absent when it names none. */
+    line?: number;
+    message: string;
+}
+
+/**
+ * A `GET /pipelines` row for a file that did not load (PIPELINE-LOAD-FAILURE-INVISIBLE-1). It never lifted,
+ * so it has no graph fields and cannot be opened; `name` is the file-name stem.
+ */
+export interface BrokenPipeline {
+    name: string;
+    /** The registered pipeline file. */
+    path: string;
+    loadError: PipelineLoadError;
+}
+
+export type PipelineListRow = PipelineSummary | BrokenPipeline;
+
+/** Split the raw list into the pipelines that loaded and the files that did not, each in served order. */
+export function splitPipelineRows(rows: readonly PipelineListRow[]): {
+    pipelines: PipelineSummary[];
+    broken: BrokenPipeline[];
+} {
+    const pipelines: PipelineSummary[] = [];
+    const broken: BrokenPipeline[] = [];
+    for (const r of rows) {
+        if ('loadError' in r && r.loadError) broken.push(r);
+        else pipelines.push(r as PipelineSummary);
+    }
+    return { pipelines, broken };
 }
 
 /** One node in a pipeline graph projection (structural only — no raw config; the inspector shows this). */
@@ -397,9 +433,18 @@ export interface PipelineBundleImportResult {
 export class PipelinesService {
     private http = inject(HttpClient);
 
-    /** Every registered pipeline, lifted to a pipeline-graph summary. */
+    /**
+     * Every registered pipeline that LOADS, lifted to a pipeline-graph summary. Broken rows are dropped
+     * here, so every consumer that picks, counts or references Pipelines never sees one; only the
+     * Pipelines list itself reads {@link listWithBroken}.
+     */
     list(): Observable<PipelineSummary[]> {
-        return this.http.get<PipelineSummary[]>(apiUrl('/pipelines'));
+        return this.listWithBroken().pipe(map((rows) => splitPipelineRows(rows).pipelines));
+    }
+
+    /** The raw `GET /pipelines` rows — healthy summaries AND files that failed to load (`loadError`). */
+    listWithBroken(): Observable<PipelineListRow[]> {
+        return this.http.get<PipelineListRow[]>(apiUrl('/pipelines'));
     }
 
     /** The full graph projection for one pipeline, by its (normalised) name. */

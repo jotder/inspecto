@@ -2062,16 +2062,37 @@
     },
     "/pipelines" : {
       "get" : {
-        "tags" : [ "pipelines" ],
-        "summary" : "GET /pipelines (generated skeleton)",
+        "tags" : [ "Pipelines" ],
+        "summary" : "List the registered Pipelines, broken ones included",
         "operationId" : "getPipelines",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
-          }
+        "description" : "One row per registered Pipeline file, lifted to a graph summary. A file that does not load (PIPELINE-LOAD-FAILURE-INVISIBLE-1) is still listed, after the healthy rows, as {name, path, loadError} with no graph fields; it appears on no other surface, so nothing runs, schedules or counts it.",
+        "x-probe" : {
+          "path" : "/api/v1/pipelines",
+          "status" : 200
         },
-        "x-generated" : true
+        "responses" : {
+          "200" : {
+            "description" : "Healthy rows first (graph summary), then broken rows (loadError).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "array",
+                        "items" : {
+                          "$ref" : "#/components/schemas/PipelineListRow"
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/pipelines/node-types" : {
@@ -7887,6 +7908,70 @@
               "type" : "object"
             },
             "description" : "Rows where some non-blank field failed its cast (bounded)."
+          }
+        }
+      },
+      "PipelineListRow" : {
+        "type" : "object",
+        "description" : "A GET /pipelines row. A healthy row is the lifted graph summary (name, active, nodeCount, edgeCount, produces, consumes, plus template/displayName/description only when set) and has no loadError key. A broken row carries ONLY name (the file-name stem, since the declared name never parsed), path and loadError.",
+        "required" : [ "name" ],
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "description" : "The Pipeline id; for a broken row, the file-name stem (orders_pipeline.toon -> orders)."
+          },
+          "active" : {
+            "type" : "boolean"
+          },
+          "nodeCount" : {
+            "type" : "integer"
+          },
+          "edgeCount" : {
+            "type" : "integer"
+          },
+          "produces" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "consumes" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "template" : {
+            "type" : "boolean"
+          },
+          "displayName" : {
+            "type" : "string"
+          },
+          "description" : {
+            "type" : "string"
+          },
+          "path" : {
+            "type" : "string",
+            "description" : "Broken rows only: the registered Pipeline file."
+          },
+          "loadError" : {
+            "type" : "object",
+            "description" : "Broken rows only: why the file did not load.",
+            "required" : [ "file", "message" ],
+            "properties" : {
+              "file" : {
+                "type" : "string",
+                "description" : "The file the loader refused — a referenced schema/segment/grammar file when the message names one, else the Pipeline file."
+              },
+              "line" : {
+                "type" : "integer",
+                "description" : "1-based line the message names; absent when it names none."
+              },
+              "message" : {
+                "type" : "string",
+                "description" : "The loader's own message, verbatim."
+              }
+            }
           }
         }
       },

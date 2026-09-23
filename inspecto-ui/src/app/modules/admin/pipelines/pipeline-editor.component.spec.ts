@@ -38,7 +38,7 @@ const FLOW: AuthoredPipeline = {
 
 describe('PipelineEditorComponent', () => {
     let api: {
-        list: ReturnType<typeof vi.fn>;
+        listWithBroken: ReturnType<typeof vi.fn>;
         nodeTypes: ReturnType<typeof vi.fn>;
         stepTypes: ReturnType<typeof vi.fn>;
         processorCatalog: ReturnType<typeof vi.fn>;
@@ -84,7 +84,7 @@ describe('PipelineEditorComponent', () => {
         // The editor persists its open-tab set the same way — a set left by one test must not restore in another.
         localStorage.removeItem('inspecto.pipelines.openTabs');
         api = {
-            list: vi.fn().mockReturnValue(of([])),
+            listWithBroken: vi.fn().mockReturnValue(of([])),
             nodeTypes: vi.fn().mockReturnValue(
                 of([
                     {
@@ -1989,7 +1989,7 @@ describe('PipelineEditorComponent', () => {
 
     describe('open set / tabs', () => {
         it('opens nothing on arrival — listing is cheap, lifting a graph is not', () => {
-            api.list.mockReturnValue(
+            api.listWithBroken.mockReturnValue(
                 of([
                     { name: 'a', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
                     { name: 'b', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
@@ -2060,7 +2060,7 @@ describe('PipelineEditorComponent', () => {
             const c = make();
             c.select('demo');
             c.select('gone');
-            api.list.mockReturnValue(
+            api.listWithBroken.mockReturnValue(
                 of([{ name: 'demo', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] }]),
             );
             c.load();
@@ -2192,7 +2192,7 @@ describe('PipelineEditorComponent', () => {
         });
 
         it('persists the open set + selection as tabs change', () => {
-            api.list.mockReturnValue(of([row('demo'), row('other')]));
+            api.listWithBroken.mockReturnValue(of([row('demo'), row('other')]));
             const c = make();
             c.select('demo');
             TestBed.tick(); // flush the persist mirror
@@ -2201,7 +2201,7 @@ describe('PipelineEditorComponent', () => {
 
         it('restores the stored set LAZILY — only the selected tab lifts its graph', () => {
             localStorage.setItem(KEY, JSON.stringify({ open: ['a', 'b'], selected: 'b' }));
-            api.list.mockReturnValue(of([row('a'), row('b'), row('c')]));
+            api.listWithBroken.mockReturnValue(of([row('a'), row('b'), row('c')]));
             const c = make();
             expect(c.openIds()).toEqual(['a', 'b']);
             expect(c.selectedId()).toBe('b');
@@ -2212,7 +2212,7 @@ describe('PipelineEditorComponent', () => {
 
         it('silently drops names the served list no longer has, falling back to the first survivor', () => {
             localStorage.setItem(KEY, JSON.stringify({ open: ['a', 'ghost'], selected: 'ghost' }));
-            api.list.mockReturnValue(of([row('a')]));
+            api.listWithBroken.mockReturnValue(of([row('a')]));
             const c = make();
             expect(c.openIds()).toEqual(['a']);
             expect(c.selectedId()).toBe('a');
@@ -2220,7 +2220,7 @@ describe('PipelineEditorComponent', () => {
 
         it('the ?open= deep link wins the selection over the stored one', () => {
             localStorage.setItem(KEY, JSON.stringify({ open: ['a', 'b'], selected: 'b' }));
-            api.list.mockReturnValue(of([row('a'), row('b'), row('c')]));
+            api.listWithBroken.mockReturnValue(of([row('a'), row('b'), row('c')]));
             const fixture = TestBed.createComponent(PipelineEditorComponent);
             fixture.componentRef.setInput('openId', 'c');
             const c = fixture.componentInstance;
@@ -2232,7 +2232,7 @@ describe('PipelineEditorComponent', () => {
 
         it('ignores a corrupt stored value, and never persists graphs or dirty flags — ids only', () => {
             localStorage.setItem(KEY, '{not json');
-            api.list.mockReturnValue(of([row('demo')]));
+            api.listWithBroken.mockReturnValue(of([row('demo')]));
             const c = make();
             expect(c.openIds()).toEqual([]);
             c.select('demo');
@@ -2241,9 +2241,28 @@ describe('PipelineEditorComponent', () => {
             expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({ open: ['demo'], selected: 'demo' });
         });
 
+        /** PIPELINE-LOAD-FAILURE-INVISIBLE-1: a broken row reaches the Open dialog, never the open set. */
+        it('hands a Pipeline that does not load to the Open dialog as broken, and never restores it as a tab', () => {
+            localStorage.setItem(KEY, JSON.stringify({ open: ['a', 'orders'], selected: 'orders' }));
+            const broken = {
+                name: 'orders',
+                path: '/c/orders_pipeline.toon',
+                loadError: { file: '/c/s.toon', message: 'm' },
+            };
+            api.listWithBroken.mockReturnValue(of([row('a'), broken]));
+            const c = make();
+            expect(c.flows().map((f) => f.name)).toEqual(['a']);
+            expect(c.openIds()).toEqual(['a']);
+            dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+            c.openPipelines();
+            const data = dialog.open.mock.calls[0][1].data;
+            expect(data.pipelines.map((p: { name: string }) => p.name)).toEqual(['a']);
+            expect(data.broken).toEqual([broken]);
+        });
+
         it('a failed list fetch must NOT wipe the stored set', () => {
             localStorage.setItem(KEY, JSON.stringify({ open: ['a'], selected: 'a' }));
-            api.list.mockReturnValue(throwError(() => new Error('down')));
+            api.listWithBroken.mockReturnValue(throwError(() => new Error('down')));
             make();
             TestBed.tick();
             expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({ open: ['a'], selected: 'a' });
@@ -3576,7 +3595,7 @@ describe('PipelineEditorComponent', () => {
 
 describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
     let api: {
-        list: ReturnType<typeof vi.fn>;
+        listWithBroken: ReturnType<typeof vi.fn>;
         nodeTypes: ReturnType<typeof vi.fn>;
         stepTypes: ReturnType<typeof vi.fn>;
         processorCatalog: ReturnType<typeof vi.fn>;
@@ -3590,7 +3609,7 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
         localStorage.removeItem('inspecto.pipelines.viewMode');
         localStorage.removeItem('inspecto.pipelines.openTabs');
         api = {
-            list: vi.fn().mockReturnValue(of([])),
+            listWithBroken: vi.fn().mockReturnValue(of([])),
             nodeTypes: vi.fn().mockReturnValue(of([])),
             stepTypes: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
             processorCatalog: vi.fn().mockReturnValue(throwError(() => new Error('404'))),

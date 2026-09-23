@@ -83,6 +83,18 @@ backend on :4204.
   own `confirm()` from newly-ticked ids) + `inspecto.pipelines.pinned` (per-row star,
   `aria-pressed`); Pinned/Recent sections render above the full list from ONE shared row
   template, stale ids dropped on render, search filters across sections.
+- **A Pipeline that does not load is a BROKEN ENTRY in the Open dialog, never a missing one**
+  (`PIPELINE-LOAD-FAILURE-INVISIBLE-1`, operator decision 2026-09-23). `GET /pipelines` appends
+  `{name, path, loadError: {file, line?, message}}` rows for registered files that failed to load
+  ([TOON config](../../backend/config/toon-config.md)). The editor reads `PipelinesService.listWithBroken()`
+  and splits it with `splitPipelineRows`: healthy rows feed `flows()` (tabs, restore, name checks) as
+  before, broken rows feed `brokenPipelines()` → the dialog's `broken` data, rendered after the list with an
+  error `<inspecto-status-badge label="Does not load">`, the loader's message verbatim and the pipeline
+  file path — and **no checkbox, pin or export**, since there is no graph to open. A stored open tab
+  naming a broken file is dropped on restore like any other unlisted id. ⛔ Every OTHER consumer
+  (Catalog registry, Link Analysis, the dashboard editor's stale-widget check) calls `list()`, which
+  drops broken rows — do not switch one to `listWithBroken()` without deciding what it should do with a
+  Pipeline that cannot run.
 
 **Edit mode is a full-bleed editor shell, not an admin page** — `pipelines.component.html` branches
 on `mode()`; no page header, no `p-6 sm:p-10`; the mode toggle and `<inspecto-ai-explain>` project
