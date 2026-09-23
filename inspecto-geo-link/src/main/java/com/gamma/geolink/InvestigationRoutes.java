@@ -46,9 +46,11 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  * ordered, append-only op log over one Dataset + projection mapping, and the <b>Working Set</b> it evaluates to.
  *
  * <ul>
- *   <li>{@code POST /inv/investigations} — create, bound to {@code {dataset, sourceCol, targetCol, linkKindCol?}}.</li>
- *   <li>{@code POST /inv/investigations/{id}/ops} — append one op ({@code seed · expand · exclude · hide · keep});
- *       answers the Working Set DELTA and {@code truncated}.</li>
+ *   <li>{@code POST /inv/investigations} — create, bound to {@code {dataset, sourceCol, targetCol, linkKindCol?,
+ *       timeCol?, timeColZone?}}.</li>
+ *   <li>{@code POST /inv/investigations/{id}/ops} — append one op ({@code seed · expand · exclude · hide · keep ·
+ *       window}); answers the Working Set DELTA and {@code truncated}. An {@code expand} is one hop-ladder rung
+ *       (LA-13, plan §2.4) — see {@link #expandParams}.</li>
  *   <li>{@code POST /inv/investigations/{id}/undo} — real undo: a log edit that reverts the latest op.</li>
  *   <li>{@code POST /inv/investigations/{id}/reorder} — re-ordering FORKS (D-E4): a new Investigation with explicit
  *       parent lineage; the original log, its Working Sets and any Artifact anchored to them are untouched.</li>
@@ -83,16 +85,18 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
 public final class InvestigationRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    /** The five ops this slice evaluates. */
-    private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep");
+    /** The six ops this slice evaluates (LA-10's five + LA-13's {@code window}). */
+    private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window");
     /** The rest of the closed vocabulary (plan §2.2): named so they refuse as "not yet", never as "unknown". */
-    private static final Set<String> DEFERRED = Set.of("seedBy", "excludeBy", "threshold", "window", "annotate",
-            "snapshot");
+    private static final Set<String> DEFERRED = Set.of("seedBy", "excludeBy", "threshold", "annotate", "snapshot");
+    /** An {@code expand} rung's traversal direction (plan §2.4). */
+    private static final List<String> DIRECTIONS = List.of("either", "out", "in", "reciprocal");
     private static final int MAX_IDS = 1_000;
     private static final int MAX_ID_LENGTH = 512;
     private static final int MAX_FRONTIER = 1_000;
-    private static final int DEFAULT_EXPAND_LIMIT = 2_000;
-    private static final int MAX_EXPAND_LIMIT = 20_000;
+    private static final int MAX_LINK_KINDS = 100;
+    private static final int DEFAULT_EXPAND_BUDGET = 2_000;
+    private static final int MAX_EXPAND_BUDGET = 20_000;
     private static final int LOG_DEFAULT = 500;
     private static final int LOG_MAX = 5_000;
 
@@ -123,9 +127,12 @@ public final class InvestigationRoutes implements RouteModule {
     // ── routes ─────────────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * {@code POST /inv/investigations} — body {@code {id?, title?, dataset, sourceCol, targetCol, linkKindCol?}}.
+     * {@code POST /inv/investigations} — body {@code {id?, title?, dataset, sourceCol, targetCol, linkKindCol?,
+     * timeCol?, timeColZone?}}. {@code timeCol} (LA-13) binds the event time every window reads; see
+     * {@link InvestigationTime} for the timezone contract {@code timeColZone} is part of.
      * Gates: write root 503 → a missing/unsafe field 422 → unknown or not-viewable Dataset 404 → a column the
-     * relation lacks 422 → id escaping the store 403 → id taken 409 → write the header CREATE_NEW.
+     * relation lacks, a time column that is not a timestamp, or a bad zone 422 → id escaping the store 403 → id
+     * taken 409 → write the header CREATE_NEW.
      */
     private Object create(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation create");
@@ -137,12 +144,14 @@ public final class InvestigationRoutes implements RouteModule {
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
+        String timeCol = ident(body, "timeCol", false);
 
         String relationSql = InvRoutes.relationFor(api, ex, writeRoot, dataset);
         List<String> columns = relationColumns(dataset, relationSql);
-        for (String col : java.util.Arrays.asList(sourceCol, targetCol, kindCol))
+        for (String col : java.util.Arrays.asList(sourceCol, targetCol, kindCol, timeCol))
             if (col != null && columns.stream().noneMatch(col::equalsIgnoreCase))
                 throw new ApiException(422, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
+        String timeColZone = timeColZone(dataset, relationSql, timeCol, ApiContext.str(body, "timeColZone"));
 
         SnapshotStore store = new SnapshotStore(writeRoot);
         jail(store, id);
@@ -154,6 +163,10 @@ public final class InvestigationRoutes implements RouteModule {
         header.put("sourceCol", sourceCol);
         header.put("targetCol", targetCol);
         header.put("linkKindCol", kindCol);
+        if (timeCol != null) {   // absent keys keep a timeless Investigation's header exactly as LA-10 wrote it
+            header.put("timeCol", timeCol);
+            header.put("timeColZone", timeColZone);
+        }
         header.put("createdAt", Instant.now().toString());
         // D-E3: no version-addressable read exists, so nothing is pinned — reads are sealed at use instead.
         header.put("datasetVersion", null);
@@ -175,10 +188,11 @@ public final class InvestigationRoutes implements RouteModule {
         if (op == null) throw new ApiException(422, "body must include 'op'");
         if (DEFERRED.contains(op))
             throw new ApiException(422, "op '" + op + "' is in the closed vocabulary but not implemented yet (LA-10 "
-                    + "ships seed, expand, exclude, hide, keep)");
+                    + "and LA-13 ship seed, expand, exclude, hide, keep, window)");
         if (!SHIPPED.contains(op))
             throw new ApiException(422, "op '" + op + "' is not in the closed op vocabulary");
         Map<String, Object> params = params(op, body);
+        requireBindings(inv.header(), op, params, "");
 
         synchronized (lock(inv.dir())) {
             List<Map<String, Object>> log = readLog(inv);
@@ -199,8 +213,7 @@ public final class InvestigationRoutes implements RouteModule {
                 if (frontier.size() > MAX_FRONTIER)
                     throw new ApiException(422, "an expand frontier is capped at " + MAX_FRONTIER
                             + " entities; name them with 'ids'");
-                entry.put("read", read(api, ex, inv, frontier, new ArrayList<>(before.excluded.keySet()),
-                        ((Number) params.get("limit")).intValue()));
+                entry.put("read", read(api, ex, inv, rung(params, frontier, before)));
             }
             return commit(ex, inv, log, entry, before);
         }
@@ -281,8 +294,7 @@ public final class InvestigationRoutes implements RouteModule {
                 List<String> frontier = new ArrayList<>();
                 for (String n : named.isEmpty() ? state.entities.keySet() : sorted(named))
                     if (state.entities.containsKey(n)) frontier.add(n);
-                e.put("read", read(api, ex, parent, frontier, new ArrayList<>(state.excluded.keySet()),
-                        ((Number) p.get("limit")).intValue()));
+                e.put("read", read(api, ex, parent, rung(p, frontier, state)));
             }
             e = roundTrip(e);
             InvestigationEvaluator.apply(state, e);
@@ -310,7 +322,7 @@ public final class InvestigationRoutes implements RouteModule {
      * LA-23 — build a NEW Investigation from an Investigation Template's ops (called by
      * {@link InvestigationTemplateRoutes}, which resolves the template, its parameters and the binding). Additive:
      * every existing route is untouched. {@code header} carries the new id, title, Dataset and column roles plus the
-     * template lineage; each op is an {@code /ops}-shaped body ({@code {op, ids?, entityType?, limit?}}) and is
+     * template lineage; each op is an {@code /ops}-shaped body ({@code {op, ids?, entityType?, window?, ...rung}}) and is
      * validated by the same {@link #params} an append uses. Gates, in {@link #create}'s order: unsafe id or column 422
      * → unknown or not-viewable Dataset 404 (R3) → a column the relation lacks 422 → id escaping the store 403 → id
      * taken 409. Every {@code expand} reads the NEW binding — the frontier is the whole Working Set at that point,
@@ -323,19 +335,28 @@ public final class InvestigationRoutes implements RouteModule {
         requireSafeId(id);
         String dataset = String.valueOf(header.get("dataset"));
         List<String> cols = new ArrayList<>();
-        for (String key : List.of("sourceCol", "targetCol", "linkKindCol")) {
-            String col = ident(header, key, !key.equals("linkKindCol"));
+        for (String key : List.of("sourceCol", "targetCol", "linkKindCol", "timeCol")) {
+            String col = ident(header, key, key.equals("sourceCol") || key.equals("targetCol"));
             if (col != null) cols.add(col);
         }
-        List<String> columns = relationColumns(dataset, InvRoutes.relationFor(api, ex, writeRoot, dataset));
+        String relationSql = InvRoutes.relationFor(api, ex, writeRoot, dataset);
+        List<String> columns = relationColumns(dataset, relationSql);
         for (String col : cols)
             if (columns.stream().noneMatch(col::equalsIgnoreCase))
                 throw new ApiException(422, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
+        String timeCol = ident(header, "timeCol", false);
+        String timeColZone = timeColZone(dataset, relationSql, timeCol, ApiContext.str(header, "timeColZone"));
         SnapshotStore store = new SnapshotStore(writeRoot);
         jail(store, id);
         if (store.readInvestigation(id) != null) throw new ApiException(409, "investigation '" + id + "' already exists");
 
         Map<String, Object> h = new LinkedHashMap<>(header);
+        h.remove("timeCol");
+        h.remove("timeColZone");
+        if (timeCol != null) {
+            h.put("timeCol", timeCol);
+            h.put("timeColZone", timeColZone);
+        }
         h.put("owner", ApiContext.actor(ex));
         h.put("createdAt", Instant.now().toString());
         h.put("datasetVersion", null);   // D-E3, as create
@@ -351,7 +372,9 @@ public final class InvestigationRoutes implements RouteModule {
             if (!SHIPPED.contains(op)) throw new ApiException(422, "op '" + op + "' is not in the closed op vocabulary");
             Map<String, Object> e = entry(++step, "op", ex);
             e.put("op", op);
-            e.put("params", params(op, body));
+            Map<String, Object> params = params(op, body);
+            requireBindings(h, op, params, "template step " + step + ": ");
+            e.put("params", params);
             e.put("derivedFrom", body.get("derivedFrom"));
             if (op.equals("expand")) {
                 List<String> frontier = new ArrayList<>(state.entities.keySet());
@@ -359,8 +382,7 @@ public final class InvestigationRoutes implements RouteModule {
                 if (frontier.size() > MAX_FRONTIER)
                     throw new ApiException(422, "template step " + step + " would expand " + frontier.size()
                             + " entities; an expand frontier is capped at " + MAX_FRONTIER);
-                e.put("read", read(api, ex, inv, frontier, new ArrayList<>(state.excluded.keySet()),
-                        ((Number) ((Map<?, ?>) e.get("params")).get("limit")).intValue()));
+                e.put("read", read(api, ex, inv, rung(params, frontier, state)));
             }
             e = roundTrip(e);
             InvestigationEvaluator.apply(state, e);
@@ -407,8 +429,7 @@ public final class InvestigationRoutes implements RouteModule {
                 if (!"expand".equals(e.get("op")) || undone.contains(step)) continue;
                 @SuppressWarnings("unchecked") Map<String, Object> sealed = (Map<String, Object>) e.get("read");
                 @SuppressWarnings("unchecked") Map<String, Object> q = (Map<String, Object>) sealed.get("query");
-                Map<String, Object> now = read(api, ex, inv, strings(q.get("frontier")), strings(q.get("excluded")),
-                        ((Number) q.get("limit")).intValue());
+                Map<String, Object> now = read(api, ex, inv, q);   // the RECORDED rung, window resolved as sealed
                 boolean d = !sealed.get("fingerprint").equals(now.get("fingerprint"));
                 diverged |= d;
                 Map<String, Object> row = new LinkedHashMap<>();
@@ -467,7 +488,7 @@ public final class InvestigationRoutes implements RouteModule {
             Map<String, Object> out = new LinkedHashMap<>(e);
             if (e.get("read") instanceof Map<?, ?> r) {
                 Map<String, Object> summary = new LinkedHashMap<>();   // the sealed rows stay out of the log view
-                for (String k : List.of("dataset", "readAt", "rowCount", "truncated", "fingerprint"))
+                for (String k : List.of("dataset", "readAt", "rowCount", "truncated", "fanOutCapped", "fingerprint"))
                     summary.put(k, r.get(k));
                 out.put("read", summary);
             }
@@ -521,39 +542,104 @@ public final class InvestigationRoutes implements RouteModule {
             for (String i : strings(((Map<?, ?>) e.get("params")).get("ids"))) if (before.kept.contains(i)) kept.add(i);
             out.put("protected", kept);
         }
-        if (read != null) out.put("read", Map.of("rowCount", read.get("rowCount"),
-                "fingerprint", read.get("fingerprint"), "readAt", read.get("readAt")));
+        if (read != null) {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("rowCount", read.get("rowCount"));
+            r.put("fingerprint", read.get("fingerprint"));
+            r.put("readAt", read.get("readAt"));
+            r.put("fanOutCapped", read.get("fanOutCapped"));
+            r.put("rung", read.get("query"));   // the rung as READ: window resolved, frontier and exclusions included
+            out.put("read", r);
+        }
+        if (after.window != null || "window".equals(op)) out.put("window", after.window);
         out.put("workingSet", summary(after));
         return out;
     }
 
     /**
-     * The sealed one-hop read behind an {@code expand} (D-E3): the folded rows touching the frontier, with rows
-     * touching an excluded entity filtered IN the query so an excluded hub cannot spend the budget (prune, then
-     * expand). Every value is a bound parameter; every identifier came from the validated header. The query
-     * inputs are recorded beside the rows so {@code reread} re-runs exactly this statement.
+     * The rung an {@code expand} reads with (plan §2.4): the op's validated params, resolved against the Working Set
+     * it runs on — its frontier, its exclusions and, for {@code window: "inherit"}, the window the latest
+     * {@code window} op set. This resolved map is recorded as {@code read.query}, so {@code reread} re-runs exactly
+     * the statement that was sealed, whatever window ops come later.
      */
-    private Map<String, Object> read(ApiContext api, HttpExchange ex, Inv inv, List<String> frontier,
-                                     List<String> excluded, int limit) {
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> rung(Map<String, Object> p, List<String> frontier,
+                                            InvestigationEvaluator.State s) {
+        Map<String, Object> q = new LinkedHashMap<>();
+        q.put("frontier", frontier);
+        q.put("excluded", new ArrayList<>(s.excluded.keySet()));
+        q.put("budget", p.get("budget"));
+        q.put("direction", p.get("direction"));
+        q.put("linkKinds", p.get("linkKinds"));
+        Object w = p.get("window");
+        q.put("window", "inherit".equals(w) ? s.window : "full".equals(w) ? null : (Map<String, Object>) w);
+        q.put("minEvents", p.get("minEvents"));
+        q.put("minDistinctDays", p.get("minDistinctDays"));
+        q.put("candidateDegreeMin", p.get("candidateDegreeMin"));
+        q.put("candidateDegreeMax", p.get("candidateDegreeMax"));
+        q.put("maxFanOut", p.get("maxFanOut"));
+        return q;
+    }
+
+    /**
+     * The sealed one-hop read behind an {@code expand} (D-E3), for one resolved rung ({@link #rung}). Every value is
+     * a bound parameter; every identifier came from the validated header. The shape, in CTE order:
+     * <ol>
+     *   <li>{@code ev} — the events: both endpoints present, of an allowed link kind, touching no excluded entity
+     *       (prune, then expand: an excluded hub neither spends the budget nor counts toward a degree), and — when a
+     *       window applies — inside it, per the {@link InvestigationTime} timezone contract;</li>
+     *   <li>{@code pairs} — folded per (source, target, kind) with the IN-WINDOW event count and distinct local days,
+     *       over the WHOLE Dataset, because a candidate's degree is a property of the windowed graph, not of the
+     *       frontier;</li>
+     *   <li>{@code cand} — the pairs touching the frontier in the rung's direction, each with its anchor (the frontier
+     *       end, source first — the same choice {@link InvestigationEvaluator} makes) and its candidate (the other);</li>
+     *   <li>{@code elig} — those passing {@code minEvents}, {@code minDistinctDays} and the candidate's in-window
+     *       degree bounds, ranked strongest first per anchor for {@code maxFanOut}.</li>
+     * </ol>
+     * The budget caps the rows returned; a breach sets {@code truncated}. The fan-out cap is reported separately as
+     * {@code fanOutCapped} — a rule the analyst stated, not a limit the engine hit.
+     */
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> read(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> query) {
         String dataset = inv.dataset();
         String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), dataset);   // R3 gate on EVERY read
+        List<String> frontier = strings(query.get("frontier"));
+        List<String> excluded = strings(query.get("excluded"));
+        Map<String, Object> window = query.get("window") instanceof Map<?, ?> w ? (Map<String, Object>) w : null;
+        Integer minDays = query.get("minDistinctDays") instanceof Number n ? n.intValue() : null;
+        Integer degMin = query.get("candidateDegreeMin") instanceof Number n ? n.intValue() : null;
+        Integer degMax = query.get("candidateDegreeMax") instanceof Number n ? n.intValue() : null;
+        Integer fanOut = query.get("maxFanOut") instanceof Number n ? n.intValue() : null;
+        List<String> kinds = query.get("linkKinds") == null ? null : strings(query.get("linkKinds"));
+        String direction = String.valueOf(query.get("direction"));
+        int budget = ((Number) query.get("budget")).intValue();
+        boolean timed = window != null || minDays != null;
+
         List<Map<String, Object>> rows = new ArrayList<>();
         boolean truncated = false;
+        long capped = 0;
         if (!frontier.isEmpty()) {
-            String src = SqlIdent.q(String.valueOf(inv.header().get("sourceCol")));
-            String tgt = SqlIdent.q(String.valueOf(inv.header().get("targetCol")));
-            Object kc = inv.header().get("linkKindCol");
-            String kind = kc == null ? null : SqlIdent.q(String.valueOf(kc));
-            String in = String.join(",", Collections.nCopies(frontier.size(), "?"));
-            StringBuilder sql = new StringBuilder("SELECT CAST(").append(src).append(" AS VARCHAR) AS source, CAST(")
-                    .append(tgt).append(" AS VARCHAR) AS target");
-            if (kind != null) sql.append(", CAST(").append(kind).append(" AS VARCHAR) AS kind");
-            sql.append(", COUNT(*) AS cnt FROM ").append(SqlIdent.q(dataset)).append(" WHERE ").append(src)
-               .append(" IS NOT NULL AND ").append(tgt).append(" IS NOT NULL AND (CAST(").append(src)
-               .append(" AS VARCHAR) IN (").append(in).append(") OR CAST(").append(tgt).append(" AS VARCHAR) IN (")
-               .append(in).append("))");
-            List<String> binds = new ArrayList<>(frontier);
+            Map<String, Object> h = inv.header();
+            String src = SqlIdent.q(String.valueOf(h.get("sourceCol")));
+            String tgt = SqlIdent.q(String.valueOf(h.get("targetCol")));
+            String kind = h.get("linkKindCol") == null ? null : SqlIdent.q(String.valueOf(h.get("linkKindCol")));
+            List<String> binds = new ArrayList<>();
+            StringBuilder sql = new StringBuilder("WITH fr(id) AS (VALUES ")
+                    .append(String.join(",", Collections.nCopies(frontier.size(), "(?)"))).append(")");
             binds.addAll(frontier);
+            sql.append(", ev0 AS (SELECT CAST(").append(src).append(" AS VARCHAR) AS s, CAST(").append(tgt)
+               .append(" AS VARCHAR) AS t, ").append(kind == null ? "CAST(NULL AS VARCHAR)" : "CAST(" + kind + " AS VARCHAR)")
+               .append(" AS k");
+            if (timed) sql.append(", ").append(InvestigationTime.instantExpr(
+                    SqlIdent.q(String.valueOf(h.get("timeCol"))),
+                    h.get("timeColZone") == null ? null : String.valueOf(h.get("timeColZone")), binds)).append(" AS ts");
+            sql.append(" FROM ").append(SqlIdent.q(dataset)).append(" WHERE ").append(src).append(" IS NOT NULL AND ")
+               .append(tgt).append(" IS NOT NULL");
+            if (kinds != null) {
+                sql.append(" AND CAST(").append(kind).append(" AS VARCHAR) IN (")
+                   .append(String.join(",", Collections.nCopies(kinds.size(), "?"))).append(")");
+                binds.addAll(kinds);
+            }
             if (!excluded.isEmpty()) {
                 String out = String.join(",", Collections.nCopies(excluded.size(), "?"));
                 sql.append(" AND CAST(").append(src).append(" AS VARCHAR) NOT IN (").append(out)
@@ -561,11 +647,60 @@ public final class InvestigationRoutes implements RouteModule {
                 binds.addAll(excluded);
                 binds.addAll(excluded);
             }
-            sql.append(kind != null ? " GROUP BY 1, 2, 3 ORDER BY cnt DESC, source, target, kind NULLS FIRST"
-                    : " GROUP BY 1, 2 ORDER BY cnt DESC, source, target");
+            sql.append(")");
+            if (timed) {
+                sql.append(", ev1 AS (SELECT *, timezone(?, ts) AS lt FROM ev0), ev AS (SELECT * FROM ev1 WHERE TRUE");
+                binds.add(InvestigationTime.localZone(window));
+                if (window != null) InvestigationTime.predicates(window, sql, binds);
+                sql.append(")");
+            } else {
+                sql.append(", ev AS (SELECT * FROM ev0)");
+            }
+            sql.append(", pairs AS (SELECT s, t, k, COUNT(*) AS cnt, ")
+               .append(timed ? "COUNT(DISTINCT CAST(lt AS DATE))" : "0").append(" AS days FROM ev GROUP BY s, t, k)");
+            boolean degree = degMin != null || degMax != null;
+            if (degree)
+                sql.append(", deg AS (SELECT id, COUNT(DISTINCT o) AS d FROM (SELECT s AS id, t AS o FROM pairs "
+                        + "UNION ALL SELECT t AS id, s AS o FROM pairs) u GROUP BY id)");
+            String inF = " IN (SELECT id FROM fr)";
+            sql.append(", cand AS (SELECT p.*, CASE WHEN p.s").append(inF).append(" THEN p.s ELSE p.t END AS anchor, ")
+               .append("CASE WHEN p.s").append(inF).append(" THEN p.t ELSE p.s END AS other FROM pairs p WHERE ")
+               .append(switch (direction) {
+                   case "out" -> "p.s" + inF;
+                   case "in" -> "p.t" + inF;
+                   case "reciprocal" -> "(p.s" + inF + " OR p.t" + inF + ") AND EXISTS (SELECT 1 FROM pairs r "
+                           + "WHERE r.s = p.t AND r.t = p.s)";
+                   default -> "(p.s" + inF + " OR p.t" + inF + ")";
+               }).append(")");
+            sql.append(", elig AS (SELECT c.*, ROW_NUMBER() OVER (PARTITION BY c.anchor ORDER BY c.cnt DESC, c.s, c.t, "
+                    + "c.k NULLS FIRST) AS rn FROM cand c");
+            if (degree) sql.append(" JOIN deg ON deg.id = c.other");
+            sql.append(" WHERE c.cnt >= CAST(? AS BIGINT)");
+            binds.add(String.valueOf(query.get("minEvents")));
+            if (minDays != null) {
+                sql.append(" AND c.days >= CAST(? AS BIGINT)");
+                binds.add(minDays.toString());
+            }
+            if (degree) {   // an already-frontier candidate is admitted already; its degree gates nothing
+                sql.append(" AND (c.other").append(inF)
+                   .append(" OR (deg.d >= CAST(? AS BIGINT) AND deg.d <= CAST(? AS BIGINT)))");
+                binds.add(Integer.toString(degMin == null ? 0 : degMin));
+                binds.add(Long.toString(degMax == null ? Long.MAX_VALUE : degMax));
+            }
+            sql.append(")");
+            sql.append(" SELECT s AS source, t AS target, k AS kind, cnt, ");
+            if (fanOut != null) {
+                sql.append("(SELECT COUNT(*) FROM elig WHERE rn > CAST(? AS BIGINT)) AS capped FROM elig "
+                        + "WHERE rn <= CAST(? AS BIGINT)");
+                binds.add(fanOut.toString());
+                binds.add(fanOut.toString());
+            } else {
+                sql.append("0 AS capped FROM elig");
+            }
+            sql.append(" ORDER BY cnt DESC, source, target, kind NULLS FIRST");
             try {
                 QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
-                        dataset, relationSql, sql.toString(), limit, 0, List.of(), List.of(), binds));
+                        dataset, relationSql, sql.toString(), budget, 0, List.of(), List.of(), binds));
                 for (Map<String, Object> row : r.rows()) {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("source", row.get("source"));
@@ -573,16 +708,13 @@ public final class InvestigationRoutes implements RouteModule {
                     m.put("kind", kind != null ? row.get("kind") : null);
                     m.put("count", ((Number) row.get("cnt")).longValue());
                     rows.add(m);
+                    capped = ((Number) row.get("capped")).longValue();
                 }
                 truncated = r.truncated();
             } catch (SQLException | IOException e) {
                 throw new ApiException(422, "expand over dataset '" + dataset + "' failed: " + e.getMessage());
             }
         }
-        Map<String, Object> query = new LinkedHashMap<>();
-        query.put("frontier", frontier);
-        query.put("excluded", excluded);
-        query.put("limit", limit);
         Map<String, Object> read = new LinkedHashMap<>();
         read.put("dataset", dataset);
         read.put("readAt", Instant.now().toString());   // weak provenance — NOT a replay pin (D-E3)
@@ -590,13 +722,35 @@ public final class InvestigationRoutes implements RouteModule {
         read.put("rows", rows);
         read.put("rowCount", rows.size());
         read.put("truncated", truncated);
+        read.put("fanOutCapped", capped);
         read.put("fingerprint", InvestigationEvaluator.sha256(canonical(rows)));
         return read;
+    }
+
+    /**
+     * The bindings an op needs from the Investigation's header, checked at append (and at template
+     * instantiation): {@code linkKinds} needs a link-kind column; a window, or {@code minDistinctDays}, needs a
+     * time column.
+     */
+    private static void requireBindings(Map<String, Object> header, String op, Map<String, Object> p, String where) {
+        boolean timed = op.equals("window")
+                || (op.equals("expand") && (p.get("window") instanceof Map<?, ?> || p.get("minDistinctDays") != null));
+        if (timed && header.get("timeCol") == null)
+            throw new ApiException(422, where + "this Investigation has no time column — create it with 'timeCol' "
+                    + "to use a window or minDistinctDays");
+        if (op.equals("expand") && p.get("linkKinds") != null && header.get("linkKindCol") == null)
+            throw new ApiException(422, where + "'linkKinds' needs a link-kind column — this Investigation has none");
     }
 
     /** Validate and normalise one op's parameters (422 on anything malformed). */
     private static Map<String, Object> params(String op, Map<String, Object> body) {
         Map<String, Object> p = new LinkedHashMap<>();
+        if (op.equals("window")) {   // no ids: an intensional op over time, not over entities
+            Object w = body.get("window");
+            if (w == null) throw new ApiException(422, "'window' requires 'window': an object, or \"full\" to clear it");
+            p.put("window", "full".equals(w) ? null : InvestigationTime.window(w, "window"));
+            return p;
+        }
         Object rawIds = body.get("ids");
         if (rawIds != null && !(rawIds instanceof List<?>)) throw new ApiException(422, "'ids' must be a list");
         LinkedHashSet<String> ids = new LinkedHashSet<>();
@@ -615,8 +769,7 @@ public final class InvestigationRoutes implements RouteModule {
                 if (type != null && type.length() > 64) throw new ApiException(422, "'entityType' is at most 64 chars");
                 p.put("entityType", type);
             }
-            case "expand" -> p.put("limit", body.get("limit") instanceof Number n
-                    ? Math.max(1, Math.min(MAX_EXPAND_LIMIT, n.intValue())) : DEFAULT_EXPAND_LIMIT);
+            case "expand" -> expandParams(body, p);
             case "exclude" -> {
                 String reason = ApiContext.str(body, "reason");
                 if (reason == null) throw new ApiException(422, "'exclude' requires a 'reason' — an exclusion "
@@ -627,6 +780,84 @@ public final class InvestigationRoutes implements RouteModule {
             default -> { }
         }
         return p;
+    }
+
+    /**
+     * One hop-ladder rung (plan §2.4): {@code direction} (either · out · in · reciprocal, default either) ·
+     * {@code linkKinds} (null = all) · {@code window} ("inherit" the Investigation's current window — the default —
+     * "full", or an override object) · {@code minEvents} (default 1) · {@code minDistinctDays} ·
+     * {@code candidateDegreeMin}/{@code Max} (evaluated within the window) · {@code maxFanOut} (strongest first) ·
+     * {@code budget} (rows read; a breach sets {@code truncated}).
+     */
+    private static void expandParams(Map<String, Object> body, Map<String, Object> p) {
+        if (body.containsKey("limit"))   // renamed by LA-13 — refused, never silently replaced by the default
+            throw new ApiException(422, "'limit' is now 'budget' (plan §2.4: the rung's row budget)");
+        p.put("budget", body.get("budget") == null ? DEFAULT_EXPAND_BUDGET
+                : Math.min(MAX_EXPAND_BUDGET, positive(body, "budget", 1)));
+        String direction = body.get("direction") == null ? "either" : String.valueOf(body.get("direction"));
+        if (!DIRECTIONS.contains(direction))
+            throw new ApiException(422, "'direction' must be one of " + DIRECTIONS + ", got '" + direction + "'");
+        p.put("direction", direction);
+        List<String> kinds = null;
+        if (body.get("linkKinds") != null) {
+            if (!(body.get("linkKinds") instanceof List<?> l) || l.isEmpty() || l.size() > MAX_LINK_KINDS)
+                throw new ApiException(422, "'linkKinds' must be a non-empty list of at most " + MAX_LINK_KINDS
+                        + " kinds (omit it for all kinds)");
+            kinds = new ArrayList<>(new java.util.TreeSet<>(strings(l)));
+        }
+        p.put("linkKinds", kinds);
+        Object w = body.get("window");
+        p.put("window", w == null || "inherit".equals(w) ? "inherit" : "full".equals(w) ? "full"
+                : InvestigationTime.window(w, "expand.window"));
+        p.put("minEvents", body.get("minEvents") == null ? 1 : positive(body, "minEvents", 1));
+        p.put("minDistinctDays", body.get("minDistinctDays") == null ? null : positive(body, "minDistinctDays", 1));
+        Integer dMin = body.get("candidateDegreeMin") == null ? null : positive(body, "candidateDegreeMin", 0);
+        Integer dMax = body.get("candidateDegreeMax") == null ? null : positive(body, "candidateDegreeMax", 1);
+        if (dMin != null && dMax != null && dMin > dMax)
+            throw new ApiException(422, "'candidateDegreeMin' must not exceed 'candidateDegreeMax'");
+        p.put("candidateDegreeMin", dMin);
+        p.put("candidateDegreeMax", dMax);
+        p.put("maxFanOut", body.get("maxFanOut") == null ? null : positive(body, "maxFanOut", 1));
+    }
+
+    private static int positive(Map<String, Object> body, String key, int min) {
+        if (!(body.get(key) instanceof Number n) || n.doubleValue() != Math.rint(n.doubleValue())
+                || n.longValue() < min || n.longValue() > Integer.MAX_VALUE)
+            throw new ApiException(422, "'" + key + "' must be an integer >= " + min + ", got " + body.get(key));
+        return n.intValue();
+    }
+
+    /**
+     * Validate {@code timeCol}'s type and settle its zone (see {@link InvestigationTime}): a naive {@code TIMESTAMP}
+     * takes {@code timeColZone} (UTC when absent, recorded explicitly); a {@code TIMESTAMP WITH TIME ZONE} is an
+     * instant and refuses one. Anything else is not an event time. Returns the zone to record, or null.
+     */
+    private static String timeColZone(String dataset, String relationSql, String timeCol, String zone) {
+        if (timeCol == null) {
+            if (zone != null) throw new ApiException(422, "'timeColZone' needs a 'timeCol'");
+            return null;
+        }
+        String type;
+        try {
+            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(dataset, relationSql,
+                    "SELECT typeof(x) AS t FROM ((SELECT " + SqlIdent.q(timeCol) + " AS x FROM " + SqlIdent.q(dataset)
+                            + " LIMIT 0) UNION ALL (SELECT NULL)) u", 1, 0, List.of(), List.of()));
+            type = String.valueOf(r.rows().get(0).get("t")).toUpperCase(java.util.Locale.ROOT);
+        } catch (Exception unusable) {
+            throw new ApiException(422, "cannot read the type of '" + timeCol + "': " + unusable.getMessage());
+        }
+        if (type.equals("TIMESTAMP WITH TIME ZONE")) {
+            if (zone != null) throw new ApiException(422, "'" + timeCol + "' is TIMESTAMP WITH TIME ZONE — already an "
+                    + "instant, so a 'timeColZone' would be ignored; omit it");
+            return null;
+        }
+        if (!type.equals("TIMESTAMP"))
+            throw new ApiException(422, "'timeCol' must be a TIMESTAMP or TIMESTAMP WITH TIME ZONE column; '" + timeCol
+                    + "' is " + type);
+        String z = zone == null ? "UTC" : zone;
+        String refusal = com.gamma.config.spec.SourceZoneGrammar.zoneRefusal(z, "timeColZone");
+        if (refusal != null) throw new ApiException(422, refusal);
+        return z;
     }
 
     /** The plain-language line for one step (plan §2.7: every op, including exclusions, with its reason). */
@@ -641,10 +872,18 @@ public final class InvestigationRoutes implements RouteModule {
             case "expand" -> {
                 Map<String, Object> r = (Map<String, Object>) e.get("read");
                 int frontier = strings(((Map<String, Object>) r.get("query")).get("frontier")).size();
+                Map<String, Object> q = (Map<String, Object>) r.get("query");
                 yield "Expanded one hop from " + frontier + " entit" + (frontier == 1 ? "y" : "ies") + " over "
-                        + r.get("dataset") + " — " + r.get("rowCount") + " link rows read"
-                        + (Boolean.TRUE.equals(r.get("truncated")) ? ", TRUNCATED at " + p.get("limit") : "") + ".";
+                        + r.get("dataset") + InvestigationTime.rungClause(q) + " — " + r.get("rowCount") + " link rows read"
+                        + (r.get("fanOutCapped") instanceof Number c && c.longValue() > 0
+                                ? ", " + c + " more left out by the fan-out cap" : "")
+                        + (Boolean.TRUE.equals(r.get("truncated")) ? ", TRUNCATED at its budget of " + q.get("budget") : "")
+                        + ".";
             }
+            case "window" -> p.get("window") == null
+                    ? "Cleared the time window: later expansions read the full time range."
+                    : "Set the time window to " + InvestigationTime.describe((Map<String, Object>) p.get("window"))
+                            + "; later expansions read inside it (earlier steps are unchanged).";
             case "exclude" -> "Excluded " + ids.size() + " entit" + (ids.size() == 1 ? "y" : "ies")
                     + " (reason: " + p.get("reason") + "): " + list(ids) + ".";
             case "hide" -> "Hid " + list(ids) + " from display (still traversed and counted).";

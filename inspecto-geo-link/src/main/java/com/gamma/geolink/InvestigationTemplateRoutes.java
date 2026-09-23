@@ -42,7 +42,11 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  * judgement about one graph:
  * <ul>
  *   <li>{@code seed} → a PARAMETER ({@code seed1}, {@code seed2}, … in log order): the ids are not stored.</li>
- *   <li>{@code expand} → carried with its {@code limit}. A template names no entities, so an expand that named its
+ *   <li>{@code window} (LA-13) → a PARAMETER ({@code window1}, … — {@code kind: "window"}) whose {@code default} is
+ *       the authored window; instantiation takes an override window (or {@code "full"}) under that name, or the
+ *       default when none is given. Seed parameters say {@code kind: "seed"}.</li>
+ *   <li>{@code expand} → carried with its whole rung (direction, link kinds, window, thresholds, fan-out, budget;
+ *       LA-13). A template names no entities, so an expand that named its
  *       frontier becomes an expand of the whole Working Set; it is listed under {@code generalised}, with
  *       {@code exact} saying whether the named frontier WAS the whole Working Set at that step.</li>
  *   <li>{@code exclude}, {@code hide}, {@code keep} → DROPPED. They name entities of this one graph with an
@@ -112,8 +116,8 @@ public final class InvestigationTemplateRoutes implements RouteModule {
             t.put("op", op);
             t.put("step", step);
             if (op.equals("seed")) {
-                String name = "seed" + (parameters.size() + 1);
-                parameters.add(ordered("name", name, "entityType", p.get("entityType"), "step", step));
+                String name = "seed" + (parameters.stream().filter(x -> "seed".equals(x.get("kind"))).count() + 1);
+                parameters.add(ordered("name", name, "kind", "seed", "entityType", p.get("entityType"), "step", step));
                 t.put("param", name);
                 t.put("entityType", p.get("entityType"));
             } else if (op.equals("expand")) {
@@ -121,7 +125,14 @@ public final class InvestigationTemplateRoutes implements RouteModule {
                 if (!named.isEmpty())
                     generalised.add(ordered("step", step, "namedFrontier", named.size(),
                             "exact", new HashSet<>(named).equals(state.entities.keySet())));
-                t.put("limit", p.get("limit"));
+                t.putAll(p);   // the rung (§2.4) is method, not case data — it travels whole
+                t.remove("ids");
+            } else if (op.equals("window")) {
+                // LA-13: a window is a PARAMETER with the authored window as its default — a template re-run over
+                // another period says so, and one that does not re-reads the period the method was written for.
+                String name = "window" + (parameters.stream().filter(x -> "window".equals(x.get("kind"))).count() + 1);
+                parameters.add(ordered("name", name, "kind", "window", "default", p.get("window"), "step", step));
+                t.put("windowParam", name);
             } else if (CASE_OPS.contains(op)) {
                 dropped.add(ordered("step", step, "op", op, "count", strings(p.get("ids")).size()));
                 t = null;
@@ -131,7 +142,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
             InvestigationEvaluator.apply(state, e);
             if (t != null) ops.add(t);
         }
-        if (parameters.isEmpty())
+        if (parameters.stream().noneMatch(x -> "seed".equals(x.get("kind"))))
             throw new ApiException(422, "investigation '" + invId + "' has no effective seed step — nothing to "
                     + "parameterise, so nothing to template");
 
@@ -144,7 +155,8 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         doc.put("derivedFrom", ordered("investigation", invId, "steps", log.size(),
                 "workingSetHash", state.hash()));
         doc.put("roles", ordered("dataset", h.get("dataset"), "sourceCol", h.get("sourceCol"),
-                "targetCol", h.get("targetCol"), "linkKindCol", h.get("linkKindCol")));
+                "targetCol", h.get("targetCol"), "linkKindCol", h.get("linkKindCol"), "timeCol", h.get("timeCol"),
+                "timeColZone", h.get("timeColZone")));
         doc.put("parameters", parameters);
         doc.put("ops", ops);
         doc.put("dropped", dropped);
@@ -176,6 +188,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         for (Map<String, Object> p : (List<Map<String, Object>>) doc.get("parameters")) {
             String name = String.valueOf(p.get("name"));
             names.add(name);
+            if ("window".equals(p.get("kind"))) continue;   // optional: the authored window is its default
             if (!(given.get(name) instanceof List<?> l) || l.isEmpty())
                 throw new ApiException(422, "parameter '" + name + "' needs a non-empty list of seed ids");
         }
@@ -188,7 +201,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         String id = ApiContext.str(body, "id");
         header.put("id", id != null ? id : "inv-" + UUID.randomUUID());
         header.put("title", ApiContext.str(body, "title"));
-        for (String key : List.of("dataset", "sourceCol", "targetCol", "linkKindCol")) {
+        for (String key : List.of("dataset", "sourceCol", "targetCol", "linkKindCol", "timeCol", "timeColZone")) {
             String override = ApiContext.str(body, key);
             header.put(key, override != null && roles.get(key) != null ? override : roles.get(key));
         }
@@ -200,6 +213,15 @@ public final class InvestigationTemplateRoutes implements RouteModule {
             op.remove("step");
             Object param = op.remove("param");
             if (param != null) op.put("ids", given.get(String.valueOf(param)));
+            Object windowParam = op.remove("windowParam");
+            if (windowParam != null) {
+                Map<String, Object> declared = null;
+                for (Map<String, Object> p : (List<Map<String, Object>>) doc.get("parameters"))
+                    if (windowParam.equals(p.get("name"))) declared = p;
+                Object w = given.containsKey(String.valueOf(windowParam)) ? given.get(String.valueOf(windowParam))
+                        : declared == null ? null : declared.get("default");
+                op.put("window", w == null ? "full" : w);   // validated by the same params() an append uses
+            }
             op.put("derivedFrom", ordered("template", templateId, "step", t.get("step")));
             ops.add(op);
         }

@@ -123,11 +123,11 @@ class ControlApiInvestigationTemplateTest {
             HttpResponse<String> saved = send(c.port, "POST", "/inv/investigations/case-a/template",
                     "{\"id\":\"tpl-1\",\"title\":\"two-hop ring\"}", null);
             JsonNode tpl = data(saved);
-            assertEquals("[{\"name\":\"seed1\",\"entityType\":\"subscriber\",\"step\":1}]", tpl.get("parameters").toString());
+            assertEquals("[{\"name\":\"seed1\",\"kind\":\"seed\",\"entityType\":\"subscriber\",\"step\":1}]", tpl.get("parameters").toString());
             assertEquals(3, tpl.get("ops").size(), "seed, expand, expand — the judgements are not steps of the method");
             assertEquals("seed1", tpl.at("/ops/0/param").asText());
             assertEquals("expand", tpl.at("/ops/1/op").asText());
-            assertEquals(2000, tpl.at("/ops/1/limit").asInt());
+            assertEquals(2000, tpl.at("/ops/1/budget").asInt());
             assertEquals("[{\"step\":3,\"op\":\"exclude\",\"count\":1},{\"step\":5,\"op\":\"hide\",\"count\":1},"
                     + "{\"step\":6,\"op\":\"keep\",\"count\":1}]", tpl.get("dropped").toString());
             assertEquals("calls_ds", tpl.at("/roles/dataset").asText());
@@ -188,14 +188,14 @@ class ControlApiInvestigationTemplateTest {
             ops(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"]}", "{\"op\":\"expand\",\"ids\":[\"alice\"]}",
                     "{\"op\":\"exclude\",\"ids\":[\"carol\"],\"reason\":\"noise\"}");
             post(c, "/inv/investigations/case-a/undo", "");
-            ops(c, "case-a", "{\"op\":\"expand\",\"ids\":[\"bob\"],\"limit\":50}");
+            ops(c, "case-a", "{\"op\":\"expand\",\"ids\":[\"bob\"],\"budget\":50}");
 
             JsonNode tpl = post(c, "/inv/investigations/case-a/template", "{\"id\":\"tpl-1\"}");
             assertEquals(3, tpl.get("ops").size());
             assertEquals(0, tpl.get("dropped").size(), "an undone exclusion was never part of the effective log");
             assertEquals("[{\"step\":2,\"namedFrontier\":1,\"exact\":true},{\"step\":5,\"namedFrontier\":1,"
                     + "\"exact\":false}]", tpl.get("generalised").toString());
-            assertEquals(50, tpl.at("/ops/2/limit").asInt());
+            assertEquals(50, tpl.at("/ops/2/budget").asInt());
         }
     }
 

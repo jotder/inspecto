@@ -565,6 +565,22 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   Working Sets live in the snapshot store (D-E2, `audit/snapshots/investigations/<id>/`). Access is
   **owner-only** (a non-owner reads 404), writes need `canManageIncidents`, and a bound Dataset shared away
   from the caller makes the Investigation read as absent.
+* **An `expand` is one hop-ladder rung, and a `window` op sets the time window** (LA-13, backend shipped
+  2026-09-23; `InvestigationRoutes`, `InvestigationTime`). Rung fields: `direction` (either · out · in ·
+  reciprocal) · `linkKinds` · `window` (`inherit` — the default — · `full` · an override) · `minEvents` ·
+  `minDistinctDays` · `candidateDegreeMin/Max`, evaluated over the WINDOWED graph of the whole Dataset, not the
+  frontier · `maxFanOut` (strongest first, reported as `fanOutCapped`, never as `truncated`) · `budget` (row cap;
+  a breach sets `truncated`). ⚠ `limit` was renamed `budget` and is **refused** (422), not silently defaulted.
+  The rung is resolved and sealed as `read.query`, so `reread` re-runs it exactly. ⛔ **Timezone contract**
+  (DuckDB's session zone is the host's, so it never touches a value): the Investigation binds `timeCol`; a naive
+  `TIMESTAMP` is read as wall clock in the declared `timeColZone` (default `UTC`, recorded in the header), a
+  `TIMESTAMPTZ` is an instant and refuses a zone; `from`/`to` must carry an offset and form a half-open range
+  compared as epoch ms; a `slot` (`22:00–04:00` crosses midnight; start inclusive, end exclusive) and a `days`
+  mask need an explicit IANA `timezone` and test the local day the EVENT fell on. `window` re-filters nothing
+  already admitted — earlier sealed reads are evidence as made. Templates carry the whole rung; a `window`
+  becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ `threshold`, `seedBy`,
+  `excludeBy`, `annotate`, `snapshot`, calendar exclusions, comparison mode and time-respecting paths remain
+  deferred; the SPA types still say `limit` and offer no rung fields.
 * **The Investigation tab drives it** (LA-10 SPA half, 2026-09-23): the right dock's third tab
   (`link-analysis-investigation.component` over the pane-provided `InvestigationSessionStore`, so the session
   survives the dock collapsing). *Start Investigation* needs a last run of ONE `entity-projection` mapping

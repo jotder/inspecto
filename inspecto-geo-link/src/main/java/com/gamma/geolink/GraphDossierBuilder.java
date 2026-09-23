@@ -394,7 +394,7 @@ final class GraphDossierBuilder {
                 Map<String, Object> t = new LinkedHashMap<>();
                 t.put("step", e.get("step"));
                 t.put("rowCount", r.get("rowCount"));
-                t.put("limit", castMap((Map<?, ?>) e.get("params")).get("limit"));
+                t.put("budget", castMap((Map<?, ?>) e.get("params")).get("budget"));
                 truncated.add(t);
             }
         List<Map<String, Object>> measures = new ArrayList<>();
@@ -437,7 +437,8 @@ final class GraphDossierBuilder {
             entries.add(out);
         }
         Map<String, Object> bindings = new LinkedHashMap<>();
-        for (String k : List.of("id", "dataset", "sourceCol", "targetCol", "linkKindCol", "datasetVersion", "parent"))
+        for (String k : List.of("id", "dataset", "sourceCol", "targetCol", "linkKindCol", "timeCol", "timeColZone",
+                "datasetVersion", "parent"))
             bindings.put(k, header.get(k));
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("investigation", bindings);
@@ -469,6 +470,12 @@ final class GraphDossierBuilder {
          .append(" to ").append(header.get("targetCol"));
         if (header.get("linkKindCol") != null) b.append(", kind from ").append(header.get("linkKindCol"));
         b.append(".");
+        if (header.get("timeCol") != null)   // LA-13: the timezone contract, stated where an authority reads it
+            b.append(" Event time from ").append(header.get("timeCol")).append(header.get("timeColZone") == null
+                    ? ", an instant (timestamp with time zone)"
+                    : ", a wall clock read as " + header.get("timeColZone") + " time")
+             .append("; time ranges are absolute instants, and intraday slots and day masks are read on the wall "
+                     + "clock of the time zone each window names.");
         if (header.get("parent") instanceof Map<?, ?> p)
             b.append(" Forked from Investigation ").append(p.get("id")).append(" in the order ").append(p.get("order"))
              .append(".");
@@ -516,7 +523,7 @@ final class GraphDossierBuilder {
         List<Map<String, Object>> truncated = castList(negative.get("truncated"));
         if (truncated.isEmpty()) out.add("- Truncated reads: none.");
         for (Map<String, Object> t : truncated)
-            out.add("- TRUNCATED: step " + t.get("step") + " read stopped at its limit of " + t.get("limit")
+            out.add("- TRUNCATED: step " + t.get("step") + " read stopped at its budget of " + t.get("budget")
                     + " link rows; entities beyond it were never considered.");
         List<String> hidden = strings(negative.get("hidden"));
         if (!hidden.isEmpty())
@@ -551,10 +558,19 @@ final class GraphDossierBuilder {
             case "expand" -> {
                 Map<String, Object> r = castMap((Map<?, ?>) e.get("read"));
                 int frontier = strings(castMap((Map<?, ?>) r.get("query")).get("frontier")).size();
+                Map<String, Object> q = castMap((Map<?, ?>) r.get("query"));
                 yield "Expanded one hop from " + frontier + " entit" + (frontier == 1 ? "y" : "ies") + " over "
-                        + r.get("dataset") + " — " + r.get("rowCount") + " link rows read at " + r.get("readAt")
-                        + (Boolean.TRUE.equals(r.get("truncated")) ? ", TRUNCATED at " + p.get("limit") : "") + ".";
+                        + r.get("dataset") + InvestigationTime.rungClause(q) + " — " + r.get("rowCount")
+                        + " link rows read at " + r.get("readAt")
+                        + (r.get("fanOutCapped") instanceof Number c && c.longValue() > 0
+                                ? ", " + c + " more left out by the fan-out cap" : "")
+                        + (Boolean.TRUE.equals(r.get("truncated")) ? ", TRUNCATED at its budget of " + q.get("budget") : "")
+                        + ".";
             }
+            case "window" -> p.get("window") == null
+                    ? "Cleared the time window: later expansions read the full time range."
+                    : "Set the time window to " + InvestigationTime.describe(castMap((Map<?, ?>) p.get("window")))
+                            + "; later expansions read inside it (earlier steps are unchanged).";
             case "exclude" -> "Excluded " + ids.size() + " entit" + (ids.size() == 1 ? "y" : "ies")
                     + " (reason: " + p.get("reason") + "): " + String.join(", ", ids) + ".";
             case "hide" -> "Hid " + head(ids) + " from display (still traversed and counted).";

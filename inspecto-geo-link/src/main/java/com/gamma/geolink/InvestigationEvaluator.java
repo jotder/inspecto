@@ -37,6 +37,10 @@ import java.util.TreeSet;
  *       reports it as {@code protected} rather than silently succeeding.</li>
  *   <li>{@code hide {ids}} — display-only: still traversed and counted (the difference from exclude).</li>
  *   <li>{@code keep {ids}} — pins an entity against later excludes.</li>
+ *   <li>{@code window {window}} (LA-13) — sets the window later {@code expand}s inherit ({@code null} clears it).
+ *       It re-filters nothing already admitted: a sealed row is a folded count with no timestamps left in it, and
+ *       an earlier step's read is evidence as it was made. Each expand's rows are already in-window (the route
+ *       resolves the window into the read), so the evaluator needs nothing more than to carry it.</li>
  * </ul>
  * An {@code undo} log entry is NOT a vocabulary op — it is a log edit, recorded append-only, naming the step it
  * reverts. Undo always targets the latest effective op, so skipping undone steps is exactly equivalent to
@@ -70,6 +74,8 @@ final class InvestigationEvaluator {
         final TreeMap<String, Exclusion> excluded = new TreeMap<>();
         final TreeSet<String> hidden = new TreeSet<>();
         final TreeSet<String> kept = new TreeSet<>();
+        /** The window the latest {@code window} op set (LA-13), inherited by later expands; null = the full range. */
+        Map<String, Object> window;
 
         /** The canonical, response-shaped view of this state. */
         Map<String, Object> toMap() {
@@ -107,6 +113,8 @@ final class InvestigationEvaluator {
             out.put("entities", es);
             out.put("links", ls);
             out.put("excluded", xs);
+            // Only when set: a state no window op touched hashes exactly as it did before LA-13.
+            if (window != null) out.put("window", window);
             return out;
         }
 
@@ -237,6 +245,7 @@ final class InvestigationEvaluator {
             case "keep" -> {
                 for (String id : ids) if (s.entities.containsKey(id)) s.kept.add(id);
             }
+            case "window" -> s.window = p.get("window") instanceof Map<?, ?> w ? (Map<String, Object>) w : null;
             default -> throw new IllegalStateException("op '" + entry.get("op") + "' in a sealed log is not evaluable");
         }
     }
