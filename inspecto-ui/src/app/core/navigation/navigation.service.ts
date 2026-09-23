@@ -8,9 +8,10 @@ import {
     horizontalNavigation,
 } from 'app/core/navigation/navigation-data';
 import { SessionService } from 'app/inspecto/api/session.service';
-import { favoritesNavGroup, loadMenuFavorites, loadMenuTrees, menuTreeToNav } from 'app/inspecto/menu';
+import { favoritesNavGroup, loadMenuFavorites, loadMenuTrees, menuTreeToNav, saveMenuTrees } from 'app/inspecto/menu';
+import { NavMenusService } from 'app/inspecto/menu/menu-api';
 import { cloneDeep } from 'lodash-es';
-import { Observable, ReplaySubject, of, tap } from 'rxjs';
+import { Observable, ReplaySubject, catchError, map, of, tap } from 'rxjs';
 
 /**
  * Keep only the first item per top-level id. Guards the sidebar against duplicate track keys (Angular
@@ -26,6 +27,16 @@ function dedupeById(items: GammaNavigationItem[]): GammaNavigationItem[] {
 export class NavigationService {
     private _navigation: ReplaySubject<Navigation> = new ReplaySubject<Navigation>(1);
     private readonly session = inject(SessionService);
+    private readonly navMenus = inject(NavMenusService);
+    /**
+     * Whether this app instance has pulled the active Space's Menu tree from the server. The sidebar
+     * merge is synchronous over the `localStorage` mirror, which only the Menu Builder used to fill — so
+     * a fresh browser never showed a Space's custom menus until Settings ▸ Menus was opened. The first
+     * {@link get} (the shell route resolver) therefore hydrates the mirror from `GET /nav/menus`.
+     * Once only: switching Space reloads the app, and a later rebuild must NOT refetch — it would race
+     * the Menu Builder's optimistic local edit with the not-yet-PUT server copy and revert it.
+     */
+    private hydrated = false;
 
     /**
      * Nav items whose backend lives in an optional module (EDITIONS CP-09). Hidden — not disabled, not
@@ -91,11 +102,34 @@ export class NavigationService {
      * `api/common/navigation` mock; that layer was removed in the M4 shell re-plumb.)
      */
     get(): Observable<Navigation> {
-        return of(this._build()).pipe(
+        const source = this.hydrated ? of(undefined) : this.hydrateMenus();
+        return source.pipe(
+            map(() => this._build()),
             tap((navigation) => {
                 this._navigation.next(navigation);
             }),
         );
+    }
+
+    /**
+     * Pull the active Space's tree into the mirror. A failure (503 legacy no-write-root, offline, …) keeps
+     * whatever the mirror holds and raises nothing: custom menus are an overlay, and their absence is not
+     * an error worth a toast (the global interceptor still drives the connectivity banner on status 0).
+     */
+    private hydrateMenus(): Observable<void> {
+        this.hydrated = true;
+        return this.navMenus.get().pipe(
+            map((tree) => {
+                if (tree && Array.isArray(tree.nodes)) {
+                    saveMenuTrees({ ...loadMenuTrees(), [NavigationService.activeSpace()]: tree });
+                }
+            }),
+            catchError(() => of(undefined)),
+        );
+    }
+
+    private static activeSpace(): string {
+        return (typeof localStorage !== 'undefined' && localStorage.getItem('inspecto.currentSpace')) || 'default';
     }
 
     private _build(): Navigation {
@@ -131,8 +165,7 @@ export class NavigationService {
         // Merge the user's per-space Menu tree (Menu Builder) as top-level siblings of the platform
         // groups, prepended above the custom-menus divider. Read fresh so a re-fetch after an edit
         // refreshes the sidebar.
-        const space =
-            (typeof localStorage !== 'undefined' && localStorage.getItem('inspecto.currentSpace')) || 'default';
+        const space = NavigationService.activeSpace();
         const tree = loadMenuTrees()[space];
         const custom = tree ? menuTreeToNav(tree.nodes) : [];
         // The personal Favorites group (client-local overlay) sits above the custom groups.

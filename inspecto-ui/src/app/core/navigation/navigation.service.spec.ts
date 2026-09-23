@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, of } from 'rxjs';
+import { NavMenusService } from 'app/inspecto/menu/menu-api';
 import { describe, expect, it } from 'vitest';
 import { SessionService } from 'app/inspecto/api/session.service';
 import { NavigationService } from './navigation.service';
@@ -16,6 +17,7 @@ describe('NavigationService — optional-module nav entries', () => {
         TestBed.configureTestingModule({
             providers: [
                 NavigationService,
+                { provide: NavMenusService, useValue: { get: () => of({ version: 1, nodes: [] }) } },
                 // Only the one signal the filter reads; the real service does an HTTP bootstrap.
                 {
                     provide: SessionService,
