@@ -6,7 +6,7 @@ raw:
   fields[11]{name,selector,type,description,unit,classification}:
     ENTRY_ID,"entry_id",VARCHAR,"Journal entry identifier; every entry balances","",""
     LINE_NO,"line_no",INTEGER,"Line number within the entry","",""
-    POSTING_SERIAL,"posting_date",INTEGER,"Posting date as the workbook stores it: an Excel 1900-system day serial","days",""
+    POSTING_DATE,"posting_date",DATE,"Posting date: a real Excel date cell, landed as a date because the field is declared DATE","",""
     ACCOUNT,"account",VARCHAR,"Chart-of-accounts code","",""
     ACCOUNT_NAME,"account_name",VARCHAR,"Chart-of-accounts name","",""
     ACCOUNT_CLASS,"account_class",VARCHAR,"Account class: ASSET, LIABILITY, EXPENSE or REVENUE; also the partition source","",""
@@ -26,10 +26,8 @@ mapping:
       from: LINE_NO
       fn: keep
     - name: POSTING_DATE
-      from: ""
-      fn: custom
-      args:
-        expression: "CAST(DATE '1899-12-30' + TRY_CAST(POSTING_SERIAL AS INTEGER) AS DATE)"
+      from: POSTING_DATE
+      fn: keep
     - name: ACCOUNT
       from: ACCOUNT
       fn: keep

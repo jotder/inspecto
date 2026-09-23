@@ -455,9 +455,23 @@ All three failing fails the batch with a message naming every remedy. ⛔ `read_
 frontend. Preview rides `sample_b64` (the workbook is binary) and its B2 type sniff is the same
 relation without `all_varchar`.
 
-⚠ **A date cell arrives as its Excel SERIAL** (`46237`), because every column is forced to text — so each
-date field needs a mapping conversion, and a raw Excel date cannot drive date partitioning. Reported
-2026-09-23 by the `gl_journal` demo lane, not yet re-grounded (`EXCEL-DATES-ARRIVE-AS-SERIALS-1`).
+✅ **A real date cell lands as a date in a date-declared field** (`EXCEL-DATES-ARRIVE-AS-SERIALS-1`,
+fixed 2026-09-23). An Excel date/time is a day-serial NUMBER with a date style, and `all_varchar`
+renders the number (probed on 1.5.2.1: `DATE '2026-08-03'` → `46237.0`, with a time of day
+`46237.4376…`). So for a raw field whose declared `type` is `DATE`, `TIMESTAMP` or `TIMESTAMPTZ`, the
+xlsx projection (`DuckDbCsvIngester.xlsxSerialAsText`) turns a bare number in the serial range
+(≤ 2958465 = 9999-12-31) back into the date it encodes — 1900 system, epoch 1899-12-30, `DATE` floors
+the time away, `TIMESTAMP` rounds it to the millisecond — and lands it as TEXT in the Pipeline's **own
+first** `csv_settings.date_formats` / `timestamp_formats` entry (ISO when the list is empty), so the
+unchanged typing step always parses it and a `DATE_*` partition can be cut from it. The column still
+lands VARCHAR; a `VARCHAR`-declared field is never touched (it keeps the serial), and a non-numeric
+cell passes through as keyed. Pinned by `XlsxParsingTest` (3 tests) and by
+`DemoCorpusIngestTest.glJournalSplitsFiveThreeThreeTwoByAccountClass` over the committed `gl_journal`
+workbook, whose schema now declares `POSTING_DATE … DATE` with a plain `keep`.
+⚠ `all_varchar` cannot tell a numeric cell from a TEXT cell of digits: in a date-declared field a text
+cell of 1–7 digits (`260803`) is read as a serial. An 8-digit `yyyymmdd` text is past the serial range
+and passes through untouched. ⚠ Preview is unchanged — it shows sheet columns, not schema fields, so
+its rows still show the serial; its B2 `columnTypes` sniff reports the column `DATE`.
 
 ### 6.5 XML `[PLUGIN]` (or `text_regex` `[LIVE]` for *flat* XML)
 DuckDB has no core XML reader. For flat, one-element-per-line XML, `text_regex` with

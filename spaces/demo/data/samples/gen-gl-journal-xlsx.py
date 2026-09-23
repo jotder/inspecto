@@ -13,7 +13,7 @@ rule: sample data is hand-generated, never trimmed from a real ledger.
 
 CELL TYPES (deliberate — this is what a real export carries)
   * Posting Date is a real Excel date: a serial number styled with built-in number format 14,
-    not a text cell. The Pipeline reads it with all_varchar, so the demo shows what that yields.
+    not a text cell. The schema declares the field DATE, so it lands as a date (no mapping math).
   * Debit / Credit are numeric cells; the side a line does not post to is an EMPTY cell (no <c>),
     not a zero — the mapping's signed AMOUNT has to COALESCE them.
   * One line's Currency is keyed " usd " (lower case, padded) to exercise the mapping's

@@ -82,6 +82,35 @@ class DemoCorpusIngestTest {
         assertEquals(0, count(accepted, "RECHARGE_TS IS NULL"), "every timestamp parses");
     }
 
+    /**
+     * gl_journal (xlsx): 13 journal lines → ASSET 5 · LIABILITY 3 · EXPENSE 3 · REVENUE 2, and the
+     * Posting Date cells — real Excel dates — land as DATEs through a plain {@code keep}, with no
+     * serial arithmetic in the mapping ({@code EXCEL-DATES-ARRIVE-AS-SERIALS-1}).
+     */
+    @Test
+    void glJournalSplitsFiveThreeThreeTwoByAccountClass(@TempDir Path dir) throws Exception {
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:")) {
+            org.junit.jupiter.api.Assumptions.assumeTrue(com.gamma.etl.ExcelExtension.tryLoad(c),
+                    "DuckDB 'excel' extension unavailable on this box — set -D" + com.gamma.etl.ExcelExtension.DIR_PROPERTY);
+        }
+        PipelineConfig cfg = stage(dir, "config/ledger/gl_journal_pipeline.toon");
+        seed(cfg, "gl_journal/JOURNAL_20260831.xlsx");
+
+        CollectorProcessor.run(cfg);
+
+        Path db = Path.of(cfg.dirs().database());
+        assertEquals(List.of("acct_class=ASSET", "acct_class=EXPENSE", "acct_class=LIABILITY", "acct_class=REVENUE"),
+                subdirs(db).stream().filter(d -> d.startsWith("acct_class=")).toList(),
+                "exactly 4 partitions — no TOTALS / NULL-class row");
+        assertEquals(5, count(db.resolve("acct_class=ASSET"), "true"), "ASSET lines");
+        assertEquals(3, count(db.resolve("acct_class=LIABILITY"), "true"), "LIABILITY lines");
+        assertEquals(3, count(db.resolve("acct_class=EXPENSE"), "true"), "EXPENSE lines");
+        assertEquals(2, count(db.resolve("acct_class=REVENUE"), "true"), "REVENUE lines");
+        assertEquals("DATE", scalar(db, "typeof(POSTING_DATE)"), "the date cell lands as a DATE");
+        assertEquals("2026-08-03|2026-08-28", scalar(db, "MIN(POSTING_DATE)::VARCHAR || '|' || MAX(POSTING_DATE)::VARCHAR"));
+        assertEquals("0.00", scalar(db, "CAST(SUM(AMOUNT) AS DECIMAL(18,2))::VARCHAR"), "the journal balances");
+    }
+
     // ── harness ─────────────────────────────────────────────────────────────────────────────────
 
     private static PipelineConfig stage(Path dir, String pipeline) throws Exception {

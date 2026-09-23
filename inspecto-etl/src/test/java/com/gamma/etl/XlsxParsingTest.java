@@ -150,6 +150,122 @@ class XlsxParsingTest {
         }
     }
 
+    // ── real date cells (EXCEL-DATES-ARRIVE-AS-SERIALS-1) ────────────────────────
+    //
+    // A real Excel date is a day-serial number with a date style; all_varchar renders the NUMBER
+    // (probed on duckdb_jdbc 1.5.2.1: DATE '2026-08-03' -> "46237.0", TIMESTAMP '2026-08-03
+    // 10:30:15' -> "46237.437673611115"). A field DECLARED date-like must land as a date instead.
+
+    private static final String DATED_SCHEMA = """
+            partitions[3]{column,source,type}:
+              year,POSTED,DATE_YEAR
+              month,POSTED,DATE_MONTH
+              day,POSTED,DATE_DAY
+            raw:
+              name: ev
+              format: CSV
+              fields[4]{name,selector,type}:
+                ACCOUNT_NUMBER,"account",VARCHAR
+                POSTED,"posted",DATE
+                STAMPED,"stamped",TIMESTAMP
+                POSTED_AS_TEXT,"posted_copy",VARCHAR
+            mapping:
+              canonicalName: ev
+              rawName: ev
+              rules[4]{targetColumn,sourceExpression,transformType}:
+                ACCOUNT_NUMBER,ACCOUNT_NUMBER,DIRECT
+                POSTED,POSTED,DIRECT
+                STAMPED,STAMPED,DIRECT
+                POSTED_AS_TEXT,POSTED_AS_TEXT,DIRECT
+            """;
+
+    /** Real DATE / TIMESTAMP cells (date-styled serials), plus a text cell in the DATE column. */
+    private static File writeDatedWorkbook(Connection conn, Path dir) throws Exception {
+        File f = dir.resolve("dated.xlsx").toFile();
+        try (Statement st = conn.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES"
+                    + " ('A00001', DATE '2026-08-03', TIMESTAMP '2026-08-03 10:30:15', DATE '2026-08-03'),"
+                    + " ('B00002', DATE '2026-09-30', TIMESTAMP '2026-09-30 23:59:59', DATE '2026-09-30')"
+                    + ") v(account, posted, stamped, posted_copy) ORDER BY account)"
+                    + " TO '" + f.getAbsolutePath().replace("\\", "/").replace("'", "''")
+                    + "' WITH (FORMAT xlsx, HEADER true)");
+        }
+        return f;
+    }
+
+    @Test
+    void aDateCellInADateDeclaredFieldLandsAsADateNotASerial(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("schema_dt.toon");
+        Files.writeString(schema, DATED_SCHEMA, StandardCharsets.UTF_8);
+        PipelineConfig cfg = loadWithSchema(dir, "dt", PARSING, schema,
+                "    date_formats[1]: \"%Y-%m-%d\"\n"
+                + "    timestamp_formats[1]: \"%Y-%m-%d %H:%M:%S\"\n");
+        try (Connection conn = open()) {
+            File wb = writeDatedWorkbook(conn, dir);
+            DuckDbCsvIngester.ingest(wb, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(List.of("2026-08-03", "2026-09-30"), col(conn, "raw_f0", "POSTED"));
+            assertEquals(List.of("2026-08-03 10:30:15", "2026-09-30 23:59:59"), col(conn, "raw_f0", "STAMPED"));
+            assertEquals(List.of("46237.0", "46295.0"), col(conn, "raw_f0", "POSTED_AS_TEXT"),
+                    "a VARCHAR-declared field keeps exactly what all_varchar yields — no reinterpretation");
+
+            // ...and it types + partitions downstream: the whole point of the row. (__src_id is the
+            // lineage column the batch orchestrator stamps; ingest alone does not add it.)
+            try (Statement st = conn.createStatement()) {
+                st.execute("ALTER TABLE raw_f0 ADD COLUMN __src_id INTEGER DEFAULT 0");
+            }
+            DataTransformer.materialize(conn, cfg.schemas().single(), cfg, "raw_f0", "t_f0");
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT typeof(POSTED), POSTED::VARCHAR, typeof(STAMPED),"
+                         + " STAMPED::VARCHAR, year, month, day FROM t_f0 ORDER BY ACCOUNT_NUMBER")) {
+                assertTrue(rs.next());
+                assertEquals("DATE", rs.getString(1));
+                assertEquals("2026-08-03", rs.getString(2));
+                assertEquals("TIMESTAMP", rs.getString(3));
+                assertEquals("2026-08-03 10:30:15", rs.getString(4));
+                assertEquals("2026", rs.getString(5));
+                assertEquals("08", rs.getString(6));
+                assertEquals("03", rs.getString(7));
+                assertTrue(rs.next());
+                assertEquals("2026-09-30 23:59:59", rs.getString(4));
+                assertEquals("30", rs.getString(7));
+            }
+        }
+    }
+
+    /** The landed text is written in the pipeline's OWN first format, so its typing always parses it. */
+    @Test
+    void aDateCellLandsInThePipelinesFirstDeclaredFormat(@TempDir Path dir) throws Exception {
+        Path schema = dir.resolve("schema_fmt.toon");
+        Files.writeString(schema, DATED_SCHEMA, StandardCharsets.UTF_8);
+        PipelineConfig cfg = loadWithSchema(dir, "fmt", PARSING, schema,
+                "    date_formats[2]: \"%d/%m/%Y\",\"%Y-%m-%d\"\n"
+                + "    timestamp_formats[1]: \"%d/%m/%Y %H:%M:%S\"\n");
+        try (Connection conn = open()) {
+            File wb = writeDatedWorkbook(conn, dir);
+            DuckDbCsvIngester.ingest(wb, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(List.of("03/08/2026", "30/09/2026"), col(conn, "raw_f0", "POSTED"));
+            assertEquals(List.of("03/08/2026 10:30:15", "30/09/2026 23:59:59"), col(conn, "raw_f0", "STAMPED"));
+        }
+    }
+
+    /** A TEXT cell in a date-declared field is not a serial and passes through untouched. */
+    @Test
+    void aTextCellInADateDeclaredFieldIsNotReinterpreted(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, "tx", PARSING);   // SCHEMA declares EVENT_DATE DATE
+        try (Connection conn = open()) {
+            File f = dir.resolve("tx.xlsx").toFile();
+            try (Statement st = conn.createStatement()) {
+                st.execute("COPY (SELECT * FROM (VALUES ('A00001', '2020-04-03', 1.0),"
+                        + " ('B00002', '20260803', 2.0)) v(account, event_date, amount) ORDER BY account)"
+                        + " TO '" + f.getAbsolutePath().replace("\\", "/").replace("'", "''")
+                        + "' WITH (FORMAT xlsx, HEADER true)");
+            }
+            DuckDbCsvIngester.ingest(f, conn, cfg.schemas().single(), cfg, "raw_f0");
+            assertEquals(List.of("2020-04-03", "20260803"), col(conn, "raw_f0", "EVENT_DATE"),
+                    "an ISO text date and an 8-digit yyyymmdd text (beyond any Excel serial) stay as keyed");
+        }
+    }
+
     @Test
     void excelAliasSelectsTheSameFrontend(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = load(dir, "al", "parsing:\n  frontend: excel\n");
@@ -212,6 +328,13 @@ class XlsxParsingTest {
 
     private static PipelineConfig loadWithSchema(Path dir, String tag, String parsingBlock, Path schema)
             throws Exception {
+        return loadWithSchema(dir, tag, parsingBlock, schema,
+                "    date_formats[1]: \"%Y-%m-%d\"\n"
+                + "    timestamp_formats[1]: \"%Y-%m-%d\"\n");
+    }
+
+    private static PipelineConfig loadWithSchema(Path dir, String tag, String parsingBlock, Path schema,
+                                                 String formatLines) throws Exception {
         String d = fwd(dir);
         String pipe =
                 "name: XLSX_" + tag + "\n" +
@@ -231,8 +354,7 @@ class XlsxParsingTest {
                 "  file_pattern: \"glob:**/*.xlsx\"\n" +
                 "  schema_file: " + fwd(schema) + "\n" +
                 "  csv_settings:\n" +
-                "    date_formats[1]: \"%Y-%m-%d\"\n" +
-                "    timestamp_formats[1]: \"%Y-%m-%d\"\n" +
+                formatLines +
                 parsingBlock;
         Path p = dir.resolve("xlsx_" + tag + "_pipeline.toon");
         Files.writeString(p, pipe, StandardCharsets.UTF_8);

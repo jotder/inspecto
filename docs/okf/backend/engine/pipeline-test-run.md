@@ -174,8 +174,8 @@ found independently by both lanes). `PipelineTestRun.sampleRowsBySegment` reads 
 **wrote** — already mapped to canonical columns — and `PipelineGraphRoutes.testRun` passes them to
 `PipelineDryRun.runSeeded` **as the parse node's output**. The walk then re-applies `map` /
 `map_<segment>` to columns that are already canonical:
-- **Loud:** `in_recharges` (`AMOUNT_MINOR`), `msc_cdr` (`EVENT_TIME`) and `gl_journal` (`POSTING_SERIAL`)
-  refuse 422 with a binder error. `?to=parse` succeeds, so on those Pipelines the test run **cannot reach
+- **Loud:** `in_recharges` (`AMOUNT_MINOR`), `msc_cdr` (`EVENT_TIME`) and `gl_journal` (`POSTING_SERIAL`, as filed —
+  that column is gone since `EXCEL-DATES-ARRIVE-AS-SERIALS-1` made its date a plain `keep`) refuse 422 with a binder error. `?to=parse` succeeds, so on those Pipelines the test run **cannot reach
   route or sinks**.
 - **Silent, and worse:** `premed_events` answers 200 with **every `EVENT_TS` NULL** in the preview, while
   a real ingest of the same file writes all 12 values. A builder is shown a broken mapping that is not

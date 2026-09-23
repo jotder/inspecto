@@ -340,11 +340,48 @@ public final class DuckDbCsvIngester {
         StringBuilder proj = new StringBuilder();
         for (int i = 0; i < fields.size(); i++) {
             if (i > 0) proj.append(", ");
-            proj.append('"').append(escapeIdent(String.valueOf(fields.get(i).get("selector"))))
-                .append("\" AS \"").append(fields.get(i).get("name")).append('"');
+            String cell = "\"" + escapeIdent(String.valueOf(fields.get(i).get("selector"))) + "\"";
+            proj.append(xlsxSerialAsText(cell, String.valueOf(fields.get(i).get("type")), cfg.csv()))
+                .append(" AS \"").append(fields.get(i).get("name")).append('"');
         }
 
         return new ReadSpec(proj.toString(), xlsxReadRelation(filePath, x, true));
+    }
+
+    /** The last day Excel's 1900 date system can hold (9999-12-31); a larger number is not a serial. */
+    private static final int XLSX_MAX_SERIAL = 2958465;
+
+    /**
+     * EXCEL-DATES-ARRIVE-AS-SERIALS-1: a real Excel date/time cell is a day-serial NUMBER with a date
+     * style, and {@code all_varchar} renders the number ({@code 46237.0}, or {@code 46237.4376…} with a
+     * time of day — probed on duckdb_jdbc 1.5.2.1). For a field whose DECLARED type is date-like, a
+     * value that is a bare number in the serial range is turned back into the date it encodes (1900
+     * system, epoch 1899-12-30; the time of day rounded to the millisecond) and landed as TEXT in the
+     * pipeline's own first {@code date_formats}/{@code timestamp_formats} entry — so the unchanged
+     * typing step ({@link SchemaFieldTypes#castSql}) always parses it — or as ISO when the list is
+     * empty (typing then TRY_CASTs). Anything else passes through exactly as {@code all_varchar}
+     * yields it, and a non-date-like field is never touched: the raw-lands-as-VARCHAR contract holds.
+     *
+     * <p>⚠ {@code all_varchar} cannot tell a numeric cell from a text cell of digits, so in a
+     * date-declared field a TEXT cell of 1–7 digits reads as a serial. An 8-digit {@code yyyymmdd}
+     * text is past {@link #XLSX_MAX_SERIAL} and passes through untouched.
+     */
+    private static String xlsxSerialAsText(String cell, String declaredType, PipelineConfig.CsvSettings csv) {
+        String t = SchemaFieldTypes.normalize(declaredType);
+        if (!SchemaFieldTypes.isDateLike(t)) return cell;
+        boolean dateOnly = "DATE".equals(t);
+        String serial = "TRY_CAST(" + cell + " AS DOUBLE)";
+        String value = dateOnly
+                ? "(DATE '1899-12-30' + CAST(floor(" + serial + ") AS INTEGER))"
+                : "(TIMESTAMP '1899-12-30 00:00:00' + to_milliseconds(CAST(round(" + serial
+                  + " * 86400000) AS BIGINT)))";
+        List<String> formats = dateOnly ? csv.dateFormats() : csv.tsFormats();
+        String asText = formats.isEmpty()
+                ? "CAST(" + value + " AS VARCHAR)"
+                : "strftime(" + value + ", '" + escapeSql(formats.get(0)) + "')";
+        return "CASE WHEN regexp_full_match(trim(" + cell + "), '[0-9]+(\\.[0-9]+)?')"
+                + " AND " + serial + " < " + (XLSX_MAX_SERIAL + 1)
+                + " THEN " + asText + " ELSE " + cell + " END";
     }
 
     /**
