@@ -103,6 +103,7 @@ class PipelineNodeTypesPackOverlayTest {
     @Test
     void aPackExecutorRegistersAndUnloadsToo() {
         assertTrue(PipelineNodeExecutors.get("transform.acme").isEmpty());
+        PipelineNodeTypes.register(new Contributed("transform.acme"), OWNER);
         PipelineNodeExecutors.register(new ContributedExec("transform.acme"), OWNER);
         assertTrue(PipelineNodeExecutors.get("transform.acme").isPresent());
         PipelineNodeExecutors.deregister(OWNER);
@@ -110,18 +111,32 @@ class PipelineNodeTypesPackOverlayTest {
     }
 
     /**
-     * The executor registry deliberately DOES let a pack specialise a built-in verb — that is what
-     * {@code RowShaper} consults it for — while the descriptor registry refuses the same thing. The two
-     * rules differ on purpose, so both are pinned here; if they are ever unified, one of these fails.
+     * S2-0: a pack may NOT specialise a built-in verb. {@code RowShaper} consults this registry before its
+     * built-in chain, so a pack executor for {@code transform.dedup} would change how every pipeline
+     * dedups. Both registries now refuse a built-in; a classpath provider (an edition) still may.
      */
     @Test
-    void anExecutorMaySpecialiseABuiltInVerbAndTheUnloadRestoresIt() {
+    void aPackExecutorMayNotSpecialiseABuiltInVerb() {
         String type = "transform.dedup";
         boolean hadOne = PipelineNodeExecutors.get(type).isPresent();
-        PipelineNodeExecutors.register(new ContributedExec(type), OWNER);
-        assertTrue(PipelineNodeExecutors.get(type).isPresent());
-        PipelineNodeExecutors.deregister(OWNER);
-        assertEquals(hadOne, PipelineNodeExecutors.get(type).isPresent(), "unload restores the prior state");
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> PipelineNodeExecutors.register(new ContributedExec(type), OWNER));
+        assertTrue(ex.getMessage().contains("built-in"), ex.getMessage());
+        assertEquals(hadOne, PipelineNodeExecutors.get(type).isPresent(), "the refusal left nothing behind");
+    }
+
+    /** S2-0: an executor must run a node type the SAME pack declared — not another pack's, not nobody's. */
+    @Test
+    void aPackExecutorMustRunItsOwnPacksNodeType() {
+        assertThrows(IllegalStateException.class,
+                () -> PipelineNodeExecutors.register(new ContributedExec("transform.acme"), OWNER),
+                "no node type declared at all");
+        PipelineNodeTypes.register(new Contributed("transform.acme"), OTHER);
+        IllegalStateException ex = assertThrows(IllegalStateException.class,
+                () -> PipelineNodeExecutors.register(new ContributedExec("transform.acme"), OWNER),
+                "declared by a different pack");
+        assertTrue(ex.getMessage().contains(OWNER), ex.getMessage());
+        assertTrue(PipelineNodeExecutors.get("transform.acme").isEmpty());
     }
 
     /** The contracts are generated in a JVM with no packs, so an overlay must never be in force there. */

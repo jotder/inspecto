@@ -298,6 +298,165 @@ class JobPackManagerTest {
         }
     }
 
+    // ── S2-0: a pack executor may only run the pack's OWN node type ───────────────────────────
+
+    /**
+     * 🔴 A jar dropped in the packs dir must not change how a BUILT-IN verb runs for every pipeline.
+     * {@code RowShaper.shape} consults the executor registry before its built-in chain, so an executor for
+     * {@code transform.filter} would silently replace the filter everywhere. The pack is rejected whole —
+     * its own (legal) node type included — and the built-in still decides which rows survive.
+     */
+    @Test
+    void aPackExecutorForABuiltInVerbIsRefusedWholeAndTheBuiltInStillRuns(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildNodePackJar(work, packsDir.resolve("hijack-1.jar"), "HijackPack", "acme.hijack",
+                "transform.acme_hijack", "transform.filter");
+
+        Sink sink = new Sink();
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
+                ExpressionRegistry.withBuiltins(), sink)) {
+            try {
+                Map<String, Object> summary = mgr.rescan();
+
+                assertEquals(List.of("hijack-1.jar"), summary.get("rejected"), "refused, not loaded");
+                assertTrue(sink.types.contains("job.pack.rejected"), "rejected loudly, not skipped quietly");
+                assertTrue(com.gamma.pipeline.exec.PipelineNodeExecutors.get("transform.filter").isEmpty(),
+                        "no pack executor may sit in front of the built-in filter");
+                assertFalse(com.gamma.pipeline.PipelineNodeTypes.isKnown("transform.acme_hijack"),
+                        "atomic: the pack's own node type is rolled back with it");
+                assertEquals(List.of(1, 3), shapeIds(com.gamma.pipeline.PipelineNode.of("f", "transform.filter",
+                        Map.of("where", "amt >= 100"))), "the built-in filter still decides (the hijack keeps all 3)");
+            } finally {
+                com.gamma.pipeline.PipelineNodeTypes.deregister("hijack-1.jar");
+                com.gamma.pipeline.exec.PipelineNodeExecutors.deregister("hijack-1.jar");
+            }
+        }
+    }
+
+    /** An executor for a kind NO node type of the same pack declares is refused too — it is not the pack's. */
+    @Test
+    void aPackExecutorForAKindItsPackDoesNotDeclareIsRefused(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildNodePackJar(work, packsDir.resolve("orphan-1.jar"), "OrphanPack", "acme.orphan",
+                null, "transform.acme_orphan");
+
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
+                ExpressionRegistry.withBuiltins(), new Sink())) {
+            try {
+                assertEquals(List.of("orphan-1.jar"), mgr.rescan().get("rejected"));
+                assertTrue(com.gamma.pipeline.exec.PipelineNodeExecutors.get("transform.acme_orphan").isEmpty());
+            } finally {
+                com.gamma.pipeline.exec.PipelineNodeExecutors.deregister("orphan-1.jar");
+            }
+        }
+    }
+
+    /** The positive twin: an executor for the pack's own declared kind loads and is what runs it. */
+    @Test
+    void aPackExecutorForItsOwnDeclaredKindLoadsAndRuns(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildNodePackJar(work, packsDir.resolve("own-1.jar"), "OwnPack", "acme.own",
+                "transform.acme_own", "transform.acme_own");
+
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
+                ExpressionRegistry.withBuiltins(), new Sink())) {
+            try {
+                assertEquals(List.of("own-1.jar"), mgr.rescan().get("loaded"));
+                assertTrue(com.gamma.pipeline.exec.PipelineNodeExecutors.get("transform.acme_own").isPresent());
+                assertEquals(List.of(1, 2, 3), shapeIds(com.gamma.pipeline.PipelineNode.of("n", "transform.acme_own",
+                        Map.of())), "the pack's executor shapes its own kind (keeps every row)");
+            } finally {
+                com.gamma.pipeline.PipelineNodeTypes.deregister("own-1.jar");
+                com.gamma.pipeline.exec.PipelineNodeExecutors.deregister("own-1.jar");
+            }
+        }
+    }
+
+    // ── S2-0: a PIPELINE run executing pack code pins the pack, as a Job run does ────────────────
+
+    /**
+     * 🔴 Only {@code JobService}'s Job path held the pack lease, so a pipeline whose Step is a pack's
+     * node type could have that pack's classloader closed under it mid-run. The run blocks inside the walk
+     * (its sink write, after the pack's executor has run); an unload arriving then must DEFER the close
+     * until the run finishes.
+     */
+    @Test
+    void anUnloadDuringAnInFlightPipelineRunIsDeferredUntilTheRunCompletes(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        Path jar = buildNodePackJar(work, packsDir.resolve("lease-1.jar"), "LeasePack", "acme.lease",
+                "transform.acme_lease", "transform.acme_lease");
+
+        java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
+        java.util.concurrent.CountDownLatch inRun = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch proceed = new java.util.concurrent.CountDownLatch(1);
+        java.io.File db = com.gamma.util.DuckDbUtil.tempDbFile("lease_");
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
+                ExpressionRegistry.withBuiltins(), new Sink());
+             java.sql.Connection conn = com.gamma.util.DuckDbUtil.openConnection(db)) {
+            try {
+                assertEquals(List.of("lease-1.jar"), mgr.rescan().get("loaded"));
+                try (java.sql.Statement st = conn.createStatement()) {
+                    st.execute("CREATE TABLE parsed AS SELECT * FROM (VALUES (1,150),(2,50),(3,200)) t(id,amt)");
+                }
+                com.gamma.pipeline.PipelineGraph g = new com.gamma.pipeline.PipelineGraph("LEASED", true,
+                        List.of(com.gamma.pipeline.PipelineNode.of("parse", "parser"),
+                                com.gamma.pipeline.PipelineNode.of("n", "transform.acme_lease", Map.of()),
+                                com.gamma.pipeline.PipelineNode.of("sink", "sink.persistent",
+                                        Map.of(com.gamma.pipeline.PipelineStores.CONFIG_STORE, "out"))),
+                        List.of(com.gamma.pipeline.PipelineEdge.data("parse", "n"),
+                                com.gamma.pipeline.PipelineEdge.data("n", "sink")));
+                var coordinator = new com.gamma.pipeline.exec.BranchCommitCoordinator(
+                        new com.gamma.pipeline.exec.BranchCommitLog(work.resolve("commit.csv").toString()));
+
+                var run = pool.submit(() -> com.gamma.pipeline.exec.PipelineExecutor.execute(conn, g, "parse",
+                        "parsed", "b1", coordinator, (sinkNode, table) -> {
+                            inRun.countDown();
+                            assertTrue(proceed.await(20, java.util.concurrent.TimeUnit.SECONDS), "test released the run");
+                        }, () -> {}));
+                assertTrue(inRun.await(20, java.util.concurrent.TimeUnit.SECONDS), "the run reached its sink write");
+
+                Files.delete(jar);
+                assertEquals(List.of("lease-1.jar"), mgr.rescan().get("unloaded"));
+                assertTrue(mgr.isDraining("lease-1.jar"),
+                        "the pack's classloader close must wait for the in-flight pipeline run");
+
+                proceed.countDown();
+                run.get(20, java.util.concurrent.TimeUnit.SECONDS);
+                assertFalse(mgr.isDraining("lease-1.jar"), "the close finishes once the run completes");
+            } finally {
+                proceed.countDown();
+                pool.shutdownNow();
+                com.gamma.pipeline.PipelineNodeTypes.deregister("lease-1.jar");
+                com.gamma.pipeline.exec.PipelineNodeExecutors.deregister("lease-1.jar");
+            }
+        } finally {
+            com.gamma.util.DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** Run {@code node} through {@code RowShaper.shape} over {@code src(id,amt)} = (1,150)(2,50)(3,200);
+     *  returns the ids on its {@code data} relation. */
+    private static List<Integer> shapeIds(com.gamma.pipeline.PipelineNode node) throws Exception {
+        java.io.File db = com.gamma.util.DuckDbUtil.tempDbFile("shape_");
+        try (java.sql.Connection conn = com.gamma.util.DuckDbUtil.openConnection(db);
+             java.sql.Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE src AS SELECT * FROM (VALUES (1,150),(2,50),(3,200)) t(id,amt)");
+            String data = com.gamma.pipeline.exec.RowShaper.shape(conn, node, "src", node.id()).stream()
+                    .filter(r -> com.gamma.pipeline.PipelineRel.DATA.equals(r.rel())).findFirst().orElseThrow().table();
+            List<Integer> ids = new java.util.ArrayList<>();
+            try (java.sql.ResultSet rs = st.executeQuery("SELECT id FROM \"" + data + "\" ORDER BY id")) {
+                while (rs.next()) ids.add(rs.getInt(1));
+            }
+            return ids;
+        } finally {
+            com.gamma.util.DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
     // ── S1-7: a pack that declares and consumes a Platform Service ────────────────────────────
 
     @Test
@@ -450,6 +609,48 @@ class JobPackManagerTest {
         // holds com.gamma.pipeline, so the node-type SPI resolves without a second classpath entry.
         Path classes = compile(work, "com/acme/pack/" + cls + ".java", src);
         writeJar(jar, classes, packId, Map.of("com.gamma.pipeline.PipelineNodeType", fqcn));
+        return jar;
+    }
+
+    /**
+     * Compile a pack with an optional {@link com.gamma.pipeline.PipelineNodeType} ({@code nodeType}, or
+     * {@code null} for none) and a {@link com.gamma.pipeline.exec.PipelineNodeExecutor} for
+     * {@code executorKind} that copies every input row to {@code data} — so a hijacked filter is visible as
+     * "kept all three rows".
+     */
+    private static Path buildNodePackJar(Path work, Path jar, String cls, String packId,
+                                         String nodeType, String executorKind) throws Exception {
+        String src = """
+                package com.acme.pack;
+                import com.gamma.pipeline.PipelineNode;
+                import com.gamma.pipeline.PipelineNodeType;
+                import com.gamma.pipeline.exec.PipelineNodeExecutor;
+                import com.gamma.pipeline.exec.RowShaper;
+                import java.util.List;
+                public class %s {
+                    public static class Type implements PipelineNodeType {
+                        public String type() { return "%s"; }
+                    }
+                    public static class Exec implements PipelineNodeExecutor {
+                        public String type() { return "%s"; }
+                        public List<RowShaper.Relation> shape(java.sql.Connection conn, PipelineNode node,
+                                String input, String outPrefix, RowShaper.ReferenceResolver refs)
+                                throws java.sql.SQLException {
+                            String data = outPrefix + "__data";
+                            try (java.sql.Statement st = conn.createStatement()) {
+                                st.execute("CREATE TABLE \\"" + data + "\\" AS SELECT * FROM \\"" + input + "\\"");
+                            }
+                            return List.of(new RowShaper.Relation("data", data));
+                        }
+                    }
+                }
+                """.formatted(cls, nodeType == null ? "unused" : nodeType, executorKind);
+
+        Path classes = compile(work, "com/acme/pack/" + cls + ".java", src);
+        Map<String, String> services = new java.util.LinkedHashMap<>();
+        if (nodeType != null) services.put("com.gamma.pipeline.PipelineNodeType", "com.acme.pack." + cls + "$Type");
+        services.put("com.gamma.pipeline.exec.PipelineNodeExecutor", "com.acme.pack." + cls + "$Exec");
+        writeJar(jar, classes, packId, services);
         return jar;
     }
 

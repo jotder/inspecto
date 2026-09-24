@@ -160,7 +160,8 @@ public final class RowShaper {
         String type = node.type();
         // The plugin seam's EXECUTION half. Consulted before the built-ins, deliberately, so a provider may
         // specialise a core verb as well as add a new one — the same rule PipelineNodeTypes applies to
-        // descriptors ("an edition can specialise a node type without forking the core"). Empty in a stock
+        // descriptors ("an edition can specialise a node type without forking the core"). A PACK cannot:
+        // PipelineNodeExecutors.register refuses a pack executor for a built-in (S2-0). Empty in a stock
         // build, so this costs one map lookup and changes nothing that ships.
         Optional<PipelineNodeExecutor> contributed = PipelineNodeExecutors.get(type);
         if (contributed.isPresent()) return contributed.get().shape(conn, node, input, outPrefix, references);
