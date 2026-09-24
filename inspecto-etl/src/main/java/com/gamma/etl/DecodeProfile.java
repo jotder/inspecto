@@ -72,15 +72,23 @@ public final class DecodeProfile {
         if (!Files.isRegularFile(file) || !Files.isReadable(file))
             throw new IllegalArgumentException(FIELD + " not readable: " + file);
 
+        // ⚠ The preview route runs this for any authenticated user, so nothing of a file that is NOT a profile
+        // is echoed back: not the codec's message (it can quote the offending line), not its keys. Any .toon
+        // under the roots is nameable here; only a real profile's own keys are named in an error.
         Map<String, Object> doc;
         try {
             doc = ConfigCodec.toMap(Files.readString(file, StandardCharsets.UTF_8));
-        } catch (IllegalArgumentException bad) {
-            throw new IllegalArgumentException("Decode Profile " + file + ": " + bad.getMessage(), bad);
+        } catch (RuntimeException bad) {
+            throw new IllegalArgumentException("Decode Profile " + file + " is not valid TOON", bad);
         }
-        if (!(doc.get("asn1") instanceof Map<?, ?> profileBlock) || doc.size() != 1)
-            throw new IllegalArgumentException("Decode Profile " + file + " must hold exactly one block, asn1: "
-                    + "(got top-level keys " + doc.keySet() + ")");
+        if (!(doc.get("asn1") instanceof Map<?, ?> profileBlock))
+            throw new IllegalArgumentException(file + " is not a Decode Profile: it has no asn1: block");
+        if (doc.size() != 1) {
+            java.util.Set<String> extra = new java.util.LinkedHashSet<>(doc.keySet());
+            extra.remove("asn1");
+            throw new IllegalArgumentException("Decode Profile " + file + " must hold only the asn1: block, "
+                    + "got also " + extra);
+        }
         if (profileBlock.containsKey(KEY))
             throw new IllegalArgumentException("Decode Profile " + file + " names another profile_file — "
                     + "profiles do not nest");
@@ -102,8 +110,12 @@ public final class DecodeProfile {
             }
             merged.put(k, v);
         }
+        // A null or blank value is UNSET, not an override: a form that submits every served field empty
+        // must not clear the profile's grammar_file.
         for (Map.Entry<String, Object> e : asn1.entrySet())
-            if (!KEY.equals(e.getKey()) && e.getValue() != null) merged.put(e.getKey(), e.getValue());
+            if (!KEY.equals(e.getKey()) && e.getValue() != null
+                    && !(e.getValue() instanceof String s && s.isBlank()))
+                merged.put(e.getKey(), e.getValue());
         return new Resolved(merged, file);
     }
 

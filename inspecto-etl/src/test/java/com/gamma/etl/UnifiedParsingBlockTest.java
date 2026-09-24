@@ -339,6 +339,20 @@ class UnifiedParsingBlockTest {
         assertEquals("4", String.valueOf(cfg.schemas().ingesterConfig().get("record_header_length")));
     }
 
+    /** A blank key is unset, never an override: an empty {@code grammar_file} does not clear the profile's. */
+    @Test
+    void aBlankPipelineKeyDoesNotClearTheProfiles(@TempDir Path dir) throws Exception {
+        writeProfile(dir, PROFILE);
+        PipelineConfig cfg = load(dir, "a1pb", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    profile_file: vendors/acme/acme.decode.toon
+                    grammar_file: ""
+                """);
+        assertEquals(dir.resolve("vendors/acme/acme.asn").toAbsolutePath().normalize(), cfg.schemas().ingesterGrammar());
+    }
+
     /** D5: an override REPLACES {@code segments} whole — no key merge, so the record kinds a Pipeline
      *  loads are readable off one file. The Pipeline's own segment ref resolves beside the Pipeline. */
     @Test

@@ -673,6 +673,11 @@ export class GrammarEditorComponent implements AfterViewInit {
         return this.forms().some((f) => f.isDirty()) || this.fwForm.dirty || this.typeTouched();
     }
 
+    /** The dotted keys (e.g. `asn1.strictness`) the user changed in any mounted form. */
+    dirtyKeys(): Set<string> {
+        return new Set(this.forms().flatMap((f) => f.dirtyKeys()));
+    }
+
     markPristine(): void {
         for (const f of this.forms()) f.form.markAsPristine();
         this.fwForm.markAsPristine();

@@ -93,6 +93,11 @@ public final class Asn1ParserPlugin implements ParserPlugin {
                                 + "segment schema paths (a sibling name, e.g. msc_cdr.asn); a stand-alone "
                                 + "preview reads it from the Space's config directory. The alternative to "
                                 + "pasting the text above. Pasted text wins when both are set."),
+                FieldSpec.of("asn1.profile_file", "Decode Profile", FieldType.STRING,
+                        "Path to the vendor's Decode Profile (.toon, one asn1: block holding these same "
+                                + "keys), relative to the Pipeline's config file. Every key set here wins over "
+                                + "the profile's; segments set here replace the profile's whole. Refs inside "
+                                + "the profile resolve beside the profile."),
                 FieldSpec.of("asn1.root_type", "Root type", FieldType.STRING,
                         "Name of the type in the grammar each record binds against, e.g. Record. "
                                 + "Required when a grammar is supplied; ignored in structural mode."),
@@ -124,19 +129,21 @@ public final class Asn1ParserPlugin implements ParserPlugin {
     public ParseResult preview(byte[] sample, Map<String, Object> grammar, Path configDir) throws Exception {
         if (sample == null || sample.length == 0)
             throw new IllegalArgumentException("sample content is required");
-        Map<String, Object> asn1 = sub(grammar, "asn1");
+        // A relative ref resolves beside the Pipeline's config dir when the caller has one (the drawer
+        // sends it — the Pipeline's own spelling); with no Pipeline context, against the bound Space's
+        // config root (null outside a Space: the working-directory reading).
+        Path base = configDir != null ? configDir : SpaceConfigRoot.current();
+        // A Decode Profile (asn1.profile_file) is overlaid through the load's own rule, so a profile-backed
+        // grammar previews exactly as it ingests; its grammar_file comes back resolved beside the profile.
+        Map<String, Object> asn1 = com.gamma.etl.DecodeProfile.overlay(sub(grammar, "asn1"), base).asn1();
         String rootType = trimOrEmpty(asn1.get("root_type"));
         Strictness strictness = strictness(trimOrEmpty(asn1.get("strictness")));
         Framing framing = framing(asn1);
         int maxRecords = clampRecords(asn1.get("max_records"));
         int maxValueBytes = maxValueBytes(asn1.get("max_value_bytes"), "asn1.max_value_bytes");
         // Inline text wins over the .asn file ref — the ingester's rule, through the ingester's resolver.
-        // A relative ref resolves beside the Pipeline's config dir when the caller has one (the drawer
-        // sends it — the Pipeline's own spelling); with no Pipeline context, against the bound Space's
-        // config root (null outside a Space: the working-directory reading).
         Asn1GrammarSource.Module module = Asn1GrammarSource.resolve(
-                asn1.get("grammar"), "asn1.grammar", asn1.get("grammar_file"), "asn1.grammar_file",
-                configDir != null ? configDir : SpaceConfigRoot.current());
+                asn1.get("grammar"), "asn1.grammar", asn1.get("grammar_file"), "asn1.grammar_file", base);
 
         // No grammar: dump the self-describing TLV structure so an unknown file can be inspected.
         if (module == null) {

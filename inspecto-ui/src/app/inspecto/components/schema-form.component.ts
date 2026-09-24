@@ -1067,6 +1067,11 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
         return this.form.dirty;
     }
 
+    /** The keys of the controls the user changed (dotted spec keys). */
+    dirtyKeys(): string[] {
+        return Object.keys(this.form.controls).filter((k) => this.form.controls[k].dirty);
+    }
+
     /**
      * Mark everything touched (house rule on invalid submit) and report validity.
      *

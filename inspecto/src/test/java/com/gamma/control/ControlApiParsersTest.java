@@ -228,6 +228,61 @@ class ControlApiParsersTest {
         }
     }
 
+    /**
+     * Decode Profile (trust design slice C2): the drawer's {@code subdir} context carries a
+     * {@code asn1.profile_file} too. A profile-backed preview answers exactly what the same settings
+     * inline answer — the profile's grammar_file resolving beside the PROFILE, a Pipeline key winning —
+     * and an escaping profile is the jail's 403.
+     */
+    @Test
+    void asn1PreviewHonoursADecodeProfileBesideThePipelineSubdir(@TempDir Path cfg) throws Exception {
+        String grammar = "TEST DEFINITIONS IMPLICIT TAGS ::= BEGIN\n"
+                + "Record ::= [APPLICATION 1] SEQUENCE { id [0] INTEGER }\n"
+                + "END\n";
+        Path wr = java.nio.file.Files.createDirectories(cfg.resolve("wr"));
+        Path vendor = java.nio.file.Files.createDirectories(wr.resolve("vendors/acme"));
+        java.nio.file.Files.writeString(vendor.resolve("acme.asn"), grammar);
+        // root_type deliberately WRONG in the profile: the Pipeline's own key must win for the tree to match.
+        java.nio.file.Files.writeString(vendor.resolve("acme.decode.toon"),
+                "asn1:\n  grammar_file: acme.asn\n  root_type: NoSuchType\n  strictness: BER\n");
+        java.nio.file.Files.createDirectories(wr.resolve("msc"));
+        String prior = System.getProperty("assist.write.root");
+        System.setProperty("assist.write.root", wr.toString());
+        Ctx ctx;
+        try {
+            ctx = open(cfg);
+        } finally {
+            if (prior != null) System.setProperty("assist.write.root", prior);
+            else System.clearProperty("assist.write.root");
+        }
+        try (Ctx c = ctx) {
+            String sample = Base64.getEncoder().encodeToString(java.util.HexFormat.of().parseHex("610380010A"));
+            ObjectMapper m = new ObjectMapper();
+            JsonNode inline = json(send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("grammar", grammar, "root_type", "Record")),
+                    "sample_b64", sample))));
+            HttpResponse<String> viaProfile = send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("profile_file", "../vendors/acme/acme.decode.toon",
+                            "root_type", "Record")),
+                    "subdir", "msc", "sample_b64", sample)));
+            assertEquals(200, viaProfile.statusCode(), viaProfile.body());
+            assertEquals(inline, json(viaProfile), "the profile-backed preview tree equals the inline one");
+
+            HttpResponse<String> profileRootType = send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("profile_file", "../vendors/acme/acme.decode.toon")),
+                    "subdir", "msc", "sample_b64", sample)));
+            assertEquals(422, profileRootType.statusCode(), "without the override the profile's root_type applies: "
+                    + profileRootType.body());
+
+            HttpResponse<String> esc = send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("profile_file", Path.of(System.getProperty("user.home"))
+                                    .getRoot().resolve("nowhere-inspecto/x.decode.toon").toString(),
+                            "root_type", "Record")),
+                    "subdir", "msc", "sample_b64", sample)));
+            assertEquals(403, esc.statusCode(), esc.body());
+        }
+    }
+
     @Test
     void unknownParserIs404(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg)) {

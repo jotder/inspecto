@@ -107,6 +107,29 @@ export const PARSE_NODE_FRONTENDS: Record<string, ParsingFrontend | 'asn1' | 'pl
 export const isParseNodeType = (type: string): boolean => type === 'parser' || type in PARSE_NODE_FRONTENDS;
 
 /**
+ * The `asn1:` keys a Pipeline backed by a **Decode Profile** (`asn1.profile_file`) actually overrides.
+ * The served form holds every field at its default, and on the server every key the Pipeline sets wins
+ * over the profile — so persisting (or previewing) the whole form would silently fork the Pipeline off
+ * its vendor profile (`record_header_length: 0` over the profile's `4`). Kept: `profile_file`,
+ * `segments`, keys the saved block already carried, and keys the user changed; blanks never.
+ * Without a profile the block is returned unchanged.
+ */
+export function decodeProfileOverrides(
+    asn1: Record<string, unknown>,
+    prior: Record<string, unknown> | undefined,
+    dirty: Set<string>,
+): Record<string, unknown> {
+    const profile = asn1['profile_file'];
+    if (typeof profile !== 'string' || profile.trim() === '') return asn1;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(asn1)) {
+        if (v === undefined || v === null || (typeof v === 'string' && v.trim() === '')) continue;
+        if (k === 'profile_file' || k === 'segments' || (prior && k in prior) || dirty.has('asn1.' + k)) out[k] = v;
+    }
+    return out;
+}
+
+/**
  * The **Parse definition pane** (definition-surface P3a; fixed width P3b, ASN.1 P3c) — the per-format
  * path of the parse node, re-hosted inside `<inspecto-definition-drawer>` instead of
  * `grammar-editor.dialog`. Renders the shared `<inspecto-grammar-editor>` locked to the node's own
@@ -854,6 +877,18 @@ export class PipelineParseDefinitionComponent {
         thread?.parseError.set(null);
         // The Pipeline's own config dir travels, so a grammar_file ref previews with the spelling the
         // Pipeline resolves it by — beside itself (BUNDLE-ASN1-GRAMMAR-FILE-1).
+        // A Decode Profile previews with only the keys this Pipeline overrides — what a save would persist.
+        if (type === 'asn1' && grammar['asn1'] && typeof grammar['asn1'] === 'object' && this.editor) {
+            const prior = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
+            grammar = {
+                ...grammar,
+                asn1: decodeProfileOverrides(
+                    grammar['asn1'] as Record<string, unknown>,
+                    prior,
+                    this.editor.dirtyKeys(),
+                ),
+            };
+        }
         return this.parsersApi.preview(type, grammar, text, b64, this.configSubdir().trim()).pipe(
             tap((p) => {
                 if (p.kind !== 'table') return;
@@ -1461,7 +1496,7 @@ export class PipelineParseDefinitionComponent {
         const prior = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
         if (segments) a['segments'] = segments;
         else if (prior?.['segments'] !== undefined) a['segments'] = prior['segments'];
-        return { frontend: 'asn1', asn1: a };
+        return { frontend: 'asn1', asn1: decodeProfileOverrides(a, prior, this.editor!.dirtyKeys()) };
     }
 
     /** `segment key → schema-toon path` for the drafts currently in the editor. */

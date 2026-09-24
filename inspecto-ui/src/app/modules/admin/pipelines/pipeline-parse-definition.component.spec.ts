@@ -12,7 +12,7 @@ import { DefinitionStateService } from 'app/inspecto/definition/definition-state
 import { GrammarEditorComponent, grammarToCsv, parsingAttributesFor } from 'app/inspecto/grammar';
 import { InspectoSegmentsEditorComponent } from 'app/inspecto/segments';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { PipelineParseDefinitionComponent } from './pipeline-parse-definition.component';
+import { PipelineParseDefinitionComponent, decodeProfileOverrides } from './pipeline-parse-definition.component';
 
 /**
  * Host so the required signal `node` input binds naturally and outputs are captured — these specs pin
@@ -1742,5 +1742,48 @@ describe('PipelineParseDefinitionComponent', () => {
         const fixture = await create(delimitedNode(), [], 0, null, 'cdr');
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('inspecto-schema-partitions-editor')).toBeNull();
+    });
+});
+
+/**
+ * Decode Profile save round-trip (parser-plugins trust design §4): a profile-backed Pipeline persists
+ * `profile_file` plus only the keys it overrides — never the form's defaults, which on the server would
+ * win over the profile and silently fork the Pipeline off it.
+ */
+describe('decodeProfileOverrides', () => {
+    const form = {
+        profile_file: '../vendors/acme/acme.decode.toon',
+        grammar: '',
+        grammar_file: '',
+        root_type: '',
+        strictness: 'BER',
+        file_header_length: 0,
+        record_header_length: 0,
+        max_value_bytes: 67108864,
+        max_records: 50,
+    };
+
+    it('keeps only profile_file, segments, previously saved keys and changed keys', () => {
+        const out = decodeProfileOverrides(
+            { ...form, segments: { moCallRecord: 'mo.toon' } },
+            { profile_file: 'x', max_value_bytes: 1024 },
+            new Set(['asn1.strictness']),
+        );
+        expect(out).toEqual({
+            profile_file: '../vendors/acme/acme.decode.toon',
+            strictness: 'BER',
+            max_value_bytes: 67108864,
+            segments: { moCallRecord: 'mo.toon' },
+        });
+    });
+
+    it('never persists a default the user did not touch (record_header_length 0 over the profile)', () => {
+        const out = decodeProfileOverrides(form, undefined, new Set());
+        expect(out).toEqual({ profile_file: '../vendors/acme/acme.decode.toon' });
+    });
+
+    it('leaves a block without a profile untouched', () => {
+        const inline = { ...form, profile_file: '' };
+        expect(decodeProfileOverrides(inline, undefined, new Set())).toBe(inline);
     });
 });
