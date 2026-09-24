@@ -264,6 +264,15 @@ if ! run_guard tools/check-nul-bytes.mjs "NUL-byte guard" \
   exit 1
 fi
 
+# Seed-path guard (2026-09-24): the sample seeder must write where the engine reads — a relative dirs.*
+# value resolves under its Space dir (PathJail.resolveDataPath), never the repo root. The old seeder put
+# every inbox in <repo>/data/inbox on a fresh checkout and the engine refused every Pipeline.
+if ! run_guard tools/check-seed-paths.mjs "seed-path guard" \
+     "CI runs it too — a seeder that writes outside the Space leaves every Pipeline unloadable on a fresh clone."; then
+  echo "pre-push: refusing to push — tools/seed-samples.mjs plans paths outside their Space (above)." >&2
+  exit 1
+fi
+
 # The Link Analysis demo corpus must keep DEMONSTRATING decision D-S4's risk. Measured 2026-09-22, the
 # split count across 24 candidate entity columns was exactly ZERO: every entity came from a canonical
 # literal, so the failure was structurally possible and empirically unobservable — and the split-identity

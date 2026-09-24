@@ -188,6 +188,13 @@ jobs:
       - name: Guard — no tracked text file contains a NUL byte
         run: node tools/check-nul-bytes.mjs
 
+      # Seed-path guard (2026-09-24). tools/seed-samples.mjs resolved dirs.poll against the repo root while
+      # the engine resolves a relative dirs.* value under its Space dir (PathJail.resolveDataPath), so on a
+      # fresh checkout every sample inbox landed in <repo>/data/inbox and the engine refused every Pipeline.
+      # Falsified: the old seeder fails it (47 of 50 planned paths outside their Space); the fix passes.
+      - name: Guard — sample seeding lands inside each Space
+        run: node tools/check-seed-paths.mjs
+
       # SBOM module-set guard (2026-09-09). tools/sbom.mjs built its first-party table from FOUR artifacts
       # under a comment claiming it was "the SAME table package.ps1 stages from". It was not, and had not
       # been since EDG-01: package.ps1 stages 11 jars for Standard and 12 for Enterprise, so every shipped

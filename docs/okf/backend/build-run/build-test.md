@@ -51,7 +51,14 @@ the pattern”* — on both the test run and the dry-run, which reads as an engi
 ⚠ **It derives the work from each Pipeline's own `dirs.poll`**, never a hand-kept list: it reads every
 `<space>/config/**` file ending `_pipeline.toon`, creates each `dirs.*` leaf, copies
 `data/samples/<pipeline>/` (recursively) into that Pipeline's inbox, and copies `data/samples/ref/*`
-into `data/ref/`. A Pipeline with **no** same-named sample directory is **reported**, not skipped in
+into `data/ref/`. 🔴 **Every relative `dirs.*` value resolves under the Pipeline's Space directory** —
+the exact rule the engine applies (`PathJail.resolveDataPath`: the parent of the nearest `config`
+ancestor; absolute paths and URIs as written; a value repeating the Space's own path is refused and
+reported). Until 2026-09-24 the seeder resolved against the repo root, so a fresh checkout got every
+inbox in `<repo>/data/inbox/` and the engine then **refused every Pipeline** (*“nothing exists there,
+while <cwd>/data/inbox/X does”*); the shared tree hid it with stale inboxes under `spaces/*/data`.
+`tools/check-seed-paths.mjs` (CI + pre-push) now fails if any planned path lands outside its Space.
+A Pipeline with **no** same-named sample directory is **reported**, not skipped in
 silence — that line is how `lookup_step`, which shipped no sample at all, stayed visible
 (`DEMO-CORPUS-FORMAT-COVERAGE-1`). *(It has shipped one since `WB-17`, 2026-09-22; the row CLOSED
 2026-09-23 once ASN.1, Excel, fixed-width and XML each gained a domain-shaped demo in `spaces/demo`

@@ -42,7 +42,7 @@
  */
 
 import { readFileSync, readdirSync, mkdirSync, copyFileSync, statSync, existsSync } from 'node:fs';
-import { join, relative, dirname, basename } from 'node:path';
+import { join, relative, dirname, basename, resolve, isAbsolute, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -64,7 +64,7 @@ function walk(dir, prefix = '') {
 }
 
 /**
- * The `dirs:` block of a pipeline toon, as {leaf: repo-relative path}.
+ * The `dirs:` block of a pipeline toon, as {leaf: path as authored} — resolve it with {@link dataPath}.
  *
  * ⚠ Deliberately a narrow line reader, not the TOON parser: this tool runs on a fresh clone before
  * anything is built, so it may not depend on the engine. The block is flat, two-space indented and
@@ -82,6 +82,39 @@ function dirsOf(toonPath) {
         if (m) dirs[m[1]] = m[2].replace(/^["']|["']$/g, '');
     }
     return dirs;
+}
+
+/**
+ * The Space directory a config belongs to: the parent of the nearest ancestor directory named `config`.
+ * Mirrors `PathJail.spaceDirOf`.
+ */
+function spaceDirOf(cfgPath) {
+    for (let d = dirname(resolve(cfgPath)); dirname(d) !== d; d = dirname(d)) {
+        if (basename(d) === 'config') return dirname(d);
+    }
+    return null;
+}
+
+/**
+ * Where the engine reads a `dirs.*` value: mirrors `PathJail.resolveDataPath`. A relative data path resolves
+ * under the config's Space directory (never the working directory); an absolute path or a URI is kept as
+ * written. A relative value that repeats the Space's own path (`spaces/demo/data/x` under `spaces/demo/`) is
+ * refused by the engine, so it is returned as `null` here and reported rather than seeded somewhere wrong.
+ *
+ * 🔴 This used to be `join(REPO, value)`. On a fresh checkout that put every inbox under `<repo>/data/inbox/`,
+ * which the engine then REFUSED for every Pipeline (the old-spelling-exists ambiguity in `resolveAgainst`) —
+ * the shared tree only worked because stale inboxes already sat under `spaces/<id>/data/`.
+ */
+function dataPath(cfgPath, value) {
+    if (isAbsolute(value) || /^[a-z][a-z0-9+.-]*:\/\//i.test(value)) return value;
+    const spaceDir = spaceDirOf(cfgPath);
+    if (!spaceDir) return resolve(value);           // no Space: the engine keeps the working-directory reading
+    const authored = value.split(/[\\/]+/).filter(Boolean);
+    const space = spaceDir.split(sep).filter(Boolean);
+    for (let k = Math.min(space.length, authored.length); k >= 2; k--) {
+        if (space.slice(space.length - k).join('/') === authored.slice(0, k).join('/')) return null;
+    }
+    return join(spaceDir, ...authored);
 }
 
 function pipelineConfigs(spaceDir) {
@@ -115,6 +148,7 @@ if (spaceNames.length === 0) {
 let seeded = 0;
 let unseeded = [];
 let refs = 0;
+const refused = [];
 const plan = { files: [], dirs: [] };
 
 for (const space of spaceNames) {
@@ -128,16 +162,22 @@ for (const space of spaceNames) {
         if (!dirs.poll) continue;
 
         // Every dirs.* leaf but poll is a working directory the engine expects to exist.
+        const resolved = {};
         for (const [leaf, p] of Object.entries(dirs)) {
-            const abs = join(REPO, p);
+            const abs = dataPath(cfg, p);
+            if (abs === null) {
+                refused.push(`${relative(REPO, cfg)}: dirs.${leaf} '${p}' repeats its own Space's path`);
+                continue;
+            }
+            resolved[leaf] = abs;
             plan.dirs.push(relative(REPO, abs));
             if (!dryRun) mkdirSync(abs, { recursive: true });
-            void leaf;
         }
+        if (!resolved.poll) continue;
 
         const sampleDir = join(samples, name);
         if (existsSync(sampleDir) && statSync(sampleDir).isDirectory()) {
-            copyTree(sampleDir, join(REPO, dirs.poll), plan);
+            copyTree(sampleDir, resolved.poll, plan);
             seeded++;
         }
 
@@ -147,7 +187,7 @@ for (const space of spaceNames) {
         // test run refuses a file run for it by name, WB-07), the other SHARES the `orders` inbox, so
         // the `orders` samples seed it. A warning that is wrong for a whole class of configs is the
         // defect WB-04 removed from the validator; it does not belong here either.
-        const pollDir = join(REPO, dirs.poll);
+        const pollDir = resolved.poll;
         const empty = dryRun
             ? !existsSync(sampleDir) && !existsSync(pollDir)
             : !existsSync(pollDir) || walk(pollDir).length === 0;
@@ -180,4 +220,12 @@ if (unseeded.length) {
             `as shipped: ${unseeded.join(', ')}`,
     );
 }
-if (dryRun) for (const f of plan.files) console.log(`    ${f}`);
+if (refused.length) {
+    console.log(
+        `  ⚠ ${refused.length} dirs.* value(s) NOT seeded — the engine refuses them too: ${refused.join('; ')}`,
+    );
+}
+if (dryRun) {
+    for (const f of plan.files) console.log(`    ${f}`);
+    for (const d of new Set(plan.dirs)) console.log(`  d ${d}`);
+}
