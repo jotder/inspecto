@@ -135,6 +135,39 @@ public final class PipelineLift {
         return new PipelineGraph(cfg.identity().pipelineName(), cfg.active(), nodes, edges);
     }
 
+    /**
+     * The one schema's slice of a multi-schema lift: {@code map_<key>} plus every node reachable
+     * downstream of it, with the edges among them. A <b>view</b> over the one lift, never a second
+     * emitter — node ids and configs are the lift's own, so the branch↔sink pairing, the branch-commit
+     * ledger keys and the park node ids are unchanged; only the other schemas' trees (and the parser,
+     * acquisition and quarantine above the map) are left out. {@code map_<key>} is the view's entry node.
+     *
+     * <p>Exists so a per-schema write reasons about THIS schema's tree only (design
+     * {@code branch-aware-segment-lift-design.md} Option A) instead of relying on the executor's
+     * no-live-inbound skip to leave the others untouched.
+     *
+     * @param key the schema's route key ({@link #routeKey}); {@code null}/blank = the whole graph (identity)
+     * @throws IllegalArgumentException when the graph has no {@code map_<key>} node
+     */
+    public static PipelineGraph scope(PipelineGraph graph, String key) {
+        if (key == null || key.isBlank()) return graph;
+        String root = "map_" + key;
+        if (!graph.byId().containsKey(root))
+            throw new IllegalArgumentException("pipeline '" + graph.name() + "' has no '" + root
+                    + "' node — '" + key + "' names no schema of this lift");
+        java.util.Set<String> keep = new java.util.LinkedHashSet<>(List.of(root));
+        java.util.Deque<String> todo = new java.util.ArrayDeque<>(List.of(root));
+        while (!todo.isEmpty()) {
+            String from = todo.pop();
+            for (PipelineEdge e : graph.edges())
+                if (e.from().equals(from) && graph.byId().containsKey(e.to()) && keep.add(e.to())) todo.push(e.to());
+        }
+        List<PipelineNode> nodes = graph.nodes().stream().filter(n -> keep.contains(n.id())).toList();
+        List<PipelineEdge> edges = graph.edges().stream()
+                .filter(e -> keep.contains(e.from()) && keep.contains(e.to())).toList();
+        return new PipelineGraph(graph.name(), graph.active(), nodes, edges);
+    }
+
     /** Stable node ids of the at-rest Stage-2 lift ({@link #stageTwo}). */
     static final String STAGE2_SRC  = "src";
     static final String STAGE2_SINK = "sink";

@@ -256,4 +256,81 @@ class PipelineLiftTest {
                 "the gate's mirrored id grammar must match the lift's route-fed sink ids");
         assertFalse(routeFedSinkIds.isEmpty(), "the fixture actually routes");
     }
+
+    // ── scope(graph, key): one schema's slice of a multi-schema lift ─────────
+
+    @Test
+    void scopeOfASegmentsLiftIsThatSegmentsRouteTreeOnly(@TempDir Path dir) throws Exception {
+        PipelineGraph whole = PipelineLift.lift(multiSchemaRoute(dir, true, false));
+        PipelineGraph g = PipelineLift.scope(whole, "dispatch");
+
+        assertEquals(Set.of("map_dispatch", "route_dispatch", "sink_dispatch__d0", "sink_dispatch__d1"),
+                Set.copyOf(ids(g.nodes())));
+        assertEquals(List.of("map_dispatch"), ids(g.entryNodes()), "the map is the view's entry node");
+        assertTrue(hasEdge(g, "route_dispatch", PipelineRel.route("bulk"), "sink_dispatch__d0"));
+        assertTrue(hasEdge(g, "route_dispatch", PipelineRel.route("normal"), "sink_dispatch__d1"));
+        assertEquals(whole.node("sink_dispatch__d0").orElseThrow(), g.node("sink_dispatch__d0").orElseThrow(),
+                "a view over the one lift: node configs are the lift's own");
+        assertTrue(PipelineValidator.validate(g).ok(), "the view is executable on its own");
+        assertTrue(ConsignmentGraphRunner.engages(g), "one schema's two branches still engage");
+    }
+
+    @Test
+    void scopeOfASelectorLiftIsThatSchemasRouteTreeOnly(@TempDir Path dir) throws Exception {
+        PipelineGraph g = PipelineLift.scope(PipelineLift.lift(multiSchemaRoute(dir, false, false)), "beta");
+
+        assertEquals(Set.of("map_beta", "route_beta", "sink_beta__d0", "sink_beta__d1"), Set.copyOf(ids(g.nodes())));
+        assertTrue(g.node("quarantine").isEmpty() && g.node("parse").isEmpty(), "nothing above the map");
+    }
+
+    @Test
+    void scopeOfASingleSchemaLiftIsTheIdentity(@TempDir Path dir) throws Exception {
+        PipelineGraph whole = PipelineLift.lift(csv(dir, PipelineConfigBatchTest.miniSchema()).load());
+        assertSame(whole, PipelineLift.scope(whole, null));
+        assertSame(whole, PipelineLift.scope(whole, ""));
+        assertThrows(IllegalArgumentException.class, () -> PipelineLift.scope(whole, "nope"),
+                "a key naming no schema is refused, never read as the whole graph");
+    }
+
+    @Test
+    void scopeKeepsABranchsFlattenedStepsChain(@TempDir Path dir) throws Exception {
+        PipelineGraph g = PipelineLift.scope(PipelineLift.lift(multiSchemaRoute(dir, true, true)), "receipt");
+
+        assertTrue(g.node("filter_receipt__bulk").isPresent(), "the bulk branch's chain node is kept");
+        assertTrue(hasEdge(g, "route_receipt", PipelineRel.route("bulk"), "filter_receipt__bulk"));
+        assertTrue(hasEdge(g, "filter_receipt__bulk", PipelineRel.DATA, "sink_receipt__d0"));
+        assertTrue(g.nodes().stream().noneMatch(n -> n.id().contains("dispatch")), "no other segment's node");
+    }
+
+    /** An inactive route over either multi-schema shape: plugin segments (receipt/dispatch) or a
+     *  schemas[] selector (alpha/beta); {@code chain} gives the bulk branch a filter step. */
+    private static PipelineConfig multiSchemaRoute(Path dir, boolean segments, boolean chain) throws Exception {
+        Path schema = dir.resolve("s.toon");
+        Files.writeString(schema, PipelineConfigBatchTest.miniSchema());
+        String s = schema.toString().replace("\\", "/");
+        String d = dir.toString().replace("\\", "/");
+        Map<String, Object> bulk = new LinkedHashMap<>(Map.of("key", "bulk", "where", "AMT > 1000",
+                "database", d + "/db_bulk"));
+        if (chain) bulk.put("steps", List.of(Map.of("filter", Map.of("where", "AMT > 2000"))));
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("name", "multi_route");
+        m.put("active", false);
+        m.put("dirs", Map.of("poll", d + "/in", "database", d + "/db", "quarantine", d + "/q"));
+        m.put("sinks", List.of(Map.of("database", d + "/db_bulk"), Map.of("database", d + "/db_normal")));
+        m.put("route", Map.of("mode", "case", "default", "normal", "branches",
+                List.of(bulk, Map.of("key", "normal", "where", "true", "database", d + "/db_normal"))));
+        Map<String, Object> proc = new LinkedHashMap<>(Map.of("threads", 1));
+        if (segments) {
+            Map<String, Object> seg = new LinkedHashMap<>();
+            seg.put("receipt", s);
+            seg.put("dispatch", s);
+            proc.put("ingester", "com.gamma.ingester.XmlRecordIngester");
+            proc.put("segments", seg);
+        } else {
+            proc.put("schemas", List.of(Map.of("column_count", 3, "schema_file", s, "table", "alpha"),
+                    Map.of("column_count", 4, "schema_file", s, "table", "beta")));
+        }
+        m.put("processing", proc);
+        return PipelineConfig.fromMap(m);
+    }
 }
