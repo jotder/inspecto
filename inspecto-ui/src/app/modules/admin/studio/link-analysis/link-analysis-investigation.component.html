@@ -147,6 +147,28 @@
                 <button mat-stroked-button [disabled]="store.busy() || !selectedInSet().length" (click)="exclude()">
                     Exclude
                 </button>
+                <!-- LA-19: a note changes nothing about traversal, display or counts -->
+                @if (selectedNotes().length) {
+                    <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs" aria-label="Notes on this entity">
+                        @for (a of selectedNotes(); track a.step + ':' + a.id) {
+                            <li>
+                                {{ a.note }} <span class="text-secondary">(step {{ a.step }})</span>
+                            </li>
+                        }
+                    </ul>
+                }
+                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Note</mat-label>
+                    <textarea matInput rows="2" [formControl]="note"></textarea>
+                    @if (note.hasError('required')) {
+                        <mat-error>Write the note first.</mat-error>
+                    } @else if (note.hasError('maxlength')) {
+                        <mat-error>At most 2000 characters.</mat-error>
+                    }
+                </mat-form-field>
+                <button mat-stroked-button [disabled]="store.busy() || !selectedInSet().length" (click)="annotate()">
+                    Annotate
+                </button>
             } @else {
                 <p class="text-secondary m-0 text-xs">
                     Click an entity on the canvas to act on it. Seed from the query graph; expand, keep, hide or exclude
@@ -208,6 +230,58 @@
                     }
                 } @else {
                     <p class="text-secondary m-0 text-xs">No steps yet — seed an entity to begin.</p>
+                }
+            }
+        </section>
+
+        @if (store.workingSet()?.annotations?.length) {
+            <section aria-label="Annotations">
+                <h3 class="text-secondary m-0 mb-1 text-xs font-semibold uppercase tracking-wide">Annotations</h3>
+                <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
+                    @for (a of store.workingSet()!.annotations; track a.step + ':' + a.id) {
+                        <li>
+                            <strong>{{ a.id }}</strong> — {{ a.note }} (step {{ a.step }})
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+
+        <!-- ── LA-19 coverage: a gap in the data looks exactly like innocence ── -->
+        <section class="flex flex-col gap-1" aria-label="Coverage">
+            <div class="flex items-center gap-2">
+                <h3 class="text-secondary m-0 text-xs font-semibold uppercase tracking-wide">Coverage</h3>
+                <button
+                    mat-stroked-button
+                    class="ml-auto"
+                    [disabled]="coverageBusy()"
+                    (click)="checkCoverage()"
+                    matTooltip="Which days of the Investigation's window have no rows at all in its Dataset"
+                >
+                    Check coverage
+                </button>
+            </div>
+            @if (coverageFor() === store.activeId()) {
+                @if (coverageError()) {
+                    <inspecto-alert variant="error" title="Coverage not read">{{ coverageError() }}</inspecto-alert>
+                }
+                @if (coverage(); as c) {
+                    @if (c.missingDays.length) {
+                        <inspecto-alert variant="warning" title="Days with no data">
+                            {{ c.missingDays.length }} of {{ c.expectedDays }} days in the window have zero rows in
+                            {{ c.dataset }} ({{ c.zone }}): {{ c.missingDays.join(', ') }}. An empty result on these
+                            days says nothing about activity.
+                        </inspecto-alert>
+                    } @else {
+                        <inspecto-alert variant="success" title="Every day has data">
+                            All {{ c.expectedDays }} days in the window have rows in {{ c.dataset }} ({{ c.zone }}).
+                        </inspecto-alert>
+                    }
+                    @if (!c.collectors.assessed) {
+                        <p class="text-secondary m-0 text-xs">
+                            Per-Collector coverage is not assessed — {{ c.collectors.note }}.
+                        </p>
+                    }
                 }
             }
         </section>

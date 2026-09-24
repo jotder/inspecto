@@ -19,6 +19,7 @@ import { firstValueFrom } from 'rxjs';
 import {
     InstantiateTemplateResult,
     InvService,
+    InvestigationCoverage,
     InvestigationLogEntry,
     WorkingSetRelationName,
     apiErrorMessage,
@@ -79,7 +80,17 @@ export class LinkAnalysisInvestigationComponent {
         nonNullable: true,
         validators: [Validators.required, Validators.maxLength(200)],
     });
+    /** LA-19: `confidence` is deliberately NOT asked — its scale is undecided (D-U9) and the server refuses it. */
+    readonly note = new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.required, Validators.maxLength(2000)],
+    });
     readonly reread = signal(false);
+    /** LA-19: the last coverage read and the Investigation it is FOR — rendered only while that one is open. */
+    readonly coverage = signal<InvestigationCoverage | null>(null);
+    readonly coverageFor = signal<string | null>(null);
+    readonly coverageBusy = signal(false);
+    readonly coverageError = signal('');
     /** LA-21: pin the Working Set to a dashboard Widget — FROZEN by default (D-E6); Live is opt-in. */
     readonly pinForm = new FormGroup({
         name: new FormControl('', {
@@ -114,6 +125,12 @@ export class LinkAnalysisInvestigationComponent {
     readonly selectedInSet = computed(() => {
         const n = this.store.selected();
         return n ? idsInWorkingSet(n, this.store.workingSet()) : [];
+    });
+
+    /** LA-19: the sealed notes on the selected entity's Working Set ids. */
+    readonly selectedNotes = computed(() => {
+        const ids = this.selectedInSet();
+        return (this.store.workingSet()?.annotations ?? []).filter((a) => ids.includes(a.id));
     });
 
     readonly counts = computed(() => {
@@ -176,6 +193,32 @@ export class LinkAnalysisInvestigationComponent {
             reason: this.reason.value.trim(),
         });
         if (ok) this.reason.reset('');
+    }
+
+    async annotate(): Promise<void> {
+        if (this.note.invalid) {
+            this.note.markAsTouched();
+            return;
+        }
+        const ok = await this.store.apply({ op: 'annotate', ids: this.selectedInSet(), note: this.note.value.trim() });
+        if (ok) this.note.reset('');
+    }
+
+    /** LA-19: which days of the Investigation's own window have no rows at all (a gap is not innocence). */
+    async checkCoverage(): Promise<void> {
+        const id = this.store.activeId();
+        if (!id || this.coverageBusy()) return;
+        this.coverageBusy.set(true);
+        this.coverageError.set('');
+        this.coverage.set(null);
+        this.coverageFor.set(id);
+        try {
+            this.coverage.set(await firstValueFrom(this.inv.investigationCoverage(id)));
+        } catch (err) {
+            this.coverageError.set(apiErrorMessage(err, 'Could not read the coverage.'));
+        } finally {
+            this.coverageBusy.set(false);
+        }
     }
 
     beginReorder(): void {

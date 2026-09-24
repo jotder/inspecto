@@ -168,9 +168,9 @@ export interface BranchingPatternResult {
 
 // ── LA-10: the Investigation object (`InvestigationRoutes`) ──────────────────────────────────────────────
 
-/** The six ops the backend evaluates (`InvestigationRoutes.SHIPPED`). `seedBy`, `excludeBy`, `threshold`,
- *  `annotate` and `snapshot` are in the closed vocabulary but answer 422 "not implemented yet" — never offer them. */
-export type InvestigationOpName = 'seed' | 'expand' | 'exclude' | 'hide' | 'keep' | 'window';
+/** The seven ops the backend evaluates (`InvestigationRoutes.SHIPPED`). `seedBy`, `excludeBy`, `threshold` and
+ *  `snapshot` are in the closed vocabulary but answer 422 "not implemented yet" — never offer them. */
+export type InvestigationOpName = 'seed' | 'expand' | 'exclude' | 'hide' | 'keep' | 'window' | 'annotate';
 
 /** A rung's traversal direction (plan §2.4; `InvestigationRoutes.DIRECTIONS`). */
 export type ExpandDirection = 'either' | 'out' | 'in' | 'reciprocal';
@@ -245,7 +245,10 @@ export type InvestigationOpRequest =
     | ({ op: 'expand'; ids?: string[] } & ExpandRung)
     | { op: 'window'; window: InvestigationWindow | 'full' }
     | { op: 'exclude'; ids: string[]; reason: string }
-    | { op: 'hide' | 'keep'; ids: string[] };
+    | { op: 'hide' | 'keep'; ids: string[] }
+    /** LA-19: `note` ≤ 2000 chars; every id must be in the Working Set. ⛔ Never send `confidence` — its scale is
+     *  undecided (D-U9) and the server refuses it with 422. */
+    | { op: 'annotate'; ids: string[]; note: string };
 
 /** What one step changed. Link changes are COUNTS only — the links themselves come from `/replay`. */
 export interface WorkingSetDelta {
@@ -318,11 +321,20 @@ export interface WorkingSetExclusion {
     reason: string;
 }
 
+/** LA-19: one note on one entity, from the `annotate` step that wrote it. A later exclusion keeps it. */
+export interface WorkingSetAnnotation {
+    id: string;
+    step: number;
+    note: string;
+}
+
 /** The full Working Set — only `/replay` returns it. */
 export interface WorkingSet {
     entities: WorkingSetEntity[];
     links: WorkingSetLink[];
     excluded: WorkingSetExclusion[];
+    /** LA-19: ABSENT when no entity is annotated (an unannotated state hashes as it did before). */
+    annotations?: WorkingSetAnnotation[];
     hash: string;
 }
 
@@ -362,7 +374,10 @@ export interface InvestigationLogEntry {
     at: string;
     op?: InvestigationOpName;
     /** The op's validated params: an expand's rung arrives resolved (defaults filled); a `window` op has no ids. */
-    params?: { ids?: string[]; entityType?: string | null; reason?: string } & Omit<ExpandRung, 'window'> & {
+    params?: { ids?: string[]; entityType?: string | null; reason?: string; note?: string } & Omit<
+        ExpandRung,
+        'window'
+    > & {
             window?: 'inherit' | 'full' | InvestigationWindow | null;
         };
     undoes?: number;
@@ -408,6 +423,26 @@ export interface WorkingSetRelationQuery {
     at?: number;
     limit?: number;
     offset?: number;
+}
+
+// ── LA-19: the coverage indicator (`InvestigationCoverageRoutes`) ──────────────────────────────────────
+
+/** `GET /inv/investigations/{id}/coverage` — which local days of a bounded window have NO rows in the Dataset. */
+export interface InvestigationCoverage {
+    id: string;
+    dataset: string;
+    window: InvestigationWindow;
+    /** The zone the days are counted in (the window's `timezone`, else UTC). */
+    zone: string;
+    expectedDays: number;
+    coveredDays: number;
+    /** `YYYY-MM-DD` local dates with zero rows — a day the window's day mask excludes is never listed. */
+    missingDays: string[];
+    complete: boolean;
+    perDay: { date: string; rows: number }[];
+    readAt: string;
+    /** Per-Collector coverage is NOT assessed: a Dataset row carries no Collector attribution. */
+    collectors: { assessed: false; note: string };
 }
 
 // ── LA-12: the Dossier (`DossierRoutes`) ──────────────────────────────────────────────────────────────
@@ -640,6 +675,16 @@ export class InvService {
     workingSetRelation(id: string, q: WorkingSetRelationQuery = {}): Observable<WorkingSetRelation> {
         return this.http.get<WorkingSetRelation>(invPath(id, 'working-set'), {
             params: toParams({ of: q.of, at: q.at, limit: q.limit, offset: q.offset }),
+        });
+    }
+
+    /** LA-19: coverage over `from`/`to` (+ `timezone`), or — with none — over the Investigation's own window. */
+    investigationCoverage(
+        id: string,
+        w: { from?: string; to?: string; timezone?: string } = {},
+    ): Observable<InvestigationCoverage> {
+        return this.http.get<InvestigationCoverage>(invPath(id, 'coverage'), {
+            params: toParams({ from: w.from, to: w.to, timezone: w.timezone }),
         });
     }
 

@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { HttpErrorResponse } from '@angular/common/http';
+import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { InvService, InvestigationLog, WorkingSet } from 'app/inspecto/api';
+import { InvService, InvestigationCoverage, InvestigationLog, WorkingSet } from 'app/inspecto/api';
 import { EntityProjection } from 'app/inspecto/graph';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -73,6 +74,27 @@ const WS: WorkingSet = {
     hash: '',
 };
 
+const COVERAGE: InvestigationCoverage = {
+    id: 'inv-1',
+    dataset: 'calls',
+    window: { from: '2026-09-01T00:00:00Z', to: '2026-09-04T00:00:00Z' },
+    zone: 'UTC',
+    expectedDays: 3,
+    coveredDays: 1,
+    missingDays: ['2026-09-02', '2026-09-03'],
+    complete: false,
+    perDay: [
+        { date: '2026-09-01', rows: 5 },
+        { date: '2026-09-02', rows: 0 },
+        { date: '2026-09-03', rows: 0 },
+    ],
+    readAt: '',
+    collectors: { assessed: false, note: 'a Dataset row carries no Collector attribution' },
+};
+
+const refused = (message: string) =>
+    throwError(() => new HttpErrorResponse({ status: 422, error: { error: { message } } }));
+
 function create() {
     const inv = {
         createInvestigation: vi.fn(() => of(LOG.header)),
@@ -86,6 +108,7 @@ function create() {
         workingSetRelation: vi.fn(() =>
             of({ head: { step: 2, workingSetHash: 'sha256:h2' }, rows: [], total: 0, truncated: false, cached: false }),
         ),
+        investigationCoverage: vi.fn(() => of(COVERAGE)),
         investigationMeasures: vi.fn(() => of({ head: { step: 2, workingSetHash: 'sha256:h2' }, measures: [] })),
     };
     const widgets = { save: vi.fn((w: Widget) => of(w)) };
@@ -204,5 +227,84 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
         button('Save Widget').click();
         await fixture.whenStable();
         expect(widgets.save.mock.calls[1][0].workingSet).toMatchObject({ relation: 'links', mode: 'live' });
+    });
+
+    it('LA-19: annotates the selected entity with its note, renders the sealed notes, and undo removes them', async () => {
+        const { fixture, store, el, inv, button } = create();
+        await openInv(store);
+        store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
+        fixture.detectChanges();
+
+        button('Annotate').click(); // no note yet
+        fixture.detectChanges();
+        expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
+        expect(el.querySelector('mat-error')?.textContent).toContain('Write the note first');
+
+        const annotated: WorkingSet = { ...WS, annotations: [{ id: 'a', step: 3, note: 'burner pattern' }] };
+        inv.replayInvestigation.mockReturnValue(of({ workingSet: annotated }));
+        const comp = fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent;
+        comp.note.setValue('  burner pattern ');
+        button('Annotate').click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(inv.appendInvestigationOp).toHaveBeenCalledWith('inv-1', {
+            op: 'annotate',
+            ids: ['a'],
+            note: 'burner pattern',
+        });
+        expect(el.querySelector('[aria-label="Annotations"]')?.textContent).toContain('burner pattern (step 3)');
+        expect(el.querySelector('[aria-label="Notes on this entity"]')?.textContent).toContain('burner pattern');
+        await expectNoA11yViolations(el);
+
+        // Undo is generic: the re-read sealed state no longer carries the note, so neither does the screen.
+        inv.replayInvestigation.mockReturnValue(of({ workingSet: WS }));
+        button('Undo').click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(inv.undoInvestigation).toHaveBeenCalledWith('inv-1');
+        expect(el.querySelector('[aria-label="Annotations"]')).toBeNull();
+        expect(el.querySelector('[aria-label="Notes on this entity"]')).toBeNull();
+    });
+
+    it('LA-19: a refused annotate (422) is surfaced with the server message, and nothing is rendered as saved', async () => {
+        const { fixture, store, el, inv, button } = create();
+        await openInv(store);
+        store.selected.set({ id: 'entity:a', data: { label: 'a', kind: 'entity', spellings: ['a'] } });
+        fixture.detectChanges();
+        inv.appendInvestigationOp.mockReturnValue(refused("'a' is not in the Working Set"));
+        const comp = fixture.debugElement.children[0].componentInstance as LinkAnalysisInvestigationComponent;
+        comp.note.setValue('burner pattern');
+        button('Annotate').click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(el.querySelector('inspecto-alert')?.textContent).toContain(
+            "The server refused this step: 'a' is not in the Working Set",
+        );
+        expect(el.querySelector('[aria-label="Annotations"]')).toBeNull();
+        expect(comp.note.value).toBe('burner pattern'); // kept for a retry
+    });
+
+    it('LA-19: coverage names the zero-row days and says per-Collector coverage is not assessed; a 422 is shown', async () => {
+        const { fixture, store, el, inv, button } = create();
+        await openInv(store);
+        fixture.detectChanges();
+        const section = el.querySelector('[aria-label="Coverage"]') as HTMLElement;
+
+        button('Check coverage').click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(inv.investigationCoverage).toHaveBeenCalledWith('inv-1');
+        expect(section.textContent).toContain('2 of 3 days in the window have zero rows in calls (UTC)');
+        expect(section.textContent).toContain('2026-09-02, 2026-09-03');
+        expect(section.textContent).not.toContain('2026-09-01');
+        expect(section.textContent).toContain('Per-Collector coverage is not assessed');
+        await expectNoA11yViolations(el);
+
+        inv.investigationCoverage.mockReturnValue(refused('coverage needs a bounded window'));
+        button('Check coverage').click();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(section.textContent).toContain('coverage needs a bounded window');
+        expect(section.textContent).not.toContain('zero rows');
     });
 });

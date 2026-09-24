@@ -125,6 +125,26 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
         replay.flush({});
     });
 
+    it('LA-19: annotate sends ids + note only (never confidence); coverage GETs from/to/timezone', () => {
+        svc.appendInvestigationOp('inv-1', { op: 'annotate', ids: ['a'], note: 'burner pattern' }).subscribe();
+        const op = httpMock.expectOne(`${base}/inv/investigations/inv-1/ops`);
+        expect(op.request.body).toEqual({ op: 'annotate', ids: ['a'], note: 'burner pattern' });
+        op.flush({});
+
+        svc.investigationCoverage('inv-1', { from: '2026-09-01T00:00:00Z', to: '2026-09-08T00:00:00Z' }).subscribe();
+        const cov = httpMock.expectOne((r) => r.url === `${base}/inv/investigations/inv-1/coverage`);
+        expect(cov.request.method).toBe('GET');
+        expect(cov.request.params.get('from')).toBe('2026-09-01T00:00:00Z');
+        expect(cov.request.params.get('to')).toBe('2026-09-08T00:00:00Z');
+        expect(cov.request.params.has('timezone')).toBe(false);
+        cov.flush({});
+
+        svc.investigationCoverage('inv-1').subscribe(); // no params — the server uses the Investigation's window
+        const own = httpMock.expectOne((r) => r.url === `${base}/inv/investigations/inv-1/coverage`);
+        expect(own.request.params.keys()).toEqual([]);
+        own.flush({});
+    });
+
     it('reads the log with GET and an optional limit', () => {
         svc.investigationLog('inv-1', 50).subscribe();
         const req = httpMock.expectOne((r) => r.url === `${base}/inv/investigations/inv-1/log`);

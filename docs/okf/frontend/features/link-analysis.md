@@ -680,6 +680,20 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   available to you*. ⛔ A Live Widget cannot leave the Space: the Exchange refuses Working Set Widgets (Frozen too,
   per D-E7), a bundle export converts Live → Frozen at its pin (`converted`). As-built:
   `docs/superpower/link-analysis-backlog-plan.md` §5.8.
+* **Annotation and the coverage indicator** (LA-19; backend 2026-09-24 in `InvestigationRoutes` /
+  `InvestigationEvaluator` / `InvestigationCoverageRoutes`, SPA half the same day in the Investigation panel).
+  *Annotate* sends `{op:'annotate', ids, note}` (note required, ≤ 2 000 chars) for the selected entity's Working
+  Set ids through the same `store.apply` path as exclude; the notes render from the sealed state's
+  `annotations` (ABSENT when empty) as an *Annotations* list and under the selected entity, and the log line is
+  the server's own text. Undo needs nothing special: the store re-reads `/replay`, whose state no longer carries
+  the note. A 422 (an id not in the Working Set, an over-long note) is the panel's error alert. ⛔ `confidence`
+  is never asked or sent — its scale is undecided (D-U9) and the server refuses it. *Check coverage* reads
+  `GET …/coverage` with NO query parameters, i.e. over the Investigation's own window (the service accepts
+  `from`/`to`/`timezone`; no picker asks for them yet), and names every day with zero rows in the window's zone,
+  or says every day has data; it always states that per-Collector coverage is not assessed
+  (`collectors.assessed:false`). A result is shown only while its Investigation is the open one. ⚠ The route
+  needs a `timeCol` in the header and a bounded window, and *Start Investigation* sends no `timeCol` — so an
+  Investigation started from this panel answers coverage with a 422, shown verbatim.
 * ✅ **The feed is INGESTED, not merely authored** (verified end to end 2026-09-23): 1 283/1 283 rows land
   across three Hive partitions, `rejected_files=0`, `rejected_rows=0`, `cast_failures=0`, and every row
   reconciles to the source PSV by `REC_SEQ` with zero value mismatches. `IMEI` keeps its leading zeros as
