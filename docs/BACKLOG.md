@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **35<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3** —
+> **35<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 15<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -24,8 +24,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 14<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 15<!--count:backlog-p3--> P3 rows are mostly a list of things
 > deliberately NOT being built, and reading all 35<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
@@ -34,7 +34,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 |---|---|---|---|
 | [3.1](#31-pipelines--authoring-editor--step-catalog) | Pipelines — authoring, editor & Step catalog | [record-transformer-replaces-map-plan.md](superpower/record-transformer-replaces-map-plan.md) · [dead-property-validation-plan.md](superpower/dead-property-validation-plan.md) · [ai-drafting-non-schema-design.md](superpower/ai-drafting-non-schema-design.md) | — |
 | [3.2](#32-pipelines--execution-lanes--consignments) | Pipelines — execution, lanes & Consignments | [platform-services-stage2-design.md](superpower/platform-services-stage2-design.md) | Row 15 · X5 |
-| [3.3](#33-acquisition-collectors--parsing) | Acquisition, Collectors & Parsing | [parser-field-tiers-interview-plan.md](superpower/parser-field-tiers-interview-plan.md) · [parser-plugins-trust-design.md](superpower/parser-plugins-trust-design.md) | D13 |
+| [3.3](#33-acquisition-collectors--parsing) | Acquisition, Collectors & Parsing | [parser-field-tiers-interview-plan.md](superpower/parser-field-tiers-interview-plan.md) | D13 |
 | [3.4](#34-catalog-onboarding-datasets--lineage) | Catalog, Onboarding, Datasets & Lineage | — | — |
 | [3.5](#35-data-quality-observability-signals--alerting) | Data quality, Observability, Signals & Alerting | [completeness-kpi-k4-design.md](superpower/completeness-kpi-k4-design.md) · [cross-space-consequence-design.md](superpower/cross-space-consequence-design.md) · [ses-sns-adapter-design.md](superpower/ses-sns-adapter-design.md) | OPS-5 · Completeness KPI hold |
 | [3.6](#36-analytics--queries-bi-studio--export) | Analytics — Queries, BI, Studio & Export | — | — |
@@ -58,9 +58,9 @@ rank.
 
 | State | P2 rows |
 |---|---|
-| **Startable now** — no gate, no owed decision | Bundle "load as draft" slice 5, authored Pipeline (§3.7) · parser plugins: P0 staging dir + the Decode Profile slices C1–C4 (§3.3) |
+| **Startable now** — no gate, no owed decision | Bundle "load as draft" slice 5, authored Pipeline (§3.7) |
 | **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | Platform Services Stage 2/3 (§3.2) · `findings-spec` acceptance session with a Case-desk lead (§3.9) · cross-Space consequence (§3.5, ⏸ on hold until D10 is named) |
-| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (SES/SNS adapter ON HOLD by operator 2026-09-25; per-user preferences need a call) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) · `DUCKLE-C1-DATASET-FRESHNESS-1` residual (2) (needs a design pass, §3.5) |
+| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Deployment topology GAP-4 · `D8-SES-SNS-1` (SES/SNS adapter ON HOLD by operator 2026-09-25; per-user preferences need a call) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) · `DUCKLE-C1-DATASET-FRESHNESS-1` residual (2) (needs a design pass, §3.5) |
 
 **Standing rules for editing this board** (distilled from the shifts that grew the old page to 644 KB):
 
@@ -99,7 +99,6 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 |---|---|---|
 | 3.12 | Link Analysis | every open D-U* / LA-* call lives in `superpower/link-analysis-backlog-plan.md` |
 | 3.2 | Platform Services Stage 2 / 3 | 10 calls in `superpower/platform-services-stage2-design.md` (Decisions owed) |
-| 3.3 | Parsing (Stage-1) — parser-plugin trust | none — all ten calls answered 2026-09-25 (see the row) in `superpower/parser-plugins-trust-design.md` (Decisions owed) |
 | 3.5 | cross-Space consequence | ⏸ ON HOLD 2026-09-25 (operator) until someone names the concrete consequence (D10); D2 two-party consent stands |
 | 3.5 | `D8-SES-SNS-1` | ⏸ adapter ON HOLD 2026-09-25 (D1–D12 parked); D13 answered by per-user read state; D14 done 2026-09-25 (the category label is now "Security"; id `security` unchanged); open: the per-user preferences design, §7 of `superpower/ses-sns-adapter-design.md` |
 | 3.7 | Bundle "load as draft" | none — all eight calls answered 2026-09-25: D1 in-memory · D2 save via the pane's route · D3 advisory findings · D4 write-through prerequisites first · D5 Dashboard/Widget/Dataset, then authored Pipeline, then LA/Geo views, never `connection` · D6 existing id ⇒ unsaved edits + diff · D7 as-built in the Metadata Bundles concept · D8 "Import as draft…" beside "Import…" in editors only |
@@ -182,7 +181,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Parsing
 
-- **P2** · **Parsing (Stage-1)** — the ASN.1 grammar from a stored, path-jailed `.asn`/`.asn1` file shipped 2026-09-23, with its bundle residual. **Still open:** a per-vendor transform config home (the grammar file was its prerequisite); a drop-in `plugins/` jar directory (the JobPackManager classloader precedent) so a customer parser deploys without a rebuild — **Decided 2026-09-25 (operator):** load parsers through the existing Job Pack loader with a **SHA-256 allowlist required** (a signer check optional on top), and with no allowlist configured **refuse every jar**, Job Packs included (breaking; D2 + D3). Also decided 2026-09-25: **D1** parsers arrive as a fifth Job Pack kind through the existing loader (one dynamic-code door); **D4** previewing a pack-contributed parser needs the Pipeline-authoring capability (built-ins stay exempt); **D7** no edition gate — the trust gate is identical in every edition; **D8** the out-of-process parser host is deferred until a customer requires running unreviewed parser code. And **D5** an override replaces `segments` whole · **D6** bundle export carries the profile as its own file and rewrites refs, refusing basename collisions · **D9** the explode-style option for repeated children is deferred until prevalence is measured over the vendor grammars (a main-checkout task — the corpus is gitignored) · **D10** the satellite is named **Decode Profile** (add to `GLOSSARY.md`). All ten calls are answered. ✅ **Slice P1, the trust gate, SHIPPED 2026-09-25**: `-Djobs.packs.allowlist=<file>` (`<sha256>  <file>  [note]` per line, `sha256sum` output works); no allowlist ⇒ every jar refused, Job Packs included (breaking); re-read on every rescan (revoking unloads); the hash is of the staged bytes the classloader reads; refused jars appear in `GET /jobs/packs` as `state: "rejected"`. ✅ **P2–P4 SHIPPED 2026-09-25**: a parser is the fifth Job Pack kind (a colliding id or ingester class refuses and rolls back the whole pack; `GET /parsers` rows carry `source: builtin|classpath|pack:<jar>`), a pack parser's ingester loads through its own pack's loader with the pack leased for the whole batch, and previewing a pack parser needs `canAuthorWorkbench` (built-ins stay open). ⚠ Every Space's pack manager watches the same packs dir, so one Space unloading a pack removes its parser for all (node types already behave this way). **Next:** the P0 server-owned staging dir, P5 (update `jobs.md`, archive the plan), then the Decode Profile slices C1–C4. **Design + 10 owed decisions: [`superpower/parser-plugins-trust-design.md`](superpower/parser-plugins-trust-design.md)** (2026-09-24). ⚠ `asn-parser/src/main/java` is NOT dead (compiled by `legacy-code/pom.xml`); corpus tests are opt-in and data-gated (DATA-GOV-1). → `okf/backend/engine/parser-plugins.md`
+- **P3** · **Parsing (Stage-1) — residuals** — ✅ **everything the trust design scoped SHIPPED 2026-09-25** (all ten calls answered that day): the Job Pack SHA-256 allowlist (`-Djobs.packs.allowlist`, no allowlist ⇒ every jar refused — breaking), staged copies in a server-owned dir, parsers as the fifth pack kind, pack-loader ingest with a lease for the whole batch, the pack-parser preview gate, and the per-vendor **Decode Profile** (`asn1.profile_file` → `*.decode.toon`; the Pipeline overrides key by key, `segments` replaced whole; carried as its own file in bundles). As-built: `okf/backend/engine/parser-plugins.md`; design archived. Re-ranked P2 → P3: what is left is small or deferred by decision — the Parse drawer shows served defaults instead of the profile's values for keys the profile sets (save and preview are correct); a crashed process leaves an inert staging dir; D9 needs repeated-children prevalence counted over the vendor grammars (a main-checkout task — the corpus is gitignored); D8's out-of-process host and T2 signer anchoring stay deferred. ⚠ `asn-parser/src/main/java` is NOT dead (compiled by `legacy-code/pom.xml`); corpus tests are opt-in and data-gated (DATA-GOV-1). → `okf/backend/engine/parser-plugins.md`
 
 ### 3.4 Catalog, Onboarding, Datasets & Lineage
 

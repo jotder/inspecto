@@ -13,7 +13,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * Trust gate T1 for Job Packs ({@code docs/superpower/parser-plugins-trust-design.md} §3, slice P1): the
+ * Trust gate T1 for Job Packs ({@code docs/archived-documents/plans-archive/parser-plugins-trust-design.md} §3, slice P1): the
  * operator-owned {@code -Djobs.packs.allowlist} file of SHA-256 hashes a pack jar must match to load.
  *
  * <p>Format — one jar per line, {@code sha256sum} output works as-is:

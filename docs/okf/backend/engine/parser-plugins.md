@@ -327,7 +327,7 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   without the data; the data alone no longer runs them without the property (2026-08-01).
 - **Drop-in parser jars** and the **segments editor** (unlock guided Save for ingestable custom parsers)
   — apply to any custom parser, not ASN.1-specific. The drop-in half's design is
-  [`parser-plugins-trust-design.md`](../../../superpower/parser-plugins-trust-design.md) (every slice
+  [`parser-plugins-trust-design.md`](../../../archived-documents/plans-archive/parser-plugins-trust-design.md) (every slice
   shipped 2026-09-25; kept in `superpower/` only until the BACKLOG row's link to it is repointed). What
   shipped is below; this concept is now the current knowledge, the design is provenance.
 
