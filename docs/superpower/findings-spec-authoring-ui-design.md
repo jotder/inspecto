@@ -395,22 +395,34 @@ suite, closes the BACKLOG row (D10).
 2. **D2 — Scope to Case only?** Four object types are authorable, but only Case renders Findings.
    *Recommend Case only*, with the dialog parameterised on type so Incident is a later one-line entry if a
    panel ever renders it.
+   **DECIDED (2026-09-25, operator): Case only**, the dialog parameterised on object type (`data.objectType`).
 3. **D3 — Canonical storage for Findings values** (§2.4, S0). (a) the server reads `attributes.findings`
    (the blob) for validation; (b) the panel writes each field as a top-level attribute key and drops the
    blob. *Recommend (a):* no data migration, and existing Cases keep working. But this must be decided
    **before** analysts can author `required`.
+   **DECIDED (2026-09-25, operator): (a).** Shipped in S0: `FindingsSpec.validateFindings` judges the blob
+   as it will be stored; top-level keys are ordinary attributes (as-built in `objects.md`).
 4. **D4 — Dialog or routed settings section?** *Recommend dialog* in the Cases toolbar, matching Case
    Rules and Tag Rules.
+   **DECIDED (2026-09-25, operator): dialog** from the Cases toolbar.
 5. **D5 — Expose the `advanced` tier?** For Findings it means "behind the gear" in a triage panel.
    *Recommend no:* offer Always / Under *More* only, and keep `advanced` readable when present.
+   **DECIDED (2026-09-25, operator): no** — Always / Under *More* only; a stored `advanced` stays readable
+   and survives a save untouched.
 6. **D6 — Expose `pattern`, `identifier`, `list`, `autocomplete` at all?** *Recommend under "Technical
    details" only*, never in the default path.
+   **DECIDED (2026-09-25, operator): only under a collapsed "Technical details" section.**
 7. **D7 — Removal impact:** build a count of Cases holding a value for a key or choice (a new read), or
    ship the generic warning only? *Recommend the generic warning first*, with the count as a follow-up
    row.
+   **DECIDED (2026-09-25, operator): the generic warning** (values stay stored but stop showing); no count read.
 8. **D8 — Components pane:** list `findings-spec` read-only with "Open in Cases", or keep it off that pane
    entirely? *Recommend off* until a builder asks.
+   **DECIDED (2026-09-25, operator): off** the Components pane.
 9. **D9 — UI word:** "Findings field" (recommended) vs "Findings question". Either needs a GLOSSARY entry
    under *Findings*, since the wire says `section`.
+   **DECIDED (2026-09-25, operator): "Findings field"**, with a GLOSSARY entry under *Findings*.
 10. **D10 — Acceptance:** does one analyst think-aloud session (§8) close the row, or is a named pilot desk
     required? *Recommend one session with a real lead*, recorded in objects.md.
+    **DECIDED (2026-09-25, operator): one think-aloud session with a real Case-desk lead**, recorded in
+    `objects.md`. ⚠ **Owed** — the row does not close on the build alone.

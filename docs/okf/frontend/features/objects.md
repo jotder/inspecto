@@ -73,16 +73,24 @@ the real ControlApi.
   the Case desk that resolves Cases authors its Findings, so `operations`/`support`/`admin`/`power` may save
   one and the builder roles may not; every other component kind is unchanged
   ([auth-security.md](../../backend/editions/auth-security.md) has the route shape).
-  **Values are validated too, since 2026-07-26** — `FindingsSpec.validateValues(submitted, merged)`, called
-  from `ObjectRoutes.validateFindings` on `PATCH /objects/{id}` (→ **422**): `select` membership, `number`
-  with `min`/`max`, `boolean`, and `pattern`; a section hidden by its `dependsOn` against the merged bag is
-  skipped entirely (the form never showed it, so it cannot be required). Three rules are load-bearing:
-  * **An undeclared key is never rejected.** `attributes` is a *shared* bag (it also carries `tags`,
-    `caseType`, `dueAt`, …), so a key no section declares is indistinguishable from a non-Findings
-    attribute. What is enforced is that a **declared** key holds a value the renderer could have produced.
-  * **Nothing is judged unless the patch touches a declared key**, and `required` is judged against the
-    **merged** result — otherwise an unrelated attribute write starts failing because a triage form was left
-    incomplete, and a partial save is tested against a form it never claimed to submit.
+  **Values are validated too, since 2026-07-26** — `FindingsSpec.validateFindings(findings, previous)`,
+  called from `ObjectRoutes.validateFindings` on `PATCH /objects/{id}` (→ **422**): `select` membership,
+  `number` with `min`/`max`, `boolean`, and `pattern`; a section hidden by its `dependsOn` is skipped
+  entirely (the form never showed it, so it cannot be required). Four rules are load-bearing:
+  * **The `attributes.findings` JSON blob is the canonical home of Findings values** (D3 = (a), operator
+    2026-09-25 — no migration). Only a patch carrying `findings` is judged, and the blob is judged **as it
+    will be stored** (it replaces the stored one whole). 🔴 Until 2026-09-25 the gate judged **top-level**
+    attribute keys, where the panel never writes a Findings value: the panel's own saves were never
+    type-checked, and because it also sends the flat `impactAmount`/`recordsAffected` copies, a spec with a
+    `required: true` section refused **every correctly filled panel save** with 422 (reproduced by
+    `ControlApiFindingsSpecTest.theFindingsPanelsOwnSaveIsAcceptedWhenARequiredFieldIsFilled`). Top-level
+    keys — the flat copies included — are now ordinary attributes.
+  * **An undeclared key is never rejected** (inside the blob or out). `attributes` is a *shared* bag (it
+    also carries `tags`, `caseType`, `dueAt`, …), and a blob key no section declares is how a **removed**
+    field's stored value survives (D7).
+  * **An unchanged stored value is not re-judged.** The panel re-sends the whole blob on every save, and a
+    spec edit (a removed choice, a tightened bound) keeps the values Cases already hold; re-judging them would
+    refuse an edit to some *other* field on that Case. A changed value is always judged.
   * **The gate is in `ObjectRoutes`, not `ObjectService`** — the spec lives in the space's `ComponentStore`,
     an edge concern; the engine stays store-agnostic. `effectiveFindingsSpec` was extracted out of
     `findingsSpecOf` so the read route and the write gate resolve the same spec exactly once.
@@ -122,8 +130,10 @@ the real ControlApi.
     an unreadable state on disk degrades to the built-in with a logged warning rather than 500ing triage.
   * **UI consequences:** `Findings` is now an open `Record<string, string>` (`mail-model.ts`), the panel's
     team + target date moved to a sibling `teamForm` (they are C6, not Findings), the flat
-    `impactAmount`/`recordsAffected` copies the C4 analytics roll-up sums are written **only while those
-    sections are configured**, and the soft no-disposition prompt on resolve **only fires while
+    `impactAmount`/`recordsAffected` copies the C4 analytics roll-up sums are written **on every Findings
+    save** — as `''` when the section is not configured, so removing those sections blanks the roll-up for
+    each Case as it is next saved (corrected 2026-09-25; this line used to say "only while configured",
+    which the code never did) — and the soft no-disposition prompt on resolve **only fires while
     `disposition` is a configured section**. `CASE_DISPOSITIONS` was removed from `mail-model.ts` — the
     ladder now lives in the backend default, which is its only home *(the offline mock backend was deleted 2026-08-31)*.
 

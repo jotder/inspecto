@@ -26,6 +26,7 @@ import com.gamma.ops.tag.CaseRule;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.util.AtomicFiles;
+import com.gamma.util.JsonAttributes;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -735,24 +736,41 @@ public final class ObjectRoutes implements RouteModule {
     }
 
     /**
-     * Judge a submitted attributes bag against the object's effective Findings spec (BACKLOG D6 residual)
+     * Judge a submitted Findings blob against the object's effective Findings spec (BACKLOG D6 residual)
      * → 422. The spec configures the <em>form</em>, so before this a direct {@code PATCH} could store a
      * disposition no ladder offers or skip a {@code required} field the UI enforces.
+     *
+     * <p>Only {@code attributes.findings} is judged — the JSON blob the Findings panel writes, which D3 =
+     * (a) (operator 2026-09-25) made the canonical home of Findings values. A patch that carries no blob
+     * does not submit the form, so nothing is judged; top-level keys (the panel's flat
+     * {@code impactAmount}/{@code recordsAffected} copies, {@code tags}, …) are ordinary attributes.
      *
      * <p>Resolved here rather than in {@code ObjectService} because the spec lives in the space's
      * {@code ComponentStore}, which is an edge concern — the engine stays store-agnostic. An unknown id is
      * left to the patch itself to 404.
      */
     private static void validateFindings(ApiContext api, String id, Map<String, String> attrs) {
+        if (!attrs.containsKey(FINDINGS_ATTR)) return;
         OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
         if (o == null) return;
-        Map<String, String> merged = new LinkedHashMap<>(o.attributes());
-        merged.putAll(attrs);
         try {
-            effectiveFindingsSpec(api, o.objectType()).validateValues(attrs, merged);
+            effectiveFindingsSpec(api, o.objectType()).validateFindings(
+                    findingsBlob(attrs.get(FINDINGS_ATTR)), findingsBlob(o.attributes().get(FINDINGS_ATTR)));
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
+    }
+
+    /** The attribute holding the Findings panel's values as one JSON object (D3). */
+    private static final String FINDINGS_ATTR = "findings";
+
+    /** A stored/submitted Findings blob as flat strings; absent or unreadable → empty (then judged as blank). */
+    private static Map<String, String> findingsBlob(String json) {
+        Map<String, String> out = new LinkedHashMap<>();
+        JsonAttributes.fromPayloadJson(json).forEach((k, v) -> {
+            if (v != null) out.put(k, v.toString());
+        });
+        return out;
     }
 
     /** {@code POST /objects/{id}/ack|resolve} — a fixed-action transition; {@code actor} from the body. */

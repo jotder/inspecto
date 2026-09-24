@@ -238,43 +238,50 @@ public record FindingsSpec(String objectType, List<Section> sections) {
 
     /**
      * Fail-closed check of a submitted Findings blob against this spec, throwing
-     * {@link IllegalArgumentException} (→ 422) on the first violation. Findings land as plain
-     * {@code attributes} strings on {@code PATCH /objects/{id}}, so without this a non-UI writer can store
-     * a value the form could never have produced.
+     * {@link IllegalArgumentException} (→ 422) on the first violation, so a non-UI writer cannot store a
+     * value the form could never have produced.
      *
-     * <p>Two deliberate scoping rules, because {@code attributes} is a <b>shared</b> bag (it also carries
-     * {@code tags}, {@code caseType}, {@code dueAt}, …) and the PATCH is a <b>merge</b>:
+     * <p><b>The blob is the canonical home of Findings values</b> (D3 = (a), operator 2026-09-25): the
+     * panel writes the whole form as one JSON object, {@code attributes.findings}, on every save. Before D3
+     * this judged <em>top-level</em> attribute keys, which is where Findings never live — so the panel's
+     * own writes were never type-checked, and its flat {@code impactAmount}/{@code recordsAffected} copies
+     * made a save "touch" the form and then fail a {@code required} section against a bag that could not
+     * hold it (findings-spec-authoring-ui-design §2.4). The flat copies are now ordinary attributes.
+     *
+     * <p>Rules:
      * <ul>
-     *   <li><b>Undeclared keys are not rejected.</b> A key no section declares cannot be told apart from a
-     *       non-Findings attribute, so rejecting it would break tagging and every other attribute writer.
-     *       What is enforced is that a <em>declared</em> key holds a value the renderer could produce.</li>
-     *   <li><b>Nothing is checked unless the patch touches at least one declared key</b>, and
-     *       {@code required} is then judged against the <em>merged</em> result — a partial save cannot be
-     *       tested against a form it never claimed to submit, and an unrelated attribute write must not
-     *       start failing because a triage form was left incomplete.</li>
+     *   <li>{@code findings} is the blob <em>as it will be stored</em> — it replaces the stored one whole,
+     *       so {@code required} and {@link DependsOn} visibility are judged against it alone.</li>
+     *   <li>A section hidden by its {@link DependsOn} is skipped entirely — the form never showed it, so it
+     *       cannot be required.</li>
+     *   <li><b>An unchanged stored value is not re-judged.</b> The panel re-sends every value on every save,
+     *       and a spec edit (a removed choice, a tightened bound) keeps the values Cases already hold (D7);
+     *       re-judging them would refuse an edit to some <em>other</em> field on that Case.</li>
+     *   <li>A key no section declares is ignored — that is how a removed field's stored value survives.</li>
      * </ul>
-     * A section hidden by its {@link DependsOn} against the merged bag is skipped entirely — the form never
-     * showed it, so it cannot be required.
      *
-     * @param submitted the attributes bag as sent
-     * @param merged    the bag as it will be stored (stored ∪ submitted)
+     * @param findings the submitted blob, as flat strings
+     * @param previous the blob currently stored (empty when none)
      */
-    public void validateValues(Map<String, String> submitted, Map<String, String> merged) {
-        if (submitted == null || submitted.isEmpty()) return;
-        boolean touches = sections.stream().anyMatch(s -> submitted.containsKey(s.key()));
-        if (!touches) return;
+    public void validateFindings(Map<String, String> findings, Map<String, String> previous) {
+        Map<String, String> now = findings == null ? Map.of() : findings;
+        Map<String, String> before = previous == null ? Map.of() : previous;
         for (Section s : sections) {
-            if (hidden(s, merged)) continue;
-            String value = merged == null ? null : merged.get(s.key());
+            if (hidden(s, now)) continue;
+            String value = now.get(s.key());
             if (value == null || value.isBlank()) {
                 if (Boolean.TRUE.equals(s.required()))
                     throw new IllegalArgumentException("findings field '" + s.key() + "' ("
                             + s.label() + ") is required");
                 continue;
             }
-            if (!submitted.containsKey(s.key())) continue;   // an untouched stored value is not re-judged
+            if (value.trim().equals(trimmed(before.get(s.key())))) continue;   // unchanged: not re-judged
             checkValue(s, value.trim());
         }
+    }
+
+    private static String trimmed(String v) {
+        return v == null ? null : v.trim();
     }
 
     /** Whether {@code s} is conditionally hidden by its {@code dependsOn} against the merged bag. */
