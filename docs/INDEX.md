@@ -38,9 +38,12 @@
 - [`REQUIREMENTS.md`](REQUIREMENTS.md) — **requirements-of-record**: the full platform requirement set with
   MoSCoW, edition mapping, NFRs, sequencing. ⚠ [`EDITIONS.md`](EDITIONS.md) is authoritative for the Edition
   column; this table mirrors it.
-- [`BACKLOG.md`](BACKLOG.md) — **the one board of open work**, grouped by what has to happen next: §0 priority
-  · §1 operator decisions · §2 externally gated · §3 unbuilt features · §4 tech-debt · §5 docs · §6 standing
-  refusals · §7 duplicate map. **Open work only** — closed rows are deleted, not struck through.
+- [`BACKLOG.md`](BACKLOG.md) — **the one board of open work**, grouped by **product area → functionality**
+  (consolidated 2026-09-24; the previous 644 KB page is frozen as
+  [`archived-documents/backlog-snapshot-2026-09-24.md`](archived-documents/backlog-snapshot-2026-09-24.md)):
+  area index · §0 priority · §1 operator decisions · §2 externally gated · §3.1–§3.12 product areas · §4
+  engineering platform · §5 docs & board hygiene · §6 standing refusals · §7 duplicate map. **Open work
+  only** — closed rows are deleted, not struck through.
 - [`FEATURE_INVENTORY.md`](FEATURE_INVENTORY.md) — every feature's TOON shape + where defined, examples,
   packaging, runnability. Pairs with the runnable suite in [`../inspecto/examples/`](../inspecto/examples).
 - [`ADVANCED_GUIDE.md`](ADVANCED_GUIDE.md) — **Advanced Operations & Internals Guide** (the production
