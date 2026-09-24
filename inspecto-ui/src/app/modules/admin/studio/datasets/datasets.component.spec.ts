@@ -2,10 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { ExchangeService, SessionService, SpacesService } from 'app/inspecto/api';
+import { AlertsService, EventsService, ExchangeService, SessionService, SpacesService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { Dataset } from './dataset-types';
@@ -22,7 +22,10 @@ const D1: Dataset = {
     calculated: [],
 };
 
-function create(datasets: Dataset[] = [D1], opts: { canShare?: boolean; offerResult?: { description: string } } = {}) {
+function create(
+    datasets: Dataset[] = [D1],
+    opts: { canShare?: boolean; offerResult?: { description: string }; signals?: ReturnType<typeof vi.fn> } = {},
+) {
     const remove = vi.fn(() => of(null));
     const offer = vi.fn(() => of({} as never));
     const dialog = { open: () => ({ afterClosed: () => of(opts.offerResult) }) };
@@ -54,6 +57,11 @@ function create(datasets: Dataset[] = [D1], opts: { canShare?: boolean; offerRes
             },
             { provide: ExchangeService, useValue: { offer } },
             { provide: SpacesService, useValue: { currentSpaceId: () => 'default' } },
+            { provide: EventsService, useValue: { signals: opts.signals ?? vi.fn(() => of([])) } },
+            {
+                provide: AlertsService,
+                useValue: { rules: () => of([{ name: 'fr', dataset: 'cdr_view', maximumAge: '1h' }]) },
+            },
         ],
     });
     TestBed.overrideProvider(MatDialog, { useValue: dialog });
@@ -61,6 +69,25 @@ function create(datasets: Dataset[] = [D1], opts: { canShare?: boolean; offerRes
 }
 
 describe('DatasetsComponent', () => {
+    it('renders a read-time freshness badge from the dataset.write ledger (DUCKLE-C1 residual 4)', async () => {
+        const signals = vi.fn(() => of([{ ts: Date.now() - 60_000 }]));
+        const { fixture } = create([D1], { signals });
+        fixture.detectChanges();
+        expect(signals).toHaveBeenCalledWith({ type: 'dataset.write', source: 'dataset:cdr_view', limit: 500 });
+        const badges = Array.from(fixture.nativeElement.querySelectorAll('inspecto-status-badge')).map((e) =>
+            (e as HTMLElement).textContent?.trim(),
+        );
+        expect(badges).toContain('Fresh');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('fails to unknown when the ledger read errors', () => {
+        const { fixture } = create([D1], { signals: vi.fn(() => throwError(() => new Error('x'))) });
+        fixture.detectChanges();
+        expect(fixture.componentInstance.freshness()['cdr_view'].state).toBe('unknown');
+        expect(fixture.nativeElement.textContent).toContain('Freshness unknown');
+    });
+
     it('loads datasets on init', () => {
         const { fixture } = create();
         fixture.detectChanges();

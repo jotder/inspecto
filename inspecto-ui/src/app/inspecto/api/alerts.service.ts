@@ -33,6 +33,10 @@ export interface AlertRule {
      * and before the metric aggregates them. Ledger-metric rules only (no `dataset`/`measure` rule).
      */
     when?: ConditionGroup | null;
+    /** A Dataset-scoped rule's Dataset id (measure or freshness rule). */
+    dataset?: string | null;
+    /** Freshness rule (DUCKLE-C1): the Dataset must have published within this (`Ns|Nm|Nh|Nd`). */
+    maximumAge?: string | null;
 }
 
 /** Create/update body — the whole rule is authorable; `name` is the identity (immutable on edit). */

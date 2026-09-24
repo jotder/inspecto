@@ -79,6 +79,13 @@
                                     matTooltip="Bound to a dataset shared by another space"
                                 />
                             }
+                            @if (freshnessBadge(d); as fb) {
+                                <inspecto-status-badge
+                                    [value]="fb.value"
+                                    [label]="fb.label"
+                                    [matTooltip]="fb.tooltip"
+                                />
+                            }
                             <span
                                 >source: <span class="font-mono">{{ d.sourceName }}</span></span
                             >

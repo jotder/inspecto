@@ -6,8 +6,12 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { catchError, of } from 'rxjs';
 import {
+    AlertRule,
+    AlertsService,
     apiErrorMessage,
+    EventsService,
     ExchangeService,
     LensService,
     parseSharedRef,
@@ -24,6 +28,13 @@ import { BindSharedDatasetDialog, BindSharedDatasetResult } from './bind-shared-
 import { TagAssignmentDialog } from 'app/inspecto/tags/tag-assignment.dialog';
 import { buildDataset, Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
+import {
+    DatasetFreshness,
+    deriveFreshness,
+    FRESHNESS_SIGNAL_LIMIT,
+    freshnessBadge,
+    maximumAgeFor,
+} from './dataset-freshness';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
@@ -65,6 +76,8 @@ export class DatasetsComponent implements OnInit {
     private dialog = inject(MatDialog);
     private exchange = inject(ExchangeService);
     private spaces = inject(SpacesService);
+    private events = inject(EventsService);
+    private alerts = inject(AlertsService);
 
     /** Offering is available only on a multi-space runtime (bootstrap.features.exchange) **and** to a
      *  subject holding `canOfferDatasets` — the server gates `POST /exchange/offers` on it (D14: Admin
@@ -78,6 +91,8 @@ export class DatasetsComponent implements OnInit {
     readonly loading = signal(false);
     readonly writesDisabled = signal(false);
     readonly filterText = signal('');
+    /** Per-Dataset freshness, derived at read time; absent = still checking. Never persisted. */
+    readonly freshness = signal<Record<string, DatasetFreshness>>({});
 
     readonly visibleDatasets = computed(() => {
         const q = this.filterText().trim().toLowerCase();
@@ -101,6 +116,7 @@ export class DatasetsComponent implements OnInit {
             next: (d) => {
                 this.datasets.set(d);
                 this.loading.set(false);
+                this.loadFreshness(d);
             },
             error: () => {
                 this.datasets.set([]);
@@ -108,6 +124,36 @@ export class DatasetsComponent implements OnInit {
                 this.toastr.warning('Could not load datasets — is ControlApi running?');
             },
         });
+    }
+
+    /**
+     * Freshness badges (DUCKLE-C1 residual 4). Loaded AFTER the cards render, one rules fetch plus one
+     * ledger read per Dataset, each resolving into its own card — nothing blocks the list. Every failure
+     * lands on `unknown`; a failed rules fetch just means no declared limit (never a `fresh` verdict).
+     */
+    private loadFreshness(datasets: Dataset[]): void {
+        this.freshness.set({});
+        if (!datasets.length) return;
+        this.alerts
+            .rules()
+            .pipe(catchError(() => of([] as AlertRule[])))
+            .subscribe((rules) => {
+                for (const d of datasets) {
+                    const maxAge = maximumAgeFor(Array.isArray(rules) ? rules : [], d.id);
+                    this.events
+                        .signals({ type: 'dataset.write', source: `dataset:${d.id}`, limit: FRESHNESS_SIGNAL_LIMIT })
+                        .pipe(catchError(() => of(null)))
+                        .subscribe((rows) =>
+                            this.freshness.update((m) => ({ ...m, [d.id]: deriveFreshness(rows, maxAge) })),
+                        );
+                }
+            });
+    }
+
+    /** Badge for a card, or null while its ledger read is in flight. */
+    freshnessBadge(d: Dataset): { value: string; label: string; tooltip: string } | null {
+        const f = this.freshness()[d.id];
+        return f ? freshnessBadge(f) : null;
     }
 
     onFilter(ev: Event): void {

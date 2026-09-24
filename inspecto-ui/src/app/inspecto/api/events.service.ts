@@ -113,7 +113,7 @@ export class EventsService {
         });
     }
 
-    signals(filter: { type?: string; limit?: number } = {}): Observable<EventRow[]> {
+    signals(filter: { type?: string; source?: string; limit?: number } = {}): Observable<EventRow[]> {
         return this.http
             .get<Signal[]>(apiUrl('/signals'), { params: toParams(filter as Record<string, unknown>) })
             .pipe(map((rows) => (Array.isArray(rows) ? rows : []).map(signalToEvent)));

@@ -208,6 +208,17 @@ list even when the catalog stops naming it (a `mat-select` whose value is absent
 Dataset's `sourceName` is **never defaulted**, because the old fallback named a key that does not exist
 and made a source-less Dataset read empty everywhere, indistinguishable from an empty store.
 
+**The Dataset list carries a freshness badge, derived at read time** (2026-09-24,
+`DUCKLE-C1-DATASET-FRESHNESS-1` residual 4; `studio/datasets/dataset-freshness.ts`). After the cards
+render, the list fetches `GET /alerts/rules` once and then, per Dataset, `GET /signals?type=dataset.write&source=dataset:<id>&limit=500`;
+each answer lands in its own card, so nothing blocks the list. The newest write is compared with the
+`maximumAge` (`Ns|Nm|Nh|Nd`) of a freshness Alert Rule naming that Dataset: within it ⇒ *Fresh*, beyond ⇒
+*Stale*; with no declared limit the badge shows *Published &lt;time&gt;*, never *Fresh*. An empty page or a
+failed read is *Freshness unknown* — `source` is filtered AFTER the store page is cut, so an empty answer
+means "not on this page", not "never published" (hence the 500 limit rather than 1). A failed rules fetch
+degrades to "no limit". ⛔ No stale flag is persisted (the `stale-tiles.ts` objection) and
+`CatalogOverlay`/`latestRunTime` is never read — a pipeline run is not a Dataset publication.
+
 **A Measure is a client-side `NamedMeasure`** — `{id, expression, label}` — authored per Dataset in the
 Dataset's Measures editor and previewed client-side. There is **no server-side Measure entity**: what
 crosses the wire is always a validated `{agg, field}` pair, so a named-Measure expression is exactly the
