@@ -64,6 +64,10 @@ above the generated commit list.
 - `POST /public/delivery-status/{adapterId}` refuses a body over **256 KiB** with **413
   `PAYLOAD_TOO_LARGE`** (a new, additive `ErrorCode`) and is throttled per caller IP (burst 60, then 5/s)
   with **429 `RATE_LIMITED`**. Providers retry a 429; a batch over 256 KiB must be split provider-side.
+- **Breaking (Professional/Enterprise):** `POST /notifications/read-all`, `POST /notifications/{id}/read`,
+  `DELETE /notifications/{id}` and `PUT /notifications/preferences` now require **`canAdminister`** (403
+  `PERMISSION_DENIED` otherwise). They were exempt as per-caller, but the feed state and the preference grid
+  are one shared state per Space. Personal (no authenticator) is unchanged.
 
 **Whole-pipeline dry run (2026-09-20, `PIPELINE-DRYRUN-1` step 5)**
 - `POST /runs/{name}/trigger?dryRun=true` runs a pipeline and **lands nothing** — no outputs, no audit or

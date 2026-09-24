@@ -37,12 +37,18 @@ final class NotificationRoutes implements RouteModule {
         api.get("/notifications", (e, m) -> feed(api, e));
         api.get("/notifications/stream", (e, m) -> stream(api, e));
         api.get("/notifications/unread-count", (e, m) -> Map.of("count", store(api).unreadCount()));
-        api.post("/notifications/read-all", (e, m) -> Map.of("updated", store(api).markAllRead()));
-        api.post("/notifications/([^/]+)/read", (e, m) -> store(api).markRead(ApiContext.name(m))
-                .map(Notification::toMap)
-                .orElseThrow(() -> new ApiException(404, "no notification '" + ApiContext.name(m) + "'")));
+        // ⚠ The feed's read/archive state and the preference grid are ONE shared state per Space (neither
+        // store has a recipient), so each write below changes every user's feed or delivery — admin-gated,
+        // not "self-service" (SEC review F2). Reads stay open.
+        api.post("/notifications/read-all", ApiContext.withCapability("canAdminister",
+                (e, m) -> Map.of("updated", store(api).markAllRead())));
+        api.post("/notifications/([^/]+)/read", ApiContext.withCapability("canAdminister",
+                (e, m) -> store(api).markRead(ApiContext.name(m))
+                        .map(Notification::toMap)
+                        .orElseThrow(() -> new ApiException(404, "no notification '" + ApiContext.name(m) + "'"))));
         api.get("/notifications/preferences", (e, m) -> api.service().notificationPreferences().grid());
-        api.put("/notifications/preferences", (e, m) -> savePreferences(api, api.body(e)));
+        api.put("/notifications/preferences", ApiContext.withCapability("canAdminister",
+                (e, m) -> savePreferences(api, api.body(e))));
         // Channel destinations admin CRUD (registered before the /notifications/{id} routes below, which
         // only match a single segment — "channels/{id}" is two, so there's no collision either way).
         api.get("/notifications/channels", (e, m) -> listChannels(api));
@@ -68,11 +74,11 @@ final class NotificationRoutes implements RouteModule {
         // back "no notification 'suppressions'". Found by ControlApiSuppressionsTest, 2026-09-07.
         // ⛔ Any future exact `/notifications/<word>` DELETE in another module must be added to this
         // lookahead; a literal path cannot otherwise outrank a parameterised one that was registered first.
-        api.delete("/notifications/(?!suppressions$)([^/]+)", (e, m) -> {
+        api.delete("/notifications/(?!suppressions$)([^/]+)", ApiContext.withCapability("canAdminister", (e, m) -> {
             if (!store(api).archive(ApiContext.name(m)))
                 throw new ApiException(404, "no notification '" + ApiContext.name(m) + "'");
             return Map.of("id", ApiContext.name(m), "deleted", true);
-        });
+        }));
     }
 
     /**

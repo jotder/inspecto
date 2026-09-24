@@ -68,6 +68,11 @@ the credential is in the URL, so they are the ones to re-check if share-token ha
 
 Each mutates **the calling user's own** notification state. ⛔ A capability gate here would be actively
 wrong: it would let an administrator decide whether you may mark *your own* notification read.
+
+> 🔴 **Corrected 2026-09-24 (SEC review F2): the premise above is false.** `NotificationStore` and
+> `NotificationPreferences` hold ONE state per Space with no recipient, so none of the four is "the calling
+> user's own" — each changes every user's feed or delivery. All four are now gated `canAdminister`; the
+> category is down to `POST /requirements` alone. See `okf/backend/editions/auth-security.md`.
 **No action.** ⚠ The one thing to verify separately is that they are scoped to the caller and cannot
 address another user's notifications — that is an *authorization-by-ownership* question, not a
 capability question, and this audit did not test it. → filed as a follow-up below.
