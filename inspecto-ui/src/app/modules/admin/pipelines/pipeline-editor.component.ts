@@ -85,7 +85,7 @@ import { PipelineChangeIdDialog, PipelineChangeIdResultData } from './pipeline-c
 import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
 import { PipelineSettingsDialog } from './pipeline-settings.dialog';
 import { PipelineHistoryDialog } from './pipeline-history.dialog';
-import type { PipelineSettings } from 'app/inspecto/api/pipelines.service';
+import type { PipelineHistoryRestore, PipelineSettings } from 'app/inspecto/api/pipelines.service';
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
 import { ViewPreviewDialog } from './view-preview.dialog';
@@ -1789,13 +1789,23 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
 
     /**
      * `PIPELINE-CONFIG-HISTORY-1`: the server-side versions of this Pipeline's config (one per successful
-     * save, newest 50 kept) with a read-only diff. Unlike undo/redo it survives a reload — and it is a
-     * read, so it opens nothing that can change the tab.
+     * save, the newest `keep` kept — a per-Space setting, 50 by default) with a diff and Restore. Unlike
+     * undo/redo it survives a reload. A restore is a SERVER save, so the tab's model is stale afterwards:
+     * it is dropped (undo/redo with it — they describe the replaced config) and reloaded from the server.
      */
     pipelineHistory(): void {
         const id = this.selectedId();
         if (!id) return;
-        this.dialog.open(PipelineHistoryDialog, { width: '56rem', maxWidth: '95vw', data: { id } });
+        this.dialog
+            .open(PipelineHistoryDialog, { width: '56rem', maxWidth: '95vw', data: { id, dirty: this.dirty() } })
+            .afterClosed()
+            .subscribe((restored?: PipelineHistoryRestore) => {
+                if (!restored || this.selectedId() !== id) return;
+                this.closeDefinition();
+                this.forgetTab(id);
+                this.select(id);
+                this.toast.success(`Restored v${restored.restored} of '${id}' — saved as v${restored.version}`);
+            });
     }
 
     /**

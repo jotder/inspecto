@@ -347,6 +347,35 @@ describe('PipelineEditorComponent', () => {
      * `POST /pipelines/import?name=<new>&conflict=refuse`. The server retargets identities and
      * directories and always lands `active: false`; the client no longer re-derives anything.
      */
+    /** PIPELINE-CONFIG-HISTORY-1: a restore is a SERVER save, so the tab's model is stale and is reloaded. */
+    describe('config history restore', () => {
+        it('reloads the tab from the server and drops its dirty state after a restore', () => {
+            dialog.open.mockReturnValue({
+                afterClosed: () => of({ pipeline: 'demo', restored: 3, version: 9, path: 'demo_pipeline.toon' }),
+            });
+            const c = make();
+            c.select('demo');
+            c.dirty.set(true);
+            api.pipelineGraphRaw.mockClear();
+            c.pipelineHistory();
+
+            expect(dialog.open.mock.calls[0][1].data).toEqual({ id: 'demo', dirty: true });
+            expect(api.pipelineGraphRaw).toHaveBeenCalledWith('demo');
+            expect(c.dirty()).toBe(false);
+            expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('v3'));
+        });
+
+        it('leaves the tab alone when the dialog closes without a restore', () => {
+            dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+            const c = make();
+            c.select('demo');
+            api.pipelineGraphRaw.mockClear();
+            c.pipelineHistory();
+
+            expect(api.pipelineGraphRaw).not.toHaveBeenCalled();
+        });
+    });
+
     describe('duplicate pipeline', () => {
         it('posts the server zip under the typed name and opens the copy as a tab', () => {
             dialog.open.mockReturnValue({ afterClosed: () => of({ name: 'demo copy' }) });

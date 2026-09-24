@@ -2551,7 +2551,35 @@
         "tags" : [ "pipelines" ],
         "summary" : "Read one kept config version",
         "operationId" : "getPipelinesByPipelineIdHistoryByHistoryId",
-        "description" : "Returns {version, savedAt, bytes, pipeline, text} where text is the version's TOON. 400 for a non-numeric version, 404 for one that is not kept.",
+        "description" : "Returns {version, savedAt, bytes, pipeline, id, text}: text is the version's TOON, id the Pipeline id it declares (it differs from pipeline for a version saved before a rename, which restore refuses). 400 for a non-numeric version, 404 for one that is not kept.",
+        "parameters" : [ {
+          "name" : "pipelineId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "historyId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/pipelines/{pipelineId}/history/{historyId}/restore" : {
+      "post" : {
+        "tags" : [ "pipelines" ],
+        "summary" : "Restore one kept config version",
+        "operationId" : "postPipelinesByPipelineIdHistoryByHistoryIdRestore",
+        "description" : "Saves the version's exact bytes over the Pipeline's registered config file through the same content gate every save runs, records the result as a NEW version and refreshes the registry. Returns {pipeline, restored, version, path, findings}. Gated on canAuthorWorkbench. 503 writes disabled; 404 unknown/unregistered Pipeline or version not kept; 400 non-numeric version; 422 the version fails today's gate; 403 the registered file is outside the write root; 409 the version declares another Pipeline id (saved before a rename) or a stale If-Match.",
         "parameters" : [ {
           "name" : "pipelineId",
           "in" : "path",
@@ -7214,6 +7242,30 @@
           }
         },
         "x-generated" : true
+      }
+    },
+    "/settings/pipeline-history" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "Read the Space's Pipeline config-history retention",
+        "operationId" : "getSettingsPipelineHistory",
+        "description" : "Returns {keep, effectiveKeep, defaultKeep, maxKeep}: the config versions kept per Pipeline (PIPELINE-CONFIG-HISTORY-1). keep null = the shipped default (50), a default the operator can change.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "Set the Space's Pipeline config-history retention",
+        "operationId" : "putSettingsPipelineHistory",
+        "description" : "Body {keep}: an integer 1..1000, or null for the shipped default; anything else is 422, never clamped. Stored as pipeline-history.toon in the Space's config root; a lower value prunes on each Pipeline's next save. Gated on canAuthorWorkbench; 503 when writes are disabled.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
       }
     },
     "/inv/schema/overlap-profile" : {

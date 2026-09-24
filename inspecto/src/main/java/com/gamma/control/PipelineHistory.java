@@ -21,8 +21,10 @@ import java.util.stream.Stream;
 
 /**
  * A Pipeline's persisted config history ({@code PIPELINE-CONFIG-HISTORY-1}, operator decision 2026-09-24):
- * a snapshot of the {@code *_pipeline.toon} bytes after every successful save, the newest {@value #KEEP}
- * kept per Pipeline (the editor's in-session undo cap), oldest pruned.
+ * a snapshot of the {@code *_pipeline.toon} bytes after every successful save, the newest {@link #keep} kept
+ * per Pipeline, oldest pruned. Retention is a per-Space setting ({@link PipelineHistorySettings},
+ * {@code pipeline-history.toon}); unset, it is {@value PipelineHistorySettings#DEFAULT_KEEP} (the editor's
+ * in-session undo cap) — a default the operator can change. Lowering it prunes on the NEXT save.
  *
  * <p><b>Layout</b> — {@code <write-root>/.history/pipelines/<pipelineId>/v<N>.toon}, {@code N} monotonic
  * per Pipeline (never reused after a prune), {@code savedAt} = the snapshot file's modification time.
@@ -45,9 +47,6 @@ final class PipelineHistory {
 
     private static final Logger log = LoggerFactory.getLogger(PipelineHistory.class);
 
-    /** Versions kept per Pipeline — the editor's in-session undo cap (operator 2026-09-24). */
-    static final int KEEP = 50;
-
     private static final Pattern FILE = Pattern.compile("v(\\d{1,9})\\.toon");
 
     /** One serialisation point: numbering, pruning and moves must not interleave across saves. */
@@ -57,6 +56,11 @@ final class PipelineHistory {
 
     /** One kept snapshot. */
     record Version(int version, Instant savedAt, long bytes, Path file) {}
+
+    /** Versions kept per Pipeline in the Space whose config root is {@code writeRoot}. */
+    static int keep(Path writeRoot) {
+        return PipelineHistorySettings.forRoot(writeRoot).effectiveKeep();
+    }
 
     /** {@code <writeRoot>/.history/pipelines/<id>} — {@code id} must already have passed {@link WriteGates#isSafeName}. */
     static Path dirFor(Path writeRoot, String id) {
@@ -82,7 +86,7 @@ final class PipelineHistory {
                 int next = versions(dir).stream().mapToInt(Version::version).max().orElse(0) + 1;
                 AtomicFiles.write(dir.resolve("v" + next + ".toon"), bytes, ".hist-");
                 List<Version> kept = versions(dir);
-                for (int i = KEEP; i < kept.size(); i++) Files.deleteIfExists(kept.get(i).file());
+                for (int i = keep(writeRoot); i < kept.size(); i++) Files.deleteIfExists(kept.get(i).file());
             }
         } catch (IOException | RuntimeException e) {
             log.warn("[PIPELINE-HISTORY] snapshot of {} failed — the save stands, this version is not in history: {}",

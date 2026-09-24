@@ -459,6 +459,14 @@ export interface PipelineHistoryDiff {
     lines: PipelineHistoryDiffLine[];
 }
 
+/** `POST /pipelines/{name}/history/{version}/restore` — the kept version saved back, recorded as `version`. */
+export interface PipelineHistoryRestore {
+    pipeline: string;
+    restored: number;
+    version: number;
+    path: string;
+}
+
 /** Read-only pipeline-graph projection + authored-pipeline CRUD/dry-run for the editor (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
 export class PipelinesService {
@@ -621,6 +629,17 @@ export class PipelinesService {
         return this.http.get<PipelineHistoryDiff>(apiUrl(`/pipelines/${encodeURIComponent(name)}/history/diff`), {
             params,
         });
+    }
+
+    /**
+     * Save kept version `version` back over the Pipeline's config — a save like any other (same content gate,
+     * `canAuthorWorkbench`), recorded as a NEW version, so a restore never rewrites history.
+     */
+    restoreHistory(name: string, version: number): Observable<PipelineHistoryRestore> {
+        return this.http.post<PipelineHistoryRestore>(
+            apiUrl(`/pipelines/${encodeURIComponent(name)}/history/${version}/restore`),
+            {},
+        );
     }
 
     // ── the server bundle (R2): one pipeline + its file closure as a portable zip ──

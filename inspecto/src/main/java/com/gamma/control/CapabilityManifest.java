@@ -185,6 +185,9 @@ final class CapabilityManifest {
             // fires a production run — hence author, unlike its /trigger sibling below.
             new Entry("POST", "/pipelines/authored/([^/]+)/run", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/authored/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
+            // PipelineHistoryRoutes — restoring a config version is a save (PIPELINE-CONFIG-HISTORY-1);
+            // the list/read/diff reads carry no gate, like GET /pipelines/{name}/graph/raw.
+            new Entry("POST", "/pipelines/([^/]+)/history/([^/]+)/restore", Roles.CAN_AUTHOR_WORKBENCH),
             // RequirementRoutes
             // ⛔ `POST /requirements` is deliberately NOT here. The route-gating audit called it "an
             // inconsistency, not a judgement call" because its two siblings are gated — that is WRONG, and
@@ -225,6 +228,7 @@ final class CapabilityManifest {
             new Entry("PUT", "/settings/branding", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/geo", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/settings/link-analysis", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("PUT", "/settings/pipeline-history", Roles.CAN_AUTHOR_WORKBENCH),
             // SchedulerRoutes — tuning the live Consignment concurrency caps is runtime operation,
             // not workbench authoring.
             new Entry("PUT", "/system/scheduler", Roles.CAN_OPERATE_RUNS),

@@ -2,9 +2,15 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
-import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
-import { PipelineHistoryDiff, PipelineHistoryVersion, PipelinesService } from 'app/inspecto/api/pipelines.service';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import {
+    PipelineHistoryDiff,
+    PipelineHistoryRestore,
+    PipelineHistoryVersion,
+    PipelinesService,
+} from 'app/inspecto/api/pipelines.service';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -12,15 +18,19 @@ import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.comp
 
 export interface PipelineHistoryData {
     id: string;
+    /** The editor tab holds unsaved edits — a restore reloads the tab, so the confirm says they are lost. */
+    dirty?: boolean;
 }
 
 /** What the selected version is compared with. */
 export type HistoryCompare = 'previous' | 'current';
 
 /**
- * `PIPELINE-CONFIG-HISTORY-1`: the saved versions of one Pipeline's config, newest first, and a READ-ONLY
- * line diff of the selected one — against the version before it, or against the config as it is now.
- * The server keeps a version per successful save (the newest 50); nothing here writes.
+ * `PIPELINE-CONFIG-HISTORY-1`: the saved versions of one Pipeline's config, newest first, a line diff of the
+ * selected one — against the version before it, or against the config as it is now — and **Restore**, which
+ * saves the selected version back (server-side, a save like any other, recorded as a NEW version). The dialog
+ * closes with the {@link PipelineHistoryRestore} result so the editor reloads the tab; it never edits a model.
+ * The server keeps a version per successful save (the newest `keep`, a per-Space setting, 50 by default).
  */
 @Component({
     selector: 'app-pipeline-history-dialog',
@@ -49,6 +59,13 @@ export type HistoryCompare = 'previous' | 'current';
                     message="No saved versions yet. A version is recorded each time this Pipeline is saved."
                 />
             } @else {
+                @if (restoreError()) {
+                    <inspecto-alert variant="error" title="Could not restore">{{ restoreError() }}</inspecto-alert>
+                }
+                <p class="text-secondary mb-2 text-xs">
+                    The newest {{ keep() }} versions are kept (a per-Space setting). Restoring saves the selected
+                    version as a new one; nothing is overwritten in the history.
+                </p>
                 <div class="flex min-h-0 gap-4">
                     <ul class="w-48 shrink-0 overflow-auto" aria-label="Saved versions">
                         @for (v of versions(); track v.version) {
@@ -117,6 +134,11 @@ export type HistoryCompare = 'previous' | 'current';
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button mat-button mat-dialog-close>Close</button>
+            @if (selected() !== null) {
+                <button mat-flat-button color="primary" [disabled]="restoring()" (click)="restore()">
+                    Restore v{{ selected() }}
+                </button>
+            }
         </mat-dialog-actions>
     `,
     styles: [
@@ -146,6 +168,8 @@ export type HistoryCompare = 'previous' | 'current';
 export class PipelineHistoryDialog implements OnInit {
     readonly data = inject<PipelineHistoryData>(MAT_DIALOG_DATA);
     private readonly api = inject(PipelinesService);
+    private readonly ref = inject<MatDialogRef<PipelineHistoryDialog, PipelineHistoryRestore>>(MatDialogRef);
+    private readonly confirm = inject(InspectoConfirmService);
 
     /** `null` while loading. */
     readonly versions = signal<PipelineHistoryVersion[] | null>(null);
@@ -154,6 +178,9 @@ export class PipelineHistoryDialog implements OnInit {
     readonly compare = signal<HistoryCompare>('previous');
     readonly diff = signal<PipelineHistoryDiff | null>(null);
     readonly diffError = signal<string | null>(null);
+    readonly keep = signal<number | null>(null);
+    readonly restoring = signal(false);
+    readonly restoreError = signal<string | null>(null);
 
     readonly summary = computed(() => {
         const d = this.diff();
@@ -166,6 +193,7 @@ export class PipelineHistoryDialog implements OnInit {
     ngOnInit(): void {
         this.api.history(this.data.id).subscribe({
             next: (h) => {
+                this.keep.set(h.keep);
                 this.versions.set(h.versions);
                 if (h.versions.length) this.select(h.versions[0].version);
             },
@@ -189,6 +217,30 @@ export class PipelineHistoryDialog implements OnInit {
     setCompare(mode: HistoryCompare): void {
         this.compare.set(mode);
         this.loadDiff();
+    }
+
+    /**
+     * Save the selected version back, after a confirm. The server refuses a version the content gate now
+     * rejects (422) or one saved before a rename (409) — its message is shown and the dialog stays open.
+     */
+    async restore(): Promise<void> {
+        const v = this.selected();
+        if (v === null) return;
+        const lost = this.data.dirty ? ' The unsaved edits in the editor tab are discarded.' : '';
+        const ok = await this.confirm.confirmDestructive(
+            `Save v${v} back as the current config of '${this.data.id}'? The restore is recorded as a new version.${lost}`,
+            { title: `Restore v${v}?`, confirmText: 'Restore' },
+        );
+        if (!ok) return;
+        this.restoring.set(true);
+        this.restoreError.set(null);
+        this.api.restoreHistory(this.data.id, v).subscribe({
+            next: (r) => this.ref.close(r),
+            error: (err) => {
+                this.restoring.set(false);
+                this.restoreError.set(apiErrorMessage(err, 'The version could not be restored'));
+            },
+        });
     }
 
     private loadDiff(): void {

@@ -13,14 +13,14 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
+> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 28<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 55<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 54<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -141,7 +141,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 - **P2** · **AUTHORING-REDESIGN-1** — **the authoring redesign's still-open letters.** (c), the structured AST table over the row predicate, is COMPLETE (2026-09-23; step 5 `transform.join` out of scope by design), and (f)(g)(j)(l)(m)(n2)(o) shipped. Open: **(d)** v3 macros as the UDF registry — per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `ConsignmentIngestStrategy` and preview — demand-gated; **(e)** column metadata editing on the Transform pane (Parse D2) — needs a backend home for metadata on a `transform.sql` node first; **(i)** a per-row "sample resolves to" line — no host resolves a sample against an `AttributeSpec`; and on (f), which COLUMNS a reference carries is the dry run's question (the save checks existence and `on` presence only). → `archived-documents/plans-archive/authoring-ast-table-design.md` · `okf/frontend/features/schema-mapping-authoring.md` §0
 - **P2** · **AI drafting on a non-`schema` kind** — trigger FIRED 2026-09-15 (an author asked). Restore `<inspecto-ai-assist>`/`component_draft` for a kind: either give `grammar`/`transform`/`sink` a backend `ConfigSpec` (none has one; `ConfigSpecs.TYPES` excludes all three) or rework `SchemaEditorDialog`. ⛔ No low-risk slice survives — **design first**; the demand answers *whether*, not *how*. → `okf/frontend/features/inline-ai-authoring.md`
 - **P3** · **P4 Test mapping on a generic `parser` node** — the (l) discharge unblocked Test mapping on a *dangling per-format* grammar binding, not on a **generic** `parser`, which the owner doc calls unmappable (it falls to `GrammarEditorDialog`). Nothing authors a parse node's mapping any more — mappings are authored in the standalone Mapping component (`mapping-editor.dialog.ts`) — so this would test a mapping an operator cannot author on that node. Build only when asked by name. → `okf/frontend/features/pipeline-editor.md`
-- **P3** · `PIPELINE-CONFIG-HISTORY-1` — **a Pipeline has no persisted config history.** The layout half shipped (`9eed24f8`). Proposal: a server-side snapshot per save, a version list and a diff — needs a route and a retention decision. Today undo/redo is capped at 50 per tab and lost on reload. → `okf/frontend/features/pipeline-editor.md`
 
 #### Step catalog & node types
 

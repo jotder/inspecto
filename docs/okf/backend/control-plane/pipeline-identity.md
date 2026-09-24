@@ -227,8 +227,16 @@ As-built notes worth keeping:
 ## Config history (`PIPELINE-CONFIG-HISTORY-1`, shipped 2026-09-24)
 
 Operator decision 2026-09-24: a server-side snapshot of a Pipeline's config on every successful save,
-the newest **50** kept per Pipeline (the editor's undo cap), oldest pruned. `PipelineHistory` (storage +
-diff) and `PipelineHistoryRoutes` (reads), both in `com.gamma.control`.
+oldest pruned beyond the Space's retention. `PipelineHistory` (storage + diff), `PipelineHistoryRoutes`
+(reads + restore) and `PipelineHistorySettings` (retention), all in `com.gamma.control`.
+
+- **Retention is a per-Space setting** — `pipeline-history.toon` in the Space's config root,
+  `GET|PUT /settings/pipeline-history` (`SettingsRoutes`, PUT gated `canAuthorWorkbench`, 503 when writes are
+  off). `keep` unset = the shipped default **50** (the editor's undo cap) — **a default the operator can
+  change**, not a measured limit. A PUT outside `1..1000` or a non-integer is a 422, never clamped; a
+  hand-edited out-of-range value READS as the default, so `keep: 0` can never prune every version. Lowering it
+  deletes nothing by itself — each Pipeline is pruned to the new value on its next save. The list route's
+  `keep` reports the value in force.
 
 - **Layout** — `<write-root>/.history/pipelines/<pipelineId>/v<N>.toon`: `N` is monotonic per Pipeline and
   never reused after a prune, `savedAt` is the snapshot file's mtime. It follows `ComponentStore`'s MET-5
@@ -246,7 +254,8 @@ diff) and `PipelineHistoryRoutes` (reads), both in `com.gamma.control`.
 - **Routes** (reads — no capability gate, like `GET /pipelines/{name}/graph/raw`, which already serves the
   current config to any authenticated caller; unauthenticated → 401 at the edge):
   `GET /pipelines/{name}/history` → `{pipeline, keep, total, versions:[{version, savedAt, bytes}]}` newest
-  first; `GET /pipelines/{name}/history/{version}` → the version's metadata + its TOON `text`;
+  first; `GET /pipelines/{name}/history/{version}` → the version's metadata + its TOON `text` + the Pipeline `id` that
+  text declares (≠ `pipeline` for a version saved before a rename);
   `GET /pipelines/{name}/history/diff?from={v}&to={v|current}` → `{from, to, added, removed, coarse,
   lines:[{op: context|remove|add, text}]}`, `to` defaulting to the current file. Gates: unknown Pipeline 404
   → non-numeric version 400 → version not kept 404. A Pipeline `/config/write` created but the registry has
@@ -254,6 +263,20 @@ diff) and `PipelineHistoryRoutes` (reads), both in `com.gamma.control`.
   `/history/diff` is registered before `/history/{version}` — first match wins. The diff is an LCS over the
   lines between the common head and tail; a middle over 4M cells is reported as a whole replacement with
   `coarse: true` (correct, not minimal).
+- **Restore** — `POST /pipelines/{name}/history/{version}/restore` (`canAuthorWorkbench`) writes the version's
+  exact bytes over the Pipeline's **registered** file through `SaveGate`, then `PipelineHistory.record` (so the
+  restore is itself a new version — history is never rewritten) and `CollectorService.refreshConfigs()`.
+  Gates: write root 503 → unknown or unregistered Pipeline 404 / non-numeric version 400 / version not kept 404
+  → content 422 (a version today's gate refuses — e.g. a Connection it names was deleted) → registered file
+  outside the write root 403 → a version declaring another id 409 (restoring it would re-key the Pipeline),
+  stale `If-Match` 409. Returns `{pipeline, restored, version, path, findings}` + the new `ETag`.
+  ⚠ **Why its own route, not a client `/config/write` of the version:** `/config/write` files a Pipeline under
+  `<id>_pipeline.toon` from the identity in the body, so for a Pipeline registered from any other filename
+  (committed samples, legacy configs) it FORKS a second file claiming the same id — measured by the first
+  version of the restore test. ⚠ **Why the refresh:** `GET …/graph/raw` lifts topology from the REGISTERED
+  config, which otherwise updates only at the next poll; without it the editor's post-restore reload shows —
+  and its next graph save lowers — the pre-restore graph. (`/config/write`, `/config/patch` and the graph PUT
+  do not refresh; the editor does not reload after those, so nothing reads the stale entry.)
 - **Rename moves the history** — `PipelineHistory.rename` runs inside `writeRenamedConfig`, AFTER the
   renamed config landed (a refused rename leaves the history under the id the Pipeline still has), then the
   rename itself is recorded as a version under the new id. Resume's "config already written" branch runs the
