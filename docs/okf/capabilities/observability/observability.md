@@ -496,6 +496,55 @@ absent days never enter the baseline and an absent target day is `NO_OBSERVATION
 **lower median, not a mean**, so one recompute spike neither manufactures nor masks the next day's breach;
 and a **zero baseline yields a null deviation** — undefined, not −100 %.
 
+### 3.10 Baseline Expectations (`DUCKLE-C8`, 2026-09-24)
+
+The sixth Expectation kind, `baseline`, asks *"does this input look like the inputs we accepted?"* rather
+than *"does any row violate a rule?"*. It **profiles** the target's at-rest data (`row_count`; per profiled
+column `null_count`, `null_rate`, `distinct_count`, `min`, `max`, `mean` — the last three numeric via
+`TRY_CAST`, so `null` and never compared on a text column), per group when `groupBy` is set, and compares
+every cell with the **median** of the same cell over the last N **accepted** profiles. One limit pair
+(`maxIncrease` / `maxDecrease`, `percent` of the baseline's magnitude or `absolute`, inclusive) applies to
+every checked cell; an author wanting different limits per measure writes a second baseline Expectation.
+Keys and defaults: [step-catalog § Expectations](../../backend/pipeline-graph/step-catalog.md#qualityconstraintcheck--expectations).
+
+**Storage — built first, because nothing existed.** `BaselineProfileStore` keeps one JSON document per
+Expectation at `<write-root>/expectation-baselines/<name>.json`: every recorded profile (accepted or not)
+plus an `ops[]` audit log. It is durable or absent — **no write root ⇒ 503**, and an unreadable document is
+an error (**503**), never "no history": reading a torn file as empty would silently reset the baseline and
+pass whatever came next. Refused and accepted profiles are capped separately (100 each), oldest first, so a
+run of refusals can never evict the baseline. Deleting the Expectation deletes its history, so a re-created
+one of the same name does not inherit it.
+
+**The acceptance rules, as built:**
+
+* **Every evaluation records its profile** — a FAILED (refused) run included — unaccepted.
+* **A profile is accepted only if the whole run succeeded.** `POST /expectations/{name}/evaluate`: this
+  check PASSED. `POST /expectations/evaluate` (the sweep): **every** enabled Expectation in the sweep PASSED
+  — one failing `non_null` anywhere leaves every baseline profile of that sweep recorded but unaccepted.
+* **Cold start:** no accepted profile (or a cell no accepted profile has) ⇒ nothing to compare ⇒ that cell
+  passes; the first successful run's profile becomes the baseline.
+* **`requireExistingGroups`** (needs `groupBy`): a group absent from the input is a `missing_group`
+  violation when its median row count over the window — **absence counting as zero** — is above zero. So a
+  group seen once in a long window is not "existing"; a group the baseline typically has is.
+* **Audited ops**, both `canOperateRuns` (the same gate as evaluation — they change what the next run
+  passes): `POST /expectations/{name}/baseline/accept` `{profileId?}` (default: most recent; 404 unknown ·
+  409 already accepted) and `POST /expectations/{name}/baseline/clear` (un-accepts all; history kept). Each
+  appends an `ops[]` entry carrying the actor and **the value it replaced** (`replaced.window` = the accepted
+  ids that were the window before an accept; `replaced.accepted` = what a clear un-accepted) and returns it;
+  `AuditTrail` records them as `expectation.accepted` / `expectation.cleared`. 422 on a non-baseline kind.
+
+`lastResult` of a baseline run carries `profileId`, `baselineSize` and up to 50 `findings`
+(`group`, `measure`, `column`, `baseline`, `current`, `direction` = `above` · `below` · `missing_group`);
+`violations` is the true total. A `groupBy` yielding more than 1,000 groups is refused (422), not stored.
+
+⚠ **Not `VolumeBaseline` (§3.9).** That design uses the *lower* median and treats an absent day as no
+observation; this kind uses the ordinary median (an even window averages the middle pair) and counts an
+absent *group* as zero rows. The two answer different questions and must not be unified by accident.
+⚠ The record constructor (`Expectation.Baseline`) is the whole value validator — Expectations are not in
+`AcceptedConfigKeys`; `ConfigSpecs.expectation()` declares the eight keys so the authoring census accepts
+them, plus a `baseline-needs-a-limit` rule. ⛔ **Not built:** Studio buttons for accept/clear (API only;
+the form authors the kind), and per-measure limits.
+
 ## 4. Decisions (dated one-liners)
 
 | Date | Decision | Who / where |
@@ -526,6 +575,7 @@ and a **zero baseline yields a null deviation** — undefined, not −100 %.
 | 2026-09-07 | `living-operational-system.md` distilled to the OKF north star with **no as-built column** ("a state column rots") | `BACKLOG.md` §5 |
 | 2026-09-08 | EDG-01 cell 6: the events feed + audit CSV export moved **whole** to `inspecto-events` (gating the CSV alone needed an `if` inside a core route, banned by §Assembly); recording not gated; new core `AuditLogRoutes` keeps `/audit/*` on every edition | operator; `EDITIONS.md` CP-13, §Audit |
 | 2026-09-08 | This spec: OPS-2's "ungated" cell, OPS-3's "tamper-evident"/"sign-ins", OPS-4's "off by default" and the 7-field GLOSSARY envelope corrected; `OPS`/Ops-Lens naming applied to REQUIREMENTS §3.7 | this file §2 |
+| 2026-09-24 | `DUCKLE-C8` baseline Expectation kind shipped with its durable profile store; acceptance only on a whole successful run (the sweep counts as one run); accept/clear gated `canOperateRuns` and audited with the replaced value | §3.10 |
 
 ## 5. Not built
 
@@ -623,6 +673,7 @@ and a **zero baseline yields a null deviation** — undefined, not −100 %.
 | Reporting, status, health | `inspecto/src/main/java/com/gamma/report/ReportService.java`; `inspecto/src/main/java/com/gamma/control/RunRoutes.java`, `HealthDetails.java`, `SystemRoutes.java`; `inspecto/src/main/java/com/gamma/service/InboxStatus.java`, `ServiceStores.java`, `OperationalDb.java`; `inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java` | [`operations-reference.md`](../../backend/build-run/operations-reference.md) §Reports, §Status backend |
 | Maintenance & retention | `inspecto-engine/src/main/java/com/gamma/job/MaintenanceJob.java`, `MaintenanceTaskProvider.java`, `EventPruneTask.java`; `inspecto-backup/src/main/java/com/gamma/backup/BackupTask.java`, `BackupTaskProvider.java`; `inspecto-ops/src/main/java/com/gamma/opsjob/OpsMaintenanceTasks.java`; `spaces/demo/config/jobs/*.toon` | [`jobs.md`](../../backend/control-plane/jobs.md) §Maintenance; `operations-reference.md` §Retention & purging; `docs/ops/backup-restore-runbook.md` |
 | Caps & scheduler | `inspecto-engine/src/main/java/com/gamma/job/JobService.java`; `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java`; `inspecto-engine/src/main/java/com/gamma/inspector/ConcurrencyBroker.java`; `inspecto-util/src/main/java/com/gamma/util/OperationsZone.java` | `jobs.md` §Total-concurrency; [`duckdb.md`](../../backend/engine/duckdb.md) (memory half) |
+| Baseline Expectations | `inspecto/src/main/java/com/gamma/expectation/BaselineEvaluator.java`, `BaselineProfileStore.java`, `Expectation.java` (`Baseline`); `inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java`; tests `BaselineEvaluatorTest`, `BaselineProfileStoreTest`, `ControlApiExpectationBaselineTest` | §3.10; [`step-catalog.md`](../../backend/pipeline-graph/step-catalog.md) § Expectations |
 | Launch flags | `inspecto/src/main/java/com/gamma/control/ControlApi.java` (`PUBLIC_PATHS`, `isInfraRoute`, `-Dcontrol.bind`) | [`operations.md`](../../backend/build-run/operations.md) |
 | UI consumers | `inspecto-ui/src/app/modules/admin/{events,audit-logs,dashboard,runs,run-detail,jobs,processing-status,settings}/`, `inspecto-ui/src/app/app.routes.ts` | [`events.md`](../../frontend/features/events.md), [`runs.md`](../../frontend/features/runs.md), [`run-detail.md`](../../frontend/features/run-detail.md), [`dashboard.md`](../../frontend/features/dashboard.md), [`jobs.md`](../../frontend/features/jobs.md) |
 | North star | — | [`living-operational-system.md`](../../living-operational-system.md) (shape only, no state column) |

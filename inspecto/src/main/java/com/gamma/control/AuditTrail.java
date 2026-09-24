@@ -214,6 +214,8 @@ final class AuditTrail {
                 case "import" -> "imported";
                 case "write" -> "written";
                 case "evaluate" -> "evaluated";
+                case "accept" -> "accepted";      // POST /expectations/{name}/baseline/accept (DUCKLE-C8)
+                case "clear" -> "cleared";        // POST /expectations/{name}/baseline/clear
                 case "delete" -> "deleted";       // e.g. /events/views/{name}/delete
                 default -> "created";
             };

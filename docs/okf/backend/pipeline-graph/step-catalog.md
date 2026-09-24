@@ -558,7 +558,8 @@ target's at-rest Parquet. A FAILED check opens a deduplicated `expectation:<name
 `EXPECTATION_FAILED`. It is authored through `/expectations*` and persisted as an `expectation` component
 under `<write-root>/registry` (`ExpectationRoutes`). It is never a chain Step.
 [ingestion § Expectations](../../capabilities/ingestion/ingestion.md#37-expectations). Parser:
-`Expectation.fromMap`. Spec: `ConfigSpecs.expectation()`, the same fourteen keys.
+`Expectation.fromMap`. Spec: `ConfigSpecs.expectation()`, the same twenty-two keys (the last eight are the
+`baseline` kind's — [observability § Baseline Expectations](../../capabilities/observability/observability.md#310-baseline-expectations-duckle-c8-2026-09-24)).
 
 | Key | Type · default | What it does |
 |---|---|---|
@@ -566,12 +567,19 @@ under `<write-root>/registry` (`ExpectationRoutes`). It is never a chain Step.
 | `description` | string | Free text. |
 | `targetType` | `pipeline` · `job` · `pipeline` | Whose at-rest data is scanned. |
 | `target` | string · required | That Pipeline or Job's name. |
-| `kind` | `non_null` · `range` · `regex` · `referential` · `condition` · required | The constraint. The spec lists `non_null` as its default, but the record refuses an absent kind. |
-| `column` | string | The checked column. Required for every kind except `condition`. |
+| `kind` | `non_null` · `range` · `regex` · `referential` · `condition` · `baseline` · required | The constraint. The spec lists `non_null` as its default, but the record refuses an absent kind. |
+| `column` | string | The checked column. Required for every kind except `condition` and `baseline`. |
 | `min` / `max` | number | `range` bounds; at least one. |
 | `pattern` | regex | `regex`: the value must match. |
 | `refDataset` / `refColumn` | string | `referential`: the lookup relation and column; both required. |
 | `when` | condition tree | `condition`: the violation predicate itself (`ConditionSql`). |
+| `baselineWindow` | integer 1–100 · `7` | `baseline`: the median of this many most recent accepted profiles is the baseline. |
+| `measures` | list · `[row_count]` | `baseline`: any of `row_count` `null_count` `null_rate` `distinct_count` `min` `max` `mean`. |
+| `columns` | list | `baseline`: the columns the per-column measures apply to; required iff one is chosen. |
+| `maxIncrease` / `maxDecrease` | number ≥ 0 | `baseline`: allowed rise / fall per cell; at least one. |
+| `limitUnit` | `percent` · `absolute` · `percent` | `baseline`: percent of the baseline's magnitude, or the raw difference. |
+| `groupBy` | list | `baseline`: profile each group separately. |
+| `requireExistingGroups` | boolean · `false` | `baseline`: a group the baseline typically has, missing now, is a violation. Needs `groupBy`. |
 | `severity` | `MINOR` · `MAJOR` · `CRITICAL` · `MAJOR` | Severity of the Incident raised. |
 | `enabled` | boolean · `true` | Evaluate-all skips a disabled check. |
 

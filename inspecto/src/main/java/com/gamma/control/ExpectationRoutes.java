@@ -4,6 +4,8 @@ import com.gamma.event.Event;
 import com.gamma.event.EventLevel;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
+import com.gamma.expectation.BaselineEvaluator;
+import com.gamma.expectation.BaselineProfileStore;
 import com.gamma.expectation.Expectation;
 import com.gamma.expectation.ExpectationEvaluator;
 import com.gamma.objects.ObjectType;
@@ -37,6 +39,10 @@ import java.util.Map;
  * <p>Fail-closed: write root unset → 503; a bad expectation body / target / column → 422; a duplicate
  * create → 409; an unknown expectation → 404. CRUD writes require {@code canAuthorWorkbench} (a no-op on
  * Personal); evaluation persists {@code lastResult}, so it also needs the write root.
+ *
+ * <p>The {@code baseline} kind (DUCKLE-C8) additionally records a profile per evaluation in
+ * {@link BaselineProfileStore} and is accepted only when the whole run passed; its audited
+ * {@code /baseline/accept|clear} ops are gated {@code canOperateRuns}. An unreadable history is 503.
  */
 final class ExpectationRoutes implements RouteModule {
 
@@ -54,6 +60,12 @@ final class ExpectationRoutes implements RouteModule {
         api.post("/expectations/evaluate", ApiContext.withCapability("canOperateRuns", (e, m) -> evaluateAll(api)));
         api.post("/expectations/([^/]+)/evaluate", ApiContext.withCapability("canOperateRuns",
                 (e, m) -> single(e, evaluateOne(api, ApiContext.name(m)))));
+        // DUCKLE-C8: the baseline kind's audited ops. Accepting a refused profile (or clearing the baseline)
+        // changes what the next evaluation passes, so it is gated like evaluation itself — an operate action.
+        api.post("/expectations/([^/]+)/baseline/accept", ApiContext.withCapability("canOperateRuns",
+                (e, m) -> acceptProfile(api, e, ApiContext.name(m))));
+        api.post("/expectations/([^/]+)/baseline/clear", ApiContext.withCapability("canOperateRuns",
+                (e, m) -> clearBaseline(api, e, ApiContext.name(m))));
 
         api.post("/expectations", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> single(e, create(api, api.body(e)))));
@@ -130,37 +142,63 @@ final class ExpectationRoutes implements RouteModule {
         ComponentStore store = store(api);
         RouteErrors.existing(store, TYPE, "expectation", name);   // 404 if absent
         store.delete(TYPE, name);
+        baselines(api).delete(name);   // a re-created same-name expectation must not inherit this baseline
         return Map.of("deleted", name);
     }
 
     // ── evaluation ──────────────────────────────────────────────────────────────
 
+    /**
+     * A baseline profile recorded by this sweep is accepted only if the WHOLE sweep succeeded — every
+     * evaluated expectation PASSED. One failing check anywhere leaves every profile recorded but unaccepted.
+     */
     private Object evaluateAll(ApiContext api) throws IOException {
         ComponentStore store = store(api);
         List<Map<String, Object>> out = new ArrayList<>();
+        Map<String, String> recorded = new LinkedHashMap<>();   // baseline expectation → profile id
+        boolean allPassed = true;
         for (ComponentRegistry.Component c : store.list(TYPE)) {
             Map<String, Object> content = c.content();
-            if (!"false".equalsIgnoreCase(String.valueOf(content.getOrDefault("enabled", true))))
-                out.add(runAndPersist(api, store, content));
-            else
+            if (!"false".equalsIgnoreCase(String.valueOf(content.getOrDefault("enabled", true)))) {
+                Map<String, Object> next = runAndPersist(api, store, content, recorded);
+                allPassed &= next.get("lastResult") instanceof Map<?, ?> r && "PASSED".equals(r.get("status"));
+                out.add(next);
+            } else
                 out.add(content);
         }
+        if (allPassed) acceptAll(api, recorded);
         out.sort(Comparator.comparing(c -> String.valueOf(c.get("name"))));
         return out;
     }
 
     private Object evaluateOne(ApiContext api, String name) throws IOException {
         ComponentStore store = store(api);
-        return runAndPersist(api, store, RouteErrors.existing(store, TYPE, "expectation", name));
+        Map<String, String> recorded = new LinkedHashMap<>();
+        Map<String, Object> next = runAndPersist(api, store, RouteErrors.existing(store, TYPE, "expectation", name),
+                recorded);
+        if (next.get("lastResult") instanceof Map<?, ?> r && "PASSED".equals(r.get("status"))) acceptAll(api, recorded);
+        return next;
     }
 
-    /** Evaluate one expectation, persist its result, fire the failure consequence chain, return the updated content. */
-    private Map<String, Object> runAndPersist(ApiContext api, ComponentStore store, Map<String, Object> content)
-            throws IOException {
+    private static void acceptAll(ApiContext api, Map<String, String> recorded) throws IOException {
+        BaselineProfileStore baselines = baselines(api);
+        for (Map.Entry<String, String> r : recorded.entrySet()) baselines.acceptByRun(r.getKey(), r.getValue());
+    }
+
+    /**
+     * Evaluate one expectation, persist its result, fire the failure consequence chain, return the updated
+     * content. A baseline expectation also RECORDS its profile — pass or fail — into {@code recorded}, for
+     * the caller to accept once it knows whether the whole run succeeded.
+     */
+    private Map<String, Object> runAndPersist(ApiContext api, ComponentStore store, Map<String, Object> content,
+                                              Map<String, String> recorded) throws IOException {
         Expectation exp = parse(content);
         ExpectationEvaluator.Result result;
+        Map<String, Object> baselineDetail = new LinkedHashMap<>();
         try {
-            result = ExpectationEvaluator.evaluate(exp, api.dataRoot());
+            result = "baseline".equals(exp.kind())
+                    ? evaluateBaseline(api, exp, recorded, baselineDetail)
+                    : ExpectationEvaluator.evaluate(exp, api.dataRoot());
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, bad.getMessage());
         } catch (SQLException sql) {
@@ -171,6 +209,7 @@ final class ExpectationRoutes implements RouteModule {
         lastResult.put("status", result.status());
         lastResult.put("violations", result.violations());
         lastResult.put("checkedAt", result.checkedAt());
+        lastResult.putAll(baselineDetail);
 
         Map<String, Object> next = new LinkedHashMap<>(content);
         next.put("lastResult", lastResult);
@@ -180,6 +219,74 @@ final class ExpectationRoutes implements RouteModule {
 
         if ("FAILED".equals(result.status())) raiseIncident(api, exp, result.violations());
         return next;
+    }
+
+    /**
+     * The {@code baseline} kind: profile the input, compare it with the median of the accepted window, and
+     * RECORD the profile whatever the verdict (a refused run still records it). Acceptance is the caller's.
+     */
+    private static ExpectationEvaluator.Result evaluateBaseline(ApiContext api, Expectation exp,
+                                                                Map<String, String> recorded,
+                                                                Map<String, Object> detail) throws SQLException {
+        try {
+            BaselineProfileStore baselines = baselines(api);
+            long now = System.currentTimeMillis();
+            var profile = BaselineEvaluator.profile(exp, api.dataRoot());
+            var cmp = BaselineEvaluator.compare(exp.baseline(), profile,
+                    baselines.acceptedWindow(exp.name(), exp.baseline().window()));
+            String status = cmp.violations() > 0 ? "FAILED" : "PASSED";
+            String profileId = baselines.record(exp.name(), profile, status, now);
+            recorded.put(exp.name(), profileId);
+            detail.put("profileId", profileId);
+            detail.put("baselineSize", cmp.baselineSize());
+            detail.put("findings", cmp.findings().stream().map(BaselineEvaluator.Finding::toMap).toList());
+            return new ExpectationEvaluator.Result(status, cmp.violations(), now);
+        } catch (IOException store) {
+            // Fail closed: an unreadable durable history yields no verdict — never one against "no baseline".
+            throw new ApiException(503, "baseline evaluation unavailable: " + store.getMessage());
+        }
+    }
+
+    // ── baseline ops (audited) ────────────────────────────────────────────────────
+
+    /**
+     * {@code POST /expectations/{name}/baseline/accept} {@code {profileId?}} — accept a recorded profile into
+     * the baseline (default: the most recent one). Returns the audit entry, which carries the window it
+     * replaced. 404 unknown expectation/profile · 422 not a baseline expectation · 409 already accepted.
+     */
+    private Object acceptProfile(ApiContext api, HttpExchange e, String name) throws IOException {
+        Expectation exp = baselineExpectation(api, name);
+        Map<String, Object> body = api.body(e);
+        Object id = body == null ? null : body.get("profileId");
+        try {
+            return baselines(api).accept(exp.name(), id == null ? null : String.valueOf(id).trim(),
+                    ApiContext.actor(e), exp.baseline().window());
+        } catch (java.util.NoSuchElementException missing) {
+            throw new ApiException(404, missing.getMessage());
+        } catch (IllegalStateException already) {
+            throw new ApiException(409, already.getMessage());
+        } catch (IOException store) {
+            throw new ApiException(503, "baseline store unavailable: " + store.getMessage());
+        }
+    }
+
+    /** {@code POST /expectations/{name}/baseline/clear} — un-accept every accepted profile (history kept);
+     *  returns the audit entry carrying the accepted ids it replaced. */
+    private Object clearBaseline(ApiContext api, HttpExchange e, String name) {
+        Expectation exp = baselineExpectation(api, name);
+        try {
+            return baselines(api).clear(exp.name(), ApiContext.actor(e));
+        } catch (IOException store) {
+            throw new ApiException(503, "baseline store unavailable: " + store.getMessage());
+        }
+    }
+
+    private Expectation baselineExpectation(ApiContext api, String name) {
+        Expectation exp = parse(RouteErrors.existing(store(api), TYPE, "expectation", name));
+        if (!"baseline".equals(exp.kind()))
+            throw new ApiException(422, "expectation '" + name + "' is kind '" + exp.kind()
+                    + "' — only a baseline expectation has a baseline to accept or clear");
+        return exp;
     }
 
     /**
@@ -240,6 +347,11 @@ final class ExpectationRoutes implements RouteModule {
 
     private ComponentStore store(ApiContext api) {
         return new ComponentStore(WriteGates.requireWriteRoot(api, "expectation").resolve("registry"));
+    }
+
+    /** DUCKLE-C8's durable profile history. No write root ⇒ 503: there is no non-durable fallback. */
+    private static BaselineProfileStore baselines(ApiContext api) {
+        return new BaselineProfileStore(WriteGates.requireWriteRoot(api, "expectation baseline"));
     }
 
     /**

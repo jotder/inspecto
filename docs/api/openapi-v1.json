@@ -7826,6 +7826,50 @@
         "x-generated" : true,
         "x-optional-module" : true
       }
+    },
+    "/expectations/{expectationId}/baseline/accept" : {
+      "post" : {
+        "tags" : [ "expectations" ],
+        "summary" : "POST /expectations/{expectationId}/baseline/accept (generated skeleton)",
+        "operationId" : "postExpectationsByExpectationIdBaselineAccept",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "expectationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/expectations/{expectationId}/baseline/clear" : {
+      "post" : {
+        "tags" : [ "expectations" ],
+        "summary" : "POST /expectations/{expectationId}/baseline/clear (generated skeleton)",
+        "operationId" : "postExpectationsByExpectationIdBaselineClear",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "expectationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   },
   "components" : {

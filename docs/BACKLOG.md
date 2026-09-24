@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **42<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 19<!--count:backlog-p3--> × P3** —
+> **41<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 54 on 2026-09-24**: P2 `STREAM-CONSUMER-1` closed — Option A built, the `SP-ACQ-09` note updated, the plan distilled into `okf/capabilities/acquisition/acquisition.md` and archived.
 > ⬇ 55 → 54 on 2026-09-24: P3 `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` closed — its work had shipped in `d5f6353be`
@@ -25,8 +25,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 23<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 19<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 42<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 18<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 41<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -195,7 +195,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 - **P2** · `DUCKLE-C1-DATASET-FRESHNESS-1` — **Dataset freshness: core shipped 2026-09-16; badge, auto-armed sweep, retention floor and shape-aware spec 2026-09-24 — one residual.** Freshness is an Alert Rule shape (`dataset:` + `maximumAge:`) evaluated against the last `dataset.write` Signal; as-built (the `system.freshness-sweep` system job, the `dataset-publications.tsv` floor, the per-shape `ConfigSpecs.alert()` rules) in `docs/okf/capabilities/studio/studio.md` §3.4. Open: **(2)** owner-routed alerting — the design is decided (owner = the authenticated `Subject`, `"appUser"` where none), but the substrate is absent: `AlertRule` has no owner, `NotificationRule` hardcodes the recipient, `ChannelConfig` routes by a flat `target`, and config-authored rules are evaluated with no request `Subject` to capture — a multi-seam design pass. ⚠ The Scheduler UI does not yet badge the `system` flag `GET /jobs` now carries.
 - **P2** · **Completeness KPI (when the hold lifts)** — K1 (`DbConsignmentOutputStore.dailyVolume()`) and K2 (`FileSequenceGaps`; `SeqScope` already ships) are unwired — `VolumeBaseline`/`FileSequenceGaps` have no production caller; **K4**, a `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, a Signal plus a deduped Incident on breach, refusing loudly when `-Dconsignment.outputs.backend=none`), is designed but unbuilt (`superpower/completeness-kpi-k4-design.md`); K3, the baseline-window default as a job parameter. K5 shipped. Open inside the design: `kpi.completeness.*` is a **Signal** type and there is no `SignalType` home (the dotted literals are scattered) — whether to create one; `KPI-UNKNOWN-1` — a null-`bounds` sink's daily count is **unknown, not zero**, end to end; and where the sequence template comes from (the Collector's, a job parameter, or the Collector's with an override). Held by the §2 *Completeness KPI hold*. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
-- **P3** · `DUCKLE-C8-BASELINE-EXPECTATION-1` — **a baseline QA Expectation kind:** profile the current input against the median of the last N *accepted* profiles (row count; per-column null count/rate, distinct, min, max, mean), limits in either direction, `groupBy` + `requireExistingGroups`, a profile accepted only if the whole run succeeds, audited `accept`/`clear` ops, and a refused run still records its profile. **Storage-blocked (grounded 2026-09-16):** `transform.profile` writes to the pipeline's ordinary output store; there is no profile-history store, no accepted-profile store and no `accept`/`clear` op, so the first action is **profile storage**, not the kind. The kind itself is four hand sites (`Expectation.java` `KINDS` and its constructor switch, `ExpectationEvaluator.columnPredicate`, `expectation-attributes.ts`); model it on `FileSequenceGaps`. ⚠ Expectations are not covered by `AcceptedConfigKeys` — the record's own constructor is the whole validator.
 
 #### Signals, decisions & notifications
 

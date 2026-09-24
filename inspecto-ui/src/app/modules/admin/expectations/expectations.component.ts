@@ -23,6 +23,7 @@ const KIND_LABELS: Record<string, string> = {
     range: 'Range',
     regex: 'Regex',
     referential: 'Referential',
+    baseline: 'Baseline',
 };
 
 /**
