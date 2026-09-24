@@ -277,7 +277,7 @@ proofs live there, and nothing pending for it lives anywhere else. Geo map defer
 
 ## 5. Docs & board hygiene
 
-- **P3** · `BOARD-STALE-HEADS-1` — **stale heads and a narrative staler than the rows.** Filed 2026-09-19 after a shift in which six of nine grounded rows were already shipped, blocked or duplicates. The 2026-09-24 consolidation removed the two shapes this page itself carried (§0 annotating rows the body closed; closed rows keeping unstruck heads). **Still open:** the candidate guard — fail when a row id appears both struck and unstruck, or when a row is ranked while its body carries a CLOSED marker; and the third shape, rows filed off one doc's prose without checking a sibling doc (the `STREAM-CONSUMER-1` / `roadmap/ROADMAP.md` §3.4 case — correct that paragraph if it still reads as unbuilt). ⚠ P3 only because it is tooling; the cost is measured in whole shifts.
+- **P3** · `BOARD-STALE-HEADS-1` — **rows filed off one doc's prose without checking a sibling doc.** The guard half shipped 2026-09-25: `tools/check-board-heads.mjs` (CI + pre-push) fails when a row id is both struck and live, when a §3–§5 head carries a closed marker, or when an id is ranked twice (`okf/backend/build-run/guard-coverage.md`). **Still open:** the third shape — the `STREAM-CONSUMER-1` / `roadmap/ROADMAP.md` §3.4 case; correct that paragraph if it still reads as unbuilt. No mechanical check is proposed for it. ⚠ P3 only because it is tooling; the cost is measured in whole shifts.
 
 ## 6. Standing refusals and won't-do (not work — keep so nobody re-files)
 
