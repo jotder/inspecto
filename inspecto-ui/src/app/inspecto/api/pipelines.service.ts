@@ -386,6 +386,10 @@ export interface PipelineReferenceSettings {
     load: 'replace' | 'upsert' | 'scd2';
     key?: string[];
     refresh_seconds?: number;
+    /** D5-ref: rows whose `column` equals one of `values` delete their key. Authored in TOON; carried through untouched. */
+    delete?: { column: string; values: string[] };
+    /** D6-ref: latest-wins tie-break within one batch. Authored in TOON; carried through untouched. */
+    order_by?: string;
 }
 
 /**

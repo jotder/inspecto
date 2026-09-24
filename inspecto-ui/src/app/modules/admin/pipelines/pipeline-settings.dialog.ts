@@ -146,7 +146,8 @@ export class PipelineSettingsDialog {
         }
         this.ref.close({
             produces,
-            reference: { load, key, refresh_seconds: Number(v.refreshSeconds) || 0 },
+            // Keep keys this dialog does not edit (`delete`, `order_by`): the route replaces the whole block.
+            reference: { ...this.data.settings.reference, load, key, refresh_seconds: Number(v.refreshSeconds) || 0 },
             description,
         });
     }

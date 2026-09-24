@@ -72,6 +72,32 @@ describe('PipelineSettingsDialog', () => {
         });
     });
 
+    it('keeps the reference keys it does not edit (delete, order_by) on save', () => {
+        const { c, ref } = make({
+            settings: {
+                produces: 'reference',
+                reference: {
+                    load: 'upsert',
+                    key: ['id'],
+                    order_by: 'updated_at',
+                    delete: { column: 'op', values: ['D'] },
+                },
+            },
+        });
+        c.save();
+        expect(ref.close).toHaveBeenCalledWith({
+            produces: 'reference',
+            reference: {
+                load: 'upsert',
+                key: ['id'],
+                refresh_seconds: 0,
+                order_by: 'updated_at',
+                delete: { column: 'op', values: ['D'] },
+            },
+            description: '',
+        });
+    });
+
     it('refuses upsert/scd2 with no key column', () => {
         const { c, ref } = make();
         c.form.controls.produces.setValue('reference');
