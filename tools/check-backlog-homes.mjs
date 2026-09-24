@@ -198,7 +198,10 @@ for (const row of rows) {
 // the floor; the grammar is unchanged — every surviving row's pointer still parses.
 // 2026-09-24: 45 → 44. SQLGUARD-COMMA-RELATION-1 closed in the follow-up push and took its one
 // pointer (→ auth-security.md) with it; the grammar is unchanged.
-const MIN_DOC_POINTERS = 44;
+// 2026-09-25: 44 → 41. RELEASE-PIPELINE-NEVER-EXECUTED-1, EMPTY-GRID-HSCROLL-1, JOB-RUNS-DIALOG-DEAD-1,
+// DUCKLE-C7-AFFECTED-CONTRACTS-1 and LEGACY-ASN-SRC-TREE-UNBUILT-1 left the board and took their pointers;
+// the grammar is unchanged — every surviving row's pointer still parses.
+const MIN_DOC_POINTERS = 41;
 
 const scope =
     `scope: ${rows.length} board row(s), ${identified} with an identifier and ` +
