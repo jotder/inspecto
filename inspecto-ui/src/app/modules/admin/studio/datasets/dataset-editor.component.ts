@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, Input, OnInit, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { concatMap, map, of, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -13,11 +14,13 @@ import { ComponentsService, LensService, apiErrorMessage } from 'app/inspecto/ap
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import {
+    BundleTransferService,
     ImportDraft,
     ImportDraftBannerComponent,
     ImportDraftHandoff,
     TransferMenuComponent,
     draftPlacement,
+    draftSaveWarning,
 } from 'app/inspecto/transfer';
 import { ColumnMeta, QueryChange, QueryModel, QueryPanelComponent, QuerySource } from 'app/inspecto/query';
 import { DatasetCalculatedComponent } from './dataset-calculated.component';
@@ -81,6 +84,7 @@ export class DatasetEditorComponent implements OnInit {
     private matDialog = inject(MatDialog);
     private components = inject(ComponentsService);
     private draftHandoff = inject(ImportDraftHandoff);
+    private transfer = inject(BundleTransferService);
     /** Materializing is an OPERATION, not authoring — same capability as any job trigger (§7). */
     readonly lens = inject(LensService);
 
@@ -392,23 +396,41 @@ export class DatasetEditorComponent implements OnInit {
             calculated: this.calculated(),
         });
         this.saving.set(true);
-        const ifMatch = this.importDraft() ? this.draftIfMatch : undefined;
-        this.datasets.save(ds, { update: this.editing(), ...(ifMatch ? { ifMatch } : {}) }).subscribe({
-            next: () => {
-                this.saving.set(false);
-                this.toastr.success(`Dataset "${name}" saved`);
-                this.router.navigate(['/catalog/datasets']);
-            },
-            error: (e) => {
-                this.saving.set(false);
-                if (e?.status === 503) this.writesDisabled.set(true);
-                this.toastr.error(
-                    e?.status === 503
-                        ? 'Writes are disabled (no write root configured).'
-                        : apiErrorMessage(e, `Could not save "${name}"`),
-                );
-            },
-        });
+        const draft = this.importDraft();
+        const ifMatch = draft ? this.draftIfMatch : undefined;
+        // An imported draft's references are re-checked against what is about to be WRITTEN (D3) — advisory:
+        // the findings go to the banner and the Save goes ahead either way.
+        const recheck$ = draft
+            ? this.transfer
+                  .draftIntegrity('dataset', name, this.datasets.toContent(ds))
+                  .pipe(tap((integrity) => this.importDraft.set({ ...draft, integrity })))
+            : of(null);
+        recheck$
+            .pipe(
+                concatMap((integrity) =>
+                    this.datasets
+                        .save(ds, { update: this.editing(), ...(ifMatch ? { ifMatch } : {}) })
+                        .pipe(map(() => integrity)),
+                ),
+            )
+            .subscribe({
+                next: (integrity) => {
+                    this.saving.set(false);
+                    const warning = draft ? draftSaveWarning(name, integrity) : null;
+                    if (warning) this.toastr.warning(warning);
+                    else this.toastr.success(`Dataset "${name}" saved`);
+                    this.router.navigate(['/catalog/datasets']);
+                },
+                error: (e) => {
+                    this.saving.set(false);
+                    if (e?.status === 503) this.writesDisabled.set(true);
+                    this.toastr.error(
+                        e?.status === 503
+                            ? 'Writes are disabled (no write root configured).'
+                            : apiErrorMessage(e, `Could not save "${name}"`),
+                    );
+                },
+            });
     }
 }
 

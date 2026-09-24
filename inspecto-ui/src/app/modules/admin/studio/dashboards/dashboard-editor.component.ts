@@ -35,11 +35,13 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import {
+    BundleTransferService,
     ImportDraft,
     ImportDraftBannerComponent,
     ImportDraftHandoff,
     TransferMenuComponent,
     draftPlacement,
+    draftSaveWarning,
 } from 'app/inspecto/transfer';
 import { DrillEvent } from '../widgets/widget-host.component';
 import { Widget, WidgetOptions, buildWidget } from '../widgets/widget-types';
@@ -47,7 +49,7 @@ import { WidgetsService } from '../widgets/widgets.service';
 import { ControlValues } from 'app/inspecto/viz';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
-import { concatMap, from, tap } from 'rxjs';
+import { concatMap, from, map, of, tap } from 'rxjs';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { DatasetRowsService, RowSourceRef } from 'app/inspecto/viz/dataset-rows.service';
@@ -131,6 +133,7 @@ export class DashboardEditorComponent implements OnInit {
     private dialog = inject(MatDialog);
     private components = inject(ComponentsService);
     private draftHandoff = inject(ImportDraftHandoff);
+    private transfer = inject(BundleTransferService);
 
     /** Route param — the dashboard id to edit; absent on the `new` route. */
     @Input() id?: string;
@@ -574,21 +577,39 @@ export class DashboardEditorComponent implements OnInit {
         }
         const dashboard = buildDashboard(name, this.tiles(), this.filter(), this.exposedFields());
         this.saving.set(true);
-        const ifMatch = this.importDraft() ? this.draftIfMatch : undefined;
-        this.dashboardsApi.save(dashboard, { update: this.editing(), ...(ifMatch ? { ifMatch } : {}) }).subscribe({
-            next: () => {
-                this.saving.set(false);
-                this.toastr.success(`Dashboard "${name}" saved`);
-                this.router.navigate(['/studio/dashboards']);
-            },
-            error: (e) => {
-                this.saving.set(false);
-                if (e?.status === 503) this.writesDisabled.set(true);
-                this.toastr.error(
-                    e?.status === 503 ? 'Writes are disabled.' : apiErrorMessage(e, `Could not save "${name}"`),
-                );
-            },
-        });
+        const draft = this.importDraft();
+        const ifMatch = draft ? this.draftIfMatch : undefined;
+        // An imported draft's references are re-checked against what is about to be WRITTEN (D3) — advisory:
+        // the findings go to the banner and the Save goes ahead either way.
+        const recheck$ = draft
+            ? this.transfer
+                  .draftIntegrity('dashboard', name, this.dashboardsApi.toContent(dashboard))
+                  .pipe(tap((integrity) => this.importDraft.set({ ...draft, integrity })))
+            : of(null);
+        recheck$
+            .pipe(
+                concatMap((integrity) =>
+                    this.dashboardsApi
+                        .save(dashboard, { update: this.editing(), ...(ifMatch ? { ifMatch } : {}) })
+                        .pipe(map(() => integrity)),
+                ),
+            )
+            .subscribe({
+                next: (integrity) => {
+                    this.saving.set(false);
+                    const warning = draft ? draftSaveWarning(name, integrity) : null;
+                    if (warning) this.toastr.warning(warning);
+                    else this.toastr.success(`Dashboard "${name}" saved`);
+                    this.router.navigate(['/studio/dashboards']);
+                },
+                error: (e) => {
+                    this.saving.set(false);
+                    if (e?.status === 503) this.writesDisabled.set(true);
+                    this.toastr.error(
+                        e?.status === 503 ? 'Writes are disabled.' : apiErrorMessage(e, `Could not save "${name}"`),
+                    );
+                },
+            });
     }
 }
 

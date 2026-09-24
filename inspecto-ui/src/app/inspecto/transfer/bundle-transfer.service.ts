@@ -17,7 +17,9 @@ import {
 import type { AuthoredPipeline } from 'app/inspecto/api/pipelines.service';
 import type { JobDetail } from 'app/inspecto/api/jobs.service';
 import {
+    BUNDLE_FORMAT,
     BUNDLE_KINDS,
+    BUNDLE_VERSION,
     BundleItem,
     BundleKind,
     MetadataBundle,
@@ -231,6 +233,26 @@ export class BundleTransferService {
      */
     preview(bundle: MetadataBundle): Observable<BundlePreview> {
         return this.http.post<BundlePreview>(apiUrl('/bundle/preview'), bundle);
+    }
+
+    /**
+     * Re-check an Import-as-draft's CURRENT content just before its Save (D3, second half): the same read-only
+     * preview, over what the editor is about to write rather than what the bundle carried, so an edit that
+     * breaks — or mends — a reference is judged. ADVISORY: the caller saves either way. An unreadable preview,
+     * or an older server with no list, is `null` ("not checked") — never an empty list, which would read as clean.
+     */
+    draftIntegrity(kind: BundleKind, id: string, content: Record<string, unknown>): Observable<string[] | null> {
+        const envelope = {
+            format: BUNDLE_FORMAT,
+            version: BUNDLE_VERSION,
+            exportedAt: new Date().toISOString(),
+            sourceSpace: null,
+            items: [{ kind, id, content }],
+        } as MetadataBundle;
+        return this.preview(envelope).pipe(
+            map((p) => (Array.isArray(p?.integrity) ? p.integrity : null)),
+            catchError(() => of(null)),
+        );
     }
 
     /**

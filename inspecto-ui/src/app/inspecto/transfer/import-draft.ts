@@ -42,3 +42,15 @@ export function draftPlacement(currentId: string | undefined, draft: ImportDraft
     if (currentId) return currentId === draft.id ? 'here' : 'elsewhere';
     return draft.targetExists ? 'elsewhere' : 'here';
 }
+
+/**
+ * What to tell the operator after a draft's Save, from the re-check that ran just before it (D3: ADVISORY —
+ * the Save went ahead regardless). The editor leaves the page on a successful Save, so the banner cannot carry
+ * this; null when the re-check ran and found nothing.
+ */
+export function draftSaveWarning(id: string, integrity: string[] | null): string | null {
+    if (integrity === null)
+        return `Saved "${id}" — the reference check could not run, so broken references are unknown.`;
+    if (!integrity.length) return null;
+    return `Saved "${id}" with ${integrity.length} broken reference(s): ${integrity.join('; ')}`;
+}

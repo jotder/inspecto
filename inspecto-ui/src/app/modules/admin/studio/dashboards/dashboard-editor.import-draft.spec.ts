@@ -70,7 +70,17 @@ function flushReads(http: HttpTestingController): void {
     }
 }
 
-const writes = (http: HttpTestingController) => http.match((r) => r.method !== 'GET');
+/** Every mutating request. `POST /bundle/preview` is a READ (the pre-Save re-check) and is answered on its own. */
+const writes = (http: HttpTestingController) =>
+    http.match((r) => r.method !== 'GET' && r.url !== `${base}/bundle/preview`);
+
+/** Answer the pre-Save re-check (D3): exactly one read-only preview; returns the envelope it judged. */
+function answerRecheck(http: HttpTestingController, integrity: string[] | 'unreadable') {
+    const req = http.expectOne(`${base}/bundle/preview`);
+    if (integrity === 'unreadable') req.flush({}, { status: 500, statusText: 'Server Error' });
+    else req.flush({ items: [], requires: [], integrity });
+    return req.request.body as { items: { kind: string; id: string; content: Record<string, unknown> }[] };
+}
 
 describe('DashboardEditorComponent — Import as draft', () => {
     it('adopts a NEW-id draft unsaved on the create route, then Save is one POST through the pane', async () => {
@@ -90,6 +100,11 @@ describe('DashboardEditorComponent — Import as draft', () => {
         await expectNoA11yViolations(fixture.nativeElement);
 
         c.save();
+        expect(writes(http)).toEqual([]); // the re-check runs FIRST — nothing is written before it answers
+        const checked = answerRecheck(http, ["broken reference: dashboard 'd1' tile -> missing widget 'w1'"]);
+        expect(checked.items).toEqual([
+            { kind: 'dashboard', id: 'd1', content: expect.objectContaining({ tiles: INCOMING.tiles }) },
+        ]);
         const [post, ...rest] = writes(http);
         expect(rest).toEqual([]);
         expect(post.request.method).toBe('POST');
@@ -97,9 +112,14 @@ describe('DashboardEditorComponent — Import as draft', () => {
         expect(post.request.headers.has('If-Match')).toBe(false);
         expect(post.request.body).toMatchObject({ id: 'd1', tiles: INCOMING.tiles });
         http.expectNone(`${base}/bundle/import`);
+        post.flush({});
+        // Advisory: it saved, and the findings outlive the page it leaves.
+        expect(TestBed.inject(ToastrService).warning).toHaveBeenCalledWith(
+            expect.stringContaining("missing widget 'w1'"),
+        );
     });
 
-    it('opens an EXISTING id with incoming content as unsaved edits + diff; Save is a PUT with If-Match (D6)', () => {
+    it('opens an EXISTING id with incoming content as unsaved edits + diff; Save is a PUT with If-Match (D6)', async () => {
         const { fixture, c, http } = create('d1');
         flushReads(http);
         c.onDraftImported(draft(true));
@@ -111,12 +131,44 @@ describe('DashboardEditorComponent — Import as draft', () => {
         expect(writes(http)).toEqual([]);
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('Changes against the stored dashboard');
 
+        // An edit AFTER adoption is what the re-check judges — not the content the bundle carried.
+        c.exposedFields.set(['region', 'country']);
         c.save();
+        const checked = answerRecheck(http, ["broken reference: dashboard 'd1' tile -> missing widget 'w1'"]);
+        expect(checked.items[0].content).toMatchObject({ exposedFields: ['region', 'country'] });
         const [put, ...rest] = writes(http);
         expect(rest).toEqual([]);
         expect(put.request.method).toBe('PUT');
         expect(put.request.url).toBe(`${base}/components/dashboard/d1`);
         expect(put.request.headers.get('If-Match')).toBe('"sha256:abc123"');
+        // A refused Save stays on the page — and the banner now shows the RE-CHECKED findings.
+        put.flush({}, { status: 409, statusText: 'Conflict' });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(c.importDraft()?.integrity).toEqual(["broken reference: dashboard 'd1' tile -> missing widget 'w1'"]);
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain("missing widget 'w1'");
+    });
+
+    it('an unreadable re-check does not block the Save — it says "not checked" instead', () => {
+        const { c, http } = create('d1');
+        flushReads(http);
+        c.onDraftImported(draft(true));
+        flushReads(http);
+        c.save();
+        answerRecheck(http, 'unreadable');
+        const [put, ...rest] = writes(http);
+        expect(rest).toEqual([]);
+        put.flush({});
+        expect(TestBed.inject(ToastrService).warning).toHaveBeenCalledWith(expect.stringContaining('could not run'));
+    });
+
+    it('an ordinary (non-draft) Save runs no re-check', () => {
+        const { c, http } = create('d1');
+        flushReads(http);
+        c.tiles.set([{ widgetId: 'w0', span: 1 }]);
+        c.save();
+        http.expectNone(`${base}/bundle/preview`);
+        expect(writes(http).length).toBe(1);
     });
 
     it('Discard drops the draft and restores the stored dashboard, writing nothing', () => {

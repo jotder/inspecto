@@ -37,6 +37,11 @@ export class DashboardsService {
         return fromContent(id, content);
     }
 
+    /** The content {@link save} writes for a {@link Dashboard} — what an imported draft's pre-Save re-check judges. */
+    toContent(dashboard: Dashboard): Record<string, unknown> {
+        return toContent(dashboard);
+    }
+
     /** Create by default; pass `{update: true}` when modifying an existing dashboard (editor save,
      *  add-tile) — the backend 409s a create on an existing id (id is immutable on edit). */
     save(dashboard: Dashboard, opts?: { update?: boolean; ifMatch?: string }): Observable<Dashboard> {

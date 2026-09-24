@@ -29,6 +29,11 @@ export class DatasetsService {
         return fromContent(id, content);
     }
 
+    /** The content {@link save} writes for a {@link Dataset} — what an imported draft's pre-Save re-check judges. */
+    toContent(ds: Dataset): Record<string, unknown> {
+        return toContent(ds);
+    }
+
     /** Create by default; pass `{update: true}` when editing an existing dataset — the backend 409s a
      *  create on an existing id (id is immutable in the editors, so update never renames). */
     save(ds: Dataset, opts?: { update?: boolean; ifMatch?: string }): Observable<Dataset> {

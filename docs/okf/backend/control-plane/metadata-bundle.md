@@ -129,8 +129,14 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
   what already landed — the `applyKpiReport` rule. An existing prerequisite is never overwritten.
 * **Integrity is advisory (D3).** After the prerequisites, the dialog calls the read-only preview for the target
   alone; the editor's banner lists the findings. An unreadable preview (or an older server with no list) is
-  `integrity: null` — shown as *not checked*, never as clean. ⚠ The check runs once, when the draft opens; edits
-  made afterwards are not re-checked before Save.
+  `integrity: null` — shown as *not checked*, never as clean. **Re-checked just before Save** (Dashboard,
+  Widget, Dataset): Save first posts the content it is ABOUT TO WRITE — edits included — as a one-item envelope to
+  the same read-only preview (`BundleTransferService.draftIntegrity`), puts the fresh findings in the banner, then
+  saves regardless (D3: never a block). The editor leaves the page on success, so the outcome goes to a toast
+  (`draftSaveWarning`): findings ⇒ a warning naming them; an unreadable re-check ⇒ "could not run"; clean ⇒ the
+  plain success. A refused Save stays on the page with the re-checked findings in the banner. ⚠ `POST
+  /bundle/preview` is a POST that writes nothing — a spec counting "writes" must exclude it (the editor specs do).
+  The Pipeline editor does not re-check: the preview judges no pipeline refs (below).
 * **Save is the pane's own route (D2)** — `POST /components/{kind}` for a new id, `PUT` for an existing one.
   When the draft landed on an existing id (D6) the editor first reads the stored copy: its content is the
   banner's diff baseline (`configDiff`, the AI-draft diff) and its `contentHash` is sent as **`If-Match`**, so

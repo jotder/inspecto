@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, Input, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { concatMap, map, of, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -25,11 +26,13 @@ import { WORKING_SET_VIEW_KIND } from 'app/inspecto/viz/plugins';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import {
+    BundleTransferService,
     ImportDraft,
     ImportDraftBannerComponent,
     ImportDraftHandoff,
     TransferMenuComponent,
     draftPlacement,
+    draftSaveWarning,
 } from 'app/inspecto/transfer';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
@@ -77,6 +80,7 @@ export class ExploreComponent implements OnInit {
     private router = inject(Router);
     private toastr = inject(ToastrService);
     private draftHandoff = inject(ImportDraftHandoff);
+    private transfer = inject(BundleTransferService);
 
     /** Route param — the widget id to edit; absent on the `new` route. */
     @Input() id?: string;
@@ -396,19 +400,39 @@ export class ExploreComponent implements OnInit {
                         queryId: viewBound ? undefined : this.boundQueryId(),
                     },
                 );
-                const ifMatch = this.importDraft() ? this.draftIfMatch : undefined;
-                this.widgetsApi.save(widget, { update: this.editing(), ...(ifMatch ? { ifMatch } : {}) }).subscribe({
-                    next: () => {
-                        this.toastr.success(`Widget "${name}" saved`);
-                        this.router.navigate(['/studio/widgets']);
-                    },
-                    error: (e) => {
-                        if (e?.status === 503) this.writesDisabled.set(true);
-                        this.toastr.error(
-                            e?.status === 503 ? 'Writes are disabled.' : apiErrorMessage(e, `Could not save "${name}"`),
-                        );
-                    },
-                });
+                const draft = this.importDraft();
+                const ifMatch = draft ? this.draftIfMatch : undefined;
+                // An imported draft's references are re-checked against what is about to be WRITTEN (D3) —
+                // advisory: the findings go to the banner and the Save goes ahead either way.
+                const recheck$ = draft
+                    ? this.transfer
+                          .draftIntegrity('widget', name, this.widgetsApi.toContent(widget))
+                          .pipe(tap((integrity) => this.importDraft.set({ ...draft, integrity })))
+                    : of(null);
+                recheck$
+                    .pipe(
+                        concatMap((integrity) =>
+                            this.widgetsApi
+                                .save(widget, { update: this.editing(), ...(ifMatch ? { ifMatch } : {}) })
+                                .pipe(map(() => integrity)),
+                        ),
+                    )
+                    .subscribe({
+                        next: (integrity) => {
+                            const warning = draft ? draftSaveWarning(name, integrity) : null;
+                            if (warning) this.toastr.warning(warning);
+                            else this.toastr.success(`Widget "${name}" saved`);
+                            this.router.navigate(['/studio/widgets']);
+                        },
+                        error: (e) => {
+                            if (e?.status === 503) this.writesDisabled.set(true);
+                            this.toastr.error(
+                                e?.status === 503
+                                    ? 'Writes are disabled.'
+                                    : apiErrorMessage(e, `Could not save "${name}"`),
+                            );
+                        },
+                    });
             });
     }
 }

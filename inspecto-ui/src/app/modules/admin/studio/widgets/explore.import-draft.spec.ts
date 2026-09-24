@@ -74,7 +74,17 @@ function flushReads(http: HttpTestingController): void {
     }
 }
 
-const writes = (http: HttpTestingController) => http.match((r) => r.method !== 'GET');
+/** Every mutating request. `POST /bundle/preview` is a READ (the pre-Save re-check) and is answered on its own. */
+const writes = (http: HttpTestingController) =>
+    http.match((r) => r.method !== 'GET' && r.url !== `${base}/bundle/preview`);
+
+/** Answer the pre-Save re-check (D3): exactly one read-only preview; returns the envelope it judged. */
+function answerRecheck(http: HttpTestingController, integrity: string[] | 'unreadable') {
+    const req = http.expectOne(`${base}/bundle/preview`);
+    if (integrity === 'unreadable') req.flush({}, { status: 500, statusText: 'Server Error' });
+    else req.flush({ items: [], requires: [], integrity });
+    return req.request.body as { items: { kind: string; id: string; content: Record<string, unknown> }[] };
+}
 
 describe('ExploreComponent — Import as draft', () => {
     it('adopts a NEW-id draft unsaved; Save proposes its id and is one POST through the pane', async () => {
@@ -100,12 +110,21 @@ describe('ExploreComponent — Import as draft', () => {
         expect(
             (open.mock.calls[0] as unknown as [unknown, { data: { suggestedId: string } }])[1].data.suggestedId,
         ).toBe('w1');
+        expect(writes(http)).toEqual([]); // the re-check runs FIRST — nothing is written before it answers
+        const checked = answerRecheck(http, []);
+        expect(checked.items).toEqual([
+            { kind: 'widget', id: 'w1', content: expect.objectContaining({ vizType: 'table' }) },
+        ]);
         const [post, ...rest] = writes(http);
         expect(rest).toEqual([]);
         expect(post.request.method).toBe('POST');
         expect(post.request.url).toBe(`${base}/components/widget`);
         expect(post.request.body).toMatchObject({ id: 'w1', vizType: 'table' });
         http.expectNone(`${base}/bundle/import`);
+        post.flush({});
+        // A clean re-check is a plain success, not a warning.
+        expect(TestBed.inject(ToastrService).warning).not.toHaveBeenCalled();
+        expect(TestBed.inject(ToastrService).success).toHaveBeenCalled();
     });
 
     it('an EXISTING id opens with the incoming content unsaved and saves as a PUT with If-Match (D6)', async () => {
@@ -120,12 +139,32 @@ describe('ExploreComponent — Import as draft', () => {
         expect(c.draftStored()).toEqual(STORED);
         expect(writes(http)).toEqual([]);
 
+        // An edit AFTER adoption is what the re-check judges — not the content the bundle carried.
+        c.vizType.set('bar');
         c.save();
+        const checked = answerRecheck(http, ["broken reference: widget 'w1' -> missing dataset 'cdr_sample'"]);
+        expect(checked.items[0].content).toMatchObject({ vizType: 'bar' });
         const [put, ...rest] = writes(http);
         expect(rest).toEqual([]);
         expect(put.request.method).toBe('PUT');
         expect(put.request.url).toBe(`${base}/components/widget/w1`);
         expect(put.request.headers.get('If-Match')).toBe('"sha256:h1"');
+        put.flush({}, { status: 409, statusText: 'Conflict' });
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain("missing dataset 'cdr_sample'");
+    });
+
+    it('an unreadable re-check does not block the Save — it says "not checked" instead', () => {
+        const { c, http } = create('w1');
+        flushReads(http);
+        c.onDraftImported(draft(true));
+        flushReads(http);
+        c.save();
+        answerRecheck(http, 'unreadable');
+        const [put, ...rest] = writes(http);
+        expect(rest).toEqual([]);
+        put.flush({});
+        expect(TestBed.inject(ToastrService).warning).toHaveBeenCalledWith(expect.stringContaining('could not run'));
     });
 
     it('Discard restores the stored widget and writes nothing', async () => {

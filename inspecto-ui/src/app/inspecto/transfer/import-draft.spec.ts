@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BundleItem, buildBundle, targetIndex } from './bundle';
-import { ImportDraft, draftPlacement, draftPrerequisites } from './import-draft';
+import { ImportDraft, draftPlacement, draftPrerequisites, draftSaveWarning } from './import-draft';
 
 const DS: BundleItem = { kind: 'dataset', id: 'sales', content: { name: 'sales' } };
 const W: BundleItem = { kind: 'widget', id: 'w1', content: { vizType: 'bar', datasetId: 'sales', controls: {} } };
@@ -49,5 +49,14 @@ describe('draftPlacement', () => {
         expect(draftPlacement('d1', draft('d2', true))).toBe('elsewhere');
         expect(draftPlacement('d1', draft('fresh', false))).toBe('elsewhere');
         expect(draftPlacement(undefined, draft('d1', true))).toBe('elsewhere');
+    });
+});
+
+describe('draftSaveWarning', () => {
+    it('is silent only when the re-check ran and found nothing', () => {
+        expect(draftSaveWarning('w1', [])).toBeNull();
+        expect(draftSaveWarning('w1', ["missing dataset 'd'"])).toContain("1 broken reference(s): missing dataset 'd'");
+        // "not checked" is said out loud, never folded into "clean"
+        expect(draftSaveWarning('w1', null)).toContain('could not run');
     });
 });

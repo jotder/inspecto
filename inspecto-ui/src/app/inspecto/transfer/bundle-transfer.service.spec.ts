@@ -108,4 +108,31 @@ describe('BundleTransferService — buildExport consults the server closure (gap
         http.expectNone(`${base}/bundle/import`);
         expect(integrity).toEqual(["broken reference: widget 'w' -> missing dataset 'd'"]);
     });
+
+    /** The pre-Save re-check: the draft's CURRENT content, as a one-item envelope, through the same preview. */
+    it('re-checks an edited draft through /bundle/preview with just that content', () => {
+        const content = { dataset: 'd2', type: 'table' };
+        let integrity: string[] | null | undefined;
+        svc.draftIntegrity('widget', 'w', content).subscribe((i) => (integrity = i));
+        const req = http.expectOne(`${base}/bundle/preview`);
+        expect(req.request.method).toBe('POST');
+        const body = req.request.body as MetadataBundle;
+        expect(body.format).toBe('inspecto-metadata-bundle');
+        expect(body.version).toBe(2);
+        expect(body.items).toEqual([{ kind: 'widget', id: 'w', content }]);
+        req.flush({ items: [], requires: [], integrity: ["broken reference: widget 'w' -> missing dataset 'd2'"] });
+        http.expectNone(`${base}/bundle/import`);
+        expect(integrity).toEqual(["broken reference: widget 'w' -> missing dataset 'd2'"]);
+    });
+
+    it('an unreadable re-check is null ("not checked"), never an empty list', () => {
+        let integrity: string[] | null | undefined;
+        svc.draftIntegrity('widget', 'w', {}).subscribe((i) => (integrity = i));
+        http.expectOne(`${base}/bundle/preview`).flush({}, { status: 500, statusText: 'boom' });
+        expect(integrity).toBeNull();
+
+        svc.draftIntegrity('widget', 'w', {}).subscribe((i) => (integrity = i));
+        http.expectOne(`${base}/bundle/preview`).flush({ items: [], requires: [] }); // an older server: no list
+        expect(integrity).toBeNull();
+    });
 });

@@ -91,7 +91,17 @@ function flushReads(http: HttpTestingController): void {
     }
 }
 
-const writes = (http: HttpTestingController) => http.match((r) => r.method !== 'GET');
+/** Every mutating request. `POST /bundle/preview` is a READ (the pre-Save re-check) and is answered on its own. */
+const writes = (http: HttpTestingController) =>
+    http.match((r) => r.method !== 'GET' && r.url !== `${base}/bundle/preview`);
+
+/** Answer the pre-Save re-check (D3): exactly one read-only preview; returns the envelope it judged. */
+function answerRecheck(http: HttpTestingController, integrity: string[] | 'unreadable') {
+    const req = http.expectOne(`${base}/bundle/preview`);
+    if (integrity === 'unreadable') req.flush({}, { status: 500, statusText: 'Server Error' });
+    else req.flush({ items: [], requires: [], integrity });
+    return req.request.body as { items: { kind: string; id: string; content: Record<string, unknown> }[] };
+}
 
 describe('DatasetEditorComponent — Import as draft', () => {
     it('adopts a NEW-id draft unsaved with its id still editable; Save is one POST through the pane', async () => {
@@ -112,6 +122,11 @@ describe('DatasetEditorComponent — Import as draft', () => {
         );
 
         c.save();
+        expect(writes(http)).toEqual([]); // the re-check runs FIRST — nothing is written before it answers
+        const checked = answerRecheck(http, []);
+        expect(checked.items).toEqual([
+            { kind: 'dataset', id: 'orders_view', content: expect.objectContaining({ sourceName: 'orders' }) },
+        ]);
         const [post, ...rest] = writes(http);
         expect(rest).toEqual([]);
         expect(post.request.method).toBe('POST');
@@ -145,12 +160,33 @@ describe('DatasetEditorComponent — Import as draft', () => {
         expect(writes(http)).toEqual([]);
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('Changes against the stored dataset');
 
+        // An edit AFTER adoption is what the re-check judges — not the content the bundle carried.
+        c.measures.set([]);
         c.save();
+        const checked = answerRecheck(http, ["broken reference: dataset 'orders_view' -> missing query 'q'"]);
+        expect(checked.items[0].content).toMatchObject({ measures: [] });
         const [put, ...rest] = writes(http);
         expect(rest).toEqual([]);
         expect(put.request.method).toBe('PUT');
         expect(put.request.url).toBe(`${base}/components/dataset/orders_view`);
         expect(put.request.headers.get('If-Match')).toBe('"sha256:dh"');
         expect(TestBed.inject(ImportDraftHandoff).take('dataset', 'orders_view')).toBeNull();
+        put.flush({}, { status: 409, statusText: 'Conflict' });
+        fixture.detectChanges();
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain("missing query 'q'");
+    });
+
+    it('an unreadable re-check does not block the Save — it says "not checked" instead', async () => {
+        const { fixture, c, http } = create();
+        flushReads(http);
+        c.onDraftImported(draft(false));
+        await fixture.whenStable();
+        flushReads(http);
+        c.save();
+        answerRecheck(http, 'unreadable');
+        const [post, ...rest] = writes(http);
+        expect(rest).toEqual([]);
+        post.flush({});
+        expect(TestBed.inject(ToastrService).warning).toHaveBeenCalledWith(expect.stringContaining('could not run'));
     });
 });

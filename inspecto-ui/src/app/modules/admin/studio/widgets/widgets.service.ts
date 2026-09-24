@@ -26,6 +26,11 @@ export class WidgetsService {
         return fromContent(id, content);
     }
 
+    /** The content {@link save} writes for a {@link Widget} — what an imported draft's pre-Save re-check judges. */
+    toContent(widget: Widget): Record<string, unknown> {
+        return toContent(widget);
+    }
+
     /** Create by default; pass `{update: true}` when editing an existing widget — the backend 409s a
      *  create on an existing id (id is immutable in the editors, so update never renames). */
     save(widget: Widget, opts?: { update?: boolean; ifMatch?: string }): Observable<Widget> {
