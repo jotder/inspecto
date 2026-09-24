@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **35<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3** —
+> **34<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -24,9 +24,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 14<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 35<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 34<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -58,7 +58,7 @@ rank.
 
 | State | P2 rows |
 |---|---|
-| **Startable now** — no gate, no owed decision | AI drafting for `transform` (§3.1, every call answered 2026-09-25) · Bundle "load as draft" (§3.7, every call answered 2026-09-25) · X1 retry affordance + per-pipeline `processing.retry` (§3.2) · policy-authoring save-time guards F1–F9 (§3.8) · parser plugins P2–P4 (§3.3) |
+| **Startable now** — no gate, no owed decision | Bundle "load as draft" (§3.7, every call answered 2026-09-25) · X1 retry affordance + per-pipeline `processing.retry` (§3.2) · policy-authoring save-time guards F1–F9 (§3.8) · parser plugins P2–P4 (§3.3) |
 | **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | Platform Services Stage 2/3 (§3.2) · `findings-spec` UI acceptance session (§3.9) · cross-Space consequence (§3.5, ⏸ on hold until D10 is named) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (SES/SNS adapter ON HOLD by operator 2026-09-25; per-user preferences need a call) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) · `DUCKLE-C1-DATASET-FRESHNESS-1` residual (2) (needs a design pass, §3.5) |
 
@@ -99,7 +99,6 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 |---|---|---|
 | 3.2 | EXECUTION-RESIDUALS X1 | none — Q1–Q4 answered 2026-09-25 (cancel = quarantine with `retry_cancelled`; retry-now clears the backoff only; routes first, per pipeline) and the per-pipeline `processing.retry` block is to be built now |
 | 3.12 | Link Analysis | every open D-U* / LA-* call lives in `superpower/link-analysis-backlog-plan.md` |
-| 3.1 | AI drafting on a non-`schema` kind | none — all seven calls answered 2026-09-25: D1 `transform` · D2 `schema` slice is its own row · D3 `ComponentSpecs.forKind` · D4 n/a · D5 both, deterministic validate-and-repair first, then NL drafting · D6 `clean` needs a passing preview, no sample ⇒ WARNING · D7 Option B (unanchored preview findings) |
 | 3.2 | Platform Services Stage 2 / 3 | 10 calls in `superpower/platform-services-stage2-design.md` (Decisions owed) |
 | 3.3 | Parsing (Stage-1) — parser-plugin trust | none — all ten calls answered 2026-09-25 (see the row) in `superpower/parser-plugins-trust-design.md` (Decisions owed) |
 | 3.5 | cross-Space consequence | ⏸ ON HOLD 2026-09-25 (operator) until someone names the concrete consequence (D10); D2 two-party consent stands |
@@ -154,7 +153,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 #### Authoring surfaces
 
 - **P2** · **AUTHORING-REDESIGN-1** — **the authoring redesign's still-open letters.** (c), the structured AST table over the row predicate, is COMPLETE (2026-09-23; step 5 `transform.join` out of scope by design), and (f)(g)(j)(l)(m)(n2)(o) shipped, and (i) — the Parse pane's per-row "sample resolves to" line, over an additive `resolved` `sniff_csv` map on the delimited previews — shipped 2026-09-24 (`okf/frontend/features/grammar-config.md`). Open: **(d)** v3 macros as the UDF registry — per-connection re-creation in `EnrichmentEngine`, `PipelineJobRunner`, `ConsignmentIngestStrategy` and preview — demand-gated; **(e)** column metadata editing on the Transform pane (Parse D2) — re-grounded 2026-09-24: storing it is trivial (`fields[]` rides `steps:` opaquely) but nothing would READ it — catalog column metadata comes only from a schema's `raw.fields[]` (`SchemaProjection` ← `MetadataGraphBuilder`), which has no node for a Step's output columns, so it needs a decision on where a Step's output metadata surfaces plus that catalog projection, not a node attribute alone; and on (f), which COLUMNS a reference carries is the dry run's question (the save checks existence and `on` presence only). → `archived-documents/plans-archive/authoring-ast-table-design.md` · `okf/frontend/features/schema-mapping-authoring.md` §0
-- **P2** · **AI drafting on a non-`schema` kind** — trigger FIRED 2026-09-15 (an author asked). Restore `<inspecto-ai-assist>`/`component_draft` for a kind: either give `grammar`/`transform`/`sink` a backend `ConfigSpec` (none has one; `ConfigSpecs.TYPES` excludes all three) or rework `SchemaEditorDialog`. ⛔ No low-risk slice survives — **design first**; the demand answers *whether*, not *how*. 📐 **Designed 2026-09-24** (design only, 7 decisions owed; D1 is *which kind*): the `schema` kind was never retired, so its re-adoption is a small slice that does not answer this ask. → `superpower/ai-drafting-non-schema-design.md` · `okf/frontend/features/inline-ai-authoring.md`
 - **P3** · **P4 Test mapping on a generic `parser` node** — the (l) discharge unblocked Test mapping on a *dangling per-format* grammar binding, not on a **generic** `parser`, which the owner doc calls unmappable (it falls to `GrammarEditorDialog`). Nothing authors a parse node's mapping any more — mappings are authored in the standalone Mapping component (`mapping-editor.dialog.ts`) — so this would test a mapping an operator cannot author on that node. Build only when asked by name. → `okf/frontend/features/pipeline-editor.md`
 
 #### Step catalog & node types
