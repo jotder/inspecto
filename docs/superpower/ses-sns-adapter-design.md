@@ -1,6 +1,6 @@
 # SES/SNS delivery-status adapter — design and security review (`D8-SES-SNS-1`)
 
-> **Status: DESIGN ONLY 2026-09-24 — nothing built; 14 operator decisions owed (§9).**
+> **Status: DESIGN ONLY 2026-09-24 — nothing built.** ⏸ **The SES/SNS adapter (§2–§5, D1–D12) is ON HOLD (operator, 2026-09-25)** until an SES deployment is named. D13 was answered 2026-09-25 by per-user notification read state. Still live: §7 per-user preferences, §6 GeoIP, §8 security triggers, D14. F1 (body cap) and F3 (`X-Forwarded-For`) were fixed 2026-09-24.
 > BACKLOG row *Notification residuals (`D8-SES-SNS-1`)*, §3.5. Owner concept:
 > [`okf/backend/control-plane/events-metrics.md`](../okf/backend/control-plane/events-metrics.md)
 > § *Inbound delivery-status webhooks*. Grounded against `master` at `7bb36309c`.
