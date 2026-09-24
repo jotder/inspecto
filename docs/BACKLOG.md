@@ -20,7 +20,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 > `PIPELINE-CONFIG-HISTORY-1`, `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` (had shipped in `d5f6353be`), `NODETYPE-SCAFFOLD-EMITS-A-COPY-1`,
 > `FLAT-DRYRUN-COUNTS-ZERO-1`, `DUCKLE-C10-ADMISSION-POOLS-1`, `DUCKLE-C8-BASELINE-EXPECTATION-1`, **EXPORT-1**,
 > `AUDIT-LOG-UNBOUNDED-READ-1`, **Vocabulary rollout, Tier 3**, `QUEUES-USER-FACING-COPY-1` (already fixed in `ec49b7bda`) and
-> `GLOSSARY-CASE-1`. Filed: P2 `SQLGUARD-PARQUET-METADATA-1`. Re-ranked: **Job framework** P2 → P3.
+> `GLOSSARY-CASE-1`. Filed: P2 `SQLGUARD-COMMA-RELATION-1` (`SQLGUARD-PARQUET-METADATA-1` was filed and closed the same day). Re-ranked: **Job framework** P2 → P3.
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
