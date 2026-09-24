@@ -138,6 +138,7 @@ final class AccessRoutes implements RouteModule {
                     .map(s -> s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS)).orElse(true);
             out.put("error", mayConfigure && doc.error() != null ? error + ": " + doc.error() : error);
             out.put("warnings", List.of());
+            out.put("resourceKinds", AccessPolicies.RESOURCE_KINDS.stream().sorted().toList());
             return out;
         }
         List<Map<String, Object>> rows = new java.util.ArrayList<>();
@@ -152,6 +153,8 @@ final class AccessRoutes implements RouteModule {
         out.put("policies", rows);
         out.put("warnings", AccessPolicies.lint(doc.policies(), Roles.effective(api.writeRoot()).keySet(), seeds)
                 .stream().map(AccessRoutes::warningShape).toList());
+        // the authoring vocabulary for resourceKinds (F4) — served so the SPA never mirrors it
+        out.put("resourceKinds", AccessPolicies.RESOURCE_KINDS.stream().sorted().toList());
         return out;
     }
 

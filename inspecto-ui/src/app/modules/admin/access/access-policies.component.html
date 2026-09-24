@@ -1,13 +1,20 @@
 <div class="flex flex-col gap-6 pt-4">
     <!-- Effective policies -->
     <section class="flex flex-col gap-3">
-        <div class="flex flex-col gap-1">
-            <h2 class="text-lg font-medium">Effective policies</h2>
-            <p class="text-secondary max-w-3xl text-sm">
-                Authored policies plus the engine's built-in denies (space isolation), which are never in the authored
-                document. Authoring is done in <code>access-policies.toon</code> or via the API; this view is read-only.
-                Policies are enforced only on the Enterprise edition.
-            </p>
+        <div class="flex flex-wrap items-start justify-between gap-3">
+            <div class="flex flex-col gap-1">
+                <h2 class="text-lg font-medium">Effective policies</h2>
+                <p class="text-secondary max-w-3xl text-sm">
+                    Authored policies plus the engine's built-in denies (space isolation), which are never in the
+                    authored document. Saving checks each policy for the mistakes that fail silently and refuses a
+                    change that would lock you out. Policies are enforced only on the Enterprise edition.
+                </p>
+            </div>
+            @if (canEdit()) {
+                <button mat-flat-button color="primary" type="button" (click)="newPolicy()" [disabled]="saving()">
+                    New policy
+                </button>
+            }
         </div>
 
         @if (docError()) {
@@ -34,11 +41,14 @@
                             <th scope="col" class="py-2 pr-4 font-medium">Target</th>
                             <th scope="col" class="py-2 pr-4 font-medium">Condition</th>
                             <th scope="col" class="py-2 pr-4 font-medium">Source</th>
+                            @if (canEdit()) {
+                                <th scope="col" class="py-2 pr-4 font-medium"><span class="sr-only">Actions</span></th>
+                            }
                         </tr>
                     </thead>
                     <tbody>
                         @for (p of rows(); track p.name) {
-                            <tr class="border-b">
+                            <tr [class.border-b]="!warningsFor(p.name).length">
                                 <td class="py-2 pr-4 font-medium">{{ p.name }}</td>
                                 <td class="py-2 pr-4">
                                     <span class="inline-flex items-center gap-1">
@@ -66,7 +76,63 @@
                                         {{ p.source === 'seed' ? 'built-in' : 'authored' }}
                                     </inspecto-chip>
                                 </td>
+                                @if (canEdit()) {
+                                    <td class="py-2 pr-4 whitespace-nowrap">
+                                        @if (p.source === 'seed') {
+                                            <button
+                                                mat-button
+                                                type="button"
+                                                (click)="override(p)"
+                                                [disabled]="saving()"
+                                            >
+                                                Override…
+                                            </button>
+                                        } @else {
+                                            <button
+                                                mat-icon-button
+                                                type="button"
+                                                (click)="edit(p)"
+                                                [disabled]="saving()"
+                                                [attr.aria-label]="'Edit policy ' + p.name"
+                                                matTooltip="Edit"
+                                            >
+                                                <mat-icon svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                                            </button>
+                                            <button
+                                                mat-icon-button
+                                                type="button"
+                                                (click)="remove(p)"
+                                                [disabled]="saving()"
+                                                [attr.aria-label]="'Delete policy ' + p.name"
+                                                matTooltip="Delete"
+                                            >
+                                                <mat-icon svgIcon="heroicons_outline:trash"></mat-icon>
+                                            </button>
+                                        }
+                                    </td>
+                                }
                             </tr>
+                            @if (warningsFor(p.name).length) {
+                                <tr class="border-b">
+                                    <td [attr.colspan]="canEdit() ? 6 : 5" class="pb-2 pr-4">
+                                        <ul
+                                            class="flex flex-col gap-1 text-xs"
+                                            [attr.aria-label]="'Warnings for ' + p.name"
+                                        >
+                                            @for (w of warningsFor(p.name); track w.code + w.message) {
+                                                <li class="text-warn flex items-start gap-1">
+                                                    <mat-icon
+                                                        class="icon-size-4 shrink-0"
+                                                        svgIcon="heroicons_outline:exclamation-triangle"
+                                                        aria-hidden="true"
+                                                    ></mat-icon>
+                                                    <span><span class="sr-only">Warning: </span>{{ w.message }}</span>
+                                                </li>
+                                            }
+                                        </ul>
+                                    </td>
+                                </tr>
+                            }
                         }
                     </tbody>
                 </table>

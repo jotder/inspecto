@@ -169,6 +169,8 @@ class ControlApiAccessPolicyLintTest {
                     {"name":"known","effect":"deny","target":{"resourceKinds":["Incident ","investigation"]},"when":"resource.caseType == 'billing'"}"""), null));
             assertTrue(codes(saved, "plural").contains("unknown-resource-kind"), "warnings: " + saved.get("warnings"));
             assertTrue(codes(saved, "known").isEmpty(), "warnings: " + saved.get("warnings"));
+            assertEquals("[\"alert\",\"case\",\"incident\",\"investigation\",\"task\"]", saved.get("resourceKinds").toString(),
+                    "the vocabulary is served, so the SPA never mirrors it");
         }
     }
 

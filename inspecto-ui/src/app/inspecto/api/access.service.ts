@@ -1,6 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { inject, Injectable } from '@angular/core';
-import { Observable } from 'rxjs';
+import { map, Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 
 /**
@@ -72,11 +72,63 @@ export interface PolicyDef {
     source?: 'authored' | 'seed';
 }
 
+/** A save-time finding the server does not refuse (policy-authoring §4) — e.g. `unknown-role`,
+ *  `unknown-capability`, `unknown-resource-kind`, `resource-ref-at-route-level`, `seed-override`. */
+export interface PolicyWarning {
+    policy: string;
+    code: string;
+    message: string;
+}
+
 /** `GET /access/policies` — authored policies plus the engine's seed policies (Enterprise only);
- *  `error` set ⇔ the authored doc is unreadable (the engine denies, fail-closed) until fixed. */
+ *  `error` set ⇔ the authored doc is unreadable (the engine denies, fail-closed) until fixed.
+ *  `etag` is the response header (the `If-Match` a save echoes), not a body field. */
 export interface PoliciesDoc {
     policies: PolicyDef[];
     error?: string;
+    warnings?: PolicyWarning[];
+    /** The resource kinds a row-level policy can target — served (`AccessPolicies.RESOURCE_KINDS`),
+     *  never mirrored here; anything else is an `unknown-resource-kind` warning. */
+    resourceKinds?: string[];
+    etag?: string;
+}
+
+/** One cell of `POST /access/policies/preview`: a role × action (× kind) decision before → after. */
+export interface PolicyPreviewCell {
+    role: string;
+    action: 'read' | 'write' | 'operate';
+    resourceKind: string | null;
+    before: 'ALLOW' | 'DENY' | 'ABSTAIN';
+    beforePolicy: string | null;
+    after: 'ALLOW' | 'DENY' | 'ABSTAIN';
+    afterPolicy: string | null;
+    changed: boolean;
+}
+
+/** `POST /access/policies/preview` — the draft's impact; `enabled:false` without a policy engine. */
+export interface PolicyPreview {
+    enabled: boolean;
+    reason?: string;
+    route?: string;
+    roles?: string[];
+    actions?: string[];
+    kinds?: string[];
+    cells?: PolicyPreviewCell[];
+    warnings?: PolicyWarning[];
+}
+
+/** The PUT/preview body shape of one policy — the GET's read-only `source` stripped (the server
+ *  refuses an unknown key, F8). */
+function policyBody(p: PolicyDef): PolicyDef {
+    const target: PolicyDef['target'] = {};
+    if (p.target?.actions?.length) target.actions = p.target.actions;
+    if (p.target?.resourceKinds?.length) target.resourceKinds = p.target.resourceKinds;
+    return {
+        name: p.name,
+        effect: p.effect,
+        ...(target.actions || target.resourceKinds ? { target } : {}),
+        ...(p.when?.trim() ? { when: p.when.trim() } : {}),
+    };
 }
 
 /** One policy's contribution to an explain trace. A policy decides only when both are true. */
@@ -128,7 +180,29 @@ export class AccessService {
     /** The effective policies — authored rows tagged `source:authored`, plus the engine's seed
      *  policies tagged `source:seed` (Enterprise only). */
     policies(): Observable<PoliciesDoc> {
-        return this.http.get<PoliciesDoc>(apiUrl('/access/policies'));
+        return this.http
+            .get<PoliciesDoc>(apiUrl('/access/policies'), { observe: 'response' })
+            .pipe(map((res) => ({ ...(res.body as PoliciesDoc), etag: res.headers.get('ETag') ?? undefined })));
+    }
+
+    /** Full replace of the AUTHORED policies (settings-doc discipline). `etag` (from {@link policies})
+     *  rides as `If-Match`, so a concurrent save is a `409 CONFLICT_STALE_VERSION`, never a silent
+     *  overwrite. A 422 names the policy and the failed check — including `would-lock-out` (F7). */
+    savePolicies(authored: PolicyDef[], etag?: string): Observable<PoliciesDoc> {
+        return this.http
+            .put<PoliciesDoc>(
+                apiUrl('/access/policies'),
+                { policies: authored.map(policyBody) },
+                { observe: 'response', ...(etag ? { headers: { 'If-Match': etag } } : {}) },
+            )
+            .pipe(map((res) => ({ ...(res.body as PoliciesDoc), etag: res.headers.get('ETag') ?? undefined })));
+    }
+
+    /** The impact of an unsaved authored list (S4) — nothing is written. */
+    previewPolicies(authored: PolicyDef[]): Observable<PolicyPreview> {
+        return this.http.post<PolicyPreview>(apiUrl('/access/policies/preview'), {
+            policies: authored.map(policyBody),
+        });
     }
 
     /** "Why denied?" dry-run for the current session against a hypothetical route/method/resource. */
