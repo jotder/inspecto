@@ -20,7 +20,8 @@ export type V1ErrorCode =
     | 'UNAUTHENTICATED'
     | 'PERMISSION_DENIED'
     | 'RATE_LIMITED'
-    | 'NOT_SUPPORTED';
+    | 'NOT_SUPPORTED'
+    | 'PAYLOAD_TOO_LARGE';
 
 export interface V1EnvelopeMetadata {
     timestamp: string;

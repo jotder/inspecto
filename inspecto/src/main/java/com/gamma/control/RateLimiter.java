@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * instance — no config framework, no external store, matching the project's no-new-dependency bar.
  *
  * <p>Each instance is one budget: a burst of {@code capacity} requests, refilling at {@code refillPerSecond}
- * tokens/second. Two budgets exist ({@link #standard()} and {@link #dashboard()}); both are fixed, not
+ * tokens/second. Three budgets exist ({@link #standard()}, {@link #dashboard()}, {@link #callback()}); all are fixed, not
  * configurable — no existing gate in this file reads a rate-limit config key, so there is no pattern to extend.
  *
  * <p>⚠ {@code /bi/query} has its OWN, larger bucket (operator decision 2026-09-24): every Studio widget fires
@@ -24,6 +24,11 @@ final class RateLimiter {
 
     /** The dashboard budget for {@code /bi/query}: burst 120 (≈ ten 12-tile dashboards), then 2 requests/second. */
     static RateLimiter dashboard() { return new RateLimiter(120.0, 2.0); }
+
+    /** The public delivery-status callback budget (SEC review F1): burst 60, then 5 requests/second per
+     *  caller IP. Unauthenticated, so the key is the IP; a provider posting from a handful of addresses
+     *  batches its events and retries a 429 later, so this bounds abuse without dropping receipts. */
+    static RateLimiter callback() { return new RateLimiter(60.0, 5.0); }
 
     private final double capacity;
     private final double refillPerSecond;

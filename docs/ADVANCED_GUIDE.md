@@ -508,7 +508,8 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
 - **Notifications (beyond alerts):** `GET /notifications`, `/notifications/stream` (SSE), `/notifications/unread-count`,
   `POST /notifications/read-all`, `POST /notifications/{id}/read`, `DELETE /notifications/{id}`,
   `GET/PUT /notifications/preferences`, `GET/POST /notifications/channels`, `PUT/DELETE /notifications/channels/{id}`
-  *(channel writes: canAuthorWorkbench)*.
+  *(channel writes: canAuthorWorkbench; read/read-all/delete + preference PUT: canAdminister — the feed state and
+  the grid are shared per Space, not per user)*.
 - **Workflows:** `GET /workflows/{type}` — authored `*_workflow.toon` override if registered, else the default state machine.
 - **Investigation / link analysis (INV-1):** `POST /inv/projection` (entity-projection fold; *503 no write root, 404 unknown
   dataset, 422 bad column*), `POST /inv/projection/neighbors` (one-hop expand; same gates). Multi-root/export/undo are

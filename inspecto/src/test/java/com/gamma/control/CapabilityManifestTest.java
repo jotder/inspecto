@@ -155,6 +155,25 @@ class CapabilityManifestTest {
                 + "capability or an exemption, never a pending row: " + pending);
     }
 
+    /**
+     * SEC review F2 (2026-09-24): the notification feed's read/archive state and the preference grid are one
+     * shared state per Space — neither store is keyed by a recipient — so these four writes were never "the
+     * caller's own", which is what their old {@code self-service} exemption claimed. Pinned so a re-exemption
+     * has to delete this test, not just move a line between tables.
+     */
+    @Test
+    void sharedNotificationStateWritesStayAdminGated() {
+        Set<String> adminGated = new LinkedHashSet<>();
+        for (CapabilityManifest.Entry e : CapabilityManifest.ENTRIES)
+            if (Roles.CAN_ADMINISTER.equals(e.capability())) adminGated.add(route(e.method(), e.pattern()));
+        for (String r : new String[] {"POST /notifications/read-all", "POST /notifications/([^/]+)/read",
+                "PUT /notifications/preferences", "DELETE /notifications/(?!suppressions$)([^/]+)"})
+            assertTrue(adminGated.contains(r), () -> r + " writes one global per-Space state and must stay canAdminister");
+        for (CapabilityManifest.Exemption x : CapabilityManifest.EXEMPTIONS)
+            assertFalse(x.pattern().startsWith("/notifications"),
+                    () -> "no /notifications write is caller-scoped, so none may be exempt: " + x);
+    }
+
     private static String route(String method, String pattern) {
         return method.toUpperCase(Locale.ROOT) + " " + pattern;
     }

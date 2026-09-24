@@ -187,6 +187,15 @@ flavour territory (core ships the SPI; the adapters live in `inspecto-connectors
   platform auth in both `authenticate` and `authorize`. It is **not** in `PUBLIC_PATHS` (exact-match infra
   paths) and **not** `isInfraRoute` — and it still lives under `/api/v1`, which is what an operator must
   paste into the provider console.
+* **The unauthenticated edge is bounded twice, before the handler buffers anything** (SEC review F1,
+  2026-09-24). The body is read through `ApiContext.rawBody(ex, maxBytes)` with
+  `DeliveryStatusRoutes.MAX_CALLBACK_BYTES` = 256 KiB — over it is **413 `PAYLOAD_TOO_LARGE`**, refused on
+  the declared `Content-Length` before reading, or after at most cap+1 bytes of a chunked body, and never
+  handed to `verify`. And the path is in `ControlApi.isRateLimited` on its own per-caller-IP bucket
+  (`RateLimiter.callback()`: burst 60, 5/s) → **429 `RATE_LIMITED`**. ⚠ Until then the route read the
+  whole body into the heap with no cap and no throttle — any anonymous caller could post gigabytes.
+  The bucket key is `ApiContext.ip`, which honours `X-Forwarded-For` only from a
+  `-Dcontrol.trustedProxies` peer (F3) — otherwise a rotating header would mint a fresh bucket per request.
 
 Config: `notify.deliverystatus.sendgrid.publicKey` · `notify.deliverystatus.hmac.secret` ·
 `…{sendgrid,hmac}.freshnessSeconds` (default 300). Unset ⇒ the adapter is inert and its URL 404s.

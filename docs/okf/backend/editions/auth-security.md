@@ -328,6 +328,24 @@ capability gate **wraps** the data-scope guard, so adding one to a scoped route 
 from **404 into 403**: existence-hiding now answers second. Tests that exercise the scope guard must carry the
 new capability, or they silently start asserting the gate instead.
 
+🔴 **A `self-service` exemption must be scoped IN THE STORE, not in the reason text** (SEC review F2,
+2026-09-24). `POST /notifications/read-all`, `POST /notifications/{id}/read`, `DELETE /notifications/{id}` and
+`PUT /notifications/preferences` were exempt as "the caller's own" feed and preferences — but
+`NotificationStore` and `NotificationPreferences` hold **one** state per Space with no recipient, so any
+authenticated user could silence a category's email/webhook delivery, or mark read and archive the feed,
+for everyone. All four are now `canAdminister` (fail closed; reads stay open), pinned by
+`CapabilityManifestTest.sharedNotificationStateWritesStayAdminGated` and exercised WITH a Subject in
+`ControlApiNotificationsTest`. ⚠ Consequence: a non-admin's bell can no longer mark read or dismiss; per-user
+read state (a recipient-keyed store) is what would let those four become self-service again.
+
+🔴 **The client IP is the socket peer unless a trusted proxy vouches otherwise** (SEC review F3,
+2026-09-24). `ApiContext.ip` — the audit trail's `ip` and the throttle key for callers with no Subject —
+took the first `X-Forwarded-For` entry from ANY caller, so both were caller-chosen: forge the audit IP, or
+rotate the header to get a fresh rate-limit bucket per request. It now reads the value `ControlApi`
+resolves once per request against `-Dcontrol.trustedProxies` (`TrustedProxies`: default empty ⇒ ignore
+XFF; with a list, only from a listed peer, right-most untrusted hop). Operator detail in
+[operations reference](../build-run/operations-reference.md).
+
 **Evidence** is `compliance/evidence/route-gating.md`, whose inventory table is **generated** by
 `tools/route-gating-report.mjs` and CI-enforced in `--check` mode — the document cannot say something the
 code does not. Plan of record: `archived-documents/plans-archive/route-gating-compliance-plan.md`.

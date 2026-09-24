@@ -42,6 +42,11 @@ import java.util.ServiceLoader;
  */
 final class DeliveryStatusRoutes implements RouteModule {
 
+    /** Hard cap on an inbound callback body (SEC review F1): the route is unauthenticated, so the body is
+     *  bounded BEFORE it is buffered — a larger one is {@code 413 PAYLOAD_TOO_LARGE} and never reaches the
+     *  adapter. 256 KiB comfortably holds a provider's batched event array (SendGrid batches ~1 KB events). */
+    static final int MAX_CALLBACK_BYTES = 256 * 1024;
+
     /** Adapters are configured from system properties, so discovery once per API instance is correct. */
     private final List<DeliveryStatusAdapter> adapters = discoverAdapters();
 
@@ -129,7 +134,7 @@ final class DeliveryStatusRoutes implements RouteModule {
 
         // rawBody, never body(): the provider signed these exact bytes, and a re-serialised map would not
         // reproduce their key order or whitespace. Parsing happens inside the adapter, after verification.
-        byte[] raw = api.rawBody(e);
+        byte[] raw = api.rawBody(e, MAX_CALLBACK_BYTES);
         if (!adapter.verify(raw, headers(e))) {
             // The audit record D8 asks for comes free: ControlApi.dispatch records every request with its
             // status, so a rejected callback lands in the trail as a 403 on this path. Nothing is written

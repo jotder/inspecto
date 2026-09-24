@@ -205,6 +205,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     /** S6 — the composed request pipeline: an ordered chain of cross-cutting {@link Middleware} wrapping the
      *  terminal route dispatch. Built once in the constructor, after the route table is registered. */
     private final Chain pipeline;
+    /** Peers whose {@code X-Forwarded-For} is believed ({@code -Dcontrol.trustedProxies}); empty ⇒ none (default). */
+    private final TrustedProxies trustedProxies;
     /** Allowed CORS origin ({@code -Dcontrol.cors}); {@code null} ⇒ CORS disabled (default). */
     private final String corsOrigin;
     /** Static SPA root ({@code -Dui.dir}); {@code null} ⇒ no static serving (default). */
@@ -223,6 +225,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     private final RateLimiter rateLimiter = RateLimiter.standard();
     /** {@code /bi/query}'s own, larger bucket — one request per dashboard widget (see {@link RateLimiter#dashboard()}). */
     private final RateLimiter dashboardLimiter = RateLimiter.dashboard();
+    /** The unauthenticated D8 delivery-status callback's own bucket, keyed by caller IP (SEC review F1). */
+    private final RateLimiter callbackLimiter = RateLimiter.callback();
 
     /**
      * Control plane over a single running service — wrapped as the {@code default} space. The long-standing
@@ -246,6 +250,11 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         this.spaces = spaces;
         String cors  = System.getProperty("control.cors");
         this.corsOrigin = blank(cors) ? null : cors.trim();
+        try {
+            this.trustedProxies = TrustedProxies.fromSystemProperty();
+        } catch (IllegalArgumentException bad) {
+            throw new IOException("-D" + TrustedProxies.PROPERTY + ": " + bad.getMessage());
+        }
         String ui    = System.getProperty("ui.dir");
         this.uiDir   = blank(ui) ? null : Path.of(ui.trim()).toAbsolutePath().normalize();
         String wr    = System.getProperty("assist.write.root");
@@ -573,7 +582,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     static final String[] REQUEST_SCOPED_ATTRS = {
             ApiContext.ATTR_CORRELATION_ID, ApiContext.ATTR_START_NANOS, ApiContext.ATTR_SELF_PATH,
             ApiContext.ATTR_ERROR_CODE, ApiContext.ATTR_IDEMPOTENCY_STORE, ApiContext.ATTR_IDEMPOTENCY_KEY,
-            ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_CAPABILITY,
+            ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_CLIENT_IP, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_CAPABILITY,
             ApiContext.ATTR_RESOURCE_PERMISSIONS,
             ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ATTR_EFFECTIVE_PATH,
             Roles.ATTR_CONFIG_ROOT, AccessDecider.ATTR_MATCHED_POLICY };
@@ -607,6 +616,10 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      *  its finally closes the exchange once the whole chain has unwound. */
     private void correlation(HttpExchange ex, Chain next) throws Exception {
         clearRequestScope(ex);   // SEC-EXCHANGE-ATTRS: nothing from a previous request may be readable
+        var peer = ex.getRemoteAddress();
+        String clientIp = trustedProxies.clientIp(peer == null ? null : peer.getAddress(),
+                ex.getRequestHeaders().get("X-Forwarded-For"));
+        if (clientIp != null) ApiContext.attr(ex, ApiContext.ATTR_CLIENT_IP, clientIp);
         String cid = ex.getRequestHeaders().getFirst("Correlation-ID");
         cid = (cid == null || cid.isBlank()) ? java.util.UUID.randomUUID().toString() : cid.trim();
         ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID, cid);
@@ -891,10 +904,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     /** Route prefixes throttled by {@link #rateLimit} ({@code NO-RATE-LIMIT-EXPENSIVE-ROUTES-1}): each can
      *  saturate DuckDB ({@code /db/query}, {@code /bi/query}, {@code /recon/*}) or spend model tokens
-     *  ({@code /agent/*}) without any other bound on request volume. */
+     *  ({@code /agent/*}) without any other bound on request volume — plus the one UNAUTHENTICATED write,
+     *  the D8 {@code /public/delivery-status/*} callback (SEC review F1), on its own per-IP bucket. */
     private static boolean isRateLimited(String path) {
         return path.equals("/db/query") || path.equals("/bi/query")
-                || path.startsWith("/recon/") || path.startsWith("/agent/");
+                || path.startsWith("/recon/") || path.startsWith("/agent/")
+                || path.startsWith("/public/delivery-status/");
     }
 
     /** Per-subject (falling back to the caller's IP when unauthenticated) token-bucket throttle for the
@@ -907,7 +922,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             String ip = ApiContext.ip(ex);
             return ip == null ? "unknown" : ip;
         });
-        RateLimiter bucket = path.equals("/bi/query") ? dashboardLimiter : rateLimiter;
+        RateLimiter bucket = path.equals("/bi/query") ? dashboardLimiter
+                : path.startsWith("/public/delivery-status/") ? callbackLimiter : rateLimiter;
         if (!bucket.tryConsume(key))
             throw new ApiException(429, ErrorCodes.RATE_LIMITED, "rate limit exceeded for " + path + " — retry later");
     }
@@ -1160,6 +1176,32 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         }
         ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY, raw);
         return raw;
+    }
+
+    @Override
+    public byte[] rawBody(HttpExchange ex, int maxBytes) throws IOException {
+        if (ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY) instanceof byte[] cached) {
+            if (cached.length > maxBytes) throw tooLarge(maxBytes);
+            return cached;
+        }
+        String declared = ex.getRequestHeaders().getFirst("Content-Length");
+        if (declared != null) {
+            long length;
+            try { length = Long.parseLong(declared.trim()); } catch (NumberFormatException bad) { length = -1L; }
+            if (length > maxBytes) throw tooLarge(maxBytes);
+        }
+        byte[] raw;
+        try (InputStream in = ex.getRequestBody()) {
+            raw = in.readNBytes(maxBytes + 1);
+        }
+        if (raw.length > maxBytes) throw tooLarge(maxBytes);
+        ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY, raw);
+        return raw;
+    }
+
+    private static ApiException tooLarge(int maxBytes) {
+        return new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE,
+                "request body exceeds the " + maxBytes + "-byte limit for this route");
     }
 
     /**

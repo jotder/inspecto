@@ -29,6 +29,8 @@ public final class ErrorCodes {
     public static final String RATE_LIMITED             = "RATE_LIMITED";
     /** 501 — the route exists but does not support this request's shape on this host (e.g. run-to-here on a non-file Collector). */
     public static final String NOT_SUPPORTED            = "NOT_SUPPORTED";
+    /** 413 — a request body over a route's hard cap (the public delivery-status callback, SEC review F1). */
+    public static final String PAYLOAD_TOO_LARGE        = "PAYLOAD_TOO_LARGE";
 
     /** The contract's default code for a status ({@code errorCode} is never absent on a v1 error). */
     static String defaultFor(int status) {
@@ -39,6 +41,7 @@ public final class ErrorCodes {
             case 404 -> NOT_FOUND;
             case 405 -> METHOD_NOT_ALLOWED;
             case 409 -> CONFLICT;
+            case 413 -> PAYLOAD_TOO_LARGE;
             case 422 -> CONFIG_VALIDATION_FAILED;
             case 501 -> NOT_SUPPORTED;
             case 503 -> CAPABILITY_UNAVAILABLE;

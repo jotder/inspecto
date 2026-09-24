@@ -148,6 +148,14 @@ final class CapabilityManifest {
             new Entry("POST", "/notifications/rules", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/notifications/rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/notifications/rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
+            // The feed state and the preference grid are ONE shared state per Space — NotificationStore and
+            // NotificationPreferences carry no recipient — so these change what EVERY user sees and receives.
+            // They were exempt as "self-service" (the caller's own) until SEC review F2, 2026-09-24.
+            // ⛔ Re-exempt them only once the store is keyed by Subject.
+            new Entry("POST", "/notifications/read-all", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/notifications/([^/]+)/read", Roles.CAN_ADMINISTER),
+            new Entry("PUT", "/notifications/preferences", Roles.CAN_ADMINISTER),
+            new Entry("DELETE", "/notifications/(?!suppressions$)([^/]+)", Roles.CAN_ADMINISTER),
             // DeliveryStatusRoutes — the read surface only; the inbound callback authenticates itself
             // by provider signature and is deliberately outside the capability spine (D8 §4.4).
             new Entry("GET", "/notifications/deliveries", Roles.CAN_AUTHOR_WORKBENCH),
@@ -286,11 +294,10 @@ final class CapabilityManifest {
             // §2 self-verifying public — authenticated by something other than a Subject.
             new Exemption("POST", "/public/delivery-status/([^/]+)", "self-verifying-public", "inbound provider callback, verified by provider signature (D8 §4.4)"),
             new Exemption("POST", "/public/dashboards/([^/]+)/query", "self-verifying-public", "the share token IS the credential; scoped to one published dashboard"),
-            // §3 self-service — the caller's own inbox and preferences.
-            new Exemption("POST", "/notifications/read-all", "self-service", "marks the caller's own feed read"),
-            new Exemption("POST", "/notifications/([^/]+)/read", "self-service", "marks one of the caller's own entries read"),
-            new Exemption("PUT", "/notifications/preferences", "self-service", "the caller's own delivery preferences"),
-            new Exemption("DELETE", "/notifications/(?!suppressions$)([^/]+)", "self-service", "dismisses one of the caller's own entries"),
+            // §3 self-service — acts only the caller's own. ⚠ The four /notifications feed/preference writes
+            // were listed here as "the caller's own" but write ONE shared per-Space state; they are gated
+            // canAdminister above since SEC review F2 (2026-09-24). Verify a write is Subject-scoped IN THE
+            // STORE before listing it here.
             new Exemption("POST", "/requirements", "self-service", "SEC-7(c): anyone may raise a requirement, only a triager decides — pinned by ControlApiRequirementTest.triageIsGatedButSubmissionIsOpen"),
             // §4 read-shaped POST — a POST because the request carries a body, persists nothing. Reads are
             // open by design, so these are exempt AS READS (operator, 2026-09-15) — not "deferred".
