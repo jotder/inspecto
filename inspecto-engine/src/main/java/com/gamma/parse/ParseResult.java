@@ -22,15 +22,25 @@ public sealed interface ParseResult permits ParseResult.Table, ParseResult.Tree 
      * Flat parse output: the produced columns, a bounded row sample, and totals.
      * {@code columnTypes} (B2, 5.4.0, additive) is a per-column {@code {name, type}} list from an
      * {@code auto_detect} sniff of the sample — advisory (ingest stays all-VARCHAR), empty when the
-     * format has no sniff.
+     * format has no sniff. {@code resolved} (additive, 2026-09-24) is what the dialect sniff resolves the
+     * sample to, keyed by the grammar option it describes ({@code delimiter}, {@code has_header}, …) —
+     * empty when the format has no dialect sniff.
      */
     record Table(List<String> columns, List<Map<String, Object>> rows,
                  long rowCount, long rejectedRows,
-                 List<Map<String, String>> columnTypes) implements ParseResult {
+                 List<Map<String, String>> columnTypes, Map<String, String> resolved) implements ParseResult {
         public Table {
             columns = columns == null ? List.of() : List.copyOf(columns);
             rows = rows == null ? List.of() : List.copyOf(rows);
             columnTypes = columnTypes == null ? List.of() : List.copyOf(columnTypes);
+            resolved = resolved == null ? Map.of() : java.util.Collections.unmodifiableMap(
+                    new java.util.LinkedHashMap<>(resolved));
+        }
+
+        /** No sniffed dialect. */
+        public Table(List<String> columns, List<Map<String, Object>> rows, long rowCount, long rejectedRows,
+                     List<Map<String, String>> columnTypes) {
+            this(columns, rows, rowCount, rejectedRows, columnTypes, Map.of());
         }
 
         /** The pre-B2 shape — no inferred types (plugins and non-sniffing formats). */

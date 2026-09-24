@@ -129,7 +129,18 @@ catalog and by persisting `fields[]`.
 - **Not built, on purpose:** the "Describe the fields" metadata section (description · unit ·
   sensitivity) — the backend does not carry column metadata on a `transform.sql` node; until it lands
   (BACKLOG (e)), metadata rides through the Parse pane's by-selector carry-through
-  ([grammar-config.md](grammar-config.md)).
+  ([grammar-config.md](grammar-config.md)). ⚠ **Re-grounded 2026-09-24: the missing half is the
+  READER, not the store.** Storing it is trivial — `fields[]` already rides the `steps:` chain opaquely
+  (`sql: {sql, fields}`), so a `description`/`unit`/`classification` per row would round-trip today. But
+  nothing would read it: the catalog's column metadata comes ONLY from a schema's `raw.fields[]`
+  (`SchemaProjection.columns` ← `MetadataGraphBuilder`, per pipeline schema), and the metadata graph has
+  no node for a Stage-2 Step's output columns at all (its Stage-2 nodes are enrichments, with no column
+  children). A node attribute + contract entry without that projection would be a written-never-read key,
+  so (e) is not a contained change: it needs a decision on WHERE a Step's output metadata surfaces (the
+  output store's Dataset columns?) and the catalog projection for it.
+- **"Sample resolves to"** (AUTHORING-REDESIGN-1 (i)) shipped on the **Parse** pane's property rows, not
+  this grid — the grid's own **Sample** column already shows each row's value from a Test run. See
+  [grammar-config.md](grammar-config.md) § *The sectioned Parse pane*.
 - **Audit boundary:** saving a `transform.sql` node yields one WARNING `SQL_STEP_UNAUDITED` from the
   validator; a WARNING never blocks save (proven by test — `catalog-vs-executors.md`).
 

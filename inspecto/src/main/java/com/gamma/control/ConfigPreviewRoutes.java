@@ -241,6 +241,8 @@ final class ConfigPreviewRoutes implements RouteModule {
             out.put("rejectedRows", r.rejectedRows());
             // B2, additive: per-column inferred types (delimited sniff) — absent for other frontends.
             if (!r.columnTypes().isEmpty()) out.put("columnTypes", r.columnTypes());
+            // Additive (AUTHORING-REDESIGN-1 (i)): what the dialect sniff resolves the sample to, per option.
+            if (!r.resolved().isEmpty()) out.put("resolved", r.resolved());
             return out;
         } catch (IllegalArgumentException unsupported) {
             throw new ApiException(422, unsupported.getMessage());

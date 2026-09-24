@@ -126,11 +126,28 @@ public final class ComponentPreview {
      * {@code {name, type}} pair from a second {@code auto_detect=true} sniff of the same sample —
      * advisory only (production ingest stays all-VARCHAR); empty when the frontend has no sniff
      * (non-delimited) or the sniff failed.
+     *
+     * <p>{@code resolved} (additive, 2026-09-24 — AUTHORING-REDESIGN-1 (i)) is what DuckDB's own dialect
+     * sniff ({@code sniff_csv}) resolves the SAMPLE to, keyed by the {@code parsing.delimited.*} option it
+     * describes ({@code delimiter}, {@code quote}, {@code escape}, {@code comment}, {@code has_header},
+     * {@code skip_header_lines}, {@code date_format}, {@code timestamp_format}). It is the sample's answer
+     * independent of the grammar being authored — the Parse pane shows it under each property row, so an
+     * author sees where the settings and the file disagree. Empty for a non-delimited frontend or when the
+     * sniff failed (advisory, like {@code columnTypes}).
      */
     public record GrammarResult(List<String> columns, int rowCount, List<Map<String, Object>> rows,
-                                int rejectedRows, List<Map<String, String>> columnTypes) {
+                                int rejectedRows, List<Map<String, String>> columnTypes,
+                                Map<String, String> resolved) {
         public GrammarResult {
             columnTypes = columnTypes == null ? List.of() : List.copyOf(columnTypes);
+            resolved = resolved == null ? Map.of() : java.util.Collections.unmodifiableMap(
+                    new java.util.LinkedHashMap<>(resolved));
+        }
+
+        /** No sniffed dialect — every frontend but delimited. */
+        public GrammarResult(List<String> columns, int rowCount, List<Map<String, Object>> rows,
+                             int rejectedRows, List<Map<String, String>> columnTypes) {
+            this(columns, rowCount, rows, rejectedRows, columnTypes, Map.of());
         }
 
         /** The pre-B2 shape — no inferred types. */
@@ -240,7 +257,8 @@ public final class ComponentPreview {
                         ScratchTables.count(conn, "preview_parsed"),
                         ScratchTables.readRows(conn, "preview_parsed", MAX_ROWS),
                         rejectCount(conn),
-                        delimited ? sniffColumnTypes(conn, cfg, path) : List.of());
+                        delimited ? sniffColumnTypes(conn, cfg, path) : List.of(),
+                        delimited ? sniffDialect(conn, path) : Map.of());
             }
         } finally {
             java.nio.file.Files.deleteIfExists(sample);
@@ -451,6 +469,45 @@ public final class ComponentPreview {
      * failed sniff returns empty rather than failing the preview. Deliberately no {@code store_rejects}
      * — the sniff must not pollute the reject count the parse above just produced.
      */
+    /** {@code sniff_csv} column → the {@code parsing.delimited.*} option it describes (GrammarResult#resolved). */
+    private static final Map<String, String> SNIFF_OPTIONS = sniffOptions();
+
+    private static Map<String, String> sniffOptions() {
+        Map<String, String> m = new java.util.LinkedHashMap<>();
+        m.put("Delimiter", "delimiter");
+        m.put("Quote", "quote");
+        m.put("Escape", "escape");
+        m.put("Comment", "comment");
+        m.put("HasHeader", "has_header");
+        m.put("SkipRows", "skip_header_lines");
+        m.put("DateFormat", "date_format");
+        m.put("TimestampFormat", "timestamp_format");
+        return java.util.Collections.unmodifiableMap(m);
+    }
+
+    /**
+     * What DuckDB's dialect sniff resolves the raw sample to — {@code sniff_csv} over the scratch file with
+     * no authored options, so it is the FILE's answer, not an echo of the grammar. A column this DuckDB does
+     * not report is left out; a NUL character (DuckDB's "none", e.g. no escape) becomes {@code ""}. Advisory
+     * by construction: a failed sniff returns empty rather than failing the preview.
+     */
+    private static Map<String, String> sniffDialect(Connection conn, String path) {
+        Map<String, String> out = new java.util.LinkedHashMap<>();
+        try (java.sql.Statement st = conn.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("SELECT * FROM sniff_csv(" + ScratchTables.sqlStr(path) + ")")) {
+            if (!rs.next()) return Map.of();
+            java.sql.ResultSetMetaData md = rs.getMetaData();
+            for (int i = 1; i <= md.getColumnCount(); i++) {
+                String option = SNIFF_OPTIONS.get(md.getColumnLabel(i));
+                Object v = option == null ? null : rs.getObject(i);
+                if (v != null) out.put(option, v.toString().replace("\0", ""));
+            }
+            return out;
+        } catch (Exception sniffFail) {
+            return Map.of();
+        }
+    }
+
     private static List<Map<String, String>> sniffColumnTypes(Connection conn, PipelineConfig cfg, String path) {
         try (java.sql.Statement st = conn.createStatement()) {
             st.execute("CREATE TABLE preview_sniff AS SELECT * FROM read_csv(" + ScratchTables.sqlStr(path)

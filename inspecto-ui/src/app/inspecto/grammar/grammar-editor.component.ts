@@ -41,6 +41,7 @@ import { ParserTreeComponent } from 'app/inspecto/components/parser-tree.compone
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { PARSING_FRONTENDS, ParsingFrontend, grammarTabsFor, parsingAttributesFor } from './parsing-attributes';
 import { FrontendSuggestion, jsonSampleToTree, sniffFrontend } from './parsing-sniff';
+import { sampleResolutions } from './sample-resolution';
 
 /** The `parsing:` roots this editor owns — switching frontend clears the others' sub-blocks. */
 export const PARSING_ROOTS = [
@@ -378,6 +379,8 @@ export class GrammarEditorComponent implements AfterViewInit {
         const p = this.preview();
         return p?.kind === 'table' ? p.rows : [];
     });
+    /** Per-row "sample resolves to" values (AUTHORING-REDESIGN-1 (i)), from the last preview's dialect sniff. */
+    readonly sampleResolved = computed(() => sampleResolutions(this.preview()));
     readonly treeNodes = computed<ParserTreeNode[] | null>(() => {
         const p = this.preview();
         return p?.kind === 'tree' ? p.nodes : null;
