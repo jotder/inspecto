@@ -269,7 +269,12 @@ falls in the same bucket as the original, not whenever it is within the period o
 **Behaviour.** Always a `LEFT JOIN … USING(on)`: an unmatched key keeps its row with NULL reference
 columns, never a silent drop; a non-key column shared by both sides fails loudly rather than writing an
 ambiguous result. `reference` is `reference/<pipeline>` (a versioned reference store read through
-`ReferenceReader`, current/as-of like the Stage-2 enrichment) or a plain CSV/Parquet path. The
+`ReferenceReader`, current/as-of like the Stage-2 enrichment) or a plain CSV/Parquet path. The recipe's
+plural `references/<pipeline>` is the same by-name binding everywhere — one test,
+`com.gamma.etl.ReferenceBinding`, shared by `PipelineConfigParser`, `ReferenceReader.parse`,
+`RecipeCompiler` and `RecipeConverter`. ⚠ Until 2026-09-24 only the parser accepted the plural, so a
+hand-written flat config saying `references/x` loaded as a name and then failed at run time as a missing
+FILE (`No files found that match the pattern "references/x"`); compiled recipes were unaffected. The
 reference is resolved once per run into a scratch view. **At rest only**: the ingest walk carries no
 reference resolver, so a mid-branch join refuses with the remedy *run it at rest via output_store:*.
 

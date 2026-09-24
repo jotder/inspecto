@@ -166,6 +166,9 @@ public final class DiagnoseAndAlertSkill implements Capability {
         if (!findings.isEmpty()) {
             throw new IllegalArgumentException("alert rule violation(s): " + findings);
         }
+        // optional fields: make the AlertRule defaults explicit so the draft and its summary show them
+        rule.putIfAbsent("comparator", "gt");
+        rule.putIfAbsent("severity", "WARNING");
         return new Draft(rule);
     }
 

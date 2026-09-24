@@ -36,7 +36,7 @@ public final class AlertRuleValidator {
     /**
      * Validate a drafted rule map (the {@code alert} section's contents) against the shape rules.
      *
-     * @param rule           the rule fields ({@code name, metric, comparator, threshold, window, severity, onPipeline?})
+     * @param rule           the rule fields ({@code name, metric, comparator?, threshold, window, severity?, onPipeline?})
      * @param knownPipelines the set of real pipeline names (for grounding {@code onPipeline})
      * @return ERROR findings for every violation (empty when the rule is well-formed)
      */
@@ -56,8 +56,8 @@ public final class AlertRuleValidator {
                     "metric '" + metric + "' is not one of " + sorted(METRICS)));
 
         String comparator = str(rule.get("comparator"));
-        if (comparator == null) findings.add(Finding.error("alert.comparator", "missing required field 'comparator'"));
-        else if (!COMPARATORS.contains(comparator))
+        // comparator and severity are OPTIONAL (AlertRule applies the ConfigSpecs.alert defaults gt / WARNING)
+        if (comparator != null && !COMPARATORS.contains(comparator))
             findings.add(Finding.error("alert.comparator",
                     "comparator '" + comparator + "' is not one of " + sorted(COMPARATORS)));
 
@@ -79,8 +79,7 @@ public final class AlertRuleValidator {
                     "window '" + window + "' is not a duration like 1h, 30m, 1d, or a batch count like 20b"));
 
         String severity = str(rule.get("severity"));
-        if (severity == null) findings.add(Finding.error("alert.severity", "missing required field 'severity'"));
-        else if (!SEVERITIES.contains(severity.toUpperCase()))
+        if (severity != null && !SEVERITIES.contains(severity.toUpperCase()))
             findings.add(Finding.error("alert.severity",
                     "severity '" + severity + "' is not one of " + sorted(SEVERITIES)));
 

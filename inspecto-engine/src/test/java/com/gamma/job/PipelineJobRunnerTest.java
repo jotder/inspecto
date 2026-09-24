@@ -967,6 +967,20 @@ class PipelineJobRunnerTest {
     /** A by-name reference (reference/<pipeline>) resolves through the loaded-pipeline context. */
     @Test
     void aStageTwoJoinResolvesAByNameReferenceFromThePipelineContext() throws Exception {
+        assertJoinsTheRegionsReference("reference/regions");
+    }
+
+    /**
+     * The recipe's plural spelling ({@code references/<pipeline>}) in a HAND-WRITTEN flat config binds by name
+     * too: {@code PipelineConfigParser} already kept it as a name, but {@code ReferenceReader.parse} knew only the
+     * singular and read it as a file path at run time (only compiled recipes were normalised).
+     */
+    @Test
+    void aStageTwoJoinResolvesThePluralByNameSpellingToo() throws Exception {
+        assertJoinsTheRegionsReference("references/regions");
+    }
+
+    private void assertJoinsTheRegionsReference(String reference) throws Exception {
         String dataDir = tmp.resolve("data").toString();
         String auditDir = tmp.resolve("audit").toString();
         // the reference producer: a pipeline declaring produces: reference, whose store holds the dimension
@@ -999,9 +1013,9 @@ class PipelineJobRunnerTest {
                   threads: 1
                 steps[1]:
                   - join:
-                      reference: reference/regions
+                      reference: %s
                       on[1]: id
-                """);
+                """.formatted(reference));
         seedParquet(dataDir, "j2_etl", "(1,150),(2,50)");
 
         JobConfig cfg = new JobConfig("j2", JobType.PIPELINE, null, null, true, false,

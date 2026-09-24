@@ -1408,8 +1408,7 @@ final class PipelineConfigParser {
      */
     private static String referencePath(Path configDir, String reference, String field) {
         if (reference == null) return null;
-        String s = reference.trim();
-        if (s.startsWith("reference/") || s.startsWith("references/")) return reference;
+        if (ReferenceBinding.isByName(reference)) return reference;
         return dataPath(configDir, reference, field);
     }
 

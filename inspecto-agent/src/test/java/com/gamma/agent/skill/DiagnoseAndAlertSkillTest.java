@@ -74,6 +74,26 @@ class DiagnoseAndAlertSkillTest {
         }
     }
 
+    /** A draft that omits comparator and severity validates, and carries the defaults explicitly (gt, WARNING)
+     *  — the same values {@code AlertRule} applies when the draft is saved. */
+    @Test
+    void aDraftWithoutComparatorOrSeverityCarriesTheDefaults(@TempDir Path dir) throws Exception {
+        Path pipe = AgentTestConfigs.writePipeline(dir);
+        try (CollectorService svc = new CollectorService(List.of(pipe), 60, 1)) {
+            ModelRouter router = ModelRouter.of(FakeModelProvider.canned(
+                    "{\"name\":\"high-error-rate\",\"metric\":\"error_rate\","
+                            + "\"threshold\":0.05,\"window\":\"1h\",\"on_pipeline\":null}"));
+            AgentResult res = skill.run(ask("tell me when the error rate goes above 5%"), context(svc, router));
+
+            assertEquals(AgentResult.Status.OK, res.status(), res.answer());
+            assertTrue(res.validated());
+            assertEquals("gt", res.data().get("comparator"));
+            assertEquals("WARNING", res.data().get("severity"));
+            assertTrue(String.valueOf(res.data().get("humanReadable")).startsWith("WARNING alert"),
+                    String.valueOf(res.data().get("humanReadable")));
+        }
+    }
+
     @Test
     void groundsAndCitesPipeline(@TempDir Path dir) throws Exception {
         Path pipe = AgentTestConfigs.writePipeline(dir);

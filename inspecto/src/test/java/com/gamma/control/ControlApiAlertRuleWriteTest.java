@@ -121,6 +121,40 @@ class ControlApiAlertRuleWriteTest {
         }
     }
 
+    /** A body without {@code comparator} used to answer 500 (an NPE in validation); it now takes the
+     *  documented default {@code gt}. */
+    @Test
+    void aRuleWithoutAComparatorDefaultsToGt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String body = """
+                    {"name":"no-cmp","metric":"error_rate","threshold":0.05,"window":"1h","severity":"WARNING"}""";
+            HttpResponse<String> r = send(c.port, "POST", "/alerts/rules", body);
+            assertEquals(200, r.statusCode(), r.body());
+            ComponentRegistry.Component saved = store(root).get("alert-rule", "no-cmp").orElseThrow();
+            assertEquals("gt", AlertRule.fromMap(saved.content()).comparator());
+            assertEquals(List.of("no-cmp"), ruleNames(c.port));
+        }
+    }
+
+    /** A body without {@code severity} used to answer 500 the same way; it now takes the spec default
+     *  {@code WARNING}, and an unknown severity is a 422 that writes nothing. */
+    @Test
+    void aRuleWithoutASeverityDefaultsToWarning(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String body = """
+                    {"name":"no-sev","metric":"error_rate","comparator":"gt","threshold":0.05,"window":"1h"}""";
+            HttpResponse<String> r = send(c.port, "POST", "/alerts/rules", body);
+            assertEquals(200, r.statusCode(), r.body());
+            ComponentRegistry.Component saved = store(root).get("alert-rule", "no-sev").orElseThrow();
+            assertEquals("WARNING", AlertRule.fromMap(saved.content()).severity());
+
+            HttpResponse<String> bad = send(c.port, "POST", "/alerts/rules",
+                    body.replace("\"no-sev\"", "\"bad-sev\"").replace("}", ",\"severity\":\"PANIC\"}"));
+            assertEquals(422, bad.statusCode(), bad.body());
+            assertTrue(store(root).get("alert-rule", "bad-sev").isEmpty(), "nothing written on a rejected rule");
+        }
+    }
+
     @Test
     void rejectsInvalidRuleAndWritesNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

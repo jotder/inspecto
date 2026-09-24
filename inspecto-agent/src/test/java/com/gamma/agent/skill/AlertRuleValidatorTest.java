@@ -66,10 +66,11 @@ class AlertRuleValidatorTest {
     }
 
     @Test
-    void missingAndUnknownComparatorAreFlagged() {
+    void missingComparatorTakesTheDefaultButUnknownIsFlagged() {
+        // aligned with AlertRule / ConfigSpecs.alert: an absent comparator defaults to gt, it is not an error
         Map<String, Object> miss = valid();
         miss.remove("comparator");
-        assertTrue(anchored(AlertRuleValidator.check(miss, PIPES), "alert.comparator"));
+        assertTrue(AlertRuleValidator.check(miss, PIPES).isEmpty(), "absent comparator defaults to gt");
 
         Map<String, Object> bad = valid();
         bad.put("comparator", "equals");
@@ -134,10 +135,11 @@ class AlertRuleValidatorTest {
     }
 
     @Test
-    void missingAndUnknownSeverityAreFlagged() {
+    void missingSeverityTakesTheDefaultButUnknownIsFlagged() {
+        // aligned with AlertRule / ConfigSpecs.alert: an absent severity defaults to WARNING, it is not an error
         Map<String, Object> miss = valid();
         miss.remove("severity");
-        assertTrue(anchored(AlertRuleValidator.check(miss, PIPES), "alert.severity"));
+        assertTrue(AlertRuleValidator.check(miss, PIPES).isEmpty(), "absent severity defaults to WARNING");
 
         Map<String, Object> bad = valid();
         bad.put("severity", "FATAL");

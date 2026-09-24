@@ -2,6 +2,7 @@ package com.gamma.pipeline;
 
 import com.gamma.api.PublicApi;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.ReferenceBinding;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -313,7 +314,7 @@ public final class RecipeConverter {
     /** {@code join: {reference, on}} → {@code transform: {join: references/…, on}}. */
     private static Map<String, Object> joinStep(Map<String, Object> cfg) {
         Map<String, Object> join = new LinkedHashMap<>();
-        putRef(join, "join", cfg.get("reference"), "reference/", "references/");
+        putRef(join, "join", cfg.get("reference"), ReferenceBinding.PREFIX, ReferenceBinding.PLURAL_PREFIX);
         putIfPresent(join, "on", cfg.get("on"));
         return join;
     }
