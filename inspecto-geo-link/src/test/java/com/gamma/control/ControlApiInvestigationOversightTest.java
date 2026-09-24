@@ -325,6 +325,7 @@ class ControlApiInvestigationOversightTest {
             HttpResponse<String> self = send(c.port, "POST", approve, "{}", "Bearer self");
             assertEquals(403, self.statusCode(), "self-approval is refused even WITH the capability: " + self.body());
             assertTrue(self.body().contains("a different person must"), self.body());
+            assertEquals(ErrorCodes.PERMISSION_DENIED, JSON.readTree(self.body()).at("/error/errorCode").asText());
             assertEquals(404, send(c.port, "POST", "/inv/investigations/case-a/pending/p9/approve", "{}", "Bearer lead")
                     .statusCode());
             assertEquals(1, Files.readAllLines(log).size(), "no refusal ran the expand");
@@ -374,6 +375,7 @@ class ControlApiInvestigationOversightTest {
             assertEquals("pending", held.get("status").asText(), "no maxFanOut = unbounded, which exceeds any threshold");
             HttpResponse<String> noSubject = send(c.port, "POST", "/inv/investigations/case-a/pending/p1/approve", "{}", null);
             assertEquals(403, noSubject.statusCode(), "with no Subject two people cannot be told apart: " + noSubject.body());
+            assertEquals(ErrorCodes.PERMISSION_DENIED, JSON.readTree(noSubject.body()).at("/error/errorCode").asText());
 
             settings(c, "four_eyes_budget_above: 100\n");
             HttpResponse<String> tpl = send(c.port, "POST", "/inv/investigation-templates/tpl/instantiate",
@@ -409,6 +411,7 @@ class ControlApiInvestigationOversightTest {
             HttpResponse<String> wide = send(c.port, "POST", nb, neighbours("calls_ds", "caller", 500), null);
             assertEquals(403, wide.statusCode(), wide.body());
             assertTrue(wide.body().contains("four-eyes") && wide.body().contains("rows 500 > 100"), wide.body());
+            assertEquals(ErrorCodes.PERMISSION_DENIED, JSON.readTree(wide.body()).at("/error/errorCode").asText());
             assertEquals(2, post(c, nb, neighbours("calls_ds", "caller", 100)).get("rows").size(),
                     "the same read AT the threshold runs — the 403 above is the gate, not the body");
             HttpResponse<String> deep = send(c.port, "POST", rp, traversal(null, null), null);

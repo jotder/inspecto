@@ -3,6 +3,7 @@ package com.gamma.geolink;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ComponentAccess;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.RowScope;
 import com.gamma.control.RouteModule;
@@ -163,7 +164,7 @@ public final class InvestigationRoutes implements RouteModule {
         requireSafeId(id);
         String purpose = purpose(body);
         String dataset = ApiContext.str(body, "dataset");
-        if (dataset == null) throw new ApiException(422, "body must include 'dataset'");
+        if (dataset == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
@@ -173,7 +174,7 @@ public final class InvestigationRoutes implements RouteModule {
         List<String> columns = relationColumns(dataset, relationSql);
         for (String col : java.util.Arrays.asList(sourceCol, targetCol, kindCol, timeCol))
             if (col != null && columns.stream().noneMatch(col::equalsIgnoreCase))
-                throw new ApiException(422, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
         String timeColZone = timeColZone(dataset, relationSql, timeCol, ApiContext.str(body, "timeColZone"));
 
         SnapshotStore store = new SnapshotStore(writeRoot);
@@ -197,7 +198,7 @@ public final class InvestigationRoutes implements RouteModule {
         header.put("parent", null);
         synchronized (lock(store.directory().resolve("investigations"))) {
             if (!store.createInvestigation(id, canonical(header)))
-                throw new ApiException(409, "investigation '" + id + "' already exists");
+                throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
         }
         emit(ex, EventType.LINK_INVESTIGATION_CREATED, "link.investigation.created",
                 "link.investigation.created — " + id + " over " + dataset,
@@ -209,12 +210,12 @@ public final class InvestigationRoutes implements RouteModule {
     private Object appendOp(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         Inv inv = open(api, ex, id);
         String op = ApiContext.str(body, "op");
-        if (op == null) throw new ApiException(422, "body must include 'op'");
+        if (op == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'op'");
         if (DEFERRED.contains(op))
-            throw new ApiException(422, "op '" + op + "' is in the closed vocabulary but not implemented yet (LA-10 "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is in the closed vocabulary but not implemented yet (LA-10 "
                     + "LA-13 and LA-19 ship seed, expand, exclude, hide, keep, window, annotate)");
         if (!SHIPPED.contains(op))
-            throw new ApiException(422, "op '" + op + "' is not in the closed op vocabulary");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is not in the closed op vocabulary");
         Map<String, Object> params = params(op, resolvePseudonyms(inv, body));
         requireBindings(inv.header(), op, params, "");
 
@@ -225,7 +226,7 @@ public final class InvestigationRoutes implements RouteModule {
             if (op.equals("hide") || op.equals("keep") || op.equals("annotate") || (op.equals("expand") && !ids.isEmpty()))
                 for (String i : ids)
                     if (!before.entities.containsKey(i))
-                        throw new ApiException(422, "'" + i + "' is not in the Working Set");
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + i + "' is not in the Working Set");
 
             int step = log.size() + 1;
             Map<String, Object> entry = entry(step, "op", ex);
@@ -233,9 +234,9 @@ public final class InvestigationRoutes implements RouteModule {
             entry.put("params", params);
             if (op.equals("expand")) {
                 List<String> frontier = ids.isEmpty() ? new ArrayList<>(before.entities.keySet()) : sorted(ids);
-                if (frontier.isEmpty()) throw new ApiException(422, "nothing to expand — the Working Set is empty");
+                if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand — the Working Set is empty");
                 if (frontier.size() > MAX_FRONTIER)
-                    throw new ApiException(422, "an expand frontier is capped at " + MAX_FRONTIER
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER
                             + " entities; name them with 'ids'");
                 Map<String, Object> sensitive = sensitivity(inv, params);
                 if (sensitive != null) return masked(inv, requestExpansion(ex, inv, params, sensitive, before));
@@ -251,7 +252,7 @@ public final class InvestigationRoutes implements RouteModule {
         synchronized (lock(inv.dir())) {
             List<Map<String, Object>> log = readLog(inv);
             int target = InvestigationEvaluator.undoTarget(log);
-            if (target < 0) throw new ApiException(409, "nothing to undo");
+            if (target < 0) throw new ApiException(409, ErrorCodes.CONFLICT, "nothing to undo");
             Map<String, Object> entry = entry(log.size() + 1, "undo", ex);
             entry.put("undoes", target);
             return masked(inv, commit(ex, inv, log, entry, evaluate(log, -1, null)));
@@ -276,14 +277,14 @@ public final class InvestigationRoutes implements RouteModule {
             if ("op".equals(e.get("kind")) && !undone.contains(s)) effective.put(s, e);
         }
         if (!(body.get("order") instanceof List<?> rawOrder))
-            throw new ApiException(422, "body must include 'order', a list of step numbers");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'order', a list of step numbers");
         List<Integer> order = new ArrayList<>();
         for (Object o : rawOrder) {
-            if (!(o instanceof Number n)) throw new ApiException(422, "'order' entries must be step numbers");
+            if (!(o instanceof Number n)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'order' entries must be step numbers");
             order.add(n.intValue());
         }
         if (order.size() != effective.size() || !new HashSet<>(order).equals(effective.keySet()))
-            throw new ApiException(422, "'order' must be a permutation of the effective op steps "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'order' must be a permutation of the effective op steps "
                     + effective.keySet());
 
         String forkId = ApiContext.str(body, "id");
@@ -291,7 +292,7 @@ public final class InvestigationRoutes implements RouteModule {
         requireSafeId(forkId);
         jail(parent.store(), forkId);
         if (parent.store().readInvestigation(forkId) != null)
-            throw new ApiException(409, "investigation '" + forkId + "' already exists");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + forkId + "' already exists");
 
         Map<String, Object> header = new LinkedHashMap<>(parent.header());
         header.put("id", forkId);
@@ -331,7 +332,7 @@ public final class InvestigationRoutes implements RouteModule {
         }
         synchronized (lock(parent.store().directory().resolve("investigations"))) {
             if (!parent.store().createFork(forkId, canonical(header), lines, sets))
-                throw new ApiException(409, "investigation '" + forkId + "' already exists");
+                throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + forkId + "' already exists");
         }
         String fid = forkId;
         emit(ex, EventType.LINK_INVESTIGATION_FORKED, "link.investigation.forked",
@@ -370,12 +371,12 @@ public final class InvestigationRoutes implements RouteModule {
         List<String> columns = relationColumns(dataset, relationSql);
         for (String col : cols)
             if (columns.stream().noneMatch(col::equalsIgnoreCase))
-                throw new ApiException(422, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + dataset + "'");
         String timeCol = ident(header, "timeCol", false);
         String timeColZone = timeColZone(dataset, relationSql, timeCol, ApiContext.str(header, "timeColZone"));
         SnapshotStore store = new SnapshotStore(writeRoot);
         jail(store, id);
-        if (store.readInvestigation(id) != null) throw new ApiException(409, "investigation '" + id + "' already exists");
+        if (store.readInvestigation(id) != null) throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
 
         Map<String, Object> h = new LinkedHashMap<>(header);
         h.put("purpose", purpose(header));   // D-U5: an instantiated Investigation states its purpose like a created one
@@ -396,8 +397,8 @@ public final class InvestigationRoutes implements RouteModule {
         for (Map<String, Object> body : ops) {
             String op = ApiContext.str(body, "op");
             if (DEFERRED.contains(op))
-                throw new ApiException(422, "op '" + op + "' is in the closed vocabulary but not implemented yet");
-            if (!SHIPPED.contains(op)) throw new ApiException(422, "op '" + op + "' is not in the closed op vocabulary");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is in the closed vocabulary but not implemented yet");
+            if (!SHIPPED.contains(op)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is not in the closed op vocabulary");
             Map<String, Object> e = entry(++step, "op", ex);
             e.put("op", op);
             Map<String, Object> params = params(op, body);
@@ -406,15 +407,15 @@ public final class InvestigationRoutes implements RouteModule {
             e.put("derivedFrom", body.get("derivedFrom"));
             if (op.equals("expand")) {
                 List<String> frontier = new ArrayList<>(state.entities.keySet());
-                if (frontier.isEmpty()) throw new ApiException(422, "template step " + step + " expands an empty Working Set");
+                if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " expands an empty Working Set");
                 if (frontier.size() > MAX_FRONTIER)
-                    throw new ApiException(422, "template step " + step + " would expand " + frontier.size()
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " would expand " + frontier.size()
                             + " entities; an expand frontier is capped at " + MAX_FRONTIER);
                 // D-U7: a template names no entities, so there is no frontier a second person could approve in
                 // advance — a sensitive step is refused rather than run unapproved.
                 Map<String, Object> sensitive = sensitivity(inv, params);
                 if (sensitive != null)
-                    throw new ApiException(422, "template step " + step + " is a sensitive expand " + sensitive.get("exceeded")
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " is a sensitive expand " + sensitive.get("exceeded")
                             + " — four-eyes applies and a template names no frontier to approve; save the template "
                             + "with a smaller budget/fan-out and expand further from the Investigation, where the "
                             + "step can be approved");
@@ -428,7 +429,7 @@ public final class InvestigationRoutes implements RouteModule {
         }
         synchronized (lock(store.directory().resolve("investigations"))) {
             if (!store.createFork(id, canonical(h), lines, sets))
-                throw new ApiException(409, "investigation '" + id + "' already exists");
+                throw new ApiException(409, ErrorCodes.CONFLICT, "investigation '" + id + "' already exists");
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
@@ -509,7 +510,7 @@ public final class InvestigationRoutes implements RouteModule {
             try {
                 limit = Integer.parseInt(raw.trim());
             } catch (NumberFormatException e) {
-                throw new ApiException(422, "limit must be an integer, got '" + raw + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "limit must be an integer, got '" + raw + "'");
             }
         }
         limit = Math.min(Math.max(limit, 1), LOG_MAX);
@@ -751,7 +752,7 @@ public final class InvestigationRoutes implements RouteModule {
                 }
                 truncated = r.truncated();
             } catch (SQLException | IOException e) {
-                throw new ApiException(422, "expand over dataset '" + dataset + "' failed: " + e.getMessage());
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "expand over dataset '" + dataset + "' failed: " + e.getMessage());
             }
         }
         Map<String, Object> read = new LinkedHashMap<>();
@@ -775,10 +776,10 @@ public final class InvestigationRoutes implements RouteModule {
         boolean timed = op.equals("window")
                 || (op.equals("expand") && (p.get("window") instanceof Map<?, ?> || p.get("minDistinctDays") != null));
         if (timed && header.get("timeCol") == null)
-            throw new ApiException(422, where + "this Investigation has no time column — create it with 'timeCol' "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "this Investigation has no time column — create it with 'timeCol' "
                     + "to use a window or minDistinctDays");
         if (op.equals("expand") && p.get("linkKinds") != null && header.get("linkKindCol") == null)
-            throw new ApiException(422, where + "'linkKinds' needs a link-kind column — this Investigation has none");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "'linkKinds' needs a link-kind column — this Investigation has none");
     }
 
     /** Validate and normalise one op's parameters (422 on anything malformed). */
@@ -786,41 +787,41 @@ public final class InvestigationRoutes implements RouteModule {
         Map<String, Object> p = new LinkedHashMap<>();
         if (op.equals("window")) {   // no ids: an intensional op over time, not over entities
             Object w = body.get("window");
-            if (w == null) throw new ApiException(422, "'window' requires 'window': an object, or \"full\" to clear it");
+            if (w == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'window' requires 'window': an object, or \"full\" to clear it");
             p.put("window", "full".equals(w) ? null : InvestigationTime.window(w, "window"));
             return p;
         }
         Object rawIds = body.get("ids");
-        if (rawIds != null && !(rawIds instanceof List<?>)) throw new ApiException(422, "'ids' must be a list");
+        if (rawIds != null && !(rawIds instanceof List<?>)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'ids' must be a list");
         LinkedHashSet<String> ids = new LinkedHashSet<>();
         if (rawIds instanceof List<?> l) for (Object o : l) {
             String v = o == null ? "" : String.valueOf(o);
             if (v.isBlank() || v.length() > MAX_ID_LENGTH)
-                throw new ApiException(422, "every id must be a non-blank string of at most " + MAX_ID_LENGTH + " chars");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every id must be a non-blank string of at most " + MAX_ID_LENGTH + " chars");
             ids.add(v);
         }
-        if (ids.size() > MAX_IDS) throw new ApiException(422, "at most " + MAX_IDS + " ids per op");
-        if (!op.equals("expand") && ids.isEmpty()) throw new ApiException(422, "op '" + op + "' requires 'ids'");
+        if (ids.size() > MAX_IDS) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_IDS + " ids per op");
+        if (!op.equals("expand") && ids.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' requires 'ids'");
         p.put("ids", new ArrayList<>(ids));
         switch (op) {
             case "seed" -> {
                 String type = ApiContext.str(body, "entityType");
-                if (type != null && type.length() > 64) throw new ApiException(422, "'entityType' is at most 64 chars");
+                if (type != null && type.length() > 64) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'entityType' is at most 64 chars");
                 p.put("entityType", type);
             }
             case "expand" -> expandParams(body, p);
             case "exclude" -> {
                 String reason = ApiContext.str(body, "reason");
-                if (reason == null) throw new ApiException(422, "'exclude' requires a 'reason' — an exclusion "
+                if (reason == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'exclude' requires a 'reason' — an exclusion "
                         + "without one cannot be challenged");
-                if (reason.length() > 200) throw new ApiException(422, "'reason' is at most 200 chars");
+                if (reason.length() > 200) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reason' is at most 200 chars");
                 p.put("reason", reason);
             }
             case "annotate" -> {
                 String note = ApiContext.str(body, "note");
-                if (note == null || note.isBlank()) throw new ApiException(422, "'annotate' requires a 'note'");
+                if (note == null || note.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'annotate' requires a 'note'");
                 if (note.length() > MAX_NOTE_LENGTH)
-                    throw new ApiException(422, "'note' is at most " + MAX_NOTE_LENGTH + " chars");
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'note' is at most " + MAX_NOTE_LENGTH + " chars");
                 p.put("note", note);
                 // D-U9: an Admiralty grade (A-F x 1-6). Absent when not given, so an ungraded annotate is sealed
                 // byte-for-byte as it was before the grade existed.
@@ -840,17 +841,17 @@ public final class InvestigationRoutes implements RouteModule {
      */
     private static void expandParams(Map<String, Object> body, Map<String, Object> p) {
         if (body.containsKey("limit"))   // renamed by LA-13 — refused, never silently replaced by the default
-            throw new ApiException(422, "'limit' is now 'budget' (plan §2.4: the rung's row budget)");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'limit' is now 'budget' (plan §2.4: the rung's row budget)");
         p.put("budget", body.get("budget") == null ? DEFAULT_EXPAND_BUDGET
                 : Math.min(MAX_EXPAND_BUDGET, positive(body, "budget", 1)));
         String direction = body.get("direction") == null ? "either" : String.valueOf(body.get("direction"));
         if (!DIRECTIONS.contains(direction))
-            throw new ApiException(422, "'direction' must be one of " + DIRECTIONS + ", got '" + direction + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'direction' must be one of " + DIRECTIONS + ", got '" + direction + "'");
         p.put("direction", direction);
         List<String> kinds = null;
         if (body.get("linkKinds") != null) {
             if (!(body.get("linkKinds") instanceof List<?> l) || l.isEmpty() || l.size() > MAX_LINK_KINDS)
-                throw new ApiException(422, "'linkKinds' must be a non-empty list of at most " + MAX_LINK_KINDS
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'linkKinds' must be a non-empty list of at most " + MAX_LINK_KINDS
                         + " kinds (omit it for all kinds)");
             kinds = new ArrayList<>(new java.util.TreeSet<>(strings(l)));
         }
@@ -863,7 +864,7 @@ public final class InvestigationRoutes implements RouteModule {
         Integer dMin = body.get("candidateDegreeMin") == null ? null : positive(body, "candidateDegreeMin", 0);
         Integer dMax = body.get("candidateDegreeMax") == null ? null : positive(body, "candidateDegreeMax", 1);
         if (dMin != null && dMax != null && dMin > dMax)
-            throw new ApiException(422, "'candidateDegreeMin' must not exceed 'candidateDegreeMax'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'candidateDegreeMin' must not exceed 'candidateDegreeMax'");
         p.put("candidateDegreeMin", dMin);
         p.put("candidateDegreeMax", dMax);
         p.put("maxFanOut", body.get("maxFanOut") == null ? null : positive(body, "maxFanOut", 1));
@@ -872,7 +873,7 @@ public final class InvestigationRoutes implements RouteModule {
     private static int positive(Map<String, Object> body, String key, int min) {
         if (!(body.get(key) instanceof Number n) || n.doubleValue() != Math.rint(n.doubleValue())
                 || n.longValue() < min || n.longValue() > Integer.MAX_VALUE)
-            throw new ApiException(422, "'" + key + "' must be an integer >= " + min + ", got " + body.get(key));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "' must be an integer >= " + min + ", got " + body.get(key));
         return n.intValue();
     }
 
@@ -883,7 +884,7 @@ public final class InvestigationRoutes implements RouteModule {
      */
     private static String timeColZone(String dataset, String relationSql, String timeCol, String zone) {
         if (timeCol == null) {
-            if (zone != null) throw new ApiException(422, "'timeColZone' needs a 'timeCol'");
+            if (zone != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'timeColZone' needs a 'timeCol'");
             return null;
         }
         String type;
@@ -893,19 +894,19 @@ public final class InvestigationRoutes implements RouteModule {
                             + " LIMIT 0) UNION ALL (SELECT NULL)) u", 1, 0, List.of(), List.of()));
             type = String.valueOf(r.rows().get(0).get("t")).toUpperCase(java.util.Locale.ROOT);
         } catch (Exception unusable) {
-            throw new ApiException(422, "cannot read the type of '" + timeCol + "': " + unusable.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "cannot read the type of '" + timeCol + "': " + unusable.getMessage());
         }
         if (type.equals("TIMESTAMP WITH TIME ZONE")) {
-            if (zone != null) throw new ApiException(422, "'" + timeCol + "' is TIMESTAMP WITH TIME ZONE — already an "
+            if (zone != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + timeCol + "' is TIMESTAMP WITH TIME ZONE — already an "
                     + "instant, so a 'timeColZone' would be ignored; omit it");
             return null;
         }
         if (!type.equals("TIMESTAMP"))
-            throw new ApiException(422, "'timeCol' must be a TIMESTAMP or TIMESTAMP WITH TIME ZONE column; '" + timeCol
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'timeCol' must be a TIMESTAMP or TIMESTAMP WITH TIME ZONE column; '" + timeCol
                     + "' is " + type);
         String z = zone == null ? "UTC" : zone;
         String refusal = com.gamma.config.spec.SourceZoneGrammar.zoneRefusal(z, "timeColZone");
-        if (refusal != null) throw new ApiException(422, refusal);
+        if (refusal != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refusal);
         return z;
     }
 
@@ -987,19 +988,19 @@ public final class InvestigationRoutes implements RouteModule {
         SnapshotStore store = new SnapshotStore(writeRoot);
         jail(store, id);
         String raw = store.readInvestigation(id);
-        if (raw == null) throw new ApiException(404, "no investigation '" + id + "'");
+        if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(raw, Map.class);
         Optional<Subject> subject = ApiContext.subject(ex);
         if (ownerOnly && subject.isPresent() && !subject.get().id().equals(header.get("owner")))
-            throw new ApiException(404, "no investigation '" + id + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         String dataset = String.valueOf(header.get("dataset"));
         Optional<Map<String, Object>> ds = new ComponentStore(writeRoot.resolve("registry")).get("dataset", dataset)
                 .map(ComponentRegistry.Component::content);
         if (ds.isPresent() && !ComponentAccess.canView(ex, ds.get()))
-            throw new ApiException(404, "no dataset '" + dataset + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + dataset + "'");
         Inv inv = new Inv(store, writeRoot, id, header);
         if (!RowScope.visible(ex, "investigation", resource(inv)))   // Enterprise PDP (D-E7); a DENY reads as absence
-            throw new ApiException(404, "no investigation '" + id + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         return inv;
     }
 
@@ -1019,10 +1020,10 @@ public final class InvestigationRoutes implements RouteModule {
     private static String purpose(Map<String, Object> body) {
         String purpose = ApiContext.str(body, "purpose");
         if (purpose == null || purpose.isBlank())
-            throw new ApiException(422, "body must include 'purpose' — the stated purpose / legal basis of this "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'purpose' — the stated purpose / legal basis of this "
                     + "Investigation (D-U5); it is recorded in the sealed header and shown in the Dossier, not enforced");
         if (purpose.length() > MAX_PURPOSE_LENGTH)
-            throw new ApiException(422, "'purpose' is at most " + MAX_PURPOSE_LENGTH + " chars");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'purpose' is at most " + MAX_PURPOSE_LENGTH + " chars");
         return purpose.trim();
     }
 
@@ -1084,7 +1085,7 @@ public final class InvestigationRoutes implements RouteModule {
         List<String> existing = inv.store().listPending(inv.id());
         for (String raw : existing)
             if ("pending".equals(parse(raw).get("status")))
-                throw new ApiException(409, "a sensitive expand is already pending approval (" + parse(raw).get("id")
+                throw new ApiException(409, ErrorCodes.CONFLICT, "a sensitive expand is already pending approval (" + parse(raw).get("id")
                         + ") — it must be approved or denied before another is requested");
         String rid = "p" + (existing.size() + 1);
         Map<String, Object> rec = new LinkedHashMap<>();
@@ -1122,21 +1123,21 @@ public final class InvestigationRoutes implements RouteModule {
                           Map<String, Object> body) throws IOException {
         Optional<Subject> subject = ApiContext.subject(ex);
         if (subject.isEmpty())
-            throw new ApiException(403, "four-eyes needs an authenticated Subject — without one, the requester and "
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "four-eyes needs an authenticated Subject — without one, the requester and "
                     + "the approver cannot be told apart");
         Inv inv = open(api, ex, id, false);
         if (!SnapshotStore.SAFE_ID.matcher(rid).matches())
-            throw new ApiException(422, "request id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + rid + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "request id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + rid + "'");
         String reason = ApiContext.str(body, "reason");
-        if (reason != null && reason.length() > 200) throw new ApiException(422, "'reason' is at most 200 chars");
+        if (reason != null && reason.length() > 200) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reason' is at most 200 chars");
         synchronized (lock(inv.dir())) {
             String raw = inv.store().readPending(inv.id(), rid);
-            if (raw == null) throw new ApiException(404, "no pending request '" + rid + "' on investigation '" + id + "'");
+            if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no pending request '" + rid + "' on investigation '" + id + "'");
             Map<String, Object> rec = parse(raw);
             if (!"pending".equals(rec.get("status")))
-                throw new ApiException(409, "request '" + rid + "' is already " + rec.get("status"));
+                throw new ApiException(409, ErrorCodes.CONFLICT, "request '" + rid + "' is already " + rec.get("status"));
             if (subject.get().id().equals(rec.get("requestedBy")))
-                throw new ApiException(403, "four-eyes: '" + rec.get("requestedBy") + "' requested this expand and "
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "four-eyes: '" + rec.get("requestedBy") + "' requested this expand and "
                         + "cannot " + (approve ? "approve" : "deny") + " it — a different person must");
             String by = ApiContext.actor(ex);
             String at = Instant.now().toString();
@@ -1161,10 +1162,10 @@ public final class InvestigationRoutes implements RouteModule {
             for (String n : named.isEmpty() ? before.entities.keySet() : sorted(named))
                 if (before.entities.containsKey(n)) frontier.add(n);
             if (frontier.isEmpty())
-                throw new ApiException(409, "nothing left to expand — the entities this request names have left the "
+                throw new ApiException(409, ErrorCodes.CONFLICT, "nothing left to expand — the entities this request names have left the "
                         + "Working Set since it was made; deny it instead");
             if (frontier.size() > MAX_FRONTIER)
-                throw new ApiException(422, "an expand frontier is capped at " + MAX_FRONTIER + " entities");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an expand frontier is capped at " + MAX_FRONTIER + " entities");
             Map<String, Object> approval = new LinkedHashMap<>();
             approval.put("request", rid);
             approval.put("requestedBy", rec.get("requestedBy"));
@@ -1200,7 +1201,7 @@ public final class InvestigationRoutes implements RouteModule {
     private Object reveal(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         Inv inv = open(api, ex, id);
         if (!(body.get("tokens") instanceof List<?> raw) || raw.isEmpty() || raw.size() > MAX_REVEAL)
-            throw new ApiException(422, "body must include 'tokens', a list of 1.." + MAX_REVEAL + " masked ids to reveal");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'tokens', a list of 1.." + MAX_REVEAL + " masked ids to reveal");
         EntityMasking mask = EntityMasking.of(inv, List.of());
         List<Map<String, Object>> revealed = new ArrayList<>();
         List<String> unknown = new ArrayList<>();
@@ -1232,7 +1233,7 @@ public final class InvestigationRoutes implements RouteModule {
                     datasetId, relationSql, "SELECT * FROM " + SqlIdent.q(datasetId), 0, 0, List.of(), List.of()));
             return r.columns().stream().map(ResultSetDescriptor.Column::name).toList();
         } catch (Exception unusable) {
-            throw new ApiException(422, "cannot read the columns of dataset '" + datasetId + "': "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "cannot read the columns of dataset '" + datasetId + "': "
                     + unusable.getMessage());
         }
     }
@@ -1285,7 +1286,7 @@ public final class InvestigationRoutes implements RouteModule {
 
     private static void requireSafeId(String id) {
         if (id == null || !SnapshotStore.SAFE_ID.matcher(id).matches())
-            throw new ApiException(422, "investigation id must match " + SnapshotStore.SAFE_ID.pattern()
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "investigation id must match " + SnapshotStore.SAFE_ID.pattern()
                     + ", got '" + id + "'");
     }
 
@@ -1293,17 +1294,17 @@ public final class InvestigationRoutes implements RouteModule {
         Path root = store.directory().resolve("investigations").normalize();
         Path target = store.investigationDir(id).normalize();
         if (!target.startsWith(root) || target.equals(root))
-            throw new ApiException(403, "investigation id escapes the investigation store");
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "investigation id escapes the investigation store");
     }
 
     private static String ident(Map<String, Object> body, String key, boolean required) {
         String v = ApiContext.str(body, key);
         if (v == null) {
-            if (required) throw new ApiException(422, "body must include '" + key + "'");
+            if (required) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + key + "'");
             return null;
         }
         if (!SAFE_IDENT.matcher(v).matches())
-            throw new ApiException(422, "unsafe column identifier '" + v + "' for " + key);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + key);
         return v;
     }
 

@@ -3,6 +3,7 @@ package com.gamma.geolink;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ComponentAccess;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
@@ -144,21 +145,21 @@ public final class InvRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis snapshot write");
         String id = str(body.get("id"));
         if (id == null || !SnapshotStore.SAFE_ID.matcher(id).matches())
-            throw new ApiException(422, "id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + id + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + id + "'");
         if (str(body.get("manifestHash")) == null)
-            throw new ApiException(422, "manifestHash is required — an unfingerprinted snapshot cannot be verified");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "manifestHash is required — an unfingerprinted snapshot cannot be verified");
 
         String json = JsonAttributes.toPayloadJson(body);
         if (!body.isEmpty() && "{}".equals(json))
-            throw new ApiException(500, "snapshot could not be serialised — refusing to seal an empty record");
+            throw new ApiException(500, ErrorCodes.INTERNAL, "snapshot could not be serialised — refusing to seal an empty record");
 
         SnapshotStore store = new SnapshotStore(writeRoot);
         Path target = store.directory().resolve(id + ".json").normalize();
         if (!target.startsWith(store.directory().normalize()))
-            throw new ApiException(403, "snapshot id escapes the snapshot directory");
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "snapshot id escapes the snapshot directory");
 
         if (!store.create(id, json))
-            throw new ApiException(409, "snapshot '" + id + "' already exists — a sealed snapshot is never replaced");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "snapshot '" + id + "' already exists — a sealed snapshot is never replaced");
 
         emitSnapshotEvent(ex, EventType.LINK_SNAPSHOT_SEALED, "link.snapshot.sealed",
                 "link.snapshot.sealed — " + sizeOf(body.get("nodes")) + " nodes, "
@@ -182,7 +183,7 @@ public final class InvRoutes implements RouteModule {
             try {
                 limit = Integer.parseInt(raw.trim());
             } catch (NumberFormatException e) {
-                throw new ApiException(422, "limit must be an integer, got '" + raw + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "limit must be an integer, got '" + raw + "'");
             }
         }
         limit = Math.min(Math.max(limit, 1), SNAPSHOT_LIST_MAX);
@@ -211,11 +212,11 @@ public final class InvRoutes implements RouteModule {
         String snapshotId = str(body.get("snapshotId"));
         String caseId = str(body.get("caseId"));
         if (snapshotId == null || !SnapshotStore.SAFE_ID.matcher(snapshotId).matches())
-            throw new ApiException(422, "snapshotId must match " + SnapshotStore.SAFE_ID.pattern());
-        if (caseId == null || caseId.isBlank()) throw new ApiException(422, "caseId is required");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "snapshotId must match " + SnapshotStore.SAFE_ID.pattern());
+        if (caseId == null || caseId.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "caseId is required");
 
         SnapshotStore store = new SnapshotStore(writeRoot);
-        if (store.read(snapshotId) == null) throw new ApiException(404, "no sealed snapshot '" + snapshotId + "'");
+        if (store.read(snapshotId) == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no sealed snapshot '" + snapshotId + "'");
         store.attach(snapshotId, caseId, java.time.Instant.now().toString());
         emitSnapshotEvent(ex, EventType.LINK_SNAPSHOT_ATTACHED, "link.snapshot.attached",
                 "link.snapshot.attached — " + snapshotId + " → " + caseId,
@@ -423,10 +424,10 @@ public final class InvRoutes implements RouteModule {
             }
         }
         for (String want : wantDatasets)
-            if (!containsIgnoreCase(seenDatasets, want)) throw new ApiException(404, "no dataset '" + want + "'");
+            if (!containsIgnoreCase(seenDatasets, want)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + want + "'");
         for (String want : wantColumns)
             if (!containsIgnoreCase(seenColumns, want))
-                throw new ApiException(422, "unknown column '" + want + "' — not a column of any profiled dataset");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + want + "' — not a column of any profiled dataset");
 
         List<Map<String, Object>> pairs = new ArrayList<>();
         int considered = 0;
@@ -569,7 +570,7 @@ public final class InvRoutes implements RouteModule {
         for (Object o : list) {
             String v = String.valueOf(o);
             if (identifiers && !SAFE_IDENT.matcher(v).matches())
-                throw new ApiException(422, "unsafe column identifier '" + v + "' for " + key);
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + key);
             out.add(v);
         }
         return out;
@@ -583,7 +584,7 @@ public final class InvRoutes implements RouteModule {
      */
     private Object neighbors(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         String value = ApiContext.str(body, "value");
-        if (value == null) throw new ApiException(422, "body must include 'value'");
+        if (value == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'value'");
         return project(api, ex, body, value);
     }
 
@@ -619,9 +620,9 @@ public final class InvRoutes implements RouteModule {
         List<Map<String, Object>> nodeSpecs = mappingList(body, "nodes");
         List<Map<String, Object>> edgeSpecs = mappingList(body, "edges");
         if (nodeSpecs.isEmpty() && edgeSpecs.isEmpty())
-            throw new ApiException(422, "body must include at least one of 'nodes' or 'edges'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include at least one of 'nodes' or 'edges'");
         if (nodeSpecs.size() + edgeSpecs.size() > MAX_MAPPINGS)
-            throw new ApiException(422, "at most " + MAX_MAPPINGS + " mappings per call");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_MAPPINGS + " mappings per call");
         int limit = body.get("limit") instanceof Number n
                 ? Math.max(1, Math.min(MAX_LIMIT, n.intValue())) : DEFAULT_LIMIT;
 
@@ -663,7 +664,7 @@ public final class InvRoutes implements RouteModule {
                 r = QueryExecutor.run(new QueryExecutor.Request(mp.dataset(), mp.relationSql(), mp.sql(),
                         limit, 0, List.of(), List.of()));
             } catch (SQLException e) {
-                throw new ApiException(422, "projection of dataset '" + mp.dataset() + "' failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection of dataset '" + mp.dataset() + "' failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
             }
             for (Map<String, Object> row : r.rows()) {
                 Map<String, Object> out;
@@ -704,10 +705,10 @@ public final class InvRoutes implements RouteModule {
     private static List<Map<String, Object>> mappingList(Map<String, Object> body, String key) {
         Object raw = body.get(key);
         if (raw == null) return List.of();
-        if (!(raw instanceof List<?> list)) throw new ApiException(422, "'" + key + "' must be a list");
+        if (!(raw instanceof List<?> list)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "' must be a list");
         List<Map<String, Object>> out = new ArrayList<>(list.size());
         for (Object o : list) {
-            if (!(o instanceof Map<?, ?> m)) throw new ApiException(422, "every '" + key + "' entry must be an object");
+            if (!(o instanceof Map<?, ?> m)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every '" + key + "' entry must be an object");
             Map<String, Object> copy = new LinkedHashMap<>();
             m.forEach((k, v) -> copy.put(String.valueOf(k), v));
             out.add(copy);
@@ -717,21 +718,21 @@ public final class InvRoutes implements RouteModule {
 
     private static String datasetOf(Map<String, Object> mapping, String key) {
         String ds = ApiContext.str(mapping, "dataset");
-        if (ds == null) throw new ApiException(422, "every '" + key + "' entry must include 'dataset'");
+        if (ds == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every '" + key + "' entry must include 'dataset'");
         return ds;
     }
 
     /** Defence in depth: a server-built statement still passes the caller-SQL guard, trusting only its own relation. */
     private static String guarded(String sql, String datasetId) {
         if (!SqlGuard.check(sql, datasetId).isEmpty())
-            throw new ApiException(422, "projection of dataset '" + datasetId + "' failed the SQL safety check");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection of dataset '" + datasetId + "' failed the SQL safety check");
         return sql;
     }
 
     private Object project(ApiContext api, HttpExchange ex, Map<String, Object> body, String neighborsOf) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity projection");
         String datasetId = ApiContext.str(body, "dataset");
-        if (datasetId == null) throw new ApiException(422, "body must include 'dataset'");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
@@ -772,7 +773,7 @@ public final class InvRoutes implements RouteModule {
             audit(ex, datasetId, neighborsOf, rows.size(), r.truncated());
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
@@ -794,7 +795,7 @@ public final class InvRoutes implements RouteModule {
         if (s.fourEyesFanOutAbove() != null && fanOut > s.fourEyesFanOutAbove())
             exceeded.add("fan-out " + fanOut + " > " + s.fourEyesFanOutAbove());
         if (!exceeded.isEmpty())
-            throw new ApiException(403, what + " is a sensitive read " + exceeded + " — four-eyes applies (D-U7) and "
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, what + " is a sensitive read " + exceeded + " — four-eyes applies (D-U7) and "
                     + "this route has no Investigation to hold a request for approval; lower the bound, or expand "
                     + "from an Investigation, where a second person can approve the step");
     }
@@ -807,13 +808,13 @@ public final class InvRoutes implements RouteModule {
     static String relationFor(ApiContext api, HttpExchange ex, Path writeRoot, String datasetId) {
         Map<String, Object> dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", datasetId)
                 .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, "no dataset '" + datasetId + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'"));
         if (!ComponentAccess.canView(ex, dataset))
-            throw new ApiException(404, "no dataset '" + datasetId + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'");
         try {
             return DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
     }
 
@@ -882,18 +883,18 @@ public final class InvRoutes implements RouteModule {
     private Object recursivePaths(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "recursive traversal");
         String datasetId = ApiContext.str(body, "dataset");
-        if (datasetId == null) throw new ApiException(422, "body must include 'dataset'");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String weightCol = ident(body, "weightCol", false);
         String startNode = ApiContext.str(body, "startNode");
-        if (startNode == null) throw new ApiException(422, "body must include 'startNode'");
+        if (startNode == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'startNode'");
         String targetNode = ApiContext.str(body, "targetNode");
-        if (startNode.equals(targetNode)) throw new ApiException(422, "'targetNode' must differ from 'startNode'");
+        if (startNode.equals(targetNode)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'targetNode' must differ from 'startNode'");
         String direction = ApiContext.str(body, "direction");
         if (direction == null) direction = "DIRECTED";
         if (!direction.equals("DIRECTED") && !direction.equals("UNDIRECTED"))
-            throw new ApiException(422, "'direction' must be DIRECTED or UNDIRECTED");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'direction' must be DIRECTED or UNDIRECTED");
         String tsCol = null;
         boolean monotonic = false;
         Double maxHours = null;
@@ -902,7 +903,7 @@ public final class InvRoutes implements RouteModule {
             tsCol = ident(t, "timestampCol", true);
             monotonic = Boolean.TRUE.equals(t.get("monotonic"));
             if (t.get("maxTotalDurationHours") instanceof Number h) {
-                if (h.doubleValue() <= 0) throw new ApiException(422, "'maxTotalDurationHours' must be positive");
+                if (h.doubleValue() <= 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'maxTotalDurationHours' must be positive");
                 maxHours = h.doubleValue();
             }
         }
@@ -916,7 +917,7 @@ public final class InvRoutes implements RouteModule {
         List<String> columns = relationColumns(datasetId, relationSql);
         for (String col : java.util.Arrays.asList(sourceCol, targetCol, weightCol, tsCol)) {
             if (col != null && !containsIgnoreCase(columns, col))
-                throw new ApiException(422, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
         }
         String filterSql = "TRUE";
         if (body.get("filter") != null) filterSql = checkedFilterSql(body.get("filter"), columns, datasetId);
@@ -991,7 +992,7 @@ public final class InvRoutes implements RouteModule {
             auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated);
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, "traversal failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "traversal failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
@@ -1071,7 +1072,7 @@ public final class InvRoutes implements RouteModule {
         try {
             return ConditionSql.predicate(filter);
         } catch (IllegalArgumentException notAGroup) {
-            throw new ApiException(422, "'filter': " + notAGroup.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'filter': " + notAGroup.getMessage());
         }
     }
 
@@ -1082,7 +1083,7 @@ public final class InvRoutes implements RouteModule {
                     datasetId, relationSql, "SELECT * FROM " + q(datasetId), 0, 0, List.of(), List.of()));
             return r.columns().stream().map(ResultSetDescriptor.Column::name).toList();
         } catch (Exception unusable) {
-            throw new ApiException(422, "cannot read the columns of dataset '" + datasetId
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "cannot read the columns of dataset '" + datasetId
                     + "' to validate 'filter': " + unusable.getMessage());
         }
     }
@@ -1105,7 +1106,7 @@ public final class InvRoutes implements RouteModule {
         String field = raw == null ? "" : String.valueOf(raw);
         if (field.isEmpty()) return;
         if (!containsIgnoreCase(columns, field))
-            throw new ApiException(422, "unknown filter field '" + field + "' — not a column of dataset '"
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown filter field '" + field + "' — not a column of dataset '"
                     + datasetId + "'");
     }
 
@@ -1117,7 +1118,7 @@ public final class InvRoutes implements RouteModule {
         for (Object o : list) {
             String v = String.valueOf(o);
             if (!SAFE_IDENT.matcher(v).matches())
-                throw new ApiException(422, "unsafe column identifier '" + v + "' for attrCols");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for attrCols");
             out.add(v);
         }
         return out;
@@ -1126,11 +1127,11 @@ public final class InvRoutes implements RouteModule {
     private static String ident(Map<String, Object> body, String key, boolean required) {
         String v = ApiContext.str(body, key);
         if (v == null) {
-            if (required) throw new ApiException(422, "body must include '" + key + "'");
+            if (required) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + key + "'");
             return null;
         }
         if (!SAFE_IDENT.matcher(v).matches())
-            throw new ApiException(422, "unsafe column identifier '" + v + "' for " + key);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + key);
         return v;
     }
 
