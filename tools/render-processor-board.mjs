@@ -23,6 +23,8 @@ const NOT_FOR_PERSONAL = new Set([
     'control.alert.dispatch', 'sink.notify.email', 'sink.api.webhook', 'quality.pii.mask',
     'quality.compliance.redact', 'transform.geo.h3', 'transform.geo.spatial_join',
     'enrichment.graph.cluster', 'sink.archive',
+    // G9 (455f9822b, operator 2026-09-24): gated to Professional+ through EditionFeatureProvider.
+    'sink.ducklake',
 ]);
 const ENTERPRISE_ONLY = new Set(['quality.pii.mask', 'quality.compliance.redact']);
 

@@ -942,7 +942,7 @@
     "icon" : "heroicons_outline:megaphone",
     "status" : "partial",
     "capability" : "alert-rule",
-    "note" : "Alert Rules over the ledgers → Alerts → channels (board CP-11/CP-15), authored in the Alert Rules pane — not a Step: never on the canvas, so no workbench preview / lift / lower",
+    "note" : "Alert Rules over the ledgers → Alerts → channels (board CP-11/CP-15), authored in the Alert Rules pane — not a Step: never on the canvas, so no workbench preview / lift / lower. Professional+ (G9): `inspecto-ops` declares it through `EditionFeatureProvider`; Personal refuses every authoring door with `ERR_EDITION_FEATURE` and arms no rule copied onto disk",
     "addable" : false
   }, {
     "id" : "control.sla.monitor",
@@ -982,7 +982,7 @@
     "icon" : "heroicons_outline:server-stack",
     "status" : "delivered",
     "nodeType" : "sink.persistent",
-    "note" : "`output.ducklake` — needs the postgresql sidecar (Professional+)",
+    "note" : "`output.ducklake` / `sinks[].ducklake` — needs the postgresql sidecar. Professional+ (G9): `inspecto-backup` declares it through `EditionFeatureProvider`; Personal refuses `ducklake.enabled: true` at save (`ERR_EDITION_FEATURE`), at pipeline load and in `DuckLakeRegistrar`",
     "addable" : true
   }, {
     "id" : "sink.view",
@@ -1012,7 +1012,7 @@
     "icon" : "heroicons_outline:archive-box-arrow-down",
     "status" : "delivered",
     "nodeType" : "acquisition",
-    "note" : "Collector `post_action: MOVE archive_path` + the `backup` maintenance task",
+    "note" : "Collector `post_action: MOVE archive_path` + the `backup` maintenance task. Professional+ (G9): `inspecto-backup` declares it through `EditionFeatureProvider`; Personal refuses `post_action.on_success: MOVE` (`ERR_EDITION_FEATURE`) at save, at pipeline load and before a remote acquisition — `RETAIN`/`DELETE`/`RENAME`/`TAG` and the local `dirs.backup` move stay in every edition",
     "addable" : true
   }, {
     "id" : "sink.lake.delta",
