@@ -2,9 +2,9 @@
 type: Concept
 title: Exchange — Cross-Space Sharing
 description: Grant-mediated, read-only Dataset/Widget sharing across Spaces — offer/request/approve ledger, snapshot/live delivery, version pin + drift, the sharing.component UI.
-resource: inspecto/src/main/java/com/gamma/control/ExchangeRoutes.java
+resource: inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java
 tags: [control-plane, multi-space, exchange, sharing]
-timestamp: 2026-07-19T00:00:00Z
+timestamp: 2026-09-24T00:00:00Z
 ---
 
 # Exchange — Cross-Space Sharing
@@ -35,6 +35,32 @@ GET  /exchange/datasets/{owner}/{item}[?consumer=]  one item's metadata (+ grant
 GET  /exchange/widgets/{owner}/{item}?consumer=     render-only view of a shared Widget
 GET  /exchange/views/{owner}/{item}?consumer=       render-only view of a shared saved View (D9)
 ```
+
+**Every write is authorized in the Space that OWNS what it acts on** (`EXCHANGE-OWNING-SPACE-AUTHZ-1`,
+fixed 2026-09-24). Because these routes are un-prefixed, `ControlApi.authenticate` binds them to the
+DEFAULT (first-hosted) Space, and the attached Subject carries *that* Space's `roles.toon` grants. Until the
+fix the gates read exactly that: a caller holding `canApproveShares` only in the default Space approved,
+denied, revoked and set expiry on grants owned by any other Space (and offered/refreshed their Datasets,
+requested/pinned for their consumers), while the owning Space's own approver was refused. Reproduced over
+real HTTP with per-Space role tables before the fix. Now each route declares
+`ApiContext.withCapability(cap, RolesRootOf, handler)`; `ApiContext.requireCapabilityIn` re-runs the active
+Authenticator on the request's own credential with `Roles.ATTR_CONFIG_ROOT` pointed at the owning Space
+(restoring the bound Space's root and held roles afterwards). It is fail-closed: a different identity, no
+config root or a credential that no longer resolves all give 403.
+
+| Route | Capability | Decided in |
+|---|---|---|
+| `POST /exchange/offers`, `/exchange/refresh` | `canOfferDatasets` | body `owner` |
+| `POST /exchange/requests` | `canRequestShares` | body `consumer` |
+| `POST /exchange/grants/{id}/{approve,deny,revoke}`, `/expiry` | `canApproveShares` | the grant's `owner` |
+| `POST /exchange/grants/{id}/pin` | `canRequestShares` | the grant's `consumer` |
+
+An unknown grant id 404s before the gate, because it has no owner to authorize against. The ids are
+derivable, and `GET /exchange/grants` is an open read, so the 404 reveals nothing new. On Personal (no
+Subject) the owner is never resolved and behaviour is unchanged. Pinned by
+`ControlApiExchangeOwningSpaceAuthzTest` (inspecto-exchange). Each case pairs a wrong-Space caller (403,
+grant/offer untouched) with an owning-Space twin (200). A mutant that restores the bound-Space check turns
+all 4 red with `approvedBy: user-steward`.
 
 **`ShareGrant`** lifecycle: `requested → active | denied`; `active` → `revoked`/`expired`. One grant per
 `(kind, item, owner, consumer)` quad, id `consumer~owner~kind~item`. Fields include `mode`

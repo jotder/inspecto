@@ -231,16 +231,70 @@ public interface ApiContext {
      * the only inventory anyone had. A marked handler gives the running server its own inventory, which is
      * what {@code ControlApi.register} needs to refuse an undeclared mutating route at boot.
      */
-    record Gated(String capability, Handler inner) implements Handler {
+    record Gated(String capability, RolesRootOf owner, Handler inner) implements Handler {
+        Gated(String capability, Handler inner) { this(capability, null, inner); }
+
         @Override public Object handle(com.sun.net.httpserver.HttpExchange ex, java.util.regex.Matcher m)
                 throws Exception {
-            requireCapability(ex, capability);
+            // The owner is resolved only when a Subject is attached: on Personal nothing is checked, so the
+            // handler keeps answering its own 400/404/409 exactly as before.
+            if (owner == null) requireCapability(ex, capability);
+            else if (subject(ex).isPresent()) requireCapabilityIn(ex, owner.configRoot(ex, m), capability);
             return inner.handle(ex, m);
         }
     }
 
     static Handler withCapability(String capability, Handler h) {
         return new Gated(capability, h);
+    }
+
+    /**
+     * The config root of the Space that OWNS what an installation-scope route acts on — whose role table,
+     * not the bound Space's, decides the capability ({@code EXCHANGE-OWNING-SPACE-AUTHZ-1}). May throw the
+     * route's own {@link ApiException} (400/404/409) when the owner cannot be resolved.
+     */
+    @FunctionalInterface
+    interface RolesRootOf {
+        Path configRoot(HttpExchange ex, java.util.regex.Matcher m) throws Exception;
+    }
+
+    /**
+     * {@link #withCapability(String, Handler)} for an un-prefixed route that acts on ONE Space's resource
+     * (the Exchange: a grant, an offer). Such a route binds to the default Space, so the attached
+     * {@link Subject} carries the DEFAULT Space's grants; this gate re-derives the caller's grants under
+     * {@code owner}'s role table instead and demands {@code capability} THERE.
+     */
+    static Handler withCapability(String capability, RolesRootOf owner, Handler h) {
+        return new Gated(capability, java.util.Objects.requireNonNull(owner), h);
+    }
+
+    /**
+     * AuthZ gate against a NAMED Space's role table: re-runs the active {@link Authenticator} on this
+     * request's own credential with {@link Roles#ATTR_CONFIG_ROOT} pointed at {@code configRoot}, and
+     * demands {@code capability} of the Subject that yields. A no-op when no Subject is attached
+     * (Personal), like {@link #requireCapability}. Fail-closed: no config root, no authenticator, a
+     * credential that no longer resolves, or a different identity → 403. The request's bound-Space
+     * attributes ({@code ATTR_CONFIG_ROOT}, held roles) are restored afterwards.
+     */
+    static void requireCapabilityIn(HttpExchange ex, Path configRoot, String capability) {
+        if (!(attr(ex, ATTR_SUBJECT) instanceof Subject bound)) return;
+        attr(ex, ATTR_CAPABILITY, capability);
+        Subject there = null;
+        Authenticator a = Authenticators.active().orElse(null);
+        if (configRoot != null && a != null) {
+            Object priorRoot = attr(ex, Roles.ATTR_CONFIG_ROOT);
+            Object priorHeld = attr(ex, ComponentAccess.ATTR_HELD_ROLES);
+            try {
+                Roles.configRoot(ex, configRoot);
+                there = a.authenticate(ex).orElse(null);
+            } finally {
+                attr(ex, Roles.ATTR_CONFIG_ROOT, priorRoot);
+                attr(ex, ComponentAccess.ATTR_HELD_ROLES, priorHeld);
+            }
+        }
+        if (there == null || !there.id().equals(bound.id()) || !there.capabilities().contains(capability))
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
+                    "missing capability '" + capability + "' in the owning space");
     }
 
     void get(String pattern, Handler h);

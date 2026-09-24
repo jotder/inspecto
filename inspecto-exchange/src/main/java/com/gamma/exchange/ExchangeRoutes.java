@@ -31,6 +31,7 @@ import java.util.NoSuchElementException;
  *   POST /exchange/offers                          owner lists/updates an offer        [canOfferDatasets]
  *   POST /exchange/requests                        consumer requests use               [canRequestShares]
  *   POST /exchange/grants/{id}/{approve|deny|revoke}  owner acts on a grant            [canApproveShares]
+ *   (every capability is checked in the OWNING Space's role table — owner, or consumer for request/pin)
  *   GET  /exchange/grants[?space=]                 the grant ledger (shared by/with a Space)
  *   GET  /exchange/datasets/{owner}/{item}[?consumer=]  one item's metadata (+ grant status)
  *   GET  /exchange/widgets/{owner}/{item}?consumer=  render-only view of a shared Widget
@@ -74,17 +75,28 @@ public final class ExchangeRoutes implements RouteModule {
                     .toList();
         });
         api.get("/exchange/offers", (e, m) -> listOffers(api, e));
+        // 🔴 Every write is gated in the Space that OWNS what it acts on (EXCHANGE-OWNING-SPACE-AUTHZ-1).
+        // These routes carry no /spaces/{id} prefix, so the attached Subject holds the DEFAULT Space's
+        // grants: until 2026-09-24 a default-Space steward approved/revoked/offered for ANY Space, and the
+        // owning Space's own approver was refused. Owner acts → the body's/grant's owner; consumer acts
+        // (request, pin) → the consumer.
         api.post("/exchange/offers", ApiContext.withCapability("canOfferDatasets",
+                (e, m) -> spaceRoles(api, bodySpace(api, e, "owner")),
                 (e, m) -> putOffer(api, e)));
         api.post("/exchange/refresh", ApiContext.withCapability("canOfferDatasets",
+                (e, m) -> spaceRoles(api, bodySpace(api, e, "owner")),
                 (e, m) -> refresh(api, e)));
         api.post("/exchange/requests", ApiContext.withCapability("canRequestShares",
+                (e, m) -> spaceRoles(api, bodySpace(api, e, "consumer")),
                 (e, m) -> requestGrant(api, e)));
         api.post("/exchange/grants/([^/]+)/(approve|deny|revoke)", ApiContext.withCapability("canApproveShares",
+                (e, m) -> spaceRoles(api, grantOf(api, ApiContext.name(m)).owner()),
                 (e, m) -> actOnGrant(api, e, ApiContext.name(m), ApiContext.param(m, 2))));
         api.post("/exchange/grants/([^/]+)/pin", ApiContext.withCapability("canRequestShares",
+                (e, m) -> spaceRoles(api, grantOf(api, ApiContext.name(m)).consumer()),
                 (e, m) -> pinGrant(api, e, ApiContext.name(m))));
         api.post("/exchange/grants/([^/]+)/expiry", ApiContext.withCapability("canApproveShares",
+                (e, m) -> spaceRoles(api, grantOf(api, ApiContext.name(m)).owner()),
                 (e, m) -> expireGrant(api, e, ApiContext.name(m))));
         api.get("/exchange/grants", (e, m) -> listGrants(api, e));
         api.get("/exchange/datasets/([^/]+)/([^/]+)", (e, m) ->
@@ -447,6 +459,27 @@ public final class ExchangeRoutes implements RouteModule {
         if (!ex.enabled())
             throw new ApiException(409, "cross-space sharing needs the multi-space runtime (-Dspaces.root)");
         return ex;
+    }
+
+    /** The grant a grant-scoped route acts on — 404 when absent (it has no owner to authorize against). */
+    private static ShareGrant grantOf(ApiContext api, String id) {
+        return requireExchange(api).grant(id)
+                .orElseThrow(() -> new ApiException(404, "no such grant '" + id + "'"));
+    }
+
+    /** The validated, hosted Space a body field names (the handler's own 400/404, raised before the gate). */
+    private static String bodySpace(ApiContext api, HttpExchange e, String field) throws java.io.IOException {
+        requireExchange(api);
+        return requireSpace(api, ApiContext.str(api.body(e), field), field);
+    }
+
+    /** The config root holding {@code space}'s role table — what its capability gate is decided by. */
+    private static java.nio.file.Path spaceRoles(ApiContext api, String space) {
+        SpaceContext ctx = api.spaces().space(SpaceId.of(space))
+                .orElseThrow(() -> new ApiException(404, "no such space '" + space + "'"));
+        java.nio.file.Path config = ctx.root().config();
+        if (config == null) throw new ApiException(409, "space '" + space + "' has no config root");
+        return config;
     }
 
     private static ComponentStore ownerRegistry(ApiContext api, String owner) {
