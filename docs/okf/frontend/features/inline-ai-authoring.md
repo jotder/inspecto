@@ -56,7 +56,7 @@ envelope, so they share a branch. The other two do not, and that is the whole re
 | `component_draft`, `query_author`, `projection_author` | `{kind, id?, clean, findings, draft}` | **one** `AiDraft` |
 | `kpi_report_builder` | + `widgets: [{id, draft}]` | one `AiDraft` whose **`prerequisites`** are the widgets |
 | `suggest_expectations` | `{table, column, profile, suggestions[]}` | **N** candidates the operator picks between |
-| `pipeline_author` | `{flow, nodes[], simulated, nodeOutputs[], …}` | one `AiDraft` from `flow`, `note` from the simulation |
+| `pipeline_author` | `{pipeline, nodes[], simulated, nodeOutputs[], …}` | one `AiDraft` from `pipeline`, `note` from the simulation |
 
 - ⚠ `suggest_expectations` candidates are **derived from real data by deterministic SQL**, so they carry
   `clean: true` and **no findings** — there is nothing to repair. Absence of findings there is not a bug.
@@ -331,7 +331,7 @@ vocabulary constraint is the durable half.)*
 
 `pipeline_author` completes A5. It reuses A5.2's loop rather than adding a second mechanism: the agent's
 `REPAIRABLE` map now names both tools and the argument each rewrites (`component_draft` → `config`,
-`pipeline_author` → `flow`), and `repairLoop` is parameterised on that property.
+`pipeline_author` → `pipeline` — the argument was `flow` until the 4.0.0 Tier 3 cutover), and `repairLoop` is parameterised on that property.
 
 ⚠ **The plan's premise for this slice was WRONG.** It budgeted a *hop*, reasoning that a graph's errors are
 "structural, not field-level" and so could not be fed back. But `PipelineValidator` already reports **coded,
@@ -342,13 +342,13 @@ What that required of the tool, all additive:
 
 - **`pipeline_author` now validates.** It returns `clean` + `findings` in the same
   `{severity, code, fieldPath, message}` shape every other draft-bearing tool uses. `fieldPath` is the
-  **collection** (`nodes` / `edges` / `flow`), never an index — the validator reports by *id* (already in the
+  **collection** (`nodes` / `edges` / `pipeline`), never an index — the validator reports by *id* (already in the
   message) and an index would anchor a repair to a position the model can reorder.
 - **⚠ An unexecutable graph stays `ok=true`.** This is the property the whole slice rests on: a refusal
   would make the loop treat a broken topology as "not repairable" and bail on turn one, which is precisely
   the case NL authoring exists to rescue. It is not simulated, though — a dry run would fail on the same
   defect and report it as a simulate *error*, losing the code.
-- **`flow`'s schema is hand-written** (`InspectoTools.flowSchemaJson`), because plan D9 cannot reach an IR —
+- **`pipeline`'s schema is hand-written** (`InspectoTools.pipelineSchemaJson`), because plan D9 cannot reach an IR —
   an authored graph has no `ConfigSpec`. What keeps it from becoming a second source of truth is that node
   `type` is enumerated from the **live `PipelineNodeTypes` registry**, so a registered extension type is
   offerable the day it registers. ⚠ `rel` is deliberately **not** an enum: `route:<key>` is open-ended, and
@@ -457,7 +457,7 @@ So `ToolSchemaAdopterContractTest` (`inspecto-intelligence`) holds each schema a
 real `<inspecto-ai-assist>` adopter's payload — 8 payloads across 6 tools — is checked against its tool's
 declared top-level property types. ⚠ **Keep the table in step when a pane's `[args]` changes**; that is the
 whole point. ⚠ It deliberately does **not** check `required`, because the NL variants of `query_author` and
-`pipeline_author` omit `when`/`flow` so the model's derived args survive the merge — an absent key is legal
+`pipeline_author` omit `when`/`pipeline` so the model's derived args survive the merge — an absent key is legal
 by design here. Runtime validation is revisitable, but only after all 23 schemas have been audited.
 
 ## Not shipped
@@ -501,7 +501,7 @@ by design here. Runtime validation is revisitable, but only after all 23 schemas
     refinement surviving in the description, which is what a model actually reads.
   - Degrades to the bare `{"type":"object"}` — today's hand-written value — for a null/unspecced kind, so an
     unknown kind never fails registration.
-  - ⚠ **`query_author.when` and `pipeline_author.flow` are still bare `{"type":"object"}`** and are **not**
+  - ⚠ **`query_author.when` and `pipeline_author.pipeline` are still bare `{"type":"object"}`** and are **not**
     fixed by this: neither is `ConfigSpec`-shaped (a condition tree and a flow graph). They need hand-written
     schemas, and belong with A5.1/A5.3 respectively.
   - ⚠ **`InspectoPackTest` asserts a hardcoded tool count** (now 23) — every new tool goes stale there.

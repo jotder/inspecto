@@ -86,9 +86,9 @@ export function adaptToolResult(tool: AiToolName, result: unknown): AiDraft[] {
             }));
         }
         case 'pipeline_author': {
-            // `flow` is the round-tripped GRAPH (A5.3). It used to be the pipeline's NAME, which this branch
-            // could not read at all — every real-backend draft fell through to "no suggestion".
-            const pipeline = result['flow'];
+            // `pipeline` is the round-tripped GRAPH (A5.3). It used to be the pipeline's NAME, which this
+            // branch could not read at all — every real-backend draft fell through to "no suggestion".
+            const pipeline = result['pipeline'];
             if (!isRecord(pipeline)) return [];
             const nodes = Array.isArray(result['nodes']) ? result['nodes'].length : 0;
             const simulated = result['simulated'] === true;

@@ -322,11 +322,6 @@ const CONFIG_ALLOW = {
     // The two `spaces/demo/…orders_rollup…` entries were RETIRED 2026-08-26: the stale-allowlist rule named
     // both (the job no longer carries a `flow:` key, and the flow file no longer exists), so the debt they
     // described is paid. The self-retirement working as designed — same as the plan entries above.
-    'spaces/ucc/config/views/sites_active_view.toon::flow-key':
-        'NOT authored debt — PRODUCT-GENERATED. `ViewDefinition.toMap` writes BOTH `pipeline` (canonical) '
-        + 'and `flow` unconditionally as the Tier-3 dual-emit for consumers not yet updated, so deleting the '
-        + 'key from this file is undone the moment the product rewrites the view. `fromMap` prefers '
-        + '`pipeline`, so the key is inert on read. Retire this entry when the dual-emit ends, not before.',
 };
 
 // ── pass 4: Java + TS source identifiers (plan §3.2, the surface it said to land LAST) ────────────
@@ -534,12 +529,6 @@ const SOURCE_ALLOW = {
         'maxFlow is the **max-flow/min-cut** graph algorithm — the mathematical sense, and the only correct name for it.',
     'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.html::flow-identifier':
         'The template half of the max-flow toolbox below (flowFrom/flowTo/runFlow) — same algorithmic sense.',
-    'inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java::flow-identifier':
-        'Tier-3 debt, NOT an internal rename: `flowSchemaJson` builds the schema for an agent tool ARGUMENT named `flow`, which is an external contract the model is prompted against. Renaming it needs dual-accept on the tool arg (BACKLOG), so the helper keeps the argument\'s name until then.',
-    'inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/ArgumentDeriver.java::flow-identifier':
-        'Tier-3 debt: `constrainedFlow` constrains that same `flow` tool argument — see InspectoTools above.',
-    'inspecto-intelligence/src/main/java/com/gamma/intelligence/InspectoIntelligenceAgent.java::flow-identifier':
-        'Tier-3 debt: calls `constrainedFlow` — see ArgumentDeriver above.',
     'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.ts::flow-identifier':
         'NOT a Pipeline: this is graph **max-flow** analysis (`flowFrom`/`flowTo`/`runFlow`), the sanctioned lowercase "flow of value" sense GLOSSARY permits — the same sense as the `circular-flow` motif pattern packs.',
 
@@ -547,8 +536,6 @@ const SOURCE_ALLOW = {
     // Every entry here is one of exactly two shapes — an external contract we do not get to rename
     // unilaterally, or the mathematical "flow of value" sense GLOSSARY permits. A stale doc, a label or a
     // 4xx body is never allowlisted: those got renamed when this rule landed.
-    'inspecto-intelligence/src/main/java/com/gamma/intelligence/pack/InspectoTools.java::flow-message':
-        'The `flow` AGENT TOOL ARGUMENT and its JSON-schema descriptions — an external contract the model is prompted against, the same Tier-3 debt as this file\'s flow-identifier entry. The messages ("flow is required and must be an object") name that argument, so renaming the prose without dual-accepting the argument would describe a key that does not exist.',
 
     // ── the sanctioned lowercase "flow of value" sense: link-analysis max-flow, not a Pipeline ─────
     'inspecto-ui/src/app/modules/admin/studio/link-analysis/link-analysis-toolbox.component.ts::flow-message':

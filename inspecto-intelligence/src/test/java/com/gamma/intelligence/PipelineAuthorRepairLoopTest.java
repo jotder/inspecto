@@ -47,7 +47,7 @@ class PipelineAuthorRepairLoopTest {
             seen.add(request);
             Map<String, Object> pipeline = flows.get(Math.min(turn++, flows.size() - 1));
             return new ChatResult(null,
-                    List.of(new ToolCall("pipeline_author", Map.of("flow", pipeline), new RunId("t"))),
+                    List.of(new ToolCall("pipeline_author", Map.of("pipeline", pipeline), new RunId("t"))),
                     MODEL, null);
         }
 
@@ -131,7 +131,7 @@ class PipelineAuthorRepairLoopTest {
         String repairTurn = model.seen.get(1).messages().stream()
                 .map(m -> String.valueOf(m.text())).reduce("", (a, b) -> a + "\n" + b);
         assertTrue(repairTurn.contains("warehouse"), "the offending node id must reach the model: " + repairTurn);
-        assertTrue(repairTurn.contains("flow"), "the repair turn names the argument to correct: " + repairTurn);
+        assertTrue(repairTurn.contains("pipeline"), "the repair turn names the argument to correct: " + repairTurn);
     }
 
     @Test
@@ -140,7 +140,7 @@ class PipelineAuthorRepairLoopTest {
         derive(model);
 
         String offered = model.seen.get(0).tools().get(0).jsonSchema();
-        assertFalse(offered.contains("\"flow\":{\"type\":\"object\"}"), "the bare payload must be gone");
+        assertFalse(offered.contains("\"pipeline\":{\"type\":\"object\"}"), "the bare payload must be gone");
         assertTrue(offered.contains("transform.filter"),
                 () -> "node types come from the live registry, was: " + offered);
         // `route:<key>` is open-ended, so enumerating rel would forbid the branch dispatch transform.route

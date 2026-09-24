@@ -13,14 +13,14 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
+> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 28<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 55<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 54<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -231,7 +231,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 #### API contract & vocabulary
 
 - **P3** · `ERRORCODE-DEFAULTED-1` — **explicit error codes on the remaining bare throw sites.** The 403 slice is done (zero bare 403 sites; `ErrorCodes` and its constants are public; `ApiContractTest` pins the catalog). **620 of 648 `ApiException` sites still take `ErrorCodes.defaultFor(status)`** — sweep by file, re-deriving each count first (the row's original figures were wrong by ~3×). Largest as of 2026-09-17: `ComponentRoutes` 36 · `inspecto-ops/ObjectRoutes` 34 · `PipelineGraphRoutes` 30 · `ExchangeRoutes` 30 · `ReconRoutes` 26 · `AgentRoutes` 22 · `RunRoutes` 21.
-- **P3** · **Vocabulary rollout, Tier 3 — the release-gated remainder** — the UI half shipped 2026-09-07 (the DTOs read the canonical `pipeline` key). What remains is **wire and needs the MAJOR**: drop `flow` from the Java JSON (`ViewDefinition.toMap`, `LineageRoutes`, `PipelineProjection`) and rename the `ViewDefinition.flow` record component, which carries `@PublicApi(since="4.0.0")`. ⛔ Do **not** rename the `"flow"` test literals (`ViewStoreTest`, `ControlApiViewsTest`) — they are the only proof the dual-read path works. The agent-tool `flow` argument stays until it dual-accepts. ⚠ When the dual-emit ends, delete `CONFIG_ALLOW['spaces/ucc/config/views/sites_active_view.toon::flow-key']` — the guard's stale-allowlist check fails the build until you do. → `GLOSSARY.md` §13 · `PROJECT_NOTES.md`
 
 ### 3.8 Security, Policy, Editions & Compliance
 

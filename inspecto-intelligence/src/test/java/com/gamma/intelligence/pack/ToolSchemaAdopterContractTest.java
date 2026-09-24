@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p><b>What it does NOT check:</b> {@code required}. Two panes adopt a tool twice — a direct call
  * and a natural-language one that deliberately omits the payload key ({@code query_author.when},
- * {@code pipeline_author.flow}) so the model's derived args are not overwritten by the pane's. An
+ * {@code pipeline_author.pipeline}) so the model's derived args are not overwritten by the pane's. An
  * absent key is therefore legal by design, and only the type of a key that IS sent is an invariant.
  *
  * <p><b>Keep this table in step with the panes.</b> A new {@code <inspecto-ai-assist>} adopter, or a
@@ -53,7 +53,7 @@ class ToolSchemaAdopterContractTest {
             new Payload("query_author", "studio/queries/queries.component.ts (natural language)",
                     Map.of("dataset", "string", "name", "string")),
             new Payload("pipeline_author", "pipelines/pipeline-editor.component.ts (check topology)",
-                    Map.of("flow", "object")),
+                    Map.of("pipeline", "object")),
             new Payload("projection_author", "studio/link-analysis/link-analysis-query-panel.component.ts",
                     // ⚠ string[], NOT {name,type}[] — this is the pair that was out of step.
                     Map.of("datasetId", "string", "columns", "array:string")),

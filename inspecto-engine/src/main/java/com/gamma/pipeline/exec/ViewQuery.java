@@ -53,7 +53,7 @@ public final class ViewQuery {
         String sql = ViewReaderSql.rendered(def);
         if (sql == null || sql.isBlank())
             throw new IllegalStateException(
-                    "view '" + def.store() + "' has no derived_sql; re-run pipeline '" + def.flow() + "' to concretise it");
+                    "view '" + def.store() + "' has no derived_sql; re-run pipeline '" + def.pipeline() + "' to concretise it");
         int limit = Math.max(0, cap);
         try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {
             // Intentionally NOT sealed — the derived SQL reads the source store's parquet by absolute path.

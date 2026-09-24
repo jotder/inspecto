@@ -521,7 +521,7 @@ class PipelineJobRunnerTest {
         assertTrue(res.success(), res.message());
         assertFalse(Files.exists(Path.of(dataDir, "active_subs")), "a sink.view writes no data bytes");
         ViewDefinition def = new ViewStore(wr.resolve("views")).get("active_subs").orElseThrow();
-        assertEquals("subs_kpi", def.flow(), "view definition records the producing pipeline");
+        assertEquals("subs_kpi", def.pipeline(), "view definition records the producing pipeline");
         assertEquals(List.of("subs"), def.sourceStores(), "view definition records source-store lineage");
     }
 

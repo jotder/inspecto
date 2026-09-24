@@ -87,7 +87,7 @@ class ControlApiPipelineLoadErrorTest {
             assertEquals(1, ready.get("pipelines").asInt(), "counts ignore it: " + ready);
 
             JsonNode combined = V1Body.of(send(c.port, "GET", "/pipelines/combined").body());
-            assertEquals(1, combined.get("flows").size(), "the combined topology ignores it: " + combined);
+            assertEquals(1, combined.get("pipelines").size(), "the combined topology ignores it: " + combined);
 
             assertEquals(404, send(c.port, "POST", "/runs/orders/trigger").statusCode(),
                     "nothing can run it");

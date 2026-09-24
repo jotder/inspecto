@@ -42,7 +42,7 @@ public final class ViewReaderSql {
         if (sql == null || !sql.contains(READER_TOKEN)) return sql;
         if (isBlank(def.readerRoot()) || isBlank(def.readerFormat()))
             throw new IllegalArgumentException("view '" + def.store() + "' templates its reader but records no"
-                    + " reader_root/reader_format — the definition is torn; re-run pipeline '" + def.flow()
+                    + " reader_root/reader_format — the definition is torn; re-run pipeline '" + def.pipeline()
                     + "' to rewrite it");
         String source = ConsignmentSelector.sourceLiteral(def.readerRoot(), SqlViews.ext(def.readerFormat()));
         // hive stays ON: the pre-template runner SQL always read with hive_partitioning, and this render

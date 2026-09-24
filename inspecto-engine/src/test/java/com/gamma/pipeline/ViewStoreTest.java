@@ -41,7 +41,7 @@ class ViewStoreTest {
 
         ViewDefinition back = store.get("premium").orElseThrow();
         assertEquals("premium", back.store());
-        assertEquals("orders_pipeline", back.flow());
+        assertEquals("orders_pipeline", back.pipeline());
         assertEquals(List.of("raw_orders", "customers"), back.sourceStores());
         assertEquals("SELECT * FROM raw_orders", back.derivedSql());
         assertEquals("2026-08-14T10:00:00Z", back.definedAt());
@@ -52,18 +52,19 @@ class ViewStoreTest {
     }
 
     /**
-     * The Tier-3 vocabulary bridge, both directions. ⛔ Dropping either key is a breaking change to a
-     * persisted file format: a consumer not yet renamed reads {@code flow}, and a definition written before
-     * the rename carries only {@code flow} — so the writer emits both and the reader prefers {@code pipeline}.
+     * The Tier-3 cutover (4.0.0): the writer emits only the canonical {@code pipeline} key, and the reader no
+     * longer falls back to the pre-rename {@code flow} key — a {@code flow}-only file resolves no producing
+     * pipeline. The dual-read was dropped because no definition on disk carried {@code flow} alone.
      */
     @Test
-    void aDefinitionWritesBothVocabulariesAndReadsEitherOne(@TempDir Path root) throws Exception {
+    void aDefinitionWritesAndReadsOnlyTheCanonicalPipelineKey(@TempDir Path root) throws Exception {
         ViewStore store = new ViewStore(root);
-        store.write(def("dual"));
+        store.write(def("canonical"));
 
-        String toon = Files.readString(root.resolve("dual_view.toon"), StandardCharsets.UTF_8);
-        assertTrue(toon.contains("pipeline"), () -> "canonical key missing:\n" + toon);
-        assertTrue(toon.contains("flow"), () -> "pre-rename key missing:\n" + toon);
+        Map<String, Object> written = ConfigCodec.toMap(
+                Files.readString(root.resolve("canonical_view.toon"), StandardCharsets.UTF_8));
+        assertEquals("orders_pipeline", written.get("pipeline"), () -> "canonical key missing: " + written);
+        assertFalse(written.containsKey("flow"), () -> "the pre-rename key is no longer emitted: " + written);
 
         // A file as written before the rename: 'flow' only, no 'pipeline' at all.
         Map<String, Object> legacy = new LinkedHashMap<>();
@@ -73,8 +74,8 @@ class ViewStoreTest {
         legacy.put("defined_at", "2026-01-01T00:00:00Z");
         Files.writeString(root.resolve("legacy_view.toon"), ConfigCodec.toToon(legacy), StandardCharsets.UTF_8);
 
-        assertEquals("old_flow_id", store.get("legacy").orElseThrow().flow(),
-                "a pre-rename definition must still resolve its producing pipeline");
+        assertNull(store.get("legacy").orElseThrow().pipeline(),
+                "the pre-rename key is no longer read — there is no silent fallback");
     }
 
     @Test
@@ -141,7 +142,7 @@ class ViewStoreTest {
         store.write(def("orders"));
         store.write(new ViewDefinition("orders", "new_pipeline", List.of("z"), null, "2026-08-14T11:00:00Z"));
 
-        assertEquals("new_pipeline", store.get("orders").orElseThrow().flow());
+        assertEquals("new_pipeline", store.get("orders").orElseThrow().pipeline());
         try (var files = Files.list(root)) {
             assertEquals(List.of("orders_view.toon"),
                     files.map(p -> p.getFileName().toString()).sorted().toList(),

@@ -75,7 +75,7 @@ are `FunctionTool`s on the belt (now **14** non-mutating of 21 total), `mutating
   (`alert-rule`→`alert` spec; `widget`/`dashboard` added 2026-07-22 for `kpi_report_builder`); an
   unvalidatable kind (e.g. `dataset`, `query` — no `ConfigSpec`) is an honest `ok=false`.
   `Capability.AUTHOR_PIPELINE`.
-- **`pipeline_author`** (parse + simulate) — parses a proposed authored-flow graph via
+- **`pipeline_author`** (parse + simulate) — parses a proposed authored-pipeline graph (argument `pipeline`; it was `flow` before 4.0.0) via
   `PipelineCodec.fromMap` (malformed shape → `ok=false`), then, given `sampleRows` (post-parse
   records), simulates the `transform→sink` subgraph on a throwaway DuckDB via the editor's own
   `PipelineDryRun.run`, returning per-node relation counts + per-sink row counts. No sampleRows →
@@ -370,7 +370,7 @@ message · otherwise **200** with the tool's `value`.
     `gateway.chat` → `extractJsonObject` → Jackson pattern is right for *hypothesis synthesis*, which has
     no schema to constrain, and wrong for an argument map.
   - ⚠ **Every tool's `jsonSchema` constrains only the arg envelope** — `component_draft.config`,
-    `query_author.when` and `pipeline_author.flow` are all bare `{"type":"object"}`, with the real shape
+    `query_author.when` and `pipeline_author.pipeline` are all bare `{"type":"object"}`, with the real shape
     living in the human-readable `description`. The intended fix already has a home: `FieldSpec`'s Javadoc
     names "LLM grammar-constrained generation" among its drivers, so `ConfigSpecs.forType(kind)` can be
     projected to JSON Schema and constrain the model with the same spec that will judge it (plan D9).
