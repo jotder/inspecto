@@ -105,7 +105,7 @@ final class ContractVerdicts {
     }
 
     /** {@link PipelineDependents} kinds that bind to a Pipeline by name (the Dataset / Widget hops are judged apart). */
-    private static final Set<String> PIPELINE_READER_KINDS = Set.of("enrichment", "job", "expectation", "decision-rule");
+    private static final Set<String> PIPELINE_READER_KINDS = Set.of("enrichment", "job", "expectation", "decision-rule", "alert-rule");
 
     /**
      * @param changes   the changes that are real (formatting-only edits already dropped)

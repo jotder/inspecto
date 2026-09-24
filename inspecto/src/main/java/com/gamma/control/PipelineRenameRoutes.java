@@ -499,7 +499,8 @@ final class PipelineRenameRoutes implements RouteModule {
     /**
      * Rewrite every dependent config's reference to {@code oldId} into {@code newId} (plan §1's dependent
      * table): {@code *_enrich.toon} triggers, {@code *_job.toon} triggers, {@code expectation}/
-     * {@code decision-rule} pipeline targets, and {@code dataset} store references. Best-effort per file —
+     * {@code decision-rule} pipeline targets, {@code dataset} store references, and {@code alert-rule}
+     * {@code onPipeline}. Best-effort per file —
      * one malformed sibling must never abort a rename whose state-moving steps already committed. Returns
      * the total count of files rewritten.
      */
@@ -509,6 +510,7 @@ final class PipelineRenameRoutes implements RouteModule {
         count += rewriteComponentTargets(writeRoot, "expectation", oldId, newId);
         count += rewriteComponentTargets(writeRoot, "decision-rule", oldId, newId);
         count += rewriteDatasetRefs(writeRoot, oldId, newId);
+        count += rewriteAlertRules(writeRoot, oldId, newId);
         return count;
     }
 
@@ -626,6 +628,30 @@ final class PipelineRenameRoutes implements RouteModule {
                 count++;
             } catch (IOException ex) {
                 log.warn("[PIPELINE-RENAME] could not rewrite dataset '{}': {}", c.name(), ex.getMessage());
+            }
+        }
+        return count;
+    }
+
+    /**
+     * {@code onPipeline} on every {@code alert-rule} naming {@code oldId} (case-insensitively, a space read as
+     * {@code _}) - mirrors {@code PipelineDependents.alertRules}. An alert's {@code dataset} names a Dataset,
+     * not the pipeline, so a rename leaves it alone.
+     */
+    private int rewriteAlertRules(Path writeRoot, String oldId, String newId) {
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        int count = 0;
+        for (ComponentRegistry.Component c : store.list("alert-rule")) {
+            Map<String, Object> content = c.content();
+            String on = content.get("onPipeline") == null ? "" : String.valueOf(content.get("onPipeline")).trim();
+            if (on.isEmpty() || !(on.equalsIgnoreCase(oldId) || on.replace(' ', '_').equalsIgnoreCase(oldId))) continue;
+            Map<String, Object> updated = new LinkedHashMap<>(content);
+            updated.put("onPipeline", newId);
+            try {
+                store.write("alert-rule", c.name(), updated);
+                count++;
+            } catch (IOException ex) {
+                log.warn("[PIPELINE-RENAME] could not rewrite alert-rule '{}': {}", c.name(), ex.getMessage());
             }
         }
         return count;

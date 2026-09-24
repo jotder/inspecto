@@ -237,4 +237,26 @@ class AffectedPipelinesTest {
                 "dashboard:board"), r.dependents().get(1).chain());
         assertTrue(r.ignored().isEmpty(), "a Dataset a Widget shows is not ignored: " + r.ignored());
     }
+
+    @Test
+    void alertRulesOnAReachedPipelineOrDatasetAreListed(@TempDir Path root) throws Exception {
+        fixture(root);
+        Path alerts = Files.createDirectories(root.resolve("registry/alert-rules"));
+        Files.writeString(alerts.resolve("on_cons.toon"), "name: on_cons\nonPipeline: cons\n");
+        Files.writeString(alerts.resolve("on_ds.toon"), "name: on_ds\ndataset: prod_ds\n");
+        Files.writeString(alerts.resolve("on_other.toon"), "name: on_other\nonPipeline: other\n");
+        Path schema = root.resolve("prod/prod_schema.toon");
+        String before = Files.readString(schema);
+        Files.writeString(schema, before.replace("AMT,\"1\",DOUBLE", "AMT,\"1\",BIGINT"));
+
+        Report r = AffectedPipelines.analyze(root, List.of(new Change(schema, Status.MODIFIED, before)));
+
+        java.util.Map<String, List<String>> chains = new java.util.LinkedHashMap<>();
+        for (AffectedPipelines.Dependent d : r.dependents()) chains.put(d.kind() + ":" + d.name(), d.chain());
+        assertEquals(List.of("file:prod/prod_schema.toon", "pipeline:prod", "alert-rule:on_ds"),
+                chains.get("alert-rule:on_ds"), AffectedPipelines.render(r));
+        assertEquals(List.of("file:prod/prod_schema.toon", "pipeline:prod", "dataset:prod_ds", "pipeline:cons",
+                "alert-rule:on_cons"), chains.get("alert-rule:on_cons"), AffectedPipelines.render(r));
+        assertFalse(chains.containsKey("alert-rule:on_other"), "an alert on an unreached Pipeline is not listed");
+    }
 }

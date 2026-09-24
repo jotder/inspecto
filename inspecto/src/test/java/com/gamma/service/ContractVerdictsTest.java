@@ -368,4 +368,19 @@ class ContractVerdictsTest {
                 AffectedPipelines.render(r));
         assertTrue(revalidate.get(0).reason().contains("downstream of pipeline:cons"), revalidate.get(0).reason());
     }
+
+    @Test
+    void anAlertRuleOnTheProducerOrItsDatasetIsRevalidate(@TempDir Path root) throws Exception {
+        Path schema = producer(root, "");
+        dataset(root, "prod_ds", "prod/db");
+        Path alerts = Files.createDirectories(root.resolve("registry/alert-rules"));
+        Files.writeString(alerts.resolve("on_prod.toon"), "name: on_prod\nonPipeline: prod\n");
+        Files.writeString(alerts.resolve("on_ds.toon"), "name: on_ds\ndataset: prod_ds\n");
+        Files.writeString(alerts.resolve("elsewhere.toon"), "name: elsewhere\nonPipeline: other\n");
+
+        Report r = removeAmt(root, schema);
+
+        assertEquals(List.of("alert-rule:on_prod", "alert-rule:on_ds"),
+                of(r, Tier.REVALIDATE).stream().map(Verdict::reader).toList(), AffectedPipelines.render(r));
+    }
 }

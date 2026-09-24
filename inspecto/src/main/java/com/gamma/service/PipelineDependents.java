@@ -23,7 +23,7 @@ import java.util.stream.Stream;
  * delete"). Answers <em>what breaks if this origin goes away</em> over the same by-name binding set the
  * rename path rewrites, plus the two transitive Studio hops a rename never needed.
  *
- * <p><b>Why this is not an extraction of {@code PipelineRoutes.rewriteDependents}.</b> Those five
+ * <p><b>Why this is not an extraction of {@code PipelineRenameRoutes.rewriteDependents}.</b> Those six
  * scanners read <em>and</em> write in one loop body; a read-only variant cannot share it without
  * reshaping a shipped rename path. The key set is deliberately kept identical — <b>if a binding is
  * added there, add it here</b> — but the code stays separate on purpose.
@@ -55,7 +55,7 @@ public final class PipelineDependents {
      * One thing that references the pipeline.
      *
      * @param kind what holds the reference ({@code enrichment} / {@code job} / {@code expectation} /
-     *             {@code decision-rule} / {@code dataset} / {@code widget} / {@code dashboard})
+     *             {@code decision-rule} / {@code dataset} / {@code alert-rule} / {@code widget} / {@code dashboard})
      * @param name the dependent's own id
      * @param via  the key that carries the reference, e.g. {@code triggers.on_pipeline}
      */
@@ -104,6 +104,7 @@ public final class PipelineDependents {
         componentTargets(store, "expectation", id, all);
         componentTargets(store, "decision-rule", id, all);
         Set<String> datasets = datasets(store, id, all);
+        alertRules(store, id, datasets, all);
         Set<String> widgets = widgets(store, datasets, all);
         dashboards(store, widgets, all);
 
@@ -191,6 +192,26 @@ public final class PipelineDependents {
             }
         }
         return hit;
+    }
+
+    /**
+     * Alert Rules watching this pipeline by {@code onPipeline} (case-insensitively, a space read as
+     * {@code _}, as {@code AlertService} matches it) or one of the affected datasets by {@code dataset}.
+     * A rule naming neither watches every pipeline and belongs to the space, not to this one.
+     */
+    private static void alertRules(ComponentStore store, String id, Set<String> datasets, List<Dependent> out) {
+        for (ComponentRegistry.Component c : store.list("alert-rule")) {
+            Map<String, Object> content = c.content();
+            String on = content.get("onPipeline") == null ? "" : String.valueOf(content.get("onPipeline")).trim();
+            if (!on.isEmpty() && (on.equalsIgnoreCase(id) || on.replace(' ', '_').equalsIgnoreCase(id))) {
+                out.add(new Dependent("alert-rule", c.name(), "onPipeline"));
+                continue;
+            }
+            String ds = content.get("dataset") == null ? "" : String.valueOf(content.get("dataset")).trim();
+            if (!ds.isEmpty() && datasets.stream().anyMatch(ds::equalsIgnoreCase)) {
+                out.add(new Dependent("alert-rule", c.name(), "dataset"));
+            }
+        }
     }
 
     /** Widgets bound to any of the affected datasets ({@code datasetId}) — the first transitive hop. */

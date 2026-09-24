@@ -195,10 +195,13 @@ turns it into a gate.
 - ⛔ **Deferred:** Measures in materialize / report jobs and saved queries parsed for their columns (a
   saved-query Widget and every enrichment / job / rule link are REVALIDATE today); column lineage *through*
   a consumer or an enrichment (its downstream is REVALIDATE or merely listed, never judged column by
-  column); diffing a multi-schema or plugin producer; Alert Rules — `AlertRule` carries `onPipeline` and
-  `dataset`, but `PipelineDependents` (kept key-for-key with the rename path) has no Alert Rule scanner, so
-  an Alert Rule is neither listed nor judged. That is an under-report, the one gap here that fails the
-  wrong way; it belongs with the scanner, not with this check.
+  column); diffing a multi-schema or plugin producer.
+- ✅ **Alert Rules shipped 2026-09-24** (closed `DUCKLE-C7-AFFECTED-CONTRACTS-1`): `PipelineDependents`
+  scans `alert-rule` components — `onPipeline` naming the Pipeline (case-insensitive, a space read as `_`,
+  as `AlertService` matches it) or `dataset` naming one of its Datasets — as kind `alert-rule`, and
+  `ContractVerdicts` judges each as a Pipeline reader (REVALIDATE; BREAKING when the producer is deleted).
+  The rename path (`PipelineRenameRoutes.rewriteAlertRules`) rewrites `onPipeline` key-for-key; an alert's
+  `dataset` names a Dataset, not the Pipeline, so a rename leaves it alone.
 
 ## Related
 

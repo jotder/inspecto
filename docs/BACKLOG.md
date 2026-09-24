@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **39<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** —
+> **38<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -25,8 +25,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 22<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 17<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 39<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 16<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 38<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -193,7 +193,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 #### Datasets & lineage
 
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises; ⬜ re-confirmed not fired 2026-09-15. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4
-- **P3** · `DUCKLE-C7-AFFECTED-CONTRACTS-1` — **the affected-Pipelines check lists no Alert Rule.** Everything else shipped 2026-09-24: `com.gamma.service.AffectedPipelines` reports reached Pipelines, their non-Pipeline dependents (enrichment `references.<n>.ref` / `triggers.on_pipeline`, job `on_pipeline`, Expectations, Decision Rules, Datasets, Widgets, Dashboards) and the four reader-dependent contract tiers (BREAKING / POSSIBLY_BREAKING / REVALIDATE / ADDITIVE, never collapsed), and CI runs it as a report-only step on every PR. **Still open:** `AlertRule` carries `onPipeline` and `dataset`, but `PipelineDependents` (kept key-for-key with the rename path) has no Alert Rule scanner, so an Alert Rule on a changed Pipeline or Dataset is neither listed nor judged — the one gap in the check that under-reports. The fix belongs in the scanner (and the rename path it mirrors), not in the check. → `okf/backend/control-plane/pipeline-related.md`
 
 ### 3.5 Data quality, Observability, Signals & Alerting
 

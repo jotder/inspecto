@@ -258,10 +258,15 @@ class ControlApiPipelineRenameTest {
             ds2.put("physicalRef", "mini_etl/database");
             store.write("dataset", "mini_ds2", ds2);
 
+            // an alert rule watching the pipeline by onPipeline.
+            Map<String, Object> alert = new LinkedHashMap<>();
+            alert.put("onPipeline", "mini_etl");
+            store.write("alert-rule", "mini_alert", alert);
+
             HttpResponse<String> r = post(c.port, "/pipelines/mini_etl/rename", "{\"newId\":\"mini_v2\"}");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode out = V1Body.of(r.body());
-            assertEquals(6, out.get("dependentsRewritten").asInt(), "enrich + job + expectation + rule + 2 datasets");
+            assertEquals(7, out.get("dependentsRewritten").asInt(), "enrich + job + expectation + rule + 2 datasets + alert");
 
             Map<String, Object> enrichAfter = ConfigLoader.filesystem().decode(root.resolve("mini_enrich.toon").toString());
             assertEquals("mini_v2", String.valueOf(((Map<?, ?>) enrichAfter.get("triggers")).get("on_pipeline")));
@@ -274,6 +279,7 @@ class ControlApiPipelineRenameTest {
             assertEquals("mini_v2", String.valueOf(store.get("decision-rule", "mini_rule").orElseThrow().content().get("target")));
             assertEquals("mini_v2", String.valueOf(store.get("dataset", "mini_ds1").orElseThrow().content().get("sourceName")));
             assertEquals("mini_v2/database", String.valueOf(store.get("dataset", "mini_ds2").orElseThrow().content().get("physicalRef")));
+            assertEquals("mini_v2", String.valueOf(store.get("alert-rule", "mini_alert").orElseThrow().content().get("onPipeline")));
         } finally {
             deleteRecursive(root);
         }
