@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **49<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 23<!--count:backlog-p3--> × P3** —
+> **48<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 22<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 54 on 2026-09-24**: P2 `STREAM-CONSUMER-1` closed — Option A built, the `SP-ACQ-09` note updated, the plan distilled into `okf/capabilities/acquisition/acquisition.md` and archived.
 > ⬇ 55 → 54 on 2026-09-24: P3 `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` closed — its work had shipped in `d5f6353be`
@@ -22,8 +22,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 26<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 23<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 49<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 22<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 48<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -211,7 +211,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 - **P2** · **D-8 XLSX export — prove it in a shipped bundle** — the export shipped 2026-09-16 through DuckDB's `excel` extension (`PipelineDocumentXlsx`, `COPY … (FORMAT xlsx)`); ⛔ **do not add POI** (and `grep poi` over the poms matches only "point"/"policy" — match `org.apache.poi`). Open, owed to the operator: whether it works in a **shipped or air-gapped bundle**. On a clean CI runner the extension cannot load — `PipelineDocumentXlsxTest.writesARealWorkbook` now skips when it is absent — and no release has ever shipped a DuckDB extension, because CI populates no cache; staged is not loadable (autoload ignores `-Dduckdb.extension.dir`). A green reactor is not evidence this works for a customer. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (The DuckDB `spatial` extension itself: zero demand, re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
-- **P3** · **EXPORT-1 outbound object-storage export (S3 / HDFS)** — sequence of record: an operator `aws s3 sync`/rclone of `data/<store>/database/` first (zero code); build the push post-action (the outbound mirror of the connector SPI, reusing `AwsSigV4`) only on demand; HDFS only via an S3-compatible gateway — ⛔ never `hadoop-client`. → `okf/backend/engine/object-storage-export.md`
 
 Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-overview`, `quality-monitor`,
 `trend-monitor` today. See [`okf/frontend/features/studio.md`](okf/frontend/features/studio.md).

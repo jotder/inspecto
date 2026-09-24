@@ -113,7 +113,8 @@ was refused) and `okf/backend/control-plane/queries.md` §3.3–§3.5. *(Provena
 `integrations.md`'s second half describes installing `pg_duckdb` on a *customer's* PostgreSQL and running a
 bundled `warehouse_setup.sql`; no `pg_duckdb` code exists in the repo and nothing tests it. `DuckLakeRegistrar`
 **registers** already-written local Parquet paths in a DuckLake catalog — bytes never move. Object-storage
-export is **intent** (`object-storage-export.md` says so in its own frontmatter; `EXPORT-1`). Read every
+export is a **push Job** (`objectstore.export`, shipped 2026-09-24 as `EXPORT-1`) that copies committed files
+out; the data tier itself stays local. Read every
 "lakehouse" claim with those three facts.
 
 ## 3. Specification
@@ -415,11 +416,12 @@ Query Library's execution path** (§2).
   `pg_duckdb`, run the bundled `warehouse_setup.sql` (repo root; not part of the Maven build), create roles
   and views. No `pg_duckdb` code in the repo; nothing tests it; `integrations.md` carries it without an
   intent banner (corrected with this spec).
-- **Object-storage export** (S3 / HDFS) is **intent**: `object-storage-export.md` is a "recommendation of
-  record" — prove the pattern with `aws s3 sync` / rclone first, then a push post-action reusing `AwsSigV4`
-  only if it earns a place; a whole Space on S3 is recommended **against** (no atomic rename ⇒ the crash-safe
-  commit ordering silently changes meaning); HDFS only via an S3-compatible gateway. Board: `EXPORT-1`;
-  `EDITIONS.md` `OPS-05` is the Enterprise-only cell for the same subject.
+- **Object-storage export** (S3 / HDFS) **shipped 2026-09-24** (`EXPORT-1`) as the `objectstore.export`
+  Job Type: on a Pipeline's commit it pushes a data-root directory to an S3-compatible Connection, skipping
+  unchanged files by size + ETag and writing a manifest last (`object-storage-export.md`). A whole Space on
+  S3 stays recommended **against** (no atomic rename ⇒ the crash-safe commit ordering silently changes
+  meaning); HDFS only via an S3-compatible gateway. `EDITIONS.md` `OPS-05` (a *shared* object store for
+  Parquet) is a different, still-open subject.
 
 ### 3.11 The SPA
 
@@ -498,7 +500,6 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 |---|---|---|
 | DuckDB `memory_limit` **default** (GAP-4) | `BACKLOG.md` §3 *Deployment topology gaps* | Only the concurrency half of D11 defaults on; no `scheduler.toon` ships |
 | **Postgres multi-user** — pool, `browseConnection()`, schema-per-Space, `CaseStore`, the three uncovered stores, a concurrency test | `BACKLOG.md` §3 *Postgres multi-user* (PARKED by §6); `EDITIONS.md` OPS-03 | |
-| **`EXPORT-1`** outbound object-storage export | `BACKLOG.md` §3 (P3); `EDITIONS.md` OPS-05 | Prove the consumption pattern with `s3 sync` first |
 | `graph` / `spatial` / `search` / `api` query types; more `$`-resolvers | `BACKLOG.md` §3 *Queries / BI* (P3) | Deliberately not built |
 | §7.4 rollup cache; `generation` staging; `run_id` always null | `BACKLOG.md` §3 *Consignment ELT* | Until read-time aggregation is measurably slow |
 | `retire_superseded` must be configured or a recompute keeps an extra copy forever; `DatasetRelation.temporalColumn` has no caller | `BACKLOG.md` §3 *Consignment addressing* | |
@@ -613,7 +614,7 @@ A whole Space on S3 (no atomic rename); `hadoop-client` for HDFS (⛔ never — 
 | The Consignment Selector, revisions, `retire_superseded` | `docs/okf/backend/engine/consignment-addressing.md` (`Concept`) | `inspecto-engine` | §3.2 |
 | `materialize`, `retire_superseded` as Job / task types | `docs/okf/backend/control-plane/jobs.md` (`Concept`) | `com.gamma.job` | §3.6 |
 | DuckLake and the warehouse runbook | `docs/okf/backend/integrations.md` (`Reference`) | `DuckLakeRegistrar.java` | §3.10 — ⚠ runbook, not feature |
-| Object-storage export posture | `docs/okf/backend/engine/object-storage-export.md` (`Reference`, self-labelled intent) | — | §3.10 |
+| Object-storage export (`objectstore.export`) | `docs/okf/backend/engine/object-storage-export.md` (`Reference`) | `ObjectStoreExportJobType.java` | §3.10 |
 | Retention and the operational flags | `docs/okf/backend/build-run/operations-reference.md` (`Reference`) §Retention | — | the operator's view |
 | Studio Datasets, Query Library, the rows seam | `docs/okf/frontend/features/studio.md` (`Feature`) | `inspecto-ui/src/app/modules/admin/studio/` | §3.11 |
 | The Data Browser | `docs/okf/frontend/features/catalog.md` (`Feature`) §Data Browser | — | §3.9 |

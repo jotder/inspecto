@@ -799,7 +799,6 @@ so they are not re-proposed as new ideas; none is scheduled.
 
 | Item | Board id | What remains |
 |---|---|---|
-| Outbound object-store export | `EXPORT-1` (P3) | The inverse direction of ACQ-4 — recommendation of record only |
 | Vault / KMS secret provider | `GAP-6` | Deferred by the SEC-07 decision, not blocked |
 | "Listed-not-yet-fetched" gauge | branch-aware residual **(e)** | Observability gap: the queue between list and fetch is invisible |
 | Remote-fetch bandwidth cap (was `acquire.maxFilesPerCycle`) | branch-aware residual **(f)** | The per-cycle intake caps SHIPPED (`-Dingest.maxFilesPerCycle`, `-Dingest.maxBytesPerCycle`); both run after listing on local files, so a cap on what a cycle *fetches* needs a listing-with-sizes seam that does not exist |

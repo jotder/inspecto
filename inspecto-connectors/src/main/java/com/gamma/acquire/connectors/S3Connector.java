@@ -4,6 +4,7 @@ import com.gamma.acquire.AcquisitionException;
 import com.gamma.acquire.ConnectionProfile;
 import com.gamma.acquire.ConnectionWorkbench;
 import com.gamma.acquire.DiscoveryContext;
+import com.gamma.acquire.ExportConnector;
 import com.gamma.acquire.PostAction;
 import com.gamma.acquire.RemoteFile;
 import com.gamma.acquire.SecretResolver;
@@ -33,6 +34,7 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.gamma.acquire.CollectorConnector.Capability.*;
 
@@ -55,7 +57,7 @@ import static com.gamma.acquire.CollectorConnector.Capability.*;
  * {@code READY} and the engine skips size/mtime stabilization. MOVE/RENAME are CopyObject+DeleteObject
  * (object storage has no rename); TAG is PutObjectTagging.
  */
-public final class S3Connector extends AbstractHttpObjectStoreConnector implements CollectorConnector {
+public final class S3Connector extends AbstractHttpObjectStoreConnector implements CollectorConnector, ExportConnector {
 
     private static final Logger log = LoggerFactory.getLogger(S3Connector.class);
     private static final int MAX_KEYS_PAGE = 1000;
@@ -208,6 +210,15 @@ public final class S3Connector extends AbstractHttpObjectStoreConnector implemen
     @Override
     protected HttpRequest request(String method, String encodedPath, Map<String, String> query,
                                   Map<String, String> headers, byte[] body) throws IOException {
+        String payloadHash = body == null ? AwsSigV4.EMPTY_PAYLOAD_SHA256 : AwsSigV4.sha256Hex(body);
+        return signed(method, encodedPath, query, headers, payloadHash,
+                body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(body));
+    }
+
+    /** A SigV4-signed request over {@code body}, whose SHA-256 the caller already knows ({@code payloadHash}). */
+    private HttpRequest signed(String method, String encodedPath, Map<String, String> query,
+                               Map<String, String> headers, String payloadHash,
+                               HttpRequest.BodyPublisher body) throws IOException {
         StringBuilder qs = new StringBuilder();
         query.forEach((k, v) -> {
             if (!qs.isEmpty()) qs.append('&');
@@ -218,14 +229,62 @@ public final class S3Connector extends AbstractHttpObjectStoreConnector implemen
         String secret = SecretResolver.resolve(profile.password());
         if (secret == null)
             throw new IOException("no usable secret key for s3 connection '" + profile.id() + "'");
-        String payloadHash = body == null ? AwsSigV4.EMPTY_PAYLOAD_SHA256 : AwsSigV4.sha256Hex(body);
         Map<String, String> signedHeaders = AwsSigV4.sign(method, uri, headers, payloadHash,
                 Instant.now(), region, "s3", profile.username(), secret);
 
-        HttpRequest.Builder b = HttpRequest.newBuilder(uri).method(method,
-                body == null ? HttpRequest.BodyPublishers.noBody() : HttpRequest.BodyPublishers.ofByteArray(body));
+        HttpRequest.Builder b = HttpRequest.newBuilder(uri).method(method, body);
         signedHeaders.forEach(b::header);
         return b.build();
+    }
+
+    // ── ExportConnector (EXPORT-1): the outbound half ─────────────────────────
+
+    /** HeadObject: 404 ⇒ absent; any other non-2xx is a failure, never read as "absent". */
+    @Override
+    public Optional<RemoteFile> stat(String key) throws AcquisitionException {
+        try {
+            HttpResponse<Void> resp = http.send(signed("HEAD", exportPath(key), Map.of(), Map.of(),
+                    AwsSigV4.EMPTY_PAYLOAD_SHA256, HttpRequest.BodyPublishers.noBody()),
+                    HttpResponse.BodyHandlers.discarding());
+            if (resp.statusCode() == 404) return Optional.empty();
+            if (resp.statusCode() / 100 != 2)
+                throw new AcquisitionException("S3 stat " + key + " failed: HTTP " + resp.statusCode());
+            long size = resp.headers().firstValueAsLong("Content-Length").orElse(RemoteFile.SIZE_UNKNOWN);
+            String etag = unquote(resp.headers().firstValue("ETag").orElse(null));
+            return Optional.of(new RemoteFile(nameOf(key), key, size, null, etag, null, null));
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw new AcquisitionException("S3 stat " + key + " failed on " + endpoint.getHost() + ": " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * PutObject, streamed from disk. {@code Content-MD5} is sent (and signed), so the store itself refuses a
+     * body that arrived corrupted rather than storing it. ⚠ Single-part only — S3 caps one PUT at 5 GiB.
+     */
+    @Override
+    public void put(String key, Path file, String md5Hex, String sha256Hex) throws AcquisitionException {
+        try {
+            HttpRequest req = signed("PUT", exportPath(key), Map.of(),
+                    Map.of("Content-MD5", java.util.Base64.getEncoder().encodeToString(java.util.HexFormat.of().parseHex(md5Hex))),
+                    sha256Hex, HttpRequest.BodyPublishers.ofFile(file));
+            HttpResponse<byte[]> resp = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
+            if (resp.statusCode() / 100 != 2)
+                throw new AcquisitionException("S3 put " + key + " failed: HTTP " + resp.statusCode() + errorDetail(resp.body()));
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) Thread.currentThread().interrupt();
+            throw new AcquisitionException("S3 put " + key + " failed on " + endpoint.getHost() + ": " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void put(String key, byte[] body, String contentType) throws AcquisitionException {
+        execute("PUT", exportPath(key), Map.of(), Map.of("Content-Type", contentType), body, "put " + key);
+    }
+
+    /** {@code /bucket/prefix+key}, encoded once — the export key is relative to the Connection's base path. */
+    private String exportPath(String key) {
+        return "/" + bucket + "/" + AwsSigV4.uriEncode(prefix + key, false);
     }
 
     /** The request path for an object: {@code /bucket/prefix+rel}, key encoded once, '/' preserved. */
