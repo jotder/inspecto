@@ -108,7 +108,7 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | 3.7 | Bundle "load as draft" | 7 calls in `superpower/bundle-load-as-draft-design.md` (D1 decided 2026-09-25: the draft is **in-memory**) |
 | 3.8 | policy-authoring UX | 9 calls in `superpower/policy-authoring-ux-design.md` (Decisions owed) |
 | 3.8 | `DUCKLE-C6-POLICY-NARROWING-1` | 16 calls in `superpower/policy-narrowing-design.md` (Decisions owed) |
-| 3.9 | D6 `findings-spec` UI | 9 calls in `superpower/findings-spec-authoring-ui-design.md` (D1 decided 2026-09-25: author on **`canManageIncidents`**) |
+| 3.9 | D6 `findings-spec` UI | 9 calls in `superpower/findings-spec-authoring-ui-design.md` (D1 decided and BUILT 2026-09-25: `findings-spec` writes are gated on **`canManageIncidents`** — `ComponentRoutes`, `okf/backend/editions/auth-security.md`) |
 
 **Decided 2026-09-25, not tied to a row** (operator; each lands in its owning OKF concept when built):
 
