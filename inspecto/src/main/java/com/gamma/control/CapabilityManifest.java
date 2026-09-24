@@ -273,7 +273,8 @@ final class CapabilityManifest {
      * step 2c, 2026-09-15). {@code category} is the audit's own bucket taxonomy — nothing invented:
      * {@code identity-flow} · {@code self-verifying-public} · {@code self-service} · {@code read-shaped} ·
      * {@code self-limiting} · {@code recovery-route} · {@code target-visibility-gated} ·
-     * {@code stateless-compute} · {@code collaboration}. Together with {@link #ENTRIES} and
+     * {@code stateless-compute} · {@code collaboration} · {@code provenance-gated} (gated in the handler by where the
+     * addressed component came from — a Job Pack parser, operator D4 2026-09-25). Together with {@link #ENTRIES} and
      * {@link #PENDING_OPERATOR_CALLS} this makes "ungated" a RECORDED state rather than an absence:
      * {@code CapabilityManifestTest} scans every {@code api.post|put|patch|delete} registration in every
      * module and fails the build on a mutating route that is in none of the three tables.
@@ -330,7 +331,10 @@ final class CapabilityManifest {
             new Exemption("POST", "/db/query", "read-shaped", "read-only SQL behind SqlGuard"),
             new Exemption("POST", "/bi/query", "read-shaped", "a Measure query; the body is the query spec"),
             new Exemption("POST", "/enrichment/preview", "read-shaped", "previews an enrichment over sample rows"),
-            new Exemption("POST", "/parsers/([^/]+)/preview", "read-shaped", "previews a parser over a sample"),
+            // Operator D4 2026-09-25 (parser-plugins-trust-design.md slice P4): the gate depends on the PARSER, so
+            // it lives IN the handler and the manifest (all-or-nothing per route) records it here, as /spaces does.
+            new Exemption("POST", "/parsers/([^/]+)/preview", "provenance-gated",
+                    "gated IN the handler: canAuthorWorkbench when the parser came from a Job Pack (third-party code over caller-chosen bytes); built-in and classpath parsers stay open as read-shaped (ParserRoutes.preview) — pinned by ControlApiPackParserPreviewTest"),
             new Exemption("POST", "/import/preview", "read-shaped", "previews an import; nothing is written until the gated import"),
             new Exemption("POST", "/bundle/preview", "read-shaped", "previews a bundle's contents"),
             new Exemption("POST", "/bundle/export", "read-shaped", "an export is a read; the import half is gated"),

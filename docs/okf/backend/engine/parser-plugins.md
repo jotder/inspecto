@@ -15,7 +15,7 @@ timestamp: 2026-07-30T00:00:00Z
 > DuckDB-native + SQL regex, Java `StreamingFileIngester`). As a **legal `parsing.frontend` config
 > value** there are ten tokens / eight distinct formats (`PipelineConfigParser.FRONTENDS:1590-1591`).
 > As a **registered `ParserPlugin` id** there are six built-ins (`BuiltinParsers.IDS:29`) plus any
-> `ServiceLoader` providers. Read "exactly three" as a mechanism claim, never as a config constraint.
+> `ServiceLoader` providers, plus parsers from allowlisted Job Packs (2026-09-25). Read "exactly three" as a mechanism claim, never as a config constraint.
 > THIS concept is the self-description layer over both: discovery, served grammar schemas, preview.
 
 The E of ELT: any file loads into one or more **Tables** (the segment → partitioned CSV/Parquet
@@ -113,7 +113,7 @@ Both spellings resolve through ONE class, `com.gamma.parse.Asn1GrammarSource`, w
   **before** the readability probe (an escaping ref is refused, never reported "not readable", which
   would leak whether a path outside the roots exists). The parser resolves but does **not** jail.
 - ⚠ **The extension is enforced (`.asn` / `.asn1`) first, before anything touches the disk.**
-  `POST /parsers/{id}/preview` is compute-only with no capability, and a compile error can echo the text
+  `POST /parsers/{id}/preview` is compute-only with no capability for the built-in ASN.1 parser, and a compile error can echo the text
   it choked on — an unrestricted ref would let a preview read any file under the roots back through an
   error message.
 - `frontend: asn1` carries `asn1.grammar_file` as-authored as the path key `ingester_config.grammar`
@@ -159,7 +159,7 @@ length-prefix machinery (`lengthOffset`/`lengthSize`/endianness/`lengthIncludesH
 offering knobs nothing has needed. They stay available in asn-core the moment a real file demands
 them.
 
-## Control plane (`ParserRoutes`, both compute-only — no write gate, no capability)
+## Control plane (`ParserRoutes`, both compute-only — no write gate; a capability only for a pack parser's preview)
 
 - `GET /parsers` → `[{id, label, hierarchical, ingestable, ingesterClass?, source, grammarSchema}]`.
   `source` (2026-09-25, additive) is `builtin`, `classpath` or `pack:<jar filename>` for a parser a Job
@@ -168,6 +168,8 @@ them.
   union `{kind: 'table' | 'tree', …}`. 404 unknown id · 400 missing/oversized sample (text 1MB,
   b64 4MB — binary formats need bytes) · 422 caller errors with the reason. The grammar-shaped
   sibling of `POST /config/preview/parsing`, which stays byte-identical as the draft-true path.
+  **403 `PERMISSION_DENIED` when the parser came from a Job Pack and the caller lacks
+  `canAuthorWorkbench`** (operator D4 2026-09-25, below). Built-in and classpath parsers stay open.
 
 ## UI adoption
 
@@ -327,7 +329,7 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   [`parser-plugins-trust-design.md`](../../../superpower/parser-plugins-trust-design.md); what has shipped
   is below.
 
-### Drop-in parser jars — trust gate + pack parser registration SHIPPED (2026-09-25)
+### Drop-in parser jars — trust gate, pack parsers, ingest and preview gate SHIPPED (2026-09-25)
 
 Operator decisions 2026-09-25: **D1** a parser arrives as a **fifth Job Pack kind** through the existing
 `JobPackManager` loader (`-Djobs.packs.dir`). There is no second `plugins/` directory. **D2** T1 SHA-256
@@ -407,7 +409,23 @@ edition gate. **D8** no out-of-process host.
   that test goes red on the `isDraining` assertion. A Pipeline naming an unloaded pack's ingester gets the
   named error.
 
-**Not built yet** (design §5): **P4**, D4 preview gating. Still open from **P0**: staging under a server-owned dir instead of
+**As built (slice P4, D4 preview gate):**
+- `ParserRoutes.preview` checks `Parsers.ownerOf(id)` after the 404 and, for a pack parser, calls
+  `ApiContext.requireCapability(ex, "canAuthorWorkbench")` (a literal, like every gate) **before** any pack
+  code runs. `canAuthorWorkbench` is the capability that authors Pipelines (`PUT /pipelines/{id}/graph`),
+  so previewing third-party code over caller-chosen bytes has the same bar as configuring its ingest.
+  Built-in and classpath parsers stay open.
+- **Recorded, not silent.** The gate depends on the parser, and the manifest can only say all-or-nothing
+  per route, so the route stays in `CapabilityManifest.EXEMPTIONS`. Its category is the new
+  **`provenance-gated`**, and the reason names the in-handler gate. That is the same shape as `POST /spaces`
+  (`recovery-route`). The route-gating evidence (`compliance/evidence/route-gating.md`) shows that category.
+- ⚠ Like every gate, it is a **no-op without a Subject** (Personal). D7 (no edition gate) means the trust
+  gate itself is identical in every edition; this preview gate only bites where an authenticator runs.
+- Proof (real HTTP, forced authenticator): `ControlApiPackParserPreviewTest` — a viewer gets 403 and the
+  pack's `preview` is never called; the same request as an author gets 200; the same viewer previews
+  `delimited`; an unknown id is still 404; no authenticator ⇒ 200. The refusal test was red before the gate.
+
+Still open from **P0**: staging under a server-owned dir instead of
 the system temp dir. The decode-profile satellite (C1–C4) waits on D5/D6/D9/D10.
 
 ### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24

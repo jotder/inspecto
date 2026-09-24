@@ -108,6 +108,10 @@ above the generated commit list.
   and the pack stays pinned until the batch ends). A Pipeline whose ingester class nothing loaded provides
   now fails its Run with `streaming ingester <fqcn> is not on the classpath and no loaded parser names it…`
   instead of `Cannot instantiate streaming ingester` wrapping a `ClassNotFoundException`.
+- **New refusal (Professional/Enterprise):** `POST /parsers/{id}/preview` for a parser a Job Pack
+  contributed returns **403 `PERMISSION_DENIED`** without **`canAuthorWorkbench`**. Built-in and classpath
+  parsers stay open; Personal (no authenticator) is unchanged. `CapabilityManifest` records the route under
+  the new exemption category `provenance-gated`.
 
 **Whole-pipeline dry run (2026-09-20, `PIPELINE-DRYRUN-1` step 5)**
 - `POST /runs/{name}/trigger?dryRun=true` runs a pipeline and **lands nothing** — no outputs, no audit or

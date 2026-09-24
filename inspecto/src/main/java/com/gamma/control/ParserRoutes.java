@@ -21,7 +21,9 @@ import static com.gamma.util.Values.mapAt;
  * {@code POST /parsers/&#123;id&#125;/preview} parses a sample with an in-progress grammar —
  * stateless and scratch-only, the grammar-shaped sibling of
  * {@code POST /config/preview/parsing} (which stays the draft-true path for pipeline drafts).
- * Both are read/compute-only: no write gate, no capability — a preview changes nothing.
+ * Both are read/compute-only: no write gate, and no capability — except that previewing a parser a Job
+ * Pack contributed needs {@code canAuthorWorkbench} (operator D4 2026-09-25): that is third-party code
+ * over caller-chosen bytes, so it sits behind the same bar as authoring the Pipeline that ingests with it.
  */
 final class ParserRoutes implements RouteModule {
 
@@ -33,7 +35,7 @@ final class ParserRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/parsers", (e, m) -> catalog());
-        api.post("/parsers/([^/]+)/preview", (e, m) -> preview(api, ApiContext.name(m), api.body(e)));
+        api.post("/parsers/([^/]+)/preview", (e, m) -> preview(api, e, ApiContext.name(m), api.body(e)));
     }
 
     private static List<Map<String, Object>> catalog() {
@@ -59,9 +61,16 @@ final class ParserRoutes implements RouteModule {
         return out;
     }
 
-    private static Object preview(ApiContext api, String id, Map<String, Object> body) {
+    private static Object preview(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String id,
+                                  Map<String, Object> body) {
         ParserPlugin parser = Parsers.get(id)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown parser: " + id));
+        // Operator D4 (parser-plugins-trust-design.md slice P4, 2026-09-25): a Job Pack's parser is
+        // third-party code over caller-chosen bytes, so previewing one takes the capability that authors
+        // the Pipeline which would ingest with it. Built-in and classpath parsers stay open (read-shaped).
+        // Gated IN the handler because the gate depends on the parser — recorded as an exemption with
+        // this reason in CapabilityManifest. Checked before any pack code runs.
+        if (Parsers.ownerOf(id).isPresent()) ApiContext.requireCapability(ex, "canAuthorWorkbench");
         byte[] sample = sampleOf(body);
         Map<String, Object> grammar = grammarOf(body);
         Path configDir = configDirOf(api, body);

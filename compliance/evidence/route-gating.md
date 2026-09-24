@@ -226,7 +226,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/objects/([^/]+)/resolve` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:73` |
 | POST | `/objects/([^/]+)/split` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:80` |
 | POST | `/objects/([^/]+)/transition` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:74` |
-| POST | `/parsers/([^/]+)/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:36` |
+| POST | `/parsers/([^/]+)/preview` | exempt | provenance-gated | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:38` |
 | PUT | `/pipelines/([^/]+)/graph` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:78` |
 | POST | `/pipelines/([^/]+)/history/([^/]+)/restore` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineHistoryRoutes.java:51` |
 | POST | `/pipelines/([^/]+)/label` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java:44` |
