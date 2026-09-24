@@ -4,7 +4,7 @@ title: Branch-aware ingest — `route:` on the poll-driven path
 description: How an armed `route:` executes on the poll-driven lane — the lane fork, the engagement predicate, fail-closed arming in `PipelineConfig.prepare()`, and what is deliberately not built.
 resource: inspecto-etl/src/main/java/com/gamma/etl/PipelineConfig.java
 tags: [route, branch, ingest, arming, fail-closed, lanes]
-timestamp: 2026-08-29T00:00:00Z
+timestamp: 2026-09-24T00:00:00Z
 ---
 
 # Branch-aware ingest — `route:` executes on the poll-driven path
@@ -110,16 +110,17 @@ Each rule refuses BY NAME a shape that would drop rows silently:
 |---|---|
 | `default:` required, naming a branch key | `mode: case` labels an unmatched row NULL and the executor emits it on NO relation — no default = silent discard |
 | every branch has a `database` matching a **distinct** `sinks[]` destination | the branch↔sink pairing is by database; unmatched or shared = a branch whose rows land nowhere |
-| `mode: clone` refused | cross-branch partial-commit UX (plan B9/D8) deliberately unshipped |
-| multi-schema (selector/segments) + route refused | the lift emits one route node per schema branch; the divert executes exactly one |
+| ~~`mode: clone` refused~~ | arms since 2026-09-06 — see the decision at the end of this page |
+| multi-schema (selector/segments): every branch `where:` must bind in EVERY schema's mapped row | one shared `route:` block applies to every schema (2026-09-24); a predicate on a column only some schemas map would fail mid-run on the others, after the earlier schemas' branches committed — see *Multi-schema route* below |
 
 Runtime refusals in `graphWriteAndTrace`: decision-rule routing + route branches; a versioned
 reference store per branch.
 
 ## Deliberately not built (residuals — BACKLOG §6)
 
-`mode: clone` arming · multi-schema + route · mid-branch transforms in the recipe's route verb
-(compiles refused: "a route branch compiles as exactly one sink step for now").
+Mid-branch transforms in the recipe's route verb (compiles refused: "a route branch compiles as exactly
+one sink step for now"). ~~`mode: clone` arming~~ (2026-09-06) · ~~multi-schema + route~~ (2026-09-24,
+below).
 
 **The save-time arming pre-check SHIPPED 2026-08-26** — and this section's reason for deferring it
 ("arming validates at engine LOAD on both server and mock — a 422-on-save would be UX polish, not a
@@ -129,13 +130,21 @@ branch tree was unarmable at the next run. A fail-closed gate the author never s
 
 ## Where the arming rules live
 
-`RouteArming.refusals(route, sinkDatabases, multiSchema)` (`inspecto-etl`) is the ONE statement of
-the six rules, with two callers holding the config in two different states:
+`RouteArming.refusals(route, sinkDatabases, schemaColumns[, mayBind])` (`inspecto-etl`) is the ONE
+statement of the rules, with two callers holding the config in two different states. `schemaColumns` is
+`null` for a single-schema pipeline, else every schema's name → its MAPPED columns (rule 4's input):
 
 | Caller | State | Behaviour |
 |---|---|---|
 | `PipelineConfig.prepare()` | parsed config, at registration | throws the FIRST refusal — registration is all-or-nothing |
 | `ConfigRoutes.routeArmingFindings` | unparsed DRAFT map, at save | reports ALL refusals as `Finding`s; `active: true` ⇒ ERROR (422, nothing written), `active: false` ⇒ WARNING naming when it will bite |
+
+The columns come from different places, deliberately: `prepare()` feeds `TypeFlow.transformedColumns`
+per schema (DuckDB-authoritative); the save path feeds each schema file's raw fields ∪ `mapping.fields[]`
+(as `routeColumnFindings` models one schema; an unreadable schema is an empty list = not judged) and
+passes `mayBind` = its `SqlGuard` check, so an untrusted predicate never reaches the binder unguarded.
+Only a genuine unknown-column binder error refuses — `RouteArming.isUnknownColumn`, now the one place
+that line is drawn (`ConfigRoutes.isUnknownColumn` delegates to it).
 
 ⛔ Do not run the draft through `PipelineConfig.fromMap` to reuse the parsed form: `fromMap`
 hard-fails on an unresolvable schema reference, which the save path deliberately keeps a WARNING
@@ -143,6 +152,48 @@ hard-fails on an unresolvable schema reference, which the save path deliberately
 makes the same call, for the same reason, and says so in its javadoc. The rules take plain data so
 both callers can supply it from what they have — restating them over raw maps in the control plane
 would be the hand-mirrored-map drift this repo has already paid for three times.
+
+## Multi-schema route — the segment-scoped lift (shipped 2026-09-24)
+
+Design + slice record: [`branch-aware-segment-lift-design.md`](../../../superpower/branch-aware-segment-lift-design.md).
+Operator decisions 2026-09-24: **one shared `route:`** for every schema (no per-schema route blocks);
+**`<branch database>/<segKey>/…`** landing (one store per branch × segment); a predicate binding in some
+schemas only **refuses arming**; the plugin `segments` path and the CSV `schemas[]` selector path ship
+**together**; **partial-batch semantics** accepted (below).
+
+- **The walk runs on one schema's slice.** `PipelineLift.scope(graph, key)` is a VIEW over the one lift —
+  `map_<key>` plus everything downstream, same node ids and configs (so branch↔sink pairing, ledger keys
+  and park ids are unchanged); `null` key = identity. `admittedLift` admits, seeds and walks the scoped
+  graph whenever the write's key is known, on the route AND the non-route admission.
+- **The key.** A segments write: `segmentWrite(cfg, writeScope)` (the segment key IS the scope) → the
+  lift's `routeKey`. A selector batch: `selectorWrite(cfg, selectedTable)` — the table its schema was
+  selected under, passed to `writeAndTrace` as its OWN argument by all three selector call sites
+  (`CsvIngestStrategy`, `NativeCsvStreamingEngine.unionStreamingIngest` and `streamUnit`). ⚠ Not through
+  `writeScope`: the single-member streaming and chunked lanes already use it for the chunk base name
+  (the ledger discriminator), and a selector batch is one schema in one call, so its ledger scope stays
+  `""`. ⚠ Keyed for `route:` pipelines only — a non-route selector write keeps its existing (flat)
+  admission; widening that lane is a separate change.
+- 🔴 **The defect it fixed (D1).** Before, a selector batch knew no key, so the seed was the FIRST
+  `transform.route` node's upstream: every non-first schema's rows were routed by the first schema's
+  route and written through its sinks — attributed to the wrong Dataset. Pinned in `SegmentScopedRouteTest`.
+- **Parking.** `StepDisableArming.parkableSinkIds(route, sinkDbs, schemaKeys)` emits `sink_<key>__d<i>`.
+  🔴 Without it, once multi-schema arms, `disabled_steps: [sink__d1]` passes the gate and matches NO lifted
+  node — a silently-enabled step. `liftKey` mirrors `PipelineLift.routeKey`, pinned against a real lift
+  (`PipelineLiftTest.multiSchemaParkableSinkIdsMatchTheLiftedGraph`).
+- **Drain.** `DrainCommand` resolves the schema by manifest: a selector batch's entry is the one named by
+  `outputTable`; a segments batch writes each parked sink under its own segment's home
+  (`database/<segKey>`, that segment's partitions) — one `IngestSinkWriter` per segment.
+- **Partial batch (accepted semantics).** Each segment commits its own branches under ledger scope
+  `segKey`. If segment 2 throws after segment 1 committed, the batch is FAILED with segment 1's branch
+  files durable; the file stays in the inbox, the ledger survives, and the retry (same content-derived
+  Consignment id) skips what the ledger holds — no duplicate rows (`SegmentRouteEndToEndTest`).
+  ⚠ **Known gap, pinned in that test (not introduced here — a single-schema route whose second branch
+  fails resumes the same way):** the resumed commit never sees the skipped branches' outputs, so its
+  manifest — and the DuckLake register / §11.3 output registry fed from it — omits them. Their rows are
+  durable and the lineage LEDGER is whole (the failed run's audit wrote it); only the output registry is
+  short. The park path solved this with the `ParkedCommit` sidecar; the failure path has none.
+- ⚠ `ConsignmentGraphRunner.engages` / `dataFedSinkCount` still exclude a multi-schema parser's
+  `route:<key>` dispatch edges; on a scoped graph there are none left to exclude.
 
 ## Traps pinned along the way
 

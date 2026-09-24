@@ -288,7 +288,8 @@ refusal message names a quantity, check which caller's granularity that quantity
 
 ⚠ `writeScope` is overloaded across the four callers — `""` whole-batch, the chunk base name when chunked,
 the segment key only in the per-segment loop — so a scope counts as a segment key only when the config
-declares a segment by that name.
+declares a segment by that name. A `schemas[]` selector batch's schema therefore travels in its OWN argument
+(`selectedTable`, 2026-09-24) rather than in the scope.
 
 ⚠ **`segments:` is parsed only when `processing.ingester:` is also set.** Without it a multi-schema config
 lifts as SINGLE-schema (a linear `acq → parse → map → sink`) and quietly proves nothing — it cost the first
@@ -649,7 +650,7 @@ and `ControlApiAsyncV1Test.pipelineTriggerDryRunImpliesSkipPostAction`.
   anywhere. `IntakeGovernor` caps FILES per cycle after listing; a pre-materialise cap would have to cap BYTES
   or files *before* the remote fetch, which needs the connector to expose size before download and a
   decision on what happens to the remainder (deferred to the next cycle, or refused). Owed as a §1 input.
-* **Branch-aware residuals** — multi-schema with route needs a **segment-scoped lift**; mid-branch
+* **Branch-aware residuals** — ~~multi-schema with route~~ (segment-scoped lift shipped 2026-09-24); mid-branch
   transforms in the route verb; three node kinds still unimplemented anywhere; the destination-list
   follow-ups.
 * **Platform services stage two and three** — the open Step-kind registry, gated on the decision to execute
@@ -741,7 +742,7 @@ Ranked. The first three are visible to an operator.
 | **Read-path connection reuse** | ⛔ **NOT the lever** | Measured: a warm open is 24 ms; no contradicting measurement exists |
 | **Route at rest** | ⛔ **REFUSED at two sites** | Route's home is the ingest lane. ⚠ Both refusals used to be *negatives that never told the author route works at all*; both now name its home, and **no test pinned either string** |
 | **Decision rules together with route** | ⛔ **REFUSED at runtime** | A rule that actually routed rows keeps the pipeline flat; the admission cannot see rules statically |
-| **Multi-schema together with route** | ⛔ **STILL REFUSED** | The lift emits one route node per schema branch and the divert executes exactly one; it needs a **segment-scoped lift** — ⛔ do not simply lift the refusal |
+| **Multi-schema together with route** | ✅ **ARMS since 2026-09-24** | Each per-schema write walks its own schema's slice (`PipelineLift.scope`); ONE shared `route:` whose predicates must bind in every schema, else arming refuses — [branch-aware-ingest.md](../../backend/engine/branch-aware-ingest.md) § *Multi-schema route* |
 | **A node between projection and write on either ingest lane** | ⛔ **REFUSED on both** | Carrying it means executing it at rest, which is second-stage work; **batch independence is the dividing rule** |
 | **Cross-branch all-or-nothing commit** | ⛔ **OUT OF SCOPE deliberately** | One healthy branch stays committed when a sibling fails, and the failed branch retries independently |
 | **A versioned reference store per branch** | ⛔ **REFUSED** | One version history across branches is ill-defined |

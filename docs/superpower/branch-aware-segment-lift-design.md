@@ -1,7 +1,9 @@
 # Branch-aware executor — segment-scoped lift (design pass)
 
-**State: DESIGN — nothing built.** BACKLOG row *Branch-aware executor residuals*, clause (b): multi-schema +
-`route:` needs a segment-scoped lift; ⛔ do not just lift the refusal. Written 2026-09-24 against `425ee239`.
+**State: S1–S6 BUILT 2026-09-24** (§7) — operator decisions recorded in §5. BACKLOG row *Branch-aware executor
+residuals*, clause (b): multi-schema + `route:` needs a segment-scoped lift; ⛔ do not just lift the refusal.
+Written 2026-09-24 against `425ee239`. As-built truth:
+[branch-aware-ingest.md](../okf/backend/engine/branch-aware-ingest.md) § *Multi-schema route*.
 
 ## 1. The problem
 
@@ -92,13 +94,17 @@ Option A. One `route:` block applies to every schema; arming fails closed unless
 schema; the walk runs on the scoped view; drain becomes schema-aware. C stays available later as an additive
 config home if Q1 answers "per segment".
 
-## 5. Open questions for the operator
+## 5. Operator decisions (answered 2026-09-24)
 
-1. **Shared or per-schema routing?** Should one `route:` block apply to every segment (predicates must bind in all of them), or does the product need a route per segment (Option C)?
-2. **Landing layout:** accept `<branch database>/<segKey>/…` (one store per branch × segment, today's re-rooting) — or must a branch collect all segments into one store?
-3. **A predicate that binds in some segments only:** refuse arming (fail closed, recommended), or treat the segment as unrouted and send it all to `default:`?
-4. **Scope of the slice:** ship the plugin `segments` path and the CSV `schemas[]` selector path together, or segments first?
-5. **Partial batch (D5):** is "segment 1's branches durable, batch FAILED, retry skips what the ledger holds" the accepted semantics, or must a multi-segment batch be all-or-nothing?
+1. **Shared or per-schema routing?** — **ANSWERED: one shared `route:` block** applies to every segment and its
+   predicates must bind in all of them. No per-schema routes; Option C is not built.
+2. **Landing layout** — **ANSWERED: accept `<branch database>/<segKey>/…`** (one store per branch × segment,
+   today's re-rooting).
+3. **A predicate that binds in some segments only** — **ANSWERED: refuse arming** (fail closed).
+4. **Scope of the slice** — **ANSWERED: ship the plugin `segments` path AND the CSV `schemas[]` selector path
+   together.**
+5. **Partial batch (D5)** — **ANSWERED: accept** "segment 1's branches durable, batch FAILED, retry skips what the
+   ledger holds" — and it must be tested (S6 does).
 
 ## 6. Build plan (ordered slices)
 
@@ -128,3 +134,39 @@ Each slice: unit tests of the touched module only (`-pl <module> -Dtest=A,B`, co
 `ConsignmentGraphRunnerTest`, `ConsignmentGraphRunnerLiftEngagementTest`, `ConsignmentGraphRunnerFinalizeTest`,
 `BranchCommitTest`, `DrainCommandRefusalTest`, plus the UI `pipeline-editable` spec (id grammar) — and the full
 `-Pedition-enterprise` reactor before push (shared seam: `writeAndTrace`).
+
+## 7. Slice status (built 2026-09-24, one commit per slice)
+
+| Slice | State | What landed |
+|---|---|---|
+| S1 | ✅ | `SegmentScopedRouteTest` pinned D1 (selector seed = first schema's map) and the seed-scoped walk |
+| S2 | ✅ | `PipelineLift.scope(graph, key)` + 4 `PipelineLiftTest` cases (segments, selector, identity, branch chain) |
+| S3 | ✅ | `admittedLift` walks the scoped graph on both admissions; `selectorWrite` + a `selectedTable` argument; `segmentWrite` returns the lift's `routeKey`; D1 test flipped |
+| S4 | ✅ | rule (4) = per-schema predicate bind, shared by `prepare()` and `ConfigRoutes.routeArmingFindings`; mutation-checked (blanket refusal re-inserted → 7 tests red) |
+| S5 | ✅ | `DrainCommand` schema-by-manifest (selector entry by `outputTable`; segments per parked sink) + multi-schema parkable ids |
+| S6 | ✅ | `SegmentRouteEndToEndTest` over a test-resources copy of `stock_movements` with `route:` on `QTY` |
+
+**Where the build departed from §6, and why:**
+
+- **S3 — the selector key is its own argument, not `writeScope`.** §3 said the selector caller passes the
+  schema key *as* `writeScope`. There are THREE selector call sites, not one (`CsvIngestStrategy`,
+  `NativeCsvStreamingEngine.unionStreamingIngest`, and `streamUnit` for the single-member streaming and
+  chunked lanes), and `streamUnit` already uses `writeScope` for the chunk base name — the ledger
+  discriminator. So `writeAndTrace` gained a `selectedTable` argument and `writeScope` keeps its one meaning.
+  The key is applied to `route:` pipelines only; non-route selector admission is unchanged (not this change's).
+- **S4 — the save path must guard before it binds.** Rule (4) binds authored predicates, and the save path is
+  untrusted input, so `RouteArming.refusals` takes a `mayBind` predicate (`SqlGuard` at save; `prepare()` binds
+  what the run itself executes). Only unknown-column binder errors refuse — the line `routeColumnFindings` draws.
+- **S5 — the design missed a silent-enable hole.** `StepDisableArming.parkableSinkIds` mirrored the
+  single-schema id grammar (`sink__d<i>`). Once S4 armed multi-schema, `disabled_steps: [sink__d1]` passed the
+  gate and matched no lifted node (`sink_<key>__d<i>`). Fixed in S5 (the drain is unreachable without it).
+  §6 also said "plugin refusal stays until Q4 says otherwise" — Q4 said together, so both paths drain.
+  `DrainCommandRefusalTest` never pinned the multi-schema refusal, so the completion tests live beside the
+  fixtures in `SegmentScopedRouteTest` (`aParked…Drains…`).
+- **S6 — "kill after segment 1" is a write failure in segment 2**, not a JVM kill: a file blocks
+  `db_bulk/dispatch`, the batch FAILS after receipt committed, the blocker is removed, the next cycle completes.
+  Same durable state a kill leaves (ledger + committed files + inbox file), minus the FAILED audit row.
+- **S6 — a gap in Q5's accepted semantics, pinned not fixed.** The retry skips the ledger's branches, so the
+  resumed commit's manifest (and the output registry fed from it) omits their outputs; rows and the lineage
+  ledger are whole. Pre-existing for single-schema routes too. Pinned as a KNOWN GAP in
+  `SegmentRouteEndToEndTest`; the fix (a failure-path sidecar like `ParkedCommit`) is an operator call.
