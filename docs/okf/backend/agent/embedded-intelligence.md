@@ -27,30 +27,32 @@ Read tool belt = `InspectoTools.tools(service)`.
 ## P1 investigation tier (shipped — all slices A–E)
 
 The read tools, deliberative memory, RCA reasoning, and autonomous triage that turn a breach into a
-ranked root-cause **Case** with a fix draft.
+ranked root-cause **Triage Run** with a fix draft. (The record was `Case` until `GLOSSARY-CASE-1`,
+2026-09-24 — renamed so *Case* means only the Incident-grouping `ObjectType.CASE`; the package moved
+`investigation` → `triage` because *Investigation* names the Link Analysis object.)
 
 - **Analysis tools (slice A)** — four read-only `FunctionTool`s on the belt (belt is now 9):
   `timeline_build` (signals + job runs + component saves, one ordered window), `diff_batches` (two
   batch-ledger entries compared), `config_versions_diff` (ComponentStore `.history` structural diff),
   `anomaly_scan` (deterministic z-score/threshold SQL — model judges, tools compute). All
   `mutating=false`, `Role.USER`. Belt exposed via `InspectoTools.tools(service, components, browseStores)`.
-- **Case Store (slice D)** — `investigation.CaseStore`, an in-memory bounded ring (synchronized
-  `ArrayDeque`, evict-oldest; modeled on `DiagnosisStore`), holding `Case` records (incidentRef,
+- **Triage Run Store (slice D)** — `triage.TriageRunStore`, an in-memory bounded ring (synchronized
+  `ArrayDeque`, evict-oldest; modeled on `DiagnosisStore`), holding `TriageRun` records (incidentRef,
   trigger Signal, timeline snapshot, hypotheses+evidence, outcome, fix-draft refs, timestamps).
-  Projected via two additive SPI defaults (`recentCases`/`caseById`, empty-degrading like
-  `/assist/diagnoses`) to `GET /agent/cases[/{id}]` (404 on unknown id). Separate from the reflex
+  Projected via two additive SPI defaults (`recentTriageRuns`/`triageRunById`, empty-degrading like
+  `/assist/diagnoses`) to `GET /agent/triage-runs[/{id}]` (JSON key `triageRuns`) (404 on unknown id). Separate from the reflex
   layer's `DiagnosisStore`.
 - **Playbooks (slice C)** — `pack.Investigator` runs a playbook as **deterministic tool-orchestration
   + single-shot model synthesis** (not model-driven ReAct): gather evidence by invoking the analysis
   tools in fixed order, then one `gateway.chat` for ranked hypotheses + fix draft (JSON), parsed
-  fail-closed into a `Case`. Fix drafts persist as DRAFT `ComponentStore` components (`status:draft`,
+  fail-closed into a `TriageRun`. Fix drafts persist as DRAFT `ComponentStore` components (`status:draft`,
   `authoredBy:agent:rca`, L1 — never applied) when a write root exists. Versioned prompts under
   `resources/prompts/` (`root_cause_analysis.v1`, `impact_analysis.v1`).
-- **Triage ingress (slice E)** — `investigation.TriageQueue`, a canonical **Signal-bus** subscriber
+- **Triage ingress (slice E)** — `triage.TriageQueue`, a canonical **Signal-bus** subscriber
   (`service.eventLog().addSubscriber`), parallel to `context.SignalIngress`. **Autonomy is opt-in**:
   off unless `-Dintelligence.triage.enabled=true` (`TriageQueue.enabled()`); the agent wires it in
   `start()` only when enabled. On an error/critical Signal it runs `Investigator.investigate` (L1) and
-  files a Case. Dedupes by correlationId, excludes `agent.*` (no self-investigation loop). Two new
+  files a Triage Run. Dedupes by correlationId, excludes `agent.*` (no self-investigation loop). Two new
   canonical Signals emit additively at their eval sites: `alert-rule.fired` (`AlertService.fire`) and
   `expectation.violated` (`ExpectationRoutes.raiseIncident`), alongside the legacy `ALERT_FIRED`/
   `EXPECTATION_FAILED` events.
@@ -120,11 +122,11 @@ governed from an operator inbox UI. Five slices shipped (`a30049a`, `b5069c1`, `
 (slice 6, `eoiagent-safety` `DecisionStore` + durable `ApprovalStore`). **P3 complete.**
 
 - **Approval spine (slice 1)** — `action.Approval`/`ApprovalStore` (bounded ring, sibling of
-  `CaseStore`; once-only guarded `PENDING→APPROVED/DENIED/TIMED_OUT`), `AgentApprovals` (an eoiagent
+  `TriageRunStore`; once-only guarded `PENDING→APPROVED/DENIED/TIMED_OUT`), `AgentApprovals` (an eoiagent
   `com.eoiagent.safety.ApprovalHandler` bridging the framework's **synchronous**
   `DefaultToolRegistry.dispatchMutating` blocking gate to an **async** inbox by parking the gate thread
   on a `CompletableFuture` until the operator decides). SPI adds `recentApprovals`/`approvalById`/
-  `decideApproval` (default-degrading like `recentCases`); routes `GET /agent/approvals`,
+  `decideApproval` (default-degrading like `recentTriageRuns`); routes `GET /agent/approvals`,
   `GET /agent/approvals/{id}`, `POST /agent/approvals/{id}/decision`. Opt-in
   `-Dintelligence.act.enabled` (`AgentApprovals.ENABLED_FLAG`) gates both `InspectoPackConfig`
   `MUTATING_ACTIONS` and whether `start()` supplies the handler — lockstep, so without the flag the
@@ -222,7 +224,7 @@ second pilot class (alert triage) and a periodic state-watch trigger are deferre
 - **Routes/SPI** — `GET /agent/policy`, `PUT /agent/policy` (replace), `POST /agent/policy/kill-switch`
   `{engaged}` (the one-call hard-off). New `IntelligenceAgent` SPI methods `autonomyPolicy` /
   `updateAutonomyPolicy` / `setAutonomyKillSwitch` (empty ⇒ 503, a genuine "no L3 tier", unlike the
-  read-degrading approvals/cases). Writes attribute the calling actor and are audited by
+  read-degrading approvals/Triage Runs). Writes attribute the calling actor and are audited by
   `ControlApi.dispatch`; a secured edition prepends the `agent.admin` capability gate. The engine is
   wired into `InspectoIntelligenceAgent` (durable store when a write root is set), always present when
   the module is loaded so operators can configure policy before any driver exists.
@@ -256,34 +258,34 @@ second pilot class (alert triage) and a periodic state-watch trigger are deferre
 ## P5 — learning, complete
 
 Turning operator judgement into eval growth + tuning. **P5 complete 2026-07-21** (feedback capture +
-case-similarity recall + the learning dashboard UI). With it, the full AGT-5 P0–P5 roadmap is shipped.
+Triage Run similarity recall + the learning dashboard UI). With it, the full AGT-5 P0–P5 roadmap is shipped.
 
-- **Case feedback (slice 1)** — `investigation.Feedback` (`{id, caseId, rating HELPFUL|NOT_HELPFUL,
+- **Triage Run feedback (slice 1)** — `triage.Feedback` (`{id, triageRunId, rating HELPFUL|NOT_HELPFUL,
   note, submittedBy, at}`) + durable `FeedbackStore` (JSON-lines at
   `<assist.write.root>/agent/feedback.jsonl`, the `ApprovalStore` ring idiom; in-memory without a write
-  root). Feedback is durable and **outlives the ephemeral `CaseStore`** (256-deep, in-memory) — the
-  `caseId` is the join key, so a rating survives even after its Case is evicted. `POST
-  /agent/cases/{id}/feedback` (`rating` synonyms parsed by `Feedback.parseRating`; unknown case → 404,
-  bad rating → 400, missing rating → 400), SPI `recordCaseFeedback` / `recentCaseFeedback`. The Case's
-  `GET /agent/cases/{id}` detail view folds in its `feedback[]`; `GET /agent/feedback` lists the corpus.
-- **Case-similarity recall (slice 2)** — `CaseStore` is now durable (`<assist.write.root>/agent/cases.jsonl`,
+  root). Feedback is durable and **outlives the ephemeral `TriageRunStore`** (256-deep, in-memory) — the
+  `triageRunId` is the join key, so a rating survives even after its Triage Run is evicted. `POST
+  /agent/triage-runs/{id}/feedback` (`rating` synonyms parsed by `Feedback.parseRating`; unknown Triage Run → 404,
+  bad rating → 400, missing rating → 400), SPI `recordTriageRunFeedback` / `recentTriageRunFeedback`. The Triage Run's
+  `GET /agent/triage-runs/{id}` detail view folds in its `feedback[]`; `GET /agent/feedback` lists the corpus.
+- **Triage Run similarity recall (slice 2)** — `TriageRunStore` is now durable (`<assist.write.root>/agent/triage-runs.jsonl`,
   `ApprovalStore` ring idiom; in-memory without a write root, as through P1–P4) so the corpus survives a
-  restart and backs recall. `CaseSimilarity` = **Jaccard token overlap** of two `Case.symptomText()`
+  restart and backs recall. `TriageRunSimilarity` = **Jaccard token overlap** of two `TriageRun.symptomText()`
   fingerprints (signal type + subject + message + payload keys + hypothesis titles; tokens < 3 chars
   dropped) — deterministic, dependency-free; the "embeddings if warranted" upgrade is a drop-in behind
-  `CaseSimilarity.score` and is **not warranted** at this scale. `CaseStore.similar(text, k, excludeId)`
-  → top-k positive matches (score desc, newest tie-break), each `Case.toView()` + a `similarity` score.
-  SPI `similarCases(id, k)`; `GET /agent/cases/{id}/similar?k=` (registered before the greedy
-  `/agent/cases/(.+)` so it wins first-match; 404 unknown case, else neighbours). `Case` gained
+  `TriageRunSimilarity.score` and is **not warranted** at this scale. `TriageRunStore.similar(text, k, excludeId)`
+  → top-k positive matches (score desc, newest tie-break), each `TriageRun.toView()` + a `similarity` score.
+  SPI `similarTriageRuns(id, k)`; `GET /agent/triage-runs/{id}/similar?k=` (registered before the greedy
+  `/agent/triage-runs/(.+)` so it wins first-match; 404 unknown Triage Run, else neighbours). `TriageRun` gained
   `toRecord`/`fromRecord`/`symptomText`.
-- **Verified**: `FeedbackStoreTest` (5), `CaseRecallTest` (4: Jaccard scoring + short-token drop,
+- **Verified**: `FeedbackStoreTest` (5), `TriageRunRecallTest` (4: Jaccard scoring + short-token drop,
   ranking + self-exclude, empty on blank/​k≤0, durable reload + recall over reloaded corpus),
   `InspectoIntelligenceAgentTest` +1 (feedback), `AgentRoutesTest` +3 (feedback 400/404/200, list,
   similar 200/404). Module 119→129.
 - **Learning dashboard (slice 3)** — the operator surface in `inspecto-ui` (`modules/admin/learning/`,
   route `/learning`, Operations nav leaf). Helpful-rate KPIs (total / helpful / not-helpful /
   helpful-rate %) over the feedback corpus + the recent-feedback ledger in the shared
-  `<inspecto-data-table>`. `LearningService` (`feedback` / `rateCase` / `similarCases`) + barrel.
+  `<inspecto-data-table>`. `LearningService` (`feedback` / `rateTriageRun` / `similarTriageRuns`) + barrel.
   Read-only; degrades to an empty state + toast. `learning.component.spec.ts` (4: KPI aggregation,
   empty-corpus rate, failure degrade, a11y); `npm run test:ci` 277 files/1537 pass, `npm run build` clean.
 - **Polish — 2nd pilot class + periodic state-watch (2026-07-21)** — `OpsMonitor.attachStateWatch
@@ -402,7 +404,7 @@ The AGT-5 phased roadmap **P0–P5 is complete**, plus P4 polish (2nd pilot clas
 periodic state-watch, shipped 2026-07-21) — and the P2 authoring tier is now complete (`kpi_report_builder`
 shipped 2026-07-22). Remaining items are deliberate deferrals, not gaps:
 the embedding-retrieval upgrade (assessed **not warranted** at the 256-cap corpus; drop-in seam preserved
-behind `CaseSimilarity.score`) · hosted providers (Professional+) · the optional S8 signal-backbone slice.
+behind `TriageRunSimilarity.score`) · hosted providers (Professional+) · the optional S8 signal-backbone slice.
 One actionable cross-repo item remains, and it is **no longer a gate**: the eoiagent per-tool
 `DryRunProvider` seam **shipped upstream 2026-09-08**, so what is left is consuming it — let the framework
 populate `ApprovalRequest.preview` instead of `AgentApprovals`' own previewer. 🔴 This paragraph read

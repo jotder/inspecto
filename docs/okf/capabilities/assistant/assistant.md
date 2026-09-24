@@ -196,10 +196,10 @@ reachable from model selection. The hardware sizes in `ModelProfile`'s javadoc (
 Phases P0–P5 are complete (2026-07-21, plus polish), and the layer is organised as tiers:
 
 * **P0 — the session spine.** A multi-turn agent with grounding through the context broker.
-* **P1 — the investigation tier.** Analysis tools, the **Case store**, RCA and impact playbooks,
-  autonomous triage, and a `goalKind` seam. ⚠ **This "Case" is not `INC`'s Case**: it is the agent's own
-  investigation memory, a **256-entry capped ring** (`CaseStore`), and the similarity scoring behind it
-  is `CaseSimilarity.score`.
+* **P1 — the triage tier.** Analysis tools, the **Triage Run store**, RCA and impact playbooks (the
+  **Triages**), autonomous triage, and a `goalKind` seam. ⚠ **A Triage Run is not `INC`'s Case** (renamed
+  from `Case` under `GLOSSARY-CASE-1`, 2026-09-24): it is the agent's own RCA memory, a **256-entry capped
+  ring** (`TriageRunStore`), and the similarity scoring behind it is `TriageRunSimilarity.score`.
 * **P2 — the authoring tier.** Five drafting tools, completed when `kpi_report_builder` shipped
   2026-07-22.
 * **P3 — the gated-action tier** (§3.6).

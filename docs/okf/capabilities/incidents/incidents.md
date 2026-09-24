@@ -477,7 +477,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | D8 notification residuals — soft-bounce retry scheduling, an SES/SNS adapter, GeoIP, auth-gated per-user preferences | `BACKLOG.md` §3 *Notifications (D8 residuals)*; §3 *D8-SUPPRESS-1* | The SNS adapter needs its own review (subscription confirmation + outbound cert fetch from an unauthenticated callback) |
 | `findings-spec` authoring UI | `BACKLOG.md` §3 *D6 spec-authoring UI* | Authored as TOON through generic `/components` CRUD today; nothing is broken without it |
 | `kpi.completeness` Job Type — signal + deduped Incident on breach | `BACKLOG.md` §3 *Completeness KPI* K4 | Gated on the hold lifting |
-| `CaseStore` interface + Postgres implementation; the 256-cap ring blocks AGT-5 embedding recall | `BACKLOG.md` §3 *Postgres multi-user*; §6 | Parked with the multi-user plan |
+| `TriageRunStore` interface + Postgres implementation; the 256-cap ring blocks AGT-5 embedding recall | `BACKLOG.md` §3 *Postgres multi-user*; §6 | Parked with the multi-user plan |
 | MNT-14 residuals — no UI, no shipped Job instance, retention derived not stamped, `INCIDENT` only | `BACKLOG.md` §6 *MNT-14* | Standing; the operator opts in |
 | Digest deliveries correlate to the digest, not per notification | `BACKLOG.md` §6 | `deliverWithReceipt` is the escape hatch |
 | D7 startup backfill is a full object scan | `BACKLOG.md` §6 | Deliberately unfixed: nothing measures startup |

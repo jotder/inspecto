@@ -30,12 +30,12 @@ import com.gamma.intelligence.action.ComponentActions;
 import com.gamma.intelligence.action.OperationalActions;
 import com.gamma.intelligence.action.RunbookActions;
 import com.gamma.intelligence.context.ContextBroker;
-import com.gamma.intelligence.investigation.Case;
-import com.gamma.intelligence.investigation.CaseStore;
-import com.gamma.intelligence.investigation.Feedback;
-import com.gamma.intelligence.investigation.FeedbackStore;
-import com.gamma.intelligence.investigation.Incident;
-import com.gamma.intelligence.investigation.TriageQueue;
+import com.gamma.intelligence.triage.TriageRun;
+import com.gamma.intelligence.triage.TriageRunStore;
+import com.gamma.intelligence.triage.Feedback;
+import com.gamma.intelligence.triage.FeedbackStore;
+import com.gamma.intelligence.triage.Incident;
+import com.gamma.intelligence.triage.TriageQueue;
 import com.gamma.intelligence.policy.ActionRecord;
 import com.gamma.intelligence.policy.AutonomyLog;
 import com.gamma.intelligence.policy.AutonomyPolicyEngine;
@@ -76,10 +76,10 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
             com.gamma.intelligence.pack.DraftArtifacts.KIND);
 
     private final Map<String, AgentSession> sessions = new ConcurrentHashMap<>();
-    // P5: durable so the investigation corpus survives a restart and backs case-similarity recall;
+    // P5: durable so the investigation corpus survives a restart and backs triage-run similarity recall;
     // start() replaces this with a write-root-backed instance (in-memory until then / without a root).
-    private CaseStore caseStore = new CaseStore();
-    // P5 (Learning): durable operator feedback on Cases (the eval-growth/tuning corpus). Always present;
+    private TriageRunStore triageRunStore = new TriageRunStore();
+    // P5 (Learning): durable operator feedback on Triage Runs (the eval-growth/tuning corpus). Always present;
     // start() replaces it with a write-root-backed instance so feedback survives a restart.
     private FeedbackStore feedback = new FeedbackStore();
     // P3 (L2): the approvals inbox + the bridge that makes eoiagent's gate non-headless. Present
@@ -180,9 +180,9 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         // GET/PUT /agent/policy regardless of any driver; a driver added later gates on autonomy.authorize.
         autonomy = new AutonomyPolicyEngine(autonomyPolicyStore());
 
-        // P5 (Learning): durable Case corpus (backs similarity recall) + durable Case feedback. Both are
+        // P5 (Learning): durable Triage Run corpus (backs similarity recall) + durable Triage Run feedback. Both are
         // write-root-backed so they accrue across restarts; in-memory (as before) without a write root.
-        caseStore = durableCaseStore();
+        triageRunStore = durableTriageRunStore();
         feedback = feedbackStore();
 
         // P4 slice 2 (L3): the ops_monitor loop is opt-in. When enabled, it watches for a
@@ -202,7 +202,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         }
 
         // Slice E: autonomous triage is opt-in. When enabled, subscribe to the canonical Signal bus
-        // and run an RCA investigation (L1 — Case + draft only) on each error/critical breach.
+        // and run an RCA investigation (L1 — Triage Run + draft only) on each error/critical breach.
         if (TriageQueue.enabled()) {
             triage = new TriageQueue(this::investigate);
             triage.attach(service.eventLog());
@@ -456,41 +456,41 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     }
 
     @Override
-    public List<Map<String, Object>> recentCases(int limit) {
-        return caseStore.recent(limit).stream().map(Case::toView).toList();
+    public List<Map<String, Object>> recentTriageRuns(int limit) {
+        return triageRunStore.recent(limit).stream().map(TriageRun::toView).toList();
     }
 
     @Override
-    public Optional<Map<String, Object>> caseById(String id) {
-        return caseStore.byId(id).map(c -> {
+    public Optional<Map<String, Object>> triageRunById(String id) {
+        return triageRunStore.byId(id).map(c -> {
             Map<String, Object> view = c.toView();
-            // P5: fold the operator feedback for this Case into its detail view.
-            view.put("feedback", feedback.byCaseId(id).stream().map(Feedback::toView).toList());
+            // P5: fold the operator feedback for this Triage Run into its detail view.
+            view.put("feedback", feedback.byTriageRunId(id).stream().map(Feedback::toView).toList());
             return view;
         });
     }
 
     @Override
-    public List<Map<String, Object>> similarCases(String id, int k) {
-        return caseStore.byId(id)
-                .map(c -> caseStore.similar(c.symptomText(), k <= 0 ? 5 : k, id))
+    public List<Map<String, Object>> similarTriageRuns(String id, int k) {
+        return triageRunStore.byId(id)
+                .map(c -> triageRunStore.similar(c.symptomText(), k <= 0 ? 5 : k, id))
                 .orElseGet(List::of);
     }
 
     @Override
-    public Optional<Map<String, Object>> recordCaseFeedback(String caseId, Map<String, Object> body, String submittedBy) {
-        if (caseStore.byId(caseId).isEmpty()) return Optional.empty();     // unknown case → route 404
+    public Optional<Map<String, Object>> recordTriageRunFeedback(String triageRunId, Map<String, Object> body, String submittedBy) {
+        if (triageRunStore.byId(triageRunId).isEmpty()) return Optional.empty();     // unknown triage run → route 404
         Feedback.Rating rating = Feedback.parseRating(body == null ? null : String.valueOf(body.get("rating")));
         if (rating == null) throw new IllegalArgumentException("rating must be 'helpful' or 'not_helpful'");
         String note = body.get("note") == null ? null : String.valueOf(body.get("note"));
-        Feedback f = new Feedback(UUID.randomUUID().toString(), caseId, rating, note,
+        Feedback f = new Feedback(UUID.randomUUID().toString(), triageRunId, rating, note,
                 submittedBy == null || submittedBy.isBlank() ? "operator" : submittedBy, Instant.now());
         feedback.add(f);
         return Optional.of(f.toView());
     }
 
     @Override
-    public List<Map<String, Object>> recentCaseFeedback(int limit) {
+    public List<Map<String, Object>> recentTriageRunFeedback(int limit) {
         return feedback.recent(limit).stream().map(Feedback::toView).toList();
     }
 
@@ -603,13 +603,13 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     }
 
     /**
-     * Run the root-cause playbook (slice C) for an incident and file the resulting {@link Case} in the
-     * store (surfaced via {@link #recentCases}/{@link #caseById}). Slice E's triage layer calls this on
+     * Run the root-cause playbook (slice C) for an incident and file the resulting {@link TriageRun} in the
+     * store (surfaced via {@link #recentTriageRuns}/{@link #triageRunById}). Slice E's triage layer calls this on
      * a triggering Signal; tests call it directly. Requires {@link #start()} to have wired the gateway.
      */
-    public Case investigate(Incident incident) {
-        Case c = investigator().investigate(incident);
-        caseStore.add(c);
+    public TriageRun investigate(Incident incident) {
+        TriageRun c = investigator().investigate(incident);
+        triageRunStore.add(c);
         return c;
     }
 
@@ -646,7 +646,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     }
 
     /**
-     * The Case-feedback store (AGT-5 P5). Durable at {@code <assist.write.root>/agent/feedback.jsonl}
+     * The Triage Run-feedback store (AGT-5 P5). Durable at {@code <assist.write.root>/agent/feedback.jsonl}
      * when a write root is set — so operator ratings accrue across restarts as the learning corpus —
      * else in-memory (dev/tests).
      */
@@ -655,12 +655,12 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     }
 
     /**
-     * The Case store (AGT-5 P5). Durable at {@code <assist.write.root>/agent/cases.jsonl} when a write
+     * The Triage Run store (AGT-5 P5). Durable at {@code <assist.write.root>/agent/triage-runs.jsonl} when a write
      * root is set — so the investigation corpus survives a restart and backs similarity recall — else
      * in-memory (dev/tests), exactly as it was through P1–P4.
      */
-    private static CaseStore durableCaseStore() {
-        return new CaseStore(AgentWriteRoot.resolve("cases.jsonl"));
+    private static TriageRunStore durableTriageRunStore() {
+        return new TriageRunStore(AgentWriteRoot.resolve("triage-runs.jsonl"));
     }
 
     /**
@@ -682,8 +682,8 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     }
 
     /** Test seam: seed/inspect the store directly (e.g. before slice E's triage trigger is wired). */
-    CaseStore caseStore() {
-        return caseStore;
+    TriageRunStore triageRunStore() {
+        return triageRunStore;
     }
 
     @Override

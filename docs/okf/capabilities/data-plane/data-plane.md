@@ -497,7 +497,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Item | Board id | What remains |
 |---|---|---|
 | DuckDB `memory_limit` **default** (GAP-4) | `BACKLOG.md` §3 *Deployment topology gaps* | Only the concurrency half of D11 defaults on; no `scheduler.toon` ships |
-| **Postgres multi-user** — pool, `browseConnection()`, schema-per-Space, `CaseStore`, the three uncovered stores, a concurrency test | `BACKLOG.md` §3 *Postgres multi-user* (PARKED by §6); `EDITIONS.md` OPS-03 | |
+| **Postgres multi-user** — pool, `browseConnection()`, schema-per-Space, `TriageRunStore`, the three uncovered stores, a concurrency test | `BACKLOG.md` §3 *Postgres multi-user* (PARKED by §6); `EDITIONS.md` OPS-03 | |
 | **`EXPORT-1`** outbound object-storage export | `BACKLOG.md` §3 (P3); `EDITIONS.md` OPS-05 | Prove the consumption pattern with `s3 sync` first |
 | `graph` / `spatial` / `search` / `api` query types; more `$`-resolvers | `BACKLOG.md` §3 *Queries / BI* (P3) | Deliberately not built |
 | §7.4 rollup cache; `generation` staging; `run_id` always null | `BACKLOG.md` §3 *Consignment ELT* | Until read-time aggregation is measurably slow |

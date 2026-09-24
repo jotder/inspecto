@@ -6,14 +6,14 @@ import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, isFeatureAbsent } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
-import { CaseFeedback, LearningService } from 'app/inspecto/api';
+import { TriageRunFeedback, LearningService } from 'app/inspecto/api';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
- * Learning dashboard (AGT-5 P5) — how useful the agent's investigation Cases have been, aggregated from
+ * Learning dashboard (AGT-5 P5) — how useful the agent's Triage Runs have been, aggregated from
  * the operator-feedback corpus (`GET /agent/feedback`). Shows the helpful-rate KPIs the learning tier
  * tunes against, plus the recent-feedback ledger. Read-only + degrades to an empty state on failure
  * (module absent / no feedback yet), mirroring the other agent panes.
@@ -37,12 +37,12 @@ export class LearningComponent implements OnInit {
     private api = inject(LearningService);
     private toastr = inject(ToastrService);
 
-    readonly feedback = signal<CaseFeedback[]>([]);
+    readonly feedback = signal<TriageRunFeedback[]>([]);
     readonly loading = signal(false);
     /** The intelligence module is not deployed here — an expected state, explained in place (UI-10). */
     readonly unavailable = signal(false);
 
-    readonly columnDefs: ColDef<CaseFeedback>[] = [
+    readonly columnDefs: ColDef<TriageRunFeedback>[] = [
         {
             field: 'at',
             headerName: 'When',
@@ -50,12 +50,12 @@ export class LearningComponent implements OnInit {
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },
-        { field: 'caseId', headerName: 'Case', width: 200 },
+        { field: 'triageRunId', headerName: 'Triage Run', width: 200 },
         {
             field: 'rating',
             headerName: 'Rating',
             width: 140,
-            cellRenderer: (p: ICellRendererParams<CaseFeedback>) => statusBadgeHtml(p.value as string),
+            cellRenderer: (p: ICellRendererParams<TriageRunFeedback>) => statusBadgeHtml(p.value as string),
         },
         { field: 'submittedBy', headerName: 'By', width: 160 },
         {

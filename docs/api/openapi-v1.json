@@ -5290,11 +5290,11 @@
         "x-generated" : true
       }
     },
-    "/agent/cases" : {
+    "/agent/triage-runs" : {
       "get" : {
         "tags" : [ "agent" ],
-        "summary" : "GET /agent/cases (generated skeleton)",
-        "operationId" : "getAgentCases",
+        "summary" : "GET /agent/triage-runs (generated skeleton)",
+        "operationId" : "getAgentTriageRuns",
         "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
         "responses" : {
           "default" : {
@@ -5304,14 +5304,14 @@
         "x-generated" : true
       }
     },
-    "/agent/cases/{caseId}/similar" : {
+    "/agent/triage-runs/{triageRunId}/similar" : {
       "get" : {
         "tags" : [ "agent" ],
-        "summary" : "GET /agent/cases/{caseId}/similar (generated skeleton)",
-        "operationId" : "getAgentCasesByCaseIdSimilar",
+        "summary" : "GET /agent/triage-runs/{triageRunId}/similar (generated skeleton)",
+        "operationId" : "getAgentTriageRunsByTriageRunIdSimilar",
         "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
         "parameters" : [ {
-          "name" : "caseId",
+          "name" : "triageRunId",
           "in" : "path",
           "required" : true,
           "schema" : {
@@ -5326,14 +5326,14 @@
         "x-generated" : true
       }
     },
-    "/agent/cases/{caseId}" : {
+    "/agent/triage-runs/{triageRunId}" : {
       "get" : {
         "tags" : [ "agent" ],
-        "summary" : "GET /agent/cases/{caseId} (generated skeleton)",
-        "operationId" : "getAgentCasesByCaseId",
+        "summary" : "GET /agent/triage-runs/{triageRunId} (generated skeleton)",
+        "operationId" : "getAgentTriageRunsByTriageRunId",
         "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
         "parameters" : [ {
-          "name" : "caseId",
+          "name" : "triageRunId",
           "in" : "path",
           "required" : true,
           "schema" : {
@@ -5348,14 +5348,14 @@
         "x-generated" : true
       }
     },
-    "/agent/cases/{caseId}/feedback" : {
+    "/agent/triage-runs/{triageRunId}/feedback" : {
       "post" : {
         "tags" : [ "agent" ],
-        "summary" : "POST /agent/cases/{caseId}/feedback (generated skeleton)",
-        "operationId" : "postAgentCasesByCaseIdFeedback",
+        "summary" : "POST /agent/triage-runs/{triageRunId}/feedback (generated skeleton)",
+        "operationId" : "postAgentTriageRunsByTriageRunIdFeedback",
         "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
         "parameters" : [ {
-          "name" : "caseId",
+          "name" : "triageRunId",
           "in" : "path",
           "required" : true,
           "schema" : {

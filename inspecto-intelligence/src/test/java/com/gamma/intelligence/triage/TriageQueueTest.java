@@ -1,4 +1,4 @@
-package com.gamma.intelligence.investigation;
+package com.gamma.intelligence.triage;
 
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;

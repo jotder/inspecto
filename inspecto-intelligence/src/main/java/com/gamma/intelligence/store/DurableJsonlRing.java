@@ -18,7 +18,7 @@ import java.util.Map;
 
 /**
  * A bounded, durable ring of {@code T} persisted as JSON lines (AGT-5). Extracted (M7) from the four
- * intelligence stores that hand-rolled the identical mechanics — {@code ApprovalStore}, {@code CaseStore},
+ * intelligence stores that hand-rolled the identical mechanics — {@code ApprovalStore}, {@code TriageRunStore},
  * {@code FeedbackStore}, {@code RunbookRunStore} — each of which now subclasses this and adds only its own
  * domain queries.
  *

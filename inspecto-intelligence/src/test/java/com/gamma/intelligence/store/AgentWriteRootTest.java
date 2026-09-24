@@ -39,8 +39,8 @@ class AgentWriteRootTest {
     @Test
     void resolvesUnderAgentSubdirWhenConfigured() {
         System.setProperty(KEY, "/tmp/inspecto-space");
-        Path p = AgentWriteRoot.resolve("cases.jsonl");
+        Path p = AgentWriteRoot.resolve("triage-runs.jsonl");
         assertNotNull(p);
-        assertEquals(Path.of("/tmp/inspecto-space", "agent", "cases.jsonl"), p);
+        assertEquals(Path.of("/tmp/inspecto-space", "agent", "triage-runs.jsonl"), p);
     }
 }

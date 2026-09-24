@@ -143,7 +143,7 @@ should be *written down*, which is the whole point of the row).
 
 ### (c) Agent governance — 4 routes
 `PUT /agent/policy` · `POST /agent/policy/kill-switch` · `POST /agent/approvals/{id}/decision` ·
-`POST /agent/cases/{id}/feedback`
+`POST /agent/triage-runs/{id}/feedback`
 
 🔴 **The kill-switch and the policy are the controls over what the agent may do** — the routes most in
 need of a gate, and the ones with nothing to gate them with. An approvals *decision* route being open is

@@ -1,4 +1,4 @@
-package com.gamma.intelligence.investigation;
+package com.gamma.intelligence.triage;
 
 import java.util.Map;
 
@@ -8,7 +8,7 @@ import java.util.Map;
  * (any of: {@code sinceMinutes}, {@code focus}, {@code focusType}/{@code focusId}, {@code pipeline}/
  * {@code batchA}/{@code batchB}, {@code table}/{@code column}) — the playbook runs each tool only
  * when its inputs are present, so an incident with a thin trigger still yields a timeline-grounded
- * Case. Slice E populates this from a triggering Signal; tests build it directly.
+ * Triage Run. Slice E populates this from a triggering Signal; tests build it directly.
  */
 public record Incident(String incidentRef, Map<String, Object> triggerSignal, Map<String, Object> params) {
 

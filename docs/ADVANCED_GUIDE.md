@@ -523,7 +523,7 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
   `POST /exchange/refresh`, `POST /exchange/requests`, `GET /exchange/grants`,
   `POST /exchange/grants/{id}/approve|deny|revoke|pin|expiry`, `GET /exchange/datasets|widgets/{owner}/{item}`
   *(403 no active grant)* — capabilities `canOfferDatasets`/`canRequestShares`/`canApproveShares`.
-- **Agent:** `POST /agent/sessions`, `POST /agent/sessions/{id}/ask[/stream]` (SSE), `GET /agent/cases[/{id}]`.
+- **Agent:** `POST /agent/sessions`, `POST /agent/sessions/{id}/ask[/stream]` (SSE), `GET /agent/triage-runs[/{id}]`.
 - **Cursor pagination adopters** (opaque keyset via `metadata.pagination`, v1-only): `GET /jobs/runs`, `GET /objects`,
   `GET /jobs`, `GET /events`.
 

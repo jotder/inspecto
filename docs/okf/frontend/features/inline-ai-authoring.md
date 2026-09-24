@@ -270,7 +270,7 @@ Load-bearing details, each of which is a way this could have gone wrong:
   refused tool must never have arguments composed for it.
 - ⚠ **Route order.** `POST /agent/tools/(.+)/derive` is registered **before** the greedy
   `POST /agent/tools/(.+)`, which would otherwise match `query_author/derive` as a tool *name* and 404.
-  Same reason `/agent/cases/{id}/similar` precedes `/agent/cases/(.+)`. Pinned by
+  Same reason `/agent/triage-runs/{id}/similar` precedes `/agent/triage-runs/(.+)`. Pinned by
   `AgentRoutesTest.deriveIsNotSwallowedByTheGreedyToolRoute`.
 - ⚠ **The derive route is as ungated as its A1 sibling** — no `Role`, no `Capability`. Do not add a
   half-gate to one of the two routes; the authoring gates are the UI's `canAuthorWorkbench` and the

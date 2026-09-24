@@ -190,30 +190,30 @@ class AgentRoutesTest {
     }
 
     @Test
-    void casesRouteIs503WhenNoIntelligenceModuleIsPresent(@TempDir Path dir) throws Exception {
+    void triageRunsRouteIs503WhenNoIntelligenceModuleIsPresent(@TempDir Path dir) throws Exception {
         try (Ctx ctx = open(dir, null)) {
-            assertEquals(503, send(ctx.port(), "GET", "/agent/cases", null).statusCode());
-            assertEquals(503, send(ctx.port(), "GET", "/agent/cases/case-1", null).statusCode());
+            assertEquals(503, send(ctx.port(), "GET", "/agent/triage-runs", null).statusCode());
+            assertEquals(503, send(ctx.port(), "GET", "/agent/triage-runs/run-1", null).statusCode());
         }
     }
 
     @Test
     void recentCasesReturnsTheSeededCasesNewestFirst(@TempDir Path dir) throws Exception {
         try (Ctx ctx = open(dir, new FakeIntelligenceAgent(Map.of(
-                "case-1", Map.of("id", "case-1", "outcome", "open"),
-                "case-2", Map.of("id", "case-2", "outcome", "resolved"))))) {
-            HttpResponse<String> r = send(ctx.port(), "GET", "/agent/cases", null);
+                "run-1", Map.of("id", "run-1", "outcome", "open"),
+                "run-2", Map.of("id", "run-2", "outcome", "resolved"))))) {
+            HttpResponse<String> r = send(ctx.port(), "GET", "/agent/triage-runs", null);
             assertEquals(200, r.statusCode());
-            JsonNode cases = V1Body.of(r.body()).get("cases");
-            assertEquals(2, cases.size());
+            JsonNode triageRuns = V1Body.of(r.body()).get("triageRuns");
+            assertEquals(2, triageRuns.size());
         }
     }
 
     @Test
-    void caseByIdReturnsTheMatchingCase(@TempDir Path dir) throws Exception {
+    void triageRunByIdReturnsTheMatchingTriageRun(@TempDir Path dir) throws Exception {
         try (Ctx ctx = open(dir, new FakeIntelligenceAgent(Map.of(
-                "case-1", Map.of("id", "case-1", "outcome", "open"))))) {
-            HttpResponse<String> r = send(ctx.port(), "GET", "/agent/cases/case-1", null);
+                "run-1", Map.of("id", "run-1", "outcome", "open"))))) {
+            HttpResponse<String> r = send(ctx.port(), "GET", "/agent/triage-runs/run-1", null);
             assertEquals(200, r.statusCode());
             assertEquals("open", V1Body.of(r.body()).get("outcome").asText());
         }
@@ -222,7 +222,7 @@ class AgentRoutesTest {
     @Test
     void caseByIdOnAnUnknownIdIs404(@TempDir Path dir) throws Exception {
         try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
-            HttpResponse<String> r = send(ctx.port(), "GET", "/agent/cases/does-not-exist", null);
+            HttpResponse<String> r = send(ctx.port(), "GET", "/agent/triage-runs/does-not-exist", null);
             assertEquals(404, r.statusCode());
         }
     }
@@ -358,36 +358,36 @@ class AgentRoutesTest {
         }
     }
 
-    // --- AGT-5 P5: case-similarity recall route ---------------------------------------------------
+    // --- AGT-5 P5: triage-run similarity recall route ---------------------------------------------------
 
     @Test
-    void similarCasesRouteReturnsNeighboursOr404(@TempDir Path dir) throws Exception {
-        FakeIntelligenceAgent agent = new FakeIntelligenceAgent(Map.of("case-1", Map.of("id", "case-1")));
-        agent.seedSimilar("case-1", List.of(Map.of("id", "case-2", "similarity", 0.5)));
+    void similarTriageRunsRouteReturnsNeighboursOr404(@TempDir Path dir) throws Exception {
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent(Map.of("run-1", Map.of("id", "run-1")));
+        agent.seedSimilar("run-1", List.of(Map.of("id", "run-2", "similarity", 0.5)));
         try (Ctx ctx = open(dir, agent)) {
-            HttpResponse<String> ok = send(ctx.port(), "GET", "/agent/cases/case-1/similar", null);
+            HttpResponse<String> ok = send(ctx.port(), "GET", "/agent/triage-runs/run-1/similar", null);
             assertEquals(200, ok.statusCode());
             JsonNode similar = V1Body.of(ok.body()).get("similar");
             assertEquals(1, similar.size());
-            assertEquals("case-2", similar.get(0).get("id").asText());
-            // The greedy /agent/cases/(.+) must not shadow /similar (registration-order match).
-            assertEquals(404, send(ctx.port(), "GET", "/agent/cases/nope/similar", null).statusCode());
+            assertEquals("run-2", similar.get(0).get("id").asText());
+            // The greedy /agent/triage-runs/(.+) must not shadow /similar (registration-order match).
+            assertEquals(404, send(ctx.port(), "GET", "/agent/triage-runs/nope/similar", null).statusCode());
         }
     }
 
-    // --- AGT-5 P5: Case feedback routes -----------------------------------------------------------
+    // --- AGT-5 P5: Triage Run feedback routes -----------------------------------------------------------
 
     @Test
     void feedbackPostValidatesAndRecords(@TempDir Path dir) throws Exception {
-        FakeIntelligenceAgent agent = new FakeIntelligenceAgent(Map.of("case-1", Map.of("id", "case-1")));
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent(Map.of("run-1", Map.of("id", "run-1")));
         try (Ctx ctx = open(dir, agent)) {
             // Missing rating → 400.
-            assertEquals(400, send(ctx.port(), "POST", "/agent/cases/case-1/feedback", "{}").statusCode());
-            // Unknown case → 404.
-            assertEquals(404, send(ctx.port(), "POST", "/agent/cases/nope/feedback",
+            assertEquals(400, send(ctx.port(), "POST", "/agent/triage-runs/run-1/feedback", "{}").statusCode());
+            // Unknown Triage Run → 404.
+            assertEquals(404, send(ctx.port(), "POST", "/agent/triage-runs/nope/feedback",
                     "{\"rating\":\"helpful\"}").statusCode());
             // Valid → 200 + stored view.
-            HttpResponse<String> ok = send(ctx.port(), "POST", "/agent/cases/case-1/feedback",
+            HttpResponse<String> ok = send(ctx.port(), "POST", "/agent/triage-runs/run-1/feedback",
                     "{\"rating\":\"helpful\",\"note\":\"good\"}");
             assertEquals(200, ok.statusCode());
             assertEquals("HELPFUL", V1Body.of(ok.body()).get("rating").asText());
@@ -399,9 +399,9 @@ class AgentRoutesTest {
         try (Ctx ctx = open(dir, null)) {
             assertEquals(503, send(ctx.port(), "GET", "/agent/feedback", null).statusCode());
         }
-        FakeIntelligenceAgent agent = new FakeIntelligenceAgent(Map.of("case-1", Map.of("id", "case-1")));
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent(Map.of("run-1", Map.of("id", "run-1")));
         try (Ctx ctx = open(dir, agent)) {
-            send(ctx.port(), "POST", "/agent/cases/case-1/feedback", "{\"rating\":\"not_helpful\"}");
+            send(ctx.port(), "POST", "/agent/triage-runs/run-1/feedback", "{\"rating\":\"not_helpful\"}");
             HttpResponse<String> r = send(ctx.port(), "GET", "/agent/feedback", null);
             assertEquals(200, r.statusCode());
             assertEquals(1, V1Body.of(r.body()).get("feedback").size());
@@ -624,13 +624,13 @@ class AgentRoutesTest {
                 java.util.Set.of("QA", "ANALYSIS", "SQL_GEN", "PIPELINE_AUTHOR", "INVESTIGATION", "OPERATIONAL_ACTION");
 
         private final Map<String, String> sessions = new ConcurrentHashMap<>();
-        private final Map<String, Object> cases;
+        private final Map<String, Object> triageRuns;
         // Insertion-ordered so recentApprovals is deterministic; entries mutate on decision.
         private final Map<String, Map<String, Object>> approvals = new java.util.LinkedHashMap<>();
         volatile String lastGoalKind;
 
         FakeIntelligenceAgent() { this(Map.of()); }
-        FakeIntelligenceAgent(Map<String, Object> cases) { this.cases = cases; }
+        FakeIntelligenceAgent(Map<String, Object> triageRuns) { this.triageRuns = triageRuns; }
 
         /** Seed one approval view (mirrors the {@code Approval.toView()} shape the real agent emits). */
         void seedApproval(String id, String tool, String status) {
@@ -731,19 +731,19 @@ class AgentRoutesTest {
             return java.util.Optional.of(new java.util.LinkedHashMap<>(policy));
         }
 
-        // P5: Case feedback the /agent/cases/{id}/feedback + /agent/feedback routes exercise.
+        // P5: Triage Run feedback the /agent/triage-runs/{id}/feedback + /agent/feedback routes exercise.
         private final List<Map<String, Object>> feedback = new java.util.ArrayList<>();
 
         @Override
-        public java.util.Optional<Map<String, Object>> recordCaseFeedback(String caseId, Map<String, Object> body, String by) {
-            if (!cases.containsKey(caseId)) return java.util.Optional.empty(); // unknown case → 404
+        public java.util.Optional<Map<String, Object>> recordTriageRunFeedback(String triageRunId, Map<String, Object> body, String by) {
+            if (!triageRuns.containsKey(triageRunId)) return java.util.Optional.empty(); // unknown triage run → 404
             String rating = String.valueOf(body.get("rating"));
             if (!"helpful".equalsIgnoreCase(rating) && !"not_helpful".equalsIgnoreCase(rating)) {
                 throw new IllegalArgumentException("bad rating"); // → route maps to 400
             }
             Map<String, Object> v = new java.util.LinkedHashMap<>();
             v.put("id", "fb-" + feedback.size());
-            v.put("caseId", caseId);
+            v.put("triageRunId", triageRunId);
             v.put("rating", rating.toUpperCase(java.util.Locale.ROOT));
             v.put("submittedBy", by);
             feedback.add(v);
@@ -751,7 +751,7 @@ class AgentRoutesTest {
         }
 
         @Override
-        public List<Map<String, Object>> recentCaseFeedback(int limit) {
+        public List<Map<String, Object>> recentTriageRunFeedback(int limit) {
             return List.copyOf(feedback);
         }
 
@@ -799,25 +799,25 @@ class AgentRoutesTest {
 
         @Override
         @SuppressWarnings("unchecked")
-        public List<Map<String, Object>> recentCases(int limit) {
-            return cases.values().stream().map(v -> (Map<String, Object>) v).toList();
+        public List<Map<String, Object>> recentTriageRuns(int limit) {
+            return triageRuns.values().stream().map(v -> (Map<String, Object>) v).toList();
         }
 
         @Override
         @SuppressWarnings("unchecked")
-        public java.util.Optional<Map<String, Object>> caseById(String id) {
-            return java.util.Optional.ofNullable((Map<String, Object>) cases.get(id));
+        public java.util.Optional<Map<String, Object>> triageRunById(String id) {
+            return java.util.Optional.ofNullable((Map<String, Object>) triageRuns.get(id));
         }
 
-        // P5: seeded similarity neighbours the /agent/cases/{id}/similar route reads.
+        // P5: seeded similarity neighbours the /agent/triage-runs/{id}/similar route reads.
         private final Map<String, List<Map<String, Object>>> similar = new java.util.LinkedHashMap<>();
 
-        void seedSimilar(String caseId, List<Map<String, Object>> neighbours) {
-            similar.put(caseId, neighbours);
+        void seedSimilar(String triageRunId, List<Map<String, Object>> neighbours) {
+            similar.put(triageRunId, neighbours);
         }
 
         @Override
-        public List<Map<String, Object>> similarCases(String id, int k) {
+        public List<Map<String, Object>> similarTriageRuns(String id, int k) {
             return similar.getOrDefault(id, List.of());
         }
 

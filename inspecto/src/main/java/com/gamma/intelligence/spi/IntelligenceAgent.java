@@ -91,7 +91,7 @@ public interface IntelligenceAgent extends AutoCloseable {
      * success or {@code error} on an expected failure (the tools never throw; a missing argument or an
      * unvalidatable kind is an {@code ok=false} result). Empty when no tool of that name exists, which
      * the control route maps to 404. Default empty: an implementation with no tool belt exposes nothing
-     * rather than 503, mirroring {@link #recentCases}.
+     * rather than 503, mirroring {@link #recentTriageRuns}.
      *
      * @param args    the tool's arguments, as the caller supplied them
      * @param session the agent-session token for audit attribution ({@code actor=agent:<run>})
@@ -133,29 +133,29 @@ public interface IntelligenceAgent extends AutoCloseable {
     }
 
     /**
-     * The most recent investigation Cases (AGT-5 P1 slice D), newest first, as plain JSON-friendly
-     * maps — the core stays free of the {@code Case} record type, which lives in the optional
+     * The most recent Triage Runs (AGT-5 P1 slice D), newest first, as plain JSON-friendly
+     * maps — the core stays free of the {@code TriageRun} record type, which lives in the optional
      * {@code inspecto-intelligence} module. Default empty: an implementation without an
-     * investigation tier (or the module absent) yields no cases rather than a 503 — {@code GET
-     * /agent/cases} is a read that degrades, mirroring {@code GET /assist/diagnoses}.
+     * investigation tier (or the module absent) yields no Triage Runs rather than a 503 — {@code GET
+     * /agent/triage-runs} is a read that degrades, mirroring {@code GET /assist/diagnoses}.
      */
-    default List<Map<String, Object>> recentCases(int limit) {
+    default List<Map<String, Object>> recentTriageRuns(int limit) {
         return List.of();
     }
 
-    /** One Case by id, or empty when unknown (the control route maps that to 404). */
-    default Optional<Map<String, Object>> caseById(String id) {
+    /** One Triage Run by id, or empty when unknown (the control route maps that to 404). */
+    default Optional<Map<String, Object>> triageRunById(String id) {
         return Optional.empty();
     }
 
     /**
-     * The prior Cases most similar to the Case {@code id} (AGT-5 P5, case-similarity recall), newest
+     * The prior Triage Runs most similar to the Triage Run {@code id} (AGT-5 P5, triage-run similarity recall), newest
      * -and-most-relevant first, each carrying a {@code similarity} score — so an operator (or the
      * investigator) can reuse earlier root-cause work on a like incident. Empty when the id is unknown
-     * <em>or</em> the tier is absent; the control route reads the base Case first to distinguish
+     * <em>or</em> the tier is absent; the control route reads the base Triage Run first to distinguish
      * unknown (404) from simply-no-neighbours (empty list). Default empty.
      */
-    default List<Map<String, Object>> similarCases(String id, int k) {
+    default List<Map<String, Object>> similarTriageRuns(String id, int k) {
         return List.of();
     }
 
@@ -164,7 +164,7 @@ public interface IntelligenceAgent extends AutoCloseable {
      * maps — the core stays free of the {@code Approval} type, which lives in the optional
      * {@code inspecto-intelligence} module. Includes both pending and already-decided entries so
      * {@code GET /agent/approvals} can show recent history. Default empty: an implementation without an
-     * act tier (or the module absent) yields no approvals rather than a 503, mirroring {@link #recentCases}.
+     * act tier (or the module absent) yields no approvals rather than a 503, mirroring {@link #recentTriageRuns}.
      */
     default List<Map<String, Object>> recentApprovals(int limit) {
         return List.of();
@@ -232,21 +232,21 @@ public interface IntelligenceAgent extends AutoCloseable {
     }
 
     /**
-     * Record an operator's feedback on an investigation Case (AGT-5 P5, "Learning") — the raw signal
+     * Record an operator's feedback on a Triage Run (AGT-5 P5, "Learning") — the raw signal
      * the learning tier turns into eval growth + per-skill tuning. {@code body} carries the
      * {@code rating} (helpful / not-helpful) and an optional {@code note}. Returns the stored feedback
-     * view, or empty when the {@code caseId} is unknown (the control route maps that to 404). Default
+     * view, or empty when the {@code triageRunId} is unknown (the control route maps that to 404). Default
      * empty for implementations without an investigation tier.
      */
-    default Optional<Map<String, Object>> recordCaseFeedback(String caseId, Map<String, Object> body, String submittedBy) {
+    default Optional<Map<String, Object>> recordTriageRunFeedback(String triageRunId, Map<String, Object> body, String submittedBy) {
         return Optional.empty();
     }
 
     /**
-     * Recent Case feedback, newest first, as plain JSON-friendly maps (AGT-5 P5) — the aggregate the
-     * tuning dashboard reads. Default empty (read-degrading, like {@link #recentCases}).
+     * Recent Triage Run feedback, newest first, as plain JSON-friendly maps (AGT-5 P5) — the aggregate the
+     * tuning dashboard reads. Default empty (read-degrading, like {@link #recentTriageRuns}).
      */
-    default List<Map<String, Object>> recentCaseFeedback(int limit) {
+    default List<Map<String, Object>> recentTriageRunFeedback(int limit) {
         return List.of();
     }
 

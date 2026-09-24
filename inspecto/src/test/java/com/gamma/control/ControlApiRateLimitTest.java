@@ -18,7 +18,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Real-HTTP tests for the per-subject token-bucket throttle on the expensive routes
  * ({@code NO-RATE-LIMIT-EXPENSIVE-ROUTES-1}): {@code /db/query}, {@code /bi/query}, {@code /recon/*},
- * {@code /agent/*}. Uses {@code GET /agent/cases} as the probe — it needs no write root or seeded
+ * {@code /agent/*}. Uses {@code GET /agent/triage-runs} as the probe — it needs no write root or seeded
  * data and answers a stable status (503, the {@code inspecto-intelligence} module is absent here)
  * regardless of throttling, so every response below 429 proves the request reached the handler.
  * Mirrors {@link ControlApiBiQueryTest}'s minimal single-space boot.
@@ -39,8 +39,8 @@ class ControlApiRateLimitTest {
         return new Ctx(svc, api, api.port());
     }
 
-    private HttpResponse<String> agentCases(int port) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/agent/cases"))
+    private HttpResponse<String> agentTriageRuns(int port) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/agent/triage-runs"))
                 .GET().build(), BodyHandlers.ofString());
     }
 
@@ -63,11 +63,11 @@ class ControlApiRateLimitTest {
             // (a) requests under the limit (the default burst capacity is 20) all reach the handler —
             // none is 429, whatever the handler itself answers (503: no intelligence module on this classpath).
             for (int i = 0; i < 20; i++) {
-                HttpResponse<String> r = agentCases(c.port);
+                HttpResponse<String> r = agentTriageRuns(c.port);
                 assertNotEquals(429, r.statusCode(), "request " + i + " should not be throttled yet");
             }
             // (b) the 21st request in the same burst finds the bucket empty.
-            HttpResponse<String> exhausted = agentCases(c.port);
+            HttpResponse<String> exhausted = agentTriageRuns(c.port);
             assertEquals(429, exhausted.statusCode(), "21st request should be throttled");
             assertTrue(exhausted.body().contains("rate limit"), "body: " + exhausted.body());
 
@@ -86,8 +86,8 @@ class ControlApiRateLimitTest {
     void biQueryHasItsOwnDashboardSizedBucketIndependentOfTheStandardOne(@TempDir Path cfg) throws Exception {
         try (Ctx c = open(cfg)) {
             // (a) the standard bucket is exhausted first — /bi/query must still be served.
-            for (int i = 0; i < 20; i++) agentCases(c.port);
-            assertEquals(429, agentCases(c.port).statusCode(), "standard bucket should be exhausted");
+            for (int i = 0; i < 20; i++) agentTriageRuns(c.port);
+            assertEquals(429, agentTriageRuns(c.port).statusCode(), "standard bucket should be exhausted");
             assertNotEquals(429, biQuery(c.port).statusCode(), "an exhausted standard bucket must not throttle /bi/query");
 
             // (b) 120 dashboard queries in one burst (one already spent above) all reach the handler — ten

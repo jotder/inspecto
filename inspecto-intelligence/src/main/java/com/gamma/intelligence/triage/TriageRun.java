@@ -1,4 +1,4 @@
-package com.gamma.intelligence.investigation;
+package com.gamma.intelligence.triage;
 
 import java.time.Instant;
 import java.util.List;
@@ -10,7 +10,7 @@ import java.util.Map;
  * ({@code "open"} until a playbook run completes); {@code fixDraftRefs} are {@code ComponentStore}
  * ids of DRAFT components written by the fix-draft step (P1 stays L1 — draft, never apply).
  */
-public record Case(
+public record TriageRun(
         String id,
         String incidentRef,
         Map<String, Object> triggerSignal,
@@ -20,7 +20,7 @@ public record Case(
         List<String> fixDraftRefs,
         Instant createdAt) {
 
-    /** The {@code GET /agent/cases*} view — a plain, JSON-friendly map (core stays free of this type). */
+    /** The {@code GET /agent/triage-runs*} view — a plain, JSON-friendly map (core stays free of this type). */
     public Map<String, Object> toView() {
         Map<String, Object> m = new java.util.LinkedHashMap<>();
         m.put("id", id);
@@ -34,13 +34,13 @@ public record Case(
         return m;
     }
 
-    /** The persisted shape (AGT-5 P5 durable {@code CaseStore}) — identical to {@link #toView()}. */
+    /** The persisted shape (AGT-5 P5 durable {@code TriageRunStore}) — identical to {@link #toView()}. */
     Map<String, Object> toRecord() { return toView(); }
 
     /** Rehydrate from a persisted {@link #toRecord()} map (restart survival + the recall corpus). */
     @SuppressWarnings("unchecked")
-    static Case fromRecord(Map<String, Object> m) {
-        return new Case(
+    static TriageRun fromRecord(Map<String, Object> m) {
+        return new TriageRun(
                 (String) m.get("id"),
                 (String) m.get("incidentRef"),
                 (Map<String, Object>) orEmptyMap(m.get("triggerSignal")),
@@ -54,7 +54,7 @@ public record Case(
     /**
      * The symptom text used for similarity recall (AGT-5 P5) — the signal type + subject + message from
      * {@link #triggerSignal}, the outcome, and each hypothesis title/text. Deterministic and dependency-
-     * free; {@link CaseSimilarity} tokenizes it. A Case with a richer trigger/hypotheses yields a
+     * free; {@link TriageRunSimilarity} tokenizes it. A Triage Run with a richer trigger/hypotheses yields a
      * richer fingerprint, so recall favours genuinely-similar incidents over merely same-type ones.
      */
     public String symptomText() {
