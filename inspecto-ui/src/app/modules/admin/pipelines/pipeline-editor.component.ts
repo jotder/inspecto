@@ -63,7 +63,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { grammarContentAsParsingBlock, nonDelimitedGrammarBlock } from 'app/inspecto/grammar';
-import { TransferMenuComponent } from 'app/inspecto/transfer';
+import { ImportDraft, ImportDraftBannerComponent, TransferMenuComponent } from 'app/inspecto/transfer';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
 import { PipelineDryRunPanelComponent } from './pipeline-dry-run-panel.component';
@@ -214,6 +214,7 @@ const UNDO_CAP = 50;
         InspectoEmptyStateComponent,
         InspectoSplitDirective,
         TransferMenuComponent,
+        ImportDraftBannerComponent,
     ],
     templateUrl: './pipeline-editor.component.html',
     // The editor is a full-bleed shell: it fills whatever the route gives it, and the canvas takes
@@ -705,7 +706,9 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 // one arbitrary pipeline both cost a fetch nobody asked for and made the tab strip lie
                 // about what the user had chosen. The Open dialog is the only thing that opens a tab.
                 // Re-listing (after a save/import) must not disturb tabs already open.
-                this.openIds.update((ids) => ids.filter((id) => fs.some((f) => f.name === id)));
+                // An imported draft for an id this Space does not hold yet is not listed until its Save.
+                const draftId = this.importDraft()?.id;
+                this.openIds.update((ids) => ids.filter((id) => id === draftId || fs.some((f) => f.name === id)));
                 this.restoreOpenTabs(new Set(fs.map((f) => f.name)));
             },
             error: () => {
@@ -1380,6 +1383,178 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         this.selectedEdgeId.set(null);
     }
 
+    // ── Import as draft (bundle load-as-draft slice 5, operator decisions D1–D8 2026-09-25) ─────────
+    // The dialog already imported any missing prerequisites write-through (D4). The pipeline itself is
+    // adopted UNSAVED into its tab and reaches the config only through this pane's own Save (D2):
+    // `PUT …/graph` with `If-Match` against the stored file (D6), or — for an id this Space does not
+    // hold — the create route's scaffold first (D5), exactly as New pipeline does.
+
+    /** The imported draft this editor holds UNSAVED (one at a time) — in memory only (D1). */
+    readonly importDraft = signal<ImportDraft | null>(null);
+    /** The draft, while its tab is the active one — what the banner shows and Save consults. */
+    readonly activeDraft = computed(() => {
+        const d = this.importDraft();
+        return d && d.id === this.selectedId() ? d : null;
+    });
+    /** The stored graph the draft replaces (D6 diff baseline); null when the id is new here. */
+    readonly draftStored = signal<Record<string, unknown> | null>(null);
+    /** The stored file's ETag, sent as `If-Match` on the draft's Save so it cannot clobber a concurrent edit. */
+    private draftIfMatch: string | undefined;
+
+    /** The transfer menu's draft: open its tab (reading the stored graph + ETag first when it exists). */
+    onDraftImported(draft: ImportDraft): void {
+        if (draft.kind !== 'authored-pipeline') return;
+        if (!this.canAuthor()) {
+            this.toast.warning('Switch to Edit to open an imported draft.');
+            return;
+        }
+        const held = this.importDraft();
+        if (held && held.id !== draft.id) {
+            this.toast.warning(`Save or discard the imported draft of '${held.id}' first.`);
+            return;
+        }
+        if (!draft.targetExists) {
+            // The create route registers under the scaffold's narrowed id — a draft must already be one.
+            if (pipelineId(draft.id) !== draft.id) {
+                this.toast.error(`'${draft.id}' is not a valid pipeline id, so it cannot be created as a draft.`);
+                return;
+            }
+            void this.showDraftTab(draft.id, null).then((ok) => ok && this.adoptImportDraft(draft, null, undefined));
+            return;
+        }
+        this.api.pipelineGraphRawTagged(draft.id).subscribe({
+            next: ({ pipeline, etag }) =>
+                void this.showDraftTab(draft.id, pipeline).then(
+                    (ok) => ok && this.adoptImportDraft(draft, pipeline, etag ?? undefined),
+                ),
+            error: (err) => this.toast.error(apiErrorMessage(err, `Could not load pipeline '${draft.id}'`)),
+        });
+    }
+
+    /**
+     * Make `id` the active tab WITHOUT a server load of its own (the stored copy is already in hand, and a
+     * second load landing after the draft would silently overwrite it). An open tab keeps its own model —
+     * unsaved edits included, and the adoption's undo entry holds them; a new tab starts from `stored`, or
+     * from an empty graph for an id this Space does not hold. False when the operator declined to discard
+     * a dirty definition drawer.
+     */
+    private async showDraftTab(id: string, stored: AuthoredPipeline | null): Promise<boolean> {
+        if (this.selectedId() === id) return true;
+        if (this.cachedModels.has(id)) {
+            await this.activateTab(id);
+            return this.selectedId() === id;
+        }
+        if (this.definitionDirty()) {
+            const ok = await this.confirm.confirmDestructive(
+                'The open definition has edits that have not been applied. Switching tabs discards them.',
+                { title: 'Discard unapplied edits?', confirmText: 'Discard' },
+            );
+            if (!ok) return false;
+        }
+        this.closeDefinition();
+        this.parkCurrent();
+        this.clearSelection();
+        if (!this.openIds().includes(id)) this.openIds.update((ids) => [...ids, id]);
+        if (!this.sampleThreads.has(id)) this.sampleThreads.set(id, new DefinitionStateService());
+        this.pendingSelect = id; // an in-flight load for another tab must not land over this one
+        this.model.set(stored ? structuredClone(stored) : { name: id, active: false, nodes: [], edges: [] });
+        this.selectedId.set(id);
+        this.dirty.set(false);
+        if (stored) this.stampBaseline(id, stored);
+        this.loadLastRun(id);
+        this.loadConfigSubdir(id);
+        return true;
+    }
+
+    /** Take the incoming graph as unsaved edits on the (now active) tab — the applyPipelineDraft idiom. */
+    private adoptImportDraft(draft: ImportDraft, stored: AuthoredPipeline | null, etag: string | undefined): void {
+        const incoming = draft.content as Partial<AuthoredPipeline>;
+        if (!Array.isArray(incoming.nodes) || !Array.isArray(incoming.edges)) {
+            this.toast.error(`The bundle's '${draft.id}' is not a pipeline graph, so no draft was opened.`);
+            return;
+        }
+        this.captureUndo(); // adopting replaces the whole graph — the tab's previous state stays one undo away
+        // Identity and lifecycle stay this Space's: a draft never renames or activates a pipeline, and a
+        // new one lands inactive (the bundle ZIP door's rule too).
+        this.model.set({
+            name: draft.id,
+            active: stored?.active ?? false,
+            nodes: incoming.nodes,
+            edges: incoming.edges,
+        });
+        this.dirty.set(true);
+        this.selectedNode.set(null);
+        this.selectedEdgeId.set(null);
+        this.canvasEpoch.update((e) => e + 1); // same tab ⇒ no graphKey change, so rebuild in place
+        // `/bundle/preview` judges references for the component kinds only (ComponentIntegrity: dataset,
+        // query, widget, dashboard, reconciliation), so its list is ALWAYS empty for a pipeline — which the
+        // banner would show as clean. Say "not checked" instead: a pipeline's references are judged by
+        // Validate and by this route's own save gate.
+        this.importDraft.set({ ...draft, integrity: null });
+        this.draftStored.set(stored as unknown as Record<string, unknown> | null);
+        this.draftIfMatch = etag;
+    }
+
+    /** Drop the draft: back to the stored graph, or close the tab a new-id draft opened. Writes nothing. */
+    discardImportDraft(): void {
+        const draft = this.importDraft();
+        if (!draft) return;
+        this.clearImportDraft();
+        if (draft.targetExists) {
+            this.select(draft.id); // the server's copy, clean
+            return;
+        }
+        this.forgetTab(draft.id);
+        this.openIds.update((ids) => ids.filter((x) => x !== draft.id));
+        if (this.selectedId() !== draft.id) return;
+        this.clearActive();
+        const next = this.openIds()[0];
+        if (next) void this.activateTab(next);
+    }
+
+    private clearImportDraft(): void {
+        this.importDraft.set(null);
+        this.draftStored.set(null);
+        this.draftIfMatch = undefined;
+    }
+
+    /**
+     * A new-id draft's first Save needs the file New pipeline writes (D5): the space-convention scaffold
+     * (inactive, the parser-required dirs), registered — through the create route, which 409s on an id
+     * someone took meanwhile. Resolves once the id is a registered pipeline the graph can lower over.
+     */
+    private scaffoldDraft(id: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            this.configApi.write('pipeline', pipelineScaffold(id)).subscribe({
+                next: (written) => {
+                    // From here the id EXISTS: a retry after a refused graph save must not scaffold again.
+                    this.importDraft.update((d) => (d && d.id === id ? { ...d, targetExists: true } : d));
+                    this.configApi.registerPipeline(written.path).subscribe({
+                        next: () => {
+                            if (!this.flows().some((f) => f.name === id))
+                                this.flows.update((fs) => [
+                                    ...fs,
+                                    { name: id, active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] },
+                                ]);
+                            resolve();
+                        },
+                        error: (err) => {
+                            // Unregistered, `PUT …/graph` would lower over a fresh canonical file beside it.
+                            this.onWriteError(err, `Created '${id}' but could not register it`);
+                            reject(err);
+                        },
+                    });
+                },
+                error: (err) => {
+                    if ((err as { status?: number })?.status === 409)
+                        this.toast.error(`A pipeline '${id}' already exists here — nothing was written.`);
+                    else this.onWriteError(err, `Could not create the pipeline '${id}'`);
+                    reject(err);
+                },
+            });
+        });
+    }
+
     async save(): Promise<void> {
         const m = this.model();
         const id = this.selectedId();
@@ -1400,12 +1575,28 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             if (!ok) return;
         }
         this.saving.set(true);
-        this.api.savePipelineGraph(id, m).subscribe({
+        // An imported draft saves through this same route, guarded by the stored file's ETag (D2/D6); a
+        // draft for an id this Space does not hold is scaffolded + registered first (D5).
+        const draft = this.activeDraft();
+        if (draft && !draft.targetExists) {
+            try {
+                await this.scaffoldDraft(id);
+            } catch {
+                this.saving.set(false);
+                return;
+            }
+        }
+        const save$ =
+            draft && this.draftIfMatch
+                ? this.api.savePipelineGraph(id, m, { ifMatch: this.draftIfMatch })
+                : this.api.savePipelineGraph(id, m);
+        save$.subscribe({
             next: () => {
                 this.saving.set(false);
                 this.dirty.set(false);
                 // The stack SURVIVES a save (undoing past it re-arms dirty against this new baseline).
                 this.stampBaseline(id, m);
+                if (draft) this.clearImportDraft(); // saved: it is this Space's pipeline now, not a draft
                 this.toast.success(`Saved pipeline '${id}'`);
             },
             error: (err) => {

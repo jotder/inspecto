@@ -543,6 +543,18 @@ export class PipelinesService {
     }
 
     /**
+     * {@link pipelineGraphRaw} plus the `ETag` the server stamps over the on-disk config
+     * (STORE-CONFLICT-DETECTION-1) — the handle {@link savePipelineGraph}'s `ifMatch` sends back, so a save
+     * that would clobber a concurrent edit is refused 409 instead of silently winning. `etag` is null when
+     * the response carried none.
+     */
+    pipelineGraphRawTagged(name: string): Observable<{ pipeline: AuthoredPipeline; etag: string | null }> {
+        return this.http
+            .get<AuthoredPipeline>(apiUrl(`/pipelines/${encodeURIComponent(name)}/graph/raw`), { observe: 'response' })
+            .pipe(map((r) => ({ pipeline: r.body as AuthoredPipeline, etag: r.headers.get('ETag') })));
+    }
+
+    /**
      * Everything related to a pipeline — the server-side closure (pipeline spec gap 5).
      *
      * 🔴 For an EXPORT closure only `references[]` applies, and only entries carrying a `ref`. The
@@ -558,11 +570,20 @@ export class PipelinesService {
      * graph must be complete; an inactive draft may be partial. 422 carries named `refusals[]`
      * (UNSUPPORTED_NODE / UNSUPPORTED_BINDING / MULTI_PARSER / NO_* completeness codes) when the topology cannot be
      * represented as a flat config, or `findings[]` when the lowered config fails the write gate.
+     *
+     * `ifMatch` is the ETag {@link pipelineGraphRawTagged} served, sent VERBATIM (it is already the
+     * server's quoted `"sha256:…"` tag): a 409 `CONFLICT_STALE_VERSION` then means the file changed since
+     * that read. Omitted, the save writes unconditionally, as before.
      */
-    savePipelineGraph(name: string, pipeline: AuthoredPipeline): Observable<PipelineGraphWriteResult> {
+    savePipelineGraph(
+        name: string,
+        pipeline: AuthoredPipeline,
+        opts?: { ifMatch?: string },
+    ): Observable<PipelineGraphWriteResult> {
         return this.http.put<PipelineGraphWriteResult>(
             apiUrl(`/pipelines/${encodeURIComponent(name)}/graph`),
             withoutDerivedEdges(pipeline),
+            opts?.ifMatch ? { headers: { 'If-Match': opts.ifMatch } } : {},
         );
     }
 

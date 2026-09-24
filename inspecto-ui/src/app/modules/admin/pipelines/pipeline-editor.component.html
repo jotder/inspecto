@@ -270,6 +270,8 @@
             <inspecto-transfer-menu
                 [items]="transferItems()"
                 [allowedKinds]="['authored-pipeline']"
+                [importDraft]="true"
+                (draftImported)="onDraftImported($event)"
                 (changed)="load()"
                 label="Import / export pipeline"
             >
@@ -408,6 +410,16 @@
                     </button>
                 </div>
             </inspecto-alert>
+        </div>
+    }
+
+    <!-- Import as draft (bundle load-as-draft slice 5): the shared banner, for the tab holding the draft. -->
+    @if (activeDraft(); as draft) {
+        <div
+            class="shrink-0 border-b px-3 py-1.5"
+            style="background: var(--gamma-bg-card); border-color: var(--gamma-border)"
+        >
+            <inspecto-import-draft-banner [draft]="draft" [stored]="draftStored()" (discard)="discardImportDraft()" />
         </div>
     }
 

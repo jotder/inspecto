@@ -159,6 +159,26 @@ describe('PipelinesService (derived companion edge)', () => {
         req.flush({ written: true });
     });
 
+    it('savePipelineGraph sends If-Match only when asked, and verbatim (it is already the server tag)', () => {
+        svc.savePipelineGraph('orders', graph).subscribe();
+        const plain = httpMock.expectOne((r) => r.method === 'PUT');
+        expect(plain.request.headers.has('If-Match')).toBe(false);
+        plain.flush({ written: true });
+
+        svc.savePipelineGraph('orders', graph, { ifMatch: '"sha256:abc"' }).subscribe();
+        const guarded = httpMock.expectOne((r) => r.method === 'PUT');
+        expect(guarded.request.headers.get('If-Match')).toBe('"sha256:abc"');
+        guarded.flush({ written: true });
+    });
+
+    it('pipelineGraphRawTagged returns the lossless graph and the ETag the save must echo', () => {
+        let got: { pipeline: AuthoredPipeline; etag: string | null } | undefined;
+        svc.pipelineGraphRawTagged('orders').subscribe((r) => (got = r));
+        httpMock.expectOne(`${base}/pipelines/orders/graph/raw`).flush(graph, { headers: { ETag: '"sha256:abc"' } });
+        expect(got?.pipeline.name).toBe(graph.name);
+        expect(got?.etag).toBe('"sha256:abc"');
+    });
+
     it('a candidate dry run never sends the derived edge back', () => {
         svc.dryRunAuthored('orders', [{ ID: '1' }], graph).subscribe();
         const req = httpMock.expectOne(

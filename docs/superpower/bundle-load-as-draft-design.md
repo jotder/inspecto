@@ -2,12 +2,14 @@
 
 > **Status: DECIDED 2026-09-25 (operator answered D1–D8 in §7) — IN FLIGHT.** Build order as signed: the
 > read-only preview extension (§5 row 4, built FIRST) then the editor slices (§5 rows 1–3) for Dashboard, Widget and
-> Dataset. Authored Pipeline (row 5) and Link Analysis / Geo views are later slices, not started.
+> Dataset, then authored Pipeline (row 5). Link Analysis / Geo views are a later slice, not started.
 > **Shipped 2026-09-25:** §5 row 4 (preview `integrity`) and rows 1–3 for Dashboard, Widget and Dataset — as-built
 > facts in [`metadata-bundle.md`](../okf/backend/control-plane/metadata-bundle.md) § *Import as draft* (D7).
-> **Open:** row 5 (authored Pipeline), then Link Analysis / Geo views; re-checking integrity against the
-> *edited* draft just before Save (row 4's second half — today the check runs once, when the draft opens);
-> a browser drive of the three editors (§6).
+> **Shipped 2026-09-25 (later):** §5 row 5 — authored Pipeline, as-built in the same concept section.
+> **Open:** Link Analysis / Geo views; re-checking integrity against the *edited* draft just before Save
+> (row 4's second half — today the check runs once, when the draft opens); a browser drive of the four
+> editors (§6); the `authored-pipeline` bundle kind reads `PipelineStore` while the editor edits the
+> registered config (found building row 5 — see the concept page).
 > Concept pages: [`metadata-bundle.md`](../okf/backend/control-plane/metadata-bundle.md) (the import this
 > changes) · [`exchange-sharing.md`](../okf/backend/control-plane/exchange-sharing.md) (the row's named owner; see D7).
 
@@ -142,7 +144,7 @@ wider closure only means more rows in the prerequisite list of slice 3. Nothing 
 | 2 | Host adoption, one editor per commit, smallest first: Dashboard → Widget (explore) → Dataset. Each gets `applyImportDraft(content)` modelled on `applyKpiReport` / `applyPipelineDraft`: undo capture where the editor has undo, model marked dirty, a banner *"Imported draft from ‹sourceSpace› — not saved"*, Save = the pane's existing route. Existing target → open that item with the incoming content as unsaved edits and the diff visible (D6). | SPA | per-editor spec: adopt ⇒ dirty, zero writes until Save; Save ⇒ exactly the pane's own request |
 | 3 | Prerequisites: when the preview's `requires` has `missing` rows or the envelope carries other-kind items the target references, the draft dialog lists them and offers "Import these first" → existing `/bundle/import` over just those items; the draft opens only after that call succeeds (partial failure: stop, name what landed — the `applyKpiReport` rule). | SPA | spec: prerequisite 422 ⇒ no draft opened |
 | 4 | `POST /bundle/preview` adds `integrity: [...]` (introduced findings for the previewed items, read-only). The editor calls preview with the *current draft content* before Save and shows findings in the draft banner. | backend + SPA | real-HTTP test in `ControlApiBundleTest`; `openapi-v1.json` response shape updated |
-| 5 | `authored-pipeline` in the Pipeline editor via the existing `applyPipelineDraft` path (lifecycle kept; a brand-new id still needs the scaffold write the editor does for "new", `pipeline-editor.component.ts:1288-1289` — D5). | SPA | spec + browser drive |
+| 5 | `authored-pipeline` in the Pipeline editor via the existing `applyPipelineDraft` path (lifecycle kept; a brand-new id still needs the scaffold write the editor does for "new", `pipeline-editor.component.ts:1288-1289` — D5). | SPA | spec + browser drive — ✅ SPA + spec shipped 2026-09-25 (scaffold deferred to Save; browser drive open) |
 | 6 | *Only if D1 = server staging:* Option B as its own plan (store, 4 routes, invisibility invariant, retention). Re-scope before starting. | backend + SPA | its own plan |
 
 Out of every slice: `connection` (secrets are stripped at export and refused raw at import — a draft editor

@@ -110,7 +110,7 @@ read/written through the uniform `BundleSource` seam regardless of its backing s
   ref's export-stamped `originHash` to the target's stored hash; a ref that travels hash-less (older bundle, or
   unresolvable at export) can only be `satisfied`/`missing`, so the classification degrades gracefully.
 
-## Import as draft (SHIPPED 2026-09-25 for Dashboard, Widget, Dataset)
+## Import as draft (SHIPPED 2026-09-25 for Dashboard, Widget, Dataset, authored Pipeline)
 
 The editor-hosted alternative to write-through import: the incoming item opens in its editor as **unsaved
 work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
@@ -118,8 +118,8 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
 
 * **Where** — an extra *Import as draft…* item beside *Import…* in the **editor** transfer menus only
   (`<inspecto-transfer-menu [importDraft]="true" (draftImported)>`); libraries and Settings stay write-through
-  (D8). Shipped on the Dashboard, Widget and Dataset editors (D5). ⏳ Not yet: authored Pipeline, then Link
-  Analysis / Geo views. ⛔ `connection` never (a draft editor would invite typing a secret).
+  (D8). Shipped on the Dashboard, Widget and Dataset editors and the authored Pipeline editor (D5). ⏳ Not
+  yet: Link Analysis / Geo views. ⛔ `connection` never (a draft editor would invite typing a secret).
 * **The dialog** is `ImportBundleDialog` with `mode: 'draft'`: the operator picks ONE row of the host's kind;
   the dialog never posts the target to `/bundle/import`. It closes with an `ImportDraft`
   (`inspecto-ui/src/app/inspecto/transfer/import-draft.ts`: content, `sourceSpace`, `targetExists`, `integrity`, `prerequisites`).
@@ -143,6 +143,22 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
   through the list route with `skipLocationChange`. 🔴 An editor that takes a draft must SKIP its plain stored
   load: both are async, and the stored copy landing second silently overwrote the draft (pinned by the
   Dataset editor's spec, mutation-checked).
+* **Authored Pipeline (slice 5).** The draft opens as the pipeline's TAB, unsaved (undo holds the tab's
+  previous state), keeping this Space's identity and lifecycle — a draft never renames or activates a
+  pipeline; a new id lands `active: false`. Existing id: the editor reads **`GET …/graph/raw`** (the
+  lossless shape — ⛔ never `GET …/graph`, a display projection that is not a valid PUT body) together with
+  its `ETag`, and Save is the pane's own **`PUT /pipelines/{name}/graph`** with that ETag as **`If-Match`**
+  (STORE-CONFLICT-DETECTION-1: 409 on a concurrent edit); the save stays key-preserving and fail-closed.
+  New id: Save first runs the create route New pipeline uses (D5) — the space-convention scaffold via
+  `POST /config/write` (409 if the id was taken meanwhile ⇒ nothing else is written) and `POST /runs` to
+  register it — then the one graph `PUT`. The draft's tab survives a re-list although the id is not listed
+  yet. One draft at a time. ⚠ The preview's `integrity` list is ALWAYS empty for a pipeline —
+  `ComponentIntegrity` judges only dataset/query/widget/dashboard/reconciliation — so the editor shows a
+  pipeline draft's references as **not checked**, never as clean; Validate and the save gate judge them.
+  🔴 The bundle kind `authored-pipeline` reads/writes `PipelineStore` (`<root>/pipelines/`) server-side,
+  while this editor (and the UI's `loadAll`) work on the REGISTERED `*_pipeline.toon` — a backend export of a
+  registered-only pipeline reports it `missing`, and a write-through import lands in the authored store. The
+  draft path is unaffected (its Save is the editor's own route), but the seam is open.
 * ⛔ **No `enabled:false` stamp** — a Dataset/Widget/Dashboard has no inactive meaning; a stamped write-through
   would be visible, resolvable and counted while carrying a key nothing reads.
 
