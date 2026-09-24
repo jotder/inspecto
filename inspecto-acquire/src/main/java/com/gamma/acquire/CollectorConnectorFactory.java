@@ -43,4 +43,13 @@ public interface CollectorConnectorFactory {
     default ConnectionWorkbench workbench(ConnectionProfile profile) {
         return null;
     }
+
+    /**
+     * Refuse, with {@link IllegalArgumentException}, a {@code profile} this connector could never be built
+     * from — the checks its construction runs, without connecting. Called when a Connection is SAVED
+     * ({@code POST/PUT /connections}, bundle import), so an option the connector requires fails at the save
+     * instead of on the first cycle (`PROCESSOR-RELEASE-READINESS-1`, 2026-09-24). The default accepts.
+     */
+    default void validate(ConnectionProfile profile) {
+    }
 }

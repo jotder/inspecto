@@ -20,6 +20,21 @@ public final class CollectorConnectors {
 
     private CollectorConnectors() {}
 
+    /**
+     * Run {@link CollectorConnectorFactory#validate} of the factory serving {@code profile}'s connector, if one
+     * is on the classpath. {@code local} and a scheme no factory serves are not judged here: the first is
+     * built-in, and the second is the run's own "no source connector registered" refusal.
+     *
+     * @throws IllegalArgumentException when the factory refuses the profile
+     */
+    public static void validate(ConnectionProfile profile) {
+        String scheme = profile.connector();
+        if (scheme == null || scheme.isBlank() || scheme.equalsIgnoreCase("local")) return;
+        for (CollectorConnectorFactory f : ServiceLoader.load(CollectorConnectorFactory.class)) {
+            if (f.scheme().equalsIgnoreCase(scheme)) { f.validate(profile); return; }
+        }
+    }
+
     public static CollectorConnector forConfig(PipelineConfig cfg) {
         if (!isRemote(cfg)) return localForConfig(cfg);
         String scheme = cfg.collector().connector();

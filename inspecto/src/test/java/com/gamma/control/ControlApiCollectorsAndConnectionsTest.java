@@ -142,6 +142,28 @@ class ControlApiCollectorsAndConnectionsTest {
             """.formatted(id, host);
     }
 
+    /**
+     * The connector's own option checks run at the SAVE (`PROCESSOR-RELEASE-READINESS-1`, 2026-09-24): a
+     * {@code db} Connection without {@code options.query} used to save 200 and fail on the first cycle. The
+     * test factory {@code faketest} refuses on a {@code fake_refuse} option, standing in for the db factory's
+     * checks (those are pinned in inspecto-connectors, {@code DbExportConnectorFactoryValidateTest}).
+     */
+    @Test
+    void aConnectionItsConnectorRefusesIs422AtTheSaveAndNotWritten(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c.port, "POST", "/connections", """
+                {"id":"bad","connector":"faketest","host":"h","options":{"fake_refuse":"needs options.query"}}
+                """);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("needs options.query"), "the connector's reason is returned: " + r.body());
+            assertFalse(Files.exists(root.resolve("bad_connection.toon")), "a refused profile is never written");
+            assertEquals(200, send(c.port, "POST", "/connections", """
+                {"id":"good","connector":"faketest","host":"h"}
+                """).statusCode(), "the same connector, nothing to refuse, saves");
+        }
+    }
+
     @Test
     void crudRoundTripPreservesMaskedSecret(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

@@ -30,6 +30,13 @@ public final class DbExportConnectorFactory implements CollectorConnectorFactory
         return new DbExportConnector(profile);
     }
 
+    /** The constructor's option checks (query, export_name, a :watermark placeholder for watermark_column) —
+     *  it reads options only and opens nothing. */
+    @Override
+    public void validate(ConnectionProfile profile) {
+        new DbExportConnector(profile);
+    }
+
     @Override
     public ConnectionWorkbench workbench(ConnectionProfile profile) {
         return new DbConnectionWorkbench(profile);

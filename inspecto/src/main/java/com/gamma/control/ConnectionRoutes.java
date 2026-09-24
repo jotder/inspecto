@@ -285,6 +285,11 @@ final class ConnectionRoutes implements RouteModule {
     /** Encode the profile as a {@code connection { … }} TOON doc, write it atomically under the write root and
      *  hot-register it on the live service. Package-private — shared with {@link BundleRoutes}. */
     static void persistConnection(ApiContext api, ConnectionProfile p) throws IOException {
+        try {
+            com.gamma.acquire.CollectorConnectors.validate(p);   // the connector's own option checks, at the save
+        } catch (IllegalArgumentException refused) {
+            throw new ApiException(422, refused.getMessage());
+        }
         Path target = connectionFile(api, p.id());
         byte[] bytes = ConfigCodec.toToon(Map.of("connection", connectionDoc(p))).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".conn-");

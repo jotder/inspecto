@@ -631,19 +631,53 @@ lift/lower code that home names, and the runtime steps→graph seam — the
 four registrations [catalog-vs-executors](../engine/catalog-vs-executors.md) names). The board's
 edition cells and the two Enterprise-only rows live in `tools/render-processor-board.mjs`.
 
-⚠ **"Delivered" is not yet "releasable"** (`PROCESSOR-RELEASE-READINESS-1`, audit 2026-09-23, awaiting
-operator sign-off on the bar). The 37 delivered processors were measured against a draft 7-point bar
-(documented · real-path test · workbench preview/lift/lower · UI palette · edition gating · fails clearly at
-save · demo); ~22 pass nearly all. Gap groups include catalog↔docs drift (✅ fixed 2026-09-23, G1:
-`parser.asn1.ber` now maps onto the `parser.asn1` node type and is addable from the palette — it was a
-*capability* mapping, so the canvas drew it inactive; every count on this page now carries a
-`<!--count:…-->` marker derived from the contract, and Part B's rows agree with it), graph save and config write running different gates, step config errors surfacing only at run (✅ fixed
-2026-09-23, G4 — see [config safety](../config/config-safety.md#step-config-checks-g4)),
-and edition gating that differs from `EDITIONS.md`. (G8, the dry-run blind spots, is closed: an enrichment
-node is now named in a warning rather than skipped silently — see
-[pipeline test run](../engine/pipeline-test-run.md).)
-Questionably delivered: `schema.drift`, circuit breaker/throttle, `constraint.check`/`alert.dispatch`/
-`sink.quarantine`, `sink.archive`, `db.jdbc`.
+✅ **"Delivered" now means "releasable" — the bar is adopted** (`PROCESSOR-RELEASE-READINESS-1`; audit
+2026-09-23, operator sign-off 2026-09-24). A DELIVERED processor meets seven points: **(1) documented** — its
+keys and behaviour on this page or the concept it links · **(2) real-path test** — a test drives the real
+engine path and asserts the written output · **(3) workbench preview / lift / lower** — it is on the canvas,
+its config survives the graph save, and the dry run shows (or honestly refuses) it · **(4) UI palette** —
+the palette offers it, or renders it inactive saying why · **(5) edition gating** — the build flavours ship
+it where `EDITIONS.md` says (G9, judged separately) · **(6) fails clearly at save** — a bad value is refused
+or warned at the save, not at load or run · **(7) demo** — a runnable `inspecto/examples/…` config or a
+committed Space config, or, where infrastructure is unavoidable, an `examples/_reference/…` template held
+true by `ShippedExamplesPassTheSaveGateTest`. A processor that cannot meet a point is **PARTIAL**, not
+DELIVERED with a footnote. Earlier gap groups G1, G3–G8 and G11 closed 2026-09-23 (catalog↔docs drift, one
+`SaveGate`, save-time step checks — [config safety](../config/config-safety.md#step-config-checks-g4) —,
+dry-run blind spots — [pipeline test run](../engine/pipeline-test-run.md)).
+
+**Verdicts on the seven "questionably delivered" (2026-09-24).** ✓ met · ✗ not met · — no keys to get wrong ·
+G9 = edition gating, still open as its own item (see *Edition notes* below).
+
+| Processor | 1 doc | 2 test | 3 workbench | 4 palette | 5 edition | 6 save | 7 demo | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| `quality.schema.drift` | ✓ row below | ✓ `SchemaDriftIngestTest`, `SchemaDriftTest` | ✓ rides the parse node; the parse pane's drift check | ✓ inactive, "delivered as parser" (like `quality.schema.validator`) | G9 | — | ✓ `03-schema-transform/schema-drift` | **PASS** — detection only IS the promise (a refusal knob was refused 2026-09-10) |
+| `control.throttle` | ✓ Collect table (`fetch.rate_limit` + `processing.intake`) | ✓ `RateLimiterTest`, `CollectorProcessorRemoteCycleTest`, `CollectorProcessorAdmissionCapTest` | ✓ acquisition form; round trip in `NodeConfigNameContractTest` | ✓ addable | G9 | ✓ rate grammar 422; inert on a local inbox warned | ✓ `05-acquisition/intake-throttle` · `_reference/sftp-collector` | **PASS** — `RATE-LIMIT-OVERSIZE-HANGS-1` fixed 2026-09-24 |
+| `control.circuitbreaker` | ✓ Collect table | ✓ `CollectorProcessorRemoteCycleTest` (trips, skips while OPEN, half-open closes) | ✓ acquisition form; round trip | ✓ addable | G9 | ✓ durations/counts 422; inert on local warned | ✓ `_reference/sftp-collector`, `_reference/db-export` | **PASS** — ⚠ there is no *fallback*: a tripped breaker skips the cycle, it switches to nothing |
+| `sink.archive` | ✓ Collect table (`post_action`) + [backup tasks](../control-plane/jobs.md) | ✓ MOVE in `CollectorProcessorRemoteCycleTest`; `BackupTaskTest` | ✓ acquisition form; a dry run never applies a post-action | ✓ addable | G9 | ✓ unknown `on_success` 422; MOVE with no `archive_path` refused | ✓ `_reference/sftp-collector` | **PASS** — originals are moved (local: `dirs.backup`; remote: `post_action: MOVE`), and the `backup`/`backup_verify` tasks zip them with SHA-256 manifests |
+| `acquisition.db.jdbc` | ✓ Collect table (`db` options) | ✓ exact sink rows (`CollectorProcessorRemoteCycleTest`, `DbExportConnectorTest`) | ✓ acquisition node | ✓ addable | G9 | ✓ connector option checks | ✓ `_reference/db-export` | **PASS** |
+| `quality.constraint.check` | ✓ [section above](#qualityconstraintcheck--expectations) | ✓ `ControlApiExpectationTest` | ✗ authored in the Expectations pane, never on the canvas | ✓ inactive | G9 | ✓ 422 on a bad body | ✓ `spaces/demo` Expectations | **PARTIAL** — not a Step |
+| `control.alert.dispatch` | ✓ [section above](#controlalertdispatch--alert-rules) | ✓ `AlertServiceTest`, `ControlApiAlertRuleWriteTest` | ✗ authored in the Alert Rules pane, never on the canvas | ✓ inactive | G9 | ✓ 422 on a bad body | ✓ `spaces/demo` Alert Rules | **PARTIAL** — not a Step |
+| `sink.quarantine` | ✓ [section above](#sinkquarantine--the-quarantine-directory-and-the-reject-log) | ✓ `ControlApiRejectedRowsTest`, the ingester reject tests | ✗ always on; a node is lifted only for selector / segments pipelines | ✓ inactive | G9 | — | ✓ `03-schema-transform/reject-routing` | **PARTIAL** — not a Step you add |
+
+The three PARTIALs are a *category* verdict, not a quality one: each is a working capability, and Part B's
+own definition of partial is "something real behind it, but not as a chain Step" — the reason
+`transform.diff.compare` and `sink.notify.email` were already partial. Nothing became less addable: all three
+were inactive in the palette before. Save-time checks added for the Collector keys:
+[config safety § Collector checks](../config/config-safety.md#collector-checks--throttle-breaker-archive-2026-09-24).
+
+**G10 — demos (2026-09-24).** Every DELIVERED processor now has one. Added: `07-steps/profile`,
+`07-steps/dedup-window`, `03-schema-transform/schema-drift`, `05-acquisition/intake-throttle`, and the
+`_reference/` templates `sftp-collector` (also `acquisition.file.sftp`), `db-export`, `webhook-sink`
+(`sink.api.webhook`), `ducklake-sink` (`sink.ducklake`). `acquisition.dataset` is demoed by `spaces/demo`'s
+`orders_by_region_feed` (its unsafe id is `DEMO-DATASET-FEED-UNSAFE-ID-1`); `enrichment.reference` by
+`spaces/demo`'s `orders_daily_enrich`.
+
+**Edition notes (G9, observed, not changed here).** Three cells disagree with the code: `control.alert.dispatch`
+is "not for Personal" on the board, but `AlertService` (inspecto-engine) and `AlertRoutes` (core) ship in
+every flavour; `sink.archive` is "not for Personal", but `post_action` and the `dirs.backup` move are core
+engine code — only the `backup` tasks (`inspecto-backup`) are Professional+; `sink.ducklake` says
+Professional+ in its note while its board cells are ✅ in all three editions and `DuckLakeRegistrar` is in
+inspecto-etl (the PostgreSQL sidecar is the practical gate, not the build).
 
 ✅ **Gap G7 (at-rest real-path tests) closed 2026-09-23.** `PipelineJobRunnerTest` now runs a flat file's
 `profile` step, its `lookup` step and a `webhook:` branch end to end through the job lane and asserts
@@ -777,7 +811,7 @@ file to `archive/archive/…`).
 | Inline stream profiler & statistics | `quality.profiler.inline` | `transform.profile` — per-column row/null/distinct counts and min/max, as a Step (2026-09-15) |
 | Sliding time-window deduplicator | `quality.dedup.windowed` | `transform.dedup` — D-9: `scope: window(P4D)` + the durable dedup ledger |
 | File-grain duplicate guard (path / checksum / metadata / marker) | `quality.dedup.file` | `acquisition` — Collector `duplicate:` policy + marker dedup — a Guarantee, rides the Collector |
-| Schema drift & new-field detector | `quality.schema.drift` | `parser` — ⚠ **Status under review** (`PROCESSOR-RELEASE-READINESS-1`): the contract says DELIVERED and this page follows it; whether a detection-only detector counts as delivered is an open operator question — until it is answered, change the status in `ProcessorCatalog.java`, never here. ✅ **SHIPPED 2026-09-10.** `SchemaDrift.detect` reads each header-bearing delimited member's header once per batch (`CsvIngestStrategy`, above the lane dispatch, so the native and Java lanes agree) and diffs it against `raw.fields[]`: **width always** (fewer than `maxSelector+1` = rejected rows; more than declared + `skip_tail_columns` = a new field), **names only when the schema was authored from the header** (≥1 declared name occurs in it, case-insensitive — a positional lane may name `customer_id` for "Customer ID", and diffing those would flag every file forever). Detection only: the parse runs unchanged and the REPORT is one `quality.schema_drift` WARN Signal per batch (`SchemaDriftSignal`, `correlationId = batchId`, payload `files[]{file, declaredWidth, observedWidth, observed, added, missing, namesCompared}`), so triage/RCA show it beside the batch's own `pipeline.batch.committed` with no UI change. ⛔ No refusal policy — a detector that cannot see (`has_header: false`, unreadable header) says nothing; a "refuse on new field" knob was put to the operator 2026-09-10 and **refused: detection only** (`BACKLOG.md` §6). |
+| Schema drift & new-field detector | `quality.schema.drift` | `parser` — ✅ **Release-ready** (`PROCESSOR-RELEASE-READINESS-1`, 2026-09-24: passes the bar; detection only is the promise, not a gap). ✅ **SHIPPED 2026-09-10.** `SchemaDrift.detect` reads each header-bearing delimited member's header once per batch (`CsvIngestStrategy`, above the lane dispatch, so the native and Java lanes agree) and diffs it against `raw.fields[]`: **width always** (fewer than `maxSelector+1` = rejected rows; more than declared + `skip_tail_columns` = a new field), **names only when the schema was authored from the header** (≥1 declared name occurs in it, case-insensitive — a positional lane may name `customer_id` for "Customer ID", and diffing those would flag every file forever). Detection only: the parse runs unchanged and the REPORT is one `quality.schema_drift` WARN Signal per batch (`SchemaDriftSignal`, `correlationId = batchId`, payload `files[]{file, declaredWidth, observedWidth, observed, added, missing, namesCompared}`), so triage/RCA show it beside the batch's own `pipeline.batch.committed` with no UI change. ⛔ No refusal policy — a detector that cannot see (`has_header: false`, unreadable header) says nothing; a "refuse on new field" knob was put to the operator 2026-09-10 and **refused: detection only** (`BACKLOG.md` §6). |
 
 **Partial**
 

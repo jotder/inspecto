@@ -53,6 +53,13 @@ public final class FakeRemoteConnectorFactory implements CollectorConnectorFacto
 
     @Override public String scheme() { return "faketest"; }
 
+    /** Refuses a profile whose options carry {@code fake_refuse} — the save-time hook, driven by
+     *  {@code ControlApiCollectorsAndConnectionsTest}; every other profile is accepted as before. */
+    @Override public void validate(com.gamma.acquire.ConnectionProfile profile) {
+        String why = profile.options().get("fake_refuse");
+        if (why != null) throw new IllegalArgumentException("faketest connection '" + profile.id() + "': " + why);
+    }
+
     @Override public CollectorConnector create(PipelineConfig cfg) {
         String why = FAIL_CREATE.get();
         if (why != null) throw new IllegalArgumentException(why);
