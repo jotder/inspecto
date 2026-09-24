@@ -649,6 +649,11 @@ public final class InvRoutes implements RouteModule {
             String sql = edgeSql(ds, srcCol, tgtCol, null, attrs, "", filterSql);
             plan.add(new Mapping(false, ds, relationSql, guarded(sql, ds), ApiContext.str(m, "type"), null, attrs));
         }
+        // D-U7, judged on the WHOLE plan before any mapping runs (fail closed, whole call): `limit` applies per
+        // mapping, so the call reads up to limit × mappings rows, and one entity can take up to `limit` links from
+        // each edge mapping.
+        refuseIfSensitive(writeRoot, "a multi-Dataset projection (limit " + limit + " × " + plan.size()
+                + " mappings)", (long) limit * plan.size(), limit * edgeSpecs.size());
 
         List<Map<String, Object>> nodes = new ArrayList<>(), edges = new ArrayList<>(), mappings = new ArrayList<>();
         boolean truncated = false;
@@ -740,8 +745,9 @@ public final class InvRoutes implements RouteModule {
         // rendered BEFORE a single character of the statement is assembled below — an identifier the
         // relation does not have cannot reach SQL, because the render never happens.
         String filterSql = filterSql(body.get("filter"), datasetId, relationSql);
-        // D-U7: a one-hop read of one entity takes at most `limit` links from it — rows and fan-out alike.
-        if (neighborsOf != null) refuseIfSensitive(writeRoot, "a neighbours read (limit " + limit + ")", limit, limit);
+        // D-U7: either read returns at most `limit` links, so no entity can have more — rows and fan-out alike.
+        refuseIfSensitive(writeRoot, (neighborsOf != null ? "a neighbours read" : "a projection")
+                + " (limit " + limit + ")", limit, limit);
 
         // The value is bound, not interpolated: `Request` gained `binds` and `QueryExecutor` a
         // PreparedStatement branch, which retired this route's hand-rolled quote-doubling. Two `?` in
@@ -772,11 +778,11 @@ public final class InvRoutes implements RouteModule {
 
     /**
      * Four-eyes on the stateless reads (D-U7, operator 2026-09-24). An Investigation's sensitive {@code expand} waits
-     * as a pending request for a second person; {@code /inv/projection/neighbors} and
-     * {@code /inv/traversal/recursive-paths} have no Investigation to hold one, so — exactly as a template's
-     * sensitive step already is — a read above the Space's thresholds is REFUSED rather than run unapproved, and
-     * the refusal names where it can be approved. Without this, both routes read what a pending expand is being
-     * held back from reading. {@code rows} (the most rows the read can touch) is compared with
+     * as a pending request for a second person; {@code /inv/projection}, {@code /inv/projection/multi},
+     * {@code /inv/projection/neighbors} and {@code /inv/traversal/recursive-paths} have no Investigation to hold
+     * one, so — exactly as a template's sensitive step already is — a read above the Space's thresholds is REFUSED
+     * rather than run unapproved, and the refusal names where it can be approved. Without this, these routes read
+     * what a pending expand is being held back from reading. {@code rows} (the most rows the read can touch) is compared with
      * {@code four_eyes_budget_above}; {@code fanOut} (the most links taken from any one entity) with
      * {@code four_eyes_fan_out_above}. No threshold set — the shipped default — means no gate.
      */

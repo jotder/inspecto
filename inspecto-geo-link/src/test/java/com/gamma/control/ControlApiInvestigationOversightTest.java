@@ -433,4 +433,46 @@ class ControlApiInvestigationOversightTest {
             assertTrue(post(c, rp, traversal(2, 5)).get("paths").size() > 0);
         }
     }
+
+    private static String projection(int limit) {
+        return "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"limit\":" + limit + "}";
+    }
+
+    private static String multi(int limit, int edgeMappings) {
+        String edge = "{\"dataset\":\"calls_ds\",\"sourceColumn\":\"caller\",\"targetColumn\":\"callee\"}";
+        return "{\"limit\":" + limit + ",\"edges\":[" + String.join(",", java.util.Collections.nCopies(edgeMappings, edge))
+                + "]}";
+    }
+
+    @Test
+    void theWholeRelationProjectionsAreRefusedAboveTheFourEyesThresholdsToo(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        String pj = "/inv/projection", mp = "/inv/projection/multi";
+        try (Ctx c = open(cfg, root)) {
+            // No threshold (the shipped default): both run at the maximum limit.
+            assertEquals(3, post(c, pj, projection(20_000)).get("rows").size());
+            assertEquals(3, post(c, mp, multi(20_000, 1)).get("edges").size());
+
+            settings(c, "four_eyes_budget_above: 100\n");
+            HttpResponse<String> wide = send(c.port, "POST", pj, projection(101), null);
+            assertEquals(403, wide.statusCode(), wide.body());
+            assertTrue(wide.body().contains("four-eyes") && wide.body().contains("rows 101 > 100"), wide.body());
+            assertEquals(3, post(c, pj, projection(100)).get("rows").size(),
+                    "the same projection AT the threshold runs — the 403 above is the gate, not the body");
+            // `limit` is per mapping, so two mappings of 60 read up to 120 rows although each is under 100.
+            HttpResponse<String> two = send(c.port, "POST", mp, multi(60, 2), null);
+            assertEquals(403, two.statusCode(), two.body());
+            assertTrue(two.body().contains("rows 120 > 100"), two.body());
+            assertEquals(3, post(c, mp, multi(50, 2)).get("edges").size() / 2, "2 × 50 = 100 rows is not above 100");
+            // Fail closed, whole call: an absent Dataset is still a 404 before the gate is judged.
+            assertEquals(404, send(c.port, "POST", mp,
+                    multi(60, 2).replaceFirst("calls_ds", "nope"), null).statusCode());
+
+            settings(c, "four_eyes_fan_out_above: 5\n");
+            assertEquals(403, send(c.port, "POST", pj, projection(6), null).statusCode());
+            assertEquals(3, post(c, pj, projection(5)).get("rows").size());
+            assertEquals(403, send(c.port, "POST", mp, multi(3, 2), null).statusCode(), "3 links from each of 2 mappings");
+            assertEquals(3, post(c, mp, multi(5, 1)).get("edges").size());
+        }
+    }
 }

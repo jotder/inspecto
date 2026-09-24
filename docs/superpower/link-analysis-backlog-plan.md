@@ -561,9 +561,14 @@ Supersedes an earlier 2026-09-24 entry (819958848) recorded in a parallel sessio
   call reads nothing. ⚠ A traversal validates its columns against the relation first, so a bad column is still a
   422; the neighbours read only learns a column is unknown when its query runs, so above a threshold that call
   answers 403 instead. With no
-  threshold set, nothing changes. `/inv/projection` and `/inv/projection/multi` are **not** gated: they read a whole
-  relation rather than walking out from an entity, and the decision named only the two walking routes. Pinned by
-  `ControlApiInvestigationOversightTest.theStatelessReadsAreRefusedAboveTheFourEyesThresholdsBecauseNothingCouldApproveThem`.
+  threshold set, nothing changes. ✅ **Extended the same day (operator) to `/inv/projection` and
+  `/inv/projection/multi`**, which read a whole relation: a projection returns at most `limit` links, so rows =
+  fan-out = `limit`; `/multi`'s `limit` is **per mapping**, so rows = `limit × mappings` and fan-out =
+  `limit × edge mappings`, judged on the whole plan before any mapping runs (the call stays fail-closed as a
+  whole). ⚠ The default `limit` is 2 000, so a Space whose budget threshold is below that refuses the canvas's
+  initial load until the caller asks for a smaller `limit`. Pinned by
+  `ControlApiInvestigationOversightTest.theStatelessReadsAreRefusedAboveTheFourEyesThresholdsBecauseNothingCouldApproveThem`
+  and `…theWholeRelationProjectionsAreRefusedAboveTheFourEyesThresholdsToo`.
 * ✅ **D-U8 — DECIDED 2026-09-24 (operator): NO purge.** Deliberate: the store stays append-only evidence (D-S1/D-E2);
   no retention period, no purge task, no legal-hold record. No code.
 * 🟡 **D-U9 — PARTLY DECIDED 2026-09-24 (operator).** ✅ Annotation `confidence` is the **Admiralty grade** — the
