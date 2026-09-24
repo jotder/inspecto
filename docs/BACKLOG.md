@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **36<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 15<!--count:backlog-p3--> × P3** —
+> **37<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -25,8 +25,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 15<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 36<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 16<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 37<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -98,6 +98,7 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | Area | Row | The call |
 |---|---|---|
 | 3.2 | EXECUTION-RESIDUALS X1 | X1's §5 decisions in `superpower/retry-affordance-design.md` (X4's default was decided 2026-09-25 — see the row) |
+| 4 | `BUNDLE-DANGLING-LINKS-1` | fix the 56 source/compliance links in the docs, or neutralise that class at package time |
 | 4 | `REACTOR-VERDICT-CI-1` | wire `check-reactor-verdict.mjs` into `ci.yml` |
 | 3.12 | Link Analysis | every open D-U* / LA-* call lives in `superpower/link-analysis-backlog-plan.md` |
 | 3.1 | AI drafting on a non-`schema` kind | 6 calls in `superpower/ai-drafting-non-schema-design.md` (D1 decided 2026-09-25: **`transform`**) |
@@ -226,7 +227,7 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 #### API contract & vocabulary
 
-- **P3** · `ERRORCODE-DEFAULTED-1` — **explicit error codes on the remaining bare throw sites.** The 403 slice is done (zero bare 403 sites; `ErrorCodes` and its constants are public; `ApiContractTest` pins the catalog). **461 of 874 `ApiException` sites still take `ErrorCodes.defaultFor(status)`** (2026-09-25, after two slices — geo-link `InvestigationRoutes`/`InvRoutes` 107 sites, then `ReconRoutes` · `AgentRoutes` · `JobRoutes` · `RunRoutes` · `DossierRoutes` · `InvestigationTime` · `PatternQueryCompiler` 130 sites, all status defaults; three four-eyes 403s moved `PATH_JAIL_VIOLATION` → `PERMISSION_DENIED`) — sweep by file, re-deriving each count first (the row's original figures were wrong by ~3×). Swept 2026-09-24: `ComponentRoutes` 40 · `inspecto-ops/ObjectRoutes` 39 · `PipelineGraphRoutes` 33 · `ExchangeRoutes` 31 — zero bare sites left in each; codes are the status defaults except the ad-hoc-run 503 (now `CONTROL_PLANE_READ_ONLY`, the write-root gate it is) and the two run-to-here 501s (new `NOT_SUPPORTED`, also `defaultFor(501)` — it was `INTERNAL`). Largest remaining: `ConnectionRoutes` 21 · `ConfigPreviewRoutes` 21 · `PipelineBundleRoutes` 20 · `DbBrowserRoutes` 16 · `AccessRoutes` 16 · `TagRoutes` 14. Derive with `git grep -cP 'new ApiException\([^,()]+,(?!\s*(\w+\.)?[A-Z][A-Z_]+\s*,)' -- '*/src/main/**.java' | sort -t: -k2 -nr` (sum the counts; drop `-c` and pipe to `wc -l` for the total; all sites: `git grep -hPo 'new ApiException\(' -- '*/src/main/**.java' | wc -l`). ⚠ One site emits a code **outside the catalog**: `PipelineGraphRoutes` `new ApiException(422, PipelineValidator.JOIN_REFERENCE_MISSING, …)` — not in `ErrorCodes`, so not in the OpenAPI `ErrorCode` enum.
+- **P3** · `ERRORCODE-DEFAULTED-1` — **explicit error codes on the remaining bare throw sites.** The 403 slice is done (zero bare 403 sites; `ErrorCodes` and its constants are public; `ApiContractTest` pins the catalog). **353 of 874 `ApiException` sites still take `ErrorCodes.defaultFor(status)`** (2026-09-25, after three slices — geo-link `InvestigationRoutes`/`InvRoutes` 107 sites, then `ReconRoutes` · `AgentRoutes` · `JobRoutes` · `RunRoutes` · `DossierRoutes` · `InvestigationTime` · `PatternQueryCompiler` 130 sites, then `ConnectionRoutes` · `ConfigPreviewRoutes` · `PipelineBundleRoutes` · `AccessRoutes` · `DbBrowserRoutes` · `TagRoutes` 108 sites, all status defaults; three four-eyes 403s moved `PATH_JAIL_VIOLATION` → `PERMISSION_DENIED`) — sweep by file, re-deriving each count first (the row's original figures were wrong by ~3×). Swept 2026-09-24: `ComponentRoutes` 40 · `inspecto-ops/ObjectRoutes` 39 · `PipelineGraphRoutes` 33 · `ExchangeRoutes` 31 — zero bare sites left in each; codes are the status defaults except the ad-hoc-run 503 (now `CONTROL_PLANE_READ_ONLY`, the write-root gate it is) and the two run-to-here 501s (new `NOT_SUPPORTED`, also `defaultFor(501)` — it was `INTERNAL`). Largest remaining: `SpaceRoutes` 13 · `SchedulerRoutes` 13 · `Roles` 13 · `PipelineRenameRoutes` 13 · `ExpectationRoutes` 12 · `AccessPolicies` 12. Derive with `git grep -cP 'new ApiException\([^,()]+,(?!\s*(\w+\.)?[A-Z][A-Z_]+\s*,)' -- '*/src/main/**.java' | sort -t: -k2 -nr` (sum the counts; drop `-c` and pipe to `wc -l` for the total; all sites: `git grep -hPo 'new ApiException\(' -- '*/src/main/**.java' | wc -l`). ⚠ One site emits a code **outside the catalog**: `PipelineGraphRoutes` `new ApiException(422, PipelineValidator.JOIN_REFERENCE_MISSING, …)` — not in `ErrorCodes`, so not in the OpenAPI `ErrorCode` enum.
 
 ### 3.8 Security, Policy, Editions & Compliance
 
@@ -265,6 +266,7 @@ proofs live there, and nothing pending for it lives anywhere else. Geo map defer
 
 #### Release & CI
 
+- **P3** · `BUNDLE-DANGLING-LINKS-1` — **56 doc links still dangle in the shipped bundle, and the guard that counts them is kept out of CI.** The withheld-doc links are rewritten at package time (`tools/bundle-doc-rewrite.mjs`, shared with the guard since 2026-09-24); what survives is one class: source-code citations (38 in `okf/backend/engine/db-layer.md`), `../compliance/…` links (5 in `INDEX.md`) and 2 in `inspecto/README.md` pointing above the bundle root. ⚠ The row was struck 2026-09-16 and this residual lived only in `okf/backend/build-run/build-test.md` — re-listed 2026-09-25. **Operator's call:** fix the docs, or neutralise that class at package time too; then wire `check-bundle-doc-links.mjs` into CI. → `okf/backend/build-run/build-test.md`
 - **P3** · `REACTOR-VERDICT-CI-1` — **wire `check-reactor-verdict.mjs` into `ci.yml`** (residual of `REACTOR-HALT-IS-A-SILENT-PASS-1`). ⛔ **Not pre-push**, deliberately: every other hook guard is a ~1 s repo-state check, and this one judges a BUILD — producing a log at push time means a 20-minute reactor per push. CI already runs a full reactor, so the log is free there. Operator's call to wire. → `okf/backend/build-run/build-test.md`
 
 #### Test infrastructure
