@@ -46,6 +46,12 @@ every pipeline as blocked.
 - **Reference** (`produces: reference` written at create): Collection → Parsing → **Keys & Load**
   (the SAME schema pane, plus an honest full-replace load-policy note) → **Publish** (bindable-by-name
   note `ref: <normalized-id>`).
+  ⚠ The versioned-store options `reference.delete` (delete-feed marker, D5-ref) and `reference.order_by`
+  (within-batch tie-break, D6-ref), shipped 2026-09-25, have **no UI surface** — hand-authored TOON only
+  (backend: [onboarding-authoring](../../backend/control-plane/onboarding-authoring.md)). 🔴 The pipeline
+  **Settings** dialog rebuilds the `reference` block from `load`/`key`/`refresh_seconds` and the route
+  replaces it wholesale, so saving Settings on such a pipeline **drops both keys** until the dialog
+  carries the unmodelled keys through.
 
 Per-stage readiness chips are **computed from the config blocks on every read** (Not configured /
 Configured / Validated — Validated is session-only, from a passed sample test); lifecycle badge =

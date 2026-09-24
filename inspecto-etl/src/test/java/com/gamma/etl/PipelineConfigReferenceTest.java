@@ -99,6 +99,98 @@ class PipelineConfigReferenceTest {
         assertTrue(ex.getMessage().contains("load"), ex.getMessage());
     }
 
+    // ── D5-ref delete marker + D6-ref order_by ───────────────────────────────────────
+
+    @Test
+    void absentDeleteAndOrderByParseAsNone() throws Exception {
+        PipelineConfig cfg = PipelineConfig.fromMap(minimal(Map.of("load", "upsert", "key", List.of("id"))));
+        assertNull(cfg.reference().delete());
+        assertNull(cfg.reference().orderBy());
+    }
+
+    @Test
+    void deleteMarkerAndOrderByParse() throws Exception {
+        PipelineConfig cfg = PipelineConfig.fromMap(minimal(Map.of("load", "upsert", "key", List.of("id"),
+                "delete", Map.of("column", "op", "values", List.of("D", "X")),
+                "order_by", "updated_at")));
+        assertEquals("op", cfg.reference().delete().column());
+        assertEquals(List.of("D", "X"), cfg.reference().delete().values());
+        assertEquals("updated_at", cfg.reference().orderBy());
+    }
+
+    @Test
+    void deleteColumnWithoutValuesIsRejected() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> PipelineConfig.fromMap(minimal(Map.of("load", "upsert", "key", List.of("id"),
+                        "delete", Map.of("column", "op")))));
+        assertTrue(ex.getMessage().contains("reference.delete"), ex.getMessage());
+    }
+
+    @Test
+    void deleteValuesWithoutColumnIsRejected() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> PipelineConfig.fromMap(minimal(Map.of("load", "upsert", "key", List.of("id"),
+                        "delete", Map.of("values", List.of("D"))))));
+        assertTrue(ex.getMessage().contains("reference.delete"), ex.getMessage());
+    }
+
+    @Test
+    void deleteOnAReplaceLoadIsRejected() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> PipelineConfig.fromMap(minimal(Map.of(
+                        "delete", Map.of("column", "op", "values", List.of("D"))))));
+        assertTrue(ex.getMessage().contains("upsert"), ex.getMessage());
+    }
+
+    @Test
+    void orderByOnAReplaceLoadIsRejected() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> PipelineConfig.fromMap(minimal(Map.of("load", "replace", "order_by", "updated_at"))));
+        assertTrue(ex.getMessage().contains("order_by"), ex.getMessage());
+    }
+
+    @Test
+    void deleteColumnThatIsAKeyColumnIsRejected() {
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> PipelineConfig.fromMap(minimal(Map.of("load", "upsert", "key", List.of("id", "op"),
+                        "delete", Map.of("column", "op", "values", List.of("D"))))));
+        assertTrue(ex.getMessage().contains("key"), ex.getMessage());
+    }
+
+    @Test
+    void deleteAndOrderByColumnsMustExistInTheSchema(@TempDir Path dir) throws Exception {
+        PipelineConfig ok = loadWithSchema(dir, """
+                reference:
+                  load: upsert
+                  key[1]: ID
+                  order_by: EVENT_DATE
+                  delete:
+                    column: AMT
+                    values[1]: "0"
+                """);
+        assertEquals("AMT", ok.reference().delete().column());
+        assertEquals("EVENT_DATE", ok.reference().orderBy());
+
+        IllegalArgumentException badDelete = assertThrows(IllegalArgumentException.class,
+                () -> loadWithSchema(dir, """
+                        reference:
+                          load: upsert
+                          key[1]: ID
+                          delete:
+                            column: OP
+                            values[1]: D
+                        """));
+        assertTrue(badDelete.getMessage().contains("OP"), badDelete.getMessage());
+        IllegalArgumentException badOrder = assertThrows(IllegalArgumentException.class,
+                () -> loadWithSchema(dir, """
+                        reference:
+                          load: upsert
+                          key[1]: ID
+                          order_by: TS
+                        """));
+        assertTrue(badOrder.getMessage().contains("TS"), badOrder.getMessage());
+    }
+
     @Test
     void negativeRefreshSecondsClampsToZero() throws Exception {
         PipelineConfig cfg = PipelineConfig.fromMap(minimal(Map.of("load", "replace", "refresh_seconds", -5)));

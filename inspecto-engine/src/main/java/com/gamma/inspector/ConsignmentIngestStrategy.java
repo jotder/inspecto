@@ -308,7 +308,7 @@ interface ConsignmentIngestStrategy {
 
         if (cfg.producesReference() && cfg.reference().load().versionedStore()) {
             String versioned = "__ref_versioned";
-            stampReferenceVersions(conn, writeTable, versioned, cfg.reference().key(), batchId,
+            stampReferenceVersions(conn, writeTable, versioned, cfg.reference(), batchId,
                     existingStoreReader(dbDir, cfg.output().format()));
             writeTable = versioned;
             writeBase = baseName + "__v_" + batchId;   // batch-unique ⇒ append, never overwrite
@@ -397,7 +397,7 @@ interface ConsignmentIngestStrategy {
                 throw new IllegalStateException("a versioned reference store cannot be written per route branch — "
                         + "one version history is ill-defined across branches (same rule as sinks:>1 at prepare())");
             String versioned = "__ref_versioned";
-            stampReferenceVersions(conn, table, versioned, cfg.reference().key(), batchId,
+            stampReferenceVersions(conn, table, versioned, cfg.reference(), batchId,
                     existingStoreReader(dbDir, cfg.output().format()));
             seedTable = versioned;
             writeBase = baseName + "__v_" + batchId;   // batch-unique ⇒ append, never overwrite
@@ -601,45 +601,75 @@ interface ConsignmentIngestStrategy {
      * from {@code src} with the reference system columns appended and within-batch key duplicates
      * folded out. Each surviving row carries {@code __key_hash} (canonical hash of the declared
      * {@code reference.key} columns), {@code __row_hash} (canonical hash of the whole payload),
-     * {@code __valid_from} (load instant), {@code __op} ({@code 'upsert'} on the ingest path —
-     * {@code 'delete'} tombstones are honoured by the read-side views but are not produced here) and
-     * {@code __batch_id}. The lineage tag {@code __src_id} is kept so {@link PartitionWriter}'s default
+     * {@code __valid_from} (load instant), {@code __op} ({@code 'upsert'}, or {@code 'delete'} for a row
+     * whose {@code reference.delete} marker matches — D5-ref; the marker column is excluded from the
+     * output and from {@code __row_hash}) and {@code __batch_id}. The lineage tag {@code __src_id} is kept so {@link PartitionWriter}'s default
      * exclude and {@link LineageCollector} keep working unchanged — but it is excluded from
      * {@code __row_hash}, since it is per-batch bookkeeping and would make every re-delivery look changed.
      *
      * <p>Within-batch dedup keeps one row per {@code __key_hash} ({@code QUALIFY row_number() = 1}); a
-     * batch that delivers the same key twice writes a single version. The winner is arbitrary
-     * (no {@code order_by} column yet — the plan's optional latest-by-column is a later refinement).
+     * batch that delivers the same key twice writes a single version. With {@code reference.order_by}
+     * (D6-ref) the winner is the row with the greatest order_by value, deletes included; without it
+     * the winner is arbitrary.
      *
      * <p><b>P2 unchanged-row skip:</b> when {@code existingStoreReader} is non-null (the store already
      * has files), a row whose {@code (__key_hash, __row_hash)} equals its key's <em>current</em> version
      * in that store writes no new version — a re-delivered identical dimension row does not grow the
      * history. A changed payload, a new key, and a key whose current version is a tombstone all still
-     * append.
+     * append. A delete appends only when its key has a live version (with no store yet, never).
      */
     static void stampReferenceVersions(Connection conn, String src, String dst,
-                                       List<String> keyCols, String batchId,
+                                       PipelineConfig.Reference ref, String batchId,
                                        String existingStoreReader) throws SQLException {
-        if (keyCols == null || keyCols.isEmpty())
+        List<String> keyCols = ref.key();
+        if (keyCols.isEmpty())
             throw new IllegalStateException(
                     "reference load 'upsert'/'scd2' requires a non-empty reference.key (config validation "
                     + "should have rejected this pipeline before execution)");
         String keyHash = md5Of(keyCols);
-        String rowHash = md5Of(payloadColumns(conn, src));
-        String staged = "SELECT *, " + keyHash + " AS __key_hash, " + rowHash + " AS __row_hash, "
+        // D5-ref: the delete marker decides __op and is then dropped — it is feed bookkeeping, not data,
+        // so it is neither persisted nor hashed (an 'U'→'D' flip must not read as a changed payload).
+        PipelineConfig.Reference.Delete del = ref.delete();
+        List<String> payload = payloadColumns(conn, src);
+        String opExpr = "'upsert'";
+        String star = "*";
+        if (del != null) {
+            payload.removeIf(c -> c.equalsIgnoreCase(del.column()));
+            StringBuilder in = new StringBuilder();
+            for (String v : del.values())
+                in.append(in.isEmpty() ? "" : ", ").append('\'').append(v.replace("'", "''")).append('\'');
+            opExpr = "CASE WHEN CAST(" + SqlIdent.q(del.column()) + " AS VARCHAR) IN (" + in
+                    + ") THEN 'delete' ELSE 'upsert' END";
+            star = "* EXCLUDE (" + SqlIdent.q(del.column()) + ")";
+        }
+        String rowHash = md5Of(payload);
+        // D6-ref: with order_by the within-batch winner per key is the greatest order_by value (NULLs lose),
+        // a tie goes to the delete, and the payload hash breaks any remaining tie — deterministic, never
+        // input-order dependent. Without order_by the winner stays arbitrary (the pre-D6 behaviour).
+        String order = ref.orderBy() == null ? ""
+                : " ORDER BY " + SqlIdent.q(ref.orderBy()) + " DESC NULLS LAST, (" + opExpr + ") = 'delete' DESC, "
+                        + rowHash;
+        String staged = "SELECT " + star + ", " + keyHash + " AS __key_hash, " + rowHash + " AS __row_hash, "
                 + "now()::TIMESTAMP AS __valid_from, "
-                + "'upsert' AS __op, "
+                + opExpr + " AS __op, "
                 + "'" + batchId.replace("'", "''") + "' AS __batch_id "
                 + "FROM \"" + src + "\" "
-                + "QUALIFY row_number() OVER (PARTITION BY " + keyHash + ") = 1";
+                + "QUALIFY row_number() OVER (PARTITION BY " + keyHash + order + ") = 1";
         String sql = "CREATE TABLE \"" + dst + "\" AS SELECT * FROM (" + staged + ") AS _staged";
-        if (existingStoreReader != null)
-            // Both are fixed-length md5 hex and never null, so the concatenation is unambiguous —
-            // and a scalar IN-list is portable where a row-constructor IN is not.
-            sql += " WHERE __key_hash || __row_hash NOT IN ("
-                    + "SELECT __key_hash || __row_hash FROM (SELECT * FROM " + existingStoreReader
+        if (existingStoreReader == null)
+            sql += " WHERE __op != 'delete'";   // an empty store has no live key for a delete to remove
+        else {
+            String live = "(SELECT * FROM " + existingStoreReader
                     + " QUALIFY row_number() OVER (PARTITION BY __key_hash ORDER BY __valid_from DESC) = 1"
-                    + ") WHERE __op != 'delete')";
+                    + ") AS _cur WHERE __op != 'delete'";
+            // Both are fixed-length md5 hex and never null, so the concatenation is unambiguous —
+            // and a scalar IN-list is portable where a row-constructor IN is not. An upsert skips when
+            // identical to its key's live version; a delete appends only when its key IS live (so a
+            // re-delivered delete feed, or a delete of a never-seen key, grows nothing).
+            sql += " WHERE (__op = 'upsert' AND __key_hash || __row_hash NOT IN ("
+                    + "SELECT __key_hash || __row_hash FROM " + live + "))"
+                    + " OR (__op = 'delete' AND __key_hash IN (SELECT __key_hash FROM " + live + "))";
+        }
         try (Statement st = conn.createStatement()) {
             st.execute("DROP TABLE IF EXISTS \"" + dst + "\"");
             st.execute(sql);

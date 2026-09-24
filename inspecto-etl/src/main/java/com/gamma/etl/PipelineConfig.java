@@ -955,15 +955,31 @@ public final class PipelineConfig {
      * @param load           {@link Load#REPLACE} (default) | {@link Load#UPSERT} | {@link Load#SCD2}
      * @param refreshSeconds {@code 0} = re-materialize on collect only (today); {@code >0} arms a
      *                       periodic compaction/re-materialize timer (Phase-3 — parsed/stored now)
+     * @param delete         D5-ref: the delete-feed marker ({@code reference.delete}), or {@code null} —
+     *                       a row whose marker matches writes a {@code 'delete'} tombstone instead of an
+     *                       upsert; the marker column is never stored. upsert/scd2 only.
+     * @param orderBy        D6-ref: the within-batch tie-break column ({@code reference.order_by}), or
+     *                       {@code null} (arbitrary) — the greatest value wins per key, deletes included.
      */
     @PublicApi(since = "4.0.0")
-    public record Reference(List<String> key, Load load, int refreshSeconds) {
+    public record Reference(List<String> key, Load load, int refreshSeconds, Delete delete, String orderBy) {
         /** Full-replace, no key, no refresh timer — exactly the pre-Phase-2 behaviour. */
-        public static final Reference DEFAULT = new Reference(List.of(), Load.REPLACE, 0);
+        public static final Reference DEFAULT = new Reference(List.of(), Load.REPLACE, 0, null, null);
         public Reference {
             key = (key == null) ? List.of() : List.copyOf(key);
             if (load == null) load = Load.REPLACE;
             if (refreshSeconds < 0) refreshSeconds = 0;
+            if (orderBy != null && orderBy.isBlank()) orderBy = null;
+        }
+
+        /**
+         * The delete-feed marker: rows whose {@code column}, read as text, equals one of {@code values}
+         * are deletes. Both are required (the parser and {@code ConfigSpecs.pipeline()} refuse either alone).
+         */
+        public record Delete(String column, List<String> values) {
+            public Delete {
+                values = List.copyOf(values);
+            }
         }
         /** Whether a periodic refresh/compaction timer should be armed (Phase-3). */
         public boolean refreshEnabled() { return refreshSeconds > 0; }

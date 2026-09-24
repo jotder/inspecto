@@ -165,6 +165,49 @@ class ControlApiPipelineSettingsTest {
         }
     }
 
+    /** D5-ref: a delete marker column with no value meaning delete is a 422, and nothing is written. */
+    @Test
+    void deleteMarkerWithoutValuesIsRefused() throws Exception {
+        Path root = Files.createTempDirectory("pipeline-settings-del-novalues");
+        try (Ctx c = open(root)) {
+            String reqBody = """
+                {"produces":"reference","reference":{"load":"upsert","key":["msisdn"],"delete":{"column":"op"}}}
+                """;
+            HttpResponse<String> r = post(c.port, "/pipelines/mini_etl/settings", reqBody);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("reference-delete-needs-column-and-values")
+                    || r.body().contains("reference.delete"), r.body());
+            Map<String, Object> onDisk = ConfigLoader.filesystem().decode(c.root.resolve("mini_pipeline.toon").toString());
+            assertNull(onDisk.get("reference"));
+        } finally {
+            deleteRecursive(root);
+        }
+    }
+
+    /** D5-ref/D6-ref on a replace load would be silently inert — refused. A valid pair on upsert saves. */
+    @Test
+    void deleteAndOrderByNeedAVersionedLoadAndSaveOnUpsert() throws Exception {
+        Path root = Files.createTempDirectory("pipeline-settings-del-order");
+        try (Ctx c = open(root)) {
+            HttpResponse<String> refused = post(c.port, "/pipelines/mini_etl/settings", """
+                {"produces":"reference","reference":{"load":"replace","order_by":"updated_at"}}
+                """);
+            assertEquals(422, refused.statusCode(), refused.body());
+
+            HttpResponse<String> ok = post(c.port, "/pipelines/mini_etl/settings", """
+                {"produces":"reference","reference":{"load":"upsert","key":["msisdn"],
+                 "delete":{"column":"op","values":["D"]},"order_by":"updated_at"}}
+                """);
+            assertEquals(200, ok.statusCode(), ok.body());
+            JsonNode reread = V1Body.of(get(c.port, "/pipelines/mini_etl/settings").body());
+            assertEquals("op", reread.get("reference").get("delete").get("column").asText());
+            assertEquals("D", reread.get("reference").get("delete").get("values").get(0).asText());
+            assertEquals("updated_at", reread.get("reference").get("order_by").asText());
+        } finally {
+            deleteRecursive(root);
+        }
+    }
+
     @Test
     void clearingAPreviouslySavedReferenceBlockRestoresTheDefault() throws Exception {
         Path root = Files.createTempDirectory("pipeline-settings-clear");

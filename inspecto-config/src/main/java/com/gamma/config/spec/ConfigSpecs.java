@@ -97,6 +97,15 @@ public final class ConfigSpecs {
                 FieldSpec.withDefault("reference.refresh_seconds", "Reference refresh seconds", FieldType.INT, 0,
                         "0 = re-materialize on collect only (today); >0 arms a periodic compaction/re-materialize "
                                 + "timer (Phase-3)."),
+                FieldSpec.of("reference.delete.column", "Delete marker column", FieldType.STRING,
+                        "upsert/scd2 only: the column of a delete-feed flagging a row as a delete (e.g. op). A row "
+                                + "whose marker is one of reference.delete.values removes its key instead of "
+                                + "upserting. The marker column itself is not stored."),
+                FieldSpec.of("reference.delete.values", "Delete marker values", FieldType.LIST,
+                        "The marker value(s) meaning delete (e.g. [D]); compared against the column's text form."),
+                FieldSpec.of("reference.order_by", "Reference order-by column", FieldType.STRING,
+                        "upsert/scd2 only: when one batch delivers a key more than once, the row with the greatest "
+                                + "value here wins (deletes included; a tie goes to the delete). Absent = arbitrary."),
                 FieldSpec.required("dirs.poll", "Poll directory", FieldType.FILEPATH,
                         "Directory watched for incoming files. All managed dirs must live outside it."),
                 FieldSpec.required("dirs.database", "Output database directory", FieldType.FILEPATH,
@@ -518,6 +527,42 @@ public final class ConfigSpecs {
                             }
                             return key != null && !key.toString().isBlank();
                         }),
+                // D5-ref / D6-ref (2026-09-25) — mirrored by PipelineConfigParser's reference block.
+                new CrossFieldRule(
+                        "reference-delete-needs-column-and-values",
+                        "reference.delete needs both a column and a non-empty values list (the marker value(s) "
+                                + "meaning delete).",
+                        Severity.ERROR,
+                        List.of("reference.delete.column", "reference.delete.values"),
+                        raw -> at(raw, "reference.delete") == null
+                                || (nonBlank(raw, "reference.delete.column")
+                                    && !textList(at(raw, "reference.delete.values")).isEmpty())),
+                new CrossFieldRule(
+                        "reference-delete-order-by-require-versioned-load",
+                        "reference.delete and reference.order_by apply only to reference.load=upsert|scd2 — on "
+                                + "replace they would be silently ignored.",
+                        Severity.ERROR,
+                        List.of("reference.load", "reference.delete", "reference.order_by"),
+                        raw -> (at(raw, "reference.delete") == null && !nonBlank(raw, "reference.order_by"))
+                                || isVersionedLoad(str(raw, "reference.load"))),
+                new CrossFieldRule(
+                        "reference-delete-column-not-a-key",
+                        "reference.delete.column may not be one of reference.key — the marker is dropped before "
+                                + "the key is hashed.",
+                        Severity.ERROR,
+                        List.of("reference.delete.column", "reference.key"),
+                        raw -> {
+                            String col = str(raw, "reference.delete.column");
+                            return col == null || col.isBlank()
+                                    || !textList(at(raw, "reference.key")).contains(col.trim());
+                        }),
+                new CrossFieldRule(
+                        "reference-delete-without-order-by",
+                        "reference.delete without reference.order_by: when one batch carries both an upsert and a "
+                                + "delete for the same key, which one wins is arbitrary.",
+                        Severity.WARNING,
+                        List.of("reference.delete", "reference.order_by"),
+                        raw -> at(raw, "reference.delete") == null || nonBlank(raw, "reference.order_by")),
                 new CrossFieldRule(
                         "threads-x-duckdb-threads-oversubscription",
                         "processing.threads × processing.duckdb_threads should not exceed available cores ("
@@ -760,7 +805,19 @@ public final class ConfigSpecs {
         return v != null && !v.isBlank();
     }
 
-    // ── expectation (ING-6) ──────────────────────────────────────────────────────
+    /** A list value (or a comma-separated scalar, as the pipeline parser reads it) as trimmed, non-blank strings. */
+    private static List<String> textList(Object v) {
+        if (v == null) return List.of();
+        List<?> items = v instanceof List<?> l ? l : List.of(v.toString().split(","));
+        return items.stream().map(o -> String.valueOf(o).trim()).filter(s -> !s.isEmpty()).toList();
+    }
+
+    /** {@code reference.load} names the append-only versioned store (upsert/scd2), not full-replace. */
+    private static boolean isVersionedLoad(String load) {
+        return load != null && (load.equalsIgnoreCase("upsert") || load.equalsIgnoreCase("scd2"));
+    }
+
+    // ── expectation (ING-6)──────────────────────────────────────────────────────
 
     /**
      * The authored data-quality {@code expectation} component evaluated by the Expectation engine.

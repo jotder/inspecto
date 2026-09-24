@@ -70,7 +70,7 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `active` | parser-only | the arming gate: poll cycle + `MultiCollectorProcessor`; manual trigger ignores it | editor lifecycle toggle / hand |
 | `template` | parser-only — **deliberate** (a lifecycle flag, kept out of schema forms; [pipeline-identity](../control-plane/pipeline-identity.md)) | parser refusal (`template`+`active`), `CollectorService.refuseIfTemplate`, `PipelineScheduler.selectDue` | written only by `save-as-template` |
 | `produces` | spec | catalog registration: `REFERENCE_DATASET` origin vs Stream | Settings dialog (`GET/POST /pipelines/{n}/settings`) |
-| `reference` | spec (`load`/`key`/`refresh_seconds`) | `ConsignmentIngestStrategy.stampReferenceVersions`, `EnrichmentEngine.versionedView`, `ReferenceCompactor`, `CollectorService.armReferenceRefresh` | Settings dialog |
+| `reference` | spec (`load`/`key`/`refresh_seconds`/`delete`/`order_by`) | `ConsignmentIngestStrategy.stampReferenceVersions`, `EnrichmentEngine.versionedView`, `ReferenceCompactor`, `CollectorService.armReferenceRefresh` | Settings dialog |
 | `stream` | spec | `MetadataGraphBuilder` Stream grouping | hand-authored (default = pipeline name) |
 | `dirs` | spec block (5 of 9 leaves — see census caveat) | `CollectorProcessor`; `dirs.backup` doubles as the park home (`StepDisableArming`) | create scaffold derives the convention set; hand after |
 | `collector` | spec block (a few leaves only — `collector.consignment.max_files`, and since 2026-09-23 `collector.fetch.rate_limit`, `collector.retry.*`, `collector.circuit_breaker.*`, and since 2026-09-24 `collector.post_action.*`; see the census caveat) | `parseCollector` → `Collector` → acquisition framework (connectors, stability gate, dedup ledger, gap detection, `connector: dataset`) | collector drawer (one component, one write route) |
@@ -286,8 +286,10 @@ against, round-tripped untouched.
 | `processing.unpack` | spec |
 | `produces` | spec |
 | `reference` | spec |
+| `reference.delete` | spec |
 | `reference.key` | spec |
 | `reference.load` | spec |
+| `reference.order_by` | spec |
 | `reference.refresh_seconds` | spec |
 | `route` | parser-only |
 | `sinks` | spec |

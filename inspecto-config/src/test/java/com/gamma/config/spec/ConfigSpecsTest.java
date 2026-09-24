@@ -309,6 +309,63 @@ class ConfigSpecsTest {
                 Map.of("reference", Map.of("load", "upsert", "key", List.of()))).isPresent());
     }
 
+    /** D5-ref: a delete marker is a column AND the value(s) meaning delete — one without the other is an ERROR. */
+    @Test
+    void referenceDeleteNeedsBothColumnAndValues() {
+        ConfigSpec p = ConfigSpecs.pipeline();
+        String id = "reference-delete-needs-column-and-values";
+        Map<String, Object> noValues = Map.of("reference", Map.of("load", "upsert", "key", List.of("id"),
+                "delete", Map.of("column", "op")));
+        assertEquals(Severity.ERROR, fire(p, id, noValues).orElseThrow().severity());
+        assertTrue(fire(p, id, Map.of("reference", Map.of("load", "upsert", "key", List.of("id"),
+                "delete", Map.of("column", "op", "values", List.of())))).isPresent(), "empty values list");
+        assertTrue(fire(p, id, Map.of("reference", Map.of("load", "upsert", "key", List.of("id"),
+                "delete", Map.of("values", List.of("D"))))).isPresent(), "values without a column");
+        assertTrue(fire(p, id, Map.of("reference", Map.of("load", "upsert", "key", List.of("id"),
+                "delete", Map.of("column", "op", "values", List.of("D"))))).isEmpty());
+        assertTrue(fire(p, id, Map.of()).isEmpty(), "absent delete block needs nothing");
+    }
+
+    /** D5-ref/D6-ref only mean something on the versioned store — on `replace` they would be silently inert. */
+    @Test
+    void referenceDeleteAndOrderByRequireAVersionedLoad() {
+        ConfigSpec p = ConfigSpecs.pipeline();
+        String id = "reference-delete-order-by-require-versioned-load";
+        Map<String, Object> del = Map.of("column", "op", "values", List.of("D"));
+        assertEquals(Severity.ERROR, fire(p, id, Map.of("reference", Map.of("delete", del))).orElseThrow().severity(),
+                "delete on an absent (replace) load");
+        assertTrue(fire(p, id, Map.of("reference", Map.of("load", "replace", "order_by", "updated_at"))).isPresent());
+        assertTrue(fire(p, id, Map.of("reference", Map.of("load", "upsert", "key", List.of("id"),
+                "delete", del, "order_by", "updated_at"))).isEmpty());
+        assertTrue(fire(p, id, Map.of("reference", Map.of("load", "scd2", "key", List.of("id"),
+                "order_by", "updated_at"))).isEmpty());
+        assertTrue(fire(p, id, Map.of("reference", Map.of("load", "replace"))).isEmpty());
+    }
+
+    /** The marker is dropped before hashing — a marker that is also a key column would change the key identity. */
+    @Test
+    void referenceDeleteColumnMayNotBeAKeyColumn() {
+        ConfigSpec p = ConfigSpecs.pipeline();
+        String id = "reference-delete-column-not-a-key";
+        assertEquals(Severity.ERROR, fire(p, id, Map.of("reference", Map.of("load", "upsert", "key", List.of("id", "op"),
+                "delete", Map.of("column", "op", "values", List.of("D"))))).orElseThrow().severity());
+        assertTrue(fire(p, id, Map.of("reference", Map.of("load", "upsert", "key", List.of("id"),
+                "delete", Map.of("column", "op", "values", List.of("D"))))).isEmpty());
+    }
+
+    /** A delete feed without order_by resolves a same-key upsert+delete pair in one batch arbitrarily — WARN. */
+    @Test
+    void referenceDeleteWithoutOrderByWarns() {
+        ConfigSpec p = ConfigSpecs.pipeline();
+        String id = "reference-delete-without-order-by";
+        Map<String, Object> del = Map.of("column", "op", "values", List.of("D"));
+        assertEquals(Severity.WARNING, fire(p, id, Map.of("reference", Map.of("load", "upsert", "key", List.of("id"),
+                "delete", del))).orElseThrow().severity());
+        assertTrue(fire(p, id, Map.of("reference", Map.of("load", "upsert", "key", List.of("id"),
+                "delete", del, "order_by", "updated_at"))).isEmpty());
+        assertTrue(fire(p, id, Map.of()).isEmpty());
+    }
+
     // ── enrichment + job rules ──────────────────────────────────────────────────
 
     @Test

@@ -351,7 +351,31 @@ final class PipelineConfigParser {
                                 + ": reference.key column '" + k + "' is not declared in the pipeline schema "
                                 + declaredColumns);
             }
-            b.reference = new Reference(key, load, refreshSeconds);
+            // D5-ref delete marker + D6-ref order_by — mirror ConfigSpecs' reference-delete-* rules.
+            Reference.Delete delete = null;
+            Map<String, Object> delBlock = castMapAt(refBlock, "delete");
+            if (delBlock != null) {
+                String column = trimToNull(delBlock.get("column"));
+                List<String> values = strList(delBlock.get("values"));
+                if (column == null || values.isEmpty())
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": reference.delete needs both a column and a non-empty values list "
+                            + "(the marker value(s) meaning delete)");
+                if (key.contains(column))
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": reference.delete.column '" + column + "' may not be a reference.key column");
+                delete = new Reference.Delete(column, values);
+            }
+            String orderBy = trimToNull(refBlock.get("order_by"));
+            if ((delete != null || orderBy != null) && !load.versionedStore())
+                throw new IllegalArgumentException("Config error in " + sourceLabel
+                        + ": reference.delete / reference.order_by apply only to reference.load upsert|scd2");
+            for (String c : java.util.Arrays.asList(delete == null ? null : delete.column(), orderBy))
+                if (c != null && !declaredColumns.isEmpty() && !declaredColumns.contains(c))
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": reference column '" + c + "' is not declared in the pipeline schema "
+                            + declaredColumns);
+            b.reference = new Reference(key, load, refreshSeconds, delete, orderBy);
         }
 
         // record-dedup keys are target (mapped) column names — validate like reference.key, here where

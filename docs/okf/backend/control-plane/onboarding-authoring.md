@@ -118,8 +118,9 @@ latest-version-wins**, the current view derived at read time. `load: replace` (d
   `cfg.producesReference() && cfg.reference().load()==UPSERT`, it materialises `__ref_versioned` from
   the `transformed` table with the §2.1 system columns appended — `__key_hash`
   (`md5(concat_ws(chr(31), COALESCE(CAST(key AS VARCHAR),'')…))`), `__valid_from` (`now()`), `__op`
-  (always `'upsert'` on the ingest path — see below), `__batch_id` — and folds within-batch key dupes
-  via `QUALIFY row_number() OVER (PARTITION BY <hash>) = 1` (tie-break arbitrary — D6). `__src_id` is
+  (`'upsert'`, or `'delete'` from a `reference.delete` marker — D5-ref, below), `__batch_id` — and folds
+  within-batch key dupes via `QUALIFY row_number() OVER (PARTITION BY <hash>) = 1` (tie-break arbitrary
+  unless `reference.order_by` is set — D6-ref, below). `__src_id` is
   kept so `PartitionWriter`'s default exclude + `LineageCollector` are unchanged. The write reveals
   under a **batch-unique file stem** (`<base>__v_<batchId>`) so versions accumulate instead of
   overwriting — append via unique filename, not a new writer mode.
@@ -128,9 +129,9 @@ latest-version-wins**, the current view derived at read time. `load: replace` (d
   row_number() OVER (PARTITION BY __key_hash ORDER BY __valid_from DESC)=1) WHERE __op != 'delete'` —
   latest version per key, tombstoned keys dropped, system columns stripped. `path:` refs and `replace`
   stores read verbatim (today's behaviour).
-- **Deferred:** how a `delete` tombstone *enters* the store on the ingest path is **not** built (D5) —
-  the ingest path always stamps `'upsert'`; the views merely honour a `delete` version if one exists.
-  Compaction + the `refresh_seconds` timer are still P3.
+- How a `delete` tombstone *enters* the store was deferred here (D5) and shipped 2026-09-25 as the
+  `reference.delete` marker column — see *D5-ref / D6-ref* below. Compaction + the `refresh_seconds`
+  timer are P3.
 - Tests: `ReferenceVersionStampTest` (stamp + within-batch dedup + unchanged-row skip) ·
   `ReferenceUpsertCurrentViewTest` (two batches — changed + unchanged + new key + delete tombstone →
   current view = expected).
@@ -210,6 +211,62 @@ P3 makes that derived view the *physical* truth — compaction output **is** the
   merges without dropping · idempotent second pass · **versions split across partitions** ·
   absent store · crash-heal · reachable as a `maintenance` task + dry-run-safe) ·
   `CollectorServicePipelineForgetTest.unregisterCancelsTheReferenceRefreshTimer`.
+
+### D5-ref / D6-ref — delete-feed marker + `order_by` tie-break (2026-09-25)
+
+Operator decision 2026-09-25: the real delete-feed carries a **marker column** (an op/deleted flag,
+e.g. `op='D'`), so a delete enters the store as a row of the ordinary feed — not a reserved system
+column and not a Decision Rule consequence. Both keys are optional and live in the `reference:` block;
+absent ⇒ byte-identical to P1/P2.
+
+```
+reference:
+  load: upsert
+  key[1]: customer_id
+  order_by: updated_at
+  delete:
+    column: op
+    values[1]: D
+```
+
+(`load` may be `upsert` or `scd2`; both keys are refused on `replace`. No `#` comments — TOON rejects them.)
+
+- **Write** (`ConsignmentIngestStrategy.stampReferenceVersions`, which now takes the whole
+  `PipelineConfig.Reference`): `__op = CASE WHEN CAST(<column> AS VARCHAR) IN (<values>) THEN 'delete'
+  ELSE 'upsert' END` — matched on the column's **text form**, exact and case-sensitive, so a BOOLEAN
+  `deleted` flag works with `values: [true]`; a NULL marker is an upsert. The marker column is then
+  **dropped** (`SELECT * EXCLUDE (<column>)`) and excluded from `__row_hash`: it is feed bookkeeping, so it
+  is never stored and a `U`→`D` flip never reads as a payload change.
+- **Which deletes append:** a delete writes a tombstone only when its key has a **live** version in the
+  store (the same current-view subquery the unchanged-row skip uses); a delete of a never-seen or
+  already-tombstoned key, and every delete in the store's first batch, appends nothing — a re-delivered
+  delete feed does not grow the history. ⚠ The P2 unchanged-row skip now applies to **upserts only**: a
+  delete row's payload is usually identical to the live version, and the skip would otherwise swallow it.
+  The read side (`EnrichmentEngine.versionedView`, `ReferenceCompactor`) needed no change — it already
+  honoured `__op = 'delete'`.
+- **`order_by` (D6-ref):** the within-batch `QUALIFY` window orders by `<order_by> DESC NULLS LAST`, then
+  **delete-first**, then `__row_hash` — the greatest value wins per key, a NULL never beats a value, a tie
+  goes to the delete, and any remaining tie is broken by payload hash, so the winner never depends on
+  input row order. Deletes participate: upsert@1 + delete@2 → tombstone; delete@1 + upsert@2 → the upsert.
+  Unlike the marker, the `order_by` column is ordinary payload and **is** persisted. It orders only
+  *within* a batch — across batches, `__valid_from` still decides.
+- **Validation (both paths, fail-closed):** `PipelineConfigParser` throws, and `ConfigSpecs.pipeline()`
+  declares `reference.delete.column` / `reference.delete.values` / `reference.order_by` plus four rules —
+  `reference-delete-needs-column-and-values` (ERROR: either alone), `reference-delete-order-by-require-versioned-load`
+  (ERROR: on `replace` they would be silently inert), `reference-delete-column-not-a-key` (ERROR: the
+  marker is dropped before hashing), `reference-delete-without-order-by` (WARNING: a same-key upsert+delete
+  pair in one batch resolves arbitrarily). The parser additionally checks both columns exist in the resolved
+  schema (skipped for a draft without one). `POST /pipelines/{name}/settings` answers **422** on the ERROR
+  rules (it runs the spec, not the parser). The generated accepted-names table in
+  [pipeline-config-keys](../pipeline-graph/pipeline-config-keys.md) gained `reference.delete` and
+  `reference.order_by`.
+- ⚠ **No UI surface.** Hand-authored only; and the Settings dialog rebuilds `reference` from
+  `load`/`key`/`refresh_seconds` while the route replaces the block wholesale, so a Settings save **drops**
+  both keys (see [onboarding](../../frontend/features/onboarding.md)).
+- Tests: `ReferenceVersionStampTest` (+5 — tombstone despite identical payload + marker not persisted/hashed ·
+  delete of a non-live key appends nothing · boolean marker · order_by row-order independence + NULL loses ·
+  deletes in the ordering + tie → delete) · `PipelineConfigReferenceTest` (+8) · `ConfigSpecsTest` (+4) ·
+  `ControlApiPipelineSettingsTest` (+2, the 422s and a round-trip).
 
 ## Engine fixes the live walks surfaced (apply beyond onboarding)
 
