@@ -136,6 +136,40 @@ the real ControlApi.
     which the code never did) — and the soft no-disposition prompt on resolve **only fires while
     `disposition` is a configured section**. `CASE_DISPOSITIONS` was removed from `mail-model.ts` — the
     ladder now lives in the backend default, which is its only home *(the offline mock backend was deleted 2026-08-31)*.
+* **Authoring UI — the *Findings fields* dialog (2026-09-25, BUILT; ⚠ ACCEPTANCE OWED).** Design + the ten
+  signed decisions: [`findings-spec-authoring-ui-design.md`](../../../superpower/findings-spec-authoring-ui-design.md).
+  A toolbar icon in the Cases pane (beside Case rules, D4) opens `FindingsSpecEditorDialog`
+  (`objects/findings-spec-editor.dialog.ts`) for the Case spec only (D2 — the dialog takes `data.objectType`, so
+  Incident is a one-line entry if a panel ever renders it). All rules live in the framework-free
+  `findings-spec-editor.model.ts`. As built:
+  * **Loads the effective spec** (`GET /findings/case`) plus the authored component (`GET
+    /components/findings-spec/case`, 404 ⇒ built-in) and badges **Built-in / Customised**. Saving the built-in
+    `POST`s the component; an authored one `PUT`s with `If-Match` (409 ⇒ "someone else changed these fields" +
+    Reload, never an overwrite). A 422 that gets past the client mirror shows verbatim. *Restore built-in* is a
+    `DELETE` behind a destructive confirm; *History* is the shared `ComponentHistoryDialog`.
+  * **Nothing technical on the default path:** five plain answer kinds (Choose one from a list · Short text ·
+    Long text · Number · Yes / No), keyed by `Record<AttributeType, …>` so a contract type added without a
+    plain label fails to compile; **Always shown / Under “More”** only (D5 — a stored `advanced` renders as a
+    third, kept-as-saved choice); *Must be filled in* separate from where it appears. Keys and choice values are
+    **derived from the label on first save and frozen after**; ID-style text / List of values / Suggested
+    values, `pattern`, and the stored key/values sit under a collapsed **Technical details** (D6).
+  * **"Show only when"** points at fields **above** only (the server accepts forward references — the picker
+    does not offer them), by local uid so a rename never breaks it; ⚠ **Number and List targets are not
+    offered**: the renderer compares with `===` and the server as text, so a numeric condition cannot be
+    authored to match on both sides. A Yes/No condition is written as a real boolean for the same reason.
+  * **Problems list** mirrors `FindingsSpec.fromMap` rule for rule in the field's label, and Save is disabled
+    while it is non-empty. **Removing** a saved field or choice warns generically that stored values stay but
+    stop showing (D7 — no count read); removing `impactAmount`/`recordsAffected` adds a Case-analytics warning.
+  * **Preview** is the real `<inspecto-schema-form>` over the draft, values carried across edits.
+  * **Gate:** Save / Add / Restore render only with `LensService.canManageIncidents()` (a new *identity*
+    capability, action node `incidents.manage` under Case Manager); everyone else sees the same screen
+    read-only. The components pane never lists the kind (D8).
+  * ⚠ **Not driven in a browser preview in the build shift** (`preview_start` serves the main checkout, and
+    the routes need a packaged `inspecto-ops`) — unit specs only (`findings-spec-editor.*.spec.ts`).
+  * 🔴 **ACCEPTANCE OWED (D10) — the BACKLOG row does NOT close on this build.** It closes on ONE think-aloud
+    session with a real Case-desk lead doing, unaided: T2 add a "Root cause category" dropdown · T6 show a
+    field only when Disposition = Recovered · T7 preview before saving · T5 remove a field. Record pass/fail per
+    task **here**, with the date and the lead's role. Not yet run.
 
 As-built designs (archived):
 [`incidents-mail-ui-design.md`](../../../archived-documents/plans-archive/incidents-mail-ui-design.md) ·

@@ -732,6 +732,13 @@ individually, tied back by a `SPLIT_FROM` trace link; the original keeps its rem
 also carries a **Team** (`assignees`, the lead stays `assignee`) and a loose-SLA **target date**
 (overdue hint only — no breach sweep, unlike the Incident's hard `dueAt` SLA).
 
+**Findings field** — One question the Findings panel asks (Disposition, Impact amount, a desk's own
+"Root cause category", …). A deployment's set of them is authored by the Case desk in the Cases
+pane's *Findings fields* dialog (D9, operator 2026-09-25). On the wire and in the stored
+`findings-spec` component a Findings field is a **`section`** — that word is the wire's only.
+⛔ never "section" or "question" in UI text; ⛔ never "finding" (singular) for it — a *finding* /
+`ConfigFinding` is a validator problem, which the dialog calls a **problem**.
+
 **Disposition** — The decided outcome a Case resolves with (built-in ladder: confirmed ·
 false-positive · recovered · written-off · inconclusive). ⛔ never "verdict/outcome" in UI text.
 

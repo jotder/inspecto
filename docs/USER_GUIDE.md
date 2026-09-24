@@ -256,6 +256,18 @@ narrative and resolution — useful when several Incidents turn out to be facets
 underlying problem. Cases and Incidents share the same working surface (the same mail-like three-pane
 pattern), just at different granularity.
 
+**Choosing what your team records when a Case closes** — Each Case has a **Findings** panel (Disposition,
+impact, summary, …). If you manage Incidents and Cases, you can change the questions it asks: in **Case
+Manager**, click the **Findings fields** icon in the toolbar. On the left is the list of fields; pick one to
+edit it in the middle, or **Add field**. For each field, give it a name, pick the kind of answer (for
+example *Choose one from a list*, then type the choices), choose whether it is **Always shown** or kept
+**Under “More”**, and whether it **Must be filled in**. **Show only when** makes a field appear only when
+an earlier field has a given answer — for example *Recovered amount* only when Disposition is *Recovered*.
+The **Preview** on the right is exactly what your team will see; try it before you save. Renaming a field
+is always safe. Removing a field or a choice keeps the answers Cases already recorded, but they stop
+showing. **Restore built-in** returns to the original fields, and the clock icon shows earlier versions.
+Without permission to manage Incidents and Cases, the same screen opens view-only.
+
 ---
 
 ## 4. Platform
