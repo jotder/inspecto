@@ -5264,6 +5264,19 @@
         "x-generated" : true
       }
     },
+    "/access/policies/preview" : {
+      "post" : {
+        "tags" : [ "access" ],
+        "summary" : "Impact matrix for an unsaved Access Policy draft",
+        "operationId" : "postAccessPoliciesPreview",
+        "description" : "Gated canConfigureAccess. Body {policies, route?} is validated exactly like PUT /access/policies (422 on the same checks). Returns {enabled, route, roles, actions, kinds, cells: [{role, action, resourceKind, before, beforePolicy, after, afterPolicy, changed}], warnings: [{policy, code, message}]} — every effective role as a synthetic subject (capabilities + role name, no id or claims) x read/write/operate, plus x each known resource kind a current or draft policy targets. Writes nothing. {enabled:false} without a policy engine (Personal/Professional). A POST, so the route PEP evaluates it as a write against the saved doc.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
     "/access/explain" : {
       "get" : {
         "tags" : [ "access" ],

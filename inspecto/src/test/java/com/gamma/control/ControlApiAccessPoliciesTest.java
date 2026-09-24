@@ -155,6 +155,18 @@ class ControlApiAccessPoliciesTest {
     }
 
     @Test
+    void previewValidatesTheDraftAndReportsDisabledWithoutAPolicyEngine(@TempDir Path dir) throws Exception {
+        // S4 on Personal: the draft still passes the PUT's 422 gate, but there is nothing to evaluate
+        try (Ctx c = open(dir, dir.resolve("cfg"))) {
+            assertEquals(422, send(c.port, "POST", "/access/policies/preview",
+                    "{\"policies\":[{\"name\":\"deny-all\",\"effect\":\"deny\"}]}").statusCode());
+            JsonNode r = json(send(c.port, "POST", "/access/policies/preview", "{\"policies\":[]}"));
+            assertFalse(r.get("enabled").asBoolean());
+            assertFalse(Files.exists(dir.resolve("cfg").resolve("access-policies.toon")), "a preview writes nothing");
+        }
+    }
+
+    @Test
     void unreadableOnDiskDocIsSurfacedFailClosed(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {

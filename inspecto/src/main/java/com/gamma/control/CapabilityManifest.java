@@ -51,6 +51,7 @@ final class CapabilityManifest {
             // AccessRoutes
             new Entry("PUT", "/access/roles", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/policies", Roles.CAN_CONFIGURE_ACCESS),
+            new Entry("POST", "/access/policies/preview", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/catalog", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/profiles/([^/]+)", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("DELETE", "/access/profiles/([^/]+)", Roles.CAN_CONFIGURE_ACCESS),

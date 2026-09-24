@@ -49,6 +49,12 @@ final class AccessRoutes implements RouteModule {
         api.get("/access/policies", (e, m) -> ETags.respond(e, policies(api, e)));
         api.put("/access/policies", ApiContext.withCapability("canConfigureAccess",
                 (e, m) -> savePolicies(api, e, api.body(e))));
+        // Impact matrix for an UNSAVED draft (policy-authoring S4). Read-shaped but a POST (the draft is a
+        // body), so ⚠ the route PEP evaluates it as a 'write' against the CURRENT doc: a subject that doc
+        // already denies cannot preview. Acceptable — PUT's would-lock-out guard (F7) keeps the in-product
+        // path from reaching that state — but it is why this is not the explain route's GET.
+        api.post("/access/policies/preview", ApiContext.withCapability("canConfigureAccess",
+                (e, m) -> previewPolicies(api, e, api.body(e))));
         // "Why denied?" dry-run for the caller's own session (BACKLOG §5). A GET (read action) on
         // purpose: it changes nothing, and a POST would be a 'write' the very policy under test could
         // deny at the route PEP — locking the denied subject out of the tool that explains their denial.
@@ -217,6 +223,80 @@ final class AccessRoutes implements RouteModule {
         requireNoSelfLockout(ex, policies);
         AccessPolicies.write(root, policies);
         return ETags.respond(ex, policies(api, ex));
+    }
+
+    /**
+     * The draft's impact (policy-authoring S4): every effective role (seed + authored) as a synthetic
+     * subject — its capabilities, data scopes and role name, no id and no claims, so a policy keyed on
+     * {@code subject.id} or a claim shows no flip here — × {@code read/write/operate} at route level,
+     * plus × every known resource kind a current or draft policy targets at row level (D7, taken on
+     * recommendation: the kind axis only where a policy can bite, so every flip is shown and the table
+     * stays bounded by {@link AccessPolicies#RESOURCE_KINDS}). Each cell is {@code before} (the saved
+     * doc; DENY everywhere while it is unreadable, as the engine does) → {@code after} (the draft).
+     * The draft passes the PUT's own 422 gate and its warnings ride the result. Nothing is written.
+     * Optional {@code route} (default {@code /}) binds {@code env.route}.
+     */
+    private Object previewPolicies(ApiContext api, HttpExchange ex, Map<String, Object> body) {
+        Path root = api.writeRoot();
+        List<AccessPolicies.Policy> draft =
+                AccessPolicies.validate(body.get("policies"), Roles.load(root).attributeClaims());
+        Map<String, Object> out = new LinkedHashMap<>();
+        AccessDecider decider = AccessDeciders.active().orElse(null);
+        if (decider == null) {
+            out.put("enabled", false);
+            out.put("reason", "no access policy engine on this edition");
+            return out;
+        }
+        String route = trimOrEmpty(body.get("route")).isBlank() ? "/" : trimOrEmpty(body.get("route")).trim();
+        AccessPolicies.Doc current = AccessPolicies.load(root);
+        Set<String> kinds = new java.util.TreeSet<>();
+        for (AccessPolicies.Policy p : current.policies()) kinds.addAll(p.resourceKinds());
+        for (AccessPolicies.Policy p : draft) kinds.addAll(p.resourceKinds());
+        kinds.retainAll(AccessPolicies.RESOURCE_KINDS);
+        List<String> kindAxis = new java.util.ArrayList<>();
+        kindAxis.add(null);   // route level
+        kindAxis.addAll(kinds);
+        List<String> actions = List.of("read", "write", "operate");
+
+        Map<String, Roles.Def> roles = Roles.effective(root);
+        Set<String> callerRoles = ComponentAccess.heldRoles(ex);
+        List<Map<String, Object>> cells = new java.util.ArrayList<>();
+        try {
+            for (Map.Entry<String, Roles.Def> role : roles.entrySet()) {
+                Subject synthetic = new Subject("role:" + role.getKey(), role.getValue().capabilities(),
+                        role.getValue().dataScopes(), Map.of());
+                ComponentAccess.heldRoles(ex, Set.of(role.getKey()));
+                for (String kind : kindAxis)
+                    for (String action : actions) {
+                        AccessDecider.Explanation before = current.unreadable()
+                                ? new AccessDecider.Explanation(AccessDecider.Decision.DENY, "<policies-unreadable>", List.of())
+                                : decider.simulate(ex, current.policies(), synthetic, action, route, kind);
+                        AccessDecider.Explanation after = decider.simulate(ex, draft, synthetic, action, route, kind);
+                        Map<String, Object> cell = new LinkedHashMap<>();
+                        cell.put("role", role.getKey());
+                        cell.put("action", action);
+                        cell.put("resourceKind", kind);
+                        cell.put("before", before.decision().name());
+                        cell.put("beforePolicy", before.matchedPolicy());
+                        cell.put("after", after.decision().name());
+                        cell.put("afterPolicy", after.matchedPolicy());
+                        cell.put("changed", before.decision() != after.decision());
+                        cells.add(cell);
+                    }
+            }
+        } finally {
+            ComponentAccess.heldRoles(ex, callerRoles);
+        }
+        List<AccessPolicies.Policy> seeds = decider.seededPolicies();
+        out.put("enabled", true);
+        out.put("route", route);
+        out.put("roles", List.copyOf(roles.keySet()));
+        out.put("actions", actions);
+        out.put("kinds", List.copyOf(kinds));
+        out.put("cells", cells);
+        out.put("warnings", AccessPolicies.lint(draft, roles.keySet(), seeds).stream()
+                .map(AccessRoutes::warningShape).toList());
+        return out;
     }
 
     /** F7 (policy-authoring S2): the route PEP runs before every handler, so a live doc that denies the

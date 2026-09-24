@@ -76,10 +76,11 @@ system: the evidence cannot say something the code does not.
 
 | Method | Route | Posture | Declared as | Registered at |
 |---|---|---|---|---|
-| PUT | `/access/catalog` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:58` |
+| PUT | `/access/catalog` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:64` |
 | PUT | `/access/policies` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:50` |
-| DELETE | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:63` |
-| PUT | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:61` |
+| POST | `/access/policies/preview` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:56` |
+| DELETE | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:69` |
+| PUT | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:67` |
 | PUT | `/access/roles` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:47` |
 | POST | `/agent/approvals/(.+)/decision` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:177` |
 | PUT | `/agent/policy` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:194` |
