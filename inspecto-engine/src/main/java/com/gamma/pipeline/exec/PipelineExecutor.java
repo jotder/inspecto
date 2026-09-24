@@ -189,6 +189,22 @@ public final class PipelineExecutor {
                                      RowShaper.ReferenceResolver references,
                                      ParkWriter parkWriter,
                                      RowShaper.ExecutionContext ctx) throws Exception {
+        // S2-0: pin every pack whose node type this graph uses for the whole walk (validation included —
+        // it calls the pack's descriptor), so an unload defers closing its classloader until we finish.
+        try (PackRunLeases.Lease lease = PackRunLeases.acquire(g)) {
+            return walk(conn, g, seeds, batchId, coordinator, sinkWriter, sourceFinalize, prov, references,
+                    parkWriter, ctx);
+        }
+    }
+
+    private static ExecResult walk(Connection conn, PipelineGraph g, Map<String, String> seeds,
+                                   String batchId, BranchCommitCoordinator coordinator,
+                                   SinkWriter sinkWriter,
+                                   BranchCommitCoordinator.SourceFinalize sourceFinalize,
+                                   ProvenanceCollector prov,
+                                   RowShaper.ReferenceResolver references,
+                                   ParkWriter parkWriter,
+                                   RowShaper.ExecutionContext ctx) throws Exception {
         PipelineValidator.validateOrThrow(g);
         Map<String, PipelineNode> byId = g.byId();
 
@@ -320,6 +336,14 @@ public final class PipelineExecutor {
     public static DryRunResult dryRun(Connection conn, PipelineGraph g, String seedNodeId,
                                       Map<String, String> seedRelations,
                                       RowShaper.ReferenceResolver references, String stopAtNodeId) throws Exception {
+        try (PackRunLeases.Lease lease = PackRunLeases.acquire(g)) {   // S2-0, as execute
+            return dryWalk(conn, g, seedNodeId, seedRelations, references, stopAtNodeId);
+        }
+    }
+
+    private static DryRunResult dryWalk(Connection conn, PipelineGraph g, String seedNodeId,
+                                        Map<String, String> seedRelations,
+                                        RowShaper.ReferenceResolver references, String stopAtNodeId) throws Exception {
         PipelineValidator.validateOrThrow(g);
         Map<String, PipelineNode> byId = g.byId();
         Set<String> bounds = ancestorsOf(g, stopAtNodeId, byId);

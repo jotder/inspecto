@@ -5,6 +5,7 @@ import com.gamma.pipeline.PipelineNodeType;
 import com.gamma.pipeline.PipelineNodeTypes;
 import com.gamma.pipeline.exec.PipelineNodeExecutor;
 import com.gamma.pipeline.exec.PipelineNodeExecutors;
+import com.gamma.pipeline.exec.PackRunLeases;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,7 +74,7 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
  * sourced from that pack to unavailable — a *later* Run on the same config then fails fast (REJECTED)
  * instead of running the stale cached {@code Job} instance.
  */
-final class JobPackManager implements AutoCloseable {
+final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
 
     private static final Logger log = LoggerFactory.getLogger(JobPackManager.class);
 
@@ -132,6 +133,8 @@ final class JobPackManager implements AutoCloseable {
         this.unloadListener = unloadListener;
         this.requireSignature = Boolean.getBoolean("jobs.packs.requireSignature");
         this.settleMillis = Long.getLong("jobs.packs.settleMillis", 500L);
+        // S2-0: a pipeline run using a pack's node type pins the pack through the same counter as a Job run.
+        if (dir != null) PackRunLeases.install(this);
     }
 
     boolean enabled() { return dir != null; }
@@ -309,15 +312,18 @@ final class JobPackManager implements AutoCloseable {
 
     /** Pin {@code owner}'s (a pack's jar filename) active-run count for the duration of one Run's
      *  {@code Job.run(ctx)} — call {@link #releaseRun} in a {@code finally}. No-op for {@code null}
-     *  (built-in/permanent job types have no owning pack). */
-    void acquireRun(String owner) {
+     *  (built-in/permanent job types have no owning pack). Also called by {@link PackRunLeases} for the
+     *  duration of a pipeline run that uses one of the pack's node types (S2-0). */
+    @Override
+    public void acquireRun(String owner) {
         if (owner == null) return;
         activeRuns.computeIfAbsent(owner, k -> new AtomicInteger()).incrementAndGet();
     }
 
     /** The counterpart to {@link #acquireRun}: when the count drops to zero, finish closing a pack whose
      *  unload was deferred while this Run (or a sibling) was still executing. No-op for {@code null}. */
-    void releaseRun(String owner) {
+    @Override
+    public void releaseRun(String owner) {
         if (owner == null) return;
         AtomicInteger count = activeRuns.get(owner);
         if (count == null) return;
@@ -387,6 +393,7 @@ final class JobPackManager implements AutoCloseable {
     @Override
     public synchronized void close() {
         running = false;
+        PackRunLeases.uninstall(this);
         if (watchThread != null) watchThread.interrupt();
         if (watcher != null) try { watcher.close(); } catch (IOException ignore) { /* best effort */ }
         for (LoadedPack p : loaded.values()) {

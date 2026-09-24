@@ -161,7 +161,36 @@ not write Datasets or send outbound mail).
    it exposed: `alert.evaluate` previously ignored `dryRun()`, so a preview fire really evaluated and
    really opened Incidents. It now does nothing and says so, because evaluation *is* the action.
 
-## 7. What is still open
+## 7. S2-0 — pack isolation for pipeline node types (as built, 2026-09-24)
+
+S2-0 of the Stage 2 design is two defects that design pass found. The design lives on another branch;
+`docs/superpower/platform-services-stage2-design.md` does not exist on this one at the time of writing. Both reproduced red first;
+the tests are in `JobPackManagerTest` and `PipelineNodeTypesPackOverlayTest`.
+
+1. **A pack executor may run only its own pack's node type.** `PipelineNodeTypes.register` already
+   refused a pack node type that reuses a built-in name, but `PipelineNodeExecutors.register` did not.
+   `RowShaper.shape` checks for a contributed executor *before* the built-in chain, so a jar in the
+   packs dir could change how `transform.filter` ran for every pipeline. The registry now refuses a
+   pack executor whose kind is a `BuiltinNodeType`, and one whose kind is not a node type registered
+   by the **same** pack. `JobPackManager` registers node types before executors, so that check sees
+   them. The refusal throws inside the pack's atomic load, so the whole pack is rejected (its legal
+   node type too), logged `[PACKS] rejected` and signalled `job.pack.rejected`. A **classpath**
+   provider (an edition, shipped and reviewed with the build) may still specialise a built-in verb.
+   ⚠ For a pack, the same-pack clause alone already covers built-ins, because a pack can never own a
+   built-in node type. The explicit built-in clause is there for its clearer message, and only a
+   message assertion catches its removal.
+2. **A pipeline run pins the packs it uses.** Before this fix, only `JobService`'s Job path held the
+   in-flight-Run lease (`acquireRun`/`releaseRun`). A pipeline whose Step was a pack's node type did
+   not, so an unload could close the pack's classloader mid-run. `PipelineExecutor.execute` and
+   `dryRun` (both terminal overloads) now hold a `PackRunLeases` lease for the whole walk, validation
+   included, and release it in `finally`. The lease covers every pack that owns a node type in the
+   graph. The counting still lives in `JobPackManager`: it installs itself as the `Leaser` when packs
+   are enabled and uninstalls on close. The seam exists only because `com.gamma.pipeline.exec` cannot
+   see `com.gamma.job`. Every installed manager is pinned, one per Space's `JobService`. Node-type
+   owners are enough, because rule 1 guarantees that no pack executor runs a kind its pack does not own.
+   ⚠ `ComponentPreview` (single-node preview) calls `RowShaper.shape` directly and holds no lease.
+
+## 8. What is still open
 
 Stage 2 (the open Step-kind registry, `LOWERED`/`EXECUTED`) and Stage 3 (pack-contributed services)
 are **not built**; Stage 2 stays gated on the branch-aware executor becoming the armed path. The open
