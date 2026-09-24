@@ -389,6 +389,9 @@ suite, closes the BACKLOG row (D10).
    (a) keep it and tell desks to use `power`; (b) gate the `findings-spec` kind on `canManageIncidents`
    instead, a per-kind capability in `ComponentRoutes` (a new-route-style four-gate change); (c) a new
    `canConfigureCaseDesk` capability. *Recommend (b):* the people who resolve Cases already hold it.
+   **DECIDED (2026-09-25, operator): (b).** Built as four literal `/components/findings-spec…` write routes
+   gated on `canManageIncidents`, registered ahead of the generic ones; other kinds unchanged
+   (`ControlApiFindingsSpecGateTest`; as-built in `docs/okf/backend/editions/auth-security.md`).
 2. **D2 — Scope to Case only?** Four object types are authorable, but only Case renders Findings.
    *Recommend Case only*, with the dialog parameterised on type so Incident is a later one-line entry if a
    panel ever renders it.

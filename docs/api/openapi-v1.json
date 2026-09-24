@@ -7898,6 +7898,91 @@
         },
         "x-generated" : true
       }
+    },
+    "/components/findings-spec" : {
+      "post" : {
+        "tags" : [ "components" ],
+        "summary" : "POST /components/findings-spec (generated skeleton)",
+        "operationId" : "postComponentsFindingsSpec",
+        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route. Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/components/findings-spec/{findingsspecId}" : {
+      "put" : {
+        "tags" : [ "components" ],
+        "summary" : "PUT /components/findings-spec/{findingsspecId} (generated skeleton)",
+        "operationId" : "putComponentsFindingsSpecByFindingsspecId",
+        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route. Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "findingsspecId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      },
+      "delete" : {
+        "tags" : [ "components" ],
+        "summary" : "DELETE /components/findings-spec/{findingsspecId} (generated skeleton)",
+        "operationId" : "deleteComponentsFindingsSpecByFindingsspecId",
+        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route. Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "findingsspecId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/components/findings-spec/{findingsspecId}/versions/{versionId}/restore" : {
+      "post" : {
+        "tags" : [ "components" ],
+        "summary" : "POST /components/findings-spec/{findingsspecId}/versions/{versionId}/restore (generated skeleton)",
+        "operationId" : "postComponentsFindingsSpecByFindingsspecIdVersionsByVersionIdRestore",
+        "description" : "Writes a findings-spec component (the Findings panel of one ObjectType). Gated on canManageIncidents, NOT canAuthorWorkbench (D1 = (b), operator 2026-09-25) - the generic /components write routes answer every other kind. Same body, statuses and semantics as the generic route. Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "findingsspecId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "versionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   },
   "components" : {

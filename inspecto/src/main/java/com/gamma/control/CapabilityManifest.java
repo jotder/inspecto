@@ -71,7 +71,11 @@ final class CapabilityManifest {
             new Entry("POST", "/bi/templates/([^/]+)/apply", Roles.CAN_AUTHOR_WORKBENCH),
             // BundleRoutes
             new Entry("POST", "/bundle/import", Roles.CAN_AUTHOR_WORKBENCH),
-            // ComponentRoutes
+            // ComponentRoutes — the findings-spec kind is Case-desk configuration (D1 = (b), operator 2026-09-25)
+            new Entry("POST", "/components/findings-spec", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("PUT", "/components/findings-spec/([^/]+)", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("DELETE", "/components/findings-spec/([^/]+)", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/components/findings-spec/([^/]+)/versions/([^/]+)/restore", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/components/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("PUT", "/components/([^/]+)/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/components/([^/]+)/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),

@@ -41,18 +41,41 @@ final class ComponentRoutes implements RouteModule {
 
     private static final Logger log = LoggerFactory.getLogger(ComponentRoutes.class);
 
+    private static final String FINDINGS_SPEC = "findings-spec";
+
+    /**
+     * The decoded kind of a GENERIC write route. That segment is URL-decoded a second time
+     * ({@link ApiContext#name}), so {@code findings%252Dspec} misses the literal findings-spec routes and
+     * lands here as {@code findings-spec}; demand that kind's own capability too, so an encoding cannot
+     * swap it for canAuthorWorkbench (fail-closed: such a caller needs both).
+     */
+    private static String genericKind(com.sun.net.httpserver.HttpExchange ex, java.util.regex.Matcher m) {
+        String kind = ApiContext.name(m);
+        if (FINDINGS_SPEC.equals(kind)) ApiContext.requireCapability(ex, Roles.CAN_MANAGE_INCIDENTS);
+        return kind;
+    }
+
     @Override
     public void register(ApiContext api) {
         api.get("/components/([^/]+)", (e, m) -> componentList(api, e, ApiContext.name(m)));
         api.get("/components/([^/]+)/([^/]+)", (e, m) -> componentById(api, e, ApiContext.name(m), ApiContext.param(m, 2)));
+        // D1 = (b) (operator, 2026-09-25): the Findings spec is Case-desk configuration, so its writes need
+        // canManageIncidents — the capability the people who resolve Cases hold — NOT canAuthorWorkbench.
+        // Literal kind routes, registered BEFORE the generic ones (first-match dispatch), so the manifest,
+        // the boot posture check and the route-gating report each see one capability per route.
+        api.post("/components/findings-spec", ApiContext.withCapability("canManageIncidents", (e, m) -> createComponent(api, e, FINDINGS_SPEC, api.body(e))));
+        api.put("/components/findings-spec/([^/]+)", ApiContext.withCapability("canManageIncidents", (e, m) -> updateComponent(api, e, FINDINGS_SPEC, ApiContext.name(m), api.body(e))));
+        api.delete("/components/findings-spec/([^/]+)", ApiContext.withCapability("canManageIncidents", (e, m) -> deleteComponent(api, e, FINDINGS_SPEC, ApiContext.name(m))));
+        api.post("/components/findings-spec/([^/]+)/versions/([^/]+)/restore", ApiContext.withCapability("canManageIncidents",
+                (e, m) -> restoreVersion(api, e, FINDINGS_SPEC, ApiContext.name(m), ApiContext.param(m, 2))));
         // Writes require canAuthorWorkbench (W6; a no-op on Personal — no Subject is ever attached there).
-        api.post("/components/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createComponent(api, e, ApiContext.name(m), api.body(e))));
-        api.put("/components/([^/]+)/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> updateComponent(api, e, ApiContext.name(m), ApiContext.param(m, 2), api.body(e))));
-        api.delete("/components/([^/]+)/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteComponent(api, e, ApiContext.name(m), ApiContext.param(m, 2))));
+        api.post("/components/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createComponent(api, e, genericKind(e, m), api.body(e))));
+        api.put("/components/([^/]+)/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> updateComponent(api, e, genericKind(e, m), ApiContext.param(m, 2), api.body(e))));
+        api.delete("/components/([^/]+)/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteComponent(api, e, genericKind(e, m), ApiContext.param(m, 2))));
         // MET-5 version history: list prior saved copies + restore one (restore is an authoring write).
         api.get("/components/([^/]+)/([^/]+)/versions", (e, m) -> listVersions(api, e, ApiContext.name(m), ApiContext.param(m, 2)));
         api.post("/components/([^/]+)/([^/]+)/versions/([^/]+)/restore", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> restoreVersion(api, e, ApiContext.name(m), ApiContext.param(m, 2), ApiContext.param(m, 3))));
+                (e, m) -> restoreVersion(api, e, genericKind(e, m), ApiContext.param(m, 2), ApiContext.param(m, 3))));
         // T18 dry-run/test: preview a component over a sample through the production logic (scratch-only).
         api.post("/components/transform/([^/]+)/test", (e, m) -> previewTransform(api, e, ApiContext.name(m), api.body(e)));
         api.post("/components/grammar/([^/]+)/test", (e, m) -> previewGrammar(api, e, ApiContext.name(m), api.body(e)));

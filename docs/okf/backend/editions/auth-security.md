@@ -71,6 +71,16 @@ because Connections are the credential + network-egress surface (worse blast rad
 a Pipeline Developer builds against *existing* connections but can't mint new ones). `RoleMapper` maps
 `admin → canOnboardConnections` and `super → {all}`; the UI mirrors it as `LensService.canOnboardConnections`
 (the connections pane's create/edit/delete gate).
+**The `findings-spec` kind gates on `canManageIncidents`, not `canAuthorWorkbench` (D1 = (b), operator
+2026-09-25, IMPLEMENTED).** The Findings spec is Case-desk configuration, so its writes go to the people who
+resolve Cases (seed: `operations`, `support`, `admin`, `power`, `super`) and **not** to the builder roles.
+It is the one per-kind exception on the generic `/components` CRUD, built as **four literal routes**
+(`POST /components/findings-spec`, `PUT`/`DELETE /components/findings-spec/{id}`, `…/versions/{v}/restore`)
+registered before the generic ones in `ComponentRoutes` — so the manifest, the boot posture check and
+`compliance/evidence/route-gating.md` each see one capability per route. ⚠ The generic routes URL-decode the
+kind segment a second time, so `findings%252Dspec` misses the literal routes; the generic handlers therefore
+also demand `canManageIncidents` for that kind (fail-closed: such a caller needs both). Pinned by
+`ControlApiFindingsSpecGateTest` with a real Subject.
 
 **RBAC shipped end-to-end (workstream R, R0–R5, 2026-07-23).** The groundwork above is now a working
 server-side authorization system, all behind the existing SPIs (core stays auth-free):

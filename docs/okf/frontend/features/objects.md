@@ -69,6 +69,10 @@ the real ControlApi.
   **fully replaces** the default for its type; field-level merge is unsupported on purpose because it makes
   "remove a section" inexpressible. Full rationale + the rejected alternatives:
   [`plans-archive/findings-spec-plan.md`](../../../archived-documents/plans-archive/findings-spec-plan.md).
+  **Writing a spec needs `canManageIncidents`, not `canAuthorWorkbench`** (D1 = (b), operator 2026-09-25):
+  the Case desk that resolves Cases authors its Findings, so `operations`/`support`/`admin`/`power` may save
+  one and the builder roles may not; every other component kind is unchanged
+  ([auth-security.md](../../backend/editions/auth-security.md) has the route shape).
   **Values are validated too, since 2026-07-26** — `FindingsSpec.validateValues(submitted, merged)`, called
   from `ObjectRoutes.validateFindings` on `PATCH /objects/{id}` (→ **422**): `select` membership, `number`
   with `min`/`max`, `boolean`, and `pattern`; a section hidden by its `dependsOn` against the merged bag is
