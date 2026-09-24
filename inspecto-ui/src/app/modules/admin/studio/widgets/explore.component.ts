@@ -24,7 +24,13 @@ import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
 import { WORKING_SET_VIEW_KIND } from 'app/inspecto/viz/plugins';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
-import { TransferMenuComponent } from 'app/inspecto/transfer';
+import {
+    ImportDraft,
+    ImportDraftBannerComponent,
+    ImportDraftHandoff,
+    TransferMenuComponent,
+    draftPlacement,
+} from 'app/inspecto/transfer';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { Widget, WidgetOptions, WorkingSetBinding, buildWidget } from './widget-types';
@@ -56,6 +62,7 @@ import './widget.kind'; // ensure the widget kind + viz plugins are registered
         VizRenderComponent,
         ExploreControlsComponent,
         TransferMenuComponent,
+        ImportDraftBannerComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './explore.component.html',
@@ -69,6 +76,7 @@ export class ExploreComponent implements OnInit {
     private dialog = inject(MatDialog);
     private router = inject(Router);
     private toastr = inject(ToastrService);
+    private draftHandoff = inject(ImportDraftHandoff);
 
     /** Route param — the widget id to edit; absent on the `new` route. */
     @Input() id?: string;
@@ -97,6 +105,13 @@ export class ExploreComponent implements OnInit {
     readonly running = signal(false);
     readonly editing = signal(false);
     readonly writesDisabled = signal(false);
+
+    /** An imported draft this editor holds UNSAVED (Import as draft, D1–D8) — in memory only. */
+    readonly importDraft = signal<ImportDraft | null>(null);
+    /** The stored copy the draft replaces (D6 diff baseline); null when the id is new here. */
+    readonly draftStored = signal<Record<string, unknown> | null>(null);
+    /** The stored copy's hash, sent as `If-Match` on the draft's Save so it cannot clobber a concurrent edit. */
+    private draftIfMatch: string | undefined;
 
     readonly fields = computed<VizField[]>(() => {
         const rows = this.rows();
@@ -156,13 +171,74 @@ export class ExploreComponent implements OnInit {
             next: (w) => this.existingWidgetIds.set(w.map((x) => x.id)),
             error: () => undefined,
         });
+        // A draft routed here from another editor (Import as draft). Taking it replaces the stored load,
+        // so the stored copy can never land AFTER the draft and silently overwrite it.
+        const pending = this.draftHandoff.take('widget', this.id);
         if (this.id) {
             this.editing.set(true);
-            this.widgetsApi.get(this.id).subscribe({
-                next: (w) => this.seedFromWidget(w),
-                error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load widget "${this.id}"`)),
-            });
+            if (pending) this.adoptDraft(pending);
+            else
+                this.widgetsApi.get(this.id).subscribe({
+                    next: (w) => this.seedFromWidget(w),
+                    error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load widget "${this.id}"`)),
+                });
+        } else if (pending) {
+            this.adoptDraft(pending);
         }
+    }
+
+    // ── Import as draft (operator decisions 2026-09-25) ──────────────────────────────────────────
+    // Any missing prerequisites (its Dataset) were imported write-through by the dialog already (D4);
+    // the widget itself is adopted UNSAVED and reaches the store only through this pane's Save (D2).
+
+    /** The transfer menu's draft: adopt it here, or route to the editor that must show it. */
+    onDraftImported(draft: ImportDraft): void {
+        if (draftPlacement(this.id, draft) === 'here') {
+            this.adoptDraft(draft);
+            return;
+        }
+        this.draftHandoff.open(
+            draft,
+            ['/studio/widgets', draft.targetExists ? draft.id : 'new'],
+            '/studio/widgets',
+            !!this.id,
+        );
+    }
+
+    /** Take the incoming content as unsaved edits; for an existing id, read the stored copy first (D6). */
+    adoptDraft(draft: ImportDraft): void {
+        const apply = () => {
+            // Re-list: the prerequisite import may just have created the Dataset this widget reads.
+            this.datasetsApi.list().subscribe({ next: (d) => this.datasets.set(d), error: () => undefined });
+            this.seedFromWidget(this.widgetsApi.fromContent(draft.id, draft.content));
+            this.importDraft.set(draft);
+        };
+        if (!draft.targetExists) {
+            this.draftStored.set(null);
+            this.draftIfMatch = undefined;
+            apply();
+            return;
+        }
+        this.componentsApi.get('widget', draft.id).subscribe({
+            next: (def) => {
+                this.draftStored.set(def.content);
+                this.draftIfMatch = def.contentHash;
+                apply();
+            },
+            error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load widget "${draft.id}"`)),
+        });
+    }
+
+    /** Drop the draft: back to the stored widget, or out of a create that only the draft started. */
+    discardDraft(): void {
+        this.importDraft.set(null);
+        this.draftStored.set(null);
+        this.draftIfMatch = undefined;
+        if (!this.id) {
+            this.router.navigate(['/studio/widgets']);
+            return;
+        }
+        this.widgetsApi.get(this.id).subscribe({ next: (w) => this.seedFromWidget(w) });
     }
 
     onSelectDataset(id: string): void {
@@ -291,7 +367,8 @@ export class ExploreComponent implements OnInit {
         this.dialog
             .open(WidgetSaveDialog, {
                 data: {
-                    suggestedId: this.id ?? `${viewBound ? this.viewId() : ds!.id}_${this.vizType()}`,
+                    suggestedId:
+                        this.id ?? this.importDraft()?.id ?? `${viewBound ? this.viewId() : ds!.id}_${this.vizType()}`,
                     lockId: this.editing(),
                     description: this.description(),
                     existingNames: this.existingWidgetIds(),
@@ -319,7 +396,8 @@ export class ExploreComponent implements OnInit {
                         queryId: viewBound ? undefined : this.boundQueryId(),
                     },
                 );
-                this.widgetsApi.save(widget, { update: this.editing() }).subscribe({
+                const ifMatch = this.importDraft() ? this.draftIfMatch : undefined;
+                this.widgetsApi.save(widget, { update: this.editing(), ...(ifMatch ? { ifMatch } : {}) }).subscribe({
                     next: () => {
                         this.toastr.success(`Widget "${name}" saved`);
                         this.router.navigate(['/studio/widgets']);

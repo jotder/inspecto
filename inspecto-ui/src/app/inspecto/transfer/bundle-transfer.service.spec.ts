@@ -95,4 +95,17 @@ describe('BundleTransferService — buildExport consults the server closure (gap
         http.expectNone(`${base}/pipelines/cdr/related`);
         http.expectOne(`${base}/bundle/export`).flush({ bundle: { items: [] } });
     });
+
+    /** Import as draft (D3): the advisory integrity read is the READ-ONLY preview, never the import door. */
+    it('previews through /bundle/preview and hands back its integrity findings', () => {
+        const bundle = { format: 'inspecto-metadata-bundle', version: 2, items: [] } as unknown as MetadataBundle;
+        let integrity: string[] | undefined;
+        svc.preview(bundle).subscribe((p) => (integrity = p.integrity));
+        const req = http.expectOne(`${base}/bundle/preview`);
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body).toBe(bundle);
+        req.flush({ items: [], requires: [], integrity: ["broken reference: widget 'w' -> missing dataset 'd'"] });
+        http.expectNone(`${base}/bundle/import`);
+        expect(integrity).toEqual(["broken reference: widget 'w' -> missing dataset 'd'"]);
+    });
 });

@@ -9,10 +9,16 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { LensService, apiErrorMessage } from 'app/inspecto/api';
+import { ComponentsService, LensService, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
-import { TransferMenuComponent } from 'app/inspecto/transfer';
+import {
+    ImportDraft,
+    ImportDraftBannerComponent,
+    ImportDraftHandoff,
+    TransferMenuComponent,
+    draftPlacement,
+} from 'app/inspecto/transfer';
 import { ColumnMeta, QueryChange, QueryModel, QueryPanelComponent, QuerySource } from 'app/inspecto/query';
 import { DatasetCalculatedComponent } from './dataset-calculated.component';
 import { DatasetColumnsComponent } from './dataset-columns.component';
@@ -60,6 +66,7 @@ const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
         DatasetCalculatedComponent,
         DatasetMeasuresComponent,
         TransferMenuComponent,
+        ImportDraftBannerComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './dataset-editor.component.html',
@@ -72,6 +79,8 @@ export class DatasetEditorComponent implements OnInit {
     private router = inject(Router);
     private destroyRef = inject(DestroyRef);
     private matDialog = inject(MatDialog);
+    private components = inject(ComponentsService);
+    private draftHandoff = inject(ImportDraftHandoff);
     /** Materializing is an OPERATION, not authoring — same capability as any job trigger (§7). */
     readonly lens = inject(LensService);
 
@@ -97,6 +106,13 @@ export class DatasetEditorComponent implements OnInit {
     readonly saving = signal(false);
     readonly materializing = signal(false);
     readonly writesDisabled = signal(false);
+
+    /** An imported draft this editor holds UNSAVED (Import as draft, D1–D8) — in memory only. */
+    readonly importDraft = signal<ImportDraft | null>(null);
+    /** The stored copy the draft replaces (D6 diff baseline); null when the id is new here. */
+    readonly draftStored = signal<Record<string, unknown> | null>(null);
+    /** The stored copy's hash, sent as `If-Match` on the draft's Save so it cannot clobber a concurrent edit. */
+    private draftIfMatch: string | undefined;
 
     readonly form = this.fb.group({
         name: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)]],
@@ -139,19 +155,27 @@ export class DatasetEditorComponent implements OnInit {
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe((s) => void this.onSourcePicked(s));
 
+        // A draft routed here from another editor (Import as draft). Taking it replaces the stored load
+        // and the create defaults, so neither can land AFTER the draft and silently overwrite it.
+        const pending = this.draftHandoff.take('dataset', this.id);
         if (this.id) {
             this.editing.set(true);
-            this.loadExisting(this.id);
+            if (pending) this.adoptDraft(pending);
+            else this.loadExisting(this.id);
         } else {
-            void this.loadStores().then(() => {
-                // Create: land on a real store rather than an empty picker, but never override a pick the
-                // operator already made while the catalog was still loading.
-                const first = this.sourceNames()[0];
-                if (first && !this.form.controls.sourceName.value) {
-                    this.form.controls.sourceName.setValue(first);
-                }
-                this.ready.set(true);
-            });
+            if (pending) {
+                this.adoptDraft(pending);
+            } else {
+                void this.loadStores().then(() => {
+                    // Create: land on a real store rather than an empty picker, but never override a pick the
+                    // operator already made while the catalog was still loading.
+                    const first = this.sourceNames()[0];
+                    if (first && !this.form.controls.sourceName.value) {
+                        this.form.controls.sourceName.setValue(first);
+                    }
+                    this.ready.set(true);
+                });
+            }
             // Product-wide rule: block a duplicate id inline on create rather than relying on the server 409.
             this.datasets
                 .list()
@@ -190,6 +214,64 @@ export class DatasetEditorComponent implements OnInit {
             next: (d) => this.seed(d),
             error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load dataset "${id}"`)),
         });
+    }
+
+    // ── Import as draft (operator decisions 2026-09-25) ──────────────────────────────────────────
+    // The dataset is adopted UNSAVED and reaches the store only through this pane's own Save (D2).
+
+    /** The transfer menu's draft: adopt it here, or route to the editor that must show it. */
+    onDraftImported(draft: ImportDraft): void {
+        if (draftPlacement(this.id, draft) === 'here') {
+            this.adoptDraft(draft);
+            return;
+        }
+        this.draftHandoff.open(
+            draft,
+            ['/catalog/datasets', draft.targetExists ? draft.id : 'new'],
+            '/catalog/datasets',
+            !!this.id,
+        );
+    }
+
+    /** Take the incoming content as unsaved edits; for an existing id, read the stored copy first (D6). */
+    adoptDraft(draft: ImportDraft): void {
+        // Unmount the query panel first: its seed-once guard would otherwise ignore the draft's model.
+        this.ready.set(false);
+        const apply = async () => {
+            await this.seed(this.datasets.fromContent(draft.id, draft.content));
+            if (!this.editing()) {
+                // seed() locks the id as on edit; a new-id draft stays nameable, prefilled with its own id.
+                this.form.controls.name.enable();
+                this.form.controls.name.setValue(draft.id);
+            }
+            this.importDraft.set(draft);
+        };
+        if (!draft.targetExists) {
+            this.draftStored.set(null);
+            this.draftIfMatch = undefined;
+            void apply();
+            return;
+        }
+        this.components.get('dataset', draft.id).subscribe({
+            next: (def) => {
+                this.draftStored.set(def.content);
+                this.draftIfMatch = def.contentHash;
+                void apply();
+            },
+            error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load dataset "${draft.id}"`)),
+        });
+    }
+
+    /** Drop the draft: back to the stored dataset, or out of a create that only the draft started. */
+    discardDraft(): void {
+        this.importDraft.set(null);
+        this.draftStored.set(null);
+        this.draftIfMatch = undefined;
+        if (!this.id) {
+            this.router.navigate(['/catalog/datasets']);
+            return;
+        }
+        this.loadExisting(this.id);
     }
 
     /** Show version history for this saved dataset; reload its state after a restore (MET-5). Edit mode only. */
@@ -310,7 +392,8 @@ export class DatasetEditorComponent implements OnInit {
             calculated: this.calculated(),
         });
         this.saving.set(true);
-        this.datasets.save(ds, { update: this.editing() }).subscribe({
+        const ifMatch = this.importDraft() ? this.draftIfMatch : undefined;
+        this.datasets.save(ds, { update: this.editing(), ...(ifMatch ? { ifMatch } : {}) }).subscribe({
             next: () => {
                 this.saving.set(false);
                 this.toastr.success(`Dataset "${name}" saved`);

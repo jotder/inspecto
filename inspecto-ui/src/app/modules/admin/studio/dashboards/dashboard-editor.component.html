@@ -21,6 +21,8 @@
                 <inspecto-transfer-menu
                     [items]="transferItems"
                     [allowedKinds]="['dashboard']"
+                    [importDraft]="true"
+                    (draftImported)="onDraftImported($event)"
                     label="Import / export dashboard"
                 />
                 <button type="button" mat-stroked-button (click)="exportPngs()" [disabled]="!tiles().length">
@@ -44,6 +46,15 @@
             </form>
         </ng-container>
     </inspecto-page-header>
+
+    @if (importDraft(); as draft) {
+        <inspecto-import-draft-banner
+            class="mt-4 block"
+            [draft]="draft"
+            [stored]="draftStored()"
+            (discard)="discardDraft()"
+        />
+    }
 
     @if (writesDisabled()) {
         <inspecto-alert class="mt-4 block" variant="warning" icon="heroicons_outline:lock-closed">

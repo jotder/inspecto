@@ -10,6 +10,8 @@
             <inspecto-transfer-menu
                 [items]="transferItems"
                 [allowedKinds]="['widget']"
+                [importDraft]="true"
+                (draftImported)="onDraftImported($event)"
                 label="Import / export widget"
             />
             @if (editing()) {
@@ -39,6 +41,15 @@
             </button>
         </ng-container>
     </inspecto-page-header>
+
+    @if (importDraft(); as draft) {
+        <inspecto-import-draft-banner
+            class="mt-4 block"
+            [draft]="draft"
+            [stored]="draftStored()"
+            (discard)="discardDraft()"
+        />
+    }
 
     @if (writesDisabled()) {
         <inspecto-alert class="mt-4 block" variant="warning" icon="heroicons_outline:lock-closed">

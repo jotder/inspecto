@@ -49,6 +49,19 @@ export interface ImportOutcome {
     results: ImportResultRow[];
 }
 
+/** `POST /bundle/preview` — the server's read-only fit-check of an envelope against this Space. */
+export interface BundlePreview {
+    items: {
+        kind: BundleKind;
+        id: string;
+        status: 'new' | 'unchanged' | 'drifted' | 'unsupported';
+        targetHash?: string;
+    }[];
+    requires: { kind: BundleKind; id: string; status: 'satisfied' | 'different' | 'missing'; targetHash?: string }[];
+    /** The broken references the items would INTRODUCE — the list `/bundle/import` refuses on, advisory here. */
+    integrity: string[];
+}
+
 const COMPONENT_KINDS = BUNDLE_KINDS.map((k) => k.kind).filter(
     (k): k is Extract<BundleKind, ComponentType> =>
         k !== 'connection' && k !== 'authored-pipeline' && k !== 'job' && k !== 'decision-rule',
@@ -209,6 +222,15 @@ export class BundleTransferService {
      */
     applyImport(bundle: MetadataBundle, actions: Record<string, ImportAction>): Observable<ImportOutcome> {
         return this.http.post<ImportOutcome>(apiUrl('/bundle/import'), { bundle, actions });
+    }
+
+    /**
+     * The server's read-only fit-check (`POST /bundle/preview`) — no writes, not capability-gated. Used by
+     * Import as draft for its ADVISORY `integrity` findings (D3, 2026-09-25): the draft saves through the
+     * editor's own route, which runs no integrity check, so the editor shows them before Save instead.
+     */
+    preview(bundle: MetadataBundle): Observable<BundlePreview> {
+        return this.http.post<BundlePreview>(apiUrl('/bundle/preview'), bundle);
     }
 
     /**

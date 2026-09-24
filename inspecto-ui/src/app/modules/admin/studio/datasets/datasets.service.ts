@@ -24,11 +24,18 @@ export class DatasetsService {
         return this.components.get('dataset', id).pipe(map((d) => fromContent(d.name, d.content)));
     }
 
+    /** A {@link Dataset} from raw stored/bundle content — the read path's own mapping, for an imported draft. */
+    fromContent(id: string, content: Record<string, unknown>): Dataset {
+        return fromContent(id, content);
+    }
+
     /** Create by default; pass `{update: true}` when editing an existing dataset — the backend 409s a
      *  create on an existing id (id is immutable in the editors, so update never renames). */
-    save(ds: Dataset, opts?: { update?: boolean }): Observable<Dataset> {
+    save(ds: Dataset, opts?: { update?: boolean; ifMatch?: string }): Observable<Dataset> {
         const req$ = opts?.update
-            ? this.components.update('dataset', ds.id, toContent(ds))
+            ? opts.ifMatch
+                ? this.components.update('dataset', ds.id, toContent(ds), { ifMatch: opts.ifMatch })
+                : this.components.update('dataset', ds.id, toContent(ds))
             : this.components.create('dataset', { id: ds.id, ...toContent(ds) });
         return req$.pipe(map(() => ds));
     }

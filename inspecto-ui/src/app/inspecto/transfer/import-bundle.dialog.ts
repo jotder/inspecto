@@ -13,6 +13,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { BundleTransferService, ImportAction, ImportStatus } from './bundle-transfer.service';
+import { ImportDraft, draftPrerequisites } from './import-draft';
 import {
     BUNDLE_KINDS,
     BundleKind,
@@ -30,6 +31,9 @@ export interface ImportBundleData {
     /** When set, only these kind names are importable here (a library scopes its import); absent = all. */
     allowedKinds?: string[];
     title?: string;
+    /** `draft` (Import as draft, editors only — D8): preview as usual, but the chosen item is handed back
+     *  to the editor as an unsaved {@link ImportDraft} instead of being written. Default `apply`. */
+    mode?: 'apply' | 'draft';
 }
 
 interface Row extends ImportRow {
@@ -89,6 +93,19 @@ export class ImportBundleDialog {
     readonly missingRequires = computed(() => this.requires().filter((r) => r.status === 'missing'));
     readonly bundleHasConnections = computed(() => this.rows().some((r) => r.item.kind === 'connection'));
 
+    /** Import as draft: the dialog writes nothing of the target itself (D1/D2). */
+    readonly draftMode = this.data.mode === 'draft';
+    /** The `<kind>/<id>` of the row the operator picked to open as a draft. */
+    readonly draftKey = signal<string | null>(null);
+    readonly draftRow = computed(() => this.rows().find((r) => rowKey(r) === this.draftKey()) ?? null);
+    /** What the picked row needs from the bundle that this Space lacks — imported write-through first (D4). */
+    readonly prerequisites = computed(() => {
+        const bundle = this.bundle();
+        const row = this.draftRow();
+        return bundle && row ? draftPrerequisites(bundle, this.target(), row.item) : [];
+    });
+    readonly rowKey = rowKey;
+
     constructor() {
         this.transfer.loadAll().subscribe((items) => {
             this.target.set(targetIndex(items));
@@ -108,6 +125,7 @@ export class ImportBundleDialog {
         this.bundle.set(bundle ?? null);
         this.requires.set(bundle ? resolveRequires(bundle, this.target()) : []);
         this.rows.set(bundle ? this.filtered(bundle) : []);
+        this.draftKey.set(this.rows()[0] ? rowKey(this.rows()[0]) : null);
     }
 
     private filtered(bundle: MetadataBundle): Row[] {
@@ -188,7 +206,79 @@ export class ImportBundleDialog {
             });
     }
 
+    /**
+     * Import as draft (operator decisions 2026-09-25): hand the picked item back as an UNSAVED draft. The
+     * target itself is never written — the editor saves it through its own route (D2). Its missing
+     * prerequisites are imported first through the ordinary `/bundle/import` (every gate), and a refusal or
+     * a failed item stops here with no draft opened, naming what landed (D4, the `applyKpiReport` rule).
+     * Then the read-only preview supplies the ADVISORY integrity findings (D3); an unreadable preview
+     * degrades to "not checked", never to "no findings".
+     */
+    openDraft(): void {
+        const source = this.bundle();
+        const row = this.draftRow();
+        if (!this.draftMode || !this.lens.canAuthorWorkbench() || this.applying() || !source || !row) return;
+        const prereqs = this.prerequisites();
+        this.applying.set(true);
+        if (!prereqs.length) {
+            this.finishDraft(source, row, []);
+            return;
+        }
+        this.transfer
+            .applyImport({ ...source, items: prereqs }, {})
+            .pipe(catchError((err) => of(apiErrorMessage(err, 'Importing the prerequisites failed.'))))
+            .subscribe((outcome) => {
+                if (typeof outcome === 'string') {
+                    this.applying.set(false);
+                    this.toastr.error(`${outcome} No draft was opened; nothing was written.`);
+                    return;
+                }
+                const written = outcome.imported + outcome.overwritten;
+                this.importedCount.set(written);
+                if (outcome.failed) {
+                    this.applying.set(false);
+                    const landed = outcome.results
+                        .filter((r) => r.status === 'imported' || r.status === 'overwritten')
+                        .map((r) => `${r.kind}/${r.id}`);
+                    this.toastr.error(
+                        `${outcome.failed} prerequisite(s) failed to import, so no draft was opened.` +
+                            (landed.length ? ` Already imported: ${landed.join(', ')}.` : ''),
+                    );
+                    return;
+                }
+                this.finishDraft(
+                    source,
+                    row,
+                    prereqs.map((i) => `${i.kind}/${i.id}`),
+                );
+            });
+    }
+
+    private finishDraft(source: MetadataBundle, row: Row, prerequisites: string[]): void {
+        this.transfer
+            .preview({ ...source, items: [row.item] })
+            .pipe(catchError(() => of(null)))
+            .subscribe((preview) => {
+                this.applying.set(false);
+                const draft: ImportDraft = {
+                    kind: row.item.kind,
+                    id: row.item.id,
+                    content: row.item.content,
+                    sourceSpace: source.sourceSpace ?? null,
+                    targetExists: row.exists,
+                    // An older server's preview carries no list: that is "not checked", not "clean".
+                    integrity: Array.isArray(preview?.integrity) ? preview.integrity : null,
+                    prerequisites,
+                };
+                this.ref.close(draft);
+            });
+    }
+
     close(): void {
         this.ref.close(this.importedCount());
     }
+}
+
+function rowKey(r: ImportRow): string {
+    return `${r.item.kind}/${r.item.id}`;
 }

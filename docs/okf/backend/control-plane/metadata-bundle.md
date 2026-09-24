@@ -42,6 +42,10 @@ read/written through the uniform `BundleSource` seam regardless of its backing s
   was invisible and such a pipeline exported **without its grammar**. ⚠ Only the **outward**
   `references[]` are followed, and only entries carrying a `ref`; server edges MERGE with the derived
   ones (neither is a superset), and the call degrades so an older server cannot fail an export.
+* **`POST /bundle/preview` also returns `integrity: [...]`** (2026-09-25, load-as-draft D3) — the findings the
+  previewed items would *introduce*, computed by the same `introducedIntegrityFindings` import enforces, but
+  **advisory**: still read-only and ungated (a Business subject reads it; the import door keeps its 403).
+  Empty when writes are disabled — there is no registry to judge against.
 * **`POST /bundle/import`** — sequential upsert in dependency order (referenced kinds first), gated
   `canAuthorWorkbench` → write-root 503 → **integrity pre-check 422** (MNT-16: `ComponentIntegrity` blocks only
   findings the import would *introduce* — computed over (registry ∪ incoming) minus pre-existing). Existing
@@ -105,6 +109,42 @@ read/written through the uniform `BundleSource` seam regardless of its backing s
 * `requires` classify `satisfied | different | missing` — *present-but-different* (2026-07-18) compares the
   ref's export-stamped `originHash` to the target's stored hash; a ref that travels hash-less (older bundle, or
   unresolvable at export) can only be `satisfied`/`missing`, so the classification degrades gracefully.
+
+## Import as draft (SHIPPED 2026-09-25 for Dashboard, Widget, Dataset)
+
+The editor-hosted alternative to write-through import: the incoming item opens in its editor as **unsaved
+work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
+[`bundle-load-as-draft-design.md`](../../../superpower/bundle-load-as-draft-design.md) §7; as built:
+
+* **Where** — an extra *Import as draft…* item beside *Import…* in the **editor** transfer menus only
+  (`<inspecto-transfer-menu [importDraft]="true" (draftImported)>`); libraries and Settings stay write-through
+  (D8). Shipped on the Dashboard, Widget and Dataset editors (D5). ⏳ Not yet: authored Pipeline, then Link
+  Analysis / Geo views. ⛔ `connection` never (a draft editor would invite typing a secret).
+* **The dialog** is `ImportBundleDialog` with `mode: 'draft'`: the operator picks ONE row of the host's kind;
+  the dialog never posts the target to `/bundle/import`. It closes with an `ImportDraft`
+  (`inspecto-ui/src/app/inspecto/transfer/import-draft.ts`: content, `sourceSpace`, `targetExists`, `integrity`, `prerequisites`).
+* **Prerequisites are written first, explicitly (D4).** `draftPrerequisites` = the target's closure *inside the
+  bundle* minus what the Space already holds; those go through the ordinary `/bundle/import` (every gate) and
+  the draft opens only after that call succeeds. A 422/503 or any failed item opens **no draft** and names
+  what already landed — the `applyKpiReport` rule. An existing prerequisite is never overwritten.
+* **Integrity is advisory (D3).** After the prerequisites, the dialog calls the read-only preview for the target
+  alone; the editor's banner lists the findings. An unreadable preview (or an older server with no list) is
+  `integrity: null` — shown as *not checked*, never as clean. ⚠ The check runs once, when the draft opens; edits
+  made afterwards are not re-checked before Save.
+* **Save is the pane's own route (D2)** — `POST /components/{kind}` for a new id, `PUT` for an existing one.
+  When the draft landed on an existing id (D6) the editor first reads the stored copy: its content is the
+  banner's diff baseline (`configDiff`, the AI-draft diff) and its `contentHash` is sent as **`If-Match`**, so
+  the draft cannot clobber a concurrent edit. ⚠ Only a draft's Save sends `If-Match`; these editors' ordinary
+  saves still write unconditionally, as before.
+* **In memory only (D1).** Reload or navigation drops it; Discard reloads the stored item (edit) or leaves the
+  create route. A draft for a *different* id than the open editor is carried across the one navigation by
+  `ImportDraftHandoff` (consumed on take). 🔴 Two edit routes of one editor share a route config, so the
+  router REUSES the component and `ngOnInit` (where the draft is taken) would never run — that hop bounces
+  through the list route with `skipLocationChange`. 🔴 An editor that takes a draft must SKIP its plain stored
+  load: both are async, and the stored copy landing second silently overwrote the draft (pinned by the
+  Dataset editor's spec, mutation-checked).
+* ⛔ **No `enabled:false` stamp** — a Dataset/Widget/Dashboard has no inactive meaning; a stamped write-through
+  would be visible, resolvable and counted while carrying a key nothing reads.
 
 The UI side (one derivation `deriveRefs`, one format, every surface — Settings workbench + editor/library
 transfer menus) lives in the frontend bundle. Design history: `docs/archived-documents/plans-archive/`

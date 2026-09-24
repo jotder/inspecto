@@ -17,7 +17,7 @@ const WIDGET: BundleItem = {
     content: { vizType: 'bar', datasetId: 'cdr_sample', controls: {} },
 };
 
-function create(opts: { afterClosed?: number; canAuthor?: boolean } = {}) {
+function create(opts: { afterClosed?: unknown; canAuthor?: boolean; importDraft?: boolean } = {}) {
     const download = vi.fn();
     // U-F (2026-08-01): export now goes through `POST /bundle/export`, so it is asynchronous.
     const buildExport = vi.fn((selected: BundleItem[]) =>
@@ -37,6 +37,7 @@ function create(opts: { afterClosed?: number; canAuthor?: boolean } = {}) {
     });
     const fixture = TestBed.createComponent(TransferMenuComponent);
     fixture.componentRef.setInput('items', [{ kind: 'widget', id: 'cost_by_tariff' }]);
+    if (opts.importDraft) fixture.componentRef.setInput('importDraft', true);
     fixture.detectChanges();
     return { fixture, c: fixture.componentInstance, download, buildExport, loadAll, open };
 }
@@ -72,6 +73,47 @@ describe('TransferMenuComponent', () => {
         c.changed.subscribe(changed);
         c.openImport();
         expect(changed).not.toHaveBeenCalled();
+    });
+
+    it('opens the dialog in DRAFT mode and hands the chosen draft to the host, not a reload', () => {
+        const draft = {
+            kind: 'widget',
+            id: 'w1',
+            content: {},
+            sourceSpace: null,
+            targetExists: false,
+            integrity: [],
+            prerequisites: [],
+        };
+        const { c, open } = create({ afterClosed: draft, importDraft: true });
+        const got = vi.fn();
+        const changed = vi.fn();
+        c.draftImported.subscribe(got);
+        c.changed.subscribe(changed);
+        c.openImportDraft();
+        expect((open.mock.calls[0] as unknown as [unknown, { data: { mode: string } }])[1].data.mode).toBe('draft');
+        expect(got).toHaveBeenCalledWith(draft);
+        expect(changed).not.toHaveBeenCalled();
+    });
+
+    it('offers "Import as draft…" only where the host opts in (editors, D8)', async () => {
+        const { fixture } = create({ importDraft: true });
+        (fixture.nativeElement as HTMLElement).querySelector('button')!.click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const items = Array.from(document.querySelectorAll('[mat-menu-item]')).map((b) => b.textContent?.trim());
+        expect(items).toContain('Import as draft…');
+        expect(items).toContain('Import…');
+    });
+
+    it('a library (no opt-in) keeps the write-through import alone', async () => {
+        const { fixture } = create();
+        (fixture.nativeElement as HTMLElement).querySelector('button')!.click();
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const items = Array.from(document.querySelectorAll('[mat-menu-item]')).map((b) => b.textContent?.trim());
+        expect(items).toContain('Import…');
+        expect(items).not.toContain('Import as draft…');
     });
 
     it('renders with no a11y violations', async () => {

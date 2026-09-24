@@ -32,11 +32,18 @@ export class DashboardsService {
         return this.components.get('dashboard', id).pipe(map((d) => fromContent(d.name, d.content)));
     }
 
+    /** A {@link Dashboard} from raw stored/bundle content — the read path's own mapping, for an imported draft. */
+    fromContent(id: string, content: Record<string, unknown>): Dashboard {
+        return fromContent(id, content);
+    }
+
     /** Create by default; pass `{update: true}` when modifying an existing dashboard (editor save,
      *  add-tile) — the backend 409s a create on an existing id (id is immutable on edit). */
-    save(dashboard: Dashboard, opts?: { update?: boolean }): Observable<Dashboard> {
+    save(dashboard: Dashboard, opts?: { update?: boolean; ifMatch?: string }): Observable<Dashboard> {
         const req$ = opts?.update
-            ? this.components.update('dashboard', dashboard.id, toContent(dashboard))
+            ? opts.ifMatch
+                ? this.components.update('dashboard', dashboard.id, toContent(dashboard), { ifMatch: opts.ifMatch })
+                : this.components.update('dashboard', dashboard.id, toContent(dashboard))
             : this.components.create('dashboard', { id: dashboard.id, ...toContent(dashboard) });
         return req$.pipe(map(() => dashboard));
     }

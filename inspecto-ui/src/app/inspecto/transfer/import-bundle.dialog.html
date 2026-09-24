@@ -1,4 +1,4 @@
-<h2 mat-dialog-title>{{ data.title || 'Import metadata bundle' }}</h2>
+<h2 mat-dialog-title>{{ data.title || (draftMode ? 'Import as draft' : 'Import metadata bundle') }}</h2>
 
 <mat-dialog-content class="flex min-w-0 flex-col gap-4">
     @if (loading()) {
@@ -45,13 +45,28 @@
             {{ rows().length }} artifact(s) — {{ rows().length - existingCount() }} new, {{ existingCount() }} already
             here@if (driftedCount()) { ({{ driftedCount() }} drifted) }
         </span>
-        @if (existingCount()) {
+        @if (existingCount() && !draftMode) {
         <button type="button" mat-stroked-button (click)="overwriteAllExisting()">Overwrite all existing</button>
         <button type="button" mat-stroked-button (click)="skipAllExisting()">Skip all existing</button>
         }
     </div>
 
-    @if (bundleHasConnections()) {
+    @if (draftMode) {
+    <inspecto-alert variant="info">
+        The chosen item opens in this editor as an unsaved draft — nothing of it is written until you Save. @if
+        (draftRow()?.exists) { It replaces the stored copy only when you Save, and the editor shows what changes. }
+    </inspecto-alert>
+    @if (prerequisites().length) {
+    <inspecto-alert variant="warning" title="Imported first, because the draft needs them">
+        These are in the bundle but not on this instance. They are written now, through the ordinary import, before the
+        draft opens:
+        <div class="mt-1 font-mono text-xs">
+            @for (p of prerequisites(); track p.kind + '/' + p.id) {
+            <div>{{ kindLabel(p.kind) }} / {{ p.id }}</div>
+            }
+        </div>
+    </inspecto-alert>
+    } } @if (bundleHasConnections()) {
     <inspecto-alert variant="info">
         Connections carry masked secrets (<code>***</code> / <code>${{ '{' }}ENV:…{{ '}' }}</code> references) — after
         import, provide the environment values or re-enter secrets on this instance.
@@ -69,8 +84,12 @@
                     <th scope="col" class="py-2 pr-4">Kind</th>
                     <th scope="col" class="py-2 pr-4">Id</th>
                     <th scope="col" class="py-2 pr-4">On this instance</th>
+                    @if (draftMode) {
+                    <th scope="col" class="py-2">Open as draft</th>
+                    } @else {
                     <th scope="col" class="py-2 pr-4">Action</th>
                     <th scope="col" class="py-2">Result</th>
+                    }
                 </tr>
             </thead>
             <tbody>
@@ -87,6 +106,18 @@
                         <inspecto-status-badge value="OK" label="New" />
                         }
                     </td>
+                    @if (draftMode) {
+                    <td class="py-1.5">
+                        <input
+                            type="radio"
+                            name="draft-target"
+                            [checked]="draftKey() === rowKey(r)"
+                            [disabled]="applying()"
+                            (change)="draftKey.set(rowKey(r))"
+                            [attr.aria-label]="'Open ' + r.item.id + ' as draft'"
+                        />
+                    </td>
+                    } @else {
                     <td class="py-1.5 pr-4">
                         <mat-form-field subscriptSizing="dynamic" class="w-36">
                             <mat-select
@@ -110,6 +141,7 @@
                         <inspecto-status-badge [value]="r.result === 'failed' ? 'ERROR' : 'OK'" [label]="r.result" />
                         @if (r.message) { <span class="text-secondary ml-2 text-xs">{{ r.message }}</span> } }
                     </td>
+                    }
                 </tr>
                 }
             </tbody>
@@ -126,6 +158,20 @@
 
 <mat-dialog-actions align="end">
     <button mat-button (click)="close()">Close</button>
+    @if (draftMode) {
+    <button
+        mat-flat-button
+        color="primary"
+        [disabled]="applying() || !draftRow() || !lens.canAuthorWorkbench()"
+        (click)="openDraft()"
+    >
+        @if (applying()) { <mat-spinner diameter="18" class="mr-2"></mat-spinner> }
+        <span
+            >{{ prerequisites().length ? 'Import ' + prerequisites().length + ' first, then open as draft' : 'Open as
+            draft' }}</span
+        >
+    </button>
+    } @else {
     <button
         mat-flat-button
         color="primary"
@@ -135,4 +181,5 @@
         @if (applying()) { <mat-spinner diameter="18" class="mr-2"></mat-spinner> }
         <span>Apply import ({{ actionableCount() }})</span>
     </button>
+    }
 </mat-dialog-actions>

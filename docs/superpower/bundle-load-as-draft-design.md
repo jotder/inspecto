@@ -3,6 +3,11 @@
 > **Status: DECIDED 2026-09-25 (operator answered D1–D8 in §7) — IN FLIGHT.** Build order as signed: the
 > read-only preview extension (§5 row 4, built FIRST) then the editor slices (§5 rows 1–3) for Dashboard, Widget and
 > Dataset. Authored Pipeline (row 5) and Link Analysis / Geo views are later slices, not started.
+> **Shipped 2026-09-25:** §5 row 4 (preview `integrity`) and rows 1–3 for Dashboard, Widget and Dataset — as-built
+> facts in [`metadata-bundle.md`](../okf/backend/control-plane/metadata-bundle.md) § *Import as draft* (D7).
+> **Open:** row 5 (authored Pipeline), then Link Analysis / Geo views; re-checking integrity against the
+> *edited* draft just before Save (row 4's second half — today the check runs once, when the draft opens);
+> a browser drive of the three editors (§6).
 > Concept pages: [`metadata-bundle.md`](../okf/backend/control-plane/metadata-bundle.md) (the import this
 > changes) · [`exchange-sharing.md`](../okf/backend/control-plane/exchange-sharing.md) (the row's named owner; see D7).
 

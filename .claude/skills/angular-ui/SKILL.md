@@ -325,6 +325,13 @@ src/app/
   them without scoping the model hop (BACKLOG AGT-6a · A5). Details + the per-pane gotchas (target-vs-table
   vocabularies, the `kind`+`min`/`max` same-patch trap, the Queries `type` switch):
   `docs/okf/frontend/features/inline-ai-authoring.md`.
+- **Import as draft in an editor → `<inspecto-transfer-menu [importDraft]="true" (draftImported)>` +
+  `<inspecto-import-draft-banner>`** (`inspecto/transfer/`, 2026-09-25; Dashboard/Widget/Dataset editors). The
+  dialog hands back an `ImportDraft`; the host adopts it UNSAVED (placement via `draftPlacement`, cross-editor
+  via `ImportDraftHandoff`) and saves through its OWN route, with `If-Match` from a fresh read when the id
+  exists. Editors only — never libraries/Settings. ⚠ A host that takes a handed-off draft must SKIP its plain
+  stored load, or the async stored copy lands second and overwrites the draft. Details:
+  `docs/okf/backend/control-plane/metadata-bundle.md` § *Import as draft*.
 - **"Explain this screen" on a pane → `<inspecto-ai-explain>`** (`inspecto/ai-assist/`, AGT-6a A4). The
   read-only sibling of the above: one icon button for the pane's header action row —
   `<inspecto-ai-explain screen="Pipelines" [terms]="['Pipeline','Step','Trigger']" />` — that resolves each

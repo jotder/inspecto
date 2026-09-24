@@ -11,6 +11,7 @@ import { LensService, apiErrorMessage } from 'app/inspecto/api';
 import { BundleItem, BundleKind } from './bundle';
 import { BundleTransferService } from './bundle-transfer.service';
 import { ImportBundleData, ImportBundleDialog } from './import-bundle.dialog';
+import { ImportDraft } from './import-draft';
 
 /** What a surface offers to export — a reference to a saved artifact (full content is resolved from the store). */
 export interface TransferItemRef {
@@ -59,6 +60,12 @@ export interface TransferItemRef {
                     <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
                     <span>Import…</span>
                 </button>
+                @if (importDraft()) {
+                    <button mat-menu-item (click)="openImportDraft()">
+                        <mat-icon svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                        <span>Import as draft…</span>
+                    </button>
+                }
             }
         </mat-menu>
     `,
@@ -78,6 +85,11 @@ export class TransferMenuComponent {
     readonly label = input('Import / export');
     /** Fires after an import writes at least one artifact — the host should reload. */
     readonly changed = output<void>();
+    /** Editors only (D8): also offer "Import as draft…", which hands the host an UNSAVED draft instead of
+     *  writing it. Libraries and Settings keep the write-through import alone. */
+    readonly importDraft = input(false);
+    /** The draft the operator chose — the host adopts it as unsaved edits and saves through its own route. */
+    readonly draftImported = output<ImportDraft>();
 
     readonly busy = signal(false);
 
@@ -130,6 +142,18 @@ export class TransferMenuComponent {
             .afterClosed()
             .subscribe((imported: number | undefined) => {
                 if (imported) this.changed.emit();
+            });
+    }
+
+    openImportDraft(): void {
+        const data: ImportBundleData = { allowedKinds: this.allowedKinds(), mode: 'draft' };
+        this.dialog
+            .open(ImportBundleDialog, { data, width: '860px', maxWidth: '95vw', autoFocus: false })
+            .afterClosed()
+            .subscribe((result: ImportDraft | number | undefined) => {
+                if (result && typeof result === 'object') this.draftImported.emit(result);
+                // A prerequisite import that partly landed before a refusal still changed this Space.
+                else if (result) this.changed.emit();
             });
     }
 }
