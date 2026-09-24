@@ -73,8 +73,9 @@ export interface AttributeSpec {
     min?: number;
     max?: number;
     /** Show this attribute only while another attribute holds (`equals`) or doesn't hold (`notEquals`)
-     *  a given value — exactly one of the two; `equals` is the common case (a kind-specific param). */
-    dependsOn?: { key: string; equals: unknown } | { key: string; notEquals: unknown };
+     *  a given value, or holds one of several (`in`) — exactly one of the three; `equals` is the common
+     *  case (a kind-specific param). `in` is UI-local: served specs (`FindingsSpec`) never carry it. */
+    dependsOn?: { key: string; equals: unknown } | { key: string; notEquals: unknown } | { key: string; in: unknown[] };
     /** One-line helper text shown under the field. */
     help?: string;
     placeholder?: string;
@@ -147,6 +148,7 @@ export function dependsOnMatches(
     value: Record<string, unknown>,
 ): boolean {
     const v = value[dependsOn.key];
+    if ('in' in dependsOn) return dependsOn.in.includes(v);
     return 'notEquals' in dependsOn ? v !== dependsOn.notEquals : v === dependsOn.equals;
 }
 

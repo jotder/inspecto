@@ -65,6 +65,12 @@ public final class ExpectationEvaluator {
     }
 
     private static String columnPredicate(Expectation exp, Path dataRoot) {
+        // 'baseline' compares a whole-input PROFILE against accepted history — there is no per-row predicate
+        // to count. Refused by name here (before ident() trips on its absent column) so a caller routing it
+        // through the violation count gets the real reason, not "unsafe column identifier 'null'".
+        if ("baseline".equals(exp.kind()))
+            throw new IllegalArgumentException("a baseline expectation is evaluated by BaselineEvaluator, "
+                    + "not as a row predicate");
         String col = quoteIdent(ident(exp.column()));
         return switch (exp.kind()) {
             case "non_null" -> col + " IS NULL";
@@ -99,7 +105,7 @@ public final class ExpectationEvaluator {
      * ({@code SqlViews.storeReadRoot} — the store-layout contract), so quarantined/backup copies
      * never count against an expectation.
      */
-    private static String parquetGlob(Path dataRoot, String ref) {
+    static String parquetGlob(Path dataRoot, String ref) {
         Path resolved = DataRef.requireUnder(dataRoot, ref, REF_LABEL);
         String root = com.gamma.sql.SqlViews.storeReadRoot(resolved.toString().replace('\\', '/'));
         // The Consignment catalog's PINNED file list, not a live glob (addressing §7-A, 2026-09-06): an

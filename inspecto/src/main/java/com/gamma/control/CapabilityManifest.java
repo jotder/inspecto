@@ -124,6 +124,8 @@ final class CapabilityManifest {
             new Entry("POST", "/expectations", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/expectations/evaluate", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/expectations/([^/]+)/evaluate", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/expectations/([^/]+)/baseline/accept", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/expectations/([^/]+)/baseline/clear", Roles.CAN_OPERATE_RUNS),
 
             new Entry("PUT", "/expectations/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("DELETE", "/expectations/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),

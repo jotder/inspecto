@@ -5,19 +5,32 @@ import type { ConditionGroup } from '../query/query-types';
 import { apiUrl } from './api-base';
 
 /**
- * The five data-quality check kinds (docs/GLOSSARY.md — Expectation, Great-Expectations model). The
+ * The six data-quality check kinds (docs/GLOSSARY.md — Expectation, Great-Expectations model). The
  * first four check one `column`; `condition` (2026-07-18) instead evaluates an arbitrary `when`
  * condition tree as the violation predicate directly (the same `query-types` shape Decision Rules
- * author) — no `column` needed, since the tree names its own field(s).
+ * author) — no `column` needed, since the tree names its own field(s). `baseline` (DUCKLE-C8) profiles the
+ * input and compares it with the median of the last N accepted profiles — it names its own `columns`.
  */
-export type ExpectationKind = 'non_null' | 'range' | 'regex' | 'referential' | 'condition';
+export type ExpectationKind = 'non_null' | 'range' | 'regex' | 'referential' | 'condition' | 'baseline';
 
 /** Outcome of the latest evaluation of one Expectation. */
 export interface ExpectationResult {
     status: 'PASSED' | 'FAILED';
-    /** Records that violated the check in the evaluated window. */
+    /** Records that violated the check in the evaluated window (baseline: out-of-limit cells + missing groups). */
     violations: number;
     checkedAt: number;
+    /** `baseline` kind only: the profile this run recorded, how many accepted profiles it was compared with,
+     *  and the first out-of-limit cells. */
+    profileId?: string;
+    baselineSize?: number;
+    findings?: {
+        group: string;
+        measure: string;
+        column?: string;
+        baseline: number;
+        current: number;
+        direction: string;
+    }[];
 }
 
 /**
@@ -42,6 +55,15 @@ export interface Expectation {
     refColumn?: string | null;
     /** `condition` kind only: the violation predicate itself. */
     when?: ConditionGroup | null;
+    /** `baseline` kind only (flat keys, validated by the server's `Expectation.Baseline`). */
+    baselineWindow?: number;
+    measures?: string[];
+    columns?: string[];
+    maxIncrease?: number | null;
+    maxDecrease?: number | null;
+    limitUnit?: 'percent' | 'absolute';
+    groupBy?: string[];
+    requireExistingGroups?: boolean;
     severity: string;
     enabled: boolean;
     lastResult?: ExpectationResult | null;

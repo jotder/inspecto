@@ -487,11 +487,22 @@ class ConfigSpecsTest {
         assertEquals(List.of(), errors, "when: null is absent, not a malformed map");
     }
 
-    /** {@code condition} is a live kind — the spec's enum must offer all five the record accepts. */
+    /** {@code condition} and {@code baseline} are live kinds — the spec's enum must offer all six the record accepts. */
     @Test
     void expectationKindEnumOffersEveryKindTheRecordAccepts() {
         FieldSpec kind = ConfigSpecs.expectation().field("kind").orElseThrow();
-        assertEquals(List.of("non_null", "range", "regex", "referential", "condition"), kind.enumValues());
+        assertEquals(List.of("non_null", "range", "regex", "referential", "condition", "baseline"),
+                kind.enumValues());
+    }
+
+    /** DUCKLE-C8: a baseline profiles its own {@code columns}, and one with no limit could never fail. */
+    @Test
+    void expectationBaselineNeedsNoColumnButNeedsALimit() {
+        ConfigSpec e = ConfigSpecs.expectation();
+        assertTrue(fire(e, "column-needed-unless-condition", Map.of("kind", "baseline")).isEmpty());
+        assertTrue(fire(e, "baseline-needs-a-limit", Map.of("kind", "baseline")).isPresent());
+        assertTrue(fire(e, "baseline-needs-a-limit", Map.of("kind", "baseline", "maxDecrease", 5)).isEmpty());
+        assertTrue(fire(e, "baseline-needs-a-limit", Map.of("kind", "non_null")).isEmpty());
     }
 
     /**

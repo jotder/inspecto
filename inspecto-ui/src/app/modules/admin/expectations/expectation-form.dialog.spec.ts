@@ -148,6 +148,52 @@ describe('ExpectationFormDialog', () => {
         });
     });
 
+    it('baseline kind hides the column, shows its own params and posts them without a column', () => {
+        const created: unknown[] = [];
+        TestBed.configureTestingModule({
+            imports: [ExpectationFormDialog],
+            providers: [
+                provideNoopAnimations(),
+                provideHttpClient(withXhr()),
+                { provide: MatDialogRef, useValue: { close: () => {} } },
+                { provide: MAT_DIALOG_DATA, useValue: {} },
+                {
+                    provide: ExpectationsService,
+                    useValue: {
+                        create: (b: unknown) => {
+                            created.push(b);
+                            return { subscribe: () => {} };
+                        },
+                    },
+                },
+                { provide: ToastrService, useValue: {} },
+            ],
+        });
+        const fixture = TestBed.createComponent(ExpectationFormDialog);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        c.schemaForm.form.patchValue({ target: 'orders', kind: 'baseline' });
+        fixture.detectChanges();
+        expect(c.schemaForm.form.get('column')!.disabled).toBe(true);
+        expect(c.schemaForm.form.get('maxDecrease')!.disabled).toBe(false);
+        c.schemaForm.form.patchValue({ maxDecrease: 20, groupBy: ['region'], requireExistingGroups: true });
+        c.save();
+        c.saveForm.patchValue({ name: 'orders_baseline' });
+        c.save();
+        expect(created[0]).toMatchObject({
+            name: 'orders_baseline',
+            kind: 'baseline',
+            column: undefined,
+            baselineWindow: 7,
+            measures: ['row_count'],
+            maxIncrease: null,
+            maxDecrease: 20,
+            limitUnit: 'percent',
+            groupBy: ['region'],
+            requireExistingGroups: true,
+        });
+    });
+
     it('edit mode stays on the config step and shows the (immutable) name in the title', () => {
         const fixture = create({
             expectation: {

@@ -715,9 +715,9 @@ public final class ConfigSpecs {
                         "The column the check applies to (required for every kind except condition, "
                                 + "whose when tree names its own fields)."),
                 FieldSpec.enumField("kind", "Kind",
-                        List.of("non_null", "range", "regex", "referential", "condition"), "non_null",
+                        List.of("non_null", "range", "regex", "referential", "condition", "baseline"), "non_null",
                         "The data-quality constraint: not-null, numeric range, regex match, referential "
-                                + "lookup, or an arbitrary condition tree."),
+                                + "lookup, an arbitrary condition tree, or a profile baseline."),
                 FieldSpec.of("min", "Min", FieldType.STRING, "Range lower bound (range kind)."),
                 FieldSpec.of("max", "Max", FieldType.STRING, "Range upper bound (range kind)."),
                 FieldSpec.of("pattern", "Pattern", FieldType.STRING, "Regex the value must match (regex kind)."),
@@ -728,6 +728,23 @@ public final class ConfigSpecs {
                 FieldSpec.of("when", "When", FieldType.MAP,
                         "The violation predicate tree (condition kind) — the same query-types shape a "
                                 + "Decision Rule authors; compiled to SQL by ConditionSql."),
+                // DUCKLE-C8 baseline kind — Expectation.Baseline is the value validator for all of these.
+                FieldSpec.withDefault("baselineWindow", "Baseline window", FieldType.INT, 7,
+                        "Baseline kind: the median of this many most recent accepted profiles is the baseline."),
+                FieldSpec.of("measures", "Measures", FieldType.LIST,
+                        "Baseline kind: row_count, null_count, null_rate, distinct_count, min, max, mean."),
+                FieldSpec.of("columns", "Profiled columns", FieldType.LIST,
+                        "Baseline kind: the columns the per-column measures apply to."),
+                FieldSpec.of("maxIncrease", "Max increase", FieldType.STRING,
+                        "Baseline kind: allowed rise over the baseline (in limitUnit)."),
+                FieldSpec.of("maxDecrease", "Max decrease", FieldType.STRING,
+                        "Baseline kind: allowed fall under the baseline (in limitUnit)."),
+                FieldSpec.enumField("limitUnit", "Limit unit", List.of("percent", "absolute"), "percent",
+                        "Baseline kind: limits as a percentage of the baseline, or absolute."),
+                FieldSpec.of("groupBy", "Group by", FieldType.LIST,
+                        "Baseline kind: profile each group of these columns separately."),
+                FieldSpec.withDefault("requireExistingGroups", "Require existing groups", FieldType.BOOL, false,
+                        "Baseline kind: a group the baseline has but the input lacks is a violation."),
                 FieldSpec.enumField("severity", "Severity", List.of("MINOR", "MAJOR", "CRITICAL"), "MAJOR",
                         "Severity of the Incident raised on failure."),
                 FieldSpec.withDefault("enabled", "Enabled", FieldType.BOOL, true,
@@ -765,7 +782,7 @@ public final class ConfigSpecs {
                 // one. Mirrors Expectation's own constructor check.
                 new CrossFieldRule(
                         "column-needed-unless-condition",
-                        "Every expectation kind except 'condition' needs a column.",
+                        "Every expectation kind except 'condition' and 'baseline' needs a column.",
                         Severity.ERROR,
                         // ⛔ `column` FIRST, and the order is load-bearing: CrossFieldRule anchors the
                         // finding on affectedPaths.get(0), and the field the author must supply is the
@@ -773,7 +790,16 @@ public final class ConfigSpecs {
                         // that is already correct — caught by InspectoToolsTest, which asserts these
                         // findings are anchored, on the FULL reactor and not by this module's own suite.
                         List.of("column", "kind"),
-                        raw -> "condition".equalsIgnoreCase(str(raw, "kind")) || present(raw, "column"))
+                        raw -> "condition".equalsIgnoreCase(str(raw, "kind"))
+                                || "baseline".equalsIgnoreCase(str(raw, "kind")) || present(raw, "column")),
+                // DUCKLE-C8: a baseline with neither limit could never fail — Expectation.Baseline refuses it.
+                new CrossFieldRule(
+                        "baseline-needs-a-limit",
+                        "A baseline expectation needs at least one of maxIncrease/maxDecrease.",
+                        Severity.ERROR,
+                        List.of("maxIncrease", "maxDecrease", "kind"),
+                        raw -> !"baseline".equalsIgnoreCase(str(raw, "kind"))
+                                || present(raw, "maxIncrease") || present(raw, "maxDecrease"))
         );
         return new ConfigSpec("expectation", fields, rules);
     }

@@ -252,6 +252,14 @@ export class ExpectationFormDialog implements AfterViewInit {
               pattern: this.data.expectation.pattern ?? '',
               refDataset: this.data.expectation.refDataset ?? '',
               refColumn: this.data.expectation.refColumn ?? '',
+              baselineWindow: this.data.expectation.baselineWindow ?? 7,
+              measures: this.data.expectation.measures ?? ['row_count'],
+              columns: this.data.expectation.columns ?? [],
+              maxIncrease: this.data.expectation.maxIncrease ?? undefined,
+              maxDecrease: this.data.expectation.maxDecrease ?? undefined,
+              limitUnit: this.data.expectation.limitUnit ?? 'percent',
+              groupBy: this.data.expectation.groupBy ?? [],
+              requireExistingGroups: this.data.expectation.requireExistingGroups ?? false,
               severity: this.data.expectation.severity,
               enabled: this.data.expectation.enabled,
           }
@@ -415,15 +423,24 @@ export class ExpectationFormDialog implements AfterViewInit {
             pattern?: string;
             refDataset?: string;
             refColumn?: string;
+            baselineWindow?: number;
+            measures?: string[];
+            columns?: string[];
+            maxIncrease?: number;
+            maxDecrease?: number;
+            limitUnit?: 'percent' | 'absolute';
+            groupBy?: string[];
+            requireExistingGroups?: boolean;
             severity?: string;
             enabled?: boolean;
         };
+        const baseline = v.kind === 'baseline';
         const body: ExpectationUpsert = {
             name: this.isEdit ? this.data.expectation!.name : String(this.saveForm.getRawValue().name ?? '').trim(),
             description: String(this.saveForm.getRawValue().description ?? '').trim(),
             targetType: v.targetType,
             target: String(v.target ?? '').trim(),
-            column: v.kind === 'condition' ? undefined : String(v.column ?? '').trim(),
+            column: v.kind === 'condition' || baseline ? undefined : String(v.column ?? '').trim(),
             kind: v.kind,
             min: v.kind === 'range' ? (v.min ?? null) : null,
             max: v.kind === 'range' ? (v.max ?? null) : null,
@@ -431,6 +448,19 @@ export class ExpectationFormDialog implements AfterViewInit {
             refDataset: v.kind === 'referential' ? String(v.refDataset ?? '').trim() : null,
             refColumn: v.kind === 'referential' ? String(v.refColumn ?? '').trim() : null,
             when: v.kind === 'condition' ? this.when : null,
+            // baseline keys are sent for the baseline kind only — the server ignores them otherwise anyway
+            ...(baseline
+                ? {
+                      baselineWindow: v.baselineWindow ?? 7,
+                      measures: v.measures ?? ['row_count'],
+                      columns: v.columns ?? [],
+                      maxIncrease: v.maxIncrease ?? null,
+                      maxDecrease: v.maxDecrease ?? null,
+                      limitUnit: v.limitUnit ?? 'percent',
+                      groupBy: v.groupBy ?? [],
+                      requireExistingGroups: v.requireExistingGroups === true,
+                  }
+                : {}),
             severity: v.severity ?? 'MAJOR',
             enabled: v.enabled !== false,
         };

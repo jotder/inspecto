@@ -21,6 +21,15 @@ class AuditTrailTest {
                 AuditTrail.classify("DELETE", "/spaces/team-b"));
     }
 
+    /** DUCKLE-C8: the baseline ops must not read as "expectation.created" in the audit trail. */
+    @Test
+    void classifiesBaselineAcceptAndClear() {
+        assertEquals(new AuditTrail.Action("expectation.accepted", "data_mutation"),
+                AuditTrail.classify("POST", "/expectations/rows/baseline/accept"));
+        assertEquals(new AuditTrail.Action("expectation.cleared", "data_mutation"),
+                AuditTrail.classify("POST", "/expectations/rows/baseline/clear"));
+    }
+
     @Test
     void classifiesConfigAndExport() {
         assertEquals("configuration", AuditTrail.classify("POST", "/config/write").category());

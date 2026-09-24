@@ -73,6 +73,23 @@ describe('attribute-spec', () => {
         expect(validateAttributes(specs, {}).map((f) => f.path)).toEqual(['name']); // title omitted ⇒ no finding
     });
 
+    it('shows an `in` dependsOn attribute only while the controller holds one of the listed values', () => {
+        const specs: AttributeSpec[] = [
+            { key: 'kind', label: 'Kind', type: 'string', tier: 'required' },
+            {
+                key: 'column',
+                label: 'Column',
+                type: 'string',
+                tier: 'required',
+                dependsOn: { key: 'kind', in: ['non_null', 'range'] },
+            },
+        ];
+        expect(visibleSpecs(specs, { kind: 'range' }).map((s) => s.key)).toContain('column');
+        expect(visibleSpecs(specs, { kind: 'baseline' }).map((s) => s.key)).not.toContain('column');
+        expect(validateAttributes(specs, { kind: 'baseline' }).map((f) => f.path)).toEqual([]);
+        expect(validateAttributes(specs, { kind: 'non_null' }).map((f) => f.path)).toEqual(['column']);
+    });
+
     it('hides a notEquals dependsOn attribute exactly when the controller matches', () => {
         const specs: AttributeSpec[] = [
             {
