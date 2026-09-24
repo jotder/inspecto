@@ -23,7 +23,7 @@ public enum NotificationCategory {
     JOB("job", "Job alerts", false, true),
     OPS("ops", "Operational alerts", false, true),
     COLLABORATION("collaboration", "Collaboration & comments", false, false),
-    SECURITY("security", "Security & passwords", true, false);
+    SECURITY("security", "Security", true, false);
 
     private final String id;
     private final String label;

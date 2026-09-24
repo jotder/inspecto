@@ -533,5 +533,5 @@ T2 keyed by a spoofed XFF from an unlisted peer counts against the **socket** pe
 | **D11** | `DeliveryDelay` maps to `BOUNCED_SOFT` or to `UNKNOWN`. | **`UNKNOWN`.** SES is still retrying on its own, and a soft bounce would make our retry task resend alongside it. |
 | **D12** | GeoIP: which database the documentation recommends, and whether `geo_city` is recorded or only `geo_country`. | **Recommend nothing we bundle. Document GeoLite2 (the operator downloads it) and DB-IP Lite. Record country only by default.** City is more personal data for little security value. |
 | **D13** | The false-premise `self-service` exemptions on `read-all`, `/{id}/read` and `DELETE /{id}` (F2). | **File a separate row and correct the exemption rationale text now.** Per-user read state is a larger change to `NotificationStore` than preferences are. |
-| **D14** | Rename the "Security & passwords" category, given that password events happen at the IdP. | **Rename it to "Security"** (a UI-only change; the category id `security` stays). |
+| **D14** | Rename the "Security & passwords" category, given that password events happen at the IdP. | **Rename it to "Security"** (a UI-only change; the category id `security` stays).  ✅ **DONE 2026-09-25** (operator). |
 

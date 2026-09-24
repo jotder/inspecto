@@ -17,7 +17,7 @@ const GRID = [
     },
     {
         category: 'security',
-        label: 'Security & passwords',
+        label: 'Security',
         critical: true,
         available: false,
         channels: { inApp: true, email: true },

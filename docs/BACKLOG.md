@@ -103,7 +103,7 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | 3.2 | Platform Services Stage 2 / 3 | 10 calls in `superpower/platform-services-stage2-design.md` (Decisions owed) |
 | 3.3 | Parsing (Stage-1) — parser-plugin trust | none — all ten calls answered 2026-09-25 (see the row) in `superpower/parser-plugins-trust-design.md` (Decisions owed) |
 | 3.5 | cross-Space consequence | 11 calls (D2 decided 2026-09-25; D10, the consequence actually asked for, is the one that unblocks the build) in `superpower/cross-space-consequence-design.md` (Decisions owed) |
-| 3.5 | `D8-SES-SNS-1` | ⏸ adapter ON HOLD 2026-09-25 (D1–D12 parked); D13 answered by per-user read state; open: D14 (rename the "Security & passwords" category) and the per-user preferences design, §7 of `superpower/ses-sns-adapter-design.md` |
+| 3.5 | `D8-SES-SNS-1` | ⏸ adapter ON HOLD 2026-09-25 (D1–D12 parked); D13 answered by per-user read state; D14 done 2026-09-25 (the category label is now "Security"; id `security` unchanged); open: the per-user preferences design, §7 of `superpower/ses-sns-adapter-design.md` |
 | 3.7 | Bundle "load as draft" | none — all eight calls answered 2026-09-25: D1 in-memory · D2 save via the pane's route · D3 advisory findings · D4 write-through prerequisites first · D5 Dashboard/Widget/Dataset, then authored Pipeline, then LA/Geo views, never `connection` · D6 existing id ⇒ unsaved edits + diff · D7 as-built in the Metadata Bundles concept · D8 "Import as draft…" beside "Import…" in editors only |
 | 3.8 | policy-authoring UX | 9 calls in `superpower/policy-authoring-ux-design.md` (Decisions owed) |
 | 3.8 | `DUCKLE-C6-POLICY-NARROWING-1` | 16 calls in `superpower/policy-narrowing-design.md` (Decisions owed) |
