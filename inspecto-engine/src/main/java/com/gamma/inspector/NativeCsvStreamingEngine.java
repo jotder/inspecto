@@ -138,7 +138,8 @@ final class NativeCsvStreamingEngine {
 
         var written = writeAndTrace(conn, "transformed", partitionColumns(schema),
                 cfg, databaseDir(batch, cfg), consolidatedBaseName(survivors, batch),
-                batch.batchId(), srcIdToFile, "");   // union streaming: the batch's ONE write
+                batch.batchId(), srcIdToFile, "",   // union streaming: the batch's ONE write
+                batch.members().get(0).selection().table());
 
         return new IngestOutcome(batchStart, "SUCCESS", "", survivors, memberAudits,
                 written.outputs(), written.lineage(), totalInputRows, batch.schemaName(),
@@ -180,7 +181,7 @@ final class NativeCsvStreamingEngine {
         Streamed s;
         try {
             s = streamUnit(conn, m.file(), m.file().getName(), schema, cfg,
-                    dbDir, baseName, partCols, m.srcId(), batch.batchId());
+                    dbDir, baseName, partCols, m.srcId(), batch.batchId(), m.selection().table());
         } catch (SinkFlushException | TransformFailedException e) {
             throw e;   // the write or the transform failed, not the read → fail the batch (don't quarantine)
         } catch (Exception e) {
@@ -246,7 +247,7 @@ final class NativeCsvStreamingEngine {
                     // Lineage is attributed to the ORIGINAL file name, not the transient chunk.
                     Streamed s = streamUnit(conn, chunk, m.file().getName(), schema, cfg, dbDir,
                             baseName + "_c" + String.format("%05d", seq), partCols,
-                            m.srcId(), batch.batchId());
+                            m.srcId(), batch.batchId(), m.selection().table());
                     parsedTotal += s.parsed();
                     rejectTotal += s.rejects();
                     outputs.addAll(s.outputs());
@@ -314,7 +315,8 @@ final class NativeCsvStreamingEngine {
      */
     private static Streamed streamUnit(Connection conn, File physical, String lineageName,
                                        Map<String, Object> schema, PipelineConfig cfg, String dbDir,
-                                       String baseName, List<String> partCols, int srcId, String batchId)
+                                       String baseName, List<String> partCols, int srcId, String batchId,
+                                       String selectedTable)
             throws Exception {
         dropTable(conn, "transformed");
         DuckDbCsvIngester.createRawInputView(physical, conn, schema, cfg, "raw_input", srcId);
@@ -349,7 +351,7 @@ final class NativeCsvStreamingEngine {
         ConsignmentIngestStrategy.Written written;
         try {
             written = writeAndTrace(conn, "transformed", partCols, cfg, dbDir, baseName,
-                    batchId, Map.of(srcId, lineageName), baseName);
+                    batchId, Map.of(srcId, lineageName), baseName, selectedTable);
         } catch (Exception e) {
             throw new SinkFlushException("partition write failed for " + baseName + ": " + msg(e), e);
         }

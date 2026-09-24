@@ -179,7 +179,8 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
                     StepProgress.track(cfg.identity().pipelineName(), batch.batchId(), "sink", 3, 3);
                     var written = writeAndTrace(conn, "transformed", partitionColumns(schema),
                             cfg, databaseDir(batch, cfg), consolidatedBaseName(survivors, batch),
-                            batch.batchId(), srcIdToFile, "");   // the batch's ONE write — no scope needed
+                            batch.batchId(), srcIdToFile, "",   // the batch's ONE write — no scope needed
+                            batch.members().get(0).selection().table());
                     outputs = written.outputs();
                     lineage = written.lineage();
                     bounds  = written.bounds();

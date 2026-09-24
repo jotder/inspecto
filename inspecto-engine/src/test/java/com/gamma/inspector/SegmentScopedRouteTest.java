@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * on a MULTI-SCHEMA pipeline — a CSV {@code schemas[]} selector or a plugin {@code segments} map — executes
  * ONE schema's route tree per write, never another schema's.
  *
- * <p>S1 pins the defects as they stand today.
+ * <p>S1 pinned the defects; S3 fixed the seed (D1) and the admission (D2).
  */
 class SegmentScopedRouteTest {
 
@@ -32,20 +32,40 @@ class SegmentScopedRouteTest {
             new DecisionRuleApplier.Result(List.of(), List.of());
 
     /**
-     * D1 as it stood: a selector batch writes with {@code writeScope = ""}, so no segment key is known and
-     * the seed is the FIRST {@code transform.route} node's upstream — {@code map_alpha} — whatever schema the
-     * batch actually is. A {@code beta} batch would be routed by {@code route_alpha} and written through
-     * {@code sink_alpha__d*}, whose store/table/schema name alpha.
+     * D1, fixed in S3. A selector batch writes with {@code writeScope = ""}, so before S3 no key was known
+     * and the seed was the FIRST {@code transform.route} node's upstream — {@code map_alpha} — whatever the
+     * batch's schema: a {@code beta} batch was routed by {@code route_alpha} and written through
+     * {@code sink_alpha__d*}. The batch's selected table now names its key, so a beta batch seeds
+     * {@code map_beta} and the admitted graph carries beta's tree only.
      */
     @Test
-    void aSelectorBatchWithNoWriteKeyIsSeededAtTheFirstSchemasMap(@TempDir Path dir) throws Exception {
+    void aSelectorBatchIsSeededAtItsOwnSchemasMap(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(selectorRoutePipeline(dir, false).toString());
 
         assertNull(ConsignmentIngestStrategy.segmentWrite(cfg, ""), "a selector write carries no segment scope");
-        PipelineGraph lifted = ConsignmentIngestStrategy.admittedLift(cfg, NO_RULES, null);
+        String key = ConsignmentIngestStrategy.selectorWrite(cfg, "beta");
+        assertEquals("beta", key);
+        PipelineGraph lifted = ConsignmentIngestStrategy.admittedLift(cfg, NO_RULES, key);
         assertNotNull(lifted, "the route engages the graph lane");
-        assertEquals("map_alpha", ConsignmentIngestStrategy.seedOfWrite(lifted, null),
-                "with no key the seed is the first schema's map — the wrong one for every non-first schema");
+        assertEquals("map_beta", ConsignmentIngestStrategy.seedOfWrite(lifted, key));
+        assertTrue(lifted.byId().containsKey("route_beta"));
+        assertFalse(lifted.byId().containsKey("route_alpha"),
+                "the admitted graph is beta's subtree — alpha's route tree is not in it");
+        assertNull(ConsignmentIngestStrategy.selectorWrite(cfg, "gamma"), "an undeclared table names no key");
+        assertNull(ConsignmentIngestStrategy.selectorWrite(cfg, null));
+    }
+
+    /** D2, fixed in S3: a per-segment route write is admitted on that segment's slice, not the whole lift. */
+    @Test
+    void aSegmentRouteWriteIsAdmittedOnItsOwnSlice(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(segmentRoutePipeline(dir, false).toString());
+
+        PipelineGraph lifted = ConsignmentIngestStrategy.admittedLift(cfg, NO_RULES,
+                ConsignmentIngestStrategy.segmentWrite(cfg, "SMS"));
+        assertNotNull(lifted);
+        assertEquals("map_SMS", ConsignmentIngestStrategy.seedOfWrite(lifted, "SMS"));
+        assertTrue(lifted.nodes().stream().noneMatch(n -> n.id().contains("CALL")),
+                "no CALL node in the SMS write's graph: " + lifted.byId().keySet());
     }
 
     /**

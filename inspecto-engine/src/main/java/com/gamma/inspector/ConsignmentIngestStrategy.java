@@ -124,6 +124,20 @@ interface ConsignmentIngestStrategy {
                                  PipelineConfig cfg, String dbDir, String baseName,
                                  String batchId, Map<Integer, String> srcIdToFile,
                                  String writeScope) throws Exception {
+        return writeAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile, writeScope, null);
+    }
+
+    /**
+     * As above, for a CSV {@code schemas[]} selector batch: {@code selectedTable} is the table the batch's
+     * schema was selected under ({@code Selection.table()}), which names that schema's subtree of the lift.
+     * ⚠ It is a SEPARATE argument, not {@code writeScope}: the single-member streaming and chunked lanes
+     * already use {@code writeScope} for the chunk base name (the branch-ledger discriminator), and a
+     * selector batch is one schema written in one call, so its ledger scope stays {@code ""}.
+     */
+    static Written writeAndTrace(Connection conn, String table, List<String> partCols,
+                                 PipelineConfig cfg, String dbDir, String baseName,
+                                 String batchId, Map<Integer, String> srcIdToFile,
+                                 String writeScope, String selectedTable) throws Exception {
         // ── the lane fork ─────────────────────────────────────────────────────
         // This is the one choke point every ingest lane already funnels through, holding the live
         // connection and the materialised table. Everything downstream of the returned Written
@@ -155,7 +169,12 @@ interface ConsignmentIngestStrategy {
         // its question about the sub-chain THIS call writes - map_<segKey> -> sink_<segKey> - not about the
         // whole lifted pipeline, which carries one such chain per schema plus quarantine and would always
         // look like more sinks than the config declares.
+        //
+        // A schemas[] selector batch is ONE schema written in one call; its schema is named by the selected
+        // table. Only a route: pipeline is keyed by it — a non-route selector write keeps today's (flat)
+        // admission, which asks about the whole lift; widening that lane is not this change's to make.
         String segKey = segmentWrite(cfg, writeScope);
+        if (segKey == null && cfg.routeConfig() != null) segKey = selectorWrite(cfg, selectedTable);
         com.gamma.pipeline.PipelineGraph lifted = admittedLift(cfg, applied, segKey);
         return lifted != null
                 ? graphWriteAndTrace(conn, table, partCols, cfg, dbDir, baseName, batchId, srcIdToFile,
@@ -192,11 +211,15 @@ interface ConsignmentIngestStrategy {
     static com.gamma.pipeline.PipelineGraph admittedLift(PipelineConfig cfg, DecisionRuleApplier.Result applied,
                                                         String segKey) {
         com.gamma.pipeline.PipelineGraph lifted = null;
+        // A per-schema write (segKey known) is admitted, seeded and walked on THAT schema's slice of the
+        // lift (PipelineLift.scope) — never on N schemas' trees at once, and never relying on the executor's
+        // no-live-inbound skip to leave the other schemas alone. A null key is the whole graph (identity).
         if (cfg.routeConfig() != null) {
-            com.gamma.pipeline.PipelineGraph routed = com.gamma.pipeline.PipelineLift.lift(cfg);
+            com.gamma.pipeline.PipelineGraph routed =
+                    com.gamma.pipeline.PipelineLift.scope(com.gamma.pipeline.PipelineLift.lift(cfg), segKey);
             if (com.gamma.pipeline.exec.ConsignmentGraphRunner.engages(routed)) lifted = routed;
         } else if (graphLaneCarries(cfg, segKey)) {
-            lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
+            lifted = com.gamma.pipeline.PipelineLift.scope(com.gamma.pipeline.PipelineLift.lift(cfg), segKey);
         }
         String mode = System.getProperty(LANE_PROPERTY, "auto").trim().toLowerCase(java.util.Locale.ROOT);
         return switch (mode) {
@@ -490,7 +513,24 @@ interface ConsignmentIngestStrategy {
     static String segmentWrite(PipelineConfig cfg, String writeScope) {
         if (writeScope == null || writeScope.isEmpty()) return null;
         Map<String, Map<String, Object>> segments = cfg.schemas().segments();
-        return segments != null && segments.containsKey(writeScope) ? writeScope : null;
+        // The LIFT's key for the segment (PipelineLift.routeKey), which is what its node ids carry.
+        return segments != null && segments.containsKey(writeScope)
+                ? com.gamma.pipeline.PipelineLift.routeKey(writeScope, 0) : null;
+    }
+
+    /**
+     * The lift key of the {@code schemas[]} selector entry whose table is {@code selectedTable}, or
+     * {@code null} when the pipeline has no selector or declares no such table. Mirrors the key
+     * {@code PipelineLift} gives that entry's subtree ({@code routeKey(table, index)}), so the seed and the
+     * scope name exactly the nodes the lift emitted.
+     */
+    static String selectorWrite(PipelineConfig cfg, String selectedTable) {
+        if (selectedTable == null || cfg.schemas().selector() == null) return null;
+        List<com.gamma.etl.SchemaSelector.Selection> entries = cfg.schemas().selector().entries();
+        for (int i = 0; i < entries.size(); i++)
+            if (selectedTable.equals(entries.get(i).table()))
+                return com.gamma.pipeline.PipelineLift.routeKey(entries.get(i).table(), i);
+        return null;
     }
 
     /**
