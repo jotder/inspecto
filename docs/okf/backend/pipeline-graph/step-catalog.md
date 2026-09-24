@@ -84,7 +84,8 @@ consignment caps), not only the served `AttributeSpec`s, because the canvas form
 *Form* names the acquisition-node attribute (`__` = nesting; `NodeAttributes.COLLECTOR`); *spec* marks a
 leaf `ConfigSpecs.pipeline()` declares, so `POST /config/write` and the graph save type-check it. Every
 sub-block is additive: absent means the default in the table. *Remote* = read only on the remote
-acquisition path (`CollectorProcessor.acquire`); a `local` inbox never reaches it.
+acquisition path (`CollectorProcessor.acquire`); a `local` inbox never reaches it, and since 2026-09-24 a save
+warns when one is set on a local inbox (`WARN_COLLECTOR_KEY_INERT`, [config safety](../config/config-safety.md#collector-checks--throttle-breaker-archive-2026-09-24)).
 
 | Key | Type · default | Form | What it does |
 |---|---|---|---|
@@ -107,7 +108,7 @@ acquisition path (`CollectorProcessor.acquire`); a `local` inbox never reaches i
 | `gap_detection.sequence` / `.enabled` | string / boolean · `true` | — (the `gap` node) | Numbered-series template (`ORDERS_{yyyyMMdd}`); a hole raises `SEQUENCE_GAP`. Authored on its own node. |
 | `incremental.watermark` | `last_modified` | — | Skip files modified strictly before the ledger's high-watermark. Needs a content-based `duplicate.mode` (the parser warns otherwise; path mode never engages it). Other values disable it. |
 | `fetch.parallel_fetch` | number · `1` | `fetch__parallel_fetch` | *Remote.* Files downloaded at once, each on its own connector session. |
-| `fetch.rate_limit` | rate · unlimited | `fetch__rate_limit` · spec | *Remote.* Bandwidth cap: `512KB/s`, `10MBps`, `1GB/s` or bare bytes/s (1024-based). |
+| `fetch.rate_limit` | rate · unlimited | `fetch__rate_limit` · spec | *Remote.* Bandwidth cap: `512KB/s`, `10MBps`, `1GB/s` or bare bytes/s (1024-based). A value outside that grammar is a 422 at save (it used to fail at load). |
 | `fetch.staging_dir` | path | — | *Remote.* Where a fetch stages before it lands in the inbox. |
 | `fetch.mode` | string · `STAGE` | — | Parsed and round-tripped; no code reads it. |
 | `retry.count` | number · `0` | `retry__count` · spec | *Remote.* Extra attempts for a failed listing or file download. `0` = one attempt. |
@@ -115,11 +116,12 @@ acquisition path (`CollectorProcessor.acquire`); a `local` inbox never reaches i
 | `retry.initial_delay` / `retry.max_delay` | duration · `1s` / `60s` | `retry__initial_delay` / `retry__max_delay` · spec | First delay, and the cap on any one delay. |
 | `circuit_breaker.failure_threshold` | number · `5` | `circuit_breaker__failure_threshold` · spec | *Remote.* Consecutive failed listings that trip the breaker. The block's presence turns the breaker on; absent = never trips. |
 | `circuit_breaker.cooldown` | duration · `5m` | `circuit_breaker__cooldown` · spec | How long a tripped breaker skips acquisition before one trial listing. |
-| `post_action.on_success` | `RETAIN` · `DELETE` · `MOVE` · `RENAME` · `TAG` · `RETAIN` | `post_action__on_success` | *Remote.* What happens to the source-side original after a successful fetch. Checked against the connector's capabilities each cycle. |
-| `post_action.archive_path` | path template | `post_action__archive_path` | The `MOVE` target. `yyyy`/`yy`/`MM`/`dd`/`HH`/`mm`/`ss` resolve against now (`PostAction.resolveTemplate`). |
+| `post_action.on_success` | `RETAIN` · `DELETE` · `MOVE` · `RENAME` · `TAG` · `RETAIN` | `post_action__on_success` · spec | *Remote.* What happens to the source-side original after a successful fetch. Checked against the connector's capabilities each cycle. An unknown value is a 422 at save (the engine would silently RETAIN). |
+| `post_action.archive_path` | path template | `post_action__archive_path` · spec | The `MOVE` target — required with `MOVE` (`ERR_COLLECTOR_CONFIG_INVALID` when active). `yyyy`/`yy`/`MM`/`dd`/`HH`/`mm`/`ss` resolve against now (`PostAction.resolveTemplate`). |
 | `post_action.tags` | map | — | Tags `TAG` writes. |
-| `post_action.on_unsupported` | `FAIL` · `WARN_AND_CONTINUE` · `IGNORE` · `WARN_AND_CONTINUE` | — | When the connector lacks the capability: `FAIL` stops the cycle, the others retain the file. |
+| `post_action.on_unsupported` | `FAIL` · `WARN_AND_CONTINUE` · `IGNORE` · `WARN_AND_CONTINUE` | — · spec | When the connector lacks the capability: `FAIL` stops the cycle, the others retain the file. |
 | `consignment.max_files` / `.max_bytes` / `.order` | number · `1` / number / `mtime` · `name` | `consignment__*` | Consignment packing ([above](#collect--acquisition--the-collector)). `max_files` is spec-declared. |
+| `processing.intake.max_files_per_cycle` / `.min_files_per_cycle` / `.adaptive` | number / number / boolean · inherit `-Dingest.*` | — · spec | The **local** throttle (`IntakeGovernor`): files one poll cycle may admit, the floor the adaptive controller may halve it to, and whether cycle overrun adjusts it. `0` = explicitly unbounded. Not under `collector:`, but it is the admission cap the Collector obeys; `examples/05-acquisition/intake-throttle` shows it. |
 
 Duration = a bare number of seconds or `N` + `s`/`m`/`h`/`d` (`toMillis`); the spec's pattern is the same
 rule, pinned by `CollectorResilienceSpecParityTest`. The acquisition node also borrows `trigger__*`,

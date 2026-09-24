@@ -57,6 +57,17 @@ public final class FindingCodes {
     /** The same step-config refusal on an INACTIVE draft — it bites only at activation. */
     public static final String WARN_STEP_CONFIG_INVALID = "WARN_STEP_CONFIG_INVALID";
 
+    /** An ACTIVE pipeline whose Collector config the run cannot honour — a {@code post_action} MOVE with no
+     *  {@code archive_path} ({@code PROCESSOR-RELEASE-READINESS-1}, sink.archive, 2026-09-24). */
+    public static final String ERR_COLLECTOR_CONFIG_INVALID = "ERR_COLLECTOR_CONFIG_INVALID";
+
+    /** The same Collector refusal on an INACTIVE draft — it bites only at activation. */
+    public static final String WARN_COLLECTOR_CONFIG_INVALID = "WARN_COLLECTOR_CONFIG_INVALID";
+
+    /** Remote-only Collector keys ({@code fetch}, {@code retry}, {@code circuit_breaker}, a non-RETAIN
+     *  {@code post_action}) on a LOCAL inbox Collector — accepted, but they never engage. Advisory only. */
+    public static final String WARN_COLLECTOR_KEY_INERT = "WARN_COLLECTOR_KEY_INERT";
+
     /** Two {@code sinks[]} destinations whose effective ducklake is one catalog + one registered table —
      *  every batch would insert both destinations' files into it ({@code SinkLakeCollisions}). A shape
      *  rule, not an arming one: refused regardless of {@code active}, so it has no {@code WARN_} twin. */

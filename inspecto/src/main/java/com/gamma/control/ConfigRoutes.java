@@ -242,6 +242,49 @@ final class ConfigRoutes {
      * split: ACTIVE ⇒ ERROR (the save is refused), inactive draft ⇒ WARNING (it saves; the refusal
      * bites at activation and again at run, {@code RowShaper.dedup}'s backstop).
      */
+    /**
+     * The Collector's remote-only keys, judged at save (`PROCESSOR-RELEASE-READINESS-1`, 2026-09-24):
+     * <ul>
+     *   <li>a {@code post_action.on_success: MOVE} with no {@code archive_path} has no target — the connector
+     *       would move the file onto its own path. ACTIVE ⇒ ERROR, inactive draft ⇒ WARNING (the arming split).</li>
+     *   <li>{@code fetch.*}, {@code retry}, {@code circuit_breaker} or an active {@code post_action} on a
+     *       LOCAL inbox Collector are read only by {@code CollectorProcessor.acquire}, which returns at once
+     *       for {@code local} — so the throttle, breaker or archive the author configured never engages.
+     *       WARNING only: the keys are harmless, just inert, and a Connection may be bound later.</li>
+     * </ul>
+     * A Collector bound to a {@code connection} is judged remote: the form derives its connector from the
+     * Connection at save, so an absent {@code connector} there is not proof of a local inbox.
+     */
+    static List<Finding> collectorFindings(String type, Map<String, Object> draft) {
+        if (!"pipeline".equals(type) || !(draft.get("collector") instanceof Map<?, ?> col)) return List.of();
+        boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
+        List<Finding> out = new ArrayList<>();
+        Map<?, ?> pa = col.get("post_action") instanceof Map<?, ?> m ? m : Map.of();
+        String onSuccess = pa.get("on_success") == null ? "" : String.valueOf(pa.get("on_success")).trim();
+        boolean postActionActive = !onSuccess.isEmpty() && !"RETAIN".equalsIgnoreCase(onSuccess);
+        if ("MOVE".equalsIgnoreCase(onSuccess)
+                && (pa.get("archive_path") == null || String.valueOf(pa.get("archive_path")).isBlank()))
+            out.add(new Finding(active ? Severity.ERROR : Severity.WARNING, "collector.post_action.archive_path",
+                    "collector.post_action.on_success is MOVE but archive_path is blank — there is no target to "
+                            + "move the source file to",
+                    active ? FindingCodes.ERR_COLLECTOR_CONFIG_INVALID : FindingCodes.WARN_COLLECTOR_CONFIG_INVALID,
+                    "set collector.post_action.archive_path (e.g. archive/yyyy/MM/dd), or choose RETAIN / DELETE / RENAME"));
+        String connector = col.get("connector") == null ? "" : String.valueOf(col.get("connector")).trim();
+        boolean local = (connector.isEmpty() || "local".equalsIgnoreCase(connector)) && col.get("connection") == null;
+        if (local) {
+            List<String> inert = new ArrayList<>();
+            for (String k : List.of("fetch", "retry", "circuit_breaker")) if (col.get(k) != null) inert.add(k);
+            if (postActionActive) inert.add("post_action");
+            if (!inert.isEmpty())
+                out.add(new Finding(Severity.WARNING, "collector." + inert.get(0),
+                        "collector." + String.join(", collector.", inert) + " only act on a remote Collector — this "
+                                + "one reads a local inbox, so they never engage",
+                        FindingCodes.WARN_COLLECTOR_KEY_INERT,
+                        "bind a remote Connection, or remove the keys; a local inbox's throttle is processing.intake"));
+        }
+        return out;
+    }
+
     static List<Finding> dedupWindowFindings(String type, Map<String, Object> draft) {
         if (!"pipeline".equals(type)) return List.of();
         boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));

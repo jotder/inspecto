@@ -466,6 +466,24 @@ helper `routeColumnFindings` uses (`branchPredicateFindings`), so they carry the
 rule; a blank predicate stays `routeArmingFindings`' refusal and is not double-reported. Pinned by
 `StepConfigSaveFindingsTest`.
 
+### Collector checks — throttle, breaker, archive (2026-09-24)
+
+*Added 2026-09-24 (`PROCESSOR-RELEASE-READINESS-1`, the "fails clearly at save" point for
+`control.throttle`, `control.circuitbreaker` and `sink.archive`).* Three faults used to save clean and do
+nothing, or fail only at load:
+
+| Fault | Before | Now |
+|---|---|---|
+| `collector.fetch.rate_limit: fast` | saved; `parseRate` threw at LOAD | 422 at save — the spec carries `parseRate`'s grammar (number, optional `KB`/`MB`/`GB`/`B`, optional `/s`/`ps`/`/sec`) |
+| `collector.post_action.on_success: MOEV` (or an unknown `on_unsupported`) | saved; the run logged a warning and silently RETAINED | 422 at save — both are spec ENUMs (any case) |
+| `on_success: MOVE` with a blank `archive_path` | saved; the connector moved the file onto its own path | `ERR_COLLECTOR_CONFIG_INVALID` (active) / `WARN_COLLECTOR_CONFIG_INVALID` (inactive draft) |
+| `fetch`, `retry`, `circuit_breaker` or a non-RETAIN `post_action` on a **local** inbox | saved; `CollectorProcessor.acquire` returns at once for `local`, so none of them ever engaged | `WARN_COLLECTOR_KEY_INERT`, naming every inert key — a warning, never a refusal (harmless, and a Connection may be bound later) |
+
+`ConfigRoutes.collectorFindings`, run by `SaveGate`, so every save door gets it. A Collector bound to a
+`connection` is judged remote even with no `connector` — the form derives it from the Connection. Pinned
+by `CollectorSaveFindingsTest` and, for the spec half, `CollectorResilienceSpecParityTest` (spec ⇔ parser on
+the rate grammar; the unknown post-action is one-way — the engine would retain, the spec refuses).
+
 ## Decision 2026-09-06 — job configs get a save-time spec; the depth rule stays
 
 (a) Job `.toon` files bypass `ConfigSafetyValidator` at save because no `ConfigSpecs.job()` exists, so

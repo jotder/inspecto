@@ -30,6 +30,11 @@ public final class ConfigSpecs {
     /** A Collector duration as {@code PipelineConfigParser.toMillis} accepts it: bare seconds, or N s|m|h|d. */
     private static final String DURATION = "\\s*[+-]?\\d+\\s*[smhdSMHD]?\\s*";
 
+    /** What {@code PipelineConfigParser.parseRate} accepts, minus its NaN/exponent/negative edge cases:
+     *  a number, an optional binary unit, an optional per-second suffix. No {@code (?i)} — the pattern is
+     *  also served to the SPA's JSON Schema, and a JS RegExp has no inline flags. */
+    private static final String RATE = "\\s*\\d+(\\.\\d+)?\\s*([kKmMgG]?[bB])?\\s*(/[sS]|[pP][sS]|/[sS][eE][cC])?\\s*";
+
     /** Spec types in canonical order — also the set accepted by {@code GET /config/spec/{type}}. */
     public static final List<String> TYPES =
             List.of("pipeline", "enrichment", "job", "schema", "meta", "alert", "expectation",
@@ -254,9 +259,10 @@ public final class ConfigSpecs {
                 // ⚠ NO spec defaults here, deliberately: the config pane seeds spec defaults into the saved
                 // file (config.component.ts toAttrSpecs), and a written circuit_breaker block ARMS the
                 // breaker — the parser enables it on presence. Each default is stated in the description.
-                FieldSpec.of("collector.fetch.rate_limit", "Download rate limit", FieldType.STRING,
+                new FieldSpec("collector.fetch.rate_limit", "Download rate limit",
                         "Remote Collectors only: cap on this pipeline's download bandwidth — 512KB/s, 10MB/s, "
-                                + "1GB/s or a bare number of bytes/s. Blank = unlimited."),
+                                + "1GB/s or a bare number of bytes/s. Blank = unlimited.",
+                        FieldType.STRING, false, null, List.of(), RATE, null, null),
                 FieldSpec.of("collector.retry.count", "Retries", FieldType.INT,
                         "Remote Collectors only: extra attempts for a failed listing or file download. Default 0 "
                                 + "(one attempt)."),
@@ -278,6 +284,19 @@ public final class ConfigSpecs {
                         "How long a tripped breaker skips acquisition before one trial listing: a bare number of "
                                 + "seconds or N s|m|h|d. Default 5m.",
                         FieldType.STRING, false, null, List.of(), DURATION, null, null),
+                // ── source-side post-action (PROCESSOR-RELEASE-READINESS-1, sink.archive, 2026-09-24) ──
+                // RemoteAcquisitionHandler.resolvePostAction reads an unknown on_success as RETAIN with a
+                // run-time log line only, so a typo silently archived nothing. No spec defaults, as above.
+                FieldSpec.enumField("collector.post_action.on_success", "After success",
+                        List.of("RETAIN", "DELETE", "MOVE", "RENAME", "TAG"), null,
+                        "Remote Collectors only: what happens to the source-side original after a successful "
+                                + "fetch. MOVE needs archive_path. Default RETAIN."),
+                FieldSpec.of("collector.post_action.archive_path", "Archive path", FieldType.STRING,
+                        "The MOVE target on the source; yyyy/yy/MM/dd/HH/mm/ss resolve against now."),
+                FieldSpec.enumField("collector.post_action.on_unsupported", "When the connector cannot",
+                        List.of("FAIL", "WARN_AND_CONTINUE", "IGNORE"), null,
+                        "When the connector lacks the post-action's capability: FAIL stops the cycle, the "
+                                + "others retain the file. Default WARN_AND_CONTINUE."),
                 FieldSpec.withDefault("processing.batch.max_files", "Consignment max files (deprecated)", FieldType.INT, 1,
                         "DEPRECATED alias of collector.consignment.max_files, read only when the canonical block is "
                                 + "absent; the editor rewrites it into collector.consignment on the next save."),

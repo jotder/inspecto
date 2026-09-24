@@ -51,6 +51,36 @@ class CollectorResilienceSpecParityTest {
         assertTrue(disagreements.isEmpty(), "spec and parser disagree:\n  " + String.join("\n  ", disagreements));
     }
 
+    /** {@code fetch.rate_limit}: until 2026-09-24 the spec took any string and {@code parseRate} threw at LOAD. */
+    @Test
+    void theSpecAndTheParserAgreeOnTheRateLimit() {
+        List<String> disagreements = new ArrayList<>();
+        for (String r : List.of("512KB/s", "10MBps", "1GB/s", "2048", "1.5MB", "64kb/sec", "100 KB/s"))
+            check("fetch.rate_limit", r, true, disagreements);
+        for (String r : List.of("fast", "10 MiB/s", "ten KB", "5 KB/min"))
+            check("fetch.rate_limit", r, false, disagreements);
+        assertTrue(disagreements.isEmpty(), "spec and parser disagree:\n  " + String.join("\n  ", disagreements));
+    }
+
+    /**
+     * ⚠ One-way, like the backoff below: {@code RemoteAcquisitionHandler.resolvePostAction} reads an unknown
+     * {@code on_success} as RETAIN with a run-time log line, so the parser never refuses one — the spec's
+     * ENUM does, at the save. The known values (any case — the record upper-cases them) are accepted by both.
+     */
+    @Test
+    void anUnknownPostActionIsRefusedBySpecAlthoughTheEngineWouldRetain() {
+        List<String> disagreements = new ArrayList<>();
+        for (String v : List.of("RETAIN", "delete", "MOVE", "Rename", "TAG"))
+            check("post_action.on_success", v, true, disagreements);
+        for (String v : List.of("FAIL", "warn_and_continue", "IGNORE"))
+            check("post_action.on_unsupported", v, true, disagreements);
+        assertTrue(disagreements.isEmpty(), "spec and parser disagree:\n  " + String.join("\n  ", disagreements));
+        assertTrue(!specFindings("post_action.on_success", "MOEV").isEmpty(),
+                "an unknown post_action.on_success must be refused at the save");
+        assertTrue(!specFindings("post_action.on_unsupported", "SHRUG").isEmpty(),
+                "an unknown post_action.on_unsupported must be refused at the save");
+    }
+
     /**
      * ⚠ The one-way case, stated rather than hidden: {@code RetryPolicy.Backoff.from} maps an unknown
      * backoff to EXPONENTIAL silently, so the parser can never refuse one — the spec's ENUM now does, at

@@ -71,7 +71,7 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `reference` | spec (`load`/`key`/`refresh_seconds`) | `ConsignmentIngestStrategy.stampReferenceVersions`, `EnrichmentEngine.versionedView`, `ReferenceCompactor`, `CollectorService.armReferenceRefresh` | Settings dialog |
 | `stream` | spec | `MetadataGraphBuilder` Stream grouping | hand-authored (default = pipeline name) |
 | `dirs` | spec block (5 of 9 leaves — see census caveat) | `CollectorProcessor`; `dirs.backup` doubles as the park home (`StepDisableArming`) | create scaffold derives the convention set; hand after |
-| `collector` | spec block (a few leaves only — `collector.consignment.max_files`, and since 2026-09-23 `collector.fetch.rate_limit`, `collector.retry.*`, `collector.circuit_breaker.*`; see the census caveat) | `parseCollector` → `Collector` → acquisition framework (connectors, stability gate, dedup ledger, gap detection, `connector: dataset`) | collector drawer (one component, one write route) |
+| `collector` | spec block (a few leaves only — `collector.consignment.max_files`, and since 2026-09-23 `collector.fetch.rate_limit`, `collector.retry.*`, `collector.circuit_breaker.*`, and since 2026-09-24 `collector.post_action.*`; see the census caveat) | `parseCollector` → `Collector` → acquisition framework (connectors, stability gate, dedup ledger, gap detection, `connector: dataset`) | collector drawer (one component, one write route) |
 | `parsing` | spec, partially (`parsing.grammar` is the canonical grammar ref; `source_timezone` / `delimited.*` are rule-only) | `mergeParsing` / `resolveGrammarRef` → format frontends | Parse drawer; New-pipeline writes `parsing.frontend` (D3) |
 | `processing` | spec block (see next table) | ingest runtime | Parse drawer + per-key surfaces below |
 | `output` | spec (`format`/`compression`/`filename_column`) | ingest strategies / `PartitionWriter` | sink node config |
@@ -235,6 +235,7 @@ against, round-tripped untouched.
 | `collector.circuit_breaker` | spec |
 | `collector.consignment` | spec |
 | `collector.fetch` | spec |
+| `collector.post_action` | spec |
 | `collector.retry` | spec |
 | `description` | spec |
 | `dirs` | spec |
