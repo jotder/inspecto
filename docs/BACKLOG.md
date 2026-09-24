@@ -106,6 +106,7 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | 3.8 | policy-authoring UX | none — D1 answered 2026-09-25: guard ALL nine failure modes F1–F9 at save time rather than wait for the incident report; D2–D9 take the design's recommendations |
 | 3.8 | `DUCKLE-C6-POLICY-NARROWING-1` | 16 calls in `superpower/policy-narrowing-design.md` (Decisions owed) |
 | 3.9 | D6 `findings-spec` UI | 5 calls (D5 advanced tier · D6 technical properties · D7 removal impact · D8 Components pane · D10 acceptance) in `superpower/findings-spec-authoring-ui-design.md`; decided 2026-09-25: D1 `canManageIncidents` (BUILT) · D2 Case only · D3 validate the existing `attributes.findings` blob · D4 a dialog in the Cases toolbar · D9 the UI word is **Findings field** |
+| 3.9 | Findings values on a Case | `PATCH /objects/{id}` is `canAdminister` (decision 2026-09-15: disposition — priority, severity, assignee — is administrative) and Findings values ride the same PATCH; split the Findings write onto `canManageIncidents`, or keep one gate? |
 
 **Decided 2026-09-25, not tied to a row** (operator; each lands in its owning OKF concept when built):
 
