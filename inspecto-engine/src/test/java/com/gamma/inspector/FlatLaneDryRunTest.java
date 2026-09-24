@@ -165,8 +165,9 @@ class FlatLaneDryRunTest {
             assertEquals(List.of("parse", "sink"), rows.stream().map(r -> r.get("nodeId")).toList(), rows.toString());
             for (java.util.Map<String, Object> r : rows) {
                 assertEquals(Boolean.TRUE, r.get("simulated"), r.toString());
-                // The strategy is skipped whole (nothing parsed, nothing landed), so both counts are zero.
-                assertEquals(0L, ((Number) r.get("rowCount")).longValue(), r.toString());
+                // FLAT-DRYRUN-COUNTS-ZERO-1: the contained pass really parses, so both counts are the real
+                // run's — 2 parsed, 2 that would land — where they used to be the skipped pass's zeros.
+                assertEquals(2L, ((Number) r.get("rowCount")).longValue(), r.toString());
             }
         } finally {
             com.gamma.pipeline.exec.ProvenanceStores.use(null);

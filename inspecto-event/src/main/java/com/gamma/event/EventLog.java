@@ -97,10 +97,22 @@ public final class EventLog {
         if (spaceId != null) SPACES.remove(spaceId);
     }
 
+    /**
+     * Bound for the extent of a <b>contained</b> pass — the flat lane's dry-run parse
+     * ({@code PipelineTestRun.dryIngest}, FLAT-DRYRUN-COUNTS-ZERO-1) and the builder's test run: while bound,
+     * {@link #current()} returns the bound log instead of the space's, so every ambient emitter inside the
+     * pass (the schema-drift Signal, the dedup-dropped event, the capture appender's log lines) lands in a
+     * throwaway log rather than on the real ledger. One seam at the lookup, not a flag at each emitter — an
+     * emitter added later is contained without knowing it exists. ⚠ A {@code ScopedValue} does not follow
+     * work onto another thread; an emitter that hops threads inside the pass is not covered.
+     */
+    public static final ScopedValue<EventLog> CONTAINED = ScopedValue.newInstance();
+
     /** The event log for the calling thread's MDC {@link #SPACE_MDC_KEY}, or {@link #global()} when no space
      *  is in scope (or its log isn't registered). Used by code that has no injected handle — the capture
      *  appender and the deep poll-path emitters. */
     public static EventLog current() {
+        if (CONTAINED.isBound()) return CONTAINED.get();
         String spaceId = MDC.get(SPACE_MDC_KEY);
         if (spaceId != null) {
             EventLog log = SPACES.get(spaceId);

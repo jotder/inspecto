@@ -5,6 +5,7 @@ import com.gamma.etl.ConsignmentPlanner;
 import com.gamma.etl.DataTransformer;
 import com.gamma.etl.IngestProgress;
 import com.gamma.etl.LineageRow;
+import com.gamma.etl.MemberStatus;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
@@ -52,6 +53,9 @@ import java.util.stream.Stream;
  * ({@code -Dconsignment.outputs.backend}), file stages ({@code -Dfile.stages.backend}), the
  * {@code pipeline.batch.*} Signal (ambient {@code EventLog.current()}, keyed by space MDC) and the
  * provenance matrix (a process-wide registry). Redirecting paths alone would have missed every one.
+ * ⚠ One ambient emitter lives INSIDE the pass — the schema-drift Signal ({@code CsvIngestStrategy}), plus
+ * the graph lane's dedup-dropped event — so the pass runs with {@code EventLog.CONTAINED} bound to a
+ * throwaway log (added 2026-09-24; before that a test run over a drifted file raised a real WARN Signal).
  *
  * <p><b>2. Filesystem containment.</b> The picked files are <b>copied</b> into
  * {@code scratchRoot/poll} and the run executes against {@link PipelineConfig#forScratchRun}, whose
@@ -179,7 +183,10 @@ public final class PipelineTestRun {
 
             IngestOutcome outcome;
             try {
+                // EventLog.CONTAINED: the schema-drift Signal and every other ambient emitter inside
+                // strategy.ingest land in a throwaway log, never on the space's ledger.
                 outcome = ScopedValue.where(DataTransformer.RAW_INPUT, capture)
+                        .where(com.gamma.event.EventLog.CONTAINED, com.gamma.event.EventLog.create())
                         .call(() -> strategy.ingest(batch, scratch));
             } finally {
                 // Mirrors ConsignmentIngestor.process — a progress snapshot must never outlive the batch.
@@ -211,6 +218,165 @@ public final class PipelineTestRun {
                 cfg.identity().pipelineName(), pickedFiles.size(), status, inputRows, written);
         return new Result(status, batches.size(), List.copyOf(files), inputRows, written, casts,
                 List.copyOf(outputs), error, Map.copyOf(schemaByOutput), Collections.unmodifiableMap(rawRows));
+    }
+
+    // ── the flat lane's dry run (FLAT-DRYRUN-COUNTS-ZERO-1) ─────────────────────
+
+    /**
+     * Which <b>kind</b> of end one member of a dry-run Consignment reached — the distinction
+     * {@code EXECUTION-RESIDUALS} X4 needs before a replay default can be chosen. Derived from the member
+     * vocabulary ({@link MemberStatus}), never a parallel one: a validation rejection is not a thrown fault
+     * (which fails the whole batch), and an unplanned Archive entry is a third thing.
+     */
+    public enum MemberKind {
+        /** {@link MemberStatus#SUCCESS} in a batch that did not fail — its rows would have landed. */
+        WOULD_LAND,
+        /** A {@code QUARANTINED_*} status — rejected by validation; the rest of the batch carries on. */
+        REJECTED,
+        /** {@link MemberStatus#SKIPPED_UNREADABLE} — never planned. ⚠ Unreachable under a dry run today:
+         *  that status comes from the unpack stage, which a dry run skips (it writes expanded copies). */
+        SKIPPED,
+        /** The batch threw: a member it had accepted (or never reached) lands nothing, whatever it parsed. */
+        FAULT;
+
+        static MemberKind of(MemberStatus status, boolean batchFailed) {
+            return switch (status) {
+                case SUCCESS -> batchFailed ? FAULT : WOULD_LAND;
+                case QUARANTINED_EMPTY, QUARANTINED_MISMATCH, QUARANTINED_UNREADABLE -> REJECTED;
+                case SKIPPED_UNREADABLE -> SKIPPED;
+                // Assigned by ConsignmentIngestor's park tail, never by an ingest pass.
+                case PARKED -> throw new IllegalStateException("PARKED is a commit-tail status, not an ingest one");
+            };
+        }
+    }
+
+    /**
+     * One member's dry-run result. {@code status} is the {@link MemberStatus} wire form the ingest pass
+     * assigned, or {@code null} when the batch threw before reaching this member; {@code reason} is the
+     * pass's own message (the rejection reason, or the batch's fault).
+     */
+    public record MemberOutcome(int srcId, String filename, MemberKind kind, String status,
+                                long parsedRows, long errorRows, String reason) {}
+
+    /**
+     * What a dry run of ONE Consignment observed. {@code outcome} is the real ingest pass's, with each
+     * member audit renamed back to the inbox file it was staged from; every path it held pointed into a
+     * scratch root that is already deleted, so they are dropped and only counts and statuses remain.
+     */
+    record DryIngest(IngestOutcome outcome, List<MemberOutcome> members) {
+
+        /** Rows the parse accepted — what the {@code parse} node would have handed on. */
+        long parsedRows() {
+            return outcome.totalInputRows();
+        }
+
+        /** Rows the write would have landed: the lineage of a batch that did not fail, else none. */
+        long wouldLandRows() {
+            return "SUCCESS".equals(outcome.status())
+                    ? outcome.lineage().stream().mapToLong(LineageRow::rowCount).sum() : 0L;
+        }
+    }
+
+    /** Suffix on the batch id the contained pass runs under — see {@link #dryIngest}. */
+    static final String DRY_BATCH_SUFFIX = "__dryrun";
+
+    /**
+     * The flat lane's dry run for one Consignment: run the <b>real</b> {@code strategy.ingest} over copies of
+     * its members, under the same two containments as {@link #run} (call graph — only the ingest pass runs,
+     * never {@code commit}/{@code writeAudit}/{@code recordProvenance}; filesystem — every destination is
+     * re-rooted under a scratch root by {@link PipelineConfig#forScratchRun}), plus a third,
+     * {@link com.gamma.event.EventLog#CONTAINED}, for the ambient emitters inside the pass.
+     *
+     * <p>The pass runs under {@code batchId + }{@value #DRY_BATCH_SUFFIX}, not the real id: the graph lane's
+     * branch commit log is keyed by batch id and lives in {@code processing.duckdb.temp_directory} when one is
+     * configured — a directory {@code forScratchRun} does not re-root — so the real id could resume, or
+     * append to, a real batch's log. The suffixed log and any {@link ParkedBranches} entry are removed here.
+     *
+     * <p>Never throws: a fault anywhere (staging included) is the batch's {@code FAILED} outcome, reported
+     * per member as {@link MemberKind#FAULT}. The scratch root is deleted before returning.
+     */
+    static DryIngest dryIngest(Consignment batch, PipelineConfig cfg) {
+        String dryId = batch.batchId() + DRY_BATCH_SUFFIX;
+        java.time.LocalDateTime start = java.time.LocalDateTime.now();
+        Path scratchRoot = null;
+        PipelineConfig scratch = null;
+        IngestOutcome raw;
+        try {
+            scratchRoot = newDryScratchRoot(cfg);
+            PipelineConfig s = cfg.forScratchRun(scratchRoot);
+            scratch = s;
+            Files.createDirectories(Path.of(s.dirs().database()));
+            List<File> staged = stage(batch.members().stream().map(m -> m.file().toPath()).toList(),
+                    Path.of(s.dirs().poll()));
+            List<Consignment.Member> copies = new ArrayList<>();
+            for (int i = 0; i < staged.size(); i++) {
+                Consignment.Member m = batch.members().get(i);
+                copies.add(new Consignment.Member(staged.get(i), m.srcId(), m.bytes(), m.selection()));
+            }
+            Consignment contained = new Consignment(dryId, batch.schemaName(), batch.table(), copies);
+            ConsignmentIngestStrategy strategy = (s.schemas().ingesterClass() == null)
+                    ? new CsvIngestStrategy()
+                    : new StreamingPluginIngestStrategy();
+            raw = ScopedValue.where(com.gamma.event.EventLog.CONTAINED, com.gamma.event.EventLog.create())
+                    .call(() -> strategy.ingest(contained, s));
+        } catch (Exception e) {
+            log.warn("dry run: consignment {} faulted before its ingest pass finished", batch.batchId(), e);
+            raw = new IngestOutcome(start, "FAILED", ConsignmentIngestStrategy.msg(e), List.of(), List.of(),
+                    List.of(), List.of(), 0L, batch.schemaName());
+        } finally {
+            IngestProgress.clear(cfg.identity().pipelineName());
+            StepProgress.clear(cfg.identity().pipelineName());
+            ParkedBranches.drain(dryId);
+            if (scratch != null) {
+                try {
+                    Files.deleteIfExists(ConsignmentIngestStrategy.branchCommitLogPath(scratch, dryId));
+                } catch (IOException e) {
+                    log.warn("dry run: could not delete the contained branch commit log for {}: {}",
+                            dryId, e.toString());
+                }
+            }
+            deleteScratch(scratchRoot);
+        }
+        return report(batch, raw);
+    }
+
+    /** Rename each audit back to its inbox member (by {@code srcId}) and classify every member. */
+    private static DryIngest report(Consignment batch, IngestOutcome raw) {
+        boolean failed = "FAILED".equals(raw.status());
+        Map<Integer, MemberAudit> bySrc = new LinkedHashMap<>();
+        for (MemberAudit ma : raw.memberAudits()) bySrc.put(ma.srcId(), ma);
+        List<MemberAudit> renamed = new ArrayList<>();
+        List<MemberOutcome> members = new ArrayList<>();
+        for (Consignment.Member m : batch.members()) {
+            String name = m.file().getName();
+            MemberAudit ma = bySrc.get(m.srcId());
+            if (ma == null) {
+                members.add(new MemberOutcome(m.srcId(), name, MemberKind.FAULT, null, 0, 0, raw.error()));
+                continue;
+            }
+            renamed.add(new MemberAudit(ma.srcId(), name, ma.status(), ma.parsedRows(), ma.errorRows(),
+                    ma.error(), ma.start(), ma.origin(), ma.originPath()));
+            MemberKind kind = MemberKind.of(ma.status(), failed);
+            String reason = kind == MemberKind.FAULT ? raw.error() : ma.error();
+            members.add(new MemberOutcome(m.srcId(), name, kind, ma.status().name(),
+                    ma.parsedRows(), ma.errorRows(), reason));
+        }
+        IngestOutcome outcome = new IngestOutcome(raw.batchStart(), raw.status(), raw.error(), List.of(),
+                List.copyOf(renamed), List.of(), raw.lineage(), raw.totalInputRows(), raw.schemaLabel(),
+                Map.of(), Map.of(), raw.castFailures());
+        return new DryIngest(outcome, List.copyOf(members));
+    }
+
+    /**
+     * A fresh scratch root on the DATA volume when the pipeline names one ({@code scratchDir}: the explicit
+     * DuckDB temp directory, else {@code dirs.temp}) — the members are copied into it, and a dry run over a
+     * large inbox must not fill a small system temp — else the JVM temp dir.
+     */
+    private static Path newDryScratchRoot(PipelineConfig cfg) throws IOException {
+        String dir = ConsignmentIngestStrategy.scratchDir(cfg);
+        Path parent = dir != null ? Path.of(dir) : Path.of(System.getProperty("java.io.tmpdir"));
+        Files.createDirectories(parent);
+        return Files.createTempDirectory(parent, "dryrun_");
     }
 
     /**

@@ -13,14 +13,17 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
+> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ⬇ 55 → 54 on 2026-09-24: P3 `FLAT-DRYRUN-COUNTS-ZERO-1` shipped — a flat-lane dry run parses inside a
+> contained pass, so its provenance counts are real and each member is reported by kind (X4's evidence
+> precondition, now met; the row's gate text says what is still open).
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 28<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 55<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 54<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -93,7 +96,7 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | Area | Row | The call |
 |---|---|---|
 | 3.1 | `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` | (A) keep or retire `GET /pipelines/step-types`; (B) delete the dead client mirrors |
-| 3.2 | EXECUTION-RESIDUALS X4 + X1 | X4's replay default — ⛔ not yet, the evidence it needs does not exist; X1's §5 decisions in `superpower/retry-affordance-design.md` |
+| 3.2 | EXECUTION-RESIDUALS X4 + X1 | X4's replay default — per-member kinds now exist (dry run parses, 2026-09-24); per-record offsets still do not; X1's §5 decisions in `superpower/retry-affordance-design.md` |
 | 3.3 | `LEGACY-ASN-SRC-TREE-UNBUILT-1` | wire, rename or delete the 21 uncompiled test-tree files |
 | 3.4 | Onboarding ↔ Pipeline W5 | carry the reference Datasets a Pipeline reads in its export (forward closure) |
 | 3.6 | D-8 XLSX export | does it work in a shipped / air-gapped bundle? |
@@ -159,9 +162,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Runs, replay & dry runs
 
-- **P2** · **EXECUTION-RESIDUALS X4 + X1 deferrals** — **X4**, record-level replay from quarantine (sidecar error manifests with offset + reason; all-or-nothing vs eject-and-continue as per-pipeline config). ⛔ **Gate still closed:** the shipped `?dryRun=true` never parses a member (`ConsignmentIngestor.process` fabricates an empty SUCCESS), so it cannot show what X4 needs. The default may be picked only once a run parses real members without landing anything and reports, per member, **which kind** of failure occurred — a validation rejection (`MemberStatus` `QUARANTINED_*`) is not a thrown fault (which fails the whole batch), and `SKIPPED_UNREADABLE` is a third thing; key any manifest on the member vocabulary. Nearest starting point: `PipelineTestRun` (the real `strategy.ingest`, zero side effects, per-FILE results at `POST /pipelines/authored/{id}/run?to=`) — the gap is per-RECORD offsets and reasons. No default picked; that is the operator's call. **X1** deferrals: a per-pipeline `processing.retry` block (regenerate the node-attributes and step-types contracts) and an operator cancel / retry-now affordance — designed in `superpower/retry-affordance-design.md`, decisions owed in its §5. → `okf/backend/pipeline-graph/execution-lanes.md` · `archived-documents/plans-archive/execution-residuals-plan.md`
-- **P3** · `FLAT-DRYRUN-COUNTS-ZERO-1` — **a flat-lane dry run's provenance record shows 0 parsed / 0 landed**, because the dry run skips parsing: the overlay shows *that* it ran, not what it would move. Real counts need a parse pass on a dry run (reverses the skip — the same build X4 waits on). Demand-gated. → `okf/capabilities/pipeline-execution/pipeline-execution.md`
-
+- **P2** · **EXECUTION-RESIDUALS X4 + X1 deferrals** — **X4**, record-level replay from quarantine (sidecar error manifests with offset + reason; all-or-nothing vs eject-and-continue as per-pipeline config). ✅ **Evidence precondition MET 2026-09-24:** `?dryRun=true` now parses real members inside a contained pass (`PipelineTestRun.dryIngest` — member copies, scratch root, `EventLog.CONTAINED`; zero side effects, pinned by `FlatLaneDryRunParseTest`) and logs, per member, **which kind** of end it reached, keyed on the member vocabulary: `WOULD_LAND` / `REJECTED` (`QUARANTINED_*`) / `SKIPPED` (`SKIPPED_UNREADABLE` — unreachable under a dry run, which skips unpack) / `FAULT` (the batch threw). Two findings for the decision: a plugin decoder that throws on one file is `REJECTED` (`QUARANTINED_UNREADABLE`), not a fault; and the native union lane has no per-member audit before its one transform, so a transform fault reports its members `not reached`. ⛔ **Still open before the default can be picked:** per-RECORD offsets and reasons (the reject sidecar `<errors>/<file>_errors.csv` exists, but in the dry run it is written to the scratch root and deleted). No default picked; that is the operator's call. **X1** deferrals: a per-pipeline `processing.retry` block (regenerate the node-attributes and step-types contracts) and an operator cancel / retry-now affordance — designed in `superpower/retry-affordance-design.md`, decisions owed in its §5. → `okf/backend/pipeline-graph/execution-lanes.md` · `archived-documents/plans-archive/execution-residuals-plan.md`
 #### Consignments
 
 - **P2** · **Consignment addressing** — the ingest-side Consignment-scoped accessor waits for a consumer. ⚠ `DatasetRelation.temporalColumn` has no caller and cannot safely gain one on a write path. Settled — do not re-open: torn multi-file reads (closed by the pinned `ConsignmentSelector` list); `generation` IS read back (`DbConsignmentOutputStore`); `retire_superseded` is warned about, not silent, and ships as a disabled demo job (`spaces/demo/config/jobs/retire_superseded_job.toon`) — ⛔ its default is **not** flipped, because enabling retirement by default deletes bytes operators may rely on. → `okf/backend/engine/consignment-addressing.md`

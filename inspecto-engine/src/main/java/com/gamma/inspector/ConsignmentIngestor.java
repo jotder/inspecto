@@ -61,16 +61,21 @@ public final class ConsignmentIngestor {
      * As above, under an explicit Run id and — {@code dryRun=true} (PIPELINE-DRYRUN-1 step 5) — with every
      * mutating site on this lane suppressed.
      *
-     * <p>🔴 <b>Why the strategy is skipped whole rather than substituted.</b> {@code strategy.ingest} is not
-     * one write: it writes partition files ({@code PartitionWriter.write}), moves rejected members into the
-     * quarantine tree ({@code QuarantineManager.quarantine}), emits a schema-drift Signal, drives the graph
-     * lane's branch commits, writes the branch commit log and, on a park, copies parquet into the park home —
-     * ~20 durable sites across {@code CsvIngestStrategy}, {@code StreamingPluginIngestStrategy} and the
-     * shared helpers in {@code ConsignmentIngestStrategy}. Substituting each one is exactly the
-     * "every sink honours a flag" shape that misses one, and it is the failure mode
-     * {@code DryRunServices}'s javadoc names. Skipping the pass is the only form that is true by
-     * construction: <b>no write can be missed if no writer runs.</b> The cost — a dry run does not
-     * re-validate parsing — is stated in the plan's as-built and is deliberate.
+     * <p>🔴 <b>Why the strategy is CONTAINED rather than substituted</b> (FLAT-DRYRUN-COUNTS-ZERO-1, 2026-09-24).
+     * {@code strategy.ingest} is not one write: it writes partition files ({@code PartitionWriter.write}),
+     * moves rejected members into the quarantine tree ({@code QuarantineManager.quarantine}), emits a
+     * schema-drift Signal, drives the graph lane's branch commits, writes the branch commit log and, on a
+     * park, copies parquet into the park home — ~20 durable sites across {@code CsvIngestStrategy},
+     * {@code StreamingPluginIngestStrategy} and the shared helpers in {@code ConsignmentIngestStrategy}.
+     * Substituting each one is exactly the "every sink honours a flag" shape that misses one, the failure mode
+     * {@code DryRunServices}'s javadoc names. Until 2026-09-24 a dry run therefore skipped the pass whole and
+     * fabricated an empty SUCCESS — true by construction, but it parsed nothing, so it reported 0 parsed /
+     * 0 landed and could not say which member would be rejected. It now runs the real pass through
+     * {@link PipelineTestRun#dryIngest}, which is ALSO true by construction, because nothing is substituted:
+     * the pass runs over COPIES of the members against {@link PipelineConfig#forScratchRun} (every writer in it
+     * writes under a scratch root that is then deleted), its ambient emitters are bound to a throwaway log
+     * ({@code EventLog.CONTAINED}), and the tail below still never runs. The result carries real parsed /
+     * would-land counts and a per-member {@link PipelineTestRun.MemberKind}, logged here.
      *
      * <p>The tail below (park / commit / audit / retry bookkeeping) is then gated site by site
      * so the log still reads as "what would have happened", and {@link ConsignmentAuditWriter#setDryRun}
@@ -87,13 +92,18 @@ public final class ConsignmentIngestor {
 
         IngestOutcome outcome;
         if (dryRun) {
-            log.info("dry run: would ingest consignment {} — {} member(s) via {} into table '{}' "
-                            + "(parse, transform, partition writes, quarantine moves and the branch commit "
-                            + "log all skipped)",
+            PipelineTestRun.DryIngest dry = PipelineTestRun.dryIngest(batch, cfg);
+            outcome = dry.outcome();
+            log.info("dry run: consignment {} parsed {} member(s) via {} into table '{}' — {}: {} row(s) "
+                            + "parsed, {} would land (partition writes, quarantine moves and the branch commit "
+                            + "log went to a deleted scratch root)",
                     batch.batchId(), batch.members().size(), strategy.getClass().getSimpleName(),
-                    batch.table());
-            outcome = new IngestOutcome(LocalDateTime.now(), "SUCCESS", null, List.of(), List.of(),
-                    List.of(), List.of(), 0L, batch.schemaName());
+                    batch.table(), outcome.status(), dry.parsedRows(), dry.wouldLandRows());
+            for (PipelineTestRun.MemberOutcome m : dry.members())
+                log.info("dry run: consignment {} member {} → {} ({}): {} parsed, {} rejected row(s){}",
+                        batch.batchId(), m.filename(), m.kind(), m.status() == null ? "not reached" : m.status(),
+                        m.parsedRows(), m.errorRows(),
+                        m.reason() == null || m.reason().isBlank() ? "" : " — " + m.reason());
         } else {
             try {
                 outcome = strategy.ingest(batch, cfg);
@@ -109,7 +119,7 @@ public final class ConsignmentIngestor {
 
         if (dryRun) {
             // Every durable tail site in one place, each logged as a would-have. ParkedBranches.drain is
-            // not consulted: the strategy never ran, so nothing can be parked.
+            // not consulted here: dryIngest ran the pass under its own suffixed batch id and drained that.
             log.info("dry run: would commit consignment {} — DuckLake register, manifest, §11.3 output "
                             + "registration, backup moves, markers, the fingerprint ledger and any DB-export "
                             + "watermark all skipped (run {})", batch.batchId(), runId);
@@ -154,9 +164,9 @@ public final class ConsignmentIngestor {
         }
         // DRYRUN-INVISIBLE-ON-FLAT-LANE-1 (a), operator decision 2026-09-23: the ONE durable write a flat-lane
         // dry run makes — the same parse/sink rows a real run records, marked simulated (as the graph lane's
-        // PipelineJobRunner marks its own), so the run picker and overlay show the dry run. The strategy was
-        // skipped whole, so the counts are the dry run's truthful zeros: nothing was parsed, nothing landed.
-        // A deliberate exception to "skip the pass whole" — metadata only, and a no-op when provenance is off.
+        // PipelineJobRunner marks its own), so the run picker and overlay show the dry run. The counts are the
+        // contained pass's real ones (FLAT-DRYRUN-COUNTS-ZERO-1): rows parsed, rows that would have landed.
+        // Metadata only, the dry run's one durable write, and a no-op when provenance is off.
         recordProvenance(cfg.identity().pipelineName(), batch, outcome, status, dryRun);
         if (!dryRun) {
             // X1: a FAILED Consignment's files stay in the inbox and re-encounter next cycle — that retry is
