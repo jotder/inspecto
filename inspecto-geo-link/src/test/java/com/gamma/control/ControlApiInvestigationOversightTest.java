@@ -382,4 +382,55 @@ class ControlApiInvestigationOversightTest {
             assertTrue(tpl.body().contains("four-eyes"), tpl.body());
         }
     }
+
+    // ── D-U7 on the stateless reads: neighbours + recursive paths ─────────────────────────────────────
+
+    private static String neighbours(String dataset, String source, int limit) {
+        return "{\"dataset\":\"" + dataset + "\",\"sourceCol\":\"" + source + "\",\"targetCol\":\"callee\","
+                + "\"value\":\"" + A + "\",\"limit\":" + limit + "}";
+    }
+
+    private static String traversal(Integer maxDepth, Integer maxEdgeYield) {
+        return "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"startNode\":\"" + A + "\""
+                + (maxDepth != null ? ",\"maxDepth\":" + maxDepth : "")
+                + (maxEdgeYield != null ? ",\"maxEdgeYield\":" + maxEdgeYield : "") + "}";
+    }
+
+    @Test
+    void theStatelessReadsAreRefusedAboveTheFourEyesThresholdsBecauseNothingCouldApproveThem(@TempDir Path cfg,
+                                                                                         @TempDir Path root) throws Exception {
+        String nb = "/inv/projection/neighbors", rp = "/inv/traversal/recursive-paths";
+        try (Ctx c = open(cfg, root)) {
+            // No threshold (the shipped default): both run, however wide.
+            assertEquals(2, post(c, nb, neighbours("calls_ds", "caller", 20_000)).get("rows").size());
+            assertTrue(post(c, rp, traversal(null, null)).get("paths").size() > 0);
+
+            settings(c, "four_eyes_budget_above: 100\n");
+            HttpResponse<String> wide = send(c.port, "POST", nb, neighbours("calls_ds", "caller", 500), null);
+            assertEquals(403, wide.statusCode(), wide.body());
+            assertTrue(wide.body().contains("four-eyes") && wide.body().contains("rows 500 > 100"), wide.body());
+            assertEquals(2, post(c, nb, neighbours("calls_ds", "caller", 100)).get("rows").size(),
+                    "the same read AT the threshold runs — the 403 above is the gate, not the body");
+            HttpResponse<String> deep = send(c.port, "POST", rp, traversal(null, null), null);
+            assertEquals(403, deep.statusCode(), "the defaults read 6 × 10 000 rows: " + deep.body());
+            assertTrue(deep.body().contains("rows 60000 > 100"), deep.body());
+            assertTrue(post(c, rp, traversal(2, 50)).get("paths").size() > 0, "2 × 50 = 100 rows is not above 100");
+
+            // Gate order: an absent Dataset still answers as absent (the 404 is judged first, so the gate cannot
+            // reveal that a Dataset the caller cannot see exists). The traversal checks its columns against the
+            // relation BEFORE the gate, so a bad one is still malformed; the neighbours read only learns a column
+            // is unknown when its query runs, which the gate — reading nothing — now pre-empts with the 403.
+            assertEquals(404, send(c.port, "POST", nb, neighbours("nope", "caller", 500), null).statusCode());
+            assertEquals(422, send(c.port, "POST", rp, traversal(null, null).replace("\"caller\"", "\"no_such_col\""),
+                    null).statusCode());
+
+            settings(c, "four_eyes_fan_out_above: 5\n");
+            HttpResponse<String> fan = send(c.port, "POST", nb, neighbours("calls_ds", "caller", 50), null);
+            assertEquals(403, fan.statusCode(), fan.body());
+            assertTrue(fan.body().contains("fan-out 50 > 5"), fan.body());
+            assertEquals(2, post(c, nb, neighbours("calls_ds", "caller", 5)).get("rows").size());
+            assertEquals(403, send(c.port, "POST", rp, traversal(2, 6), null).statusCode());
+            assertTrue(post(c, rp, traversal(2, 5)).get("paths").size() > 0);
+        }
+    }
 }

@@ -550,8 +550,20 @@ Supersedes an earlier 2026-09-24 entry (819958848) recorded in a parallel sessio
   as the requester's op with `approval{requestedBy, approvedBy, …}`, resolved against the Working Set at approval
   time. One pending request per Investigation (a second is 409). The approver exception skips ONLY the owner check —
   R3 and the PDP still judge the approver. A template's sensitive expand is refused (422): it names no frontier to
-  approve. ⚠ Not gated by this: the ungated read routes (`/inv/projection/neighbors`, `/inv/traversal/recursive-paths`)
-  that the grounding flagged — the decision covered the Investigation's `expand`.
+  approve. ✅ **The two stateless read routes are gated too (operator 2026-09-24).** `/inv/projection/neighbors` and
+  `/inv/traversal/recursive-paths` have no Investigation to hold a pending request, so — like a template step —
+  a read above the Space's thresholds is **refused (403)** and the message points to an Investigation, where a
+  second person can approve the expand (`InvRoutes.refuseIfSensitive`). Before this, both routes could read
+  exactly what a pending expand was being held back from reading. The size of each read is checked against the
+  same two thresholds: for neighbours, rows = fan-out = `limit`; for a traversal, rows = `maxDepth × maxEdgeYield`
+  and fan-out = `maxEdgeYield` (the defaults, 6 × 10 000, are over most thresholds). The check runs after the
+  Dataset-visibility 404 (so it cannot reveal a Dataset the caller cannot see) and before any query, so a refused
+  call reads nothing. ⚠ A traversal validates its columns against the relation first, so a bad column is still a
+  422; the neighbours read only learns a column is unknown when its query runs, so above a threshold that call
+  answers 403 instead. With no
+  threshold set, nothing changes. `/inv/projection` and `/inv/projection/multi` are **not** gated: they read a whole
+  relation rather than walking out from an entity, and the decision named only the two walking routes. Pinned by
+  `ControlApiInvestigationOversightTest.theStatelessReadsAreRefusedAboveTheFourEyesThresholdsBecauseNothingCouldApproveThem`.
 * ✅ **D-U8 — DECIDED 2026-09-24 (operator): NO purge.** Deliberate: the store stays append-only evidence (D-S1/D-E2);
   no retention period, no purge task, no legal-hold record. No code.
 * 🟡 **D-U9 — PARTLY DECIDED 2026-09-24 (operator).** ✅ Annotation `confidence` is the **Admiralty grade** — the

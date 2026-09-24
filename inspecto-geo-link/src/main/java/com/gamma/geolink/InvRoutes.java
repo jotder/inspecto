@@ -3,6 +3,7 @@ package com.gamma.geolink;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ComponentAccess;
+import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 
@@ -739,6 +740,8 @@ public final class InvRoutes implements RouteModule {
         // rendered BEFORE a single character of the statement is assembled below — an identifier the
         // relation does not have cannot reach SQL, because the render never happens.
         String filterSql = filterSql(body.get("filter"), datasetId, relationSql);
+        // D-U7: a one-hop read of one entity takes at most `limit` links from it — rows and fan-out alike.
+        if (neighborsOf != null) refuseIfSensitive(writeRoot, "a neighbours read (limit " + limit + ")", limit, limit);
 
         // The value is bound, not interpolated: `Request` gained `binds` and `QueryExecutor` a
         // PreparedStatement branch, which retired this route's hand-rolled quote-doubling. Two `?` in
@@ -765,6 +768,29 @@ public final class InvRoutes implements RouteModule {
         } catch (SQLException e) {
             throw new ApiException(422, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
+    }
+
+    /**
+     * Four-eyes on the stateless reads (D-U7, operator 2026-09-24). An Investigation's sensitive {@code expand} waits
+     * as a pending request for a second person; {@code /inv/projection/neighbors} and
+     * {@code /inv/traversal/recursive-paths} have no Investigation to hold one, so — exactly as a template's
+     * sensitive step already is — a read above the Space's thresholds is REFUSED rather than run unapproved, and
+     * the refusal names where it can be approved. Without this, both routes read what a pending expand is being
+     * held back from reading. {@code rows} (the most rows the read can touch) is compared with
+     * {@code four_eyes_budget_above}; {@code fanOut} (the most links taken from any one entity) with
+     * {@code four_eyes_fan_out_above}. No threshold set — the shipped default — means no gate.
+     */
+    static void refuseIfSensitive(Path writeRoot, String what, long rows, int fanOut) {
+        LinkAnalysisSettings s = LinkAnalysisSettings.forRoot(writeRoot);
+        List<String> exceeded = new ArrayList<>();
+        if (s.fourEyesBudgetAbove() != null && rows > s.fourEyesBudgetAbove())
+            exceeded.add("rows " + rows + " > " + s.fourEyesBudgetAbove());
+        if (s.fourEyesFanOutAbove() != null && fanOut > s.fourEyesFanOutAbove())
+            exceeded.add("fan-out " + fanOut + " > " + s.fourEyesFanOutAbove());
+        if (!exceeded.isEmpty())
+            throw new ApiException(403, what + " is a sensitive read " + exceeded + " — four-eyes applies (D-U7) and "
+                    + "this route has no Investigation to hold a request for approval; lower the bound, or expand "
+                    + "from an Investigation, where a second person can approve the step");
     }
 
     /**
@@ -888,6 +914,9 @@ public final class InvRoutes implements RouteModule {
         }
         String filterSql = "TRUE";
         if (body.get("filter") != null) filterSql = checkedFilterSql(body.get("filter"), columns, datasetId);
+        // D-U7: the walk reads at most maxDepth × maxEdgeYield rows, and takes up to maxEdgeYield links per level.
+        refuseIfSensitive(writeRoot, "a traversal (maxDepth " + maxDepth + " × maxEdgeYield " + maxEdges + ")",
+                (long) maxDepth * maxEdges, maxEdges);
 
         String src = q(sourceCol), tgt = q(targetCol);
         String wSel = weightCol != null ? "TRY_CAST(" + q(weightCol) + " AS DOUBLE)" : "CAST(NULL AS DOUBLE)";

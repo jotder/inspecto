@@ -704,6 +704,10 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   one); the panel shows the pseudonym as given and may send it back in an op's `ids` — the server resolves it.
   ⚠ The panel has NO UI yet for `POST …/reveal`, for approving/denying a pending expand, or for rendering an expand
   answered `{status:"pending"}` (only reachable when a Space sets a four-eyes threshold).
+  ⚠ When a Space sets a four-eyes threshold, the canvas's *expand node* (`/inv/projection/neighbors`) and the
+  traversal (`/inv/traversal/recursive-paths`) are **refused with 403** above it, because a stateless read has
+  nothing that could be approved (2026-09-24). The SPA has no dedicated state for that refusal; what it displays has
+  not been checked.
 * ✅ **The feed is INGESTED, not merely authored** (verified end to end 2026-09-23): 1 283/1 283 rows land
   across three Hive partitions, `rejected_files=0`, `rejected_rows=0`, `cast_failures=0`, and every row
   reconciles to the source PSV by `REC_SEQ` with zero value mismatches. `IMEI` keeps its leading zeros as
