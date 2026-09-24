@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **38<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** —
+> **37<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 15<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -25,8 +25,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 22<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 16<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 38<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 15<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 37<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -58,7 +58,7 @@ rank.
 
 | State | P2 rows |
 |---|---|
-| **Startable now** — no gate, no owed decision | Onboarding D5-ref — ground the delete-feed first (§3.4) |
+| **Startable now** — no gate, no owed decision | Onboarding D5-ref + D6-ref — `reference.delete` on a marker column, with the `order_by` tie-break (§3.4, decided 2026-09-25) · `JOB-RUNS-DIALOG-DEAD-1` + `API-DEAD-METHODS-1` deletes (§3.11, decided 2026-09-25) |
 | **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | AI drafting on a non-`schema` kind (§3.1) · Platform Services Stage 2/3 (§3.2) · cross-Space consequence (§3.5) · Bundle "load as draft" (§3.7) · D6 `findings-spec` UI (§3.9) · policy-authoring UX (§3.8) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) · `DUCKLE-C1-DATASET-FRESHNESS-1` residual (2) (needs a design pass, §3.5) |
 
@@ -83,8 +83,8 @@ rank.
 ## 1. Operator decisions pending
 
 **Owed inputs** — nothing a shift can supply. Counted from the table:
-`awk '/^\| Owed input/,/^$/' docs/BACKLOG.md | grep '^| ' | grep -vc '^| ~~'` minus the header row = **4**.
-⚠ Three of the four block rows whose **code is already complete** — a shift reading them will look for
+`awk '/^\| Owed input/,/^$/' docs/BACKLOG.md | grep '^| ' | grep -vc '^| ~~'` minus the header row = **3**.
+⚠ The access-details row blocks rows whose **code is already complete** — a shift reading them will look for
 something to build and find nothing. Answer an owed input by **deleting its row**, never by adding a second.
 
 | Owed input | Blocks | Why only the operator can supply it |
@@ -92,26 +92,30 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | **Two dates** — when the off-repo backup bundle was deleted, and when the no-reuse check completed | the `SEC-INCIDENT-1` CC6.1 line (§2) | Both acts happened off-repo and leave no trace here. ⛔ A line dated *when it was written down* would misstate the evidence to an auditor |
 | **Per-tier RTO/RPO targets** | `compliance/evidence/rto-rpo-statement.md` · §2 Deployment topology | ⛔ Decided 2026-09-15: do **not** transcribe the signed §3.14 numbers. In `editions.md` they are an engineering target; in `compliance/evidence/` they are a commitment an auditor holds you to, and those are not the same number by default |
 | **Access details** — MinIO endpoint/key/secret, the systemd host, the elevated Windows box | `DEPLOY-SERVICE-WRAPPER-1` (§3.10) | ✅ Operator confirmed 2026-09-15 that all three EXIST. Both rows are **code-complete and evidence-blocked** — neither needs a build, only a run |
-| **Eager or deferred resolution of an `s3://` `dirs.database`** — validate a profile at PARSE time (forces the deployment-root / pipeline-field split, because `CollectorService` parses every pipeline before `loadConnections` runs) or resolve at FIRST WRITE-TIME USE (no split; `dirs.database` is a plain `String` nothing resolves at parse) | scale-out phase C §5.4 bullet 6 (the credential surface that `AIRGAP-S3-EXTENSIONS-1` left behind when it closed 2026-09-15) | The bootstrap order is measured (`ServiceBootstrap.buildFrom:69` vs `:73-74`); which side of it to build on is a design posture only the operator sets. |
 
 **Decisions owed on individual rows** — an index; the question and its options live on the row.
 
 | Area | Row | The call |
 |---|---|---|
-| 3.3 | `LEGACY-ASN-SRC-TREE-UNBUILT-1` | rename or deprecate the superseded `ByteSource`/`TxConfig`/`Tag` twins (test-tree rename done 2026-09-24) |
-| 3.2 | EXECUTION-RESIDUALS X4 + X1 | X4's replay default — per-member kinds now exist (dry run parses, 2026-09-24); per-record offsets still do not; X1's §5 decisions in `superpower/retry-affordance-design.md` |
-| 3.11 | `API-DEAD-METHODS-1` · `JOB-RUNS-DIALOG-DEAD-1` | wire or delete; retain as a test vehicle or delete |
+| 3.2 | EXECUTION-RESIDUALS X1 | X1's §5 decisions in `superpower/retry-affordance-design.md` (X4's default was decided 2026-09-25 — see the row) |
 | 4 | `REACTOR-VERDICT-CI-1` | wire `check-reactor-verdict.mjs` into `ci.yml` |
 | 3.12 | Link Analysis | every open D-U* / LA-* call lives in `superpower/link-analysis-backlog-plan.md` |
 | 3.1 | AI drafting on a non-`schema` kind | 7 calls in `superpower/ai-drafting-non-schema-design.md` (Decisions owed) |
 | 3.2 | Platform Services Stage 2 / 3 | 10 calls in `superpower/platform-services-stage2-design.md` (Decisions owed) |
-| 3.3 | Parsing (Stage-1) — parser-plugin trust | 10 calls in `superpower/parser-plugins-trust-design.md` (Decisions owed) |
-| 3.5 | cross-Space consequence | 12 calls in `superpower/cross-space-consequence-design.md` (Decisions owed) |
+| 3.3 | Parsing (Stage-1) — parser-plugin trust | 8 calls (D2 + D3 decided 2026-09-25 — see the row) in `superpower/parser-plugins-trust-design.md` (Decisions owed) |
+| 3.5 | cross-Space consequence | 11 calls (D2 decided 2026-09-25; D10, the consequence actually asked for, is the one that unblocks the build) in `superpower/cross-space-consequence-design.md` (Decisions owed) |
 | 3.5 | `D8-SES-SNS-1` | 14 calls in `superpower/ses-sns-adapter-design.md` (Decisions owed) |
 | 3.7 | Bundle "load as draft" | 8 calls in `superpower/bundle-load-as-draft-design.md` (Decisions owed) |
 | 3.8 | policy-authoring UX | 9 calls in `superpower/policy-authoring-ux-design.md` (Decisions owed) |
 | 3.8 | `DUCKLE-C6-POLICY-NARROWING-1` | 16 calls in `superpower/policy-narrowing-design.md` (Decisions owed) |
 | 3.9 | D6 `findings-spec` UI | 10 calls in `superpower/findings-spec-authoring-ui-design.md` (Decisions owed) |
+
+**Decided 2026-09-25, not tied to a row** (operator; each lands in its owning OKF concept when built):
+
+- **Notifications:** per-user read state — each Subject marks its own read/unread; delete stays admin-only.
+- **Space import (W5) with a missing connection:** warn, and land the affected Pipelines **disabled** with a "connect X" warning — no longer a refusal.
+- **Admission pools:** a "queued run" means **Consignment admission** (what is built) — no new Run records.
+- **`s3://` `dirs.database`:** resolved **deferred, at first write** — no bootstrap split (was an owed input above).
 
 ⛔ **A plan is where a decision is *described*; this section is where it is *queued*.** A decision
 described in `superpower/` and not indexed here is how a three-day stall happened (2026-09-11 → 09-14).
@@ -168,7 +172,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Runs, replay & dry runs
 
-- **P2** · **EXECUTION-RESIDUALS X4 + X1 deferrals** — **X4**, record-level replay from quarantine (sidecar error manifests with offset + reason; all-or-nothing vs eject-and-continue as per-pipeline config). ✅ **Evidence precondition MET 2026-09-24:** `?dryRun=true` now parses real members inside a contained pass (`PipelineTestRun.dryIngest` — member copies, scratch root, `EventLog.CONTAINED`; zero side effects, pinned by `FlatLaneDryRunParseTest`) and logs, per member, **which kind** of end it reached, keyed on the member vocabulary: `WOULD_LAND` / `REJECTED` (`QUARANTINED_*`) / `SKIPPED` (`SKIPPED_UNREADABLE` — unreachable under a dry run, which skips unpack) / `FAULT` (the batch threw). Two findings for the decision: a plugin decoder that throws on one file is `REJECTED` (`QUARANTINED_UNREADABLE`), not a fault; and the native union lane has no per-member audit before its one transform, so a transform fault reports its members `not reached`. ⛔ **Still open before the default can be picked:** per-RECORD offsets and reasons (the reject sidecar `<errors>/<file>_errors.csv` exists, but in the dry run it is written to the scratch root and deleted). No default picked; that is the operator's call. **X1** deferrals: a per-pipeline `processing.retry` block (regenerate the node-attributes and step-types contracts) and an operator cancel / retry-now affordance — designed in `superpower/retry-affordance-design.md`, decisions owed in its §5. → `okf/backend/pipeline-graph/execution-lanes.md` · `archived-documents/plans-archive/execution-residuals-plan.md`
+- **P2** · **EXECUTION-RESIDUALS X4 + X1 deferrals** — **X4**, record-level replay from quarantine (sidecar error manifests with offset + reason; all-or-nothing vs eject-and-continue as per-pipeline config). ✅ **Evidence precondition MET 2026-09-24:** `?dryRun=true` now parses real members inside a contained pass (`PipelineTestRun.dryIngest` — member copies, scratch root, `EventLog.CONTAINED`; zero side effects, pinned by `FlatLaneDryRunParseTest`) and logs, per member, **which kind** of end it reached, keyed on the member vocabulary: `WOULD_LAND` / `REJECTED` (`QUARANTINED_*`) / `SKIPPED` (`SKIPPED_UNREADABLE` — unreachable under a dry run, which skips unpack) / `FAULT` (the batch threw). Two findings for the decision: a plugin decoder that throws on one file is `REJECTED` (`QUARANTINED_UNREADABLE`), not a fault; and the native union lane has no per-member audit before its one transform, so a transform fault reports its members `not reached`. ⛔ **Still open before the default can be picked:** per-RECORD offsets and reasons (the reject sidecar `<errors>/<file>_errors.csv` exists, but in the dry run it is written to the scratch root and deleted). **Decided 2026-09-25 (operator):** the default is **eject-and-continue** — good records land, bad ones go to the reject sidecar with offset + reason for replay; per-record offsets must be kept first. **X1** deferrals: a per-pipeline `processing.retry` block (regenerate the node-attributes and step-types contracts) and an operator cancel / retry-now affordance — designed in `superpower/retry-affordance-design.md`, decisions owed in its §5. → `okf/backend/pipeline-graph/execution-lanes.md` · `archived-documents/plans-archive/execution-residuals-plan.md`
 #### Consignments
 
 - **P2** · **Consignment addressing** — the ingest-side Consignment-scoped accessor waits for a consumer. ⚠ `DatasetRelation.temporalColumn` has no caller and cannot safely gain one on a write path. Settled — do not re-open: torn multi-file reads (closed by the pinned `ConsignmentSelector` list); `generation` was DELETED 2026-09-24 — nothing read it (`okf/backend/engine/db-layer.md` §3.9); `retire_superseded` is warned about, not silent, and ships as a disabled demo job (`spaces/demo/config/jobs/retire_superseded_job.toon`) — ⛔ its default is **not** flipped, because enabling retirement by default deletes bytes operators may rely on. → `okf/backend/engine/consignment-addressing.md`
@@ -181,14 +185,13 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Parsing
 
-- **P2** · **Parsing (Stage-1)** — the ASN.1 grammar from a stored, path-jailed `.asn`/`.asn1` file shipped 2026-09-23, with its bundle residual. **Still open:** a per-vendor transform config home (the grammar file was its prerequisite); a drop-in `plugins/` jar directory (the JobPackManager classloader precedent) so a customer parser deploys without a rebuild — needs a trust decision first. **Design + 10 owed decisions: [`superpower/parser-plugins-trust-design.md`](superpower/parser-plugins-trust-design.md)** (2026-09-24). ⚠ `asn-parser/src/main/java` is NOT dead (compiled by `legacy-code/pom.xml`); corpus tests are opt-in and data-gated (DATA-GOV-1). → `okf/backend/engine/parser-plugins.md`
-- **P3** · `LEGACY-ASN-SRC-TREE-UNBUILT-1` — **residual: the superseded `ByteSource`/`TxConfig`/`Tag` twins in `asn-parser/src/main/java`** (compiled by `legacy-code/pom.xml`, 41 classes — ⛔ do NOT delete the tree) — a rename/deprecation question, untouched. The test-tree half closed 2026-09-24 (operator: rename, don't wire): the six `*Test`-named files under `asn-parser/src/test/` became `*Harness` (`SchemaCsvHarness`, `ASNFileReaderHarness`, `BERDecoderHarness`, `SbinHuaMscAsnHarness`, `FixedLengthFileReaderHarness`, `RTDMS_ASN_Harness`) with `GoldenCapture`'s 7 citations updated — see [`okf/backend/engine/parser-plugins.md`](okf/backend/engine/parser-plugins.md). ⛔ Operator's call.
+- **P2** · **Parsing (Stage-1)** — the ASN.1 grammar from a stored, path-jailed `.asn`/`.asn1` file shipped 2026-09-23, with its bundle residual. **Still open:** a per-vendor transform config home (the grammar file was its prerequisite); a drop-in `plugins/` jar directory (the JobPackManager classloader precedent) so a customer parser deploys without a rebuild — **Decided 2026-09-25 (operator):** load parsers through the existing Job Pack loader with a **SHA-256 allowlist required** (a signer check optional on top), and with no allowlist configured **refuse every jar**, Job Packs included (breaking; D2 + D3). **Design + 10 owed decisions: [`superpower/parser-plugins-trust-design.md`](superpower/parser-plugins-trust-design.md)** (2026-09-24). ⚠ `asn-parser/src/main/java` is NOT dead (compiled by `legacy-code/pom.xml`); corpus tests are opt-in and data-gated (DATA-GOV-1). → `okf/backend/engine/parser-plugins.md`
 
 ### 3.4 Catalog, Onboarding, Datasets & Lineage
 
 #### Onboarding & bundles
 
-- **P2** · **Onboarding (Stream/Reference)** — **D5-ref is now answerable:** a real delete-feed exists (the gate fired 2026-09-15). Decide how a `delete` tombstone *enters* the reference store (a reserved column? a Decision Rule consequence?) — ⛔ **ground the actual feed first**; the whole point of waiting was to pick the representation from the real shape. **D6-ref:** the within-batch same-key tie-break is arbitrary — add an optional latest-by-`order_by` column only when needed. An optional templates entry (space-template-gallery precedent). ⚠ Enrichment/job configs still derive identity from name. ⛔ Do not implement name-deferral by holding the draft client-side. → `okf/backend/control-plane/onboarding-authoring.md` · `okf/frontend/features/onboarding.md`
+- **P2** · **Onboarding (Stream/Reference)** — **Decided 2026-09-25 (operator):** the real delete-feed carries a **marker column** (an op/deleted flag); build `reference.delete` keyed on it together with the D6-ref `order_by` tie-break. Previously: **D5-ref is now answerable:** a real delete-feed exists (the gate fired 2026-09-15). Decide how a `delete` tombstone *enters* the reference store (a reserved column? a Decision Rule consequence?) — ⛔ **ground the actual feed first**; the whole point of waiting was to pick the representation from the real shape. **D6-ref:** the within-batch same-key tie-break is arbitrary — add an optional latest-by-`order_by` column only when needed. An optional templates entry (space-template-gallery precedent). ⚠ Enrichment/job configs still derive identity from name. ⛔ Do not implement name-deferral by holding the draft client-side. → `okf/backend/control-plane/onboarding-authoring.md` · `okf/frontend/features/onboarding.md`
 
 #### Datasets & lineage
 
@@ -203,7 +206,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Signals, decisions & notifications
 
-- **P2** · **Signal / Decision networks — cross-Space consequence** — trigger FIRED 2026-09-15: a Signal in one Space must cause something in another. Re-grounded 2026-09-17: this is structurally absent, not merely unguarded — each Space is isolated at the runtime-instance level (`EventLog` keeps one ledger per Space; `SpaceContext` gives each Space its own services), `Signal.space` is descriptive only, and there is no target-space parameter anywhere in the apply path. ⛔ No small safe increment exists — it needs a **design pass** on the cross-space controller (S8): does a consequence need its own authorization, independent of the triggering caller? Under what identity does a target Space accept an externally originated Signal? Scope to the consequence that was asked for; connector-direct emission rides with it; ⛔ RFC 6902 JSON Patch deltas for AG-UI have no consumer and do not ride along. 📐 **Design pass written 2026-09-24:** [`superpower/cross-space-consequence-design.md`](superpower/cross-space-consequence-design.md) — 12 decisions owed (§8). → `okf/backend/control-plane/signal-backbone.md` §"Open / deferred" · `okf/backend/control-plane/decision-rules.md`
+- **P2** · **Signal / Decision networks — cross-Space consequence** — trigger FIRED 2026-09-15: a Signal in one Space must cause something in another. Re-grounded 2026-09-17: this is structurally absent, not merely unguarded — each Space is isolated at the runtime-instance level (`EventLog` keeps one ledger per Space; `SpaceContext` gives each Space its own services), `Signal.space` is descriptive only, and there is no target-space parameter anywhere in the apply path. ⛔ No small safe increment exists — it needs a **design pass** on the cross-space controller (S8): does a consequence need its own authorization, independent of the triggering caller? Under what identity does a target Space accept an externally originated Signal? Scope to the consequence that was asked for; connector-direct emission rides with it; ⛔ RFC 6902 JSON Patch deltas for AG-UI have no consumer and do not ride along. 📐 **Design pass written 2026-09-24:** [`superpower/cross-space-consequence-design.md`](superpower/cross-space-consequence-design.md) — 12 decisions owed (§8). **Decided 2026-09-25 (operator):** D2 — two-party consent on the Exchange (Option D). ⚠ D10, the concrete consequence that was asked for, is still owed and gates the build. → `okf/backend/control-plane/signal-backbone.md` §"Open / deferred" · `okf/backend/control-plane/decision-rules.md`
 - **P2** · **Notification residuals (`D8-SES-SNS-1`)** — Soft-bounce retry shipped 2026-09-15. Remaining: the SES/SNS adapter — SNS subscription confirmation plus a cert-chain fetch from a validated `amazonaws.com` URL; ⚠ an outbound fetch induced by an unauthenticated callback gets its **own security review and its own commit**; GeoIP; auth-gated per-user preferences and security triggers. **Designed + security-reviewed 2026-09-24:** [`superpower/ses-sns-adapter-design.md`](superpower/ses-sns-adapter-design.md) (14 operator decisions owed). → `okf/backend/control-plane/events-metrics.md`
 
 ### 3.6 Analytics — Queries, BI, Studio & Export
@@ -250,8 +253,8 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.11 Web UI — SPA-wide hygiene
 
-- **P3** · `JOB-RUNS-DIALOG-DEAD-1` — **`modules/admin/jobs/job-runs.dialog.ts` has no opener**; only its own spec references `JobRunsDialog`. Decide retain-as-test-vehicle (the `MOCK-DEAD-COMPUTE-1` precedent) or delete; do not leave it looking like a live surface. → `okf/frontend/conventions/page-chrome.md`
-- **P3** · `API-DEAD-METHODS-1` — five exported service methods have no caller in the SPA: `access.service.ts:128` `deleteProfile`, `collectors.service.ts:41` `notify`, and `config.service.ts:180, 187, 203` `previewParsing`/`previewSchema`/`previewEnrichment`. The three previews look like an intended feature that never got a pane — a product call (wire or delete), not a mechanical delete.
+- **P3** · `JOB-RUNS-DIALOG-DEAD-1` — **`modules/admin/jobs/job-runs.dialog.ts` has no opener**; only its own spec references `JobRunsDialog`. **Decided 2026-09-25 (operator):** **delete it** with its spec. → `okf/frontend/conventions/page-chrome.md`
+- **P3** · `API-DEAD-METHODS-1` — five exported service methods have no caller in the SPA: `access.service.ts:128` `deleteProfile`, `collectors.service.ts:41` `notify`, and `config.service.ts:180, 187, 203` `previewParsing`/`previewSchema`/`previewEnrichment`. The three previews look like an intended feature that never got a pane — a product call (wire or delete), not a mechanical delete. **Decided 2026-09-25 (operator):** delete `deleteProfile` and `notify`; KEEP the three previews — they are to get a pane (file that row when built).
 
 ### 3.12 Link Analysis & Geo
 
@@ -312,6 +315,7 @@ someone asks what is still gated.
 
 #### Acquisition & Parsing
 
+- **`LEGACY-ASN-SRC-TREE-UNBUILT-1` twins** — ⛔ decided 2026-09-25 (operator): **leave** the superseded `ByteSource`/`TxConfig`/`Tag` twins in `asn-parser/src/main/java` as they are — no rename, no deprecation (41 compiled classes; ⛔ never delete the tree). The test-tree `*Harness` rename (2026-09-24) stands. → `okf/backend/engine/parser-plugins.md`
 - **Unpack (10) crash mid-archive** (moved from §4) — re-ingests committed members; relies on
   `OVERWRITE_OR_IGNORE` idempotence (`PartitionWriter:186`, documented at `UnpackOrigins:32` and
   `ConsignmentIngestor:284/508`). By design; revisit only with a measured cost. ⚠ X1's `CommitRetry` does **not**
