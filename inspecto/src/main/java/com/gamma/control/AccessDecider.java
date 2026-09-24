@@ -86,6 +86,19 @@ public interface AccessDecider {
         return new Explanation(Decision.ABSTAIN, null, List.of());
     }
 
+    /**
+     * Draft evaluation (policy-authoring S2): the same evaluation {@link #decide} would make, but over
+     * {@code draft} — a validated, not-yet-saved authored doc — instead of the one on disk, for
+     * {@code subject} against a hypothetical {@code action}/{@code route}/{@code resourceKind}.
+     * Enforces, stamps and audits nothing. {@code PUT /access/policies} uses it to refuse a draft that
+     * would deny the saver's own next save (F7, {@code would-lock-out}). Default: {@code ABSTAIN} with
+     * no trace (no engine ⇒ a stored policy has no effect ⇒ nothing to refuse).
+     */
+    default Explanation simulate(HttpExchange ex, List<AccessPolicies.Policy> draft, Subject subject,
+                                 String action, String route, String resourceKind) {
+        return new Explanation(Decision.ABSTAIN, null, List.of());
+    }
+
     /** The outcome of an {@link #explain} dry-run: the combined {@code decision}, the {@code matchedPolicy}
      *  name (null on {@code ABSTAIN}), and the ordered per-policy {@code trace}. */
     record Explanation(Decision decision, String matchedPolicy, List<Evaluation> trace) {

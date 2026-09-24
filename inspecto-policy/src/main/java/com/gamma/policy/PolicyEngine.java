@@ -80,21 +80,9 @@ public final class PolicyEngine implements AccessDecider {
             AccessDecider.matchedPolicy(ex, "<policies-unreadable>");
             return Decision.DENY;
         }
-        Map<String, Object> context = context(ex, subject, action, route, resourceKind, resource);
-        Decision verdict = Decision.ABSTAIN;
-        String matched = null;
-        for (AccessPolicies.Policy p : effective(doc.policies())) {
-            if (!targets(p, action, resourceKind)) continue;
-            if (!p.condition().test(context)) continue;
-            if (p.deny()) {   // deny overrides — no later allow can rescue
-                AccessDecider.matchedPolicy(ex, p.name());
-                return Decision.DENY;
-            }
-            verdict = Decision.ALLOW;
-            matched = p.name();
-        }
-        if (verdict == Decision.ALLOW) AccessDecider.matchedPolicy(ex, matched);
-        return verdict;
+        Explanation verdict = evaluate(ex, doc.policies(), subject, action, route, resourceKind, resource);
+        if (verdict.decision() != Decision.ABSTAIN) AccessDecider.matchedPolicy(ex, verdict.matchedPolicy());
+        return verdict.decision();
     }
 
     /** The A4 seeded space-scoping denies — surfaced (read-only) by {@code GET /access/policies} so an
@@ -115,13 +103,30 @@ public final class PolicyEngine implements AccessDecider {
         AccessPolicies.Doc doc = AccessPolicies.effective(ex);
         if (doc.unreadable())
             return new Explanation(Decision.DENY, "<policies-unreadable>", List.of());
+        return evaluate(ex, doc.policies(), subject, action, route, resourceKind, resource);
+    }
 
+    /** Draft evaluation (policy-authoring S2, F7): {@link #decide}'s evaluation over an unsaved
+     *  authored doc — the same evaluator, so the lockout guard cannot diverge from enforcement. */
+    @Override
+    public Explanation simulate(HttpExchange ex, List<AccessPolicies.Policy> draft, Subject subject,
+                                String action, String route, String resourceKind) {
+        return evaluate(ex, draft, subject, action, route, resourceKind, Map.of());
+    }
+
+    /** The ONE evaluator behind {@link #decide}, {@link #explain} and {@link #simulate}: every effective
+     *  policy (authored overlaid on {@link #SEED}) is evaluated for the trace; the first matching
+     *  {@code deny} names the DENY (deny overrides), otherwise the last matching {@code allow} names an
+     *  ALLOW, otherwise ABSTAIN. */
+    private static Explanation evaluate(HttpExchange ex, List<AccessPolicies.Policy> authoredPolicies,
+                                        Subject subject, String action, String route,
+                                        String resourceKind, Map<String, Object> resource) {
         Map<String, Object> context = context(ex, subject, action, route, resourceKind, resource);
-        java.util.Set<String> authored = doc.policies().stream()
+        java.util.Set<String> authored = authoredPolicies.stream()
                 .map(AccessPolicies.Policy::name).collect(java.util.stream.Collectors.toSet());
         List<Evaluation> trace = new java.util.ArrayList<>();
         String denyName = null, allowName = null;
-        for (AccessPolicies.Policy p : effective(doc.policies())) {
+        for (AccessPolicies.Policy p : effective(authoredPolicies)) {
             boolean targeted = targets(p, action, resourceKind);
             boolean held = targeted && p.condition().test(context);
             trace.add(new Evaluation(p.name(), p.effect(),

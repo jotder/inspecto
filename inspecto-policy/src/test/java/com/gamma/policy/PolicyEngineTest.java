@@ -108,6 +108,52 @@ class PolicyEngineTest {
         }
     }
 
+    /** Run {@code call} on a real exchange stamped with {@code configRoot} (the S2 simulate probe). */
+    private static <T> T onExchange(Path configRoot, java.util.function.Function<com.sun.net.httpserver.HttpExchange, T> call)
+            throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+        AtomicReference<T> result = new AtomicReference<>();
+        CountDownLatch done = new CountDownLatch(1);
+        server.createContext("/", ex -> {
+            Roles.configRoot(ex, configRoot);
+            result.set(call.apply(ex));
+            ex.sendResponseHeaders(204, -1);
+            ex.close();
+            done.countDown();
+        });
+        server.start();
+        try {
+            HttpClient.newHttpClient().send(
+                    HttpRequest.newBuilder(URI.create("http://localhost:" + server.getAddress().getPort() + "/"))
+                            .GET().build(), HttpResponse.BodyHandlers.discarding());
+            assertTrue(done.await(5, TimeUnit.SECONDS));
+            return result.get();
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void simulateOverADraftMatchesDecideOverTheSameDocOnDisk(@TempDir Path draftRoot, @TempDir Path diskRoot) throws Exception {
+        // S2: the lockout guard evaluates an UNSAVED doc; it must agree with what enforcement does once saved.
+        List<Map<String, Object>> doc = List.of(
+                Map.of("name", "allow-reads", "effect", "allow", "target", Map.of("actions", List.of("read"))),
+                Map.of("name", "freeze-mallory", "effect", "deny", "target", Map.of("actions", List.of("write")),
+                        "when", "subject.id == 'mallory'"));
+        writePolicies(diskRoot, doc);
+        List<com.gamma.control.AccessPolicies.Policy> draft =
+                com.gamma.control.AccessPolicies.load(diskRoot).policies();   // the same validated policies
+        for (String who : List.of("ana", "mallory"))
+            for (String action : List.of("read", "write", "operate")) {
+                Explanation simulated = onExchange(draftRoot,
+                        ex -> ENGINE.simulate(ex, draft, subject(who), action, "/route/under/test", null));
+                Decision decided = decide(diskRoot, null, null, subject(who), action, null, Map.of());
+                assertEquals(decided, simulated.decision(), who + " " + action);
+            }
+        assertEquals("freeze-mallory", onExchange(draftRoot,
+                ex -> ENGINE.simulate(ex, draft, subject("mallory"), "write", "/r", null)).matchedPolicy());
+    }
+
     private static Evaluation traceOf(Explanation e, String name) {
         return e.trace().stream().filter(v -> name.equals(v.name())).findFirst().orElse(null);
     }

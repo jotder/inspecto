@@ -214,8 +214,25 @@ final class AccessRoutes implements RouteModule {
         ETags.requireMatch(ex, ETags.of(ContentHash.of(policies(api, ex))));
         List<AccessPolicies.Policy> policies =
                 AccessPolicies.validate(body.get("policies"), Roles.load(root).attributeClaims());
+        requireNoSelfLockout(ex, policies);
         AccessPolicies.write(root, policies);
         return ETags.respond(ex, policies(api, ex));
+    }
+
+    /** F7 (policy-authoring S2): the route PEP runs before every handler, so a live doc that denies the
+     *  saver's {@code write} on this route can only be undone on disk. Refuse such a draft before it is
+     *  written. D9 (taken on recommendation): the saver only — a draft denying someone else is theirs to
+     *  author. No engine or no Subject ⇒ the doc has no effect on this request ⇒ nothing to refuse. */
+    private static void requireNoSelfLockout(HttpExchange ex, List<AccessPolicies.Policy> draft) {
+        AccessDecider decider = AccessDeciders.active().orElse(null);
+        Subject subject = ApiContext.subject(ex).orElse(null);
+        if (decider == null || subject == null) return;
+        AccessDecider.Explanation next = decider.simulate(ex, draft, subject,
+                ControlApi.actionFor("PUT", "/access/policies"), "/access/policies", null);
+        if (next.decision() == AccessDecider.Decision.DENY)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + next.matchedPolicy()
+                    + "' [would-lock-out]: it would deny your own next PUT /access/policies, and that can only be"
+                    + " undone by editing access-policies.toon on disk — narrow its target or condition");
     }
 
     private static Map<String, Object> policyShape(AccessPolicies.Policy p, String source) {
