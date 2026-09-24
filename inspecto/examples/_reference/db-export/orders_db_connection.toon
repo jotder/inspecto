@@ -1,0 +1,14 @@
+connection:
+  id: ORDERS_DB
+  connector: db
+  username: inspecto
+  password: "${ENV:ORDERS_DB_PASSWORD}"
+  options:
+    jdbc_url: "jdbc:postgresql://db.example.com:5432/sales"
+    driver: org.postgresql.Driver
+    query: "SELECT order_id, order_date, region, product, quantity, unit_price, status FROM orders WHERE updated_at > :watermark ORDER BY updated_at"
+    export_name: ORDERS_export.csv
+    watermark_column: updated_at
+    watermark_type: timestamp
+    watermark_initial: "2026-01-01 00:00:00"
+    test_timeout_ms: 1500

@@ -1,0 +1,35 @@
+name: REF_DUCKLAKE_ORDERS
+active: false
+
+dirs:
+  poll:       out/inbox
+  database:   out/database
+  backup:     out/backup
+  temp:       out/temp
+  errors:     out/errors
+  quarantine: out/quarantine
+  markers:    out/markers
+  status_dir: out/status
+  log_dir:    out/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+  ducklake:
+    enabled: true
+    catalog_url: "postgres:host=pg.example.com dbname=lake user=inspecto"
+    data_path: out/lake
+    schema: sales
+    table: orders
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"

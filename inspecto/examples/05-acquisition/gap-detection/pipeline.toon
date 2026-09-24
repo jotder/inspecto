@@ -1,6 +1,5 @@
 name: GAP_DETECTION
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

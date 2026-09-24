@@ -1,6 +1,5 @@
 name: OUTPUT_CSV
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

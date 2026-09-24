@@ -1,6 +1,5 @@
 name: PARSE_XML_PLUGIN
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

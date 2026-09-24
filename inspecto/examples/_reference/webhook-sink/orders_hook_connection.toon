@@ -1,0 +1,9 @@
+connection:
+  id: ORDERS_HOOK
+  connector: https
+  host: hooks.example.com
+  port: 443
+  base_path: /inspecto/orders
+  password: "${ENV:ORDERS_HOOK_TOKEN}"
+  options:
+    timeout_seconds: 10

@@ -1,0 +1,21 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# STEP: profile (transform.profile) — processor quality.profiler.inline. Per-column statistics as a Step:
+#   steps[1]: - profile: { columns[3]: REGION,QUANTITY,GROSS }
+# One output row per profiled column: column_name, row_count, null_count, distinct_count, min_value,
+# max_value (the bounds are aggregated in the column's own type, then cast to VARCHAR). Leave columns
+# empty to profile every inbound column; naming a column the row does not carry is refused at save.
+# At rest, like summarize: the ingest lands out/orders/, the commit fires profile_rollup, and the
+# statistics land in out/profile/.
+#
+# Expected evidence after the run:
+#   /jobs shows profile_rollup type PIPELINE with lastStatus SUCCESS; /jobs/profile_rollup/runs shows the
+#   run record "1 file(s), 3 row(s) → store(s) [profile]". On disk, out/profile/*.parquet holds
+#   (column_name, row_count, null_count, distinct_count, min_value, max_value):
+#     REGION    8 0 4  EAST  WEST    — 4, not 6: the steps see the MAPPED row, UPPER(TRIM(REGION))
+#     QUANTITY  8 0 7  1     10      — numeric min/max (1 before 10), cast to VARCHAR only afterwards
+#     GROSS     8 0 8  15.0  122.5   — a mapping-derived column is profiled like any other
+#   The job can also be fired by hand: POST /jobs/profile_rollup/trigger.
+/jobs
+/jobs/profile_rollup/runs

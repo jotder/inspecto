@@ -7,8 +7,9 @@ directory — so you can run, inspect, delete `out/`, and re-run freely without 
 > **Status:** the Stage-1 ingest / parsing / schema / output core, the serve-mode acquisition and
 > job examples, and — since 2026-09-06 — **one runnable example per Step kind** (`07-steps/`, plus
 > the three parse frontends that were missing under `02-parsing/`). Every example below is verified
-> end to end. Still to come: authored-flow and Stage-2 enrichment serve examples, and a `_reference/`
-> set of shape-correct templates for features that need external infra (SFTP/FTP/DB connections).
+> end to end. Still to come: authored-flow and Stage-2 enrichment serve examples. Features that need
+> external infra (SFTP, a database, an https receiver, a DuckLake catalog) ship as **`_reference/`**
+> shape-correct templates (2026-09-24) — see the last section.
 
 ## How to run
 
@@ -50,9 +51,11 @@ git-ignored.
 | **02-parsing/asn1-frontend** | BER-encoded records decoded against an inline X.680 module (`frontend: asn1`: `grammar`, `root_type`, `segments`). Each record type is a **segment** with its own schema; `raw.fields[].selector` is a dotted path into the decoded record (`party.number`). A record of an undeclared type (the `smsRecord`) is counted as junk, not an error. | `… 02-parsing/asn1-frontend` |
 | **02-parsing/xml-plugin-frontend** | The **custom-plugin** parse family (`frontend: plugin`): a deployed `StreamingFileIngester` named by class — here the shipped `XmlRecordIngester` — with `segments` (one schema per record element) and its own `ingester_config` (`record_element: order`). Selectors address attributes (`@id`) and nested elements (`customer.name`); the `<refund>` element is junk, not a reject. The same block wires any plugin jar on the classpath. | `… 02-parsing/xml-plugin-frontend` |
 | **03-schema-transform/expr-transform** | Per-record `EXPR` transforms: `UPPER(TRIM(...))` and a derived `GROSS = ROUND(net*1.1, 2)` column. | `… 03-schema-transform/expr-transform` |
+| **03-schema-transform/schema-drift** | `quality.schema.drift`: each file's header vs `raw.fields[]`, reported as one `quality.schema_drift` WARN Signal per drifted batch. Day 02 adds a `CHANNEL` column (Signal + the parse's own width rule quarantines it); day 03 says `AREA` where `REGION` was — equal width, so it ingests cleanly and only the Signal tells anyone. Serve mode: probes `/signals?type=quality.schema_drift`. | `serve-example 03-schema-transform/schema-drift --demo` |
 | **03-schema-transform/reject-routing** | Structurally-bad rows (wrong column count) are split out to `out/errors/*_errors.csv` while good rows still land in `out/database/`. | `… 03-schema-transform/reject-routing` |
 | **04-output/csv-output** | Switch the sink to `format: CSV` (vs the default Parquet+snappy), same Hive partition layout. | `… 04-output/csv-output` |
 | **05-acquisition/dedup-rerun** | Disk-marker dedup (`processing.duplicate_check`): run it **twice** (no `--clean`) — the 2nd run reports "No new files" and skips the already-processed file. | `… 05-acquisition/dedup-rerun` (run ×2) |
+| **05-acquisition/intake-throttle** | The **local throttle** (`processing.intake: {max_files_per_cycle: 2, adaptive: false}`, processor `control.throttle`): five files wait, each run admits the two oldest (by mtime) and logs *Admission cap: taking 2 of 5*; run it three times (no `--clean`) and the inbox drains 2 → 2 → 1. `collector.fetch.rate_limit` is the REMOTE half — see `_reference/sftp-collector`. | `… 05-acquisition/intake-throttle` (run ×3) |
 | **05-acquisition/gap-detection** | Configures `source.gap_detection` over a numbered feed (`FEED_yyyyMMdd`, day 02 missing). Both files ingest; the `SEQUENCE_GAP` **alert** is emitted in serve mode — see the runnable serve example below. | `… 05-acquisition/gap-detection` |
 | **06-serve/sequence-gap** | The same gap feed run **as a service**: the poll loop detects the hole in the `FEED_{yyyyMMdd}.csv` series (day 02 missing) and emits a `SEQUENCE_GAP` event + ALERT — observable only in serve mode. | `serve-example 06-serve/sequence-gap --demo` |
 | **06-serve/checksum-change** | Content-based (SHA256) dedup with change alerting (`source.duplicate { mode: checksum, on_change: alert }`). A two-cycle example (uses `phase2/`): the same `ORDERS.csv` path is re-presented with **changed** content → the engine sees the checksum differ, emits `FILE_CHANGED`, and reprocesses. | `serve-example 06-serve/checksum-change --demo` |
@@ -97,6 +100,8 @@ is [`docs/okf/backend/pipeline-graph/step-catalog.md`](../../docs/okf/backend/pi
 | **join** → `transform.join` | `reference:` (a path, or `reference/<pipeline>`) + `on[]`: a LEFT JOIN, unmatched keys keep NULL reference columns. 8 in → 8 out, 6 enriched. | `07-steps/join` | `serve-example 07-steps/join --demo` |
 | **sql** → `transform.sql` | `sql:` — one SELECT over `input` (the Record Transformer; the editor's Fields grid compiles to the same key). 8 in → 7 out, two derived columns. | `07-steps/sql` | `serve-example 07-steps/sql --demo` |
 | **summarize** → `transform.summarize` | `group_by[]` + `measures[]` in the one measure grammar (`count`, `sum(GROSS)`, `max(UNIT_PRICE)`). 8 in → 4 groups. | `07-steps/summarize` | `serve-example 07-steps/summarize --demo` |
+| **profile** → `transform.profile` | `columns[]` (blank = every inbound column): one statistics row per column — `row_count`, `null_count`, `distinct_count`, `min_value`, `max_value`, bounds aggregated in the column's own type. 8 in → 3 rows (REGION, QUANTITY, GROSS). | `07-steps/profile` | `serve-example 07-steps/profile --demo` |
+| **dedup** (windowed) → `transform.dedup` | `scope: window(P4D)` + the required `order_by`: winners are claimed in the durable dedup ledger, so a key an EARLIER Consignment admitted in the same window is suppressed. Two drops (`samples/`, then `phase2/`): 8 rows, then 1. ⚠ The ledger (`inspecto-dedup-ledger.db`) sits beside the config, not under `out/` — delete it to replay. | `07-steps/dedup-window` | `serve-example 07-steps/dedup-window --demo` |
 | **route** → `transform.route` | `route: {mode: case, default, branches[]{key,where,database}}` paired with `sinks[]{database,format}` by `database`; first match wins, the default catches the rest (the unknown `CENTRAL` region lands in `other`). | `07-steps/route` | `run-example 07-steps/route` |
 | **sink** → `sink.persistent` | `output: {format, compression, filename_column}` (or `sinks[]` for several): the resting store, Hive-partitioned by the schema's `partitionKey`. `filename_column: SOURCE_FILE` stamps each row with the file it came from. | `07-steps/sink` | `run-example 07-steps/sink` |
 
@@ -135,6 +140,22 @@ examples omit it for clarity.
 More config shapes are in
 [`../../docs/FEATURE_INVENTORY.md`](../../docs/FEATURE_INVENTORY.md) §I; jobs, authored flows, and
 Stage-2 enrichment serve examples are landing in subsequent batches.
+
+## Reference templates — `_reference/` (need external infrastructure)
+
+Shape-correct configs for the processors that cannot run offline. They are **inactive** (`active: false`),
+their Connections carry `${ENV:…}` secret references, and none of them runs from `run-example`: the
+remote connectors ship in the optional `inspecto-connectors` module, outside the core JAR. What keeps them
+true is `ShippedExamplesPassTheSaveGateTest` (inspecto module): every example Pipeline here — runnable or
+reference — must pass the save gate and load, and every `*_connection.toon` must load. To use one, copy the
+folder into a Space's `config/`, point the Connection at real infrastructure, and activate it.
+
+| Template | Processors it shows | Keys |
+|---|---|---|
+| **_reference/sftp-collector** | `acquisition.file.sftp`, `control.throttle`, `control.circuitbreaker`, `sink.archive` | `connector: sftp` + a pinned-host-key Connection; `fetch.{parallel_fetch, rate_limit, staging_dir}`, `retry`, `circuit_breaker`, `post_action: {on_success: MOVE, archive_path: archive/yyyy/MM/dd, on_unsupported: FAIL}` |
+| **_reference/db-export** | `acquisition.db.jdbc` | `connector: db`; the Connection's `options.{jdbc_url, query (with :watermark), export_name, watermark_column, watermark_type}` |
+| **_reference/webhook-sink** | `sink.api.webhook` (Professional+) | an `https` Connection (token = its `password`, a secret ref) + `webhook: {connection, batch_size, retry}` over a filtered `output_store:`, run by `webhook_job.toon` |
+| **_reference/ducklake-sink** | `sink.ducklake` (Professional+) | `output.ducklake: {enabled, catalog_url, data_path, schema, table}` |
 
 ## Things worth knowing (learned the hard way)
 

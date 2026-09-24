@@ -1,0 +1,42 @@
+name: REF_DB_ORDERS
+active: false
+
+dirs:
+  poll:       out/inbox
+  database:   out/database
+  backup:     out/backup
+  temp:       out/temp
+  errors:     out/errors
+  quarantine: out/quarantine
+  markers:    out/markers
+  status_dir: out/status
+  log_dir:    out/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/ORDERS_*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  connector: db
+  connection: ORDERS_DB
+  fetch:
+    staging_dir: out/staging
+  retry:
+    count: 2
+    backoff: FIXED
+    initial_delay: 10s
+  circuit_breaker:
+    failure_threshold: 3
+    cooldown: 10m

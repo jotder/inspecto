@@ -1,0 +1,24 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# PROCESSOR: quality.dedup.windowed — transform.dedup with a TIME WINDOW (D-9):
+#   steps[1]: - dedup: { keys[1]: ORDER_ID, order_by: "ORDER_DATE DESC", scope: window(P4D) }
+# The plain dedup example (07-steps/dedup) keeps one row per key WITHIN one Consignment. With a window
+# scope each run's winners are also claimed in the durable dedup ledger, so a key an EARLIER Consignment
+# admitted inside the window is suppressed too. order_by is REQUIRED with a window (refused at save and
+# at run): a durable ledger must never record a non-deterministic winner.
+# ⚠ The window is a TUMBLING bucket anchored on the epoch (DedupScope.Window.startFor), keyed on the
+# order_by column's date: window(P4D) files 2026-07-02..2026-07-05 in ONE bucket, 2026-07-01 in the one
+# before. A re-send is suppressed only when it lands in the same bucket as the original — every date
+# below is inside 07-02..07-05 on purpose.
+# Two drops (samples/ then phase2/), so each is its own commit and its own at-rest run:
+#   run 1 — ORDERS_20260701.csv: 8 orders 1001..1008 -> 8 rows land in out/rollup/
+#   run 2 — ORDERS_20260702.csv: re-sends 1002, 1004, 1001 (same bucket) + the new 1009
+#                                 -> only 1009 lands; the three re-sends are suppressed by the ledger
+#
+# Expected evidence after the run: /jobs/dedup_window_rollup/runs shows two SUCCESS runs, "8 row(s)" and
+# "1 row(s)" (newest first). 07-steps/dedup's consignment scope would keep all 4 in run 2.
+# ⚠ To replay: the ledger is inspecto-dedup-ledger.db BESIDE this config, not under out/, so --clean
+# does not reset it — delete inspecto-*.db* here first, or run 1 reports the keys already claimed.
+/jobs
+/jobs/dedup_window_rollup/runs

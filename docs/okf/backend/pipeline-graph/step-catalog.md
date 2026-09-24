@@ -139,7 +139,11 @@ outside the block. Their keys are in the served contract.
 
 **Examples.** `examples/07-steps/collect` · `spaces/default/config/collect_step` (include/exclude,
 recursion, gap detection) · `05-acquisition/*` and `06-serve/{sequence-gap,checksum-change,
-incremental-watermark}` for the duplicate and gap policies.
+incremental-watermark}` for the duplicate and gap policies · `05-acquisition/intake-throttle` (the local
+throttle, `processing.intake`: 5 files, 2 per cycle) · the infra-bound `_reference/sftp-collector` (SFTP
+with `fetch.rate_limit`, `retry`, `circuit_breaker`, `post_action: MOVE`) and `_reference/db-export`
+(`connector: db` with a watermark) — shape-correct, validated by `ShippedExamplesPassTheSaveGateTest`, not
+runnable offline.
 
 ## `parse` → the **7**<!--count:parser-node-types--> `parser.*` frontends
 
@@ -250,7 +254,10 @@ a ledger must never record a non-deterministic winner. Mid-branch only the consi
 | `scope` | string | advanced | — | **Scope.** How far back a key is a duplicate: blank/consignment = within this Consignment only; window(<ISO-8601 period>), e.g. window(P4D), also suppresses keys admitted by earlier Consignments inside that window via the durable dedup ledger (runs at rest). |
 
 **Example.** `examples/07-steps/dedup` (12 → 9 rows, newest version of each order) ·
-`spaces/default/config/dedup_step`.
+`spaces/default/config/dedup_step` · `examples/07-steps/dedup-window` (`scope: window(P4D)`, two drops: 8 rows, then 1 — the three re-sends
+suppressed by the ledger). ⚠ The window is a **tumbling** bucket anchored on the epoch
+(`DedupScope.Window.startFor`), keyed on the `order_by` column's date — a re-send is suppressed only when it
+falls in the same bucket as the original, not whenever it is within the period of it.
 
 ## `join` → `transform.join` — Reference join
 
@@ -343,6 +350,9 @@ pipeline carrying it must declare `output_store:` (`stage-two-blocks-require-out
 |---|---|---|---|---|
 | `columns` | list | optional | — | **Columns.** Columns to profile. Leave blank to profile every inbound column. |
 
+**Example.** `examples/07-steps/profile` (8 rows → 3 statistics rows: REGION, QUANTITY, GROSS; added
+2026-09-24 — until then the profile Step was the one Step kind with no example).
+
 ## `route` → `transform.route` — Router
 
 **Function.** Content-based routing into operator-defined branches, each writing its own destination.
@@ -420,7 +430,8 @@ accepted whole. On one node a failed registration is logged and the batch succee
 `DuckLakeRegistrar.requireRegistrationConfigured` and `onRegistrationFailure`.
 
 **Example.** `examples/07-steps/sink` (CSV + `SOURCE_FILE`) · `04-output/csv-output` ·
-`spaces/default/config/sink_step`.
+`spaces/default/config/sink_step` · `_reference/ducklake-sink` (`output.ducklake`, needs a PostgreSQL
+catalog — shape-correct, not runnable offline).
 
 ---
 

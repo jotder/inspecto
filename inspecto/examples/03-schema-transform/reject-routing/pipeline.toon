@@ -1,6 +1,5 @@
 name: REJECT_ROUTING
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

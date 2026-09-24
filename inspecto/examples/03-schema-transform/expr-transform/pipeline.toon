@@ -1,6 +1,5 @@
 name: EXPR_TRANSFORM
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

@@ -1,6 +1,5 @@
 name: PARSE_NO_HEADER
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

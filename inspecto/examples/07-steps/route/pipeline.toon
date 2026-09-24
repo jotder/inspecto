@@ -1,6 +1,5 @@
 name: STEP_ROUTE
 active: true
-version: 1
 
 dirs:
   poll:       out/inbox

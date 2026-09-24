@@ -1,0 +1,6 @@
+job:
+  name: orders_webhook
+  type: pipeline
+  pipeline_config: orders_pipeline.toon
+  data_dir: out
+  on_pipeline: ref_webhook_orders

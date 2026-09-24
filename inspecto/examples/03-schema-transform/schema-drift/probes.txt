@@ -1,0 +1,16 @@
+# Per-example Control API probes for serve-example.{ps1,sh}.
+# One endpoint path per line; blank lines and lines starting with '#' are ignored.
+#
+# PROCESSOR: quality.schema.drift — the header each file carries vs the schema's raw.fields[].
+# No keys: it rides every header-bearing delimited Parse Step. Detection only (operator decision
+# 2026-09-10): the parse runs exactly as it would without the detector; the REPORT is one
+# quality.schema_drift WARN Signal per drifted batch, correlated to the batch id.
+#   ORDERS_20260701.csv  matches the schema               -> no Signal; ingested
+#   ORDERS_20260702.csv  carries an extra CHANNEL column  -> Signal added=[CHANNEL]; the parse's own width
+#                        rule quarantines it (out/quarantine/field_mismatch/, TOO MANY COLUMNS) — the
+#                        Signal says WHY in schema terms
+#   ORDERS_20260703.csv  says AREA where REGION was       -> Signal added=[AREA], missing=[REGION]; ingested
+#                        (equal width: it parses perfectly by position — only the Signal tells anyone)
+#
+# Expected evidence after the run: two quality.schema_drift Signals below; out/database/ holds days 01 and 03.
+/signals?type=quality.schema_drift

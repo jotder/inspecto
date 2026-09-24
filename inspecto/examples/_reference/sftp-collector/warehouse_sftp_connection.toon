@@ -1,0 +1,12 @@
+connection:
+  id: WAREHOUSE_SFTP
+  connector: sftp
+  host: sftp.warehouse.example.com
+  port: 22
+  base_path: /exports/orders
+  username: inspecto
+  password: "${ENV:WAREHOUSE_SFTP_PASSWORD}"
+  options:
+    host_key: "SHA256:replace-with-the-servers-host-key-fingerprint"
+    strict_host_key: true
+    test_timeout_ms: 1500

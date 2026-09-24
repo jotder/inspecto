@@ -1,0 +1,52 @@
+name: REF_SFTP_ORDERS
+active: false
+
+dirs:
+  poll:       out/inbox
+  database:   out/database
+  backup:     out/backup
+  temp:       out/temp
+  errors:     out/errors
+  quarantine: out/quarantine
+  markers:    out/markers
+  status_dir: out/status
+  log_dir:    out/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/ORDERS_*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+  schema_file: "schema.toon"
+  csv_settings:
+    delimiter: ","
+    date_formats[1]: "%Y-%m-%d"
+    timestamp_formats[1]: "%Y-%m-%d %H:%M:%S"
+
+collector:
+  connector: sftp
+  connection: WAREHOUSE_SFTP
+  include[1]: "glob:**/ORDERS_*.csv"
+  stability:
+    window: 30s
+  fetch:
+    parallel_fetch: 2
+    rate_limit: 10MB/s
+    staging_dir: out/staging
+  retry:
+    count: 3
+    backoff: EXPONENTIAL
+    initial_delay: 2s
+    max_delay: 60s
+  circuit_breaker:
+    failure_threshold: 5
+    cooldown: 5m
+  post_action:
+    on_success: MOVE
+    archive_path: archive/yyyy/MM/dd
+    on_unsupported: FAIL
