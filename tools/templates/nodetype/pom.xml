@@ -25,6 +25,15 @@
             <version>4.0.0-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
+        <!-- SqlIdent, the one SQL-quoting implementation — call it, never copy it. The engine carries
+             this jar at run time too, so it is `provided`; declared directly rather than trusted to
+             arrive transitively through inspecto-engine. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-util</artifactId>
+            <version>4.0.0-SNAPSHOT</version>
+            <scope>provided</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

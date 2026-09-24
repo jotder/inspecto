@@ -4,6 +4,7 @@ import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.PipelineRel;
 import com.gamma.pipeline.exec.PipelineNodeExecutor;
 import com.gamma.pipeline.exec.RowShaper;
+import com.gamma.util.SqlIdent;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -30,7 +31,8 @@ import java.util.List;
  *       reads exactly the names you return.</li>
  *   <li>🔴 <b>Quote every identifier.</b> Column names come from an operator's config and reach SQL
  *       directly; a name like {@code order} is a keyword and one containing a quote is an injection.
- *       {@link #quote} is the whole defence.</li>
+ *       {@link SqlIdent#q} (identifiers) and {@link SqlIdent#sqlStr} (string literals) are the whole
+ *       defence — call them, never a private copy (see the dependency contract below).</li>
  *   <li>⚠ <b>Fail by throwing.</b> A bad config should raise here rather than produce a silently wrong
  *       relation — the batch fails with your message, which is what an operator can act on.</li>
  * </ul>
@@ -38,6 +40,14 @@ import java.util.List;
  * <p>⚠ <b>It runs on a SEALED connection in preview.</b> The component preview seals its DuckDB
  * (`enable_external_access=false`), so an executor that reads a file works in production and fails in
  * the editor's "Test this Step" — read nothing outside {@code input}.
+ *
+ * <h2>Dependency contract</h2>
+ * A scaffolded module compiles against two engine artifacts, both {@code provided} in its pom because
+ * the engine already carries them at run time: {@code inspecto-engine} (the SPI) and
+ * {@code inspecto-util} (for {@link SqlIdent}, the reactor's one SQL-quoting implementation). The pom
+ * declares {@code inspecto-util} directly rather than leaning on it arriving transitively through the
+ * engine, so it states what these sources import. Do not paste a quoting helper into this class: a
+ * private copy is how consolidated quoting drifts apart again (SQLIDENT-NINE-COPIES-1).
  */
 public final class {{className}}Executor implements PipelineNodeExecutor {
 
@@ -61,21 +71,21 @@ public final class {{className}}Executor implements PipelineNodeExecutor {
         // SELECT * EXCLUDE(<redacted>), <redacted expressions> — every other column travels untouched,
         // which is what keeps this composable with whatever Step follows.
         StringBuilder sel = new StringBuilder("SELECT * EXCLUDE (");
-        for (int i = 0; i < columns.size(); i++) sel.append(i > 0 ? ", " : "").append(quote(columns.get(i)));
+        for (int i = 0; i < columns.size(); i++) sel.append(i > 0 ? ", " : "").append(SqlIdent.q(columns.get(i)));
         sel.append(')');
         for (String col : columns) {
-            String q = quote(col);
+            String q = SqlIdent.q(col);
             sel.append(", CASE WHEN ").append(q).append(" IS NULL THEN NULL ELSE ")
                .append("left(CAST(").append(q).append(" AS VARCHAR), ").append(keep).append(") || ")
-               .append("repeat(").append(literal(mask)).append(", ")
+               .append("repeat(").append(SqlIdent.sqlStr(mask)).append(", ")
                .append("greatest(length(CAST(").append(q).append(" AS VARCHAR)) - ").append(keep).append(", 0))")
                .append(" END AS ").append(q);
         }
-        sel.append(" FROM ").append(quote(input));
+        sel.append(" FROM ").append(SqlIdent.q(input));
 
         String data = outPrefix + "__" + PipelineRel.DATA;
         try (Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE " + quote(data) + " AS " + sel);
+            st.execute("CREATE TABLE " + SqlIdent.q(data) + " AS " + sel);
         }
         return List.of(new RowShaper.Relation(PipelineRel.DATA, data));
     }
@@ -104,15 +114,5 @@ public final class {{className}}Executor implements PipelineNodeExecutor {
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException("{{id}}: 'keep' must be a whole number, got: " + value, e);
         }
-    }
-
-    /** Quote a SQL identifier, escaping embedded double quotes — see the contract note above. */
-    private static String quote(String ident) {
-        return '"' + ident.replace("\"", "\"\"") + '"';
-    }
-
-    /** A single-quoted SQL string literal, escaping embedded quotes. */
-    private static String literal(String s) {
-        return "'" + s.replace("'", "''") + "'";
     }
 }

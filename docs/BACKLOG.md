@@ -13,14 +13,14 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
+> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 28<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 55<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 54<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -147,7 +147,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 - **P3** · **Step Processor catalog** — ⛔ **ON HOLD (operator, 2026-09-23): no NEW Step Processors — neither the 67 planned nor completing the partials — until the existing ones are releasable.** Build only when the operator names one again. 119 processors: **34**<!--count:processors-delivered--> delivered / **18**<!--count:processors-partial--> partial / 67 planned (`processor-catalog.contract.json`). Each partial is its own product decision (Kafka consumer, XPath grammar, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email sinks…) — pick one by name. ⚠ A catalog entry is a `BuiltinNodeType` case compiled by `RecipeCompiler`/`ProcessorCatalog`, **not** the `ConsignmentProcessor` SPI; the namespace is `transform.*`; a new node type needs a flat-config home too; and both contract JSONs under `inspecto-ui/` are generated from Java and must be regenerated in the same change. → `EDITIONS.md` §Step Processors · `okf/backend/pipeline-graph/step-catalog.md`
 - **P3** · `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` — **`GET /pipelines/step-types` has no live UI consumer** since the Recipe view was removed (`6d3c68fa`). The client `RECIPE_VERBS`, the write-only `servedVerbs` and its fetch in `pipeline-editor.component.ts`, and the mock lift/lower port in `pipeline-editable.ts` (dead since `f1553136`, and drifted — lookup and chain `sql` drop silently, profile and webhook refuse) are held up only by specs. Operator decisions: **(A)** keep the endpoint as the published recipe vocabulary (add profile + webhook server-side only, drop the client parity spec) or retire it with its contract and count guard; **(B)** delete the dead client code (keep `isProjectionSlot`). → `okf/backend/pipeline-graph/step-catalog.md`
-- **P3** · `NODETYPE-SCAFFOLD-EMITS-A-COPY-1` — **the node-type scaffold plants a private SQL-quoting copy into every generated Executor** (`tools/templates/nodetype/src/main/java/__packageDir__/__className__Executor.java:111`), so consolidated identifier quoting regrows from the template. Fixing it means settling the scaffold's dependency contract first — whether a scaffolded module has `inspecto-util` on its classpath; the template's javadoc points at a contract note that is no longer in the file. → `okf/backend/engine/node-types.md`
 
 ### 3.2 Pipelines — execution, lanes & Consignments
 

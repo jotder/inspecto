@@ -69,7 +69,8 @@ The `transform.` prefix is not decoration: the inline component-preview route re
 
 - 🔴 **Quote every identifier.** Column names arrive from an operator's config and reach SQL directly.
   A name like `order` is a reserved word and one containing a quote is an injection —
-  `aReservedWordColumnNameIsQuoted` is the test that pins it.
+  `aReservedWordColumnNameIsQuoted` is the test that pins it. Quote through `com.gamma.util.SqlIdent`
+  (`inspecto-util`, `provided` in the pom — the engine carries it), never a private copy.
 - 🔴 **Create your own output tables**, named `outPrefix + "__" + relationship`, and return one
   `RowShaper.Relation` per table. Nothing renames them; the caller reads exactly the names you return.
 - ⚠ **Fail by throwing.** A bad config must raise rather than produce a silently wrong relation — the
