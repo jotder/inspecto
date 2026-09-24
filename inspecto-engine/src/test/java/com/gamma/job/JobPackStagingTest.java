@@ -1,5 +1,6 @@
 package com.gamma.job;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -57,7 +58,9 @@ class JobPackStagingTest {
             assertEquals(List.of("pack.jar"), summary.get("rejected"), "the unsigned swap is verified and refused");
             assertFalse(registry.has("acme.evil"), "the unsigned jar never registers");
             assertFalse(registry.has("acme.signed"));
-            assertTrue(mgr.inventory().isEmpty());
+            assertEquals("rejected", mgr.inventory().get(0).get("state"));
+            assertTrue(String.valueOf(mgr.inventory().get(0).get("cause")).contains("unsigned"),
+                    "refused by the signature check, not the allowlist: " + mgr.inventory().get(0).get("cause"));
             Path stagingDir = stagingDir(mgr);
             assertNotNull(stagingDir, "the jar was staged before verification");
             try (Stream<Path> left = Files.list(stagingDir)) {
@@ -90,14 +93,23 @@ class JobPackStagingTest {
                 signedJar.toString(), "pack");
     }
 
-    /** A copy of the signed pack at {@code packs/pack.jar}; the unsigned pack stays outside the watched dir. */
+    /** A copy of the signed pack at {@code packs/pack.jar}; the unsigned pack stays outside the watched dir.
+     *  BOTH hashes are on the trust allowlist (T1), so what these tests exercise is the SIGNATURE check on the
+     *  staged bytes — the allowlist's own staged-bytes pin is {@code JobPackTrustTest}'s. */
     private static Fixture fixture(Path work) throws Exception {
         Path packs = Files.createDirectories(work.resolve("packs"));
         Path watched = Files.copy(signedJar, packs.resolve("pack.jar"));
         String sha = HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(watched)));
+        Path allow = Files.writeString(work.resolve("packs.allowlist"),
+                sha + "  pack.jar\n" + JobPackTrustTest.sha(unsignedJar) + "  evil.jar\n");
+        System.setProperty("jobs.packs.allowlist", allow.toString());
+        JobPackManagerTest.narrowSafetyRoots(work.resolve("jail"));
         return new Fixture(packs, watched, unsignedJar, sha);
     }
+
+    @AfterEach
+    void clearAllowlist() { JobPackManagerTest.clearTrust(); }
 
     private static JobPackManager signingManager(Path packs, JobTypeRegistry registry) {
         String prior = System.getProperty("jobs.packs.requireSignature");

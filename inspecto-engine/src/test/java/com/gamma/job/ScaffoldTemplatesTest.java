@@ -81,6 +81,7 @@ class ScaffoldTemplatesTest {
 
         Path packsDir = Files.createDirectories(work.resolve("packs"));
         Files.copy(jar, packsDir.resolve(jar.getFileName()));
+        JobPackManagerTest.trustEveryJarIn(packsDir);
         List<String> signals = new ArrayList<>();
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry,
                 ExpressionRegistry.withBuiltins(),
@@ -91,6 +92,8 @@ class ScaffoldTemplatesTest {
                     "the scaffolded pack did not register: " + signals);
             assertEquals(List.of("notifications"),
                     registry.descriptor("acme.reconcile").orElseThrow().requires());
+        } finally {
+            JobPackManagerTest.clearTrust();
         }
 
         // The generated project's own claim — that PackTestHarness runs it green — verified here on

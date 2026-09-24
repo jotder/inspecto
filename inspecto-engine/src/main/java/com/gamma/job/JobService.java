@@ -1805,7 +1805,8 @@ public final class JobService implements AutoCloseable {
         return JobTypeCatalog.of(jobTypes());
     }
 
-    /** Loaded Job Pack inventory (id, version, hash, types, state) — {@code GET /jobs/packs} (§12, R8). */
+    /** Job Pack inventory — loaded packs (id, version, hash, types, {@code state: loaded}) plus jars the trust
+     *  gate or loader refused ({@code state: rejected}, cause) — {@code GET /jobs/packs} (§12, R8). */
     public List<Map<String, Object>> jobPacks() {
         return packs.inventory();
     }

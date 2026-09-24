@@ -19,6 +19,12 @@ curl localhost:8080/jobs/types/{{id}}                # 5. confirm the engine reg
 `$PACKS_DIR` is whatever the engine was started with as `-Djobs.packs.dir`. With that flag absent
 the pack mechanism is off entirely — nothing is scanned, by design.
 
+Before step 5, approve the exact jar on the host. Append `sha256sum target/{{artifactId}}-1.0.0.jar`
+to the file the engine names as `-Djobs.packs.allowlist`, then `POST /jobs/packs/rescan`. A jar whose
+hash is not listed is refused, and with no allowlist configured every jar is refused. Keep that file
+outside `$PACKS_DIR` and outside every control-plane write root, or the engine refuses to boot. A rebuilt
+jar has a new hash, so it needs a new line.
+
 Start the engine with `-Djobs.packs.requireSignature=true` and every class entry in the jar must
 carry a valid signature or the pack is rejected whole. Signing (step 4) is what makes that pass;
 grants tell an operator what a pack *can* reach, signatures tell them the jar is the one you built.

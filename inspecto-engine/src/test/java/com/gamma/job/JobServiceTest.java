@@ -344,6 +344,7 @@ class JobServiceTest {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
         Path packsDir = Files.createDirectories(dir.resolve("packs"));
         Path jar = buildPackJar(dir, packsDir.resolve("greet-1.jar"), "acme.greet", "GreetType", "acme-greet");
+        JobPackManagerTest.trustEveryJarIn(packsDir);
         System.setProperty("jobs.packs.dir", packsDir.toString());
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
@@ -376,6 +377,7 @@ class JobServiceTest {
                     "names why: " + second.message());
         } finally {
             System.clearProperty("jobs.packs.dir");
+            JobPackManagerTest.clearTrust();
         }
     }
 
@@ -483,6 +485,7 @@ class JobServiceTest {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
         Path packsDir = Files.createDirectories(dir.resolve("packs"));
         buildSleepPackJar(dir, packsDir.resolve("sleep-1.jar"), "acme.sleep", "SleepType", "acme-sleep");
+        JobPackManagerTest.trustEveryJarIn(packsDir);
         System.setProperty("jobs.packs.dir", packsDir.toString());
         System.setProperty("jobs.maxConcurrentRuns", "1");
         try (Scheduler s = new Scheduler();
@@ -513,6 +516,7 @@ class JobServiceTest {
                 "permit released after both runs finish");
         } finally {
             System.clearProperty("jobs.packs.dir");
+            JobPackManagerTest.clearTrust();
             System.clearProperty("jobs.maxConcurrentRuns");
         }
     }

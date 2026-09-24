@@ -311,8 +311,51 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   is green; *skipped* is the expected state, not a regression. Exercise them where the corpus lives
   (the main checkout) with `mvn test -Dasn.corpus.tests=true`. The property alone does nothing
   without the data; the data alone no longer runs them without the property (2026-08-01).
-- **Drop-in `plugins/` jar directory** and the **segments editor** (unlock guided Save for
-  ingestable custom parsers) — unchanged from before, apply to any custom parser, not ASN.1-specific.
+- **Drop-in parser jars** and the **segments editor** (unlock guided Save for ingestable custom parsers)
+  — apply to any custom parser, not ASN.1-specific. The drop-in half's design is
+  [`parser-plugins-trust-design.md`](../../../superpower/parser-plugins-trust-design.md); what has shipped
+  is below.
+
+### Drop-in parser jars — trust gate SHIPPED, parser registration NOT yet (2026-09-25)
+
+Operator decisions 2026-09-25: **D1** a parser arrives as a **fifth Job Pack kind** through the existing
+`JobPackManager` loader (`-Djobs.packs.dir`). There is no second `plugins/` directory. **D2** T1 SHA-256
+allowlist is required; signer anchoring (T2) is not built. **D3** fail closed for Job Packs too. **D4**
+`POST /parsers/{id}/preview` needs the Pipeline-authoring capability for pack parsers only. **D7** no
+edition gate. **D8** no out-of-process host.
+
+**As built (slice P1, the gate every pack kind now passes):**
+- `-Djobs.packs.allowlist=<file>` (`PackAllowlist`, `inspecto-engine` `com.gamma.job`). Format: one
+  `<64-hex sha256>  <file>  [note]` per line, so `sha256sum` output works as-is. Only the hash decides.
+  Blank lines and `#` lines are skipped.
+- **Fail closed:** packs dir set with no allowlist ⇒ **every** jar is refused, cause `not trusted: no
+  jobs.packs.allowlist configured`. An unreadable file, or a single malformed line, refuses every jar
+  (the cause names the file or the line). An unlisted hash is refused with `not trusted: sha256 <hash> is
+  not in jobs.packs.allowlist`.
+- **Verify before load, no TOCTOU:** the hash that is checked is the SHA-256 of the **staged copy the
+  `URLClassLoader` reads**. It is taken after staging and before any class is defined. That is the same
+  staged-bytes rule the earlier verify/load TOCTOU fix (`f90ddcf25`) set up for the signature check.
+  `JobPackTrustTest` pins both swap windows. A jar swapped before staging is refused under its own hash.
+  A jar swapped after staging loads only the vetted bytes, and is then refused on the next rescan.
+- **Rescan re-reads the allowlist.** Approve = add the line and rescan (`POST /jobs/packs/rescan` or any
+  change in the packs dir). Revoke = remove the line and rescan, which **unloads** the loaded pack and then
+  refuses it.
+- **A3, boot refusal:** the constructor throws, so the Space does not load, when the allowlist lies inside
+  the packs dir or under `assist.write.root`, `spaces.root` or any `PathJail.allowedRoots()` root. By
+  design there is no API or UI route that approves a jar.
+- **Signals / log / inventory:** each refusal emits `job.pack.rejected {file, hash, cause}` and a WARN
+  `[PACKS] rejected …` line. `GET /jobs/packs` lists refused jars as `{file, hash, state: "rejected",
+  cause}` next to the `state: "loaded"` rows, and a row is dropped when its jar leaves the dir. The
+  startup log line names the allowlist, or says it is `NOT CONFIGURED`.
+- `-Djobs.packs.requireSignature` is unchanged. It is an **integrity** check on top of the allowlist, and
+  it still never looks at who signed.
+
+**Not built yet** (design §5): **P2**, the fifth `ServiceLoader` loop plus an owner-keyed `Parsers`
+overlay. Until then a `ParserPlugin` inside a pack is **not registered**, and custom parsers stay
+classpath-only. **P3**, ingester resolution through the owning loader and an ingest-time pack pin.
+**P4**, D4 preview gating. It has no pack parser to gate until P2 lands, so the route and
+`CapabilityManifest` are unchanged. Still open from **P0**: staging under a server-owned dir instead of
+the system temp dir. The decode-profile satellite (C1–C4) waits on D5/D6/D9/D10.
 
 ### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24
 

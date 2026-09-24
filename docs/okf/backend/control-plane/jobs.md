@@ -105,7 +105,12 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   Jobs record their delivered `out_dir` file as a `report` artifact, so a scheduled report is downloadable.
 * **Job Packs** — hot-deployable jars in `-Djobs.packs.dir` (absent ⇒ feature off, fail-closed); watched
   with a settle delay, each pack in its own parent-first `URLClassLoader` with shaded deps.
-  `GET /jobs/packs`, `POST /jobs/packs/rescan`. **2026-07-20 SHIPPED the classloader half of quiesce:**
+  `GET /jobs/packs`, `POST /jobs/packs/rescan`. **2026-09-25, breaking: trust gate T1.** A jar loads only
+  when the SHA-256 of its staged bytes is listed in `-Djobs.packs.allowlist`. With no allowlist, every jar
+  is refused. The file is re-read on every rescan, so removing a line unloads the pack. Boot is refused when
+  the allowlist is inside the packs dir or under a control-plane write root. Refused jars show as
+  `state: "rejected"` rows with a cause. Details: [parser-plugins.md](../engine/parser-plugins.md),
+  *Drop-in parser jars*. **2026-07-20 SHIPPED the classloader half of quiesce:**
   `JobPackManager.acquireRun`/`releaseRun` pin a pack's active-run count for the duration of a Run's
   `Job.run(ctx)` (`JobService.runJob`); `unload()` still deregisters the pack's types immediately (so a
   reload's new types are usable at once), but defers closing the old `URLClassLoader` + deleting its staged

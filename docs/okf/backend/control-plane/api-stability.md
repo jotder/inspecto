@@ -86,6 +86,18 @@ above the generated commit list.
   **`CONTROL_PLANE_READ_ONLY`** (was the 503 default `CAPABILITY_UNAVAILABLE`), matching every other
   write-root refusal. Status and message are unchanged; a client keying on the old code must switch.
 
+**Breaking — Job Packs need a SHA-256 allowlist (2026-09-25, parser-plugins trust design slice P1)**
+- With `-Djobs.packs.dir` set, a pack jar loads **only** when the SHA-256 of its bytes is listed in the
+  operator-owned file named by the new **`-Djobs.packs.allowlist`** (one `<sha256>  <file>  [note]` line per
+  jar; `sha256sum` output works as-is). **No allowlist configured ⇒ every jar is refused**, Job Packs
+  included; today's unconditional load is gone, with no compatibility switch. An unreadable file or one
+  malformed line refuses every jar too. Refusals emit `job.pack.rejected` with a `not trusted: …` cause.
+- The allowlist is re-read on every rescan: add a line + `POST /jobs/packs/rescan` approves; remove it +
+  rescan **unloads** a loaded pack. **Boot fails** (the Space does not load) if the allowlist sits inside the
+  packs dir or under `assist.write.root`, `spaces.root` or an `assist.safety.roots` root.
+- `GET /jobs/packs` now also lists refused jars as `{file, hash, state: "rejected", cause}` beside the
+  `state: "loaded"` rows. A client that treated every row as loaded must filter on `state`.
+
 **Whole-pipeline dry run (2026-09-20, `PIPELINE-DRYRUN-1` step 5)**
 - `POST /runs/{name}/trigger?dryRun=true` runs a pipeline and **lands nothing** — no outputs, no audit or
   commit-log rows, no provenance row, no markers, no backup/quarantine moves — logging each suppressed

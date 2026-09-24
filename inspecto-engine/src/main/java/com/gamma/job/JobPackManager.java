@@ -60,8 +60,17 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
  * partial registration) and emits {@code job.pack.rejected}; success emits {@code job.pack.loaded}.
  *
  * <p><b>Fail-closed & scope (§12.3):</b> absent flag ⇒ feature entirely off (no dynamic code loading).
- * {@code -Djobs.packs.requireSignature} (default off) rejects jars with any unsigned class entry; matching
- * the signer against {@code -Djobs.packs.trustStore} is the SEC-7 sign-off gate and is not yet enforced.
+ *
+ * <p><b>Trust gate T1 (parser-plugins-trust-design.md slice P1, operator D2/D3 2026-09-25):</b> a jar loads
+ * ONLY when the SHA-256 of the staged bytes the loader reads is listed in the operator-owned
+ * {@code -Djobs.packs.allowlist} file ({@link PackAllowlist}). Packs dir set and no allowlist configured ⇒
+ * <em>every</em> jar is refused. The allowlist is re-read on every {@link #rescan()} (approve = edit the file
+ * and rescan; revoke = remove the line and rescan, which unloads the pack), and boot refuses an allowlist
+ * that sits inside the packs dir or under a control-plane write root (threat A3: a dir writer or a config
+ * writer must not also be able to approve). ⛔ There is deliberately no API route that approves a jar.
+ * {@code -Djobs.packs.requireSignature} (default off) is an additional INTEGRITY check — it rejects jars with
+ * any unsigned class entry but never looks at who signed; signer anchoring ({@code -Djobs.packs.trustStore},
+ * T2 / SEC-7) is not built.
  *
  * <p><b>In-flight-Run quiesce (§12.2, 2026-07-20 SHIPPED the classloader half):</b> {@link #acquireRun}/
  * {@link #releaseRun} let {@code JobService} pin a pack's active-run count for the duration of
@@ -105,6 +114,10 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
     private final SignalSink signals;
     private final UnloadListener unloadListener;      // nullable — no-op when not wired
     private final boolean requireSignature;
+    /** {@code -Djobs.packs.allowlist}, absolute; {@code null} ⇒ not configured ⇒ every jar refused. */
+    private final Path allowlistFile;
+    /** Jars refused by the last {@link #rescan()} (jar filename → inventory row), cleared on load/removal. */
+    private final Map<String, Map<String, Object>> rejectedRows = new ConcurrentHashMap<>();
     private final long settleMillis;
     private final Map<String, LoadedPack> loaded = new ConcurrentHashMap<>();   // jar filename -> pack
     /** In-flight Run count per pack (jar filename/owner key), incremented for the duration of one
@@ -137,6 +150,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         this.unloadListener = unloadListener;
         this.requireSignature = Boolean.getBoolean("jobs.packs.requireSignature");
         this.settleMillis = Long.getLong("jobs.packs.settleMillis", 500L);
+        this.allowlistFile = dir == null ? null : PackAllowlist.configuredFile(dir);   // refuses boot if writable (A3)
         // S2-0: a pipeline run using a pack's node type pins the pack through the same counter as a Job run.
         if (dir != null) PackRunLeases.install(this);
     }
@@ -157,7 +171,9 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             log.warn("[PACKS] jobs.packs.dir '{}' is not a directory — no Job Packs loaded", dir);
             return;
         }
-        log.info("[PACKS] scanning Job Pack dir {} (requireSignature={})", dir, requireSignature);
+        log.info("[PACKS] scanning Job Pack dir {} (allowlist={}, requireSignature={})", dir,
+                allowlistFile == null ? "NOT CONFIGURED - every jar will be refused" : allowlistFile,
+                requireSignature);
         rescan();
     }
 
@@ -182,16 +198,20 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         // Removed jars ⇒ unload.
         for (String name : List.copyOf(loaded.keySet()))
             if (!present.containsKey(name)) { unload(name); unloaded.add(name); }
+        rejectedRows.keySet().retainAll(present.keySet());
 
-        // New or changed jars ⇒ (re)load.
+        // Re-read on EVERY rescan: approving or revoking a jar is a host-level edit of this file.
+        PackAllowlist trust = PackAllowlist.read(allowlistFile);
+
+        // New, changed, or no-longer-trusted jars ⇒ (re)load — a revoked hash unloads, then is refused.
         for (var e : present.entrySet()) {
             String name = e.getKey();
             String hash = hash(e.getValue());
             LoadedPack cur = loaded.get(name);
-            if (cur != null && cur.hash().equals(hash)) continue;      // unchanged
+            if (cur != null && cur.hash().equals(hash) && trust.allows(hash)) continue;   // unchanged + trusted
             boolean isReload = cur != null;
             if (isReload) unload(name);                                // reload = unload old + load new
-            if (load(name, e.getValue(), hash)) (isReload ? reloaded : loadedNow).add(name);
+            if (load(name, e.getValue(), hash, trust)) (isReload ? reloaded : loadedNow).add(name);
             else rejected.add(name);
         }
         return summary(loadedNow, reloaded, unloaded, rejected);
@@ -200,7 +220,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
     /** Load one pack atomically: stage → hash + verify the staged bytes → discover → validate → register
      *  all, or reject the whole jar. {@code hash} is the watched jar's (the change trigger); the recorded
      *  fingerprint is re-taken from the staged copy. */
-    private boolean load(String name, Path jar, String hash) {
+    private boolean load(String name, Path jar, String hash, PackAllowlist trust) {
         URLClassLoader loader = null;
         Path staged = null;
         try {
@@ -212,6 +232,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             staged = stage(name, jar);                // load from a private copy; keep the watched jar unlocked
             afterStage.run();
             hash = hash(staged);                      // fingerprint of the bytes actually verified and loaded
+            trust.check(hash);                        // T1: the STAGED bytes' hash must be listed, before any class loads
             if (requireSignature) verifySignature(staged);
             loader = new URLClassLoader(new URL[]{staged.toUri().toURL()}, JobPackManager.class.getClassLoader());
 
@@ -267,6 +288,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             LoadedPack pack = new LoadedPack(mf[0] != null ? mf[0] : name, mf[1] != null ? mf[1] : "?",
                     jar, hash, List.copyOf(ids), loader, staged);
             loaded.put(name, pack);
+            rejectedRows.remove(name);
             log.info("[PACKS] loaded {} v{} ({}): {}", pack.id(), pack.version(), name, ids);
             signals.emit("job.pack.loaded", Severity.INFO, packPayload(pack));
             return true;
@@ -286,8 +308,14 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             if (loader != null) try { loader.close(); } catch (IOException ignore) { /* best effort */ }
             if (staged != null) try { Files.deleteIfExists(staged); } catch (IOException ignore) { /* best effort */ }
             log.warn("[PACKS] rejected {}: {}", name, ex.toString());
-            signals.emit("job.pack.rejected", Severity.WARN,
-                    Map.of("file", name, "hash", hash, "cause", String.valueOf(ex.getMessage())));
+            String cause = String.valueOf(ex.getMessage());
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("file", name);
+            row.put("hash", hash);
+            row.put("state", "rejected");
+            row.put("cause", cause);
+            rejectedRows.put(name, row);
+            signals.emit("job.pack.rejected", Severity.WARN, Map.of("file", name, "hash", hash, "cause", cause));
             return false;
         }
     }
@@ -396,10 +424,13 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
      *  (test/introspection only — not on any HTTP surface). */
     boolean isDraining(String name) { return draining.containsKey(name); }
 
-    /** Pack inventory for {@code GET /jobs/packs} (id, version, file, hash, types, state). */
+    /** Pack inventory for {@code GET /jobs/packs}: every loaded pack (id, version, file, hash, types,
+     *  {@code state: loaded}) plus every jar the last rescan refused (file, hash, {@code state: rejected},
+     *  cause) - so the audit trail shows what was turned away and why, not only what runs. */
     List<Map<String, Object>> inventory() {
         List<Map<String, Object>> out = new ArrayList<>();
         for (LoadedPack p : loaded.values()) out.add(packPayload(p));
+        out.addAll(rejectedRows.values());
         return out;
     }
 
@@ -488,8 +519,8 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
 
     /**
      * Reject a jar with any unsigned class entry (JDK jar-signature model). Reads every entry so the
-     * verifier populates {@link JarEntry#getCodeSigners()}. Trust-anchor matching against
-     * {@code -Djobs.packs.trustStore} is the SEC-7 gate and is intentionally not yet enforced (§12.3).
+     * verifier populates {@link JarEntry#getCodeSigners()}. INTEGRITY only - the trust decision is the
+     * allowlist ({@link PackAllowlist}); signer anchoring against {@code -Djobs.packs.trustStore} (T2) is not built.
      */
     private static void verifySignature(Path jar) throws IOException, SecurityException {
         try (JarFile jf = new JarFile(jar.toFile(), true)) {   // verify=true

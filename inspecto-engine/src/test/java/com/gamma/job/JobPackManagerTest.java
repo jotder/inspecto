@@ -2,6 +2,7 @@ package com.gamma.job;
 
 import com.gamma.util.RunLog;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -42,6 +43,46 @@ class JobPackManagerTest {
         }
     }
 
+    /** The trust gate (T1) refuses every jar with no allowlist, so these tests approve the jars they build:
+     *  an allowlist of every jar now in {@code packsDir}, written BESIDE it (inside is refused at boot). */
+    static void trustEveryJarIn(Path packsDir) throws Exception {
+        StringBuilder sb = new StringBuilder();
+        try (Stream<Path> jars = Files.list(packsDir)) {
+            for (Path j : jars.filter(p -> p.toString().endsWith(".jar")).toList())
+                sb.append(JobPackTrustTest.sha(j)).append("  ").append(j.getFileName()).append('\n');
+        }
+        Path allow = packsDir.resolveSibling(packsDir.getFileName() + ".allowlist");
+        Files.writeString(allow, sb.toString());
+        System.setProperty("jobs.packs.allowlist", allow.toString());
+        narrowSafetyRoots(packsDir.resolveSibling("jail"));
+    }
+
+    private static String priorSafetyRoots;
+    private static boolean narrowed;
+
+    /** The surefire sandbox makes {@code java.io.tmpdir} an {@code assist.safety.roots} root, and boot refuses
+     *  an allowlist under any such root (threat A3) — so a test keeping its allowlist in a temp dir narrows
+     *  the roots to a jail that does not contain it. Undone by {@link #clearTrust()}. */
+    static void narrowSafetyRoots(Path jail) {
+        if (!narrowed) { priorSafetyRoots = System.getProperty("assist.safety.roots"); narrowed = true; }
+        System.setProperty("assist.safety.roots", jail.toString());
+    }
+
+    static void clearTrust() {
+        System.clearProperty("jobs.packs.allowlist");
+        if (!narrowed) return;
+        if (priorSafetyRoots == null) System.clearProperty("assist.safety.roots");
+        else System.setProperty("assist.safety.roots", priorSafetyRoots);
+        narrowed = false;
+    }
+
+    @AfterEach
+    void clearAllowlist() { clearTrust(); }
+
+    private static List<Object> states(JobPackManager mgr) {
+        return mgr.inventory().stream().map(r -> r.get("state")).toList();
+    }
+
     @Test
     void loadsRegistersAndUnloadsAPackTypeThroughAnIsolatedClassLoader(@TempDir Path work) throws Exception {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
@@ -52,6 +93,7 @@ class JobPackManagerTest {
         JobTypeRegistry registry = new JobTypeRegistry();
         ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
 
@@ -87,6 +129,7 @@ class JobPackManagerTest {
         JobTypeRegistry registry = new JobTypeRegistry();
         ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
             Job job = registry.create("acme.greet", jobConfig("g1", "acme.greet"));
@@ -126,6 +169,7 @@ class JobPackManagerTest {
         registry.register(builtin);   // permanent, owner=null
 
         Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
             assertTrue(registry.has("report"));
@@ -133,7 +177,7 @@ class JobPackManagerTest {
             assertThrows(UnsupportedOperationException.class,
                     () -> registry.create("report", jobConfig("r", "report")),
                     "the built-in still owns 'report' (pack did not displace it)");
-            assertTrue(mgr.inventory().isEmpty(), "rejected pack is not in the inventory");
+            assertEquals(List.of("rejected"), states(mgr), "the rejected pack is listed as rejected, never loaded");
             assertTrue(sink.types.contains("job.pack.rejected"));
         }
     }
@@ -166,6 +210,7 @@ class JobPackManagerTest {
         JobTypeRegistry registry = new JobTypeRegistry();
         ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
 
@@ -175,8 +220,9 @@ class JobPackManagerTest {
             assertTrue(sink.types.contains("job.pack.loaded"));
             assertTrue(sink.types.contains("job.pack.rejected"), "the broken jar is rejected, explicitly");
 
-            List<Map<String, Object>> inv = mgr.inventory();
-            assertEquals(1, inv.size(), "only the good pack is in the inventory");
+            List<Map<String, Object>> inv = mgr.inventory().stream()
+                    .filter(r -> "loaded".equals(r.get("state"))).toList();
+            assertEquals(1, inv.size(), "only the good pack is loaded");
             assertEquals("acme-greet", inv.get(0).get("id"));
         }
     }
@@ -191,6 +237,7 @@ class JobPackManagerTest {
         JobTypeRegistry registry = new JobTypeRegistry();
         ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
             assertFalse(registry.has("real.id"));
@@ -217,6 +264,7 @@ class JobPackManagerTest {
         JobTypeRegistry registry = new JobTypeRegistry();
         ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             try {
                 mgr.scanAtStartup();
@@ -261,6 +309,7 @@ class JobPackManagerTest {
         JobTypeRegistry registry = new JobTypeRegistry();
         ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
 
@@ -288,6 +337,7 @@ class JobPackManagerTest {
         JobTypeRegistry registry = new JobTypeRegistry();
         ExpressionRegistry expressions = ExpressionRegistry.withBuiltins();
         Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry, expressions, sink)) {
             mgr.scanAtStartup();
 
@@ -314,6 +364,7 @@ class JobPackManagerTest {
                 "transform.acme_hijack", "transform.filter");
 
         Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
                 ExpressionRegistry.withBuiltins(), sink)) {
             try {
@@ -342,6 +393,7 @@ class JobPackManagerTest {
         buildNodePackJar(work, packsDir.resolve("orphan-1.jar"), "OrphanPack", "acme.orphan",
                 null, "transform.acme_orphan");
 
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
                 ExpressionRegistry.withBuiltins(), new Sink())) {
             try {
@@ -361,6 +413,7 @@ class JobPackManagerTest {
         buildNodePackJar(work, packsDir.resolve("own-1.jar"), "OwnPack", "acme.own",
                 "transform.acme_own", "transform.acme_own");
 
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
                 ExpressionRegistry.withBuiltins(), new Sink())) {
             try {
@@ -394,6 +447,7 @@ class JobPackManagerTest {
         java.util.concurrent.CountDownLatch inRun = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.CountDownLatch proceed = new java.util.concurrent.CountDownLatch(1);
         java.io.File db = com.gamma.util.DuckDbUtil.tempDbFile("lease_");
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
                 ExpressionRegistry.withBuiltins(), new Sink());
              java.sql.Connection conn = com.gamma.util.DuckDbUtil.openConnection(db)) {
@@ -475,6 +529,7 @@ class JobPackManagerTest {
         });
         JobTypeRegistry registry = new JobTypeRegistry(platform);
 
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry,
                 ExpressionRegistry.withBuiltins(), new Sink())) {
             mgr.scanAtStartup();
@@ -508,12 +563,13 @@ class JobPackManagerTest {
         JobTypeRegistry registry = new JobTypeRegistry(platform);
         Sink sink = new Sink();
 
+        trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), registry,
                 ExpressionRegistry.withBuiltins(), sink)) {
             mgr.scanAtStartup();
 
             assertFalse(registry.has("acme.greedy"), "an undeclarable grant refuses the type");
-            assertTrue(mgr.inventory().isEmpty(), "and the whole pack is rejected, not partially loaded");
+            assertEquals(List.of("rejected"), states(mgr), "and the whole pack is rejected, not partially loaded");
             assertTrue(sink.types.contains("job.pack.rejected"));
         }
     }
