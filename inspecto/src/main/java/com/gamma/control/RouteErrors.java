@@ -29,9 +29,9 @@ public final class RouteErrors {
         try {
             return body.get();
         } catch (NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(400, bad.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
         }
     }
 
@@ -41,11 +41,11 @@ public final class RouteErrors {
         try {
             return body.get();
         } catch (NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         } catch (IllegalStateException illegal) {
-            throw new ApiException(422, illegal.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, illegal.getMessage());
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(400, bad.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
         }
     }
 
@@ -54,9 +54,9 @@ public final class RouteErrors {
         try {
             return body.get();
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         } catch (SQLException | IOException e) {
-            throw new ApiException(422, "preview failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "preview failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
@@ -66,7 +66,7 @@ public final class RouteErrors {
         try {
             return store.exists(type, id);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
@@ -74,9 +74,9 @@ public final class RouteErrors {
     public static Map<String, Object> existing(ComponentStore store, String type, String label, String id) {
         try {
             return store.get(type, id).map(ComponentRegistry.Component::content)
-                    .orElseThrow(() -> new ApiException(404, label + " '" + id + "' not found"));
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, label + " '" + id + "' not found"));
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 

@@ -59,7 +59,7 @@ final class ParserRoutes implements RouteModule {
 
     private static Object preview(ApiContext api, String id, Map<String, Object> body) {
         ParserPlugin parser = Parsers.get(id)
-                .orElseThrow(() -> new ApiException(404, "unknown parser: " + id));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown parser: " + id));
         byte[] sample = sampleOf(body);
         Map<String, Object> grammar = grammarOf(body);
         Path configDir = configDirOf(api, body);
@@ -68,11 +68,11 @@ final class ParserRoutes implements RouteModule {
             return toJson(r);
         } catch (PathJail.Escape escape) {
             // A grammar FILE reference (asn1.grammar_file) outside the allowed roots — the jail's verdict.
-            throw new ApiException(403, escape.getMessage());
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, escape.getMessage());
         } catch (IllegalArgumentException callerError) {
-            throw new ApiException(422, callerError.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, callerError.getMessage());
         } catch (Exception parseFail) {
-            throw new ApiException(422, "sample does not parse with this grammar: " + parseFail.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "sample does not parse with this grammar: " + parseFail.getMessage());
         }
     }
 
@@ -81,20 +81,20 @@ final class ParserRoutes implements RouteModule {
         String text = ApiContext.str(body, "sample_text");
         String b64 = ApiContext.str(body, "sample_b64");
         if ((text == null || text.isBlank()) && (b64 == null || b64.isBlank()))
-            throw new ApiException(400, "body must include 'sample_text' or 'sample_b64'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'sample_text' or 'sample_b64'");
         if (text != null && !text.isBlank()) {
             if (text.length() > MAX_SAMPLE_CHARS)
-                throw new ApiException(400, "sample_text too large (max " + MAX_SAMPLE_CHARS + " chars)");
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "sample_text too large (max " + MAX_SAMPLE_CHARS + " chars)");
             return text.getBytes(StandardCharsets.UTF_8);
         }
         byte[] bytes;
         try {
             bytes = Base64.getDecoder().decode(b64);
         } catch (IllegalArgumentException notB64) {
-            throw new ApiException(400, "sample_b64 is not valid base64");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "sample_b64 is not valid base64");
         }
         if (bytes.length > MAX_SAMPLE_BYTES)
-            throw new ApiException(400, "sample_b64 too large (max " + MAX_SAMPLE_BYTES + " bytes)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "sample_b64 too large (max " + MAX_SAMPLE_BYTES + " bytes)");
         return bytes;
     }
 
@@ -110,7 +110,7 @@ final class ParserRoutes implements RouteModule {
         if (!body.containsKey("subdir")) return null;
         String subdir = ApiContext.str(body, "subdir");
         Path sub = Path.of(subdir == null ? "" : subdir.trim());
-        if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
+        if (sub.isAbsolute()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "subdir must be relative");
         Path root = api.writeRoot();
         return root == null ? null : root.resolve(sub).normalize();
     }
@@ -118,7 +118,7 @@ final class ParserRoutes implements RouteModule {
     private static Map<String, Object> grammarOf(Map<String, Object> body) {
         Object g = body.get("grammar");
         if (g == null) return Map.of();
-        if (!(g instanceof Map<?, ?>)) throw new ApiException(400, "'grammar' must be a map of options");
+        if (!(g instanceof Map<?, ?>)) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'grammar' must be a map of options");
         return mapAt(body, "grammar");
     }
 

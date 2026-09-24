@@ -56,11 +56,11 @@ final class RuleRoutes implements RouteModule {
     private Object simulate(ApiContext api, HttpExchange ex, String id) throws IOException {
         Path writeRoot = api.writeRoot();
         if (writeRoot == null)
-            throw new ApiException(503, "no write root configured — rule templates are unavailable");
+            throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY, "no write root configured — rule templates are unavailable");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
 
         Map<String, Object> config = component(store, TYPE, id)
-                .orElseThrow(() -> new ApiException(404, "unknown rule template '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown rule template '" + id + "'"));
         RuleTemplate template = RuleTemplate.from(config);
 
         Map<String, Object> body = api.body(ex);
@@ -71,7 +71,7 @@ final class RuleRoutes implements RouteModule {
         try {
             compiled = template.compile(callerValues(body));
         } catch (IllegalArgumentException | IllegalStateException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
 
         // 2. Resolve any run-time `$`-context tokens in the (already bind-rewritten) text.
@@ -80,7 +80,7 @@ final class RuleRoutes implements RouteModule {
             resolved = Parameters.resolve(compiled.sql(), List.of(), Map.of(),
                     Parameters.Context.of(ApiContext.actor(ex), null));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
 
         // 3. Safety-gate the SQL text. The binds are NOT part of it, so no bind value can influence this.
@@ -94,13 +94,13 @@ final class RuleRoutes implements RouteModule {
         String relationSql = null;
         if (source != null) {
             Map<String, Object> dataset = component(store, "dataset", source)
-                    .orElseThrow(() -> new ApiException(404,
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND,
                             "rule template '" + id + "' reads unknown dataset '" + source + "'"));
             try {
                 relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(),
                         new ViewStore(writeRoot.resolve("views")));
             } catch (IllegalArgumentException bad) {
-                throw new ApiException(422, bad.getMessage());
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
             }
         }
 
@@ -109,11 +109,11 @@ final class RuleRoutes implements RouteModule {
             result = QueryExecutor.run(new QueryExecutor.Request(source, relationSql, resolved,
                     limit(body), 0, List.of(), List.of(), compiled.binds()));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException sql) {
-            throw new ApiException(422, "rule template failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "rule template failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
         } catch (IOException io) {
-            throw new ApiException(503, "query sandbox unavailable: " + io.getMessage());
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + io.getMessage());
         }
 
         Map<String, Object> out = new LinkedHashMap<>();

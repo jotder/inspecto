@@ -52,14 +52,14 @@ final class EnrichmentRoutes implements RouteModule {
     /** The enrichment service, or a 404 when no enrichment jobs are registered. */
     private EnrichmentService enrichment(ApiContext api) {
         return api.service().enrichmentService()
-                .orElseThrow(() -> new ApiException(404, "no enrichment jobs registered"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no enrichment jobs registered"));
     }
 
     /** Resolve a path-named enrichment job to its name, 404 when it is not registered. */
     private String enrichJob(ApiContext api, Matcher m) {
         String n = ApiContext.name(m);
         if (enrichment(api).config(n).isEmpty())
-            throw new ApiException(404, "no enrichment job named '" + n + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no enrichment job named '" + n + "'");
         return n;
     }
 
@@ -80,13 +80,13 @@ final class EnrichmentRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "enrichment registration");
         String configPath = ApiContext.str(body, "configPath");
         if (configPath == null || configPath.isBlank())
-            throw new ApiException(400, "body must include 'configPath'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'configPath'");
 
         Path candidate = Path.of(configPath.trim());
         Path resolved = WriteGates.jail(writeRoot,
                 candidate.isAbsolute() ? candidate : writeRoot.resolve(candidate), "configPath");
         if (!Files.isRegularFile(resolved))
-            throw new ApiException(404, "no config file at "
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no config file at "
                     + writeRoot.relativize(resolved).toString().replace('\\', '/'));
 
         // Validate before registering: spec + the hard-fail safety gate. Block on ERRORs — the
@@ -95,7 +95,7 @@ final class EnrichmentRoutes implements RouteModule {
         try {
             raw = ConfigLoader.filesystem().decode(resolved.toString());
         } catch (RuntimeException parse) {
-            throw new ApiException(422, "config does not parse: " + parse.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "config does not parse: " + parse.getMessage());
         }
         List<Finding> findings = new ArrayList<>(
                 ConfigLoader.filesystem().validate(ConfigSpecs.enrichment(), raw));
@@ -110,7 +110,7 @@ final class EnrichmentRoutes implements RouteModule {
         try {
             cfg = EnrichmentConfig.load(resolved.toString());   // structural validation
         } catch (RuntimeException invalid) {
-            throw new ApiException(422, "config is not a valid enrichment: " + invalid.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "config is not a valid enrichment: " + invalid.getMessage());
         }
         api.service().registerEnrichment(cfg);
 
@@ -138,14 +138,14 @@ final class EnrichmentRoutes implements RouteModule {
         Object cfgObj = body.get("config");
         List<Map<String, Object>> sampleRows = ApiContext.sampleRows(body);
         if (!(cfgObj instanceof Map<?, ?>) || sampleRows.isEmpty())
-            throw new ApiException(400, "body must include 'config' (an enrichment draft map) and non-empty 'sampleRows'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'config' (an enrichment draft map) and non-empty 'sampleRows'");
         Map<String, Object> configMap = mapAt(body, "config");
         EnrichmentConfig cfg;
         try {
             // inline transform; no file I/O. Data paths resolve under this Space, as the saved config's would.
             cfg = EnrichmentConfig.fromMap(configMap, null, api.writeRoot());
         } catch (RuntimeException invalid) {
-            throw new ApiException(422, "config is not a valid enrichment: " + invalid.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "config is not a valid enrichment: " + invalid.getMessage());
         }
         // PREVIEW-REFERENCE-PATH-UNJAILED-1: a path reference is a caller-named file whose rows the preview
         // returns — jail it to the safety roots BEFORE the engine opens it (403), as /validate does.
@@ -154,7 +154,7 @@ final class EnrichmentRoutes implements RouteModule {
         try {
             return EnrichmentEngine.preview(cfg, sampleRows, api.service().loadedPipelines(), PREVIEW_LIMIT).toMap();
         } catch (Exception compute) {
-            throw new ApiException(422, "enrichment preview failed on the sample: " + DuckDbUtil.withoutPendingQueryPreamble(compute.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "enrichment preview failed on the sample: " + DuckDbUtil.withoutPendingQueryPreamble(compute.getMessage()));
         }
     }
 

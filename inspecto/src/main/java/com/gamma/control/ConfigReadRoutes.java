@@ -63,19 +63,19 @@ final class ConfigReadRoutes implements RouteModule {
      */
     private Object deleteConfig(ApiContext api, HttpExchange ex, String type, String name) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "config delete");
-        if (ConfigSpecs.forType(type) == null) throw new ApiException(404, "unknown config type: " + type);
+        if (ConfigSpecs.forType(type) == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
         String fileName = WriteGates.safeName(name, "config name");
 
         Path dir = writeRoot;
         String subdir = ApiContext.query(ex, "subdir");
         if (subdir != null && !subdir.isBlank()) {
             Path sub = Path.of(subdir.trim());
-            if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
+            if (sub.isAbsolute()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "subdir must be relative");
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
         Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, type, fileName, subdir);
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
-        if (!Files.isRegularFile(target)) throw new ApiException(404, "no such config: " + rel);
+        if (!Files.isRegularFile(target)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such config: " + rel);
 
         boolean force = "true".equalsIgnoreCase(String.valueOf(ApiContext.query(ex, "force")));
         // ⚠ Opt-in, and never implied by `force`. `force` overrides a DEPENDENTS refusal — a statement
@@ -175,12 +175,12 @@ final class ConfigReadRoutes implements RouteModule {
         String subdir = ApiContext.query(ex, "subdir");
         if (subdir != null && !subdir.isBlank()) {
             Path sub = Path.of(subdir.trim());
-            if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
+            if (sub.isAbsolute()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "subdir must be relative");
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
         Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, "pipeline", fileName, subdir);
         if (!Files.isRegularFile(target)) {
-            throw new ApiException(404, "no such config: "
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such config: "
                     + writeRoot.relativize(target).toString().replace('\\', '/'));
         }
 
@@ -191,9 +191,9 @@ final class ConfigReadRoutes implements RouteModule {
             try {
                 limit = Integer.parseInt(limitParam.trim());
             } catch (NumberFormatException nfe) {
-                throw new ApiException(400, "limit must be an integer");
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "limit must be an integer");
             }
-            if (limit < 1) throw new ApiException(400, "limit must be positive");
+            if (limit < 1) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "limit must be positive");
         }
         return PipelineDependents.toJson(
                 PipelineDependents.scan(writeRoot, pipelineIdOf(raw, fileName), limit));
@@ -222,14 +222,14 @@ final class ConfigReadRoutes implements RouteModule {
      */
     private Object readConfig(ApiContext api, HttpExchange ex, String type, String name) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "config read");
-        if (ConfigSpecs.forType(type) == null) throw new ApiException(404, "unknown config type: " + type);
+        if (ConfigSpecs.forType(type) == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
         String fileName = WriteGates.safeName(name, "config name");
 
         Path dir = writeRoot;
         String subdir = ApiContext.query(ex, "subdir");
         if (subdir != null && !subdir.isBlank()) {
             Path sub = Path.of(subdir.trim());
-            if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
+            if (sub.isAbsolute()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "subdir must be relative");
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
         Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, type, fileName, subdir);
@@ -237,7 +237,7 @@ final class ConfigReadRoutes implements RouteModule {
         // resolve it there when the convention path misses. READ ONLY; see resolveSatelliteForRead.
         target = ConfigFileSupport.resolveSatelliteForRead(writeRoot, target, type, fileName, subdir);
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
-        if (!Files.isRegularFile(target)) throw new ApiException(404, "no such config: " + rel);
+        if (!Files.isRegularFile(target)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such config: " + rel);
 
         // Split storage (schema) is handled inside storedContent, which is ALSO what /config/write
         // hashes for its If-Match precondition — one statement, so the two can never drift apart.

@@ -39,7 +39,8 @@ class ControlApiRuleTemplateTest {
     private Ctx open(Path cfg, Path writeRoot) throws Exception {
         Path toon = TestConfigs.csv(cfg, PipelineConfigBatchTest.miniSchema()).write();
         String prior = System.getProperty("assist.write.root");
-        System.setProperty("assist.write.root", writeRoot.toString());
+        if (writeRoot != null) System.setProperty("assist.write.root", writeRoot.toString());
+        else System.clearProperty("assist.write.root");
         try {
             CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
             ControlApi api = new ControlApi(svc, 0);
@@ -55,6 +56,17 @@ class ControlApiRuleTemplateTest {
     private void saveTemplate(int port, String id, String json) throws Exception {
         HttpResponse<String> res = send(port, "POST", "/components/rule-template", json);
         assertTrue(res.statusCode() < 300, "could not seed template " + id + ": " + res.body());
+    }
+
+    @Test
+    void noWriteRootIs503ReadOnly(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg, null)) {
+            HttpResponse<String> res = send(c.port, "POST", "/rule-templates/any/simulate", "{}");
+            assertEquals(503, res.statusCode(), res.body());
+            assertEquals("CONTROL_PLANE_READ_ONLY",
+                    V1Body.of(res.body()).get("error").get("errorCode").asText(),
+                    "an unbound write root is the read-only contract code, not the 503 default");
+        }
     }
 
     @Test

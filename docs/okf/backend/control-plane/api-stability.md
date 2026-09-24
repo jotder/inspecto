@@ -81,6 +81,11 @@ above the generated commit list.
   first. A deployment behind a proxy must list it, or it audits and throttles every caller as the proxy.
   An unparseable entry fails the boot.
 
+**Error-code corrections (`ERRORCODE-DEFAULTED-1`, 2026-09-25)**
+- `POST /rule-templates/{id}/simulate` with no write root bound now answers 503 with `errorCode`
+  **`CONTROL_PLANE_READ_ONLY`** (was the 503 default `CAPABILITY_UNAVAILABLE`), matching every other
+  write-root refusal. Status and message are unchanged; a client keying on the old code must switch.
+
 **Whole-pipeline dry run (2026-09-20, `PIPELINE-DRYRUN-1` step 5)**
 - `POST /runs/{name}/trigger?dryRun=true` runs a pipeline and **lands nothing** — no outputs, no audit or
   commit-log rows, no provenance row, no markers, no backup/quarantine moves — logging each suppressed

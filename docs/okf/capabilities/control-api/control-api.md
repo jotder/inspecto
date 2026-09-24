@@ -171,7 +171,12 @@ against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` �
 `CONFIG_VALIDATION_FAILED` · `INTERNAL` · `CONTROL_PLANE_READ_ONLY` · `CAPABILITY_UNAVAILABLE` ·
 `UNAUTHENTICATED` · `PERMISSION_DENIED` · `RATE_LIMITED` (429) · `NOT_SUPPORTED` (501) ·
 `PAYLOAD_TOO_LARGE` (413). `defaultFor(status)` maps a bare status to a code (`:36-50`).
-**255 of 874** `new ApiException(` sites under `*/src/main` still take that default (2026-09-25, after the
+**197 of 874** `new ApiException(` sites under `*/src/main` still take that default (2026-09-25, after the
+`QueryRoutes` / `ParserRoutes` / `ConfigReadRoutes` / `RuleRoutes` / `EnrichmentRoutes` / `RouteErrors` slice —
+58 sites, all the status default but one: `RuleRoutes`' "no write root configured" 503 is now
+`CONTROL_PLANE_READ_ONLY` (was `CAPABILITY_UNAVAILABLE`), a wire change asserted over HTTP by
+`ControlApiRuleTemplateTest` and noted in [api-stability](../../backend/control-plane/api-stability.md);
+`RouteErrors`' mappers fix their status per branch, so every caller keeps its code; the
 `SpaceRoutes` / `SchedulerRoutes` / `Roles` / `PipelineRenameRoutes` / `ExpectationRoutes` / `AccessPolicies` /
 `ShareRoutes` / `NotificationRoutes` slice — 98 sites, all the status default but one: `SchedulerRoutes`'
 "no home for the server-wide scheduler document" 503 is `CONTROL_PLANE_READ_ONLY`, which gate 1

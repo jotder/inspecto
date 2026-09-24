@@ -49,14 +49,14 @@ final class QueryRoutes implements RouteModule {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
 
         Map<String, Object> query = component(store, "query", id)
-                .orElseThrow(() -> new ApiException(404, "no query '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no query '" + id + "'"));
 
         String type = ApiContext.str(query, "type");
         if (type != null && !"sql".equalsIgnoreCase(type))
-            throw new ApiException(422, "only type:sql queries run server-side today (got '" + type
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "only type:sql queries run server-side today (got '" + type
                     + "'); author structured queries as SQL");
         String text = ApiContext.str(query, "text");
-        if (text == null) throw new ApiException(422, "query '" + id + "' has no 'text'");
+        if (text == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query '" + id + "' has no 'text'");
 
         // 1. Resolve $-parameters (declared defaults + caller values + session/clock context) → SQL literals.
         String resolved;
@@ -64,7 +64,7 @@ final class QueryRoutes implements RouteModule {
             resolved = Parameters.resolve(text, declaredParams(query), callerValues(body),
                     Parameters.Context.of(ApiContext.actor(ex), null));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
 
         // 2. Safety-gate the resolved query text (single read-only SELECT, no file/extension surface).
@@ -78,11 +78,11 @@ final class QueryRoutes implements RouteModule {
         String relationSql = null;
         if (datasetId != null) {
             Map<String, Object> dataset = component(store, "dataset", datasetId)
-                    .orElseThrow(() -> new ApiException(404, "query '" + id + "' references unknown dataset '" + datasetId + "'"));
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "query '" + id + "' references unknown dataset '" + datasetId + "'"));
             try {
                 relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
             } catch (IllegalArgumentException bad) {
-                throw new ApiException(422, bad.getMessage());
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
             }
         }
 
@@ -93,11 +93,11 @@ final class QueryRoutes implements RouteModule {
         try {
             result = QueryExecutor.run(req);
         } catch (IllegalArgumentException bad) {          // unsafe projection/sort identifier
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException sql) {
-            throw new ApiException(422, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
         } catch (IOException io) {
-            throw new ApiException(503, "query sandbox unavailable: " + io.getMessage());
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + io.getMessage());
         }
 
         return response(result);
@@ -139,7 +139,7 @@ final class QueryRoutes implements RouteModule {
         try {
             return store.get(type, id).map(ComponentRegistry.Component::content);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
     }
 
