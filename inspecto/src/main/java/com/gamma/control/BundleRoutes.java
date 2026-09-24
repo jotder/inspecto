@@ -202,6 +202,12 @@ final class BundleRoutes implements RouteModule {
      * (unchanged/drifted compare the item's {@code provenance.contentHash} to the target's current hash),
      * and each top-level {@code requires} entry classified {@code satisfied} | {@code different} | {@code missing}
      * ({@code different} = present but at a different version, when the ref carried an {@code originHash}). No writes.
+     *
+     * <p>Also {@code integrity}: the referential-integrity findings the previewed items would INTRODUCE —
+     * exactly the list {@code /bundle/import} refuses on ({@link #introducedIntegrityFindings}), but
+     * ADVISORY here (bundle load-as-draft D3, 2026-09-25): a draft editor shows them before its own Save,
+     * which goes through {@code /components} and runs no integrity check, so the draft is never weaker than
+     * hand-authoring the same config. Empty when there is no write root (no registry to judge against).
      */
     private Object previewBundle(ApiContext api, Map<String, Object> body) {
         validateEnvelope(body);
@@ -246,9 +252,14 @@ final class BundleRoutes implements RouteModule {
             requires.add(row);
         }
 
+        Path registry = componentRootOrNull(api);
+        List<String> integrity = registry == null ? List.of()
+                : introducedIntegrityFindings(new ComponentStore(registry), asMapList(body.get("items")));
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("items", items);
         out.put("requires", requires);
+        out.put("integrity", integrity);
         return out;
     }
 

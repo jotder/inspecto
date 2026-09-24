@@ -1,7 +1,8 @@
 # Bundle "load as draft" import — design
 
-> **Status: DESIGN ONLY, 2026-09-24 — nothing built.** The work item is the BACKLOG §3.7 row *"Bundle / Exchange —
-> load as draft import"*. Decisions in §7 are owed by the operator before slice 1 starts.
+> **Status: DECIDED 2026-09-25 (operator answered D1–D8 in §7) — IN FLIGHT.** Build order as signed: the
+> read-only preview extension (§5 row 4, built FIRST) then the editor slices (§5 rows 1–3) for Dashboard, Widget and
+> Dataset. Authored Pipeline (row 5) and Link Analysis / Geo views are later slices, not started.
 > Concept pages: [`metadata-bundle.md`](../okf/backend/control-plane/metadata-bundle.md) (the import this
 > changes) · [`exchange-sharing.md`](../okf/backend/control-plane/exchange-sharing.md) (the row's named owner; see D7).
 
@@ -158,24 +159,20 @@ would invite typing one; D5), and libraries/Settings imports (they stay write-th
   the library until Save, reload and confirm the draft is gone (A's stated limit), Save and confirm it appears.
 * Guards: `tools/check-vocabulary.mjs`, `tools/check-doc-links.mjs`, UI `lint:tokens` for the banner.
 
-## 7. Decisions owed (operator)
+## 7. Decisions (operator, 2026-09-25 — all eight answered, each the recommendation)
 
-1. **D1 — Draft durability.** In-memory only, lost on reload/navigation (recommended; matches every existing
-   draft) · per-tab `sessionStorage` · server-side staging (Option B, multi-session, a separate plan).
-2. **D2 — The draft's Save door.** The pane's own route — owner stamp, `If-Match`, schema compat (recommended) ·
-   a one-item `/bundle/import` — integrity + secret gates, but no ownership/lock/compat (Option D).
-3. **D3 — Integrity on save.** Advisory findings from an extended `/bundle/preview` (recommended, read-only) ·
-   make `POST|PUT /components` refuse introduced broken refs for **every** save (behaviour change for all
-   hand edits; its own row).
-4. **D4 — Prerequisites.** Write-through import of the missing prerequisites first, then the target as draft
-   (recommended; `applyKpiReport` precedent) · refuse the draft until every `requires` is `satisfied` · draft
-   the whole closure (needs D1 = staging).
-5. **D5 — Kind scope.** Slice 2 kinds Dashboard, Widget, Dataset; then `authored-pipeline`; also
-   `link-analysis-view` / `geo-map-view` (their editors host the menu)? `connection` excluded (recommended) — confirm.
-6. **D6 — Draft onto an existing id.** Open the existing item with incoming content as unsaved edits + diff
-   (recommended) · always force a new id · offer both in the dialog.
-7. **D7 — Owning concept.** The row names `exchange-sharing.md`, but that page is grant-mediated cross-Space
-   sharing and explicitly routes config transport to Metadata Bundles; the as-built facts belong in
-   `metadata-bundle.md` (recommended re-home on ship) · keep `exchange-sharing.md`.
-8. **D8 — Where the verb appears.** Editor-hosted menus only, as an extra "Import as draft…" item beside
-   "Import…" (recommended) · replace "Import…" in editors · also libraries.
+1. **D1 — Draft durability: IN-MEMORY only**, lost on reload/navigation (Option A). No `sessionStorage`, no
+   server staging; slice 6 is not built.
+2. **D2 — Save door: the pane's own route** (owner stamp, `If-Match`, schema compat). No new write path; a draft
+   never posts to `/bundle/import`.
+3. **D3 — Integrity: ADVISORY findings** from the extended read-only `POST /bundle/preview` (`integrity: [...]`).
+   `/components` is not changed to enforce integrity.
+4. **D4 — Prerequisites: write-through import first**, through the existing `/bundle/import`, then the target
+   opens as a draft (`applyKpiReport` precedent). A failed prerequisite import opens no draft.
+5. **D5 — Kinds: Dashboard, Widget, Dataset first**; then `authored-pipeline`; then Link Analysis / Geo views
+   (later slices). `connection` excluded.
+6. **D6 — Existing id: open the existing item with the incoming content as unsaved edits + a diff.**
+7. **D7 — Owning concept: `metadata-bundle.md`** (not `exchange-sharing.md`).
+8. **D8 — Verb placement: an extra "Import as draft…" item beside "Import…"**, in editor-hosted menus only.
+
+⛔ Unchanged: no cross-kind `enabled:false` stamp (§3 option C).

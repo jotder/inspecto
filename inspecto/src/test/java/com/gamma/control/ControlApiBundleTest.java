@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.service.CollectorService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,6 +18,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -239,6 +241,83 @@ class ControlApiBundleTest {
         }
     }
 
+    /**
+     * Bundle load-as-draft D3: preview reports the integrity findings the previewed items would INTRODUCE,
+     * read-only — the same (registry ∪ incoming) minus pre-existing subtraction import enforces, so a draft
+     * editor can show them before its own Save. (a) resolvable ⇒ [], (b) absent Dataset ⇒ one finding naming
+     * it, (c) an unrelated broken ref already on disk ⇒ still [] for (a) — and nothing is ever written.
+     */
+    @Test
+    void previewReportsOnlyTheIntegrityFindingsTheItemsWouldIntroduce(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            seed(c.port, "dataset", "sales", "title", "Sales");
+            String ok = bundleOf("widget", "sales_bar", "{\"vizType\":\"bar\",\"datasetId\":\"sales\"}");
+            String broken = bundleOf("widget", "lonely", "{\"vizType\":\"bar\",\"datasetId\":\"ghost_ds\"}");
+
+            JsonNode a = json(send(c.port, "POST", "/bundle/preview", ok));
+            assertTrue(a.get("integrity").isArray(), "preview carries an integrity list: " + a);
+            assertEquals(0, a.get("integrity").size(), a.toString());
+
+            JsonNode b = json(send(c.port, "POST", "/bundle/preview", broken));
+            assertEquals(1, b.get("integrity").size(), b.toString());
+            assertTrue(b.get("integrity").get(0).asText().contains("ghost_ds"), b.toString());
+            assertEquals(404, send(c.port, "GET", "/components/widget/lonely", null).statusCode(),
+                    "preview is read-only — the finding is advisory and nothing was written");
+
+            seed(c.port, "widget", "old_broken", "datasetId", "long_gone");
+            JsonNode c2 = json(send(c.port, "POST", "/bundle/preview", ok));
+            assertEquals(0, c2.get("integrity").size(),
+                    "a pre-existing broken ref is subtracted, exactly as import does: " + c2);
+        }
+    }
+
+    /** Without a write root there is no registry to judge against: the list is present and empty, never a 503. */
+    @Test
+    void previewIntegrityIsEmptyWithoutAWriteRoot(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, null)) {
+            HttpResponse<String> r = send(c.port, "POST", "/bundle/preview",
+                    bundleOf("widget", "lonely", "{\"vizType\":\"bar\",\"datasetId\":\"ghost_ds\"}"));
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals(0, json(r).get("integrity").size(), r.body());
+        }
+    }
+
+    // Forced Authenticator standing in for the Standard edition (same seam as ControlApiNavMenusTest).
+    private static final Authenticator SEED_ROLES = ex -> switch (
+            String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+        case "Bearer business" -> Optional.of(new Subject("biz", Roles.SEED.get("business").capabilities()));
+        case "Bearer developer" -> Optional.of(new Subject("dev", Roles.SEED.get("developer").capabilities()));
+        default -> Optional.empty();
+    };
+
+    @AfterEach
+    void restoreAuthenticator() {
+        Authenticators.forTest(null);
+    }
+
+    /**
+     * The extended preview stays READ-ONLY and ungated under a real Subject: a Business subject (no
+     * canAuthorWorkbench) gets its integrity findings, while the same subject is refused the write door —
+     * so the probe that would otherwise succeed (developer import) proves the 403 is the gate, not a typo.
+     */
+    @Test
+    void previewIntegrityIsReadableWithoutTheAuthoringCapability(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String broken = bundleOf("widget", "lonely", "{\"vizType\":\"bar\",\"datasetId\":\"ghost_ds\"}");
+            Authenticators.forTest(SEED_ROLES);
+            assertFalse(Roles.SEED.get("business").capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH));
+
+            HttpResponse<String> p = send(c.port, "POST", "/bundle/preview", broken, "Authorization", "Bearer business");
+            assertEquals(200, p.statusCode(), p.body());
+            assertEquals(1, json(p).get("integrity").size(), p.body());
+
+            assertEquals(403, send(c.port, "POST", "/bundle/import", broken, "Authorization", "Bearer business").statusCode(),
+                    "the write door stays gated");
+            HttpResponse<String> dev = send(c.port, "POST", "/bundle/import", broken, "Authorization", "Bearer developer");
+            assertEquals(422, dev.statusCode(), "an authoring subject passes the gate and meets the integrity refusal: " + dev.body());
+        }
+    }
+
     @Test
     void importAppliesOverwritesSkipsAndIsIdempotent(@TempDir Path source, @TempDir Path target) throws Exception {
         String bundle;
@@ -323,8 +402,9 @@ class ControlApiBundleTest {
         }
     }
 
-    private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
+    private HttpResponse<String> send(int port, String method, String path, String body, String... headers) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
+        if (headers.length > 0) b.headers(headers);
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());

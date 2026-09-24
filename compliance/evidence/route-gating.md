@@ -165,13 +165,13 @@ system: the evidence cannot say something the code does not.
 | POST | `/expectations/([^/]+)/baseline/clear` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java:67` |
 | POST | `/expectations/([^/]+)/evaluate` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java:61` |
 | POST | `/expectations/evaluate` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/ExpectationRoutes.java:60` |
-| POST | `/geo/projection` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java:67` |
-| POST | `/geo/routes` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java:68` |
+| POST | `/geo/projection` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java:68` |
+| POST | `/geo/routes` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java:69` |
 | POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:65` |
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:66` |
-| POST | `/inv/investigation-templates/([^/]+)/instantiate` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationTemplateRoutes.java:85` |
+| POST | `/inv/investigation-templates/([^/]+)/instantiate` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationTemplateRoutes.java:86` |
 | POST | `/inv/investigations` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:125` |
-| POST | `/inv/investigations/([^/]+)/alert-rules` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:57` |
+| POST | `/inv/investigations/([^/]+)/alert-rules` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:58` |
 | POST | `/inv/investigations/([^/]+)/dossier/verify` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/DossierRoutes.java:64` |
 | POST | `/inv/investigations/([^/]+)/ops` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:127` |
 | POST | `/inv/investigations/([^/]+)/pending/([^/]+)/approve` | gated | `canApproveLinkExpansions` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:137` |
@@ -179,7 +179,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/investigations/([^/]+)/reorder` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:131` |
 | POST | `/inv/investigations/([^/]+)/replay` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:133` |
 | POST | `/inv/investigations/([^/]+)/reveal` | gated | `canRevealLinkEntities` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:135` |
-| POST | `/inv/investigations/([^/]+)/template` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationTemplateRoutes.java:82` |
+| POST | `/inv/investigations/([^/]+)/template` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationTemplateRoutes.java:83` |
 | POST | `/inv/investigations/([^/]+)/undo` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:129` |
 | POST | `/inv/pattern/branching` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/PatternRoutes.java:59` |
 | POST | `/inv/projection` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java:99` |

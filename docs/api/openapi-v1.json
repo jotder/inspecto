@@ -2958,15 +2958,62 @@
     "/bundle/preview" : {
       "post" : {
         "tags" : [ "bundle" ],
-        "summary" : "POST /bundle/preview (generated skeleton)",
+        "summary" : "Read-only fit-check of a Metadata Bundle against this Space",
         "operationId" : "postBundlePreview",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Body = a v2 bundle envelope. No writes, not capability-gated. Per item: new | unchanged | drifted | unsupported; per requires entry: satisfied | different | missing; integrity = the referential-integrity findings the items would INTRODUCE (the list /bundle/import refuses on) — advisory here, used by the editors' Import as draft before their own Save. Empty when writes are disabled.",
         "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          "200" : {
+            "description" : "The fit-check.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "properties" : {
+                          "items" : {
+                            "type" : "array",
+                            "items" : {
+                              "type" : "object",
+                              "properties" : {
+                                "kind" : { "type" : "string" },
+                                "id" : { "type" : "string" },
+                                "status" : { "type" : "string", "enum" : [ "new", "unchanged", "drifted", "unsupported" ] },
+                                "targetHash" : { "type" : "string" }
+                              }
+                            }
+                          },
+                          "requires" : {
+                            "type" : "array",
+                            "items" : {
+                              "type" : "object",
+                              "properties" : {
+                                "kind" : { "type" : "string" },
+                                "id" : { "type" : "string" },
+                                "status" : { "type" : "string", "enum" : [ "satisfied", "different", "missing" ] },
+                                "targetHash" : { "type" : "string" }
+                              }
+                            }
+                          },
+                          "integrity" : {
+                            "type" : "array",
+                            "items" : { "type" : "string" }
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Malformed envelope (format, version or items)."
           }
-        },
-        "x-generated" : true
+        }
       }
     },
     "/bundle/import" : {
