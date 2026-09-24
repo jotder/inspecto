@@ -90,12 +90,6 @@ const MANIFEST = {
         derive: () => json(`${CONTRACTS}/sql-functions.contract.json`).length,
         source: `${CONTRACTS}/sql-functions.contract.json`,
     },
-    'step-types': {
-        floor: 5,
-        what: 'Recipe step-type entries (over 9 verbs)',
-        derive: () => json(`${CONTRACTS}/step-types.contract.json`).length,
-        source: `${CONTRACTS}/step-types.contract.json`,
-    },
     'node-types': {
         floor: 3,
         what: 'built-in node types',
@@ -156,10 +150,16 @@ const MANIFEST = {
     },
     'parser-node-types': {
         floor: 4,
-        what: 'parser.* node types in the step catalog (bare `parser` excluded)',
-        derive: () => json(`${CONTRACTS}/step-types.contract.json`)
-            .filter(e => String(e.type).startsWith('parser.')).length,
-        source: `${CONTRACTS}/step-types.contract.json`,
+        what: 'parser.* node types in BuiltinNodeType (bare `parser` excluded)',
+        // Re-homed 2026-09-24 from step-types.contract.json, retired with GET /pipelines/step-types
+        // (STEP-TYPES-DEAD-CLIENT-MIRRORS-1). Same enum parse as `node-types`, narrowed to `parser.`.
+        derive: () => {
+            const src = read('inspecto-engine/src/main/java/com/gamma/pipeline/BuiltinNodeType.java');
+            const body = src.split('implements PipelineNodeType {')[1];
+            if (!body) throw new Error('BuiltinNodeType: enum body not found — re-anchor this parse');
+            return (body.match(/^ {4}[A-Z][A-Z0-9_]*\("parser\.[^"]+"/gm) || []).length;
+        },
+        source: 'inspecto-engine/src/main/java/com/gamma/pipeline/BuiltinNodeType.java',
     },
     // A FIFTH set, found while placing the markers above: the frontends the UI ships its OWN schema-form
     // specs for (plugin parsers render the served `grammarSchema` instead). The union type is the owner;
@@ -348,7 +348,7 @@ const ROOTS = ['.'];
  * Copied from `check-doc-links.mjs`, and every entry was re-checked against THIS guard rather than
  * assumed to transfer — two of them carry real markers:
  *   - `graphify-out` holds dated GRAPH_REPORT snapshots with **8** `<!--count:parser-node-types-->`
- *     markers frozen at whatever the contract derived on the day each snapshot was taken;
+ *     markers frozen at whatever the source derived on the day each snapshot was taken;
  *   - `inspecto-deploy` is the packaged BUNDLE — gitignored build output carrying a stale COPY of the
  *     whole docs tree: 485 markdown files and **59** markers in this checkout.
  * Both are generated artifacts nobody edits, so policing them would fail the build over a stale copy

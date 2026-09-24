@@ -226,19 +226,19 @@ class JobPackManagerTest {
                 assertEquals("acme-node-1.jar",
                         com.gamma.pipeline.PipelineNodeTypes.ownerOf("transform.redact").orElseThrow());
                 assertTrue(sink.types.contains("job.pack.loaded"));
-                // The authoring surface the type exists for: the served step catalog offers it, so the
+                // The authoring surface the type exists for: the served node-type catalog offers it, so the
                 // palette can. (`StepKindRegistry.current()` — the parser's load-time gate — is
                 // package-private in com.gamma.etl and delegates to the same registry.)
-                assertTrue(com.gamma.pipeline.PipelineProjection.stepCatalog().stream()
+                assertTrue(com.gamma.pipeline.PipelineProjection.catalog().stream()
                                 .anyMatch(e -> "transform.redact".equals(e.get("type"))),
-                        "a contributed type must reach the served step catalog");
+                        "a contributed type must reach the served node-type catalog");
 
                 Files.delete(jar);
                 mgr.rescan();
 
                 assertFalse(com.gamma.pipeline.PipelineNodeTypes.isKnown("transform.redact"),
                         "unload takes the pack's node type back with it");
-                assertTrue(com.gamma.pipeline.PipelineProjection.stepCatalog().stream()
+                assertTrue(com.gamma.pipeline.PipelineProjection.catalog().stream()
                                 .noneMatch(e -> "transform.redact".equals(e.get("type"))),
                         "…and the served catalog stops offering it");
                 for (com.gamma.pipeline.BuiltinNodeType b : com.gamma.pipeline.BuiltinNodeType.values())

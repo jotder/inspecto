@@ -2109,20 +2109,6 @@
         "x-generated" : true
       }
     },
-    "/pipelines/step-types" : {
-      "get" : {
-        "tags" : [ "pipelines" ],
-        "summary" : "GET /pipelines/step-types (generated skeleton)",
-        "operationId" : "getPipelinesStepTypes",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
-          }
-        },
-        "x-generated" : true
-      }
-    },
     "/pipelines/processor-catalog" : {
       "get" : {
         "tags" : [ "pipelines" ],

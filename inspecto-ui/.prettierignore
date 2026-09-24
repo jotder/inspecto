@@ -15,7 +15,7 @@ src/app/modules/auth/
 
 # ── Byte-compared cross-language contracts — DO NOT FORMAT ────────────────────
 # These are written by Jackson (SerializationFeature.INDENT_OUTPUT) and compared
-# as STRINGS by NodeAttributesContractTest / StepTypesContractTest /
+# as STRINGS by NodeAttributesContractTest / ProcessorCatalogContractTest /
 # MeasureGrammarContractTest in inspecto-engine. Any reformat fails the JAVA
 # build, which the UI gate would never catch.
 src/app/inspecto/contracts/*.contract.json

@@ -63,30 +63,6 @@ public final class PipelineProjection {
     }
 
     /**
-     * The recipe-verb palette (ELT amendment §5, Phase 5): the verbs in pipeline order (see
-     * {@link #RECIPE_VERBS} — a verb may be entered once per shape it authors, so {@code parse} appears
-     * once per FORMAT and {@code transform} once per shape),
-     * each carrying the node type it authors as plus that type's served attribute specs — the
-     * server-published version of the verb table the UI carried as its documented interim
-     * ({@code RECIPE_VERBS}). ⚠ There is no {@code map} verb: {@code transform.map} and its Load pane
-     * were deleted 2026-09-05, so a stored {@code mapping.rules[]} is converted to {@code fields[]} on
-     * read and the projection slot is always a {@code transform.sql} Record Transformer.
-     * Plugin-contributed node types (anything beyond the builtins) are appended after the
-     * verbs, keyed by their own type, so a deployment's custom Steps show up without a UI release.
-     */
-    public static List<Map<String, Object>> stepCatalog() {
-        Map<String, PipelineNodeType> byType = new LinkedHashMap<>();
-        for (PipelineNodeType t : PipelineNodeTypes.catalog()) byType.put(t.type(), t);
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (String[] v : RECIPE_VERBS) out.add(stepEntry(v[0], v[1], byType.get(v[1])));
-        Set<String> builtin = new LinkedHashSet<>();
-        for (BuiltinNodeType b : BuiltinNodeType.values()) builtin.add(b.type());
-        for (PipelineNodeType t : byType.values())
-            if (!builtin.contains(t.type())) out.add(stepEntry(t.type(), t.type(), t));
-        return out;
-    }
-
-    /**
      * The Step Processor catalog for {@code GET /pipelines/processor-catalog}: {@link ProcessorCatalog}
      * plus, per processor, {@code addable} — true only for a processor that maps onto a node type the
      * editor may author ({@link PipelineEditable#isAuthorable}). A PARTIAL processor mapped onto an
@@ -102,52 +78,6 @@ public final class PipelineProjection {
             m.put("addable", nodeType instanceof String t && PipelineEditable.isAuthorable(t));
         }
         return out;
-    }
-
-    /**
-     * verb → the node type it authors as, in pipeline order (collect first, sink last).
-     * <p>⚠ A verb may appear more than once: {@code transform} authors both {@code transform.filter} and
-     * {@code transform.join}, because the recipe spells a join as {@code transform: {join: …}} — there is no
-     * {@code join} case in {@link RecipeCompiler}'s verb switch, so publishing {@code verb: "join"} would
-     * advertise a vocabulary the compiler refuses. The palette entry is therefore per SHAPE while the verb
-     * stays the recipe's own word; {@code type} is the unique key of an entry, never {@code verb}.
-     */
-    private static final List<String[]> RECIPE_VERBS = List.of(
-            new String[] {"collect", BuiltinNodeType.ACQUISITION.type()},
-            // 🔴 One entry PER FORMAT, not one generic `parse` (pipeline spec gap 2, decision D3). The
-            // generic BuiltinNodeType.PARSER is READ_COMPAT_ONLY, so `isAuthorable` already refuses it
-            // and the canvas palette never offered it — but this catalogue published it anyway, which
-            // meant the SAME vocabulary disagreed with itself across two served surfaces, and a recipe
-            // author got an untyped Parse Step that had to be converted through a custody dialog.
-            // The verb stays the recipe's own word (`parse`); `type` is what makes an entry unique.
-            new String[] {"parse", BuiltinNodeType.PARSER_DELIMITED.type()},
-            new String[] {"parse", BuiltinNodeType.PARSER_FIXEDWIDTH.type()},
-            new String[] {"parse", BuiltinNodeType.PARSER_JSON.type()},
-            new String[] {"parse", BuiltinNodeType.PARSER_TEXT_REGEX.type()},
-            new String[] {"parse", BuiltinNodeType.PARSER_XLSX.type()},
-            new String[] {"parse", BuiltinNodeType.PARSER_ASN1.type()},
-            new String[] {"parse", BuiltinNodeType.PARSER_PLUGIN.type()},
-            new String[] {"dedup", BuiltinNodeType.TRANSFORM_DEDUP.type()},
-            new String[] {"transform", BuiltinNodeType.TRANSFORM_FILTER.type()},
-            new String[] {"transform", BuiltinNodeType.TRANSFORM_JOIN.type()},
-            new String[] {"sql", BuiltinNodeType.TRANSFORM_SQL.type()},
-            new String[] {"lookup", BuiltinNodeType.TRANSFORM_LOOKUP.type()},
-            new String[] {"summarize", BuiltinNodeType.TRANSFORM_SUMMARIZE.type()},
-            new String[] {"route", BuiltinNodeType.TRANSFORM_ROUTE.type()},
-            new String[] {"sink", BuiltinNodeType.SINK_PERSISTENT.type()});
-
-    private static Map<String, Object> stepEntry(String verb, String type, PipelineNodeType t) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("verb", verb);
-        m.put("type", type);
-        m.put("category", t == null ? NodeCategory.TRANSFORM.name() : t.category().name());
-        m.put("label", t == null ? type : t.label());
-        m.put("description", t == null ? "" : t.description());
-        m.put("lowerable", PipelineEditable.isLowerable(type));
-        List<Map<String, Object>> attributes = new ArrayList<>();
-        for (NodeAttribute a : NodeAttributes.forType(type)) attributes.add(a.toMap());
-        m.put("attributes", attributes);
-        return m;
     }
 
     /** A pipeline's full topology for the G6 renderer: nodes + relationship-typed edges + store endpoints. */

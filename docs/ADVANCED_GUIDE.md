@@ -468,7 +468,7 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
 - **Objects:** `GET/POST /objects`, `GET /objects/{id}`, `POST /objects/{id}/ack|resolve|transition|links|comments|attachments|rca`,
   `GET /objects/{id}/links|graph|comments|attachments`, `GET /rca/templates`.
 - **Pipelines** (each line names its OKF owner; re-verified against `Pipeline*Routes` 2026-09-01):
-  - `GET /pipelines`, `/pipelines/node-types`, `/pipelines/step-types`, `/pipelines/combined` — list + palette/step catalogs → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
+  - `GET /pipelines`, `/pipelines/node-types`, `/pipelines/combined` — list + palette catalog → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
   - `GET /pipelines/{n}/graph` — lifted read-only graph projection → [`pipeline-graph-design.md`](okf/backend/pipeline-graph/pipeline-graph-design.md).
   - `GET /pipelines/{n}/graph/raw` — lossless editable graph for the editor → [`editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md).
   - `PUT /pipelines/{n}/graph` *(canAuthorWorkbench)* — save the graph over the canonical `*_pipeline.toon` (THE authoring write) → [`editable-round-trip.md`](okf/backend/pipeline-graph/editable-round-trip.md).

@@ -80,8 +80,8 @@ time**. The seam was descriptor-only in the literal sense: you could describe a 
   and it gets no hot deploy, no isolated classloader and no watchdog.
 * The in-repo test fixture `FakeNodeExecutor` (`inspecto-engine/src/test`) contributes `transform.take`
   through the executor service file. ⚠ It deliberately registers **no descriptor**, and that is a finding worth
-  keeping: **the served step catalog is a COMMITTED CONTRACT** (`StepTypesContractTest` vs
-  `inspecto-ui/.../step-types.contract.json`), so a test-scope `PipelineNodeType` provider either fails
+  keeping: **the served node-type catalog is a COMMITTED CONTRACT** (`NodeAttributesContractTest` vs
+  `inspecto-ui/.../node-attributes.contract.json`), so a test-scope `PipelineNodeType` provider either fails
   that guard or gets a fixture type baked into the shipped client contract. Registering one broke three
   contract assertions on the first attempt. A REAL plugin still registers both halves — it just does so
   outside this build.
@@ -212,14 +212,15 @@ over a DuckDB relation, so they operate on the previous node's output metadata, 
   same-batch Steps depend on. **It is a change of execution moment, not a rename.**
 
 ⚠ **The fold has already happened where it safely could — at the authoring layer.**
-`PipelineProjection.RECIPE_VERBS` offers **16<!--count:step-types--> entries over 9 verbs** — `collect · parse` (one entry per
-FORMAT, seven of them) `· dedup · transform→filter · transform→join · sql · lookup · summarize · route ·
-sink`. ⛔ There is **no `map` verb**: `transform.map` was deleted 2026-09-05. `select`, `derive`, `split`, `merge`, `validate` and
-`dedup.marker` are **not offered**, and one verb (`transform`) already covers two types. What is
-duplicated is the type enum, not the authoring surface.
+`RecipeCompiler`'s verb switch accepts **11 verbs** — `collect · parse · transform` (→ filter or join) `·
+sql · sink · dedup · lookup · route · summarize · profile · webhook` (plus the legacy `map`, converted to
+a `transform.sql` Record Transformer: `transform.map` was deleted 2026-09-05). `select`, `derive`,
+`split`, `merge`, `validate` and `dedup.marker` have **no verb**, and one verb (`transform`) already
+covers two types. What is duplicated is the type enum, not the authoring surface. (The served
+recipe-verb table `PipelineProjection.RECIPE_VERBS` / `GET /pipelines/step-types` was retired 2026-09-24 (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`) — the Recipe view was its last reader.)
 
 ⚠ **Retiring a type is a migration, not an edit.** The type strings are a committed contract
-(`node-attributes` + `step-types` contract JSON, pinned by `NodeConfigNameContractTest`) and they appear
+(`node-attributes` contract JSON, pinned by `NodeConfigNameContractTest`) and they appear
 verbatim in stored `*_pipeline.toon` files that `PipelineLift`/lower map.
 
 ## 🔴 `transform.dedup.marker` cannot simply be deleted — REFUTED 2026-08-29

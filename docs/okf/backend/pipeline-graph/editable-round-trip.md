@@ -84,8 +84,11 @@ speaks the **config-file vocabulary end to end**, so nothing typed crosses the H
   no home for is the *ref*. Giving map a `steps:` entry remains wrong for a separate reason — a map node
   never enters the chain, so it would change **when `steps:` is emitted at all**.
 
-  The offline mirror (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-editable.ts`) refuses identically, in
+  The offline mirror (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-editable.ts`) refused identically, in
   the same commit — a preview that accepts what the backend refuses is the same defect reversed.
+  ⛔ **That TS lift/lower port was deleted 2026-09-24** (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`): its last reader, the offline mock,
+  went in `f1553136`, and only `isProjectionSlot` survives in the file. Every mention of the SPA's
+  `liftConfig` / `lowerGraph` below is history; the server's `PipelineEditable` is the only lower.
 
   🔴 **A DERIVED ref is not an unhomed one** (`PipelineEditable.DERIVED_USE`, 2026-08-15). The 08-14
   refusal was applied to every lowerable kind, which swept up **enrichment** — whose
@@ -182,7 +185,7 @@ processing:
   migrating all three onto it) stays its own `BACKLOG` item.
 
 *Verified: 6 cases in `PipelineEditableTest` (incl. the rich fixture's verbatim round-trip now carrying a
-`processing.map`), 3 in `MapNodeKeyContractTest`, 6 in `modules/admin/pipelines/pipeline-editable.spec.ts` (promoted out of the deleted mock tree 2026-08-31), and
+`processing.map`), 3 in `MapNodeKeyContractTest`, 6 in `modules/admin/pipelines/pipeline-editable.spec.ts` (promoted out of the deleted mock tree 2026-08-31; deleted 2026-09-24 with the TS lift/lower), and
 `PipelineExecutorTest#anAuthoredProcessingMapProjectsThroughTheRealExecutor` — which runs config →
 `PipelineLift` → `PipelineExecutor` over real DuckDB, because a config-format slice is not verified by a
 `fromMap` test. Both new guards were falsified before being trusted (a bogus `node.cfg` read and a
@@ -199,8 +202,8 @@ widen what executes.
 `ControlApiPipelineCrudTest` (7 — the canonical round-trip, grandfathered reads, retired writes), full
 `inspecto-engine,inspecto` reactor 618/0/0; UI gate 1945/0 + prod build; a live offline walk (create →
 canonical `*_pipeline.toon` written with the full space-convention dir set + `registered:true` → lifted
-to the graph). The UI's TS lift/lower (`inspecto-ui/.../modules/admin/pipelines/pipeline-editable.ts`) pins the same
-refusals so the offline preview cannot pass a topology the server 422s.*
+to the graph). The UI's TS lift/lower (`inspecto-ui/.../modules/admin/pipelines/pipeline-editable.ts`) pinned the same
+refusals so the offline preview could not pass a topology the server 422s (deleted 2026-09-24, see above).*
 
 #### The chain has two spellings, and the FILE owns which one (fixed 2026-08-18)
 
@@ -469,12 +472,12 @@ declaring its spellings and nothing else.
   first one's config on save. They now refuse exactly like `MULTI_PARSER`: `MULTI_ACQUISITION`,
   `MULTI_GAP`, `MULTI_MARKER`, naming the SECOND node, the message naming the node that holds the slot,
   strict and lenient alike (the discard never depended on `strict`). Same 422 `refusals[]` shape through
-  `PUT /pipelines/{name}/graph`, mirrored in the SPA's `lowerGraph` so the editor flags it before Save.
+  `PUT /pipelines/{name}/graph` (the SPA's `lowerGraph` mirror of it was deleted 2026-09-24).
   The lift emits at most one of each, so no shipped config can trip them (`LiftLowerFixtureSweepTest`
   green); the rule only closes the hand-built / canvas-authored case. Pinned by
   `PipelineEditableTest.aSecondNodeOfASingleSlotKindRefusesByName`,
-  `ControlApiPipelineCrudTest.aSecondAcquisitionNodeRefusesWithANamedCode` and the three
-  `pipeline-editable.spec.ts` cases.
+  `ControlApiPipelineCrudTest.aSecondAcquisitionNodeRefusesWithANamedCode` (and, until their deletion
+  2026-09-24, three `pipeline-editable.spec.ts` cases).
 * Every subtype's `use:` home is `grammar/` **only**, not `ingester/`: a plugin-ingester binding on a node
   whose type already names its format is a contradiction, refused rather than half-honoured.
 * ⚠ **`use: grammar/<id>` is read-supported but NEVER authored** (operator decision 2026-08-15). Every
@@ -491,8 +494,8 @@ declaring its spellings and nothing else.
 * **No `NodeAttributes` spec is published** for these types on purpose. Their grammars nest two levels
   (`parsing.delimited.*`, `parsing.fixedwidth.*`) while the `key__nested` spec convention has only ever
   carried one, and the UI drawer owns the form shape — a best-guess table that looks authoritative is what
-  that class's doc warns against. Consequently `node-attributes.contract.json` / `step-types.contract.json`
-  stay byte-unchanged as each subtype lands.
+  that class's doc warns against. Consequently `node-attributes.contract.json` stays byte-unchanged as
+  each subtype lands.
 * ⚠ `BindKindHomeContractTest` has fired correctly **twice** — at `parser.delimited` and again at
   `parser.fixedwidth`. Its tripwire asserts the exact PARSE type list plus the derivation the UI's
   category-keyed picker depends on. The category stays *bindable* only because each new type arrived

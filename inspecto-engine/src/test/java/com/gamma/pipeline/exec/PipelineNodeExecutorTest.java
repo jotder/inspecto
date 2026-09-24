@@ -35,8 +35,8 @@ class PipelineNodeExecutorTest {
             // ⚠ The two halves are INDEPENDENT registrations: this provider contributes only the executor,
             // and the type shapes rows anyway. A real plugin registers a PipelineNodeType descriptor too —
             // without one the validator will not let anyone wire its output — but a test-scope descriptor
-            // is deliberately NOT registered here: the served step catalog is a COMMITTED CONTRACT
-            // (StepTypesContractTest vs step-types.contract.json), so a fixture type would either fail
+            // is deliberately NOT registered here: the served node-type catalog is a COMMITTED CONTRACT
+            // (NodeAttributesContractTest vs node-attributes.contract.json), so a fixture type would either fail
             // that guard or get baked into the shipped client contract.
             assertFalse(PipelineNodeTypes.isKnown(FakeNodeExecutor.TYPE), "descriptor deliberately absent");
             assertTrue(PipelineNodeExecutors.get(FakeNodeExecutor.TYPE).isPresent(), "executor registered");

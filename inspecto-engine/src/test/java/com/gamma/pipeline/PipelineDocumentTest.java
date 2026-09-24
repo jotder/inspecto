@@ -209,7 +209,7 @@ class PipelineDocumentTest {
     /**
      * Byte-compare against a checked-in golden document — the Phase 5 DoD ("the document regenerates
      * deterministically from fixtures"). Regenerate with {@code -Dpipeline.document.write=true} after an
-     * intentional format change, exactly like the step-types / node-attributes contracts.
+     * intentional format change, exactly like the node-attributes contract.
      */
     @Test
     void documentRegeneratesDeterministicallyFromTheFixture() throws IOException {

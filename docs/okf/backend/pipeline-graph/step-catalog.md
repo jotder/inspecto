@@ -1,8 +1,8 @@
 ---
 type: Concept
 title: Step catalog — every Step kind, delivered and pending
-description: The one reference for every Step a Pipeline can chain — the 16 delivered Step kinds (function, behaviour, configuration keys with the flat-file spelling, refusals, the runnable example) and the 119-entry Step Processor catalog the palette lists, split into delivered, partial and planned entries (counts in the body, derived from the contract) with what exists today for each.
-resource: inspecto-ui/src/app/inspecto/contracts/step-types.contract.json
+description: The one reference for every Step a Pipeline can chain — every delivered Step kind (function, behaviour, configuration keys with the flat-file spelling, refusals, the runnable example) and the 119-entry Step Processor catalog the palette lists, split into delivered, partial and planned entries (counts in the body, derived from the contract) with what exists today for each.
+resource: inspecto-ui/src/app/inspecto/contracts/node-attributes.contract.json
 tags: [pipeline-graph, steps, catalog, processors, palette, examples, roadmap]
 timestamp: 2026-09-06T00:00:00Z
 ---
@@ -12,10 +12,13 @@ timestamp: 2026-09-06T00:00:00Z
 A **Pipeline** is a chain of **Steps**: `collect → parse → transform steps… → sink`. Two vocabularies
 describe the chain, and this page is the one place both are laid out side by side:
 
-1. **Step kinds** — the 16<!--count:step-types--> authorable node types the engine executes today
-   (`step-types.contract.json`, served as `GET /pipelines/step-types`). Each has a recipe **verb**
-   (what the Recipe view and `steps[]` chain call it) and a **node type** (what the graph, the flat
-   file and the palette call it). Part A documents every one.
+1. **Step kinds** — the authorable node types the engine executes today (`BuiltinNodeType`, served
+   with their attribute specs by `GET /pipelines/node-types`; the specs are pinned by
+   `node-attributes.contract.json`). Each has a recipe **verb** (what `RecipeCompiler` and the
+   `steps[]` chain call it) and a **node type** (what the graph, the flat file and the palette call
+   it). Part A documents every one. ⚠ The separate recipe-verb catalogue `GET /pipelines/step-types`
+   and its `step-types.contract.json` were retired 2026-09-24 (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`): the Recipe view was
+   their last reader, and the verb vocabulary's one owner is `RecipeCompiler`'s verb switch.
 2. **Step Processors** — the 119<!--count:processors-->-entry product taxonomy the palette lists in eight families
    (`processor-catalog.contract.json`, `ProcessorCatalog.java`, served as
    `GET /pipelines/processor-catalog`). A processor is a *label* over a Step kind or an engine
@@ -454,7 +457,7 @@ webhook:
   retry: {count: 3, backoff: EXPONENTIAL, initial_delay: 1s, max_delay: 30s}
 ```
 
-The canvas palette offers it (catalog `addable`). The recipe verb `webhook:` compiles, and `RecipeConverter` projects it back, but it is **not** a `step-types.contract.json` entry. ✅ Nothing more is owed in the SPA: the Recipe view was deleted (`6d3c68fa`, 2026-09-18), so the client `RECIPE_VERBS` fallback and the mock lower in `pipeline-editable.ts` (dead since `f1553136`) have no production reader (`WEBHOOK-RECIPE-PALETTE-1` refuted 2026-09-23; the dead mirrors are `STEP-TYPES-DEAD-CLIENT-MIRRORS-1`).
+The canvas palette offers it (catalog `addable`). The recipe verb `webhook:` compiles, and `RecipeConverter` projects it back. ✅ Nothing more is owed in the SPA: the Recipe view was deleted (`6d3c68fa`, 2026-09-18), and the lists it read — the served `GET /pipelines/step-types` catalogue, the client `RECIPE_VERBS` fallback and the mock lift/lower in `pipeline-editable.ts` (dead since `f1553136`) — were deleted 2026-09-24 (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`; `WEBHOOK-RECIPE-PALETTE-1` refuted 2026-09-23). `pipeline-editable.ts` keeps only `isProjectionSlot`.
 
 **Egress (operator decision 2026-09-23).** ⛔ **There is no `url:` and no token key.** The block
 names a Connection whose connector is `https`. Onboarding one needs the admin-only
@@ -979,8 +982,8 @@ file to `archive/archive/…`).
 ## Keeping this page true
 
 - **Part A's tables are the served contracts.** When `NodeAttributes` or a parse grammar changes,
-  regenerate `step-types.contract.json` (`mvn -o test -Dstep.types.write=true`) and rebuild the tables
-  from it; do not retype a help string here.
+  regenerate `node-attributes.contract.json` (`mvn -o test -Dnode.attributes.write=true`) and rebuild
+  the tables from it; do not retype a help string here.
 - **Part B is the processor contract, verbatim.** Change `ProcessorCatalog.java`, regenerate with
   `-Dprocessor.catalog.write=true`, then re-render this part and `EDITIONS.md`
   (`node tools/render-processor-board.mjs`). A processor moves from *planned* to *delivered* only when

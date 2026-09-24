@@ -423,9 +423,6 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      */
     private readonly typeAttributes = signal<Map<string, AttributeSpec[]>>(new Map());
 
-    /** S4 dual-read — step types the server says this build supports. */
-    private servedVerbs = signal<readonly { type: string; label: string }[] | null>(null);
-
     readonly selectedNode = signal<AuthoredNode | null>(null);
     readonly selectedEdgeId = signal<string | null>(null);
     /** Two-click edge creation: the first node clicked, awaiting a target. */
@@ -757,10 +754,6 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         this.api.processorCatalog().subscribe({
             next: (c) => this.paletteProcessors.set(groupByFamily(c)),
             error: () => this.paletteProcessors.set(null),
-        });
-        this.api.stepTypes().subscribe({
-            next: (types) => this.servedVerbs.set(types?.length ? types : null),
-            error: () => this.servedVerbs.set(null),
         });
 
         this.loadComponentRefs();

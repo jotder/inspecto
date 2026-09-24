@@ -46,7 +46,7 @@ live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<
 * `/pipelines…` — the `Pipeline*Routes` modules (`inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java`,
   alongside `PipelineGraphRoutes`, `PipelineRenameRoutes`, `PipelineSettingsRoutes` and the shared
   `PipelineSupport` helpers): `GET /pipelines`
-  (lifted pipelines), `GET /pipelines/node-types` **and** `GET /pipelines/step-types` (the editor palette catalog — dual-read is the intended state, `GLOSSARY.md` §13), `GET /pipelines/combined` (the
+  (lifted pipelines), `GET /pipelines/node-types` (the editor palette catalog; the sibling `GET /pipelines/step-types` was retired 2026-09-24, `GLOSSARY.md` §13), `GET /pipelines/combined` (the
   store-joined pipeline+job topology). Authoring goes through the graph round-trip — `PUT
   /pipelines/{name}/graph` (+ `GET …/graph/raw`) — owned by the
   [pipeline-graph bundle](../pipeline-graph/editable-round-trip.md); the old `/pipelines/authored/*`

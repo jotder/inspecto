@@ -86,7 +86,7 @@ authoring document is the wrong one.** Measured from code and the committed cont
 | Fact | Measured | What the docs say |
 |---|---|---|
 | Built-in node types | **32**<!--count:node-types--> | 20 in the glossary (and its list predates the per-format parsers), 28 in the active plan, 20 in the editor page |
-| Recipe catalogue | **16<!--count:step-types--> entries over 9 verbs**, and **no `map` verb** | the active plan says 9 entries and includes `map`, a verb deleted 2026-09-05 |
+| Recipe catalogue | ⛔ **retired 2026-09-24** — `GET /pipelines/step-types` + its contract went with their last reader, the Recipe view; `RecipeCompiler`'s verb switch is the vocabulary | the active plan says 9 entries and includes `map`, a verb deleted 2026-09-05 |
 | Step processors | **119**<!--count:processors--> — **34**<!--count:processors-delivered--> delivered, **18**<!--count:processors-partial--> partial, 67 planned | ✅ all agree since 2026-09-09 — the editor and mapping pages said 121 and were corrected; ⚠ this cell still read "both say 121" until 2026-09-09. Now derived: `tools/check-doc-counts.mjs` |
 | Transform function catalogue | **23 in 7 categories** | the editor page says 24; the mapping page says both "~20" and "24", in one file |
 | Live "too many of a kind" refusals | **2** — one for a second parser, one for a conflicting map config | two documents cite refusals for a second join and a second sink; **neither constant exists** |
@@ -116,8 +116,10 @@ The code comment beside the allow-list says why this matters:
 This is not a harmless doc bug. **The reasoning that `fields` is inert is what produced the live drift**
 recorded in §5: the client mirror of the authored-key set carried two keys where the server carries three,
 and the missing one was `fields`. It was the fourth hand-mirrored map in this repository to drift, and
-✅ **it is fixed and pinned as of 2026-09-09** — `MapNodeKeyContractTest` parses `pipeline-editable.ts`
-and holds both sets against the Java ones, so the mirror cannot drift silently again.
+✅ **it was fixed and pinned 2026-09-09** — `MapNodeKeyContractTest` parsed `pipeline-editable.ts`
+and held both sets against the Java ones. ⛔ **Since 2026-09-24 the mirror no longer exists**: the whole
+TS lift/lower had been dead since the mock went (`f1553136`), so it was deleted
+(`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`) and the pin with it — the Java sets have no client copy to drift from.
 🔴 **The live cost, measured:** for four days the client REFUSED a key the server accepts — `lower`
 reported `UNSUPPORTED_MAP_KEY` and advertised `[columns, rules]` as the accepted set — and dropped it on
 the round trip. That is exactly the failure `MAP_AUTHORED`'s own Java comment says the constant exists to
@@ -553,10 +555,10 @@ of those citations is wrong (§5.2 item 9).
 | The at-rest projection | `PipelineLift.stageTwo` | Execution spec's |
 | Executor dispatch | `RowShaper.shape` in `com.gamma.pipeline.exec` | ⚠ Four docs cite the wrong package **and** wrong lines |
 | The executable map-node keys | `RowShaper.MAP_NODE_CONFIG_KEYS` | 🔴 Contradicted by the config-key reference (§2.3) |
-| The authored map keys | `PipelineEditable.MAP_AUTHORED` (3 keys) | ✅ Client mirror pinned to it by `MapNodeKeyContractTest` (2026-09-09) |
+| The authored map keys | `PipelineEditable.MAP_AUTHORED` (3 keys) | ✅ No client mirror since 2026-09-24 (deleted as dead code); `MapNodeKeyContractTest` holds it to `RowShaper` |
 | Live refusal codes | `PipelineEditable` constants | ⚠ Two docs cite two that do not exist |
 | Graph validation | `PipelineValidator` | 🔴 Unknown type is a WARNING (§2.1) |
-| The Recipe layer | `RecipeCompiler` (16<!--count:step-types--> entries, 9 verbs) / `RecipeConverter` | 🔴 The fifth registration point (§3.3); no guard call (§3.5) |
+| The Recipe layer | `RecipeCompiler` (11 verbs) / `RecipeConverter` | 🔴 The fifth registration point (§3.3); no guard call (§3.5) |
 | The transform guard | `SqlGuard` — 10 call sites | 🔴 **Zero on any save path** |
 | The legacy read bridge | `DataTransformer.recordFields` | — |
 | The function catalogue | `sql-functions.ts` (23 in 7 categories) | ⚠ Counted 24 and ~20 in docs |

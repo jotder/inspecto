@@ -172,15 +172,14 @@ As built:
   `PipelineValidator.Result.ok()` and `PipelineGraphRoutes.saveGraph`'s findings gate already keyed off
   `Severity.ERROR` only — proven, not trusted, by `PipelineValidatorTest`
   (`theUnauditedSqlWarningAloneDoesNotBlockSave`, `anActualErrorOnAGraphWithASqlStepStillBlocksSave`).
-* **Recipe view:** since 2026-09-04 `transform.sql` IS a recipe verb — `sql`, ordered between `transform`
-  and `summarize` in `PipelineProjection.RECIPE_VERBS` and in the UI's `RECIPE_VERBS` and generated
-  `step-types.contract.json` (regenerate with `mvn -o test -Dstep.types.write=true`, pinned by
-  `StepTypesContractTest`).
+* **Recipe verb:** since 2026-09-04 `transform.sql` IS a recipe verb — `sql` in `RecipeCompiler`'s verb
+  switch. (The served verb table `PipelineProjection.RECIPE_VERBS`, the UI's `RECIPE_VERBS` and
+  `step-types.contract.json` that also listed it were retired 2026-09-24 with `GET /pipelines/step-types`,
+  `STEP-TYPES-DEAD-CLIENT-MIRRORS-1`.)
 - 🔴 **Neither committed contract can be drifted by a plugin, which is why hot node types were not gated on
   them.** `NodeAttributesContractTest` compares a **static Java table** (`NodeAttributes.wireMap()`), and a
-  plugin type is simply not in it. `StepTypesContractTest` does read the served step catalogue, but its own
-  comment records that it runs with no plugins loaded, so what it compares there is exactly the verb table.
-  The authors had already accounted for plugin types being **additive at runtime** — so “the contracts would
+  plugin type is simply not in it. (The second, `StepTypesContractTest`, read the served step catalogue
+  with no plugins loaded, so it compared exactly the verb table; it was retired 2026-09-24.) The authors had already accounted for plugin types being **additive at runtime** — so “the contracts would
   drift” is not a reason to defer pack work. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 - `RecipeCompiler` compiles `sql: {sql, fields}` on the trunk and inside a
   `route:` branch; `RecipeConverter.sqlStep` converts it back, so a config carrying a sql step round-trips

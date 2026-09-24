@@ -384,7 +384,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Item | Board id | What remains |
 |---|---|---|
 | **`MAPPING-SPELLING-1`** — do the generators emit `mapping.fields[]`? Recommended: emit `fields[]`, keep the `rules[]` read path, migrate the committed schemas, then rewrite `configuration.md` §2 | `BACKLOG.md` §1 (the one pending operator decision) | Absorbs `RECORD-TRANSFORMER-1` |
-| ✅ ~~`MAP_AUTHORED` drift~~ **FIXED + PINNED 2026-09-09** — the mirror carries `fields`, and `MapNodeKeyContractTest` now parses `pipeline-editable.ts` and asserts both sets against the Java ones | `pipeline-authoring.md` §2 | Done as a contract, not a fifth hand-fix |
+| ✅ ~~`MAP_AUTHORED` drift~~ **FIXED + PINNED 2026-09-09** — the mirror carried `fields`, and `MapNodeKeyContractTest` parsed `pipeline-editable.ts` and asserted both sets against the Java ones; ⛔ the mirror was deleted outright 2026-09-24 (dead since the mock went) | `pipeline-authoring.md` §2 | Done as a contract, not a fifth hand-fix — then retired with its subject |
 | Onboarding residuals — D5-ref (how a `delete` tombstone enters the reference store), D6-ref (within-batch tie-break), enrichment/job identity by name | `BACKLOG.md` §3 *Onboarding* | Wait for a real delete feed |
 | Unification W4 (`EnrichmentService` incremental vs full recompute) and W5 (promotion-grade export; import-time referential integrity) | `BACKLOG.md` §3 | |
 | Canonical-pipeline selective bundle export; retire the `authored-pipeline` bundle kind | `BACKLOG.md` §3 *Authoring* | |
@@ -484,7 +484,7 @@ A draft is server state (an inactive pipeline); "⚠ Do not implement" stands in
 | The three-type cast `switch` with an uncast `default` | `SchemaFieldTypes`, fail-closed (2026-08-22) | `SchemaFieldTypes.java` |
 | Lineage `USES`; `LineageRow` as lineage | `CONSUMES`; Provenance | `GLOSSARY.md` §11 |
 | `EVENT_TABLE / TRANSFORMED_TABLE / REFERENCE_TABLE` | `Table / Derived Table / Reference Dataset` | `GLOSSARY.md` §11 |
-| `GET /pipelines/node-types` as the sole palette source | `/pipelines/step-types` served and read alongside — dual-read is the intended state | `GLOSSARY.md` §13 |
+| `GET /pipelines/node-types` as the sole palette source | ✅ true again since 2026-09-24 — `/pipelines/step-types` was served and read alongside until the Recipe view went, then retired | `GLOSSARY.md` §13 |
 | The mock integrity rules as the home of widget / dashboard delete protection | deleted with the mock (2026-08-31); no server replacement | this spec §5 |
 | `component-registry.md`'s "`schema` is NOT a component", "precondition-failed", node-types-only palette | corrected with this spec | `component-registry.md` |
 | `config.md`'s "the `FieldSpec → AttributeSpec` port is still open" | shipped — the Config pane is on `<inspecto-schema-form>` (`frontend/log.md`) | `config.md` |
@@ -545,7 +545,7 @@ and `PipelineDryRunTest` (the fail-closed field-type refusal at load), `RecordTr
 `sharing.component.spec.ts`, `store-lineage.component.spec.ts`, `component-form.dialog.spec.ts`,
 `components.component.spec.ts`, `components-data-provider.spec.ts`, `mapping-editor.dialog.spec.ts`
 (rules grid + validate), `schema-editor.dialog.spec.ts` (fields grid + `422` findings); plus the cross-language
-`attribute-spec`, `bind-kinds`, `node-attributes`, `step-types` contract specs.
+`attribute-spec`, `bind-kinds`, `node-attributes` contract specs (`step-types` retired 2026-09-24).
 
 ### 8.5 Committed artifacts
 

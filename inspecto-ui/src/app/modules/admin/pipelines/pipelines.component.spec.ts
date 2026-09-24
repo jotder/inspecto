@@ -62,7 +62,6 @@ function build() {
         listWithBroken: () =>
             of([{ name: 'cdr_etl', active: true, nodeCount: 1, edgeCount: 0, produces: [], consumes: [] }]),
         nodeTypes: () => of(TYPES),
-        stepTypes: () => of([]),
         processorCatalog: () => of({ families: [], processors: [] }),
         provenanceBatches: () => of([]),
         combined: () => {

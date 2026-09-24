@@ -67,7 +67,7 @@ git-ignored.
 ## Step catalog — one runnable example per Step kind (`07-steps/`)
 
 A pipeline is a chain of **Steps**: `collect → parse → (map) → transform steps… → sink`. The palette
-offers fifteen Step kinds (`step-types.contract.json`); every one has a worked example below. Two lanes
+offers fifteen Step kinds; every one has a worked example below. Two lanes
 matter for how you run them:
 
 - **Ingest lane** — `collect`, every `parse` frontend, `route` and `sink` execute in the poll cycle, so

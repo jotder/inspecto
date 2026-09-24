@@ -142,36 +142,6 @@ class ControlApiPipelinesTest {
     }
 
     @Test
-    void stepTypesCatalogServesTheRecipeVerbs(@TempDir Path dir) throws Exception {
-        try (Ctx c = open(dir)) {
-            JsonNode arr = V1Body.of(get(c.port, "/pipelines/step-types").body());
-            assertTrue(arr.isArray());
-            java.util.List<String> verbs = new java.util.ArrayList<>();
-            for (JsonNode t : arr) {
-                verbs.add(t.get("verb").asText());
-                assertTrue(t.get("lowerable").asBoolean(), t.get("verb").asText() + " must author a saveable type");
-            }
-            // A verb appears once per SHAPE it authors: `transform` twice (filter, join — the recipe
-            // spells a join `transform: {join: …}` and RecipeCompiler has no `join` verb), and since
-            // 2026-08-31 `parse` once per FORMAT (pipeline spec gap 2). `type` is the unique key, never
-            // `verb`. ⚠ Asserted as the DISTINCT sequence for the same reason as
-            // StepTypesContractTest: the multiplicity is expected to change, the pipeline ORDER is not,
-            // and pinning the flat list made a deliberate widening read as a regression.
-            assertEquals(java.util.List.of("collect", "parse", "dedup", "transform", "sql", "lookup", "summarize",
-                    "route", "sink"), verbs.stream().distinct().toList(), "verbs in order: " + verbs);
-            // dedup serves its specs (§5: specs reach the verbs, not just the raw node-type catalog)
-            for (JsonNode t : arr)
-                if ("dedup".equals(t.get("verb").asText()))
-                    assertEquals("keys", t.get("attributes").get(0).get("key").asText());
-            // and so does join, whose spec existed for days while the palette served no way to reach it
-            JsonNode join = null;
-            for (JsonNode t : arr) if ("transform.join".equals(t.get("type").asText())) join = t;
-            assertNotNull(join, "the transform verb must offer the join shape: " + arr);
-            assertEquals("reference", join.get("attributes").get(0).get("key").asText());
-        }
-    }
-
-    @Test
     void flowGraphProjectionRendersNodesAndEdges(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             HttpResponse<String> r = get(c.port, "/pipelines/flow_etl/graph");

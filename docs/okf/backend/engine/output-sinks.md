@@ -99,7 +99,7 @@ snappy` above three `{database,format}` entries) never passed its codec to the w
   their own.
 * **The editor does not materialise it** — `PipelineEditable.toMap` gives a sink node only its own
   entry's keys, and `lower` **preserves `output:` verbatim** while the file keeps a plural `sinks:`
-  block (no node models that layer; the SPA's `lowerGraph` has the same `authoredSinks` rule). Before,
+  block (no node models that layer). Before,
   `lower` rebuilt `output:` from the primary node, which dropped the inherited codec on every no-edit save
   and would have let one destination's explicit value re-point every other destination's inheritance.
   **Collapsing to one destination** drops `sinks:` and folds the layer into the shorthand (the node's

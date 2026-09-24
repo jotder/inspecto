@@ -543,7 +543,7 @@ rule), `Asn1ParserPlugin` tests, `RealGrammarsTest` · `ParityCheckTest` (`asn-p
 ### 8.7 Guards
 
 `CompressionTest`'s one-way vocabulary guard; `ParsersTest`'s duplicate-id and display-flag pins; the
-`step-types` and `node-attributes` contract pairs (parse verbs and attributes); `check-vocabulary` keeps *Batch*
+`node-attributes` contract pair (parse attributes; the `step-types` pair was retired 2026-09-24); `check-vocabulary` keeps *Batch*
 (the entity), *member* (for an Entry) and *parser config* out of the docs; `SchemaFieldTypes` at load.
 
 ### 8.8 Named coverage gaps (verified absent, not assumed)

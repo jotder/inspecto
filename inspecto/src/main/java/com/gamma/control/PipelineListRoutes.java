@@ -18,7 +18,7 @@ import java.util.Map;
 
 /**
  * Pipeline listing and authored-pipeline read/delete routes ({@code /pipelines}, {@code /pipelines/node-types},
- * {@code /pipelines/step-types}, {@code /pipelines/combined}, {@code /pipelines/authored*}): the read-only
+ * {@code /pipelines/combined}, {@code /pipelines/authored*}): the read-only
  * lifted-pipeline projections (T31) and the grandfathered {@code *_flow.toon} reads (W5, plan U-A).
  * Extracted verbatim from {@code PipelineRoutes}: identical routes, order, HTTP statuses and validation.
  */
@@ -28,11 +28,8 @@ final class PipelineListRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/pipelines", (e, m) -> pipelineSummaries(api));
         api.get("/pipelines/node-types", (e, m) -> PipelineProjection.catalog());
-        // The recipe-verb palette (ELT amendment Phase 5): seven verbs + route + discovered plugins,
-        // each with served attribute specs. node-types stays for the canvas + old-server fallback.
-        api.get("/pipelines/step-types", (e, m) -> PipelineProjection.stepCatalog());
         // The full Step Processor taxonomy incl. undelivered entries (2026-09-02): the palettes show every
-        // processor and render the non-addable ones inactive. Read-only, like the two catalogs above.
+        // processor and render the non-addable ones inactive. Read-only, like the node-type catalog above.
         api.get("/pipelines/processor-catalog", (e, m) -> PipelineProjection.processorCatalog());
         api.get("/pipelines/combined", (e, m) -> combinedPipelines(api));
         // *_flow.toon is GRANDFATHERED (W5, plan U-A): existing files stay readable / runnable /

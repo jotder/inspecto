@@ -233,12 +233,11 @@ closing D1–D9 (full history: `NodeConfigNameContractTest` docblock and git his
 
 - **A served empty array ≠ absent**: empty = the server says the type has no schema (honoured, never
   re-enables the client table); absent = catalog not yet answered (`??`).
-- 🔴 **The Step vocabulary feeds TWO committed contracts**:
-  ⚠ **It covers 13<!--count:node-types-with-attributes--> of the 32<!--count:node-types--> built-in node types** — only those that carry an attribute spec. 🔴 That gap is the root of the five-way "node types" count: `BuiltinNodeType` is the roster, this contract is the subset with attributes, and `step-types.contract.json` holds 16<!--count:step-types--> recipe entries. Three different sets, one noun. Both figures are derived by `tools/check-doc-counts.mjs`.
+- 🔴 **The Step vocabulary feeds a committed contract**:
+  ⚠ **It covers 13<!--count:node-types-with-attributes--> of the 32<!--count:node-types--> built-in node types** — only those that carry an attribute spec. 🔴 That gap is the root of the five-way "node types" count: `BuiltinNodeType` is the roster and this contract is the subset with attributes — two different sets, one noun. Both figures are derived by `tools/check-doc-counts.mjs`.
   `inspecto/contracts/node-attributes.contract.json` (`NodeAttributesContractTest` +
-  `node-attributes.spec.ts`) AND `inspecto/contracts/step-types.contract.json`
-  (`StepTypesContractTest`). Regen flags `-Dnode.attributes.write=true` / `-Dstep.types.write=true`
-  — regenerate BOTH or the full reactor goes red after a green targeted run. ⚠ `inspecto/contracts/`
+  `node-attributes.spec.ts`), regenerated with `-Dnode.attributes.write=true`. (The second one,
+  `step-types.contract.json`, was retired 2026-09-24 (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`) with `GET /pipelines/step-types`.) ⚠ `inspecto/contracts/`
   is byte-compared and `.prettierignore`-exempted by path. When a contract test fails, decide which
   side is wrong FIRST — regenerating moves the goalposts.
 - ⚠ Serialization must use `LinkedHashMap` — `Map.of`/`Map.copyOf` are unordered and make the
@@ -619,9 +618,9 @@ anywhere** — `insertNode` is a bare `addNodeToModel` — which is what `WB-14`
 chain editor — cards in chain order, insert-between, remove, move up/down, nested `route` branches,
 wired with `[editable]`.~~
 
-- ⚠ **Never key anything on `verb`** — `GET /pipelines/step-types` publishes entries where
-  `transform` appears twice (filter, join); `type` is the unique key (duplicate `@for` track keys
-  are an Angular runtime error). A verb can serve a spec the palette never reaches — when a type
+- ⚠ **Never key anything on `verb`** — one recipe verb authors more than one type (`transform` →
+  filter or join); `type` is the unique key (duplicate `@for` track keys are an Angular runtime
+  error). A verb can serve a spec the palette never reaches — when a type
   gains a spec, check the palette serves it.
 - ⛔ One polymorphic entry with a discriminator does not work: `PipelineEditable.lower` dispatches
   on the node's `type`, never config content.

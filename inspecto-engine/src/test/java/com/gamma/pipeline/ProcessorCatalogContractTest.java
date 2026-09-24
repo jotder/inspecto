@@ -16,7 +16,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The served Step Processor catalog vs the committed TS contract ({@code processor-catalog.contract.json})
- * — the same pattern as {@link StepTypesContractTest}. Regenerate deliberately with
+ * — the same pattern as {@link NodeAttributesContractTest}. Regenerate deliberately with
  * {@code -Dprocessor.catalog.write=true}, then check the TS suite still agrees.
  */
 class ProcessorCatalogContractTest {

@@ -799,43 +799,6 @@ function walkStepChain(
 }
 
 /**
- * The recipe verbs the Add-Step palette offers, mapped client-side onto the lowerable node types
- * (UI plan §2.1). Since S4 the server publishes this same table on `GET /pipelines/step-types`
- * (`PipelineProjection.stepCatalog()`, pinned to `step-types.contract.json`) and the editor
- * dual-reads: served palette when available, this map as the old-server fallback — never a second
- * vocabulary, and a drift between the two fails the contract spec. `route` (S3) inserts via
- * {@link insertRouteAfter}, not {@link insertStepAfter}: a branch point rewires its downstream
- * edge as its first branch.
- *
- * An entry is keyed by `type`, and only by `type`: two entries can author the same recipe verb, since
- * the recipe spells a join `transform: {join: …}` and `RecipeCompiler` has no `join` verb. The verb
- * itself is the server's business (it stays on the wire type `RecipeStepType`), so it is deliberately
- * absent here — nothing client-side may key on a value that isn't unique.
- */
-export const RECIPE_VERBS: readonly { type: string; label: string }[] = [
-    { type: 'acquisition', label: 'Collect' },
-    // 🔴 One entry PER FORMAT (pipeline spec gap 2, decision D3). The generic `parser` type is
-    // READ_COMPAT_ONLY server-side, so the canvas palette never offered it — but this fallback did,
-    // and so did the served catalogue, which is how a recipe author ended up with an untyped Parse
-    // Step to convert through a custody dialog. A parser is always FORMAT-SPECIFIC.
-    { type: 'parser.delimited', label: 'Parse (delimited)' },
-    { type: 'parser.fixedwidth', label: 'Parse (fixed-width)' },
-    { type: 'parser.json', label: 'Parse (JSON)' },
-    { type: 'parser.text_regex', label: 'Parse (regex)' },
-    { type: 'parser.xlsx', label: 'Parse (Excel)' },
-    { type: 'parser.asn1', label: 'Parse (ASN.1)' },
-    { type: 'parser.plugin', label: 'Parse (custom)' },
-    { type: 'transform.dedup', label: 'Dedup' },
-    { type: 'transform.filter', label: 'Transform (filter)' },
-    { type: 'transform.join', label: 'Transform (join)' },
-    { type: 'transform.sql', label: 'Transform (SQL)' },
-    { type: 'transform.lookup', label: 'Lookup' },
-    { type: 'transform.summarize', label: 'Summarize' },
-    { type: 'transform.route', label: 'Route' },
-    { type: 'sink.persistent', label: 'Sink' },
-];
-
-/**
  * The Step types a route BRANCH may be given from the recipe cards (MIDBRANCH-UI-1) — the client mirror
  * of `RouteArming.BRANCH_STEP_KINDS` (filter / dedup / summarize): what the ingest walk can execute
  * mid-branch with its NONE reference/execution context. `join` (needs a reference resolver) and a nested

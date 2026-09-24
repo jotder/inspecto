@@ -8,7 +8,6 @@ import { MatDialog } from '@angular/material/dialog';
 import { PipelineEditorComponent } from './pipeline-editor.component';
 import { AuthoredPipeline, ComponentsService, ConfigService, LensService, PipelinesService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import { lowerGraph } from './pipeline-editable';
 import { StreamTransferService } from 'app/inspecto/transfer/stream-transfer.service';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -40,7 +39,6 @@ describe('PipelineEditorComponent', () => {
     let api: {
         listWithBroken: ReturnType<typeof vi.fn>;
         nodeTypes: ReturnType<typeof vi.fn>;
-        stepTypes: ReturnType<typeof vi.fn>;
         processorCatalog: ReturnType<typeof vi.fn>;
         pipelineGraphRaw: ReturnType<typeof vi.fn>;
         savePipelineGraph: ReturnType<typeof vi.fn>;
@@ -110,8 +108,6 @@ describe('PipelineEditorComponent', () => {
                     },
                 ]),
             ),
-            // S4 dual-read: an "old server" by default — the editor must fall back to RECIPE_VERBS.
-            stepTypes: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
             processorCatalog: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
             pipelineGraphRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
             savePipelineGraph: vi
@@ -233,11 +229,6 @@ describe('PipelineEditorComponent', () => {
         return (c as unknown as { canvas: ReturnType<typeof canvasMock> }).canvas;
     }
 
-    /** `servedVerbs` is private; read it the way this file already reads `canvas`. */
-    function verbsOf(c: PipelineEditorComponent): unknown {
-        return (c as unknown as { servedVerbs: () => unknown }).servedVerbs();
-    }
-
     describe('the palette host error arms (§3.7)', () => {
         it('falls back to the node-type groups with null, never an empty taxonomy', () => {
             // The default mock already makes processorCatalog throw — that is the degraded server.
@@ -275,19 +266,6 @@ describe('PipelineEditorComponent', () => {
             api.nodeTypes = vi.fn().mockReturnValue(throwError(() => new Error('500')));
             const c = make();
             expect(c.paletteGroups()).toEqual([]);
-        });
-
-        it('falls back to the client verb map when the served verbs error', () => {
-            const c = make();
-            expect(verbsOf(c)).toBeNull();
-        });
-
-        it('treats a served-but-EMPTY verb list as not served', () => {
-            // "an empty palette is never what a real server means" — the component says so in a comment,
-            // and this is the only place that holds it to it.
-            api.stepTypes = vi.fn().mockReturnValue(of([]));
-            const c = make();
-            expect(verbsOf(c)).toBeNull();
         });
     });
 
@@ -3407,20 +3385,6 @@ describe('PipelineEditorComponent', () => {
             expect(c.canUndo(), 'a reopened tab starts with no history').toBe(false);
         });
 
-        /** The snapshot is the SAVE serialization, so a restored graph must lower without refusals. */
-        it('a restored graph passes the TS lower (pipeline-editable) without refusals', async () => {
-            const c = make();
-            c.select('demo');
-            c.onDropAdd({ type: 'transform.filter', x: 5, y: 5 });
-            c.renameNode(c.model()!.nodes[1], { name: 'Filter A', description: '' });
-
-            await c.undo();
-            await c.undo();
-
-            const res = lowerGraph(c.model()!, { name: 'demo' }, false);
-            expect('config' in res, JSON.stringify(res)).toBe(true);
-        });
-
         /** R4 keyboard layer — extends the SAME host keydown handler Ctrl+S lives on. */
         describe('Ctrl+Z / Ctrl+Y', () => {
             function press(el: HTMLElement, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
@@ -3597,7 +3561,6 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
     let api: {
         listWithBroken: ReturnType<typeof vi.fn>;
         nodeTypes: ReturnType<typeof vi.fn>;
-        stepTypes: ReturnType<typeof vi.fn>;
         processorCatalog: ReturnType<typeof vi.fn>;
         pipelineGraphRaw: ReturnType<typeof vi.fn>;
         provenanceBatches: ReturnType<typeof vi.fn>;
@@ -3611,7 +3574,6 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
         api = {
             listWithBroken: vi.fn().mockReturnValue(of([])),
             nodeTypes: vi.fn().mockReturnValue(of([])),
-            stepTypes: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
             processorCatalog: vi.fn().mockReturnValue(throwError(() => new Error('404'))),
             pipelineGraphRaw: vi.fn().mockReturnValue(of(structuredClone(FLOW))),
             provenanceBatches: vi.fn().mockReturnValue(of([])),
@@ -3668,9 +3630,8 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
 
     /**
      * SPEC-NOPROOF-1 / pipeline-authoring §3.7 item 7 — the palette's silent fallback had no HOST-level
-     * spec. The rendering *given* nothing was tested; the three error arms that PRODUCE the nothing were
-     * not, even though this file's own default mock has made `stepTypes` and `processorCatalog` throw all
-     * along. They ran in every test here and nothing asserted their result.
+     * spec. The rendering *given* nothing was tested; the error arms that PRODUCE the nothing were
+     * not, even though this file's own default mock has made `processorCatalog` throw all along. They ran in every test here and nothing asserted their result.
      *
      * ⚠ The distinction under test is `null` vs `[]`, and it is not cosmetic. `null` means "not served —
      * fall back", `[]` means "served, and genuinely empty". The palette renders those differently, so an
@@ -3682,8 +3643,7 @@ describe('PipelineEditorComponent recipe view (UI plan §1, S1)', () => {
      * decision and deliberately NOT asserted here; asserting it would encode an unmade decision.
      *
      * <p><b>Mutation-proven 2026-09-09:</b> setting the `processorCatalog` error arm to `[]` instead of
-     * `null`, and dropping the empty-means-not-served mapping for `servedVerbs`, each fail exactly their
-     * own test (2 of 190).
+     * `null` fails exactly its own test.
      *
      * <p>⚠ <b>The positive control earned its place.</b> My first served-catalog fixture was an ARRAY, but
      * the payload is `{families, processors}` — `groupByFamily` threw reading `catalog.families` and RxJS

@@ -222,13 +222,12 @@ public final class PipelineEditable {
     /**
      * As {@link #stepKindOf(String)}, with the descriptor supplied — the seam the test uses, because a
      * CONTRIBUTED descriptor cannot be registered in this build's test scope without entering the served
-     * step catalog, which is a committed contract.
+     * node-type catalog, which {@code NodeAttributesContractTest} pins to a committed contract.
      *
      * <p>🔴 <b>CONTRIBUTED only, and that restriction is the load-bearing part.</b> Several built-ins are
      * registered, executable and deliberately NOT authorable — {@code transform.split} / {@code select} /
-     * {@code derive} / {@code validate} / {@code merge} are absent from {@link #LOWERABLE} and from
-     * {@code RECIPE_VERBS} by decision. Admitting every registered {@code transform.*} would silently
-     * reverse all of those and change the two-types-differ invariant {@code PipelineProjectionTest} pins.
+     * {@code derive} / {@code validate} / {@code merge} are absent from {@link #LOWERABLE} by decision.
+     * Admitting every registered {@code transform.*} would silently reverse all of those and change the two-types-differ invariant {@code PipelineProjectionTest} pins.
      * So a built-in keeps whatever {@link #LOWERABLE} already says about it, and only a type the core
      * does not ship gains the {@code steps:} home.
      */
@@ -1107,9 +1106,9 @@ public final class PipelineEditable {
             // each entry inherits every key it omits. No node models that layer — a sink node carries only
             // its own entry's keys — so while the file keeps a plural block the layer is preserved verbatim;
             // rebuilding it from the primary node dropped an inherited compression on every save and would
-            // let one destination's explicit value re-point every other destination's inheritance. (The
-            // SPA's lowerGraph has the same authoredSinks rule.) Collapsing to ONE destination folds the
-            // layer into the shorthand: the node's own value, else the value it was inheriting.
+            // let one destination's explicit value re-point every other destination's inheritance. Collapsing
+            // to ONE destination folds the layer into the shorthand: the node's own value, else the value it
+            // was inheriting.
             boolean authoredSinks = existing.get("sinks") instanceof List<?> l && !l.isEmpty();
             if (!(authoredSinks && destByDatabase.size() > 1)) {
                 Map<String, Object> layer = authoredSinks ? new LinkedHashMap<>(output) : Map.of();

@@ -674,7 +674,7 @@ mutation paths.
 Eight committed JSON contracts, each compared by a Java `*ContractTest` and a TypeScript spec so neither
 side moves alone: `attribute-spec` (`FindingsSpecContractTest`), `bind-kinds` (`BindKindHomeContractTest`),
 `processor-catalog` (`ProcessorCatalogContractTest`), `sql-functions` (`RecordTransformContractTest` — both
-sides compile SQL independently), `node-attributes`, `expression-guard`, `measure-grammar`, `step-types`.
+sides compile SQL independently), `node-attributes`, `expression-guard`, `measure-grammar` (`step-types` was retired 2026-09-24).
 Build-time *generation* of these artifacts was refused: a generated artifact silently absorbs the drift the
 test exists to catch.
 

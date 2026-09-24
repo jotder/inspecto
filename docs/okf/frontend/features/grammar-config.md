@@ -290,7 +290,7 @@ whole UI half was two `PARSE_NODE_FRONTENDS` entries. Everything else was the en
   because the config parser *synthesizes* the binding at load. On a plain built-in an `ingester/` ref is an
   authoring mistake and must refuse rather than be dropped.
 * `isParserType` is now `PARSER` ∪ `SUBTYPE_FRONTENDS.keySet()` in both languages, rather than a chain of
-  `equals` growing one arm per format.
+  `equals` growing one arm per format. (The TS copy in `pipeline-editable.ts` was deleted 2026-09-24 as dead code.)
 
 ## The generic custom-plugin subtype — `parser.plugin` (P3d slice D, 2026-08-16)
 

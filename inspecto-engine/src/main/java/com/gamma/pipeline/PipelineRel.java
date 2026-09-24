@@ -12,7 +12,7 @@ import com.gamma.api.PublicApi;
  * travels between two nodes is control information naming where the data rests — a Consignment id and
  * its registered outputs — exactly what {@code ProcessorContext} offers a third-party Step: no row
  * stream, {@code read()} resolves by reference. ⚠ The constant below is still spelled {@code "data"}
- * and stays so: renaming it breaks two committed contracts (node-attributes, step-types) and belongs to
+ * and stays so: renaming it breaks the committed node-attributes contract and belongs to
  * the major-bump window with the Step SPI. Only the MEANING is corrected here — do not read
  * {@code DATA} as "records flow along this edge", because nothing in the runtime does that.
  *

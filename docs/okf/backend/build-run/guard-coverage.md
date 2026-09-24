@@ -60,8 +60,8 @@ separate `URLClassLoader`, filtering to providers that actually came from it. Co
    this scan before trusting it"*. Without that, a moved region silently scans nothing.
    ⚠ **Parsing the other side's source is the sanctioned idiom for a cross-language pin.** There is no
    shared artifact to compare against, and inventing one for two short lists costs more than it saves —
-   so `MapNodeKeyContractTest` parses `pipeline-editable.ts` directly, the same way it already did for
-   `RowShaper`. Mutation-verified 2026-09-09: removing `fields` again fails exactly 1 of 4 Java tests
+   so `MapNodeKeyContractTest` parsed `pipeline-editable.ts` directly, the same way it already did for
+   `RowShaper` (⛔ the mirror itself was deleted 2026-09-24 with the rest of the dead TS lift/lower, `STEP-TYPES-DEAD-CLIENT-MIRRORS-1`, and that test method with it). Mutation-verified 2026-09-09: removing `fields` again fails exactly 1 of 4 Java tests
    naming the missing key, and exactly 1 of 74 UI tests (`lowers an authored fields projection instead of
    refusing it`, exit 1).
 4. **Prefer an assertion to an assumption — and where a skip is genuinely right, make it VISIBLE.**

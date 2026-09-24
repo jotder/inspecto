@@ -77,7 +77,7 @@ src/app/
     components/             # shared UI: status-badge, empty-state, skeleton, chart, connectivity-banner, schema-form
     grid/                   # ag-Grid theme + helpers (index.ts)
     contracts/              # server-published contract JSONs the UI is pinned to (node-attributes,
-                            # step-types, bind-kinds, attribute-spec, expression-guard, measure-grammar).
+                            # bind-kinds, attribute-spec, expression-guard, measure-grammar, …).
                             # 🔴 Six Java contract tests read these SAME FILES BY PATH — regenerate them
                             # from the backend, never hand-edit, and never move them without repointing
                             # the Java constants in the same change.
@@ -301,9 +301,9 @@ src/app/
   unmodeled keys survive a save. ⚠ A `PUT …/graph` 422 carries named **`refusals[]`** (`UNSUPPORTED_NODE`
   / `MULTI_PARSER` / `NO_*`) under `error.details`; surface them, don't swallow them (the editor's
   `showRefusals`). ⚠ The old `*_flow.toon` authoring writes (`POST /pipelines/authored`, `PUT`,
-  `/nodes`, `/edges`) are **retired** — grandfathered flows stay readable/deletable only. ⚠ The UI's
-  TS lift/lower (`modules/admin/pipelines/pipeline-editable.ts`) must keep refusing exactly what the
-  server does, or the editor greenlights a topology the backend 422s.
+  `/nodes`, `/edges`) are **retired** — grandfathered flows stay readable/deletable only. ⛔ There is
+  no client-side lift/lower any more (the dead TS port in `pipeline-editable.ts` was deleted 2026-09-24;
+  only `isProjectionSlot` remains) — the server's refusals are the only ones.
 - **Labelling something with cross-entity tags → `TagAssignmentDialog`** (`inspecto/tags/`, D7). Kind-
   agnostic: `dialog.open(TagAssignmentDialog, {data: {targetKind, targetId, label}})`, where `targetKind`
   is `object` or a `ComponentStore.WRITABLE_TYPES` value. Adopting it on a new pane is a menu item, not a
@@ -772,7 +772,7 @@ src/app/
    tabWidth 4, singleQuote, trailingComma all — measured off the pre-upgrade tree, not guessed).
    **`.prettierignore` excludes** `src/@gamma/` + `modules/auth/` (vendored, §3 bans restyling it — stays
    mergeable with upstream), `src/app/inspecto/contracts/*.contract.json` (Jackson-written,
-   byte/string-compared by `NodeAttributesContractTest`/`StepTypesContractTest`/
+   byte/string-compared by `NodeAttributesContractTest`/`ProcessorCatalogContractTest`/
    `MeasureGrammarContractTest` in `inspecto-engine` — reformatting these breaks the **Java** build, a
    gate the UI verify loop never runs), and `src/assets/` (fixture payloads). ⚠ **Prettier's HTML
    reflow can silently change whitespace that carries MEANING**, in two ways seen so far:

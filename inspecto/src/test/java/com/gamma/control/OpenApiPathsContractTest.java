@@ -32,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * derived from the live route table</b>, so a route can never be undocumented, while the hand-written
  * exemplars keep their request/response schemas.
  *
- * <p>Two modes, the same idiom as {@code StepTypesContractTest} / {@code ProcessorCatalogContractTest}:
+ * <p>Two modes, the same idiom as {@code NodeAttributesContractTest} / {@code ProcessorCatalogContractTest}:
  * <ul>
  *   <li>{@code -Dopenapi.paths.write=true} — boots {@link ControlApi} exactly as {@link ApiContractTest} does,
  *       enumerates every registration (plus the absent-module stubs, which mirror the optional modules'

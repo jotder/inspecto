@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * {@code UNSUPPORTED_BINDING} — an affordance whose every outcome was a failure.
  *
  * <p>This pins the derivation both sides depend on into one committed artifact, the
- * {@link StepTypesContractTest} idiom: a category is <b>bindable</b> when every builtin node type in it
+ * {@link NodeAttributesContractTest} idiom: a category is <b>bindable</b> when every builtin node type in it
  * has a {@code use:} home. {@code pipeline-graph.contract.spec.ts} reads the same file and asserts the
  * picker never appears on a category absent from that list.
  *
