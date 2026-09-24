@@ -81,6 +81,29 @@ above the generated commit list.
   first. A deployment behind a proxy must list it, or it audits and throttles every caller as the proxy.
   An unparseable entry fails the boot.
 
+**Breaking — Access Policy save-time guards (2026-09-25, policy-authoring UX S1–S4, operator D1)**
+- `PUT /access/policies` now **422s** (`CONFIG_VALIDATION_FAILED`, the message naming the policy and a
+  bracketed check code): an unknown key on a policy or its `target` (`[unknown-key]`; both `resourceKinds`
+  and `resource_kinds` = `[ambiguous-key]`); a `when` reference the engine never binds (`[unknown-ref]` —
+  a root other than `subject.`/`env.`/`resource.`, `subject.<k>` outside `id, capabilities, dataScopes,
+  roles` + the `roles.toon identity.attributeClaims` allowlist, `env.<k>` outside `action, route, space`);
+  an untargeted `deny` with no `when` (`[deny-everything]`); and, on Enterprise, a draft that would deny the
+  saver's own next `PUT /access/policies` (`[would-lock-out]` — nothing is written).
+- ⚠ **Upgrade:** the same checks run on the on-disk `access-policies.toon`. A doc that loaded before with a
+  stray key (`wen:`), or that references a claim not allowlisted in `roles.toon`, is now **unreadable** —
+  on Enterprise every authenticated request is denied (fail-closed) until it is fixed on disk. The
+  `GET /access/policies` `error` names the policy and the check for `canConfigureAccess` holders. Fix the
+  doc (or allowlist the claim) before upgrading.
+- `PUT /access/roles` 422s a claim-allowlist change that would make the policies doc unreadable.
+- `GET`/`PUT /access/policies` gain additive `warnings: [{policy, code, message}]` (`unknown-capability`,
+  `unknown-role`, `unknown-resource-kind`, `resource-ref-at-route-level`, `seed-override`) and
+  `resourceKinds` (the kind vocabulary). A client that round-trips GET rows into a PUT must strip the
+  read-only `source` key — it is now an unknown key.
+- New route **`POST /access/policies/preview`** (gated `canConfigureAccess`): the draft's role × action
+  (× kind) impact, before → after. New SPI default `AccessDecider.simulate(…)`; the `@PublicApi`
+  record `AccessPolicies.Doc` gains an `error` component (the unreadable reason), and `AccessPolicies`
+  gains `RESOURCE_KINDS` and the `Warning` record.
+
 **Error-code corrections (`ERRORCODE-DEFAULTED-1`, 2026-09-25)**
 - `POST /rule-templates/{id}/simulate` with no write root bound now answers 503 with `errorCode`
   **`CONTROL_PLANE_READ_ONLY`** (was the 503 default `CAPABILITY_UNAVAILABLE`), matching every other

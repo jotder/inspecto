@@ -165,7 +165,41 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   trace, enforcing/auditing nothing). It is a GET on purpose — a POST would be a `write` the policy under
   test could 403 at the route PEP, locking the denied subject out of their own explanation. Both are
   Enterprise-only (the seam is default-empty; Personal/Professional show authored rows only and
-  `{enabled:false}`). UI: Settings ▸ Access ▸ **Policies** tab (read-only effective table + explain panel).
+  `{enabled:false}`). UI: Settings ▸ Access ▸ **Policies** tab (effective table + explain panel; authoring
+  since 2026-09-25, next bullet).
+- **Policy authoring guards (2026-09-25, `superpower/policy-authoring-ux-design.md` S1–S4, operator D1 =
+  guard all nine failure modes at save time).** The one grammar `AccessPolicies.validate` (shared by the
+  PUT and the file parser) now refuses, as 422s naming the policy and a bracketed check code: an unknown
+  key on a policy or `target` (**F8** `unknown-key`/`ambiguous-key`); a `when` reference the engine never
+  binds (**F2** `unknown-ref` — `subject.<k>` must be `id/capabilities/dataScopes/roles` or a claim
+  allowlisted in `roles.toon identity.attributeClaims`, `env.<k>` must be `action/route/space`, any
+  `resource.*` passes); an untargeted `deny` with no `when` (**F9** `deny-everything`). The reference facts
+  come from the new `Conditions.refs(source)` (every dotted ref → the string literals compared with it).
+  Judgement calls are **warnings** (`AccessPolicies.lint`), returned as `warnings[]` by GET and PUT alike
+  so a hand-edited doc shows them too: **F3** `unknown-capability` / `unknown-role`, **F4**
+  `unknown-resource-kind` (vocabulary `AccessPolicies.RESOURCE_KINDS` — the lower-cased `ObjectType`s plus
+  `investigation`, served as `resourceKinds` so the SPA never mirrors it), **F5**
+  `resource-ref-at-route-level`, **F6** `seed-override` (the message quotes the built-in condition it
+  replaces). **F7**: `PUT /access/policies` runs the validated draft through the new default-ABSTAIN seam
+  `AccessDecider.simulate` for the saver's own Subject against their next `PUT /access/policies` and 422s
+  `would-lock-out` before writing; `PolicyEngine.decide`/`explain`/`simulate` share ONE private evaluator
+  so the guard cannot drift from enforcement. **F1**: a hand edit that fails a 422-class check still marks
+  the doc unreadable (fail-closed, unchanged), but `GET`'s `error` now names the policy and check —
+  to `canConfigureAccess` holders only (D5); and `PUT /access/roles` 422s a claim-allowlist change that
+  would turn the policies doc unreadable as a side effect (the doc's cache is keyed on the allowlist).
+  `POST /access/policies/preview` (gated `canConfigureAccess`, S4) returns the draft's impact: every
+  effective role as a synthetic subject (capabilities + role name — no id, no claims) × read/write/operate
+  at route level, plus × each known kind a saved or draft policy targets, each cell before → after.
+  UI: the Policies tab authors (new/edit/delete, built-in "Override…" behind a confirm, full replace with
+  `If-Match`, warnings under each row, *Preview impact* in `PolicyFormDialog`).
+  ⚠ **Upgrade bites at runtime:** an existing doc with a stray key, or a `subject.<claim>` not
+  allowlisted, is unreadable after upgrade ⇒ deny-all on Enterprise, recoverable only on disk (the PUT is
+  itself denied while the doc is unreadable). Pinned by `ControlApiAccessPolicyLintTest`
+  (`f8_upgradePath_…`) and `ControlApiPolicyEnforcementTest.d4_upgradePath_…`.
+  ⚠ Limits, stated: the preview's role subjects carry no id or claims, so a policy keyed on
+  `subject.id` or a claim shows no flip; the lockout guard protects the SAVER only (D9) — a draft that
+  denies every *other* access configurer is accepted; and the preview is a POST, so a subject the saved
+  doc already denies cannot preview (F7 keeps the in-product path from reaching that state).
 - **Q3 `canTriageRequirements` grant (2026-07-24, product sign-off).** Seeded to Business + Power + Admin +
   Super (`Roles.SEED`) — requirement triage is a business-analyst activity; Pipeline Developer/Operations
   build/run rather than triage.
@@ -283,9 +317,7 @@ Three things a future change must not undo:
   lens-scoping it revoked the single grant that role has. Consequence, accepted deliberately:
   **"Business lens ⇒ read-only" is no longer a true statement about the product.**
 
-Still-open (carried to [BACKLOG](../../../BACKLOG.md), non-blocking): a policy-**authoring** UX beyond
-TOON+validation (a matrix/create editor — the read-only visibility + explain above shipped, authoring did
-not); X-Actor is already rejected on Professional (the SEC-7a spoof guard), so only its full removal remains,
+Still-open (carried to [BACKLOG](../../../BACKLOG.md), non-blocking): X-Actor is already rejected on Professional (the SEC-7a spoof guard), so only its full removal remains,
 gated on **the next MAJOR tag** (restated 2026-09-07 — the API-v1 sunset apparatus this used to cite was deleted 2026-07-25). The capability spec [`okf/capabilities/security/security.md`](../../capabilities/security/security.md) is the front door for what was required, left and refused; this page stays the mechanism.
 
 `package.ps1 -Edition Enterprise` **shipped 2026-07-25** — a superset of Professional (both the `security` and

@@ -1,6 +1,8 @@
 # Access Policy authoring UX — design
 
-**Status: DESIGN ONLY (2026-09-24). Nothing built. Nine operator decisions open (§8).**
+**Status: BUILT 2026-09-25 (S1–S4) on branch `lane-policy-guards` — all nine decisions answered (§8); as-built
+facts in [`auth-security.md`](../okf/backend/editions/auth-security.md) §"Policy authoring guards". Close-out
+(security.md §3.10, EDITIONS SEC-05, archive this file) waits for the lane to land on `master`.**
 Row: `docs/BACKLOG.md` §3.8 *Security: policy-authoring UX* (P2, trigger fired 2026-09-15) · `EDITIONS.md`
 SEC-05. Owner concept: [`okf/backend/editions/auth-security.md`](../okf/backend/editions/auth-security.md)
 (mechanism) and [`okf/capabilities/security/security.md`](../okf/capabilities/security/security.md) §3.10
@@ -217,3 +219,27 @@ a file watcher for disk edits (the GET-side lint covers it at next read).
    action, or forbid overriding `space-isolation*` from the UI entirely (API/disk only)?
 9. **D9 — Lockout guard scope.** Refuse only a draft that denies the *saver's* next `PUT /access/policies`
    (proposed), or also one that denies **every** `canConfigureAccess` holder among the seeded roles?
+
+### Decisions of record (operator, 2026-09-25)
+
+The operator answered D1 and delegated D2–D9 to "the design's recommendation; where it gives none, the most
+fail-closed reasonable option". Every "taken on recommendation" answer below is **reversible**.
+
+| # | Answer | How it was reached |
+|---|---|---|
+| D1 | The incident stays unrecorded; **guard all nine failure modes at save time** rather than wait for a report | operator |
+| D2 | **B then C**, in the recommended order (S1 lint → S2 lockout → S3 editor → S4 matrix) | taken on recommendation, reversible |
+| D3 | **§4's split as proposed**: unknown `subject.<k>` is a hard 422 (the claim set is closed at save time); ref-root and `env.<k>` 422; F3–F6 warnings. ⚠ One deviation, forced by the operator's requirement that F9 be refused *before* it takes effect: **F9 is a 422 (`deny-everything`), not the proposed warning** | taken on recommendation (F9: operator requirement) |
+| D4 | **Unknown keys are a 422** (the §4 table's severity), on the PUT and on disk; the upgrade path (stray key ⇒ unreadable ⇒ deny-all on Enterprise) is accepted, tested, and in the release notes | taken on recommendation, reversible |
+| D5 | **Name the policy and check in the unreadable-doc `error`** — but only to `canConfigureAccess` holders (no Subject = Personal = shown); others get the generic fail-closed notice. The design named the detail, not the audience; the narrower audience is the fail-closed choice | no recommendation → most fail-closed, reversible |
+| D6 | **Build the matrix (S4)** — part of "B then C" | taken on recommendation, reversible |
+| D7 | **Roles × {read, write, operate} at route level, plus × each known resource kind a saved or draft policy targets** — the kind axis only where a policy can bite, so every flip is visible and the table stays bounded by `RESOURCE_KINDS` | no recommendation → most fail-closed, reversible |
+| D8 | **Keep seed override as a confirmed UI action** (§4: "seed rows get override… behind a confirm"); the confirm and the `seed-override` warning quote the built-in condition, and so the exemption, that the replacement drops | taken on recommendation, reversible |
+| D9 | **The saver only** (proposed). A draft denying every *other* access configurer is accepted | taken on recommendation, reversible |
+
+**Added while building (not in §4, each closes a hole the checks themselves opened or left):**
+`ambiguous-key` — `resourceKinds` and `resource_kinds` both given used to let the wire spelling win
+silently; `PUT /access/roles` refuses a claim-allowlist change that would make the policies doc unreadable
+(F2's 422 made `roles.toon` a second way to reach F1); `GET /access/policies` serves `resourceKinds` so the
+SPA carries no mirror of the F4 vocabulary. **Not built:** the preview's optional `probes` (D7 fixed the
+axes instead); an optional `route` body field binds `env.route` (default `/`).
