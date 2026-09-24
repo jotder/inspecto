@@ -56,22 +56,22 @@ public final class GoldenCapture {
      * in the legacy test drivers. This manifest is their durable home; sources noted per case.
      */
     static final List<CaseSpec> CASES = List.of(
-            // RTDMS_ASN_Test.testMtnaOCC — tx key matches the decoded record's top key
+            // RTDMS_ASN_Harness.testMtnaOCC — tx key matches the decoded record's top key
             new CaseSpec("mtna_occ", "config/rtdms/mtna/occ/mtnOCC.asn", "ChargingDataOutputRecord", 11,
                     null, null, "config/rtdms/mtna/occ/mtn_occ_tx.json", "data/rtdms/mtna/INexamples/OCC"),
-            // RTDMS_ASN_Test.testMtnaCCN
+            // RTDMS_ASN_Harness.testMtnaCCN
             new CaseSpec("mtna_ccn", "config/rtdms/mtna/ccn/mtnCCN.asn", "ChargingDataOutputRecord", 11,
                     null, null, "config/rtdms/mtna/ccn/ccn_tx.json", "data/rtdms/mtna/INexamples/CCN"),
-            // RTDMS_ASN_Test.testMtnaSDP — decode only, its tx json is a generic stub
+            // RTDMS_ASN_Harness.testMtnaSDP — decode only, its tx json is a generic stub
             new CaseSpec("mtna_sdp", "config/rtdms/mtna/sdp/sdp.asn", "SDPCallDataRecord", 11,
                     null, null, null, "data/rtdms/mtna/INexamples/SDP"),
-            // RTDMS_ASN_Test.testAftelIMS
+            // RTDMS_ASN_Harness.testAftelIMS
             new CaseSpec("aftel_ims", "config/rtdms/aftel/ims/aftelIMS.asn", "IMSRecord", 12,
                     null, null, "config/rtdms/aftel/ims/ims_tx_new.json", "data/rtdms/aftel/ims"),
-            // RTDMS_ASN_Test.testMTNAhuwIMS — huwIMS.json is 0 bytes, decode only
+            // RTDMS_ASN_Harness.testMTNAhuwIMS — huwIMS.json is 0 bytes, decode only
             new CaseSpec("mtna_huwims", "config/rtdms/mtna/huwIMS/huwIMS.asn", "IMSRecord", 12,
                     null, null, null, "data/rtdms/mtna/huwIMS"),
-            // RTDMS_ASN_Test.testMTNAhuwMsc / TestASNFiles.parseGMSC
+            // RTDMS_ASN_Harness.testMTNAhuwMsc / TestASNFiles.parseGMSC
             new CaseSpec("mtna_huwmsc", "config/rtdms/mtna/huwMsc/2980-gmsc.asn", "CallEventDataFile", 17,
                     null, null, "config/rtdms/mtna/huwMsc/huwMsc.json", "data/rtdms/mtna/huwMsc", true),
             // ZainHuwIMS — the only driver with real framing config (50-byte file header,
@@ -80,7 +80,7 @@ public final class GoldenCapture {
             new CaseSpec("zain_ims", "config/zain/sudan/ims/huwIMS.asn", "IMSRecord", 12,
                     50L, 4L, null, "data/zain/sudan/ims"),
             // Same Huawei framing assumed for the loose PS-domain file; grammar per
-            // RTDMS_ASN_Test.pgwParse (root CallEventRecord, skip 5). Experimental — the
+            // RTDMS_ASN_Harness.pgwParse (root CallEventRecord, skip 5). Experimental — the
             // report records whatever happens.
             new CaseSpec("zain_pgw", "config/zain/sudan/pgw/huwSgsn.asn", "CallEventRecord", 5,
                     50L, 4L, null, "data/zain/sudan"),

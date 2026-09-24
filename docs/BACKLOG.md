@@ -96,7 +96,7 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | Area | Row | The call |
 |---|---|---|
 | 3.2 | EXECUTION-RESIDUALS X4 + X1 | X4's replay default — ⛔ not yet, the evidence it needs does not exist; X1's §5 decisions in `superpower/retry-affordance-design.md` |
-| 3.3 | `LEGACY-ASN-SRC-TREE-UNBUILT-1` | wire, rename or delete the 21 uncompiled test-tree files |
+| 3.3 | `LEGACY-ASN-SRC-TREE-UNBUILT-1` | rename or deprecate the superseded `ByteSource`/`TxConfig`/`Tag` twins (test-tree rename done 2026-09-24) |
 | 3.4 | Onboarding ↔ Pipeline W5 | carry the reference Datasets a Pipeline reads in its export (forward closure) |
 | 3.6 | D-8 XLSX export | does it work in a shipped / air-gapped bundle? |
 | 3.11 | `API-DEAD-METHODS-1` · `JOB-RUNS-DIALOG-DEAD-1` | wire or delete; retain as a test vehicle or delete |
@@ -181,7 +181,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 #### Parsing
 
 - **P2** · **Parsing (Stage-1)** — the ASN.1 grammar from a stored, path-jailed `.asn`/`.asn1` file shipped 2026-09-23, with its bundle residual. **Still open:** a per-vendor transform config home (the grammar file was its prerequisite); a drop-in `plugins/` jar directory (the JobPackManager classloader precedent) so a customer parser deploys without a rebuild — needs a trust decision first. **Design + 10 owed decisions: [`superpower/parser-plugins-trust-design.md`](superpower/parser-plugins-trust-design.md)** (2026-09-24). ⚠ `asn-parser/src/main/java` is NOT dead (compiled by `legacy-code/pom.xml`); corpus tests are opt-in and data-gated (DATA-GOV-1). → `okf/backend/engine/parser-plugins.md`
-- **P3** · `LEGACY-ASN-SRC-TREE-UNBUILT-1` — **decide the 21 uncompiled files under `asn-parser/src/test/`.** The original premise was refuted 2026-09-17: `asn-parser/src/main/java` IS compiled — `legacy-code/pom.xml` sets `<sourceDirectory>../../src/main/java</sourceDirectory>` and 41 classes ship — ⛔ **do NOT delete it.** What is true: no `testSourceDirectory` exists anywhere in the repo, so the test tree compiles on no path, and six of its files carry `*Test` names claiming coverage they do not have (`Test.java`, `ASNFileReaderTest`, `BERDecoderTest`, `SbinHuaMscAsnTest`, `FixedLengthFileReaderTest`, `RTDMS_ASN_Test`). `RTDMS_ASN_Test` was kept verbatim with an explanatory javadoc on 2026-09-17 because `asn-golden`'s `GoldenCapture` cites it as provenance for 7 of its 9 golden cases. Remaining: wire the tree, or rename/delete it — rename all six together and update `GoldenCapture`'s 8 comments in the same commit; and treat the superseded `ByteSource`/`TxConfig`/`Tag` twins in `main` as a rename/deprecation question. ⛔ Operator's call.
+- **P3** · `LEGACY-ASN-SRC-TREE-UNBUILT-1` — **residual: the superseded `ByteSource`/`TxConfig`/`Tag` twins in `asn-parser/src/main/java`** (compiled by `legacy-code/pom.xml`, 41 classes — ⛔ do NOT delete the tree) — a rename/deprecation question, untouched. The test-tree half closed 2026-09-24 (operator: rename, don't wire): the six `*Test`-named files under `asn-parser/src/test/` became `*Harness` (`SchemaCsvHarness`, `ASNFileReaderHarness`, `BERDecoderHarness`, `SbinHuaMscAsnHarness`, `FixedLengthFileReaderHarness`, `RTDMS_ASN_Harness`) with `GoldenCapture`'s 7 citations updated — see [`okf/backend/engine/parser-plugins.md`](okf/backend/engine/parser-plugins.md). ⛔ Operator's call.
 
 ### 3.4 Catalog, Onboarding, Datasets & Lineage
 

@@ -9,7 +9,7 @@ package com.gamma.skybase.decoder.asn2;//package com.gamma.skybase.decoder.asn;
 //import java.util.concurrent.atomic.AtomicReference;
 //import java.util.stream.Stream;
 //
-//public class Test {
+//public class SchemaCsvHarness {
 //
 //
 //    private static void createSchema(String content) {

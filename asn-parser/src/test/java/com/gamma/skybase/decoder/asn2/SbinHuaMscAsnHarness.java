@@ -8,7 +8,7 @@ package com.gamma.skybase.decoder.asn2;//package com.gamma.skybase.decoder.asn;
 //import java.util.Map;
 //import java.util.concurrent.atomic.AtomicLong;
 //
-//public class SbinHuaMscAsnTest {
+//public class SbinHuaMscAsnHarness {
 //
 //
 //    public static void main(String[] args) throws Exception {
