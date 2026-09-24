@@ -72,6 +72,18 @@ class AlertRuleTest {
         assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(m));
     }
 
+    /** An absent severity takes the spec default ({@code WARNING}) instead of NPE-ing; an unknown one is refused. */
+    @Test
+    void anAbsentSeverityDefaultsToWarning() {
+        Map<String, Object> m = valid();
+        m.remove("severity");
+        assertEquals("WARNING", AlertRule.fromMap(m).severity());
+        m.put("severity", "  ");
+        assertEquals("WARNING", AlertRule.fromMap(m).severity());
+        m.put("severity", "PANIC");
+        assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(m));
+    }
+
     @Test
     void batchWindowAndComparators() {
         Map<String, Object> m = valid();

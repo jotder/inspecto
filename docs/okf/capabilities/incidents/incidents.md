@@ -135,12 +135,11 @@ avg / min / max). Both take a `when` condition tree that scopes rows before aggr
 (`ComponentStore`, `ComponentRegistry` dir `alert-rules`), armed at boot by `ServiceBootstrap.loadAlerts` —
 promoted off raw `*_alert.toon` files 2026-07-18. ⚠ A leftover `*_alert.toon` is **not read by anything**.
 
-`comparator` ∈ `gt | gte | lt | lte`, **optional, default `gt`** (the `ConfigSpecs.alert` default, applied in
-the `AlertRule` constructor); an unknown value is a 422 on `/alerts/rules`. ⚠ Until 2026-09-24 an absent
-comparator was an HTTP **500**: `Set.of(..).contains(null)` throws NPE rather than answering false, so the
-check escaped validation. `severity` is validated the same way, so an absent `severity` is still that 500
-(its spec default `WARNING` is not applied); the agent's draft validator (`AlertRuleValidator`) still
-requires `comparator` outright.
+`comparator` ∈ `gt | gte | lt | lte` is **optional, default `gt`**, and `severity` is **optional, default
+`WARNING`** (both the `ConfigSpecs.alert` defaults, applied in the `AlertRule` constructor); an unknown value
+of either is a 422 on `/alerts/rules`. ⚠ Until 2026-09-24 an absent comparator or severity was an HTTP
+**500**: `Set.of(..).contains(null)` throws NPE rather than answering false, so the check escaped
+validation. The agent's draft validator (`AlertRuleValidator`) still requires `comparator` outright.
 
 **Evaluation.** `AlertService` polls on a window-derived floor of 1 min, default 10 min
 (`AlertService.java:411-413`); a breach emits `EventType.ALERT_FIRED` (`:227`) and the canonical
