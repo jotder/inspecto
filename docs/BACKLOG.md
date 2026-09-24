@@ -58,8 +58,8 @@ rank.
 
 | State | P2 rows |
 |---|---|
-| **Startable now** — no gate, no owed decision | EXECUTION-RESIDUALS **X4** record-level replay — default eject-and-continue (decided 2026-09-25) over the per-record evidence the dry run now reports (§3.2); X1 stays on its §5 decisions |
-| **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | AI drafting on a non-`schema` kind (§3.1) · Platform Services Stage 2/3 (§3.2) · cross-Space consequence (§3.5) · Bundle "load as draft" (§3.7) · D6 `findings-spec` UI (§3.9) · policy-authoring UX (§3.8) |
+| **Startable now** — no gate, no owed decision | EXECUTION-RESIDUALS **X4** record-level replay — default eject-and-continue (decided 2026-09-25) over the per-record evidence the dry run now reports (§3.2); X1 stays on its §5 decisions · AI drafting for `transform` (§3.1, every call answered 2026-09-25) · Bundle "load as draft" (§3.7, every call answered 2026-09-25) |
+| **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | Platform Services Stage 2/3 (§3.2) · cross-Space consequence (§3.5) · D6 `findings-spec` UI (§3.9) · policy-authoring UX (§3.8) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (SES/SNS adapter ON HOLD by operator 2026-09-25; per-user preferences need a call) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) · `DUCKLE-C1-DATASET-FRESHNESS-1` residual (2) (needs a design pass, §3.5) |
 
 **Standing rules for editing this board** (distilled from the shifts that grew the old page to 644 KB):
@@ -99,15 +99,15 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 |---|---|---|
 | 3.2 | EXECUTION-RESIDUALS X1 | X1's §5 decisions in `superpower/retry-affordance-design.md` (X4's default was decided 2026-09-25 — see the row) |
 | 3.12 | Link Analysis | every open D-U* / LA-* call lives in `superpower/link-analysis-backlog-plan.md` |
-| 3.1 | AI drafting on a non-`schema` kind | 4 calls (D4–D7) in `superpower/ai-drafting-non-schema-design.md` (decided 2026-09-25: D1 **`transform`** · D2 ship the `schema` slice as its own row · D3 kind specs live in `ComponentSpecs.forKind` in `inspecto-engine`) |
+| 3.1 | AI drafting on a non-`schema` kind | none — all seven calls answered 2026-09-25: D1 `transform` · D2 `schema` slice is its own row · D3 `ComponentSpecs.forKind` · D4 n/a · D5 both, deterministic validate-and-repair first, then NL drafting · D6 `clean` needs a passing preview, no sample ⇒ WARNING · D7 Option B (unanchored preview findings) |
 | 3.2 | Platform Services Stage 2 / 3 | 10 calls in `superpower/platform-services-stage2-design.md` (Decisions owed) |
 | 3.3 | Parsing (Stage-1) — parser-plugin trust | none — all ten calls answered 2026-09-25 (see the row) in `superpower/parser-plugins-trust-design.md` (Decisions owed) |
 | 3.5 | cross-Space consequence | 11 calls (D2 decided 2026-09-25; D10, the consequence actually asked for, is the one that unblocks the build) in `superpower/cross-space-consequence-design.md` (Decisions owed) |
 | 3.5 | `D8-SES-SNS-1` | ⏸ adapter ON HOLD 2026-09-25 (D1–D12 parked); D13 answered by per-user read state; open: D14 (rename the "Security & passwords" category) and the per-user preferences design, §7 of `superpower/ses-sns-adapter-design.md` |
-| 3.7 | Bundle "load as draft" | 5 calls (D4–D8) in `superpower/bundle-load-as-draft-design.md` (decided 2026-09-25: D1 **in-memory** · D2 save through the pane's own route · D3 advisory findings from an extended `/bundle/preview`) |
+| 3.7 | Bundle "load as draft" | none — all eight calls answered 2026-09-25: D1 in-memory · D2 save via the pane's route · D3 advisory findings · D4 write-through prerequisites first · D5 Dashboard/Widget/Dataset, then authored Pipeline, then LA/Geo views, never `connection` · D6 existing id ⇒ unsaved edits + diff · D7 as-built in the Metadata Bundles concept · D8 "Import as draft…" beside "Import…" in editors only |
 | 3.8 | policy-authoring UX | 9 calls in `superpower/policy-authoring-ux-design.md` (Decisions owed) |
 | 3.8 | `DUCKLE-C6-POLICY-NARROWING-1` | 16 calls in `superpower/policy-narrowing-design.md` (Decisions owed) |
-| 3.9 | D6 `findings-spec` UI | 9 calls in `superpower/findings-spec-authoring-ui-design.md` (D1 decided and BUILT 2026-09-25: `findings-spec` writes are gated on **`canManageIncidents`** — `ComponentRoutes`, `okf/backend/editions/auth-security.md`) |
+| 3.9 | D6 `findings-spec` UI | 5 calls (D5 advanced tier · D6 technical properties · D7 removal impact · D8 Components pane · D10 acceptance) in `superpower/findings-spec-authoring-ui-design.md`; decided 2026-09-25: D1 `canManageIncidents` (BUILT) · D2 Case only · D3 validate the existing `attributes.findings` blob · D4 a dialog in the Cases toolbar · D9 the UI word is **Findings field** |
 
 **Decided 2026-09-25, not tied to a row** (operator; each lands in its owning OKF concept when built):
 
