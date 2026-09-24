@@ -32,15 +32,15 @@ number** — rows moved between sections in this consolidation, and older docs c
 
 | § | Product area | Active plans (`docs/superpower/`) | §2 gates in this area |
 |---|---|---|---|
-| [3.1](#31-pipelines--authoring-editor--step-catalog) | Pipelines — authoring, editor & Step catalog | [record-transformer-replaces-map-plan.md](superpower/record-transformer-replaces-map-plan.md) · [dead-property-validation-plan.md](superpower/dead-property-validation-plan.md) | — |
-| [3.2](#32-pipelines--execution-lanes--consignments) | Pipelines — execution, lanes & Consignments | [retry-affordance-design.md](superpower/retry-affordance-design.md) | Row 15 · X5 |
-| [3.3](#33-acquisition-collectors--parsing) | Acquisition, Collectors & Parsing | [parser-field-tiers-interview-plan.md](superpower/parser-field-tiers-interview-plan.md) | D13 |
+| [3.1](#31-pipelines--authoring-editor--step-catalog) | Pipelines — authoring, editor & Step catalog | [record-transformer-replaces-map-plan.md](superpower/record-transformer-replaces-map-plan.md) · [dead-property-validation-plan.md](superpower/dead-property-validation-plan.md) · [ai-drafting-non-schema-design.md](superpower/ai-drafting-non-schema-design.md) | — |
+| [3.2](#32-pipelines--execution-lanes--consignments) | Pipelines — execution, lanes & Consignments | [retry-affordance-design.md](superpower/retry-affordance-design.md) · [platform-services-stage2-design.md](superpower/platform-services-stage2-design.md) | Row 15 · X5 |
+| [3.3](#33-acquisition-collectors--parsing) | Acquisition, Collectors & Parsing | [parser-field-tiers-interview-plan.md](superpower/parser-field-tiers-interview-plan.md) · [parser-plugins-trust-design.md](superpower/parser-plugins-trust-design.md) | D13 |
 | [3.4](#34-catalog-onboarding-datasets--lineage) | Catalog, Onboarding, Datasets & Lineage | — | — |
-| [3.5](#35-data-quality-observability-signals--alerting) | Data quality, Observability, Signals & Alerting | [completeness-kpi-k4-design.md](superpower/completeness-kpi-k4-design.md) | OPS-5 · Completeness KPI hold |
+| [3.5](#35-data-quality-observability-signals--alerting) | Data quality, Observability, Signals & Alerting | [completeness-kpi-k4-design.md](superpower/completeness-kpi-k4-design.md) · [cross-space-consequence-design.md](superpower/cross-space-consequence-design.md) · [ses-sns-adapter-design.md](superpower/ses-sns-adapter-design.md) | OPS-5 · Completeness KPI hold |
 | [3.6](#36-analytics--queries-bi-studio--export) | Analytics — Queries, BI, Studio & Export | — | — |
-| [3.7](#37-control-plane-api--jobs) | Control plane, API & Jobs | [job-path-compat-survey.md](superpower/job-path-compat-survey.md) | Release notes for the next MAJOR |
-| [3.8](#38-security-policy-editions--compliance) | Security, Policy, Editions & Compliance | [route-gating-audit.md](superpower/route-gating-audit.md) | X-Actor · NFR-7 · SOC 2 · SEC-INCIDENT-1 · DATA-GOV-1 |
-| [3.9](#39-cases-incidents--assistant) | Cases, Incidents & Assistant | — | AGT-6b |
+| [3.7](#37-control-plane-api--jobs) | Control plane, API & Jobs | [job-path-compat-survey.md](superpower/job-path-compat-survey.md) · [bundle-load-as-draft-design.md](superpower/bundle-load-as-draft-design.md) | Release notes for the next MAJOR |
+| [3.8](#38-security-policy-editions--compliance) | Security, Policy, Editions & Compliance | [route-gating-audit.md](superpower/route-gating-audit.md) · [policy-authoring-ux-design.md](superpower/policy-authoring-ux-design.md) · [policy-narrowing-design.md](superpower/policy-narrowing-design.md) | X-Actor · NFR-7 · SOC 2 · SEC-INCIDENT-1 · DATA-GOV-1 |
+| [3.9](#39-cases-incidents--assistant) | Cases, Incidents & Assistant | [findings-spec-authoring-ui-design.md](superpower/findings-spec-authoring-ui-design.md) | AGT-6b |
 | [3.10](#310-deployment-packaging--scale-out) | Deployment, Packaging & Scale-out | [enterprise-scale-out-plan.md](superpower/enterprise-scale-out-plan.md) | Deployment topology live validation · E1 |
 | [3.11](#311-web-ui--spa-wide-hygiene) | Web UI — SPA-wide hygiene | — | — |
 | [3.12](#312-link-analysis--geo) | Link Analysis & Geo | [link-analysis-backlog-plan.md](superpower/link-analysis-backlog-plan.md) — the ONLY Link Analysis backlog | — |
@@ -59,11 +59,8 @@ rank.
 | State | P2 rows |
 |---|---|
 | **Startable now** — no gate, no owed decision | Onboarding D5-ref — ground the delete-feed first (§3.4) · `RELEASE-PIPELINE-NEVER-EXECUTED-1` — the checksum/signature split (§4) |
-| **Design first** — the trigger fired, the shape is not decided | AI drafting on a non-`schema` kind (§3.1) · Platform Services Stage 2/3 (§3.2) · cross-Space consequence (§3.5) · Bundle "load as draft" (§3.7) · D6 `findings-spec` UI (§3.9) · policy-authoring UX (§3.8) |
-| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · space-to-space comparison (postponed) · W5 forward closure (operator decision) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
-| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · space-to-space comparison (postponed) · W5 forward closure (operator decision) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
-| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · space-to-space comparison (postponed) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
-| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · W5 forward closure (operator decision) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
+| **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | AI drafting on a non-`schema` kind (§3.1) · Platform Services Stage 2/3 (§3.2) · cross-Space consequence (§3.5) · Bundle "load as draft" (§3.7) · D6 `findings-spec` UI (§3.9) · policy-authoring UX (§3.8) |
+| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) · `DUCKLE-C1-DATASET-FRESHNESS-1` residual (2) (needs a design pass, §3.5) |
 
 **Standing rules for editing this board** (distilled from the shifts that grew the old page to 644 KB):
 
@@ -94,7 +91,7 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 |---|---|---|
 | **Two dates** — when the off-repo backup bundle was deleted, and when the no-reuse check completed | the `SEC-INCIDENT-1` CC6.1 line (§2) | Both acts happened off-repo and leave no trace here. ⛔ A line dated *when it was written down* would misstate the evidence to an auditor |
 | **Per-tier RTO/RPO targets** | `compliance/evidence/rto-rpo-statement.md` · §2 Deployment topology | ⛔ Decided 2026-09-15: do **not** transcribe the signed §3.14 numbers. In `editions.md` they are an engineering target; in `compliance/evidence/` they are a commitment an auditor holds you to, and those are not the same number by default |
-| **Access details** — MinIO endpoint/key/secret, the systemd host, the elevated Windows box | `AIRGAP-S3-EXTENSIONS-1` (§5) · `DEPLOY-SERVICE-WRAPPER-1` (§3.10) | ✅ Operator confirmed 2026-09-15 that all three EXIST. Both rows are **code-complete and evidence-blocked** — neither needs a build, only a run |
+| **Access details** — MinIO endpoint/key/secret, the systemd host, the elevated Windows box | `DEPLOY-SERVICE-WRAPPER-1` (§3.10) | ✅ Operator confirmed 2026-09-15 that all three EXIST. Both rows are **code-complete and evidence-blocked** — neither needs a build, only a run |
 | **Eager or deferred resolution of an `s3://` `dirs.database`** — validate a profile at PARSE time (forces the deployment-root / pipeline-field split, because `CollectorService` parses every pipeline before `loadConnections` runs) or resolve at FIRST WRITE-TIME USE (no split; `dirs.database` is a plain `String` nothing resolves at parse) | scale-out phase C §5.4 bullet 6 (the credential surface that `AIRGAP-S3-EXTENSIONS-1` left behind when it closed 2026-09-15) | The bootstrap order is measured (`ServiceBootstrap.buildFrom:69` vs `:73-74`); which side of it to build on is a design posture only the operator sets. |
 
 **Decisions owed on individual rows** — an index; the question and its options live on the row.
@@ -106,6 +103,15 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | 3.11 | `API-DEAD-METHODS-1` · `JOB-RUNS-DIALOG-DEAD-1` | wire or delete; retain as a test vehicle or delete |
 | 4 | `REACTOR-VERDICT-CI-1` | wire `check-reactor-verdict.mjs` into `ci.yml` |
 | 3.12 | Link Analysis | every open D-U* / LA-* call lives in `superpower/link-analysis-backlog-plan.md` |
+| 3.1 | AI drafting on a non-`schema` kind | 7 calls in `superpower/ai-drafting-non-schema-design.md` (Decisions owed) |
+| 3.2 | Platform Services Stage 2 / 3 | 10 calls in `superpower/platform-services-stage2-design.md` (Decisions owed) |
+| 3.3 | Parsing (Stage-1) — parser-plugin trust | 10 calls in `superpower/parser-plugins-trust-design.md` (Decisions owed) |
+| 3.5 | cross-Space consequence | 12 calls in `superpower/cross-space-consequence-design.md` (Decisions owed) |
+| 3.5 | `D8-SES-SNS-1` | 14 calls in `superpower/ses-sns-adapter-design.md` (Decisions owed) |
+| 3.7 | Bundle "load as draft" | 8 calls in `superpower/bundle-load-as-draft-design.md` (Decisions owed) |
+| 3.8 | policy-authoring UX | 9 calls in `superpower/policy-authoring-ux-design.md` (Decisions owed) |
+| 3.8 | `DUCKLE-C6-POLICY-NARROWING-1` | 16 calls in `superpower/policy-narrowing-design.md` (Decisions owed) |
+| 3.9 | D6 `findings-spec` UI | 10 calls in `superpower/findings-spec-authoring-ui-design.md` (Decisions owed) |
 
 ⛔ **A plan is where a decision is *described*; this section is where it is *queued*.** A decision
 described in `superpower/` and not indexed here is how a three-day stall happened (2026-09-11 → 09-14).
@@ -284,7 +290,7 @@ someone asks what is still gated.
 
 - **Mapping sidecars for the committed schemas** — ⛔ decided 2026-09-10: inline `mapping:` is the norm; **0** of 24
   schemas use a `*_mapping.csv` and nothing depends on one (the single sidecar in the tree is untracked evidence).
-  Trigger: an operator picks the sidecar form in the mapping editor for a committed pipeline. → `MAPPING-GEN-1` (§3)
+  Trigger: an operator picks the sidecar form in the mapping editor for a committed pipeline.
 - **`transform.merge` attributes — REFUSED 2026-09-07, the same day MERGE-ATTRS-1 was filed as a defect.**
   The row was right that `RowShaper.merge` reads `type` (`union`|`inner`|`left`) and `on` off the node config
   and that `NodeAttributes` declares neither. Its **cause and severity were both wrong.** `transform.merge`
@@ -448,7 +454,7 @@ someone asks what is still gated.
 | Completeness KPI hold (§2) | Completeness KPI K2/K4/K5 (§3) · `archived-documents/plans-archive/completeness-kpi-plan.md` |
 | Compliance program NFR-7 (§2) | SOC 2 Type II window (§2) — the same observation window, twice in one table |
 | Deployment topology live validation (§2) | Deployment topology gaps (§3) · §6 "D1–D8 signed as recommended" — the §3 row's gate is already discharged |
-| Postgres multi-user — 🔴 §6 park LIFTED 2026-09-15 (trigger fired), now a P2 build row | §3 Postgres multi-user row — now says PARKED and points at `plans-archive/` (this row's "contradicts §6 / dead pointer" note was stale by 2026-09-08); `EDITIONS.md` OPS-03 |
+| Postgres multi-user — 🔴 §6 park LIFTED 2026-09-15 (trigger fired), now a P2 build row | §3.10 Postgres multi-user row — now a P2 build row (park lifted 2026-09-15) (this row's "contradicts §6 / dead pointer" note was stale by 2026-09-08); `EDITIONS.md` OPS-03 |
 
 ---
 
