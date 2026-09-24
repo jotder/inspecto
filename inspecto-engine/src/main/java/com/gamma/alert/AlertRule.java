@@ -132,6 +132,9 @@ public record AlertRule(String name, String metric, String comparator, double th
         require(name != null && !name.isBlank(), "alert.name is required");
         metric = lower(metric);
         comparator = lower(comparator);
+        // Absent/blank → the spec default (ConfigSpecs.alert: gt). ⚠ Set.of(..).contains(null) THROWS, so
+        // a missing comparator used to escape validation as an NPE (HTTP 500) instead of taking the default.
+        if (comparator == null || comparator.isEmpty()) comparator = "gt";
         severity = severity == null ? null : severity.trim().toUpperCase(Locale.ROOT);
         window = window == null ? null : window.trim().toLowerCase(Locale.ROOT);
         dataset = (dataset == null || dataset.isBlank()) ? null : dataset.trim();

@@ -59,6 +59,19 @@ class AlertRuleTest {
         assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(m));
     }
 
+    /** An absent comparator takes the spec default ({@code gt}, ConfigSpecs.alert) instead of NPE-ing on
+     *  {@code Set.of(..).contains(null)}; an unknown one is still refused. */
+    @Test
+    void anAbsentComparatorDefaultsToGt() {
+        Map<String, Object> m = valid();
+        m.remove("comparator");
+        assertEquals("gt", AlertRule.fromMap(m).comparator());
+        m.put("comparator", "  ");
+        assertEquals("gt", AlertRule.fromMap(m).comparator());
+        m.put("comparator", "between");
+        assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(m));
+    }
+
     @Test
     void batchWindowAndComparators() {
         Map<String, Object> m = valid();

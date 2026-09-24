@@ -121,6 +121,21 @@ class ControlApiAlertRuleWriteTest {
         }
     }
 
+    /** A body without {@code comparator} used to answer 500 (an NPE in validation); it now takes the
+     *  documented default {@code gt}. */
+    @Test
+    void aRuleWithoutAComparatorDefaultsToGt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String body = """
+                    {"name":"no-cmp","metric":"error_rate","threshold":0.05,"window":"1h","severity":"WARNING"}""";
+            HttpResponse<String> r = send(c.port, "POST", "/alerts/rules", body);
+            assertEquals(200, r.statusCode(), r.body());
+            ComponentRegistry.Component saved = store(root).get("alert-rule", "no-cmp").orElseThrow();
+            assertEquals("gt", AlertRule.fromMap(saved.content()).comparator());
+            assertEquals(List.of("no-cmp"), ruleNames(c.port));
+        }
+    }
+
     @Test
     void rejectsInvalidRuleAndWritesNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
