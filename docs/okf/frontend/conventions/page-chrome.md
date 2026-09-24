@@ -89,7 +89,6 @@ picker cannot express).
 
 * `EMPTY-GRID-HSCROLL-1` (BACKLOG §4): Incidents and Cases draw a horizontal scrollbar on an empty grid because
   their column minimum widths exceed the pane at narrow widths.
-* `JOB-RUNS-DIALOG-DEAD-1` (BACKLOG §4): `jobs/job-runs.dialog.ts` has no opener.
 * Backend, not UI: `SCHEMA-FILE-RESOLVES-AGAINST-CWD-1` and `HEAD-RESPONSE-STREAM-CLOSED-1` (BACKLOG §4).
 
 ## References

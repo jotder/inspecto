@@ -125,10 +125,6 @@ export class AccessService {
         );
     }
 
-    deleteProfile(id: string): Observable<{ deleted: string }> {
-        return this.http.delete<{ deleted: string }>(apiUrl(`/access/profiles/${encodeURIComponent(id)}`));
-    }
-
     /** The effective policies — authored rows tagged `source:authored`, plus the engine's seed
      *  policies tagged `source:seed` (Enterprise only). */
     policies(): Observable<PoliciesDoc> {
