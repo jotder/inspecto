@@ -30,10 +30,11 @@ class SpaceManagerTest {
     }
 
     /**
-     * PATH-2 tier 3: the allowed safety roots are the union of the operator-declared property and every
-     * hosted space base, so a space minted at runtime never needs `assist.safety.roots` extended by hand.
-     * Asserted on the registry content, not on a containment verdict — surefire's reactor-wide roots
-     * already cover every {@code @TempDir}, so a jail-based assertion here would pass vacuously.
+     * PATH-2 tier 3: a Space's allowed safety roots are the operator-declared property plus <b>its own</b>
+     * base, so a space minted at runtime never needs `assist.safety.roots` extended by hand — and, since
+     * {@code CROSS-SPACE-JAIL-1}, never gains another Space's base. Asserted on the registry content, not
+     * on a containment verdict — surefire's reactor-wide roots already cover every {@code @TempDir}, so a
+     * jail-based assertion here would pass vacuously.
      */
     @Test
     void spaceLifecycleDerivesTheAllowedRoots(@TempDir Path root) throws Exception {
@@ -42,19 +43,49 @@ class SpaceManagerTest {
             Files.createDirectories(root.resolve("seeded").resolve("config"));
             try (SpaceManager mgr = SpaceManager.discover(root)) {
                 Path seeded = root.resolve("seeded").toAbsolutePath().normalize();
-                assertTrue(allowedRoots().contains(seeded), "a discovered space base is an allowed root");
+                assertTrue(allowedRoots("seeded").contains(seeded), "a discovered space base is its own allowed root");
 
                 mgr.create(SpaceId.of("acme"), null, null);
                 Path acme = root.resolve("acme").toAbsolutePath().normalize();
-                assertTrue(allowedRoots().contains(acme),
-                        "a space created at runtime extends the roots immediately, no restart");
+                assertTrue(allowedRoots("acme").contains(acme),
+                        "a space created at runtime extends its roots immediately, no restart");
+                assertFalse(allowedRoots("seeded").contains(acme), "one Space never gains another's base");
+                assertFalse(allowedRoots("acme").contains(seeded), "one Space never gains another's base");
 
                 assertTrue(mgr.delete(SpaceId.of("acme"), true));
-                assertFalse(allowedRoots().contains(acme), "a deleted space leaves the union");
-                assertTrue(allowedRoots().contains(seeded), "deleting one space must not evict another's root");
+                assertFalse(allowedRoots("acme").contains(acme), "a deleted space's base leaves with it");
+                assertTrue(allowedRoots("seeded").contains(seeded), "deleting one space must not evict another's root");
             }
         } finally {
             com.gamma.config.safety.DiscoveredRoots.clear();   // process-global — never leak into other tests
+        }
+    }
+
+    /**
+     * {@code CROSS-SPACE-JAIL-1}: once a Space's roots are its own base (not the union), loading a named
+     * Space must run AS that Space — its pipelines' {@code schema_file} refs meet the jail at boot, and an
+     * unbound boot thread is the {@code default} Space, whose roots do not include {@code acme}. The
+     * operator roots here hold neither Space, so only the boot binding can make the ref loadable.
+     */
+    @Test
+    void aNamedSpacesOwnSchemaRefLoadsAtBootUnderNarrowedRoots(@TempDir Path root, @TempDir Path operator)
+            throws Exception {
+        String saved = System.getProperty("assist.safety.roots");
+        com.gamma.config.safety.DiscoveredRoots.clear();
+        try {
+            com.gamma.etl.PipelineConfigBatchTest.writePipeline(
+                    Files.createDirectories(root.resolve("acme").resolve("config")), "");
+            System.setProperty("assist.safety.roots", operator.toString());
+            try (SpaceManager mgr = SpaceManager.discover(root)) {
+                SpaceContext acme = mgr.space(SpaceId.of("acme")).orElseThrow(
+                        () -> new AssertionError("acme failed to boot"));
+                assertEquals(1, acme.service().pipelines().size(),
+                        "acme's own pipeline (schema beside its config) must load at boot");
+            }
+        } finally {
+            if (saved == null) System.clearProperty("assist.safety.roots");
+            else System.setProperty("assist.safety.roots", saved);
+            com.gamma.config.safety.DiscoveredRoots.clear();
         }
     }
 
@@ -71,6 +102,10 @@ class SpaceManagerTest {
 
     private static List<Path> allowedRoots() {
         return com.gamma.config.safety.SafetyPolicy.defaultPolicy().allowedRoots();
+    }
+
+    private static List<Path> allowedRoots(String spaceId) {
+        return com.gamma.config.safety.SafetyPolicy.forSpace(spaceId).allowedRoots();
     }
 
     @Test

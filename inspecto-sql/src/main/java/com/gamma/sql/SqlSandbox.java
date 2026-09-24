@@ -4,9 +4,11 @@ import com.gamma.util.DuckDbUtil;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.List;
 
 /**
  * A hardened, ephemeral DuckDB connection used to <em>validate</em> agent-generated SQL — the
@@ -74,8 +76,7 @@ public final class SqlSandbox implements AutoCloseable {
         }
         try (Statement st = conn.createStatement()) {
             // Block extension escalation up front; these are immutable once configuration is locked.
-            st.execute("SET autoinstall_known_extensions=false");
-            st.execute("SET autoload_known_extensions=false");
+            disableExtensionAutoload(conn);
             st.execute("SET memory_limit='" + sanitizeMemory(p.memoryLimit()) + "'");
             st.execute("SET threads=" + p.maxThreads());
         } catch (SQLException e) {
@@ -92,11 +93,46 @@ public final class SqlSandbox implements AutoCloseable {
      */
     public void seal() throws SQLException {
         if (sealed) return;
+        sealAllowing(conn, List.of());
+        sealed = true;
+    }
+
+    /**
+     * The extension half of the lockdown, for a caller that owns its own connection (a batch job whose
+     * work does not fit this sandbox's interactive memory/timeout caps): nothing is auto-installed or
+     * auto-loaded, so a function or URL scheme that needs an extension ({@code read_csv('http://…')} →
+     * httpfs) fails instead of pulling it in. Call <em>before</em> any trusted registration.
+     */
+    public static void disableExtensionAutoload(Connection conn) throws SQLException {
         try (Statement st = conn.createStatement()) {
+            st.execute("SET autoinstall_known_extensions=false");
+            st.execute("SET autoload_known_extensions=false");
+        }
+    }
+
+    /**
+     * The seal, for a caller-owned connection whose untrusted SQL must still reach specific directories
+     * ({@code SQL-TEMPLATE-SANDBOX-1}): {@code allowed_directories} is set to {@code dirs} — each an
+     * absolute, normalised prefix with a trailing {@code /}, so {@code /data} does not also admit
+     * {@code /data-other} — then external access is denied and the configuration locked. Everything
+     * outside {@code dirs} (other files, every URL, an {@code ATTACH} elsewhere) is refused by DuckDB
+     * itself, whatever a lexical guard missed. An empty list is exactly {@link #seal()}.
+     */
+    public static void sealAllowing(Connection conn, List<Path> dirs) throws SQLException {
+        try (Statement st = conn.createStatement()) {
+            if (!dirs.isEmpty()) {
+                StringBuilder list = new StringBuilder("[");
+                for (Path d : dirs) {
+                    String dir = d.toAbsolutePath().normalize().toString().replace('\\', '/');
+                    if (!dir.endsWith("/")) dir += "/";
+                    if (list.length() > 1) list.append(", ");
+                    list.append('\'').append(dir.replace("'", "''")).append('\'');
+                }
+                st.execute("SET allowed_directories=" + list.append(']'));
+            }
             st.execute("SET enable_external_access=false");
             st.execute("SET lock_configuration=true");
         }
-        sealed = true;
     }
 
     /** The underlying connection. Caller must not close it directly — use {@link #close()}. */

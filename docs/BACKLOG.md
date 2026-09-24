@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **41<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
+> **42<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 24<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 54 on 2026-09-24**: P2 `STREAM-CONSUMER-1` closed — Option A built, the `SP-ACQ-09` note updated, the plan distilled into `okf/capabilities/acquisition/acquisition.md` and archived.
 > ⬇ 55 → 54 on 2026-09-24: P3 `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` closed — its work had shipped in `d5f6353be`
@@ -24,9 +24,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 23<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 24<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 18<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 41<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 42<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -224,6 +224,7 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 - **P2** · **Security: policy-authoring UX** — trigger FIRED 2026-09-15: an install had hand-edited policy TOON go wrong. A matrix/create editor beyond hand-authored TOON. The read-only Policies tab and the "why denied?" endpoint already make the mistake diagnosable, so the build is about **preventing** the error — extend those surfaces rather than duplicate them. **Design: [`superpower/policy-authoring-ux-design.md`](superpower/policy-authoring-ux-design.md)** (9 operator decisions owed). → `okf/backend/editions/auth-security.md`
 - **P3** · `DUCKLE-C6-POLICY-NARROWING-1` — **a workspace policy that can only NARROW.** Denies union, allowlists intersect, permissions AND; `mode` comes from the server file only; enforced **at plan time AND at the point of the act** (network: every hop plus DuckDB itself; state mutation: every watermark/offset advance); prefixes match at a path boundary, not as strings; a named policy file that cannot be read refuses the run. Parts exist (`PathJail`, `ConfigSafetyValidator`, `DataRef`); the structural narrowing and the unreadable-policy refusal do not. The prefix-boundary rule is the exact defect corrected in scale-out phase C §5.4. → **Design:** [`superpower/policy-narrowing-design.md`](superpower/policy-narrowing-design.md) (DESIGN ONLY 2026-09-24, 16 decisions owed).
+- **P2** · `SQLGUARD-PARQUET-METADATA-1` — **`SqlGuard` passes `parquet_metadata('<any file>')`** (and very likely `parquet_schema`/`parquet_file_metadata`/`parquet_kv_metadata`): not `read_*`/`*_scan`, and `FROM parquet_metadata(` is not path-like. It returns a file's schema, row counts and min/max statistics. Found 2026-09-24 as the seal-only probe of `SQL-TEMPLATE-SANDBOX-1` (`SqlTemplateJobSandboxTest.aFileFunctionTheGuardMissesIsStoppedByTheConnectionSeal`), where the sealed connection stops it; a caller that relies on `SqlGuard` **alone** on an unsealed connection (`QueryExecutor`'s documented posture) does not. Remedy is a guard-list change plus a sweep of the unsealed callers — grep `SqlGuard` for them, don't trust a list. → `okf/backend/editions/auth-security.md`
 
 Ongoing, not a row: the **compliance repo-side artifacts** — the customer verification runbook (G2 half), the
 CI-evidence doc, a recorded restore drill (G6 — `compliance/evidence/rto-rpo-statement.md` has operator-fill
