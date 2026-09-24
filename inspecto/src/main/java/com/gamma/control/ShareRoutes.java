@@ -54,15 +54,15 @@ final class ShareRoutes implements RouteModule {
     /** {@code POST /dashboards/{name}/share} — issue a link token for an existing dashboard. */
     private Object share(ApiContext api, String name, Map<String, Object> body) throws IOException {
         if (!ShareTokens.enabled())
-            throw new ApiException(503, "dashboard sharing is disabled; set -Dbi.share.secret (>= 16 chars) to enable");
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "dashboard sharing is disabled; set -Dbi.share.secret (>= 16 chars) to enable");
         ComponentStore store = store(api);
-        store.get("dashboard", name).orElseThrow(() -> new ApiException(404, "no dashboard '" + name + "'"));
+        store.get("dashboard", name).orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dashboard '" + name + "'"));
 
         long ttlHours = body.get("ttl_hours") instanceof Number n ? n.longValue() : DEFAULT_TTL_HOURS;
         ttlHours = Math.max(1, Math.min(MAX_TTL_HOURS, ttlHours));
         long exp = Instant.now().plusSeconds(ttlHours * 3600).getEpochSecond();
         String token = ShareTokens.issue("dashboard", name, exp)
-                .orElseThrow(() -> new ApiException(503, "sharing disabled"));
+                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "sharing disabled"));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("token", token);
         out.put("url", "/public/dashboards/" + token);
@@ -77,7 +77,7 @@ final class ShareRoutes implements RouteModule {
         ComponentStore store = store(api);
         Map<String, Object> dashboard = store.get("dashboard", scope.name())
                 .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, "not found"));   // deleted since sharing
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "not found"));   // deleted since sharing
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("dashboard", Map.of("id", scope.name(), "content", dashboard));
@@ -98,7 +98,7 @@ final class ShareRoutes implements RouteModule {
         ComponentStore store = store(api);
         Map<String, Object> dashboard = store.get("dashboard", scope.name())
                 .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, "not found"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "not found"));
 
         MeasureCompiler.Spec spec;
         String sql;
@@ -106,23 +106,23 @@ final class ShareRoutes implements RouteModule {
             spec = MeasureCompiler.parse(body, 500, 10_000);
             sql = MeasureCompiler.compile(spec);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         if (!allowedDatasets(store, dashboard).contains(spec.dataset()))
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "this share link does not cover dataset '" + spec.dataset() + "'");
 
         List<Finding> findings = SqlGuard.check(sql);
-        if (!findings.isEmpty()) throw new ApiException(422, "compiled query failed the SQL safety check");
+        if (!findings.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "compiled query failed the SQL safety check");
 
         Map<String, Object> dataset = store.get("dataset", spec.dataset())
                 .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, "no dataset '" + spec.dataset() + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + spec.dataset() + "'"));
         String relationSql;
         try {
             relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(),
                     new ViewStore(api.writeRoot().resolve("views")));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         try {
             QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
@@ -133,7 +133,7 @@ final class ShareRoutes implements RouteModule {
             out.put("truncated", r.truncated());
             return out;
         } catch (SQLException e) {
-            throw new ApiException(422, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
@@ -184,7 +184,7 @@ final class ShareRoutes implements RouteModule {
     private static ShareTokens.Scope requireScope(String token) {
         return ShareTokens.verify(token)
                 .filter(s -> "dashboard".equals(s.type()))
-                .orElseThrow(() -> new ApiException(404, "not found"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "not found"));
     }
 
     private static ComponentStore store(ApiContext api) throws IOException {

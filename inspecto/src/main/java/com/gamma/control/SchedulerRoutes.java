@@ -217,7 +217,7 @@ final class SchedulerRoutes implements RouteModule {
         requireBoundWriteRoot(api);
         Path doc = systemDocPath(api);
         if (doc == null)
-            throw new ApiException(503, "No home for the server-wide scheduler document "
+            throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY, "No home for the server-wide scheduler document "
                     + "(-Dsystem.config.dir, spaces root and write root all unset)");
         // Merge per key with the stored document — the cap included: absent = preserve stored,
         // explicit null = clear (revert to the -D bootstrap default, live), stated = gated. A save
@@ -309,7 +309,7 @@ final class SchedulerRoutes implements RouteModule {
         if (raw == null || raw.toString().isBlank()) return null;
         String v = raw.toString().trim();
         if (!MEMORY_LIMIT.matcher(v).matches())
-            throw new ApiException(422, "duckdbMemoryLimit must be a DuckDB size string (e.g. 2GB) "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "duckdbMemoryLimit must be a DuckDB size string (e.g. 2GB) "
                     + "or a percentage of host RAM in 1..100% (e.g. 80%)");
         return v;
     }
@@ -398,10 +398,10 @@ final class SchedulerRoutes implements RouteModule {
         try {
             v = Integer.parseInt(String.valueOf(raw).trim());
         } catch (NumberFormatException e) {
-            throw new ApiException(422, key + " must be an integer, got '" + raw + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, key + " must be an integer, got '" + raw + "'");
         }
         if (v < floor || v > 10_000_000)
-            throw new ApiException(422, key + " must be " + floor + "..10000000, got " + v);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, key + " must be " + floor + "..10000000, got " + v);
         return v;
     }
 
@@ -415,21 +415,21 @@ final class SchedulerRoutes implements RouteModule {
         Object raw = body.get("pools");
         if (raw == null) return null;
         if (!(raw instanceof Map<?, ?> m))
-            throw new ApiException(422, "pools must be an object of pool name -> cap");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pools must be an object of pool name -> cap");
         Map<String, Integer> out = new LinkedHashMap<>();
         for (Map.Entry<?, ?> e : m.entrySet()) {
             String name = String.valueOf(e.getKey());
             if (!ConcurrencyBroker.POOL_NAME.matcher(name).matches())
-                throw new ApiException(422, "pool name '" + name + "' must be a lowercase identifier "
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pool name '" + name + "' must be a lowercase identifier "
                         + "(letters, digits, '_'; at most 64 chars)");
             int cap;
             try {
                 cap = Integer.parseInt(String.valueOf(e.getValue()).trim());
             } catch (NumberFormatException nfe) {
-                throw new ApiException(422, "pool '" + name + "' cap must be an integer, got '" + e.getValue() + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pool '" + name + "' cap must be an integer, got '" + e.getValue() + "'");
             }
             if (cap < 0 || cap > MAX_CAP)
-                throw new ApiException(422, "pool '" + name + "' cap must be 0.." + MAX_CAP + ", got " + cap);
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pool '" + name + "' cap must be 0.." + MAX_CAP + ", got " + cap);
             out.put(name, cap);
         }
         return out.isEmpty() ? null : out;
@@ -443,7 +443,7 @@ final class SchedulerRoutes implements RouteModule {
         String s = String.valueOf(raw).trim();
         if ("true".equalsIgnoreCase(s)) return Boolean.TRUE;
         if ("false".equalsIgnoreCase(s)) return Boolean.FALSE;
-        throw new ApiException(422, key + " must be true or false, got '" + raw + "'");
+        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, key + " must be true or false, got '" + raw + "'");
     }
 
     /** The server-wide document home: {@code -Dsystem.config.dir} → spaces container root → sole
@@ -529,10 +529,10 @@ final class SchedulerRoutes implements RouteModule {
         try {
             v = Integer.parseInt(String.valueOf(raw).trim());
         } catch (NumberFormatException e) {
-            throw new ApiException(422, key + " must be an integer number of seconds, got '" + raw + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, key + " must be an integer number of seconds, got '" + raw + "'");
         }
         if (v < 1 || v > 86_400)
-            throw new ApiException(422, key + " must be 1..86400 seconds, got " + v);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, key + " must be 1..86400 seconds, got " + v);
         return v;
     }
 
@@ -566,10 +566,10 @@ final class SchedulerRoutes implements RouteModule {
         try {
             cap = Integer.parseInt(String.valueOf(raw).trim());
         } catch (NumberFormatException e) {
-            throw new ApiException(422, "maxConcurrentConsignments must be an integer, got '" + raw + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "maxConcurrentConsignments must be an integer, got '" + raw + "'");
         }
         if (cap < 0 || cap > MAX_CAP)
-            throw new ApiException(422, "maxConcurrentConsignments must be 0.." + MAX_CAP + ", got " + cap);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "maxConcurrentConsignments must be 0.." + MAX_CAP + ", got " + cap);
         return cap;
     }
 }

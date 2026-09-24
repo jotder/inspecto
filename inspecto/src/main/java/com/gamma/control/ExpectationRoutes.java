@@ -117,7 +117,7 @@ final class ExpectationRoutes implements RouteModule {
         census(body);
         Expectation exp = parse(body);
         if (RouteErrors.exists(store, TYPE, exp.name()))
-            throw new ApiException(409, "expectation '" + exp.name() + "' already exists (use PUT to update)");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "expectation '" + exp.name() + "' already exists (use PUT to update)");
         long now = System.currentTimeMillis();
         Map<String, Object> content = exp.toMap();
         content.put("lastResult", null);
@@ -200,9 +200,9 @@ final class ExpectationRoutes implements RouteModule {
                     ? evaluateBaseline(api, exp, recorded, baselineDetail)
                     : ExpectationEvaluator.evaluate(exp, api.dataRoot());
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException sql) {
-            throw new ApiException(422, "expectation evaluation failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "expectation evaluation failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
         }
 
         Map<String, Object> lastResult = new LinkedHashMap<>();
@@ -243,7 +243,7 @@ final class ExpectationRoutes implements RouteModule {
             return new ExpectationEvaluator.Result(status, cmp.violations(), now);
         } catch (IOException store) {
             // Fail closed: an unreadable durable history yields no verdict — never one against "no baseline".
-            throw new ApiException(503, "baseline evaluation unavailable: " + store.getMessage());
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "baseline evaluation unavailable: " + store.getMessage());
         }
     }
 
@@ -262,11 +262,11 @@ final class ExpectationRoutes implements RouteModule {
             return baselines(api).accept(exp.name(), id == null ? null : String.valueOf(id).trim(),
                     ApiContext.actor(e), exp.baseline().window());
         } catch (java.util.NoSuchElementException missing) {
-            throw new ApiException(404, missing.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, missing.getMessage());
         } catch (IllegalStateException already) {
-            throw new ApiException(409, already.getMessage());
+            throw new ApiException(409, ErrorCodes.CONFLICT, already.getMessage());
         } catch (IOException store) {
-            throw new ApiException(503, "baseline store unavailable: " + store.getMessage());
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "baseline store unavailable: " + store.getMessage());
         }
     }
 
@@ -277,14 +277,14 @@ final class ExpectationRoutes implements RouteModule {
         try {
             return baselines(api).clear(exp.name(), ApiContext.actor(e));
         } catch (IOException store) {
-            throw new ApiException(503, "baseline store unavailable: " + store.getMessage());
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "baseline store unavailable: " + store.getMessage());
         }
     }
 
     private Expectation baselineExpectation(ApiContext api, String name) {
         Expectation exp = parse(RouteErrors.existing(store(api), TYPE, "expectation", name));
         if (!"baseline".equals(exp.kind()))
-            throw new ApiException(422, "expectation '" + name + "' is kind '" + exp.kind()
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "expectation '" + name + "' is kind '" + exp.kind()
                     + "' — only a baseline expectation has a baseline to accept or clear");
         return exp;
     }
@@ -378,7 +378,7 @@ final class ExpectationRoutes implements RouteModule {
         try {
             ComponentRoutes.refuseUnknownComponentKeys(TYPE, body);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
@@ -386,7 +386,7 @@ final class ExpectationRoutes implements RouteModule {
         try {
             return Expectation.fromMap(body);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
@@ -395,7 +395,7 @@ final class ExpectationRoutes implements RouteModule {
             ComponentRegistry.Component c = store.write(TYPE, name, content);
             return c.content();
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 }

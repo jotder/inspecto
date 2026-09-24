@@ -81,17 +81,17 @@ final class PipelineRenameRoutes implements RouteModule {
             throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
         Path srcPath = api.service().pathFor(source)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + source + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + source + "'"));
         WriteGates.jail(writeRoot, srcPath, "config path");
         PipelineConfig live = api.service().configFor(source)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + source + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + source + "'"));
 
         String rawId = ApiContext.str(body, "newId");
         if (rawId == null || rawId.isBlank())
-            throw new ApiException(400, "body must include 'newId'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'newId'");
         String newId = rawId.trim().toLowerCase();
         if (!newId.matches("[a-z0-9][a-z0-9_]*"))
-            throw new ApiException(422, "newId '" + newId
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "newId '" + newId
                     + "' must match [a-z0-9][a-z0-9_]* (lowercase letters, digits and underscores)");
 
         String oldId = live.identity().pipelineName();
@@ -106,7 +106,7 @@ final class PipelineRenameRoutes implements RouteModule {
         WriteGates.conflictIf(Files.exists(newPath), "file exists: " + newFileName);
 
         if (Boolean.parseBoolean(String.valueOf(body.getOrDefault("relocateDirs", "false"))))
-            throw new ApiException(422, "relocateDirs is not yet supported — rename leaves dirs.* pointing "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "relocateDirs is not yet supported — rename leaves dirs.* pointing "
                     + "where they already do (plan §1.1); relocate the data tree manually if that's needed");
         boolean rewriteDependents = !"false".equalsIgnoreCase(
                 String.valueOf(body.getOrDefault("rewriteDependents", "true")));
@@ -193,7 +193,7 @@ final class PipelineRenameRoutes implements RouteModule {
             // (named in `journal`) stays moved; this is the plan's documented residual risk, not a bug.
             if (Files.exists(srcPath)) api.service().registerPipeline(srcPath);
             log.warn("[PIPELINE-RENAME] '{}' -> '{}' failed after {}", oldId, newId, journal, ex);
-            throw new ApiException(500, "rename of '" + oldId + "' to '" + newId + "' failed after "
+            throw new ApiException(500, ErrorCodes.INTERNAL, "rename of '" + oldId + "' to '" + newId + "' failed after "
                     + journal.size() + " step(s) — see server log / rename.journal for detail: " + ex.getMessage());
         }
     }
@@ -264,10 +264,10 @@ final class PipelineRenameRoutes implements RouteModule {
                 .filter(p -> selNew == null || selNew.isBlank() || p.newId().equals(selNew.trim().toLowerCase()))
                 .toList();
         if (pending.isEmpty())
-            throw new ApiException(404, "no incomplete rename found in rename.journal"
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no incomplete rename found in rename.journal"
                     + (selOld != null || selNew != null ? " matching the given oldId/newId" : ""));
         if (pending.size() > 1)
-            throw new ApiException(409, "several incomplete renames — specify {oldId, newId}: "
+            throw new ApiException(409, ErrorCodes.CONFLICT, "several incomplete renames — specify {oldId, newId}: "
                     + pending.stream().map(p -> p.oldId() + " -> " + p.newId()).toList());
         PendingRename p = pending.get(0);
         String oldId = p.oldId(), newId = p.newId();
@@ -278,7 +278,7 @@ final class PipelineRenameRoutes implements RouteModule {
         boolean srcExists = Files.exists(srcPath);
         boolean newExists = Files.exists(newPath);
         if (!srcExists && !newExists)
-            throw new ApiException(409, "cannot resume '" + oldId + "' -> '" + newId + "': neither "
+            throw new ApiException(409, ErrorCodes.CONFLICT, "cannot resume '" + oldId + "' -> '" + newId + "': neither "
                     + p.srcFileName() + " nor " + newFileName + " exists — manual reconciliation needed");
 
         // Fail-closed identity checks before touching anything: each surviving file must still be the
@@ -286,14 +286,14 @@ final class PipelineRenameRoutes implements RouteModule {
         if (newExists) {
             Map<String, Object> chk = ConfigLoader.filesystem().decode(newPath.toString());
             if (!newId.equals(chk.get("id")))
-                throw new ApiException(409, newFileName + " exists but is not this rename's product "
+                throw new ApiException(409, ErrorCodes.CONFLICT, newFileName + " exists but is not this rename's product "
                         + "(id: " + chk.get("id") + ") — manual reconciliation needed");
         }
         PipelineConfig srcCfg = null;
         if (srcExists) {
             srcCfg = PipelineConfig.load(srcPath.toString());
             if (!oldId.equals(srcCfg.identity().pipelineName()))
-                throw new ApiException(409, p.srcFileName() + " no longer carries id '" + oldId
+                throw new ApiException(409, ErrorCodes.CONFLICT, p.srcFileName() + " no longer carries id '" + oldId
                         + "' (now '" + srcCfg.identity().pipelineName() + "') — manual reconciliation needed");
             // The failed attempt's recovery re-registers the source, and it may have been reactivated or
             // started since — the same lifecycle gates a fresh rename runs.
@@ -305,7 +305,7 @@ final class PipelineRenameRoutes implements RouteModule {
         Optional<Path> registeredNew = api.service().pathFor(newId);
         if (registeredNew.isPresent()
                 && !registeredNew.get().toAbsolutePath().normalize().equals(newPath.toAbsolutePath().normalize()))
-            throw new ApiException(409, "pipeline id '" + newId + "' is registered to a different config ("
+            throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline id '" + newId + "' is registered to a different config ("
                     + registeredNew.get().getFileName() + ") — manual reconciliation needed");
 
         List<String> journal = new ArrayList<>();
@@ -382,7 +382,7 @@ final class PipelineRenameRoutes implements RouteModule {
             // bracket stays open, so the NEXT resume picks up from here.
             if (Files.exists(srcPath)) api.service().registerPipeline(srcPath);
             log.warn("[PIPELINE-RENAME] resume '{}' -> '{}' failed after {}", oldId, newId, journal, ex);
-            throw new ApiException(500, "resume of '" + oldId + "' to '" + newId + "' failed after "
+            throw new ApiException(500, ErrorCodes.INTERNAL, "resume of '" + oldId + "' to '" + newId + "' failed after "
                     + journal.size() + " step(s) — see server log / rename.journal for detail: " + ex.getMessage());
         }
     }

@@ -171,7 +171,11 @@ against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` �
 `CONFIG_VALIDATION_FAILED` · `INTERNAL` · `CONTROL_PLANE_READ_ONLY` · `CAPABILITY_UNAVAILABLE` ·
 `UNAUTHENTICATED` · `PERMISSION_DENIED` · `RATE_LIMITED` (429) · `NOT_SUPPORTED` (501) ·
 `PAYLOAD_TOO_LARGE` (413). `defaultFor(status)` maps a bare status to a code (`:36-50`).
-**353 of 874** `new ApiException(` sites under `*/src/main` still take that default (2026-09-25, after the
+**255 of 874** `new ApiException(` sites under `*/src/main` still take that default (2026-09-25, after the
+`SpaceRoutes` / `SchedulerRoutes` / `Roles` / `PipelineRenameRoutes` / `ExpectationRoutes` / `AccessPolicies` /
+`ShareRoutes` / `NotificationRoutes` slice — 98 sites, all the status default but one: `SchedulerRoutes`'
+"no home for the server-wide scheduler document" 503 is `CONTROL_PLANE_READ_ONLY`, which gate 1
+(`requireBoundWriteRoot`) makes unreachable over HTTP, so no observable wire change; the
 `ConnectionRoutes` / `ConfigPreviewRoutes` / `PipelineBundleRoutes` / `DbBrowserRoutes` / `AccessRoutes` +
 `inspecto-ops` `TagRoutes` slice of `ERRORCODE-DEFAULTED-1` — 108 sites, every one the status default, so
 no wire change; the `ReconRoutes` / `AgentRoutes` / `JobRoutes` / `RunRoutes` + `inspecto-geo-link` slice

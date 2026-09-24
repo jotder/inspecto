@@ -256,15 +256,15 @@ public final class Roles {
      *  both accepted) into name → {@link Def}. Throws {@link ApiException} 422 on any violation. */
     static Map<String, Def> validate(Object rolesObj) {
         if (!(rolesObj instanceof List<?> raw))
-            throw new ApiException(422, "role settings require a 'roles' list");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "role settings require a 'roles' list");
         if (raw.size() > MAX_ROLES)
-            throw new ApiException(422, "too many roles (max " + MAX_ROLES + ")");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "too many roles (max " + MAX_ROLES + ")");
         Map<String, Def> out = new LinkedHashMap<>();
         for (Object o : raw) {
             if (!(o instanceof Map<?, ?> role))
-                throw new ApiException(422, "every role must be an object {name, capabilities, dataScopes?}");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every role must be an object {name, capabilities, dataScopes?}");
             String name = WriteGates.safeName(trimOrEmpty(role.get("name")).toLowerCase(Locale.ROOT), "role name");
-            if (out.containsKey(name)) throw new ApiException(422, "duplicate role '" + name + "'");
+            if (out.containsKey(name)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "duplicate role '" + name + "'");
             out.put(name, new Def(capabilities(name, role.get("capabilities")),
                     dataScopes(name, role.containsKey("dataScopes") ? role.get("dataScopes") : role.get("data_scopes"))));
         }
@@ -274,12 +274,12 @@ public final class Roles {
     private static Set<String> capabilities(String role, Object capsObj) {
         if (capsObj == null) return Set.of();
         if (!(capsObj instanceof List<?> caps))
-            throw new ApiException(422, "role '" + role + "': 'capabilities' must be a list");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "role '" + role + "': 'capabilities' must be a list");
         Set<String> out = new LinkedHashSet<>();
         for (Object c : caps) {
             String cap = trimOrEmpty(c);
             if (!KNOWN_CAPABILITIES.contains(cap))
-                throw new ApiException(422, "role '" + role + "': unknown capability '" + cap
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "role '" + role + "': unknown capability '" + cap
                         + "' (expected one of " + KNOWN_CAPABILITIES + ")");
             out.add(cap);
         }
@@ -291,18 +291,18 @@ public final class Roles {
     static List<String> attributeClaims(Object identityObj) {
         if (identityObj == null) return List.of();
         if (!(identityObj instanceof Map<?, ?> identity))
-            throw new ApiException(422, "'identity' must be an object {attributeClaims: [claim, ...]}");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'identity' must be an object {attributeClaims: [claim, ...]}");
         Object claimsObj = identity.get("attributeClaims");
         if (claimsObj == null) claimsObj = identity.get("attribute_claims");
         if (claimsObj == null) return List.of();
         if (!(claimsObj instanceof List<?> claims))
-            throw new ApiException(422, "'identity.attributeClaims' must be a list of claim names");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'identity.attributeClaims' must be a list of claim names");
         if (claims.size() > MAX_ATTRIBUTE_CLAIMS)
-            throw new ApiException(422, "too many attributeClaims (max " + MAX_ATTRIBUTE_CLAIMS + ")");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "too many attributeClaims (max " + MAX_ATTRIBUTE_CLAIMS + ")");
         Set<String> out = new LinkedHashSet<>();
         for (Object c : claims) {
             String claim = trimOrEmpty(c);
-            if (claim.isBlank()) throw new ApiException(422, "blank attribute claim name");
+            if (claim.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "blank attribute claim name");
             out.add(claim);
         }
         return List.copyOf(out);
@@ -311,14 +311,14 @@ public final class Roles {
     private static Set<String> dataScopes(String role, Object scopesObj) {
         if (scopesObj == null) return null;   // key absent — the role contributes no scoping
         if (!(scopesObj instanceof List<?> scopes))
-            throw new ApiException(422, "role '" + role + "': 'dataScopes' must be a list");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "role '" + role + "': 'dataScopes' must be a list");
         if (scopes.size() > MAX_SCOPES)
-            throw new ApiException(422, "role '" + role + "': too many dataScopes (max " + MAX_SCOPES + ")");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "role '" + role + "': too many dataScopes (max " + MAX_SCOPES + ")");
         Set<String> out = new LinkedHashSet<>();
         for (Object s : scopes) {
             String scope = trimOrEmpty(s).toLowerCase(Locale.ROOT);
             if (scope.isBlank())
-                throw new ApiException(422, "role '" + role + "': blank data scope");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "role '" + role + "': blank data scope");
             out.add(scope);
         }
         return out;

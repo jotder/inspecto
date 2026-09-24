@@ -78,7 +78,7 @@ final class NotificationRoutes implements RouteModule {
         // lookahead; a literal path cannot otherwise outrank a parameterised one that was registered first.
         api.delete("/notifications/(?!suppressions$)([^/]+)", ApiContext.withCapability("canAdminister", (e, m) -> {
             if (!store(api).archive(ApiContext.name(m)))
-                throw new ApiException(404, "no notification '" + ApiContext.name(m) + "'");
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "no notification '" + ApiContext.name(m) + "'");
             return Map.of("id", ApiContext.name(m), "deleted", true);
         }));
     }
@@ -167,7 +167,7 @@ final class NotificationRoutes implements RouteModule {
     }
 
     private static Notification existing(ApiContext api, String id) {
-        return store(api).get(id).orElseThrow(() -> new ApiException(404, "no notification '" + id + "'"));
+        return store(api).get(id).orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no notification '" + id + "'"));
     }
 
     // ── channel destinations (admin CRUD; C4 — persisted as `channel` components per space) ─────────
@@ -187,7 +187,7 @@ final class NotificationRoutes implements RouteModule {
         ComponentStore store = channelStore(api);
         ChannelConfig ch = parse(body, System.currentTimeMillis());
         if (RouteErrors.exists(store, CHANNEL_TYPE, ch.id()))
-            throw new ApiException(409, "channel '" + ch.id() + "' already exists (use PUT to update)");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "channel '" + ch.id() + "' already exists (use PUT to update)");
         return write(store, ch.id(), ch.toMap());
     }
 
@@ -219,7 +219,7 @@ final class NotificationRoutes implements RouteModule {
         try {
             return ChannelConfig.fromMap(body, defaultCreatedAt);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
@@ -228,7 +228,7 @@ final class NotificationRoutes implements RouteModule {
         try {
             return store.write(CHANNEL_TYPE, id, content).content();
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
@@ -249,7 +249,7 @@ final class NotificationRoutes implements RouteModule {
         ComponentStore store = ruleStore(api);
         NotificationRule rule = parseRule(body);
         if (existsRule(store, rule.id()))
-            throw new ApiException(409, "rule '" + rule.id() + "' already exists (use PUT to update)");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "rule '" + rule.id() + "' already exists (use PUT to update)");
         return writeRule(store, rule.id(), rule.toMap());
     }
 
@@ -278,7 +278,7 @@ final class NotificationRoutes implements RouteModule {
         try {
             return NotificationRule.fromMap(body);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
@@ -286,16 +286,16 @@ final class NotificationRoutes implements RouteModule {
         try {
             return store.exists(RULE_TYPE, id);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
     private static Map<String, Object> existingRule(ComponentStore store, String id) {
         try {
             return store.get(RULE_TYPE, id).map(ComponentRegistry.Component::content)
-                    .orElseThrow(() -> new ApiException(404, "rule '" + id + "' not found"));
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "rule '" + id + "' not found"));
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
@@ -304,7 +304,7 @@ final class NotificationRoutes implements RouteModule {
         try {
             return store.write(RULE_TYPE, id, content).content();
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 

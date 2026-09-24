@@ -133,36 +133,36 @@ public final class AccessPolicies {
      *  including a {@code when} that does not parse ({@link Conditions} is the authoring gate). */
     static List<Policy> validate(Object policiesObj) {
         if (!(policiesObj instanceof List<?> raw))
-            throw new ApiException(422, "access policies require a 'policies' list");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "access policies require a 'policies' list");
         if (raw.size() > MAX_POLICIES)
-            throw new ApiException(422, "too many policies (max " + MAX_POLICIES + ")");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "too many policies (max " + MAX_POLICIES + ")");
         Set<String> seen = new LinkedHashSet<>();
         List<Policy> out = new java.util.ArrayList<>();
         for (Object o : raw) {
             if (!(o instanceof Map<?, ?> policy))
-                throw new ApiException(422, "every policy must be an object {name, effect, target?, when?}");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every policy must be an object {name, effect, target?, when?}");
             String name = WriteGates.safeName(trimOrEmpty(policy.get("name")).toLowerCase(Locale.ROOT), "policy name");
-            if (!seen.add(name)) throw new ApiException(422, "duplicate policy '" + name + "'");
+            if (!seen.add(name)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "duplicate policy '" + name + "'");
             String effect = trimOrEmpty(policy.get("effect"));
             if (!EFFECTS.contains(effect))
-                throw new ApiException(422, "policy '" + name + "': effect must be one of " + EFFECTS);
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + name + "': effect must be one of " + EFFECTS);
             Set<String> actions = Set.of();
             Set<String> resourceKinds = Set.of();
             Object targetObj = policy.get("target");
             if (targetObj != null) {
                 if (!(targetObj instanceof Map<?, ?> target))
-                    throw new ApiException(422, "policy '" + name + "': 'target' must be an object {actions?, resourceKinds?}");
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + name + "': 'target' must be an object {actions?, resourceKinds?}");
                 actions = targetValues(name, "actions", target.get("actions"));
                 for (String a : actions)
                     if (!ACTIONS.contains(a))
-                        throw new ApiException(422, "policy '" + name + "': unknown action '" + a
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + name + "': unknown action '" + a
                                 + "' (expected one of " + ACTIONS + ")");
                 resourceKinds = targetValues(name, "resourceKinds",
                         target.containsKey("resourceKinds") ? target.get("resourceKinds") : target.get("resource_kinds"));
             }
             String when = trimOrEmpty(policy.get("when"));
             if (when.length() > MAX_CONDITION_LENGTH)
-                throw new ApiException(422, "policy '" + name + "': 'when' is too long (max "
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + name + "': 'when' is too long (max "
                         + MAX_CONDITION_LENGTH + " chars)");
             Conditions.Condition condition;
             if (when.isBlank()) {
@@ -171,7 +171,7 @@ public final class AccessPolicies {
                 try {
                     condition = Conditions.parse(when);
                 } catch (IllegalArgumentException e) {
-                    throw new ApiException(422, "policy '" + name + "': " + e.getMessage());
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + name + "': " + e.getMessage());
                 }
             }
             out.add(new Policy(name, effect, actions, resourceKinds, when, condition));
@@ -182,13 +182,13 @@ public final class AccessPolicies {
     private static Set<String> targetValues(String policy, String field, Object valuesObj) {
         if (valuesObj == null) return Set.of();
         if (!(valuesObj instanceof List<?> values))
-            throw new ApiException(422, "policy '" + policy + "': '" + field + "' must be a list");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + policy + "': '" + field + "' must be a list");
         if (values.size() > MAX_TARGET_VALUES)
-            throw new ApiException(422, "policy '" + policy + "': too many " + field + " (max " + MAX_TARGET_VALUES + ")");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + policy + "': too many " + field + " (max " + MAX_TARGET_VALUES + ")");
         Set<String> out = new LinkedHashSet<>();
         for (Object v : values) {
             String value = trimOrEmpty(v).toLowerCase(Locale.ROOT);
-            if (value.isBlank()) throw new ApiException(422, "policy '" + policy + "': blank " + field + " entry");
+            if (value.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + policy + "': blank " + field + " entry");
             out.add(value);
         }
         return out;

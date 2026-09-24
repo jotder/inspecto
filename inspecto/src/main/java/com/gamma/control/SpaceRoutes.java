@@ -86,13 +86,13 @@ final class SpaceRoutes implements RouteModule {
         requireAdministerUnlessRecovering(api, e);
         String id = ApiContext.query(e, "id");
         if (id == null || !SpaceId.isValid(id))
-            throw new ApiException(400, "query param 'id' is required and must be a valid space id ([a-z0-9-], 1-63 chars)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "query param 'id' is required and must be a valid space id ([a-z0-9-], 1-63 chars)");
         try {
             return manifest(api.spaces().createFromBundle(SpaceId.of(id), e.getRequestBody().readAllBytes()));
         } catch (IllegalArgumentException badBundle) {   // not a bundle / invalid manifest / zip-slip
-            throw new ApiException(400, badBundle.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, badBundle.getMessage());
         } catch (IllegalStateException conflict) {       // id / directory already exists
-            throw new ApiException(409, conflict.getMessage());
+            throw new ApiException(409, ErrorCodes.CONFLICT, conflict.getMessage());
         }
     }
 
@@ -103,7 +103,7 @@ final class SpaceRoutes implements RouteModule {
         requireAdministerUnlessRecovering(api, e);
         String id = ApiContext.str(body, "id");
         if (id == null || !SpaceId.isValid(id))
-            throw new ApiException(400, "body must include a valid 'id' ([a-z0-9-], 1-63 chars, not starting with '-')");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include a valid 'id' ([a-z0-9-], 1-63 chars, not starting with '-')");
         String template = ApiContext.str(body, "template");
         try {
             SpaceContext ctx = template == null
@@ -113,20 +113,20 @@ final class SpaceRoutes implements RouteModule {
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), template);
             return manifest(ctx);
         } catch (IllegalArgumentException badTemplate) { // unknown template id
-            throw new ApiException(400, badTemplate.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, badTemplate.getMessage());
         } catch (IllegalStateException conflict) {   // already exists (single-mode was rejected above)
-            throw new ApiException(409, conflict.getMessage());
+            throw new ApiException(409, ErrorCodes.CONFLICT, conflict.getMessage());
         }
     }
 
     /** Rename / re-describe a space (its id/folder is immutable). The {@code default} space is not editable. */
     private Object updateSpace(ApiContext api, Map<String, Object> body, String id) throws IOException {
         requireMultiSpace(api);
-        if (!SpaceId.isValid(id)) throw new ApiException(400, "invalid space id '" + id + "'");
-        if ("default".equals(id)) throw new ApiException(400, "the default space cannot be edited");
+        if (!SpaceId.isValid(id)) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid space id '" + id + "'");
+        if ("default".equals(id)) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "the default space cannot be edited");
         SpaceContext ctx = api.spaces().update(SpaceId.of(id),
                 ApiContext.str(body, "display_name"), ApiContext.str(body, "description"));
-        if (ctx == null) throw new ApiException(404, "no such space '" + id + "'");
+        if (ctx == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
         return manifest(ctx);
     }
 
@@ -134,17 +134,17 @@ final class SpaceRoutes implements RouteModule {
      *  {@code 409} when it is the last space dir on disk (it would leave the server unbootable). */
     private Object deleteSpace(ApiContext api, HttpExchange e, String id) throws IOException {
         requireMultiSpace(api);
-        if (!SpaceId.isValid(id)) throw new ApiException(400, "invalid space id '" + id + "'");
+        if (!SpaceId.isValid(id)) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid space id '" + id + "'");
         boolean purge = "true".equalsIgnoreCase(ApiContext.query(e, "purge"));
         // Purging the last space DIRECTORY is irrecoverable over HTTP: its tree is the last copy, and main()
         // refuses to boot an empty -Dspaces.root (System.exit(1)), so the server could not be restarted back
         // into existence either. Deregister-only stays allowed — it leaves the files for re-discovery.
         if (purge && api.spaces().space(SpaceId.of(id)).isPresent() && api.spaces().isLastOnDisk(SpaceId.of(id)))
-            throw new ApiException(409, "refusing to purge '" + id + "' — it is the last space on disk and the "
+            throw new ApiException(409, ErrorCodes.CONFLICT, "refusing to purge '" + id + "' — it is the last space on disk and the "
                     + "server cannot boot from an empty spaces root; delete it without ?purge=true (the files stay "
                     + "for re-discovery), or create another space first");
         if (!api.spaces().delete(SpaceId.of(id), purge))
-            throw new ApiException(404, "no such space '" + id + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
         return Map.of("id", id, "deleted", true, "purged", purge);
     }
 
@@ -164,7 +164,7 @@ final class SpaceRoutes implements RouteModule {
     private static void requireMultiSpace(ApiContext api) {
 
         if (!api.spaces().supportsCrud())
-            throw new ApiException(409, "this server hosts a single space; launch with -Dspaces.root to manage many");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "this server hosts a single space; launch with -Dspaces.root to manage many");
     }
 
     /** The id + display metadata returned for a space. */
