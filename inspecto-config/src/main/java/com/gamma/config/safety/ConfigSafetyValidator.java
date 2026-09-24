@@ -211,6 +211,14 @@ public final class ConfigSafetyValidator {
         // key would leave the *preferred* spelling ungated.
         checkConfigRef(raw, "parsing.grammar", p, configDir, out);
         checkConfigRef(raw, "processing.grammar", p, configDir, out);
+        // The Decode Profile (parser-plugins trust design C1): a .toon satellite the loader resolves beside
+        // this config and jails (com.gamma.etl.DecodeProfile) — the name is checked before the path.
+        String profile = RawConfig.str(raw, "parsing.asn1.profile_file");
+        if (profile != null && !profile.isBlank()
+                && !profile.trim().toLowerCase(java.util.Locale.ROOT).endsWith(".toon"))
+            out.add(Finding.error("parsing.asn1.profile_file", "parsing.asn1.profile_file must name a Decode "
+                    + "Profile .toon file, got: " + profile.trim()));
+        else checkConfigRef(raw, "parsing.asn1.profile_file", p, configDir, out);
         // ⚠ `schema_file` is ALSO a column of the multi-schema table form
         // (`schemas[3]{column_count,file_pattern,schema_file,table}` — see
         // spaces/ucc/config/voucher/voucher_pipeline.toon). A scalar-only check misses every row of it.

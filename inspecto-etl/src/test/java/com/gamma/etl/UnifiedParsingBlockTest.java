@@ -274,6 +274,147 @@ class UnifiedParsingBlockTest {
         assertTrue(e.getMessage().contains("synthesizes its own plugin ingester"), e.getMessage());
     }
 
+    // ── asn1.profile_file — the Decode Profile (trust design slice C1, D5/D10) ──────────
+
+    /** One vendor's decode settings in {@code vendors/acme/acme.decode.toon}; its relative refs resolve
+     *  BESIDE THE PROFILE, never beside the Pipeline. */
+    private static Path writeProfile(Path dir, String body) throws Exception {
+        Path vendor = Files.createDirectories(dir.resolve("vendors/acme"));
+        Files.writeString(vendor.resolve("seg_a.toon"), SCHEMA, StandardCharsets.UTF_8);
+        Files.writeString(vendor.resolve("seg_b.toon"), SCHEMA, StandardCharsets.UTF_8);
+        Path profile = vendor.resolve("acme.decode.toon");
+        Files.writeString(profile, body, StandardCharsets.UTF_8);
+        return profile;
+    }
+
+    private static final String PROFILE = """
+            asn1:
+              grammar_file: acme.asn
+              root_type: CallEventRecord
+              strictness: DER
+              record_header_length: 4
+              segments:
+                moCallRecord: seg_a.toon
+                mtCallRecord: seg_b.toon
+            """;
+
+    @Test
+    void aProfileOnlyAsn1PipelineLoadsWithTheProfilesRefsResolvedBesideTheProfile(@TempDir Path dir)
+            throws Exception {
+        Path profile = writeProfile(dir, PROFILE);
+        PipelineConfig cfg = load(dir, "a1pf", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    profile_file: vendors/acme/acme.decode.toon
+                """);
+        assertEquals("com.gamma.ingester.Asn1RecordIngester", cfg.schemas().ingesterClass());
+        assertEquals(java.util.List.of("moCallRecord", "mtCallRecord"),
+                java.util.List.copyOf(cfg.schemas().segments().keySet()));
+        assertEquals(dir.resolve("vendors/acme/acme.asn").toAbsolutePath().normalize(),
+                cfg.schemas().ingesterGrammar(), "the profile's grammar_file resolves beside the PROFILE");
+        assertEquals("CallEventRecord", cfg.schemas().ingesterConfig().get("root_type"));
+        assertEquals("DER", cfg.schemas().ingesterConfig().get("strictness"));
+        assertEquals("4", String.valueOf(cfg.schemas().ingesterConfig().get("record_header_length")));
+        assertTrue(cfg.referencedFiles().contains(profile.toAbsolutePath().normalize()),
+                "the profile is a referenced file (reload + bundle closure): " + cfg.referencedFiles());
+        assertTrue(cfg.referencedFiles().contains(dir.resolve("vendors/acme/seg_a.toon").toAbsolutePath().normalize()),
+                "its segment schemas too: " + cfg.referencedFiles());
+    }
+
+    @Test
+    void aPipelineScalarWinsOverTheProfileKeyByKey(@TempDir Path dir) throws Exception {
+        writeProfile(dir, PROFILE);
+        PipelineConfig cfg = load(dir, "a1pw", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    profile_file: vendors/acme/acme.decode.toon
+                    strictness: BER
+                    max_value_bytes: 4096
+                """);
+        assertEquals("BER", cfg.schemas().ingesterConfig().get("strictness"), "the Pipeline's scalar wins");
+        assertEquals("4096", String.valueOf(cfg.schemas().ingesterConfig().get("max_value_bytes")));
+        assertEquals("CallEventRecord", cfg.schemas().ingesterConfig().get("root_type"), "unset keys come from the profile");
+        assertEquals("4", String.valueOf(cfg.schemas().ingesterConfig().get("record_header_length")));
+    }
+
+    /** D5: an override REPLACES {@code segments} whole — no key merge, so the record kinds a Pipeline
+     *  loads are readable off one file. The Pipeline's own segment ref resolves beside the Pipeline. */
+    @Test
+    void aPipelinesSegmentsReplaceTheProfilesWhole(@TempDir Path dir) throws Exception {
+        writeProfile(dir, PROFILE);
+        Files.writeString(dir.resolve("seg_sms.toon"), SCHEMA, StandardCharsets.UTF_8);
+        PipelineConfig cfg = load(dir, "a1ps", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    profile_file: vendors/acme/acme.decode.toon
+                    segments:
+                      moSMSRecord: seg_sms.toon
+                """);
+        assertEquals(java.util.Set.of("moSMSRecord"), cfg.schemas().segments().keySet(),
+                "replaced whole, never merged with moCallRecord/mtCallRecord");
+        assertTrue(cfg.referencedFiles().contains(dir.resolve("seg_sms.toon").toAbsolutePath().normalize()));
+        assertFalse(cfg.referencedFiles().contains(dir.resolve("vendors/acme/seg_a.toon").toAbsolutePath().normalize()),
+                "a replaced profile segment is not part of the closure");
+    }
+
+    /** Jailed BEFORE any existence/readability probe: an escaping ref is refused as an escape, never
+     *  reported "not readable" (which would leak whether a path outside the roots exists). */
+    @Test
+    void anEscapingProfileRefIsRefusedByTheJail(@TempDir Path dir) {
+        com.gamma.config.safety.PathJail.Escape e = assertThrows(com.gamma.config.safety.PathJail.Escape.class,
+                () -> load(dir, "a1pe", "", """
+                        parsing:
+                          frontend: asn1
+                          asn1:
+                            profile_file: ../../outside.decode.toon
+                        """));
+        assertTrue(e.getMessage().contains("asn1.profile_file"), e.getMessage());
+    }
+
+    /** The extension is checked first: the same valid profile under a {@code .txt} name is refused
+     *  before anything reads it (the {@code .toon} spelling of it loads — the test above). */
+    @Test
+    void aProfileRefThatIsNotAToonFileIsRefusedBeforeAnyRead(@TempDir Path dir) throws Exception {
+        Path profile = writeProfile(dir, PROFILE);
+        Files.copy(profile, profile.resolveSibling("acme.decode.txt"));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> load(dir, "a1pt", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    profile_file: vendors/acme/acme.decode.txt
+                """));
+        assertTrue(e.getMessage().contains(".toon"), e.getMessage());
+    }
+
+    @Test
+    void aProfileNamingAnotherProfileIsRefused(@TempDir Path dir) throws Exception {
+        writeProfile(dir, PROFILE.replace("asn1:\n", "asn1:\n  profile_file: other.decode.toon\n"));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> load(dir, "a1pn", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    profile_file: vendors/acme/acme.decode.toon
+                """));
+        assertTrue(e.getMessage().contains("nest"), e.getMessage());
+    }
+
+    /** A Decode Profile holds the one {@code asn1:} block; anything else beside it would be silently
+     *  ignored, so it is refused. */
+    @Test
+    void aProfileWithAnythingButAnAsn1BlockIsRefused(@TempDir Path dir) throws Exception {
+        writeProfile(dir, PROFILE + "processing:\n  threads: 4\n");
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> load(dir, "a1pk", "", """
+                parsing:
+                  frontend: asn1
+                  asn1:
+                    profile_file: vendors/acme/acme.decode.toon
+                """));
+        assertTrue(e.getMessage().contains("processing"), e.getMessage());
+    }
+
     @Test
     void unknownFrontendInCsvSettingsAlsoRejected(@TempDir Path dir) {
         Exception e = assertThrows(IllegalArgumentException.class,

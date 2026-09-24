@@ -346,6 +346,31 @@ class ConfigSafetyValidatorTest {
     }
 
     /**
+     * Decode Profile (parser-plugins trust design slice C1): {@code parsing.asn1.profile_file} is a config
+     * ref the loader resolves beside the Pipeline and jails, so the 422 write gate refuses what the load
+     * would — an escaping ref, and a ref that names no {@code .toon} file. The probe: a sibling
+     * {@code .toon} under the root draws no finding.
+     */
+    @Test
+    void aDecodeProfileRefIsJailedAndMustNameAToonFile(@TempDir Path root) {
+        String evil = Path.of("/etc/evil.decode.toon").toAbsolutePath().toString();
+        assertTrue(hasError(ConfigSafetyValidator.check("pipeline", withAsn1Profile(root, evil),
+                SafetyPolicy.withRoots(root), root), "parsing.asn1.profile_file"), "an escaping profile is refused");
+        assertTrue(hasError(ConfigSafetyValidator.check("pipeline", withAsn1Profile(root, "acme.decode.txt"),
+                SafetyPolicy.withRoots(root), root), "parsing.asn1.profile_file"), "a non-.toon profile is refused");
+        List<Finding> ok = ConfigSafetyValidator.check("pipeline", withAsn1Profile(root, "acme.decode.toon"),
+                SafetyPolicy.withRoots(root), root);
+        assertFalse(hasError(ok, "parsing.asn1.profile_file"), "a sibling .toon profile passes: " + ok);
+    }
+
+    private static Map<String, Object> withAsn1Profile(Path root, String ref) {
+        Map<String, Object> raw = pipeline(safeDirs(root));
+        raw.put("parsing", new LinkedHashMap<>(Map.of("frontend", "asn1",
+                "asn1", new LinkedHashMap<>(Map.of("profile_file", ref)))));
+        return raw;
+    }
+
+    /**
      * ⚠ A registry reference is an <b>id</b>, not a path. Jailing it resolves {@code grammar/<id>}
      * against the working directory and reports an escape whenever the roots are not the CWD — which
      * refused a valid config at the 422 gate until {@code checkConfigRef} learned the difference.

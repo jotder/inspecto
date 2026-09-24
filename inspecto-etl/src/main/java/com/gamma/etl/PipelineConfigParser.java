@@ -1176,7 +1176,7 @@ final class PipelineConfigParser {
             if (pluginBlock != null || proc.get("ingester") != null)
                 throw new IllegalArgumentException("frontend 'asn1' synthesizes its own plugin ingester — "
                         + "remove parsing.plugin / processing.ingester, or use frontend 'plugin'");
-            pluginBlock = asn1PluginBlock(csv);
+            pluginBlock = asn1PluginBlock(csv, configDir, b);
         }
         b.ingesterClass = pluginBlock != null && pluginBlock.get("ingester") != null
                 ? (String) pluginBlock.get("ingester") : (String) proc.get("ingester");
@@ -1854,13 +1854,20 @@ final class PipelineConfigParser {
      * which the preview uses too. Hard-fails
      * (draft rejected before any run) on a missing block, no grammar of either spelling, empty root_type, or missing
      * segments — the tailored messages here, not the generic plugin ones.
+     *
+     * <p>A {@code asn1.profile_file} (the Decode Profile, {@link DecodeProfile}) is overlaid FIRST, so a
+     * profile-backed Pipeline passes these same refusals with no second validator; the profile file joins
+     * {@code referencedFiles} (reload trigger + bundle closure).
      */
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> asn1PluginBlock(Map<String, Object> csv) {
+    private static Map<String, Object> asn1PluginBlock(Map<String, Object> csv, Path configDir, Builder b)
+            throws IOException {
         if (!(csv.get("asn1") instanceof Map<?, ?> aMap))
             throw new IllegalArgumentException(
                     "frontend 'asn1' requires an 'asn1:' block with grammar, root_type and segments");
-        Map<String, Object> a = (Map<String, Object>) aMap;
+        DecodeProfile.Resolved profile = DecodeProfile.overlay((Map<String, Object>) aMap, configDir);
+        if (profile.file() != null) b.referencedFiles.add(profile.file());
+        Map<String, Object> a = profile.asn1();
         String grammar  = a.get("grammar")   == null ? "" : String.valueOf(a.get("grammar")).trim();
         String grammarFile = a.get("grammar_file") == null ? "" : String.valueOf(a.get("grammar_file")).trim();
         String rootType = a.get("root_type") == null ? "" : String.valueOf(a.get("root_type")).trim();
