@@ -64,7 +64,7 @@ final class JobRoutes implements RouteModule {
         // pack:<owner>) / version (§7.3), so "what is this job, where did it come from" is answerable.
         api.get("/jobs/types", (e, m) -> jobs(api).jobTypeViews());
         api.get("/jobs/types/([^/]+)", (e, m) -> jobs(api).jobTypeView(ApiContext.name(m))
-                .orElseThrow(() -> new ApiException(404, "no job type '" + ApiContext.name(m) + "'")));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no job type '" + ApiContext.name(m) + "'")));
         // Expression catalog (job-parameter-contract §4.3): the registered $-token vocabulary that drives
         // the authoring form's token picker, generated from the ExpressionRegistry so it stays correct as
         // Job Packs load. Context-free tokens carry a preview evaluated by the engine's own evaluator, so
@@ -122,7 +122,7 @@ final class JobRoutes implements RouteModule {
         // Ends in a fixed /diff/{b} tail, so it never collides with the history, log or artifact routes.
         api.get("/jobs/([^/]+)/runs/([^/]+)/diff/([^/]+)", (e, m) -> jobs(api)
                 .diffRuns(ApiContext.param(m, 2), ApiContext.param(m, 3))
-                .orElseThrow(() -> new ApiException(404, "no run '" + ApiContext.param(m, 2) + "' or '" + ApiContext.param(m, 3) + "'")));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no run '" + ApiContext.param(m, 2) + "' or '" + ApiContext.param(m, 3) + "'")));
         // Download the bytes of one file-kind Run Artifact (report CSV/JSON, backup zip, storage report).
         // Ends in a fixed /content segment so it never collides with the metadata read above.
         api.get("/jobs/([^/]+)/runs/([^/]+)/artifacts/([^/]+)/content",
@@ -154,7 +154,7 @@ final class JobRoutes implements RouteModule {
         // Optional ?dryRun=true (MNT-1): a preview fire — the Run reports impact, mutates nothing.
         boolean dryRun = "true".equalsIgnoreCase(ApiContext.query(e, "dryRun"));
         String runId = jobs(api).triggerRun(name, ApiContext.query(e, "actor"), args, dryRun)   // optional ?actor= attributes the fire (T32)
-                .orElseThrow(() -> new ApiException(404, "no job named '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'"));
         if (ApiContext.v1(e)) {
             e.getResponseHeaders().set("Location", "/api/v1/jobs/runs/" + runId);
             return ApiContext.respondJson(e, 202,
@@ -174,11 +174,11 @@ final class JobRoutes implements RouteModule {
     private Object replayRun(ApiContext api, HttpExchange e, String runId) throws IOException {
         JobService svc = jobs(api);
         JobRun orig = svc.runById(runId)
-                .orElseThrow(() -> new ApiException(404, "no run '" + runId + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no run '" + runId + "'"));
         if (svc.isRunning(orig.job()))
-            throw new ApiException(409, "job '" + orig.job() + "' is currently running — replay refused");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "job '" + orig.job() + "' is currently running — replay refused");
         String newId = svc.replayRun(runId, ApiContext.query(e, "actor"))
-                .orElseThrow(() -> new ApiException(409,
+                .orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT,
                         "job '" + orig.job() + "' is no longer registered — cannot replay run '" + runId + "'"));
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("runId", newId);
@@ -262,7 +262,7 @@ final class JobRoutes implements RouteModule {
         WriteGates.requireWriteRoot(api, "job write");
         refuseSystemJob(api, name);
         String cron = ApiContext.str(body, "cron");
-        if (cron == null || cron.isBlank()) throw new ApiException(422, "'cron' is required");
+        if (cron == null || cron.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'cron' is required");
         Map<String, Object> m = new LinkedHashMap<>(existingJob(api, name).toMap());
         m.put("cron", cron);
         JobConfig c = parseJob(m);
@@ -284,12 +284,12 @@ final class JobRoutes implements RouteModule {
     /** The registered job named {@code name}, or a 404. */
     private JobConfig existingJob(ApiContext api, String name) {
         return jobs(api).jobConfig(name)
-                .orElseThrow(() -> new ApiException(404, "no job named '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'"));
     }
 
     /** {@code GET /jobs/runs/{runId}} — poll one run's status (W5); 404 once evicted or unknown. */
     private Object runById(ApiContext api, String runId) {
-        JobRun r = jobs(api).runById(runId).orElseThrow(() -> new ApiException(404, "no run '" + runId + "'"));
+        JobRun r = jobs(api).runById(runId).orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no run '" + runId + "'"));
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("runId", r.runId());
         m.put("job", r.job());
@@ -327,20 +327,20 @@ final class JobRoutes implements RouteModule {
      */
     private Object provenanceData(ApiContext api, String pipeline, String batch) {
         if (pipeline == null || pipeline.isBlank() || batch == null || batch.isBlank())
-            throw new ApiException(400, "both 'pipeline' and 'batch' query params are required");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "both 'pipeline' and 'batch' query params are required");
         return provenanceStore(api).query(pipeline, batch);
     }
 
     /** {@code GET /provenance/batches?pipeline=&limit=} — recent runs of a pipeline (newest first) to pick one to inspect. */
     private Object provenanceBatches(ApiContext api, String pipeline, String limit) {
         if (pipeline == null || pipeline.isBlank())
-            throw new ApiException(400, "the 'pipeline' query param is required");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "the 'pipeline' query param is required");
         return provenanceStore(api).batches(pipeline, ApiContext.parseIntOr(limit, 20));
     }
 
     /** The DuckDB data-plane provenance store (T21/T22), or a 404 when no backend is configured (-Dprovenance.backend). */
     private DbProvenanceStore provenanceStore(ApiContext api) {
-        return jobs(api).provenanceStore().orElseThrow(() -> new ApiException(404,
+        return jobs(api).provenanceStore().orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND,
                 "provenance DB not enabled (set -Dprovenance.backend=duckdb)"));
     }
 
@@ -365,10 +365,10 @@ final class JobRoutes implements RouteModule {
         JobService svc = jobs(api);
         refuseSystemJob(api, name);
         JobConfig existing = svc.jobConfig(name)
-                .orElseThrow(() -> new ApiException(404, "no job named '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'"));
         ETags.requireMatch(ex, ETags.of(ContentHash.of(existing.toMap())));
         JobConfig c = parseJob(body);
-        if (!name.equals(c.name())) throw new ApiException(400, "body 'name' must match the path id");
+        if (!name.equals(c.name())) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body 'name' must match the path id");
         persistJob(api, c);
         ETags.set(ex, ETags.of(ContentHash.of(c.toMap())));
         return c.toMap();
@@ -380,7 +380,7 @@ final class JobRoutes implements RouteModule {
         JobService svc = jobs(api);
         refuseSystemJob(api, name);
         if (svc.jobs().stream().noneMatch(v -> v.name().equals(name)))
-            throw new ApiException(404, "no job named '" + name + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'");
         boolean removed = Files.deleteIfExists(jobFile(api, name));
         svc.removeJob(name);
         return Map.of("name", name, "deleted", true, "fileRemoved", removed);
@@ -393,7 +393,7 @@ final class JobRoutes implements RouteModule {
         try {
             cfg = JobConfig.fromMap(Map.of("job", body));
         } catch (RuntimeException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
         // JOB-SPEC-1 (decided 2026-09-06): the SAME spec + safety gate /config/write applies, at the one
         // moment the author is present. Until now this route parsed the shape and skipped containment,
@@ -409,7 +409,7 @@ final class JobRoutes implements RouteModule {
                 com.gamma.pipeline.SpaceConfigRoot::jobPathBase));
         List<String> errors = findings.stream().filter(f -> f.severity() == Severity.ERROR)
                 .map(f -> f.fieldPath() + ": " + f.message()).toList();
-        if (!errors.isEmpty()) throw new ApiException(422, "job refused at save: " + errors);
+        if (!errors.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job refused at save: " + errors);
         return cfg;
     }
 
@@ -438,12 +438,12 @@ final class JobRoutes implements RouteModule {
      */
     private Object downloadArtifact(ApiContext api, HttpExchange e, String runId, String artifact) throws IOException {
         RunArtifact a = jobs(api).runArtifact(runId, artifact)
-                .orElseThrow(() -> new ApiException(404, "no artifact '" + artifact + "' recorded by run '" + runId + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no artifact '" + artifact + "' recorded by run '" + runId + "'"));
         if (!"file".equals(a.kind()))
-            throw new ApiException(404, "artifact '" + artifact + "' is a " + a.kind() + ", not a downloadable file");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "artifact '" + artifact + "' is a " + a.kind() + ", not a downloadable file");
         Path file = Path.of(a.ref());
         if (!Files.isRegularFile(file))
-            throw new ApiException(404, "artifact '" + artifact + "' is no longer available on disk");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "artifact '" + artifact + "' is no longer available on disk");
         byte[] bytes = Files.readAllBytes(file);
         String filename = file.getFileName().toString();
         e.getResponseHeaders().set("Content-Type", artifactContentType(filename));
@@ -465,12 +465,12 @@ final class JobRoutes implements RouteModule {
     }
 
     private JobService jobs(ApiContext api) {
-        return api.service().jobService().orElseThrow(() -> new ApiException(404, "no jobs registered"));
+        return api.service().jobService().orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no jobs registered"));
     }
 
     /** The DuckDB job-run reporting store (T27), or a 404 when no backend is configured (-Djobs.backend). */
     private DbJobRunStore jobRunStore(ApiContext api) {
-        return jobs(api).runStore().orElseThrow(() -> new ApiException(404,
+        return jobs(api).runStore().orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND,
                 "job reporting DB not enabled (set -Djobs.backend=duckdb)"));
     }
 

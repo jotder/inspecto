@@ -165,13 +165,16 @@ success  {data, metadata:{timestamp, durationMs, apiVersion:"v1", pagination?}, 
 error    {error:{errorCode, message, recoverable, correlationId, details?}}
 ```
 
-`ErrorCodes` (`ErrorCodes.java:11-31`) is the whole catalog — fourteen codes, pinned in both directions
+`ErrorCodes` (`ErrorCodes.java:11-33`) is the whole catalog — fifteen codes, pinned in both directions
 against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` · `NOT_FOUND` ·
 `METHOD_NOT_ALLOWED` · `PATH_JAIL_VIOLATION` · `CONFLICT` · `CONFLICT_STALE_VERSION` ·
 `CONFIG_VALIDATION_FAILED` · `INTERNAL` · `CONTROL_PLANE_READ_ONLY` · `CAPABILITY_UNAVAILABLE` ·
-`UNAUTHENTICATED` · `PERMISSION_DENIED` · `RATE_LIMITED` (429) · `NOT_SUPPORTED` (501). `defaultFor(status)` maps a bare status to a code (`:34-47`).
-**591 of 874** `new ApiException(` sites under `*/src/main` still take that default (2026-09-24, after the
-`inspecto-geo-link` `InvestigationRoutes` + `InvRoutes` slice of `ERRORCODE-DEFAULTED-1`; its four-eyes
+`UNAUTHENTICATED` · `PERMISSION_DENIED` · `RATE_LIMITED` (429) · `NOT_SUPPORTED` (501) ·
+`PAYLOAD_TOO_LARGE` (413). `defaultFor(status)` maps a bare status to a code (`:36-50`).
+**461 of 874** `new ApiException(` sites under `*/src/main` still take that default (2026-09-25, after the
+`ReconRoutes` / `AgentRoutes` / `JobRoutes` / `RunRoutes` + `inspecto-geo-link` `DossierRoutes` /
+`InvestigationTime` / `PatternQueryCompiler` slice of `ERRORCODE-DEFAULTED-1` — 130 sites, every one the
+status default, so no wire change; the earlier `InvestigationRoutes` + `InvRoutes` slice's four-eyes
 403s are `PERMISSION_DENIED`, not the defaulted `PATH_JAIL_VIOLATION`). Re-derive with
 `git grep -nP 'new ApiException\([^,()]+,(?!\s*(\w+\.)?[A-Z][A-Z_]+\s*,)' -- '*/src/main/**.java' | wc -l`.
 Bodies ≥ 1024 bytes are gzipped when the client accepts it (`ApiContext.maybeGzip`, `:370-393`).

@@ -2,6 +2,7 @@ package com.gamma.geolink;
 
 import com.gamma.config.spec.SourceZoneGrammar;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 
 import java.time.DateTimeException;
 import java.time.Instant;
@@ -59,26 +60,26 @@ final class InvestigationTime {
      */
     @SuppressWarnings("unchecked")
     static Map<String, Object> window(Object raw, String origin) {
-        if (!(raw instanceof Map<?, ?> m)) throw new ApiException(422, origin + " must be an object");
+        if (!(raw instanceof Map<?, ?> m)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be an object");
         Map<String, Object> w = (Map<String, Object>) m;
         for (String k : w.keySet())
             if (!WINDOW_KEYS.contains(k))
-                throw new ApiException(422, origin + ": unknown key '" + k + "' (allowed: " + WINDOW_KEYS + ")");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + ": unknown key '" + k + "' (allowed: " + WINDOW_KEYS + ")");
         Map<String, Object> out = new LinkedHashMap<>();
         Instant from = instant(w.get("from"), origin + ".from");
         Instant to = instant(w.get("to"), origin + ".to");
         if (from != null && to != null && !from.isBefore(to))
-            throw new ApiException(422, origin + ": 'from' must be before 'to' (the range is half-open [from, to))");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + ": 'from' must be before 'to' (the range is half-open [from, to))");
         out.put("from", from == null ? null : from.toString());
         out.put("to", to == null ? null : to.toString());
 
         Map<String, Object> slot = null;
         if (w.get("slot") != null) {
-            if (!(w.get("slot") instanceof Map<?, ?> s)) throw new ApiException(422, origin + ".slot must be an object {start, end}");
+            if (!(w.get("slot") instanceof Map<?, ?> s)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + ".slot must be an object {start, end}");
             LocalTime start = clock(s.get("start"), origin + ".slot.start");
             LocalTime end = clock(s.get("end"), origin + ".slot.end");
             if (start.equals(end))
-                throw new ApiException(422, origin + ".slot: start equals end — say which you mean with a range or no slot");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + ".slot: start equals end — say which you mean with a range or no slot");
             slot = new LinkedHashMap<>();
             slot.put("start", start.toString());
             slot.put("end", end.toString());
@@ -88,25 +89,25 @@ final class InvestigationTime {
         List<String> days = null;
         if (w.get("days") != null) {
             if (!(w.get("days") instanceof List<?> l) || l.isEmpty())
-                throw new ApiException(422, origin + ".days must be a non-empty list of " + DAYS);
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + ".days must be a non-empty list of " + DAYS);
             days = new ArrayList<>();
             for (String d : DAYS) if (l.contains(d)) days.add(d);
             if (days.size() != l.size())
-                throw new ApiException(422, origin + ".days: every entry must be one of " + DAYS + ", once");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + ".days: every entry must be one of " + DAYS + ", once");
         }
         out.put("days", days);
 
         String zone = w.get("timezone") == null ? null : String.valueOf(w.get("timezone"));
         if (zone != null) {
             String refusal = SourceZoneGrammar.zoneRefusal(zone, origin + ".timezone");
-            if (refusal != null) throw new ApiException(422, refusal);
+            if (refusal != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refusal);
         }
         if ((slot != null || days != null) && zone == null)
-            throw new ApiException(422, origin + ": a slot or day mask is wall-clock time and needs an explicit "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + ": a slot or day mask is wall-clock time and needs an explicit "
                     + "'timezone' (an IANA region id) — there is no default, because the default would be the host's");
         out.put("timezone", zone);
         if (from == null && to == null && slot == null && days == null)
-            throw new ApiException(422, origin + " must set at least one of from, to, slot, days");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must set at least one of from, to, slot, days");
         return out;
     }
 
@@ -119,7 +120,7 @@ final class InvestigationTime {
             try {
                 return Instant.parse(s);
             } catch (DateTimeParseException e) {
-                throw new ApiException(422, origin + " must be an ISO-8601 instant WITH an offset or Z (e.g. "
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be an ISO-8601 instant WITH an offset or Z (e.g. "
                         + "2026-09-01T00:00:00Z), got '" + s + "' — a naive date-time would mean the host's clock");
             }
         }
@@ -127,11 +128,11 @@ final class InvestigationTime {
 
     private static LocalTime clock(Object raw, String origin) {
         String s = raw == null ? "" : String.valueOf(raw);
-        if (!s.matches("\\d{2}:\\d{2}")) throw new ApiException(422, origin + " must be HH:mm, got '" + s + "'");
+        if (!s.matches("\\d{2}:\\d{2}")) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be HH:mm, got '" + s + "'");
         try {
             return LocalTime.parse(s);
         } catch (DateTimeException e) {
-            throw new ApiException(422, origin + " must be HH:mm, got '" + s + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, origin + " must be HH:mm, got '" + s + "'");
         }
     }
 

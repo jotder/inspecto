@@ -2,6 +2,7 @@ package com.gamma.geolink;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.ComponentAccess;
 import com.gamma.control.RouteModule;
 import com.gamma.event.Event;
@@ -70,7 +71,7 @@ public final class DossierRoutes implements RouteModule {
         Opened inv = open(api, ex, id);
         String format = Optional.ofNullable(ApiContext.query(ex, "format")).orElse("json");
         if (!List.of("json", "steps", "method").contains(format))
-            throw new ApiException(422, "format must be json, steps or method, got '" + format + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "format must be json, steps or method, got '" + format + "'");
         List<String> log = inv.store().readLog(id);
         int at = log.size();
         String rawAt = ApiContext.query(ex, "at");
@@ -78,13 +79,13 @@ public final class DossierRoutes implements RouteModule {
             try {
                 at = Integer.parseInt(rawAt.trim());
             } catch (NumberFormatException e) {
-                throw new ApiException(422, "at must be an integer, got '" + rawAt + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at must be an integer, got '" + rawAt + "'");
             }
             if (at < 0 || at > log.size())
-                throw new ApiException(422, "at must be between 0 and " + log.size() + ", got " + at);
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at must be between 0 and " + log.size() + ", got " + at);
         }
         if (at > MAX_STEPS)
-            throw new ApiException(422, "a dossier covers at most " + MAX_STEPS + " steps; pass 'at'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a dossier covers at most " + MAX_STEPS + " steps; pass 'at'");
         List<String> snapshotIds = new ArrayList<>();
         String rawSnaps = ApiContext.query(ex, "snapshots");
         if (rawSnaps != null)
@@ -134,15 +135,15 @@ public final class DossierRoutes implements RouteModule {
         Map<String, Object> submitted = (Map<String, Object>) raw;
         if (!(submitted.get("root") instanceof String) || !(submitted.get("artefacts") instanceof List<?>)
                 || !(submitted.get("at") instanceof Number n))
-            throw new ApiException(422, "body must carry a dossier manifest {root, at, artefacts, ...}");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must carry a dossier manifest {root, at, artefacts, ...}");
         if (!id.equals(submitted.get("investigation")))
-            throw new ApiException(422, "the manifest is for investigation '" + submitted.get("investigation")
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the manifest is for investigation '" + submitted.get("investigation")
                     + "', not '" + id + "'");
         List<String> log = inv.store().readLog(id);
         int at = Math.max(0, Math.min(n.intValue(), Math.min(log.size(), MAX_STEPS)));
         List<String> ids = new ArrayList<>();
         if (submitted.get("snapshots") instanceof List<?> l) for (Object o : l) ids.add(String.valueOf(o));
-        if (ids.size() > MAX_SNAPSHOTS) throw new ApiException(422, "at most " + MAX_SNAPSHOTS + " snapshots");
+        if (ids.size() > MAX_SNAPSHOTS) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_SNAPSHOTS + " snapshots");
 
         GraphDossierBuilder.Input in = input(inv, log, at, snapshots(ex, inv, ids, false));
         Map<String, Object> dossier = GraphDossierBuilder.build(in);
@@ -176,26 +177,26 @@ public final class DossierRoutes implements RouteModule {
      */
     private static List<GraphDossierBuilder.Snapshot> snapshots(HttpExchange ex, Opened inv, List<String> ids,
                                                                 boolean strict) throws IOException {
-        if (ids.size() > MAX_SNAPSHOTS) throw new ApiException(422, "at most " + MAX_SNAPSHOTS + " snapshots");
+        if (ids.size() > MAX_SNAPSHOTS) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_SNAPSHOTS + " snapshots");
         List<GraphDossierBuilder.Snapshot> out = new ArrayList<>();
         for (String sid : new LinkedHashSet<>(ids)) {
             if (!SnapshotStore.SAFE_ID.matcher(sid).matches())
-                throw new ApiException(422, "snapshot id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + sid + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "snapshot id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + sid + "'");
             String raw = inv.store().read(sid);
             if (raw == null) {
-                if (strict) throw new ApiException(404, "no sealed snapshot '" + sid + "'");
+                if (strict) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no sealed snapshot '" + sid + "'");
                 continue;
             }
             @SuppressWarnings("unchecked") Map<String, Object> snap = ApiContext.JSON.readValue(raw, Map.class);
             if (!inv.id().equals(snap.get("investigationId")))
-                throw new ApiException(422, "snapshot '" + sid + "' is not anchored to investigation '" + inv.id()
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "snapshot '" + sid + "' is not anchored to investigation '" + inv.id()
                         + "' (its investigationId is " + snap.get("investigationId") + ")");
             if (snap.get("origin") instanceof Map<?, ?> origin && origin.get("dataset") != null) {
                 String ds = String.valueOf(origin.get("dataset"));
                 Optional<Map<String, Object>> content = new ComponentStore(inv.writeRoot().resolve("registry"))
                         .get("dataset", ds).map(ComponentRegistry.Component::content);
                 if (content.isPresent() && !ComponentAccess.canView(ex, content.get()))
-                    throw new ApiException(404, "no sealed snapshot '" + sid + "'");
+                    throw new ApiException(404, ErrorCodes.NOT_FOUND, "no sealed snapshot '" + sid + "'");
             }
             out.add(new GraphDossierBuilder.Snapshot(sid, raw));
         }
@@ -207,7 +208,7 @@ public final class DossierRoutes implements RouteModule {
     private static Opened open(ApiContext api, HttpExchange ex, String id) throws IOException {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
         String raw = inv.store().readInvestigation(id);
-        if (raw == null) throw new ApiException(404, "no investigation '" + id + "'");
+        if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation '" + id + "'");
         return new Opened(inv, inv.store(), inv.writeRoot(), id, raw);
     }
 

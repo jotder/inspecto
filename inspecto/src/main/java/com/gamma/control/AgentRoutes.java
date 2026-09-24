@@ -37,24 +37,24 @@ final class AgentRoutes implements RouteModule {
             try {
                 return agentOr503(api).openSession(new AgentSessionRequest(role, mapField(page), goalKind));
             } catch (IllegalArgumentException ex) {   // unknown goalKind → reject at the edge
-                throw new ApiException(400, ex.getMessage());
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, ex.getMessage());
             }
         });
         api.post("/agent/sessions/(.+)/ask", (e, m) -> {
             Map<String, Object> body = api.body(e);
             String question = ApiContext.str(body, "question");
-            if (question == null) throw new ApiException(400, "question is required");
+            if (question == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "question is required");
             Object page = body.get("page");
             try {
                 return agentOr503(api).ask(ApiContext.name(m), new AgentAskRequest(question, mapField(page)));
             } catch (IllegalArgumentException ex) {
-                throw new ApiException(404, ex.getMessage());
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, ex.getMessage());
             }
         });
         api.post("/agent/sessions/(.+)/ask/stream", (e, m) -> {
             Map<String, Object> body = api.body(e);
             String question = ApiContext.str(body, "question");
-            if (question == null) throw new ApiException(400, "question is required");
+            if (question == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "question is required");
             Object page = body.get("page");
             streamAsk(agentOr503(api), ApiContext.name(m), new AgentAskRequest(question, mapField(page)), e);
             return ApiContext.HANDLED;
@@ -89,19 +89,19 @@ final class AgentRoutes implements RouteModule {
             String tool = ApiContext.name(m);
             Map<String, Object> body = api.body(e);
             String prompt = ApiContext.str(body, "prompt");
-            if (prompt == null || prompt.isBlank()) throw new ApiException(400, "prompt is required");
+            if (prompt == null || prompt.isBlank()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "prompt is required");
             Map<String, Object> result;
             try {
                 result = agentOr503(api).deriveTool(tool, prompt, mapField(body.get("args")), actorOrOperator(e))
-                        .orElseThrow(() -> new ApiException(404, "unknown tool: '" + tool + "'"));
+                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown tool: '" + tool + "'"));
             } catch (IllegalStateException mutating) {
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, mutating.getMessage());
             } catch (UnsupportedOperationException noModel) {
-                throw new ApiException(503, noModel.getMessage());
+                throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, noModel.getMessage());
             }
             if (!Boolean.TRUE.equals(result.get("ok"))) {
                 Object error = result.get("error");
-                throw new ApiException(422, error == null ? "tool '" + tool + "' failed" : String.valueOf(error));
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, error == null ? "tool '" + tool + "' failed" : String.valueOf(error));
             }
             // derivedArgs travels beside the tool's own value: the operator must see what their sentence
             // became before they Apply it. A HashMap, not Map.of — a tool may legitimately return a null
@@ -120,13 +120,13 @@ final class AgentRoutes implements RouteModule {
             Map<String, Object> result;
             try {
                 result = agentOr503(api).runTool(tool, mapField(api.body(e).get("args")), actorOrOperator(e))
-                        .orElseThrow(() -> new ApiException(404, "unknown tool: '" + tool + "'"));
+                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown tool: '" + tool + "'"));
             } catch (IllegalStateException mutating) {
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, mutating.getMessage());
             }
             if (!Boolean.TRUE.equals(result.get("ok"))) {
                 Object error = result.get("error");
-                throw new ApiException(422, error == null ? "tool '" + tool + "' failed" : String.valueOf(error));
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, error == null ? "tool '" + tool + "' failed" : String.valueOf(error));
             }
             return result.get("value");
         });
@@ -138,23 +138,23 @@ final class AgentRoutes implements RouteModule {
         api.get("/agent/triage-runs/(.+)/similar", (e, m) -> {
             String id = ApiContext.name(m);
             IntelligenceAgent agent = agentOr503(api);
-            if (agent.triageRunById(id).isEmpty()) throw new ApiException(404, "unknown triage run: '" + id + "'");
+            if (agent.triageRunById(id).isEmpty()) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown triage run: '" + id + "'");
             return Map.of("similar", agent.similarTriageRuns(id, ApiContext.parseIntOr(ApiContext.query(e, "k"), 5)));
         });
         api.get("/agent/triage-runs/(.+)", (e, m) ->
                 agentOr503(api).triageRunById(ApiContext.name(m))
-                        .orElseThrow(() -> new ApiException(404, "unknown triage run: '" + ApiContext.name(m) + "'")));
+                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown triage run: '" + ApiContext.name(m) + "'")));
 
         // AGT-5 P5 (Learning): operator feedback on a Triage Run — the raw signal the learning
         // tier turns into eval growth + per-skill tuning. The write is audited by ControlApi.dispatch.
         api.post("/agent/triage-runs/(.+)/feedback", ApiContext.withCapability("canAdminister", (e, m) -> {
             Map<String, Object> body = api.body(e);
-            if (ApiContext.str(body, "rating") == null) throw new ApiException(400, "rating is required");
+            if (ApiContext.str(body, "rating") == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "rating is required");
             try {
                 return agentOr503(api).recordTriageRunFeedback(ApiContext.name(m), body, actorOrOperator(e))
-                        .orElseThrow(() -> new ApiException(404, "unknown triage run: '" + ApiContext.name(m) + "'"));
+                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown triage run: '" + ApiContext.name(m) + "'"));
             } catch (IllegalArgumentException bad) {   // unrecognized rating value → reject at the edge
-                throw new ApiException(400, bad.getMessage());
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
             }
         }));
         api.get("/agent/feedback", (e, m) -> Map.of("feedback",
@@ -173,15 +173,15 @@ final class AgentRoutes implements RouteModule {
                 Map.of("approvals", agentOr503(api).recentApprovals(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
         api.get("/agent/approvals/(.+)", (e, m) ->
                 agentOr503(api).approvalById(ApiContext.name(m))
-                        .orElseThrow(() -> new ApiException(404, "unknown approval: '" + ApiContext.name(m) + "'")));
+                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown approval: '" + ApiContext.name(m) + "'")));
         api.post("/agent/approvals/(.+)/decision", ApiContext.withCapability("canAdminister", (e, m) -> {
             Map<String, Object> body = api.body(e);
             Boolean approve = parseDecision(ApiContext.str(body, "decision"));
-            if (approve == null) throw new ApiException(400, "decision is required and must be 'approve' or 'decline'");
+            if (approve == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "decision is required and must be 'approve' or 'decline'");
             String decidedBy = ApiContext.str(body, "decidedBy");
             return agentOr503(api).decideApproval(ApiContext.name(m), approve,
                             decidedBy == null || decidedBy.isBlank() ? "operator" : decidedBy.trim())
-                    .orElseThrow(() -> new ApiException(404,
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND,
                             "unknown or already-decided approval: '" + ApiContext.name(m) + "'"));
         }));
 
@@ -190,18 +190,18 @@ final class AgentRoutes implements RouteModule {
         // genuine "feature not present"). Writes are audited by ControlApi.dispatch; a secured edition
         // prepends the agent.admin capability gate at the ApiContext/WriteGates seam (plan §1, §6, L3).
         api.get("/agent/policy", (e, m) -> agentOr503(api).autonomyPolicy()
-                .orElseThrow(() -> new ApiException(503, "autonomy policy not available (no L3 tier)")));
+                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "autonomy policy not available (no L3 tier)")));
         api.put("/agent/policy", ApiContext.withCapability("canAdminister", (e, m) -> {
             String by = actorOrOperator(e);
             return agentOr503(api).updateAutonomyPolicy(api.body(e), by)
-                    .orElseThrow(() -> new ApiException(503, "autonomy policy not available (no L3 tier)"));
+                    .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "autonomy policy not available (no L3 tier)"));
         }));
         api.post("/agent/policy/kill-switch", ApiContext.withCapability("canAdminister", (e, m) -> {
             Map<String, Object> body = api.body(e);
             Boolean engaged = parseEngaged(body.get("engaged"));
-            if (engaged == null) throw new ApiException(400, "engaged is required and must be a boolean");
+            if (engaged == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "engaged is required and must be a boolean");
             return agentOr503(api).setAutonomyKillSwitch(engaged, actorOrOperator(e))
-                    .orElseThrow(() -> new ApiException(503, "autonomy policy not available (no L3 tier)"));
+                    .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "autonomy policy not available (no L3 tier)"));
         }));
 
         // AGT-5 P4 (autonomy L3): the autonomy ledger — what the ops_monitor loop did, why, and spend.
@@ -213,7 +213,7 @@ final class AgentRoutes implements RouteModule {
                 agentOr503(api).recentAutonomousActions(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
         api.get("/agent/actions/(.+)", (e, m) ->
                 agentOr503(api).autonomousActionById(ApiContext.name(m))
-                        .orElseThrow(() -> new ApiException(404, "unknown action: '" + ApiContext.name(m) + "'")));
+                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown action: '" + ApiContext.name(m) + "'")));
     }
 
     /** The request's audited actor (agent/human) as the policy's {@code updatedBy}, defaulting to "operator". */
@@ -324,7 +324,7 @@ final class AgentRoutes implements RouteModule {
 
     /** The in-process intelligence agent, or 503 when the optional module is absent. */
     private IntelligenceAgent agentOr503(ApiContext api) {
-        return api.service().intelligenceAgent().orElseThrow(() -> new ApiException(503,
+        return api.service().intelligenceAgent().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                 "intelligence agent not available (inspecto-intelligence not on classpath)"));
     }
 

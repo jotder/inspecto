@@ -62,7 +62,7 @@ final class ReconRoutes implements RouteModule {
     private Object columns(ApiContext api, Map<String, Object> body) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
         List<String> ids = strings(body.get("datasets"));
-        if (ids.isEmpty()) throw new ApiException(422, "missing 'datasets' (the dataset ids to inventory)");
+        if (ids.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'datasets' (the dataset ids to inventory)");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         List<ReconService.Side> sides = ids.stream()
                 .map(id -> new ReconService.Side(id, relationSql(api, store, writeRoot, id), null, null))
@@ -70,9 +70,9 @@ final class ReconRoutes implements RouteModule {
         try {
             return ReconService.columns(sides);
         } catch (SQLException e) {
-            throw new ApiException(422, "column inventory failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "column inventory failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
-            throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + e.getMessage());
         }
     }
 
@@ -85,11 +85,11 @@ final class ReconRoutes implements RouteModule {
         try {
             r = ReconService.run(spec, limit);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
-            throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + e.getMessage());
         }
         Map<String, Object> statistics = new LinkedHashMap<>();
         statistics.put("rowCount", r.rows().size());
@@ -116,17 +116,17 @@ final class ReconRoutes implements RouteModule {
         // The compared side of the anchor-relative pair: "b" (default) or, on a 3-way spec, "c".
         String side = orDefault(ApiContext.str(body, "side"), "b");
         int other = "b".equals(side) ? 1 : "c".equals(side) ? 2 : -1;
-        if (other < 0) throw new ApiException(422, "side must be b|c, got '" + side + "'");
+        if (other < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "side must be b|c, got '" + side + "'");
         Map<String, String> path = pathOf(body.get("path"));
         Map<String, ReconService.BreakSet> sets;
         try {
             sets = ReconService.breaks(spec, path, type, other, limit, offset);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
-            throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + e.getMessage());
         }
         Map<String, Object> data = new LinkedHashMap<>();
         for (Map.Entry<String, ReconService.BreakSet> e : sets.entrySet()) {
@@ -149,20 +149,20 @@ final class ReconRoutes implements RouteModule {
     private Object rows(ApiContext api, Map<String, Object> body) {
         ReconService.Spec spec = spec(api, body);
         Map<String, String> key = pathOf(body.get("key"));
-        if (key == null) throw new ApiException(422, "body must include 'key' — every key column and its value");
+        if (key == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'key' — every key column and its value");
         int limit = clamp(intOr(body.get("limit"), DEFAULT_BREAKS_LIMIT));
         String side = orDefault(ApiContext.str(body, "side"), "b");
         int other = "b".equals(side) ? 1 : "c".equals(side) ? 2 : -1;
-        if (other < 0) throw new ApiException(422, "side must be b|c, got '" + side + "'");
+        if (other < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "side must be b|c, got '" + side + "'");
         Map<String, ReconService.BreakSet> sets;
         try {
             sets = ReconService.rows(spec, other, key, limit);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
-            throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + e.getMessage());
         }
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("key", key);
@@ -226,18 +226,18 @@ final class ReconRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
         String reconId = ApiContext.str(body, "reconciliation");
         if (reconId == null || reconId.isBlank())
-            throw new ApiException(422, "missing 'reconciliation' (the saved reconciliation this Break came from)");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'reconciliation' (the saved reconciliation this Break came from)");
         String key = ApiContext.str(body, "key");
         if (key == null || key.isBlank())
-            throw new ApiException(422, "missing 'key' (the Break's business key — the dedupe identity)");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'key' (the Break's business key — the dedupe identity)");
 
         // An inline draft config is accepted by every other recon route; NOT here. An Incident that
         // outlives the session must reference a reconciliation someone can still open.
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         component(store, "reconciliation", reconId)
-                .orElseThrow(() -> new ApiException(404, "no reconciliation '" + reconId + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + reconId + "'"));
 
-        com.gamma.objects.ObjectAccess objects = api.service().objects().orElseThrow(() -> new ApiException(503,
+        com.gamma.objects.ObjectAccess objects = api.service().objects().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                 "operational objects are not installed — promoting a Break to an Incident needs the "
                         + "inspecto-ops module, which ships in Standard and Enterprise (EDITIONS CP-11)"));
 
@@ -293,7 +293,7 @@ final class ReconRoutes implements RouteModule {
      */
     private static Object promoted(ApiContext api, String reconId) {
         if (reconId == null || reconId.isBlank())
-            throw new ApiException(422, "missing 'reconciliation' (the reconciliation id to report on)");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'reconciliation' (the reconciliation id to report on)");
         // The id becomes a filename under the registry, so it is gated as a bare name (422) rather than
         // jailed after the fact — a separator never reaches a path resolve.
         String safeId = WriteGates.safeName(reconId, "reconciliation id");
@@ -305,9 +305,9 @@ final class ReconRoutes implements RouteModule {
         // ⚠ 404 on an unknown reconciliation, exactly as promote() does — an empty map would be
         // indistinguishable from "nothing is promoted", so a typo would read as a healthy board.
         if (root == null || component(new ComponentStore(root.resolve("registry")), "reconciliation", safeId).isEmpty())
-            throw new ApiException(404, "no reconciliation '" + safeId + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + safeId + "'");
 
-        com.gamma.objects.ObjectAccess objects = api.service().objects().orElseThrow(() -> new ApiException(503,
+        com.gamma.objects.ObjectAccess objects = api.service().objects().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                 "operational objects are not installed — reading promoted Breaks needs the "
                         + "inspecto-ops module, which ships in Standard and Enterprise (EDITIONS CP-11)"));
 
@@ -376,27 +376,27 @@ final class ReconRoutes implements RouteModule {
             config = cast(inline);
         } else {
             String id = ApiContext.str(body, "id");
-            if (id == null) throw new ApiException(422, "provide a saved reconciliation 'id' or an inline 'config'");
+            if (id == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "provide a saved reconciliation 'id' or an inline 'config'");
             config = component(store, "reconciliation", id)
-                    .orElseThrow(() -> new ApiException(404, "no reconciliation '" + id + "'"));
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + id + "'"));
         }
         // Shared spec assembly (identical to the scheduled recon.run Job); relation-SQL resolution stays
         // here so an unknown/unusable dataset keeps its route gate (404/422 via relationSql).
         try {
             return ReconConfigLoader.buildSpec(config, dsId -> relationSql(api, store, writeRoot, dsId));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
     }
 
     /** A dataset component's trusted relation SQL — 404 unknown dataset, 422 unusable dataset config. */
     private static String relationSql(ApiContext api, ComponentStore store, Path writeRoot, String datasetId) {
         Map<String, Object> dataset = component(store, "dataset", datasetId)
-                .orElseThrow(() -> new ApiException(404, "unknown dataset '" + datasetId + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown dataset '" + datasetId + "'"));
         try {
             return DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, "dataset '" + datasetId + "': " + bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dataset '" + datasetId + "': " + bad.getMessage());
         }
     }
 
@@ -404,7 +404,7 @@ final class ReconRoutes implements RouteModule {
         try {
             return store.get(type, id).map(ComponentRegistry.Component::content);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
     }
 

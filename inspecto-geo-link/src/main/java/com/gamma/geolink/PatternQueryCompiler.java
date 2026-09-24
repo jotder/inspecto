@@ -1,6 +1,7 @@
 package com.gamma.geolink;
 
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.util.SqlIdent;
 
 import java.util.ArrayList;
@@ -55,24 +56,24 @@ final class PatternQueryCompiler {
     /** Parse and validate the body's {@code stages} — the TS {@code BranchStage[]} shape. Any fault is a 422. */
     static List<Stage> parseStages(Object raw) {
         if (!(raw instanceof List<?> list) || list.isEmpty())
-            throw new ApiException(422, "body must include a non-empty 'stages' array");
-        if (list.size() > 8) throw new ApiException(422, "'stages' is capped at 8");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include a non-empty 'stages' array");
+        if (list.size() > 8) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'stages' is capped at 8");
         List<Stage> out = new ArrayList<>(list.size());
         for (int i = 0; i < list.size(); i++) {
-            if (!(list.get(i) instanceof Map<?, ?> m)) throw new ApiException(422, "stages[" + i + "] must be an object");
+            if (!(list.get(i) instanceof Map<?, ?> m)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "stages[" + i + "] must be an object");
             Object shape = m.get("shape");
             if (!"fan-in".equals(shape) && !"fan-out".equals(shape))
-                throw new ApiException(422, "stages[" + i + "].shape must be fan-in or fan-out");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "stages[" + i + "].shape must be fan-in or fan-out");
             if (!(m.get("minBranches") instanceof Number mb) || mb.intValue() < 1 || mb.intValue() > 1000)
-                throw new ApiException(422, "stages[" + i + "].minBranches must be an integer 1..1000");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "stages[" + i + "].minBranches must be an integer 1..1000");
             Threshold th = null;
             if (m.get("threshold") instanceof Map<?, ?> t) {
                 Object attr = t.get("attr");
                 if (!(attr instanceof String a) || !SAFE_IDENT.matcher(a).matches())
-                    throw new ApiException(422, "stages[" + i + "].threshold.attr must be a column identifier");
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "stages[" + i + "].threshold.attr must be a column identifier");
                 th = new Threshold(a, num(t.get("min"), i, "threshold.min"), num(t.get("max"), i, "threshold.max"));
             } else if (m.get("threshold") != null) {
-                throw new ApiException(422, "stages[" + i + "].threshold must be an object");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "stages[" + i + "].threshold must be an object");
             }
             out.add(new Stage("fan-in".equals(shape), mb.intValue(), text(m.get("edgeKind")), text(m.get("nodeKind")),
                     th, positive(m.get("windowHours"), i, "windowHours"), Boolean.TRUE.equals(m.get("afterPrevious")),
@@ -226,12 +227,12 @@ final class PatternQueryCompiler {
     private static Double num(Object v, int i, String key) {
         if (v == null) return null;
         if (v instanceof Number n && Double.isFinite(n.doubleValue())) return n.doubleValue();
-        throw new ApiException(422, "stages[" + i + "]." + key + " must be a number");
+        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "stages[" + i + "]." + key + " must be a number");
     }
 
     private static Double positive(Object v, int i, String key) {
         Double d = num(v, i, key);
-        if (d != null && d <= 0) throw new ApiException(422, "stages[" + i + "]." + key + " must be positive");
+        if (d != null && d <= 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "stages[" + i + "]." + key + " must be positive");
         return d;
     }
 }

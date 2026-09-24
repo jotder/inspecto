@@ -85,7 +85,7 @@ final class RunRoutes implements RouteModule {
         api.get("/runs/([^/]+)/files/stage", (e, m) -> {
                     PipelineConfig cfg = cfg(api, m);
                     String rel = ApiContext.query(e, "path");
-                    if (rel == null || rel.isBlank()) throw new ApiException(400, "?path= is required");
+                    if (rel == null || rel.isBlank()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "?path= is required");
                     return Map.of("pipeline", ApiContext.name(m), "path", rel,
                             "stages", com.gamma.consignment.FileStages.stages(cfg.collector().id(), rel));
                 });
@@ -93,9 +93,9 @@ final class RunRoutes implements RouteModule {
         api.post("/runs/([^/]+)/reprocess", ApiContext.withCapability("canOperateRuns", (e, m) -> {
             var path = api.service().pathFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
             if (api.service().isTemplate(ApiContext.name(m)))   // a template has no committed batches anyway
-                throw new ApiException(409, "pipeline '" + ApiContext.name(m) + "' is a template and is not runnable");
+                throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + ApiContext.name(m) + "' is a template and is not runnable");
             String batchId = ApiContext.str(api.body(e), "batchId");
-            if (batchId == null) throw new ApiException(400, "body must include 'batchId'");
+            if (batchId == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'batchId'");
             ReprocessCommand.run(path.toString(), batchId);
             return Map.of("pipeline", ApiContext.name(m), "batchId", batchId, "status", "reprocessed");
         }));
@@ -106,20 +106,20 @@ final class RunRoutes implements RouteModule {
         api.post("/runs/([^/]+)/drain", ApiContext.withCapability("canOperateRuns", (e, m) -> {
             var path = api.service().pathFor(ApiContext.name(m)).orElseThrow(() -> notFound(ApiContext.name(m)));
             if (api.service().isTemplate(ApiContext.name(m)))   // a template has no parked batches anyway
-                throw new ApiException(409, "pipeline '" + ApiContext.name(m) + "' is a template and is not runnable");
+                throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + ApiContext.name(m) + "' is a template and is not runnable");
             String batchId = ApiContext.str(api.body(e), "batchId");
-            if (batchId == null) throw new ApiException(400, "body must include 'batchId'");
+            if (batchId == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'batchId'");
             DrainCommand.Result r;
             try {
                 r = DrainCommand.run(path.toString(), batchId);
             } catch (IOException noManifest) {
                 // The only IOException DrainCommand lets out is "no manifest for this batch" — every
                 // state refusal is an IllegalStateException below.
-                throw new ApiException(404, noManifest.getMessage());
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, noManifest.getMessage());
             } catch (IllegalStateException refused) {
                 // Every DrainCommand refusal is a state conflict (not parked / still disabled / park
                 // table gone), never a malformed request — 409, with the reason verbatim.
-                throw new ApiException(409, refused.getMessage());
+                throw new ApiException(409, ErrorCodes.CONFLICT, refused.getMessage());
             }
             return Map.of("pipeline", ApiContext.name(m), "batchId", batchId, "status", "drained",
                     "branches", r.drainedBranches(), "outputFiles", r.outputFiles(), "rows", r.rows());
@@ -182,14 +182,14 @@ final class RunRoutes implements RouteModule {
             }
             return api.service().runPipelineOffThread(name, skipPostAction, dryRun).orElseThrow(() -> notFound(name));
         } catch (IllegalStateException notRunnable) {
-            throw new ApiException(409, notRunnable.getMessage());   // a `template: true` pipeline
+            throw new ApiException(409, ErrorCodes.CONFLICT, notRunnable.getMessage());   // a `template: true` pipeline
         }
     }
 
     /** {@code GET /runs/runs/{runId}} — poll one manual pipeline run's status (W5b); 404 once evicted or unknown. */
     private Object pipelineRunById(ApiContext api, String runId) {
         PipelineRun r = api.service().pipelineRunById(runId)
-                .orElseThrow(() -> new ApiException(404, "no run '" + runId + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no run '" + runId + "'"));
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("runId", r.runId());
         m.put("pipeline", r.pipeline());
@@ -227,20 +227,20 @@ final class RunRoutes implements RouteModule {
         PipelineConfig cfg = cfg(api, m);                       // 404 — unknown pipeline
         String file = ApiContext.query(e, "file");
         if (file == null || file.isBlank())
-            throw new ApiException(400, "?file= is required (the input file's name)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "?file= is required (the input file's name)");
         if (file.contains("/") || file.contains("\\") || file.contains(".."))
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "?file= must be a bare file name, not a path");
 
         String wanted = com.gamma.etl.CsvIngester.stripExtensions(file) + "_errors.csv";
         Path found = locateErrorsFile(cfg, wanted);
         if (found == null)
-            throw new ApiException(404, "no rejected-row detail recorded for '" + file + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no rejected-row detail recorded for '" + file + "'");
 
         List<Map<String, String>> rows = new ArrayList<>();
         try {
             com.gamma.util.Csv.readInto(found, rows);
         } catch (Exception bad) {
-            throw new ApiException(422, "could not read the rejected-row detail: " + bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "could not read the rejected-row detail: " + bad.getMessage());
         }
         boolean truncated = rows.size() > MAX_REJECT_ROWS;
         Map<String, Object> out = new LinkedHashMap<>();
@@ -400,10 +400,10 @@ final class RunRoutes implements RouteModule {
         if (raw == null || raw.isBlank()) return PROBLEM_FILES_DEFAULT_LIMIT;
         try {
             int v = Integer.parseInt(raw.trim());
-            if (v < 1) throw new ApiException(400, "?limit= must be >= 1");
+            if (v < 1) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "?limit= must be >= 1");
             return Math.min(v, PROBLEM_FILES_MAX_LIMIT);
         } catch (NumberFormatException nfe) {
-            throw new ApiException(400, "?limit= must be an integer");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "?limit= must be an integer");
         }
     }
 
@@ -488,7 +488,7 @@ final class RunRoutes implements RouteModule {
      */
     private static Object consignmentOutputs(ApiContext api, String consignmentId) {
         if (consignmentId == null || consignmentId.isBlank())
-            throw new ApiException(400, "consignmentId is required");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "consignmentId is required");
         DbConsignmentOutputStore store = ConsignmentOutputStores.shared();
         Map<String, Object> page = new LinkedHashMap<>();
         page.put("enabled", store != null);
@@ -522,7 +522,7 @@ final class RunRoutes implements RouteModule {
     }
 
     private static ApiException notFound(String name) {
-        return new ApiException(404, "no pipeline named '" + name + "'");
+        return new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'");
     }
 
     /** Build a report {@link ReportService.Window} from {@code ?from=&to=}. */
@@ -549,13 +549,13 @@ final class RunRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline registration");
         String configPath = ApiContext.str(body, "configPath");
         if (configPath == null || configPath.isBlank())
-            throw new ApiException(400, "body must include 'configPath'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'configPath'");
 
         Path candidate = Path.of(configPath.trim());
         Path resolved = WriteGates.jail(writeRoot,
                 candidate.isAbsolute() ? candidate : writeRoot.resolve(candidate), "configPath");
         if (!Files.isRegularFile(resolved))
-            throw new ApiException(404, "no config file at "
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no config file at "
                     + writeRoot.relativize(resolved).toString().replace('\\', '/'));
 
         // Validate before registering: spec + the hard-fail safety gate (R6). Block on ERRORs —
@@ -564,7 +564,7 @@ final class RunRoutes implements RouteModule {
         try {
             raw = ConfigLoader.filesystem().decode(resolved.toString());
         } catch (RuntimeException parse) {
-            throw new ApiException(422, "config does not parse: " + parse.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "config does not parse: " + parse.getMessage());
         }
         List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), raw));
         findings.addAll(ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.defaultPolicy(), resolved.getParent()));
@@ -583,9 +583,9 @@ final class RunRoutes implements RouteModule {
         try {
             id = api.service().registerPipeline(resolved);
         } catch (IllegalStateException collision) {
-            throw new ApiException(409, collision.getMessage());
+            throw new ApiException(409, ErrorCodes.CONFLICT, collision.getMessage());
         } catch (RuntimeException invalid) {
-            throw new ApiException(422, "config is not a valid pipeline: " + invalid.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "config is not a valid pipeline: " + invalid.getMessage());
         }
 
         PipelineView view = api.service().pipelines().stream()
