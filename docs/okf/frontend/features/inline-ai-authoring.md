@@ -79,6 +79,7 @@ sent, never by prompt inspection.
 | `studio/queries` | `query_author` | form `datasetId` + `structuredModel().where` | `form.controls.text`; operator presses the existing Save |
 | `expectations/expectation-form.dialog` | `suggest_expectations` | `target` + `column` controls | `schemaForm.form.patchValue(...)` + `markAsDirty()`; operator completes the two-step save |
 | `components/schema-editor.dialog` | `component_draft` (NL, `prompting`) | identity only: `{kind:'schema'}` | grid rows ← draft `raw.fields[]` + dirty; operator presses the existing Save (2026-09-25) |
+| `components/component-form.dialog` (**transform** kind only, 2026-09-25) | `component_draft` | the draft as Save writes it + the Test panel's `sampleRows` | `subtype` + `config` controls + `markAsDirty()`; operator presses the existing Save — see [*`transform` drafting*](#transform-drafting-shipped-2026-09-25) |
 | `studio/link-analysis` query panel | `projection_author` | `datasetId` + the panel's own `datasetColumns()` | `patchFormFromQuery(...)` + `markAsDirty()`; operator presses Run, then the host's Save |
 
 ⚠ **The Link Analysis adopter is the one whose args the backend could not have resolved itself** — no tool
@@ -313,7 +314,8 @@ validates every draft against the real `ConfigSpec` regardless of what the model
 The plan assumed `component_draft` had a pane. **It had none.** Adopted on the **Components pane's
 schema kind** (`component-form.dialog`), and *only* that kind: of the dialog's four
 (grammar/schema/transform/sink) only `schema` had a `ConfigSpec`, so on the rest the tool can only answer
-*"no structural spec for kind"*. ⚠ **Do not "complete" the adoption onto the other three.**
+*"no structural spec for kind"*. ⚠ **Do not "complete" the adoption onto a kind with no spec** — as of
+2026-09-25 that is still `grammar` and `sink`; `transform` has one now (below).
 
 ⚠ **Removed 2026-07-31 (unification W1) — on a FALSE premise, corrected 2026-09-25.** W1 removed the
 component-draft affordance from `component-form.dialog`, saying the `schema` registry component no longer
@@ -353,6 +355,39 @@ spec `component_draft(kind='schema')` judges by. So no backend work was needed. 
 silently and left the row's type dropdown **blank** — it looked like the draft had worked, and it was
 caught only in the preview, by no unit test. *(Learned on the offline mock, deleted 2026-08-31; the
 vocabulary constraint is the durable half.)*
+
+### `transform` drafting (shipped 2026-09-25)
+
+The author's ask was AI drafting on a non-`schema` kind; the operator named **`transform`** (design
+[`superpower/ai-drafting-non-schema-design.md`](../../../superpower/ai-drafting-non-schema-design.md), D1–D7
+decided 2026-09-25). As built:
+
+- **Spec home: `ComponentSpecs.forKind`** (`inspecto-engine`, `com.gamma.pipeline.exec`), consulted by
+  `InspectoTools.specFor` **only when `ConfigSpecs.forType` returns `null`**. ⛔ Never add a component kind
+  to `ConfigSpecs.TYPES`/`forType`: that is the config admission gate (`/config/write`, `/config/spec`,
+  bootstrap, the save gate), so it would open a write surface for a type the engine never loads. Pinned:
+  `/config/spec/transform` is still **404** (`ControlApiConfigSpecTest`).
+- **The spec is thin on purpose** (`type` required, `transform\..+`). The operator vocabulary lives in
+  `RowShaper`, and D7 declined to re-declare it. **The judge is the production preview**:
+  `component_draft` takes optional **`sampleRows`** and, for a component kind with no spec ERROR, runs
+  `ComponentPreview.transform` over them (sealed sandbox, same path as `POST /components/transform/preview`).
+- ⚠ **`clean` means the preview RAN AND PASSED (D6).** A spec-only verdict would call almost any transform
+  clean and the repair loop would stop on turn 1 with an unchecked draft. **No sample ⇒ one WARNING, so
+  never `clean`.** Pinned by a mutation-checked test (`InspectoToolsTest.aSpecCleanTransformThatFailsItsPreviewIsNotClean`)
+  and in the loop (`ComponentDraftRepairLoopTest`: a preview-only failure is repaired on turn 2).
+- ⚠ **Preview findings are UNANCHORED** (`fieldPath: ""`, D7): the executor reports prose, not a path. The
+  surface now renders such a finding as its message alone instead of an empty `<code>` and a dangling dash.
+- **Host: `component-form.dialog`, transform kind only.** `[args]` = `{kind:'transform', config: <the draft
+  as Save would write it>, sampleRows?}` — the deterministic path validates the draft the author typed, so
+  the config IS the argument here (the identity-only rule is for the NL `prompting` instance, which this
+  pane does not have yet). `sampleRows` is the Test panel's sample, which now shows **on create too** for a
+  transform (the dry-run button stays edit-only). The affordance is **disabled with a reason** while the
+  config or the sample is not valid JSON. **Apply** splits `type` into the Operator picker and the rest into
+  the Config JSON, marks the form dirty and saves nothing; a draft whose `type` is not `transform.*` is
+  refused with a toast, mirroring the server's own refusal.
+- **Not built:** the NL (`prompting`) instance on this dialog (design S6) — the backend loop already
+  resolves `transform` and threads a pane's `sampleRows` through, so it is a UI-only slice. `grammar` and
+  `sink` remain unspecced by decision.
 
 ## Natural-language topologies (A5.3 — shipped 2026-07-27)
 
@@ -481,7 +516,9 @@ Generalize: where the declared schema is the unreliable artifact, enforcing it c
 into outages.
 
 So `ToolSchemaAdopterContractTest` (`inspecto-intelligence`) holds each schema against reality instead: every
-real `<inspecto-ai-assist>` adopter's payload — 8 payloads across 6 tools — is checked against its tool's
+real `<inspecto-ai-assist>` adopter's payload — 7 payloads across 6 tools (2026-09-25: the phantom
+`component-form.dialog` row replaced by its real `transform` adoption, and the `dashboard-editor`
+`kpi_report_builder` adopter added) — is checked against its tool's
 declared top-level property types. ⚠ **Keep the table in step when a pane's `[args]` changes**; that is the
 whole point. ⚠ It deliberately does **not** check `required`, because the NL variants of `query_author` and
 `pipeline_author` omit `when`/`pipeline` so the model's derived args survive the merge — an absent key is legal

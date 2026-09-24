@@ -257,3 +257,11 @@ The original questions, kept for provenance:
   previewed · `config_schema` projects it · `TYPES` unchanged and grammar/sink still refused),
   `ComponentDraftRepairLoopTest` (+2: a preview-only failure is repaired on turn 2; a no-sample draft never
   stops the loop as clean), `ControlApiConfigSpecTest` (`/config/spec/transform` is still **404**).
+- **S4 (UI).** `ComponentFormDialog` renders `<inspecto-ai-assist tool="component_draft">` for the
+  `transform` kind only. `[args]` = `{kind, config: <the draft as Save writes it>, sampleRows?}`; the Test
+  panel's sample box now shows on create for a transform. Disabled with a reason while config or sample is
+  not valid JSON. Apply → Operator picker + Config JSON, `markAsDirty()`, never saves; a non-`transform.*`
+  draft is refused. The shared surface renders an unanchored finding as its message alone. Adopter row
+  added to `ToolSchemaAdopterContractTest`. Vitest: `component-form.dialog.spec.ts` (+6),
+  `ai-assist.component.spec.ts` (+1). ⚠ **Not driven live in the preview** (no backend with the
+  intelligence module in this lane) — the owed live check is the design's S4 "drive it live".

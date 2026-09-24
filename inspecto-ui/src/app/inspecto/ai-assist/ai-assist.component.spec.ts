@@ -193,6 +193,24 @@ describe('AiAssistComponent', () => {
         );
     });
 
+    it('renders an UNANCHORED finding (a preview failure) as its message alone, with no empty path', () => {
+        runTool.mockReturnValue(
+            of({
+                kind: 'transform',
+                clean: false,
+                findings: [{ severity: 'ERROR', fieldPath: '', message: 'preview failed: no_such_column' }],
+                draft: { type: 'transform.filter', where: 'no_such_column > 1' },
+            }),
+        );
+        const fixture = create({ tool: 'component_draft' });
+        clickRun(fixture);
+
+        const list = (fixture.nativeElement as HTMLElement).querySelector('[aria-label="Validation findings"]')!;
+        expect(list.textContent).toContain('preview failed: no_such_column');
+        expect(list.querySelector('code')).toBeNull();
+        expect(list.textContent).not.toContain('—');
+    });
+
     it('diffs the draft against the pane current config, folding unchanged fields away', () => {
         runTool.mockReturnValue(
             of({ kind: 'expectation', clean: true, findings: [], draft: { name: 'amt', severity: 'MAJOR' } }),

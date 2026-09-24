@@ -60,6 +60,20 @@
             <mat-hint>e.g. <code>{{ '{ "where": "CAST(amt AS INT) >= 100" }' }}</code></mat-hint>
             } }
         </mat-form-field>
+        <!-- AI drafting (S4): component_draft judges this draft by the production preview over the Test
+             panel's sample rows. It never writes — Apply fills the form, the operator presses Save. -->
+        <inspecto-ai-assist
+            tool="component_draft"
+            [args]="aiArgs()"
+            [current]="aiCurrent()"
+            label="Check this transform"
+            [disabled]="aiBlockedReason() !== ''"
+            [disabledReason]="aiBlockedReason()"
+            (applyDraft)="applyTransformDraft($event)"
+        />
+        <p class="text-secondary text-xs">
+            Checked by previewing it over the sample rows below. Without a sample it is not run, and says so.
+        </p>
         }
 
         <!-- ── sink ────────────────────────────────────────────────────────────── -->
@@ -99,7 +113,9 @@
             <div class="mb-2 font-medium">Test</div>
             @if (!isEdit) {
             <p class="text-secondary text-sm">Save the component first, then reopen it to run a dry-run.</p>
-            } @else { @if (kind === 'grammar') {
+            }
+            <!-- A transform's sample shows on create too: the AI check above is judged by previewing over it. -->
+            @if (isEdit && kind === 'grammar') {
             <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>Sample text</mat-label>
                 <textarea
@@ -110,18 +126,19 @@
                     spellcheck="false"
                 ></textarea>
             </mat-form-field>
-            } @else {
+            } @else if (isEdit || kind === 'transform') {
             <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>Sample rows (JSON array)</mat-label>
                 <textarea
                     matInput
-                    [(ngModel)]="sampleRows"
+                    [ngModel]="sampleRows()"
+                    (ngModelChange)="sampleRows.set($event)"
                     [ngModelOptions]="{ standalone: true }"
                     rows="4"
                     spellcheck="false"
                 ></textarea>
             </mat-form-field>
-            }
+            } @if (isEdit) {
             <button type="button" mat-stroked-button (click)="runTest()" [disabled]="testing()">
                 <mat-icon svgIcon="heroicons_outline:play"></mat-icon>
                 <span class="ml-1">{{ testing() ? 'Running…' : 'Run dry-run' }}</span>

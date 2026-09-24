@@ -119,9 +119,14 @@
                                 @for (finding of findingsOf(draft); track finding.fieldPath + finding.message) {
                                     <li class="flex items-start gap-2 text-sm">
                                         <inspecto-status-badge [value]="finding.severity" />
+                                        <!-- An UNANCHORED finding (a preview failure — the executor reports
+                                             prose, not a path) shows its message alone, not an empty path. -->
                                         <span>
-                                            <code>{{ finding.fieldPath }}</code>
-                                            — {{ finding.message }}
+                                            @if (finding.fieldPath) {
+                                                <code>{{ finding.fieldPath }}</code>
+                                                —
+                                            }
+                                            {{ finding.message }}
                                         </span>
                                     </li>
                                 }

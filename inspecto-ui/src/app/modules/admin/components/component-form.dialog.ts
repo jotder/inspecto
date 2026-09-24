@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
+import { toSignal } from '@angular/core/rxjs-interop';
 import {
     AbstractControl,
     FormBuilder,
@@ -40,6 +41,8 @@ import { isRecord } from 'app/inspecto/a2ui/a2ui-artifact';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
+import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 
 /** Dialog data: `def` set ⇒ edit mode (id locked, Test available); absent ⇒ create. */
 interface ComponentFormData {
@@ -88,6 +91,7 @@ const SINK_FORMATS = ['parquet', 'csv', 'json', 'avro'];
     selector: 'app-component-form-dialog',
     standalone: true,
     imports: [
+        AiAssistComponent,
         InspectoOptionPickerComponent,
         ReactiveFormsModule,
         FormsModule,
@@ -130,7 +134,8 @@ export class ComponentFormDialog {
 
     /** Raw sample input for the Test panel: free text for grammar, a JSON rows array otherwise. */
     sampleText = this.kind === 'grammar' ? 'a,b,c\n1,2,3' : '';
-    sampleRows = '[{ "id": "1", "amt": "150" }, { "id": "x", "amt": "abc" }]';
+    /** A signal (not a plain field) because the transform AI check's args are derived from it. */
+    readonly sampleRows = signal('[{ "id": "1", "amt": "150" }, { "id": "x", "amt": "abc" }]');
 
     /** Original `partitions:` entries by chip label — a `{column, source}` map survives an untouched save. */
     private readonly sinkPartitionEntries = new Map<string, unknown>();
@@ -177,6 +182,9 @@ export class ComponentFormDialog {
         format: ['parquet'],
         partitions: [[] as string[]],
     });
+
+    /** The form as a signal, so the transform AI check's args recompute as the operator types. */
+    private readonly formValue = toSignal(this.form.valueChanges, { initialValue: this.form.getRawValue() });
 
     constructor() {
         const c = this.data.def?.content ?? {};
@@ -239,11 +247,60 @@ export class ComponentFormDialog {
         }
     }
 
-    // AI drafting (AGT-6a A5.2) was removed from this dialog in W1 (2026-07-31). The reason recorded here
-    // then — "`schema` is no longer a registry component" — was FALSE: `schema` is still in
-    // ComponentStore.WRITABLE_TYPES and opens in SchemaEditorDialog, not here (design
-    // ai-drafting-non-schema-design.md §2.5-1). What is true is that none of THIS dialog's kinds
-    // (grammar/transform/sink) had a structural spec, so the tool could only answer "no structural spec".
+    // ── AI drafting on the transform kind (design ai-drafting-non-schema-design.md S4) ─────────────────
+    // Only `transform` of this dialog's kinds has a structural spec (ComponentSpecs, operator D1), so only
+    // it renders <inspecto-ai-assist>. `component_draft` judges the draft by the PRODUCTION preview over the
+    // Test panel's sample rows (D6/D7): its findings are unanchored, and with no sample it is never clean.
+    // The surface has no write path — Apply lands the draft in the form and the operator presses Save.
+
+    /** The draft as `buildContent` would save it, or `null` while the config is not valid JSON. */
+    private readonly transformDraft = computed<Record<string, unknown> | null>(() => {
+        const { config: raw, subtype } = this.formValue();
+        try {
+            const config = String(raw ?? '').trim() ? JSON.parse(raw) : {};
+            return isRecord(config) ? { type: subtype, ...config } : null;
+        } catch {
+            return null;
+        }
+    });
+
+    /** The Test panel's sample rows, `undefined` when blank, `null` when not a JSON array of objects. */
+    private readonly parsedSampleRows = computed<Record<string, unknown>[] | null | undefined>(() => {
+        const raw = this.sampleRows().trim();
+        if (!raw) return undefined;
+        try {
+            const rows = JSON.parse(raw);
+            return Array.isArray(rows) && rows.every(isRecord) ? rows : null;
+        } catch {
+            return null;
+        }
+    });
+
+    readonly aiArgs = computed<Record<string, unknown>>(() => {
+        const rows = this.parsedSampleRows();
+        return { kind: 'transform', config: this.transformDraft() ?? {}, ...(rows ? { sampleRows: rows } : {}) };
+    });
+
+    readonly aiCurrent = computed(() => this.transformDraft());
+
+    readonly aiBlockedReason = computed(() => {
+        if (this.transformDraft() === null) return 'Config must be a valid JSON object first.';
+        if (this.parsedSampleRows() === null) return 'Sample rows must be a JSON array of objects.';
+        return '';
+    });
+
+    /** Land a drafted transform in the form: `type` into the operator picker, the rest as the config JSON. */
+    applyTransformDraft(draft: AiDraft): void {
+        const { type, ...rest } = draft.config as { type?: unknown };
+        // Mirror the server's own refusal (`type: transform.*` required) rather than load a draft this
+        // form would then save as something else.
+        if (typeof type !== 'string' || !type.startsWith('transform.')) {
+            this.toastr.error('The draft does not name a transform operator, so it was not applied.');
+            return;
+        }
+        this.form.patchValue({ subtype: type, config: JSON.stringify(rest, null, 2) });
+        this.form.markAsDirty();
+    }
 
     addPartition(event: MatChipInputEvent): void {
         const value = event.value.trim();
@@ -354,7 +411,7 @@ export class ComponentFormDialog {
         }
         let rows: Record<string, unknown>[];
         try {
-            rows = JSON.parse(this.sampleRows);
+            rows = JSON.parse(this.sampleRows());
             if (!Array.isArray(rows)) throw new Error('expected an array of rows');
         } catch {
             this.testing.set(false);
