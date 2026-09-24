@@ -52,6 +52,17 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             label: 'Author alert rules',
         },
     ],
+    cases: [
+        {
+            // Hung under Case Manager, where its one client-side gate lives (the Findings-fields editor, D1).
+            // The server gates more on it (opening an Incident, promote, Investigations); denying it here
+            // only hides the affordance — the server stays the boundary.
+            id: 'incidents.manage',
+            kind: 'action',
+            capability: 'canManageIncidents',
+            label: 'Manage incidents and cases (author Findings fields)',
+        },
+    ],
     catalog: [
         {
             id: 'exchange.offer',

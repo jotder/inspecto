@@ -223,6 +223,15 @@ export class LensService {
      *  (`docs/superpower/route-gating-audit.md` §6b). Do not widen this one to cover it. */
     readonly canAdminister = computed(() => this.identityCapability('canAdminister', 'space.administer'));
 
+    /** May manage Incidents and Cases — the grant the backend puts on opening an Incident/Case, promoting a
+     *  Break, Investigation writes, and (D1, operator 2026-09-25) the Case desk's Findings fields
+     *  (`/components/findings-spec…`). RBAC: Operations, Support, Admin, Power, Super.
+     *
+     *  {@link identityCapability}: it is the Case desk's grant, and the `admin` seed qualifies for no
+     *  non-Business lens — lens-scoping it would hide the Findings-fields editor from exactly the people
+     *  the server lets save it. Client-side it gates only that editor today. */
+    readonly canManageIncidents = computed(() => this.identityCapability('canManageIncidents', 'incidents.manage'));
+
     /** Set the preferred lens and persist it across reloads. A lens outside {@link allowedLenses}
      *  is remembered but not activated (the switcher never offers one). */
     selectLens(lens: Lens): void {
