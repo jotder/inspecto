@@ -966,7 +966,7 @@ class names against `git ls-files` and the module tree.
 
 `package.ps1` stages `inspecto.service` + `install-service.sh` (systemd) and `install-service.ps1` (a Windows Scheduled Task at boot as SYSTEM, with restart-on-failure). ⛔ The `sc.exe` route was REFUSED on grounding: a Windows service binary must reach the service control dispatcher shortly after start and `java.exe` never does, so an `sc.exe` service fails every start with error 1053 — that installer would have looked installed and restarted nothing. WinSW is the documented alternative. ⚠ **The unit renders and both installers parse, but the acceptance test — `kill -9` → back on `/health`, plus the reboot leg — is UNRUN**, because it needs a systemd host and an elevated Windows box. Tracked as `DEPLOY-SERVICE-WRAPPER-1` in `BACKLOG.md`; it is evidence-blocked, not code-blocked, and ⛔ SCR-3's acceptance must not be marked met until someone runs both legs.
 
-### `QUEUES-USER-FACING-COPY-1` (open, filed 2026-09-17)
+### `QUEUES-USER-FACING-COPY-1` (CLOSED 2026-09-24 — the copy was already fixed 2026-09-18)
 
 The work-queue family was retired on 2026-09-14 (created `a5b89a89`, moved to `inspecto-ops` `e8d98918`,
 deleted `519673a7`), and EDG-01 cell 7 is now **three** route families, not four. Three shipped strings still
@@ -977,6 +977,14 @@ reading "notes, links, tags **and queues** are provided by the…".
 ⚠ A 503 telling an operator that a deleted feature is available in Professional is a small but real defect. It was
 kept out of the comment-correcting change deliberately: shipped copy plus two Angular templates is a different
 change class and needs the `angular-ui` skill.
+
+**As-built (closed 2026-09-24).** All three strings had **already** been corrected the day after filing, inside
+`ec49b7bda` (the Standard→Professional rename, 2026-09-18), which rewrote each sentence and dropped "and queues" in
+passing — so the row sat open over fixed copy for six days. They now read "…notes, links and tags are provided by
+the…". A repo-wide grep for "and queues" finds no other shipped copy. The closing change fixed the one leftover:
+the `SURFACE` array's Javadoc in `AbsentObjectRoutes.java` still said "four moved route families"; it lists three
+(Object/Note/Tag). ⚠ Lesson: a copy row names a STRING, so grep the string before editing — the cited line numbers
+still matched, only the words had moved.
 
 ⚠ Provenance trap: `git log --grep="RETIRE-HALVES"` does **not** find the commit that removed the routes — it
 landed under a whitepaper message when a concurrent session committed the staged tree. Search the symbol, or

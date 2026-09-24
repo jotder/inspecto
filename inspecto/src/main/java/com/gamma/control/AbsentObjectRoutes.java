@@ -27,7 +27,7 @@ final class AbsentObjectRoutes implements RouteModule {
             + "Incidents, Cases, Tasks and their notes, links and tags are provided by the "
             + "optional inspecto-ops module (Professional edition and above).";
 
-    /** Mirrors the four moved route families, in their registration order. ⚠ Catch-alls stay last. */
+    /** Mirrors the three moved route families, in their registration order. ⚠ Catch-alls stay last. */
     private static final String[][] SURFACE = {
             // ── ObjectRoutes ────────────────────────────────────────────────────────────────────
             {"GET",    "/objects"},
