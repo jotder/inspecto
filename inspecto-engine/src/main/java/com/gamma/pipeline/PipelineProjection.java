@@ -127,7 +127,6 @@ public final class PipelineProjection {
                 Map<String, Object> nm = node(n);
                 nm.put("id", qualify(g.name(), n.id()));   // namespace to avoid cross-pipeline id collisions
                 nm.put("pipeline", g.name());
-                nm.put("flow", g.name());   // Tier 3 dual-emit: kept for callers still reading the pre-rename key
                 nodes.add(nm);
             }
             for (PipelineEdge e : g.edges()) {
@@ -136,7 +135,6 @@ public final class PipelineProjection {
                 // on_commit's `to` names another pipeline, not a local node — keep it bare so it can resolve cross-pipeline
                 em.put("to", g.byId().containsKey(e.to()) ? qualify(g.name(), e.to()) : e.to());
                 em.put("pipeline", g.name());
-                em.put("flow", g.name());   // Tier 3 dual-emit: kept for callers still reading the pre-rename key
                 edges.add(em);
             }
             // producer edges: each producing sink → its store node
@@ -171,7 +169,6 @@ public final class PipelineProjection {
             links.add(lm);
         }
         out.put("pipelines", flows);
-        out.put("flows", flows);   // Tier 3 dual-emit: kept for callers still reading the pre-rename key
         out.put("nodes", nodes);
         out.put("edges", edges);
         out.put("links", links);

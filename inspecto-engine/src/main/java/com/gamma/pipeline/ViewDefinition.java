@@ -16,10 +16,10 @@ import static com.gamma.util.Values.str;
  * pipeline), and — when expressible — the SQL that derives it.
  *
  * @param store        the produced logical store name (the view's identity)
- * @param flow         the authored pipeline id that produces it (run to concretise the view)
+ * @param pipeline     the authored pipeline id that produces it (run to concretise the view)
  * @param sourceStores the {@code source_store}s the producing pipeline consumes (lineage)
  * @param derivedSql   the SELECT that derives the view, when expressible as a single statement; else {@code null}
- *                     (the multi-statement transform chain is re-run via {@code flow} instead). A runner-written
+ *                     (the multi-statement transform chain is re-run via {@code pipeline} instead). A runner-written
  *                     definition carries its source read as the {@code ViewReaderSql.READER_TOKEN} placeholder —
  *                     rendered fresh at every execution so the Consignment catalog can subtract superseded files
  *                     (addressing §7-A) — with the read's ingredients in {@link #readerRoot}/{@link #readerFormat}.
@@ -29,7 +29,7 @@ import static com.gamma.util.Values.str;
  * @param definedAt    ISO-8601 timestamp the definition was last written
  */
 @PublicApi(since = "4.0.0")
-public record ViewDefinition(String store, String flow, List<String> sourceStores,
+public record ViewDefinition(String store, String pipeline, List<String> sourceStores,
                              String derivedSql, String readerRoot, String readerFormat, String definedAt) {
 
     public ViewDefinition {
@@ -37,19 +37,17 @@ public record ViewDefinition(String store, String flow, List<String> sourceStore
     }
 
     /** The plain-SQL form — every hand-authored view and every pre-template call site. */
-    public ViewDefinition(String store, String flow, List<String> sourceStores,
+    public ViewDefinition(String store, String pipeline, List<String> sourceStores,
                           String derivedSql, String definedAt) {
-        this(store, flow, sourceStores, derivedSql, null, null, definedAt);
+        this(store, pipeline, sourceStores, derivedSql, null, null, definedAt);
     }
 
-    /** Lossless map form for {@code ConfigCodec.toToon} persistence. Tier 3 dual-emit (vocabulary plan
-     *  §4): writes both {@code pipeline} (canonical) and {@code flow} (pre-rename, read by any consumer
-     *  not yet updated) — never a hard cutover on a persisted file format. */
+    /** Lossless map form for {@code ConfigCodec.toToon} persistence. Writes the canonical {@code pipeline}
+     *  key only — the Tier 3 {@code flow} dual-emit ended with the 4.0.0 rename. */
     public Map<String, Object> toMap() {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("store", store);
-        m.put("pipeline", flow);
-        m.put("flow", flow);
+        m.put("pipeline", pipeline);
         m.put("source_store", sourceStores);
         if (derivedSql != null && !derivedSql.isBlank()) m.put("derived_sql", derivedSql);
         if (readerRoot != null && !readerRoot.isBlank()) m.put("reader_root", readerRoot);
@@ -58,14 +56,13 @@ public record ViewDefinition(String store, String flow, List<String> sourceStore
         return m;
     }
 
-    /** Dual-read: {@code pipeline} (canonical) preferred, {@code flow} (pre-rename) as fallback for
-     *  definitions written before the Tier 3 rename. */
+    /** Reads the canonical {@code pipeline} key only. The pre-rename {@code flow} fallback was dropped with
+     *  the Tier 3 cutover: no definition on disk carried {@code flow} without {@code pipeline}. */
     public static ViewDefinition fromMap(Map<String, Object> m) {
         Object ss = m.get("source_store");
         List<String> sources = ss instanceof List<?> l ? l.stream().map(String::valueOf).toList() : List.of();
-        String pipeline = m.get("pipeline") != null ? str(m.get("pipeline")) : str(m.get("flow"));
         return new ViewDefinition(
-                str(m.get("store")), pipeline, sources,
+                str(m.get("store")), str(m.get("pipeline")), sources,
                 str(m.get("derived_sql")), str(m.get("reader_root")), str(m.get("reader_format")),
                 str(m.get("defined_at")));
     }

@@ -176,7 +176,7 @@ class ControlApiPipelinesTest {
             HttpResponse<String> r = get(c.port, "/pipelines/combined");
             assertEquals(200, r.statusCode(), r.body());
             JsonNode g = V1Body.of(r.body());
-            assertTrue(g.get("flows").isArray() && g.get("flows").size() >= 1);
+            assertTrue(g.get("pipelines").isArray() && g.get("pipelines").size() >= 1);
             assertTrue(g.get("nodes").isArray() && g.get("nodes").size() >= 4);
             assertTrue(g.get("edges").isArray());
             assertTrue(g.has("links"));   // superimposition (empty for a lone legacy pipeline with no consumer)

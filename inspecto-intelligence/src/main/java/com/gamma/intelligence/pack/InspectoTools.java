@@ -1260,7 +1260,7 @@ final class InspectoTools {
     }
 
     /**
-     * A JSON Schema for {@code pipeline_author}'s {@code flow} payload (AGT-6a A5.3).
+     * A JSON Schema for {@code pipeline_author}'s {@code pipeline} payload (AGT-6a A5.3).
      *
      * <p><b>Hand-written, and that is not an oversight.</b> Plan D9 projects a schema from a
      * {@link ConfigSpec}; an authored graph has none — it is an IR ({@code PipelineCodec}), not a config
@@ -1272,11 +1272,11 @@ final class InspectoTools {
      * <p>{@code rel} is deliberately <b>not</b> an enum: {@code route:<key>} is open-ended, so closing it
      * would forbid the branch dispatch {@code transform.route} and {@code parser} exist to express.
      */
-    static String flowSchemaJson() {
+    static String pipelineSchemaJson() {
         Map<String, Object> node = new LinkedHashMap<>();
         node.put("type", "object");
         node.put("properties", Map.of(
-                "id", Map.of("type", "string", "description", "unique within the flow"),
+                "id", Map.of("type", "string", "description", "unique within the pipeline"),
                 "type", new LinkedHashMap<>(Map.of(
                         "type", "string",
                         "enum", PipelineNodeTypes.all().stream().sorted().toList())),
@@ -1287,8 +1287,8 @@ final class InspectoTools {
         Map<String, Object> edge = new LinkedHashMap<>();
         edge.put("type", "object");
         edge.put("properties", Map.of(
-                "from", Map.of("type", "string", "description", "a node id in this flow"),
-                "to", Map.of("type", "string", "description", "a node id in this flow"),
+                "from", Map.of("type", "string", "description", "a node id in this pipeline"),
+                "to", Map.of("type", "string", "description", "a node id in this pipeline"),
                 "rel", Map.of("type", "string", "description",
                         "data (default) | success | failure | unmatched | gap | on_commit | dropped |"
                                 + " invalid | duplicate | route:<key>")));
@@ -1297,7 +1297,7 @@ final class InspectoTools {
         Map<String, Object> schema = new LinkedHashMap<>();
         schema.put("type", "object");
         schema.put("properties", Map.of(
-                "name", Map.of("type", "string", "description", "the flow's canonical id"),
+                "name", Map.of("type", "string", "description", "the pipeline's canonical id"),
                 "nodes", Map.of("type", "array", "items", node),
                 "edges", Map.of("type", "array", "items", edge)));
         schema.put("required", List.of("name", "nodes"));
@@ -1457,28 +1457,28 @@ final class InspectoTools {
      */
     private static Tool pipelineAuthor() {
         ToolSpec spec = new ToolSpec("pipeline_author",
-                "Parse a proposed authored-flow graph {name,nodes,edges} and, given sampleRows (post-parse "
+                "Parse a proposed authored-pipeline graph {name,nodes,edges} and, given sampleRows (post-parse "
                         + "records), simulate its transform→sink subgraph on a throwaway DuckDB — per-node and "
                         + "per-sink row counts. Tests a pipeline draft before it is applied. Persists nothing.",
                 "{\"type\":\"object\",\"properties\":{"
-                        + "\"flow\":{\"type\":\"object\"},"
+                        + "\"pipeline\":{\"type\":\"object\"},"
                         + "\"sampleRows\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}}},"
-                        + "\"required\":[\"flow\"]}",
+                        + "\"required\":[\"pipeline\"]}",
                 false, Role.USER, Capability.AUTHOR_PIPELINE);
         return new FunctionTool(spec, call -> {
-            Map<String, Object> pipeline = mapArg(call, "flow");
-            if (pipeline == null) return error("flow is required and must be an object");
+            Map<String, Object> pipeline = mapArg(call, "pipeline");
+            if (pipeline == null) return error("pipeline is required and must be an object");
             PipelineGraph g;
             try {
                 g = PipelineCodec.fromMap(pipeline);
             } catch (IllegalArgumentException e) {
-                return error("invalid flow: " + e.getMessage());
+                return error("invalid pipeline: " + e.getMessage());
             }
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("name", g.name());
             // The PARSED graph, not just its name (AGT-6a A5.3). This is what the caller applies, so it
             // must be the round-tripped IR — a name string is not something a pane can adopt.
-            result.put("flow", PipelineCodec.toMap(g));
+            result.put("pipeline", PipelineCodec.toMap(g));
             result.put("nodes", g.nodes().stream()
                     .map(n -> Map.of("id", n.id(), "type", n.type())).toList());
 
@@ -1500,7 +1500,7 @@ final class InspectoTools {
             List<Map<String, Object>> sampleRows = listOfMapsArg(call, "sampleRows");
             if (sampleRows == null || sampleRows.isEmpty()) {
                 result.put("simulated", false);
-                result.put("note", "graph parsed; provide sampleRows (post-parse records) to simulate the flow");
+                result.put("note", "graph parsed; provide sampleRows (post-parse records) to simulate the pipeline");
                 return ok(result);
             }
             try {
@@ -1549,7 +1549,7 @@ final class InspectoTools {
                 case PipelineValidator.DANGLING_FROM, PipelineValidator.DANGLING_TO,
                      PipelineValidator.ILLEGAL_EMIT, PipelineValidator.ILLEGAL_ACCEPT,
                      PipelineValidator.ON_COMMIT_SAME_GRAPH -> "edges";
-                default -> "flow";   // EMPTY_GRAPH, NO_ENTRY, CYCLE — properties of the whole graph
+                default -> "pipeline";   // EMPTY_GRAPH, NO_ENTRY, CYCLE — properties of the whole graph
             });
             f.put("message", i.message());
             return f;

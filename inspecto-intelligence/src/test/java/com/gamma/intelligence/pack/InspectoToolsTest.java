@@ -563,13 +563,13 @@ class InspectoToolsTest {
     @Test
     @SuppressWarnings("unchecked")
     void pipelineAuthorParsesWithoutSampleRows() {
-        Map<String, Object> out = invoke(authorTool(), Map.of("flow", filterFlowMap()));
+        Map<String, Object> out = invoke(authorTool(), Map.of("pipeline", filterFlowMap()));
         assertEquals("orders_flow", out.get("name"));
         assertEquals(false, out.get("simulated"));
         assertEquals(3, ((List<Object>) out.get("nodes")).size());
-        // `flow` is the round-tripped GRAPH, not its name (A5.3) — the caller applies this, and a name
+        // `pipeline` is the round-tripped GRAPH, not its name (A5.3) — the caller applies this, and a name
         // string is not something a pane can adopt.
-        Map<String, Object> echoed = (Map<String, Object>) out.get("flow");
+        Map<String, Object> echoed = (Map<String, Object>) out.get("pipeline");
         assertEquals("orders_flow", echoed.get("name"));
         assertEquals(3, ((List<Object>) echoed.get("nodes")).size());
         assertEquals(true, out.get("clean"));
@@ -595,14 +595,14 @@ class InspectoToolsTest {
     }
 
     private static Map<String, Object> pipelineArg(Map<String, Object> f) {
-        return Map.of("flow", f);
+        return Map.of("pipeline", f);
     }
 
     @Test
     @SuppressWarnings("unchecked")
     void pipelineAuthorSimulatesTheFilterFlowWithSinkCounts() {
         Map<String, Object> out = invoke(authorTool(), Map.of(
-                "flow", filterFlowMap(),
+                "pipeline", filterFlowMap(),
                 "sampleRows", List.of(sampleRow("1", "150"), sampleRow("2", "50"), sampleRow("3", "200"))));
         assertEquals(true, out.get("simulated"));
         assertEquals("acq", out.get("seedNode"));
@@ -615,16 +615,16 @@ class InspectoToolsTest {
     @Test
     void pipelineAuthorReportsAMalformedFlowAsAnError() {
         ToolResult r = authorTool().invoke(new ToolCall("pipeline_author",
-                Map.of("flow", Map.of("active", true)), new RunId("t")));   // no name
+                Map.of("pipeline", Map.of("active", true)), new RunId("t")));   // no name
         assertFalse(r.ok());
-        assertTrue(r.error().contains("invalid flow"));
+        assertTrue(r.error().contains("invalid pipeline"));
     }
 
     @Test
     void pipelineAuthorRequiresAFlowObject() {
         ToolResult r = authorTool().invoke(new ToolCall("pipeline_author", Map.of(), new RunId("t")));
         assertFalse(r.ok());
-        assertTrue(r.error().contains("flow is required"));
+        assertTrue(r.error().contains("pipeline is required"));
     }
 
     // ── AGT-5 P2 slice 4: suggest_expectations (profiling → expectation drafts) ───

@@ -92,7 +92,7 @@ describe('adaptToolResult', () => {
 
     it('reports the simulation in the pipeline_author note', () => {
         const drafts = adaptToolResult('pipeline_author', {
-            flow: { name: 'dedup_msisdn', nodes: [] },
+            pipeline: { name: 'dedup_msisdn', nodes: [] },
             nodes: [{ id: 'n1' }, { id: 'n2' }],
             simulated: true,
         });
@@ -106,7 +106,7 @@ describe('adaptToolResult', () => {
         // edge as a green draft and invite the operator to apply an unexecutable pipeline.
         const drafts = adaptToolResult('pipeline_author', {
             name: 'orders_flow',
-            flow: { name: 'orders_flow', nodes: [{ id: 'acq' }] },
+            pipeline: { name: 'orders_flow', nodes: [{ id: 'acq' }] },
             nodes: [{ id: 'acq' }],
             clean: false,
             simulated: false,

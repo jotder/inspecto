@@ -31,7 +31,7 @@ import java.util.Map;
  * <pre>
  *   { "store": "...",
  *     "upstream":   [ { pipeline, batchId, inputFile, partition, rowCount } … ],   // ingest: files → this store
- *     "downstream": [ { flow, sinks:[…] } … ] }                                    // flows reading this store
+ *     "downstream": [ { pipeline, sinks:[…] } … ] }                                    // flows reading this store
  * </pre>
  * Independent of {@code -Dprovenance.backend}: the upstream half reads the ingest audit CSVs and the downstream
  * half reads the authored-pipeline store. Both degrade to {@code []} (never a 500) when their inputs are absent.
@@ -110,7 +110,6 @@ final class LineageRoutes implements RouteModule {
             if (!PipelineStores.consumed(g).contains(store)) continue;
             Map<String, Object> f = new LinkedHashMap<>();
             f.put("pipeline", g.name());
-            f.put("flow", g.name());   // Tier 3 dual-emit: kept for callers still reading the pre-rename key
             f.put("sinks", new ArrayList<>(PipelineStores.produced(g)));
             flows.add(f);
         }

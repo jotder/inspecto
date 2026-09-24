@@ -3067,18 +3067,18 @@ describe('PipelineEditorComponent', () => {
 
     // ─── AGT-6a A5.3: natural-language authoring ───
 
-    it('sends the graph under `flow`, the only shape the tool accepts', () => {
+    it('sends the graph under `pipeline`, the only shape the tool accepts', () => {
         // Regression: this pane passed {name, nodes, edges} FLAT, so every real-backend call answered
-        // "flow is required and must be an object". Only the offline mock's leniency hid it.
+        // "pipeline is required and must be an object". Only the offline mock's leniency hid it.
         const c = make();
         c.model.set(structuredClone(FLOW));
 
-        const args = c.aiPipelineArgs() as { flow: AuthoredPipeline };
-        expect(Object.keys(args)).toEqual(['flow']);
-        expect(args.flow.nodes).toHaveLength(2);
-        expect(args.flow.name).toBe('demo');
+        const args = c.aiPipelineArgs() as { pipeline: AuthoredPipeline };
+        expect(Object.keys(args)).toEqual(['pipeline']);
+        expect(args.pipeline.nodes).toHaveLength(2);
+        expect(args.pipeline.name).toBe('demo');
         // `active` travels or the echoed graph diffs as though the check wanted to deactivate the pipeline.
-        expect(args.flow.active).toBe(false);
+        expect(args.pipeline.active).toBe(false);
     });
 
     it('sends NO pane args on the prompt instance, or the derived topology would be overwritten', () => {

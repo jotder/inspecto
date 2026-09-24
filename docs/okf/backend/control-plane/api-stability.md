@@ -114,6 +114,22 @@ above the generated commit list.
 - Unaffected: `PipelineGraphRoutes` (needs a migration pass first) and `RecipeCompiler`, where the intended
   run-time WARNING has nowhere to go until a non-fatal diagnostic channel exists.
 
+**Breaking — `flow` → `pipeline` on the wire (vocabulary Tier 3 cutover, 2026-09-24)**
+- The Tier 3 dual-emit is **over**: JSON responses carry only the canonical key. `GET /views` and
+  `GET /views/{store}` summaries drop `flow` (keep `pipeline`); the `/lineage` `downstream[]` entries drop
+  `flow`; the combined topology `GET /pipelines/combined` (`PipelineProjection.combined`) drops the top-level `flows` array
+  (keep `pipelines`) and each node's / edge's `flow` field (keep `pipeline`).
+- Persisted view definitions (`<write-root>/views/*_view.toon`) are written with `pipeline:` only, and
+  **`flow:` is no longer read** — a `flow`-only file resolves no producing pipeline. No such file existed
+  (`spaces/`, `examples/`), and the one file carrying both keys was migrated.
+- `com.gamma.pipeline.ViewDefinition` (`@PublicApi(since = "4.0.0")`): record component **`flow` →
+  `pipeline`** (accessor `flow()` → `pipeline()`). No alias.
+- The `pipeline_author` agent tool: argument **`flow` → `pipeline`**, result key `flow` → `pipeline`, and the
+  whole-graph finding `fieldPath` `flow` → `pipeline`. The one caller (the pipeline editor) moved in the
+  same change; `flow` is not accepted.
+- ⚠ **Not in this cutover** (still dual-read, separate debt): the `flow:` key of a `type: pipeline`
+  `*_job.toon` and the `?flow=` query param.
+
 **Breaking — configuration and CLI**
 - `-Dauth.oidc.tokenEndpoint` is **required** under `authMode: oidc` (D15, 2026-07-25); there is no IdP
   vendor of record and `OidcTokenRelay` will not guess the endpoint.

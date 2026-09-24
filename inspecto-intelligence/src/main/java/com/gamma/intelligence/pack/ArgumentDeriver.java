@@ -74,7 +74,7 @@ public final class ArgumentDeriver {
      * which is the whole reason a repair loop can converge where a re-roll would not.
      *
      * <p>{@code property} names the argument the model must rewrite ({@code config} for
-     * {@code component_draft}, {@code flow} for {@code pipeline_author}) — a repair turn that does not say
+     * {@code component_draft}, {@code pipeline} for {@code pipeline_author}) — a repair turn that does not say
      * which argument to correct invites the model to restate the whole call.
      */
     public record PriorAttempt(String property, Map<String, Object> config,
@@ -170,15 +170,15 @@ public final class ArgumentDeriver {
     }
 
     /**
-     * {@code pipeline_author}'s spec with {@code flow} constrained by the hand-written graph schema (A5.3).
+     * {@code pipeline_author}'s spec with {@code pipeline} constrained by the hand-written graph schema (A5.3).
      *
      * <p>Unlike {@link #constrainedFor} there is no {@code kind} to key on — a pipeline has exactly one shape —
      * and no {@link com.gamma.config.spec.ConfigSpec} to project from, because an authored graph is an IR
-     * rather than a config type. Plan D9 therefore does not reach it; see {@code InspectoTools.flowSchemaJson}.
+     * rather than a config type. Plan D9 therefore does not reach it; see {@code InspectoTools.pipelineSchemaJson}.
      */
-    public static ToolSpec constrainedFlow(ToolSpec spec) {
-        String json = InspectoTools.flowSchemaJson();
-        return json == null ? spec : withPropertySchema(spec, "flow", json);
+    public static ToolSpec constrainedPipeline(ToolSpec spec) {
+        String json = InspectoTools.pipelineSchemaJson();
+        return json == null ? spec : withPropertySchema(spec, "pipeline", json);
     }
 
     /**

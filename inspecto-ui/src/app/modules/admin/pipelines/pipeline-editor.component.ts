@@ -1328,16 +1328,16 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * The deterministic check's arguments. The tool takes the graph under a `flow` key — passing
+     * The deterministic check's arguments. The tool takes the graph under a `pipeline` key — passing
      * `{name, nodes, edges}` flat, as this pane did before A5.3, made the real backend answer
-     * "flow is required and must be an object" on every call; only the offline mock accepted it.
+     * "pipeline is required and must be an object" on every call; only the offline mock accepted it.
      */
     aiPipelineArgs(): Record<string, unknown> {
         const m = this.model();
         // `active` travels too: the tool echoes the parsed graph, which always carries it, so omitting it
         // here makes the diff claim the check wants to deactivate a live pipeline. (Applying never could —
         // applyPipelineDraft keeps the current lifecycle — but a diff that lies is a diff nobody reads.)
-        return m ? { flow: { name: m.name, active: m.active, nodes: m.nodes, edges: m.edges } } : {};
+        return m ? { pipeline: { name: m.name, active: m.active, nodes: m.nodes, edges: m.edges } } : {};
     }
 
     /**
@@ -1354,7 +1354,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
 
     /**
      * AGT-6a A2: the working model as the diff baseline for the inline surface. `pipeline_author` echoes
-     * back a parsed `flow`, so the comparison is draft-vs-current on the same shape.
+     * back a parsed `pipeline`, so the comparison is draft-vs-current on the same shape.
      */
     aiCurrentPipeline(): Record<string, unknown> | null {
         const m = this.model();

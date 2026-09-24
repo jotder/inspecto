@@ -334,7 +334,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
      */
     private static final Map<String, String> REPAIRABLE = Map.of(
             "component_draft", "config",
-            "pipeline_author", "flow");
+            "pipeline_author", "pipeline");
 
     /** Hard turn cap (plan §5 D11). Three, then hand the operator the best draft and its findings. */
     static final int MAX_REPAIR_TURNS = 3;
@@ -352,7 +352,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
      *   <li><b>Schema-constrained regeneration.</b> The offered spec's bare {@code {"type":"object"}} payload
      *       is replaced with a real schema, so the model is constrained by the very spec that will judge it —
      *       projected from the kind's {@code ConfigSpec} (plan D9) for {@code component_draft}, hand-written
-     *       for a {@code flow} (D9 cannot reach an IR). The kind comes from the <b>pane</b>, never the model.</li>
+     *       for a {@code pipeline} (D9 cannot reach an IR). The kind comes from the <b>pane</b>, never the model.</li>
      *   <li><b>The cap is a hand-over, not a failure.</b> At {@link #MAX_REPAIR_TURNS} it returns the best
      *       draft seen with its findings — which is exactly the A1 experience the surface already renders
      *       for human repair, so the fallback is a working screen rather than a dead end.</li>
@@ -363,8 +363,8 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
     private Map<String, Object> repairLoop(Tool tool, String payload, String prompt,
                                            Map<String, Object> args, String session) {
         Map<String, Object> paneArgs = args == null ? Map.of() : args;
-        ToolSpec spec = "flow".equals(payload)
-                ? ArgumentDeriver.constrainedFlow(tool.spec())                       // A5.3, hand-written
+        ToolSpec spec = "pipeline".equals(payload)
+                ? ArgumentDeriver.constrainedPipeline(tool.spec())                   // A5.3, hand-written
                 : ArgumentDeriver.constrainedFor(tool.spec(), paneArgs.get("kind")); // A5.2, projected (D9)
 
         Map<String, Object> best = null;

@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **50<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** —
+> **49<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 23<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 54 on 2026-09-24**: P2 `STREAM-CONSUMER-1` closed — Option A built, the `SP-ACQ-09` note updated, the plan distilled into `okf/capabilities/acquisition/acquisition.md` and archived.
 > ⬇ 55 → 54 on 2026-09-24: P3 `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` closed — its work had shipped in `d5f6353be`
@@ -22,8 +22,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 26<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 24<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 50<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 23<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 49<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -226,7 +226,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 #### API contract & vocabulary
 
 - **P3** · `ERRORCODE-DEFAULTED-1` — **explicit error codes on the remaining bare throw sites.** The 403 slice is done (zero bare 403 sites; `ErrorCodes` and its constants are public; `ApiContractTest` pins the catalog). **675 of 849 `ApiException` sites still take `ErrorCodes.defaultFor(status)`** (2026-09-24, after the first by-file slice; it was 818 of 849 before it — the 2026-09-17 figure of 620/648 had drifted as routes landed) — sweep by file, re-deriving each count first (the row's original figures were wrong by ~3×). Swept 2026-09-24: `ComponentRoutes` 40 · `inspecto-ops/ObjectRoutes` 39 · `PipelineGraphRoutes` 33 · `ExchangeRoutes` 31 — zero bare sites left in each; codes are the status defaults except the ad-hoc-run 503 (now `CONTROL_PLANE_READ_ONLY`, the write-root gate it is) and the two run-to-here 501s (new `NOT_SUPPORTED`, also `defaultFor(501)` — it was `INTERNAL`). Largest remaining: `inspecto-geo-link/InvestigationRoutes` 68 · `inspecto-geo-link/InvRoutes` 39 · `ReconRoutes` 28 · `AgentRoutes` 24 · `JobRoutes` 22 · `RunRoutes` 21 · `ConnectionRoutes` 21 · `ConfigPreviewRoutes` 21. Derive with `git grep -cP 'new ApiException\([^,()]+,(?!\s*(\w+\.)?[A-Z][A-Z_]+\s*,)' -- '*/src/main/**.java' | sort -t: -k2 -nr` (sum the counts; drop `-c` and pipe to `wc -l` for the total; all sites: `git grep -hPo 'new ApiException\(' -- '*/src/main/**.java' | wc -l`). ⚠ One site emits a code **outside the catalog**: `PipelineGraphRoutes` `new ApiException(422, PipelineValidator.JOIN_REFERENCE_MISSING, …)` — not in `ErrorCodes`, so not in the OpenAPI `ErrorCode` enum.
-- **P3** · **Vocabulary rollout, Tier 3 — the release-gated remainder** — the UI half shipped 2026-09-07 (the DTOs read the canonical `pipeline` key). What remains is **wire and needs the MAJOR**: drop `flow` from the Java JSON (`ViewDefinition.toMap`, `LineageRoutes`, `PipelineProjection`) and rename the `ViewDefinition.flow` record component, which carries `@PublicApi(since="4.0.0")`. ⛔ Do **not** rename the `"flow"` test literals (`ViewStoreTest`, `ControlApiViewsTest`) — they are the only proof the dual-read path works. The agent-tool `flow` argument stays until it dual-accepts. ⚠ When the dual-emit ends, delete `CONFIG_ALLOW['spaces/ucc/config/views/sites_active_view.toon::flow-key']` — the guard's stale-allowlist check fails the build until you do. → `GLOSSARY.md` §13 · `PROJECT_NOTES.md`
 
 ### 3.8 Security, Policy, Editions & Compliance
 

@@ -95,7 +95,8 @@ class ControlApiViewsTest {
             assertEquals(2, list.size(), list.toString());
             JsonNode orders = byStore(list, "orders_view");
             assertTrue(orders.get("has_derived_sql").asBoolean());
-            assertEquals("orders_flow", orders.get("flow").asText());
+            assertEquals("orders_flow", orders.get("pipeline").asText());
+            assertFalse(orders.has("flow"), "the pre-rename key is no longer emitted: " + orders);
             assertFalse(byStore(list, "complex_view").get("has_derived_sql").asBoolean());
 
             // definition — carries the derived_sql + lineage
