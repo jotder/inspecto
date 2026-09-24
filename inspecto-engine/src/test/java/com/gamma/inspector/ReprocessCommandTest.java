@@ -83,7 +83,7 @@ class ReprocessCommandTest {
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             store.record(m.outputs.stream()
                     .map(o -> new ConsignmentOutput(batchId, null, "t", "dt=2020-04-03", "2020-04-03",
-                            o.outputFile(), 1L, 100L, "2026-08-04T10:00:00Z", 0,
+                            o.outputFile(), 1L, 100L, "2026-08-04T10:00:00Z",
                             ConsignmentOutput.State.LIVE))
                     .toList());
             // What PartitionCompactor now does when it merges those files away.
@@ -127,7 +127,7 @@ class ReprocessCommandTest {
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             store.record(m.outputs.stream()
                     .map(o -> new ConsignmentOutput(batchId, null, "t", "dt=2020-04-03", "2020-04-03",
-                            o.outputFile(), 1L, 100L, "2026-08-04T10:00:00Z", 0,
+                            o.outputFile(), 1L, 100L, "2026-08-04T10:00:00Z",
                             ConsignmentOutput.State.LIVE))
                     .toList());
             ConsignmentOutputStores.use(store);

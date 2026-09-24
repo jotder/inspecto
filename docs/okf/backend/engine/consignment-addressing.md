@@ -198,7 +198,8 @@ The current model:
    old one. Not a `<generation>` counter: that needs durable state the optional registry cannot
    guarantee, `_g<N>_` is already `DuckDbRecordSink`'s spelling for a memory-bounded flush chunk, and a
    batch-derived name preserves what the old stable name existed for — a same-batch-id replay still
-   rewrites its own path, so it stays idempotent.
+   rewrites its own path, so it stays idempotent. The registry's never-written `generation` column was
+   deleted on 2026-09-24 for the same reason (`db-layer.md` §3.9) — nothing here pins by generation.
 2. `supersedeOtherRevisions(table, keep)` marks earlier revisions dead. **Full recomputes only** — an
    incremental run appends a slice, so superseding there would discard every increment before it.
    `keep` is required: omitting it would mark the recompute's own fresh files stale and empty the table.

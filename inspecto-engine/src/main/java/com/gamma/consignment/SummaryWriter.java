@@ -273,7 +273,7 @@ public final class SummaryWriter {
             String partition = p.partition() == null ? "" : p.partition();
             out.add(new ConsignmentOutput(consignmentId, runId, target + SUMMARY_SUFFIX, partition,
                     recordDayOf(partition), p.outputFile(), counts.getOrDefault(partition, 0L),
-                    p.bytes(), writtenAt, 0, ConsignmentOutput.State.LIVE, null, bounds.get(partition),
+                    p.bytes(), writtenAt, ConsignmentOutput.State.LIVE, null, bounds.get(partition),
                     producer));
         }
         return out;

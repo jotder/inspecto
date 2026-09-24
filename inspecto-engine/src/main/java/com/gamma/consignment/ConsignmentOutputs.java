@@ -342,7 +342,7 @@ public final class ConsignmentOutputs {
     }
 
     /**
-     * One {@link ConsignmentOutput} per written file, stamped {@code LIVE} at {@code generation} 0 with a single
+     * One {@link ConsignmentOutput} per written file, stamped {@code LIVE} with a single
      * {@code writtenAt} for the whole registration — the files became visible together, at the reveal that
      * preceded this call.
      */
@@ -372,7 +372,7 @@ public final class ConsignmentOutputs {
                         byOutput.getOrDefault(o.outputFile(), tableName), o.partition(),
                         recordDay(o.partition(), bounds == null ? null : bounds.get(o.outputFile())),
                         o.outputFile(), rows.applyAsLong(o), o.bytes(),
-                        writtenAt, 0, ConsignmentOutput.State.LIVE, schemaFingerprint,
+                        writtenAt, ConsignmentOutput.State.LIVE, schemaFingerprint,
                         bounds == null ? null : bounds.get(o.outputFile()), producer))
                 .toList();
     }

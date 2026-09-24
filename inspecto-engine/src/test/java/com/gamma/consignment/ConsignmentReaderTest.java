@@ -39,7 +39,7 @@ class ConsignmentReaderTest {
 
     private static ConsignmentOutput out(Path path, String table, long rows, State state) {
         return new ConsignmentOutput("c1", null, table, "year=2026/month=07/day=01", "2026-07-01",
-                path.toString(), rows, 100L, "2026-08-04T10:00:00Z", 0, state);
+                path.toString(), rows, 100L, "2026-08-04T10:00:00Z", state);
     }
 
     private static ConsignmentReader readerOver(Path root, String partition, int n) throws Exception {

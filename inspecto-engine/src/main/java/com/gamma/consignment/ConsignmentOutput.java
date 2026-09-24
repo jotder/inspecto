@@ -38,8 +38,6 @@ import com.gamma.api.PublicApi;
  * @param rows          row count, summed across every lineage row sharing this output file.
  * @param bytes         file size as observed on disk after the atomic reveal.
  * @param writtenAt     ISO-8601 instant the file was revealed.
- * @param generation    per-partition compaction generation (§6.3) — compaction stages a new generation and
- *                      flips it, so a crash between write and unlink cannot double-count.
  * @param state         lifecycle state; see {@link State}.
  * @param schemaFingerprint SHA-256 ({@code CanonicalHash}) of the resolved schema map — mapping rules
  *                      included — that wrote the file (ELT amendment §3.4.3: data carries its schema
@@ -67,7 +65,6 @@ public record ConsignmentOutput(
         long rows,
         long bytes,
         String writtenAt,
-        int generation,
         State state,
         String schemaFingerprint,
         EventTimeBounds bounds,
@@ -76,17 +73,17 @@ public record ConsignmentOutput(
     /** Fingerprint-less form — pre-§3.4.3 call sites and write paths with no pipeline schema. */
     public ConsignmentOutput(String consignmentId, String runId, String tableName, String partitionKey,
                              String recordDay, String path, long rows, long bytes, String writtenAt,
-                             int generation, State state) {
+                             State state) {
         this(consignmentId, runId, tableName, partitionKey, recordDay, path, rows, bytes, writtenAt,
-                generation, state, null);
+                state, null);
     }
 
     /** Pre-§3.1 form — no event-time bounds and no producer. */
     public ConsignmentOutput(String consignmentId, String runId, String tableName, String partitionKey,
                              String recordDay, String path, long rows, long bytes, String writtenAt,
-                             int generation, State state, String schemaFingerprint) {
+                             State state, String schemaFingerprint) {
         this(consignmentId, runId, tableName, partitionKey, recordDay, path, rows, bytes, writtenAt,
-                generation, state, schemaFingerprint, null, null);
+                state, schemaFingerprint, null, null);
     }
 
     /**

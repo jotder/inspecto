@@ -473,7 +473,6 @@ CREATE TABLE IF NOT EXISTS consignment_outputs (
   row_count      BIGINT,   -- (the plan sketch calls this `rows`; `ROWS` is a SQL keyword)
   bytes          BIGINT,
   written_at     VARCHAR,
-  generation     INTEGER,
   state          VARCHAR,  -- LIVE | SUPERSEDED | COMPACTED_AWAY | SIMULATED (PIPELINE-DRYRUN-1 — a dry-run
                             -- "would-have" row: no bytes written, `path` a placeholder; excluded from every
                             -- state='LIVE' readability/selection check, so it can never be read as real data
@@ -489,7 +488,26 @@ CREATE TABLE IF NOT EXISTS consignment_outputs (
 `initSchema()` follows the CREATE with `ALTER TABLE consignment_outputs ADD COLUMN IF NOT EXISTS` for
 `schema_fingerprint` and for each of the four addressing columns — the additive migration for registries
 created before they existed (CREATE TABLE IF NOT EXISTS never widens an existing table). Pre-migration rows
-read back `NULL`.
+read back `NULL`. It then runs `ALTER TABLE consignment_outputs DROP COLUMN IF EXISTS generation` — the one
+**subtractive** migration (see below); it runs before the constraint check, so a pre-constraint registry is
+rebuilt without the column and a constrained one loses it in place.
+
+⛔ **`generation` was DELETED end to end on 2026-09-24** (record field, column, upsert, reader). Grounded
+before the cut: every writer (`ConsignmentOutputs.build`, `DerivedTableWriter`, `SummaryWriter`,
+`DryRunSinkWriter`) passed a literal `0`; the only reader was `DbConsignmentOutputStore.map` copying it into a
+record field whose accessor no main-code path called; no SQL string, route (`RunRoutes` provenance omits it),
+openapi entry or UI surface mentioned it. The semantics it was declared for are already carried elsewhere —
+reprocess by `state = SUPERSEDED`, compaction by `COMPACTED_AWAY`, revisions by batch-id file names
+(`consignment-addressing.md`, which records why a counter was refused), and torn-read safety by
+`ConsignmentSelector` pinning an **enumerated file list**, not a generation. ⛔ Do not re-add a counter
+"for pinning": the Selector never needed one. Pinned by
+`DbConsignmentOutputStoreTest.aRegistryCarryingTheRetiredGenerationColumnLosesItOnReopen`.
+
+**Deliberately unbuilt** (carried here when the *Consignment ELT* board row was retired with the column,
+2026-09-24): the §7.4 rollup cache, until read-time aggregation is measurably slow; the §7.3 unpartitioned
+fallback stands by operator call. The per-schema outputs decision shipped 2026-09-15 (this table made
+per-schema accurate; `batches` stays one row per ingest). ⛔ Pointers to `CONSIGNMENT-OUTPUTS-NULLRUN-1` are
+dead (refuted 2026-09-15).
 
 ✅ **`UNIQUE (consignment_id, path, run_id)` SHIPPED 2026-09-13** (Run model slice 4) — one Consignment
 writing one path in one Run is **one file**, and `record` is
@@ -525,8 +543,7 @@ from the key — but `NOT NULL` would be strictly worse than the exemption: `rec
 violation would drop a *landed* file's row into a WARN, and a registry written before slice 3 could not be
 rebuilt at all (its legacy rows have no run identity, and inventing one would report a Run that never
 existed). The remaining exemption is the five-arg `EnrichmentEngine.runResult` overload that only tests call,
-pinned by its own test so it stays visible. ⚠ `generation` stays **inert** — declared on the record, hard-coded
-`0` at every construction site — and is therefore not part of the key.
+pinned by its own test so it stays visible.
 
 **Measured cost (2026-09-13, DuckDB 1.5.2.1, throwaway harness).** Per row, steady from 500 to 8 000 rows:
 plain `INSERT` ~610 µs · **UNIQUE constraint + plain `INSERT` ~740 µs (+15 %)** · `ON CONFLICT DO NOTHING`
@@ -923,7 +940,7 @@ beside `-D`, the split-brain the enrichment companion already refused (D7). Deci
 operator applies flags through their own deployment tooling; this screen tells them what is in force.
 
 - ⛔ **Two ledger homes were rejected for the keyed dedup window, and the reasons still bind.** The
-  file-grained output ledger keys on `(consignmentId, runId, tableName, partitionKey, path, generation)` and
+  file-grained output ledger keys on `(consignmentId, runId, tableName, partitionKey, path)` and
   has **no column for a business key**, so carrying key hashes there would be a new table shape, not a new
   column. And **manifests are the crash-recovery record of existence, not a query surface**. *(Distilled 2026-09-10 (Sprint 7.6) from the three archived plans; this was their only home.)*
 - ⚠ **Adding a `Family` is a COMPILING change, not a config toggle** — a label, a `*.backend` property, a

@@ -339,9 +339,9 @@ class PipelineJobRunnerTest {
             String old  = Path.of(dataDir, "events", "c-old.parquet").toString();
             registry.record(List.of(
                     new com.gamma.consignment.ConsignmentOutput("c-live", "run-0", "events", "", null, live,
-                            2, 200, "2026-09-01T00:00:00Z", 0, com.gamma.consignment.ConsignmentOutput.State.LIVE),
+                            2, 200, "2026-09-01T00:00:00Z", com.gamma.consignment.ConsignmentOutput.State.LIVE),
                     new com.gamma.consignment.ConsignmentOutput("c-old", "run-0", "events", "", null, old,
-                            1, 100, "2026-08-01T00:00:00Z", 0, com.gamma.consignment.ConsignmentOutput.State.SUPERSEDED)));
+                            1, 100, "2026-08-01T00:00:00Z", com.gamma.consignment.ConsignmentOutput.State.SUPERSEDED)));
             com.gamma.consignment.ConsignmentOutputStores.use(registry);
             try {
                 RecordingContext ctx = new RecordingContext();

@@ -42,7 +42,7 @@ class DerivedTableWriterTest {
     private static ConsignmentReader readerOver(Path file, long rows) throws Exception {
         return SandboxConsignmentReader.over(List.of(new ConsignmentOutput(
                 "c1", null, "base", "", null, file.toString(), rows, 1L, "2026-08-29T00:00:00Z",
-                0, State.LIVE, null, null, "sync")));
+                State.LIVE, null, null, "sync")));
     }
 
     // ── the guard ─────────────────────────────────────────────────────────────

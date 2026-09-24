@@ -96,7 +96,7 @@ class ConsignmentProcessJobTypeTest {
 
     private static ConsignmentOutput out(Path path, long rows) {
         return new ConsignmentOutput("c1", null, "cdr", "year=2026/month=07/day=01", "2026-07-01",
-                path.toString(), rows, 100L, "2026-08-04T10:00:00Z", 0, ConsignmentOutput.State.LIVE);
+                path.toString(), rows, 100L, "2026-08-04T10:00:00Z", ConsignmentOutput.State.LIVE);
     }
 
     /** A job whose lookup knows several processors, so a chain can resolve every step. */

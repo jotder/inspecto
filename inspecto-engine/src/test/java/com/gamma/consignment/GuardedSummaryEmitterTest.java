@@ -191,7 +191,7 @@ class GuardedSummaryEmitterTest {
 
     private static ConsignmentOutput detail(String table, long rows) {
         return new ConsignmentOutput("c1", null, table, "p", null, "/w/" + table + "/f.parquet",
-                rows, 10L, "2026-08-04T10:00:00Z", 0, ConsignmentOutput.State.LIVE);
+                rows, 10L, "2026-08-04T10:00:00Z", ConsignmentOutput.State.LIVE);
     }
 
     @Test
@@ -216,7 +216,7 @@ class GuardedSummaryEmitterTest {
         emitter.emit(row(Measure.additive(SummaryEmitter.COUNT, 5)));
 
         ConsignmentOutput compacted = new ConsignmentOutput("c1", null, "cdr", "p", null, "/w/old.parquet",
-                500L, 10L, "2026-08-04T10:00:00Z", 0, ConsignmentOutput.State.COMPACTED_AWAY);
+                500L, 10L, "2026-08-04T10:00:00Z", ConsignmentOutput.State.COMPACTED_AWAY);
         assertTrue(emitter.reconcile(List.of(detail("cdr", 5), compacted)).isEmpty());
     }
 }

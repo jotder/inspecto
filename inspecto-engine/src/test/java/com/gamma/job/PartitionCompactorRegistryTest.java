@@ -54,7 +54,7 @@ class PartitionCompactorRegistryTest {
 
     private static ConsignmentOutput out(String consignment, Path path) {
         return new ConsignmentOutput(consignment, null, "cdr", "dt=2026-08-04", "2026-08-04",
-                path.toString(), 1L, 100L, "2026-08-04T10:00:00Z", 0, State.LIVE);
+                path.toString(), 1L, 100L, "2026-08-04T10:00:00Z", State.LIVE);
     }
 
     private static JobConfig compactCfg(Path root) {

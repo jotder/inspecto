@@ -44,7 +44,7 @@ class ViewReaderSqlTest {
 
     private static ConsignmentOutput row(String path, State state) {
         return new ConsignmentOutput("c-" + path.hashCode(), "run-1", "cdr", "", null, path,
-                1, 100, "2026-08-10T10:00:00Z", 0, state);
+                1, 100, "2026-08-10T10:00:00Z", state);
     }
 
     /** A runner-shaped definition: the source read is the token, its ingredients ride alongside. */

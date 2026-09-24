@@ -105,7 +105,7 @@ class MaintenanceLibraryTest {
 
     private static com.gamma.consignment.ConsignmentOutput superseded(Path file) {
         return new com.gamma.consignment.ConsignmentOutput("c1", "run-1", "cdr", "", null,
-                file.toString(), 1, 1, "2026-08-01T10:00:00Z", 0,
+                file.toString(), 1, 1, "2026-08-01T10:00:00Z",
                 com.gamma.consignment.ConsignmentOutput.State.SUPERSEDED);
     }
 

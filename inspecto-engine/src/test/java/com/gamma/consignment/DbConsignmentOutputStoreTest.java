@@ -47,7 +47,7 @@ class DbConsignmentOutputStoreTest {
     private static ConsignmentOutput vol(String consignment, String producer, String day, String path,
                                          long rows, State state) {
         return new ConsignmentOutput(consignment, "run-1", "cdr", "dt=" + day, day, path, rows,
-                rows * 100, day + "T10:00:00Z", 1, state, null, null, producer);
+                rows * 100, day + "T10:00:00Z", state, null, null, producer);
     }
 
     /**
@@ -101,7 +101,7 @@ class DbConsignmentOutputStoreTest {
             db.record(List.of(
                     vol("c1", "p", "2026-08-04", "/w/known.parquet", 10, State.LIVE),
                     new ConsignmentOutput("c2", "run-1", "cdr", null, null, "/w/unknown.parquet", 7, 700,
-                            "2026-08-04T10:00:00Z", 1, State.LIVE, null, null, "p")));
+                            "2026-08-04T10:00:00Z", State.LIVE, null, null, "p")));
 
             List<DbConsignmentOutputStore.DailyVolume> v = db.dailyVolume("p", "2026-08-01", "2026-08-31");
 
@@ -146,7 +146,7 @@ class DbConsignmentOutputStoreTest {
 
     private static ConsignmentOutput out(String consignment, String path, long rows, State state) {
         return new ConsignmentOutput(consignment, "run-1", "cdr", "dt=2026-08-04", "2026-08-04",
-                path, rows, rows * 100, "2026-08-04T10:00:00Z", 1, state);
+                path, rows, rows * 100, "2026-08-04T10:00:00Z", state);
     }
 
     @Test
@@ -166,7 +166,6 @@ class DbConsignmentOutputStoreTest {
             assertEquals(42L, o.rows(), "row_count must survive — it is the field PartitionOutput cannot supply");
             assertEquals(4200L, o.bytes());
             assertEquals("2026-08-04T10:00:00Z", o.writtenAt());
-            assertEquals(1, o.generation());
             assertEquals(State.LIVE, o.state());
         }
     }
@@ -244,10 +243,10 @@ class DbConsignmentOutputStoreTest {
                     // Columns named, not positional: this row exists to exercise `state`, and an unrelated
                     // additive migration must not turn it into an arity error.
                     st.execute("INSERT INTO consignment_outputs (consignment_id, run_id, table_name, "
-                            + "partition_key, record_day, path, row_count, bytes, written_at, generation, "
+                            + "partition_key, record_day, path, row_count, bytes, written_at, "
                             + "state, schema_fingerprint) VALUES "
                             + "('c1','run-1','cdr','dt=2026-08-04','2026-08-04','/w/x.parquet',1,100,"
-                            + "'2026-08-04T10:00:00Z',1,'QUARANTINED_BY_A_FUTURE_BUILD',NULL)");
+                            + "'2026-08-04T10:00:00Z','QUARANTINED_BY_A_FUTURE_BUILD',NULL)");
                 } catch (SQLException e) {
                     fail("raw insert should succeed: " + e.getMessage());
                 }
@@ -283,7 +282,7 @@ class DbConsignmentOutputStoreTest {
         try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             db.record(List.of(
                     new ConsignmentOutput("c1", "run-1", "cdr", "dt=2026-08-04", "2026-08-04",
-                            "/w/a.parquet", 1, 100, "2026-08-04T10:00:00Z", 1, State.LIVE, "abc123"),
+                            "/w/a.parquet", 1, 100, "2026-08-04T10:00:00Z", State.LIVE, "abc123"),
                     out("c1", "/w/b.parquet", 2, State.LIVE)));   // fingerprint-less form → null
 
             List<ConsignmentOutput> rows = db.outputs("c1");
@@ -320,7 +319,7 @@ class DbConsignmentOutputStoreTest {
             assertNull(old.get(0).schemaFingerprint());
 
             db.record(List.of(new ConsignmentOutput("c1", "run-1", "cdr", "dt=2026-08-04", "2026-08-04",
-                    "/w/new.parquet", 1, 100, "2026-08-04T10:00:00Z", 1, State.LIVE, "fp-1")));
+                    "/w/new.parquet", 1, 100, "2026-08-04T10:00:00Z", State.LIVE, "fp-1")));
             assertEquals("fp-1", db.outputs("c1").get(0).schemaFingerprint());
         }
     }
@@ -430,7 +429,7 @@ class DbConsignmentOutputStoreTest {
     private static ConsignmentOutput by(String producer, String path, String eventTimeMax,
                                         String writtenAt, State state) {
         return new ConsignmentOutput("c-" + path, "run-1", "cdr", "dt=2026-08-10", "2026-08-10", path,
-                1, 100, writtenAt, 0, state, null,
+                1, 100, writtenAt, state, null,
                 eventTimeMax == null ? null : new EventTimeBounds("2026-08-10T00:00:00", eventTimeMax, 0),
                 producer);
     }
@@ -443,7 +442,7 @@ class DbConsignmentOutputStoreTest {
     /** As {@link #by} but with both ends of the range explicit — {@code bounds()} folds min as well as max. */
     private static ConsignmentOutput ranged(String path, String min, String max, State state) {
         return new ConsignmentOutput("c-" + path, "run-1", "cdr", "dt=2026-08-10", "2026-08-10", path,
-                1, 100, "2026-08-10T12:00:00Z", 0, state, null, new EventTimeBounds(min, max, 0), "north");
+                1, 100, "2026-08-10T12:00:00Z", state, null, new EventTimeBounds(min, max, 0), "north");
     }
 
     /**
@@ -598,7 +597,7 @@ class DbConsignmentOutputStoreTest {
             db.record(List.of(by("north", "/w/rev2.parquet", null, "2026-08-10T10:00:00Z", State.LIVE)));
             // a different table's rows must not move
             db.record(List.of(new ConsignmentOutput("c-other", "run-1", "sms", "", null, "/w/sms.parquet",
-                    1, 100, "2026-08-10T10:00:00Z", 0, State.LIVE)));
+                    1, 100, "2026-08-10T10:00:00Z", State.LIVE)));
 
             assertEquals(1, db.supersedeOtherRevisions("cdr", "c-/w/rev2.parquet"));
             assertEquals(List.of("/w/rev1.parquet"), db.unreadablePaths());
@@ -784,10 +783,55 @@ class DbConsignmentOutputStoreTest {
         }
     }
 
+    /**
+     * The retired {@code generation} column (a literal 0 on every write path, read by nothing) is DROPPED on
+     * reopen of a current-shape registry — one that already carries the UNIQUE key, so the drop runs against a
+     * constrained table rather than riding the pre-constraint rebuild. Every row and every other column survives.
+     */
+    @Test
+    void aRegistryCarryingTheRetiredGenerationColumnLosesItOnReopen(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("outputs.duckdb");
+        try (Connection legacy = com.gamma.util.JdbcDrivers.connect(url);
+             Statement st = legacy.createStatement()) {
+            st.execute("CREATE TABLE consignment_outputs ("
+                    + "consignment_id VARCHAR, run_id VARCHAR, table_name VARCHAR, "
+                    + "partition_key VARCHAR, record_day VARCHAR, path VARCHAR, "
+                    + "row_count BIGINT, bytes BIGINT, written_at VARCHAR, "
+                    + "generation INTEGER, state VARCHAR, schema_fingerprint VARCHAR, "
+                    + "event_time_min VARCHAR, event_time_max VARCHAR, "
+                    + "event_time_spread_ms BIGINT, producer VARCHAR, "
+                    + "UNIQUE (consignment_id, path, run_id))");
+            st.execute("INSERT INTO consignment_outputs VALUES "
+                    + "('c0','run-0','cdr','dt=2026-08-01','2026-08-01','/w/a.parquet',9,900,"
+                    + "'2026-08-01T10:00:00Z',0,'SUPERSEDED','fp-0',NULL,NULL,NULL,'north')");
+        }
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open(url)) {
+            List<ConsignmentOutput> rows = db.outputs("c0");
+            assertEquals(1, rows.size(), "the row survives the drop");
+            ConsignmentOutput o = rows.get(0);
+            assertEquals(9L, o.rows());
+            assertEquals(State.SUPERSEDED, o.state());
+            assertEquals("fp-0", o.schemaFingerprint());
+            assertEquals("north", o.producer());
+
+            db.record(List.of(withRun("c0", "run-0", "/w/a.parquet", 42, State.LIVE)));
+            assertEquals(1, db.outputs("c0").size(), "the key survives the drop, so the write upserts");
+            assertEquals(42L, db.outputs("c0").get(0).rows());
+            db.browseSource().run(raw -> {
+                try (Statement st = raw.createStatement();
+                     java.sql.ResultSet rs = st.executeQuery("SELECT count(*) FROM information_schema.columns "
+                             + "WHERE table_name = 'consignment_outputs' AND column_name = 'generation'")) {
+                    assertTrue(rs.next());
+                    assertEquals(0, rs.getInt(1), "the retired column is gone");
+                }
+            });
+        }
+    }
+
     /** As {@link #out} but naming the Run - the key column these tests are about. */
     private static ConsignmentOutput withRun(String consignment, String runId, String path, long rows,
                                              State state) {
         return new ConsignmentOutput(consignment, runId, "cdr", "dt=2026-08-04", "2026-08-04",
-                path, rows, rows * 100, "2026-08-04T10:00:00Z", 1, state);
+                path, rows, rows * 100, "2026-08-04T10:00:00Z", state);
     }
 }
