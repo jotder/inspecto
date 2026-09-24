@@ -307,8 +307,8 @@ public final class RecipeCompiler {
         if (join != null) {
             Map<String, Object> node = new LinkedHashMap<>();
             String s = join.toString().trim();
-            node.put("reference", s.startsWith("references/")
-                    ? "reference/" + s.substring("references/".length()) : s);
+            String byName = com.gamma.etl.ReferenceBinding.name(s);
+            node.put("reference", byName != null ? com.gamma.etl.ReferenceBinding.PREFIX + byName : s);
             if (on != null) node.put("on", on instanceof List<?> l ? l : List.of(on.toString()));
             else refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
                     "transform.join needs on: — the join-key column(s)"));

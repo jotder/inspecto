@@ -2,6 +2,7 @@ package com.gamma.enrich;
 
 import com.gamma.api.PublicApi;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.ReferenceBinding;
 import com.gamma.sql.SqlViews;
 
 import java.util.List;
@@ -29,9 +30,6 @@ import java.util.Locale;
 public final class ReferenceReader {
 
     private ReferenceReader() {}
-
-    /** The {@code reference/<name>} prefix a {@code transform.join} node's {@code reference} key uses. */
-    private static final String REF_PREFIX = "reference/";
 
     /**
      * The read expression for {@code r}. {@code pipelines} is the loaded-pipeline context a by-name
@@ -75,7 +73,8 @@ public final class ReferenceReader {
     /**
      * The {@link EnrichmentConfig.Reference} a {@code transform.join} node's {@code reference} config value
      * denotes: {@code reference/<pipeline>} binds by name (the spelling {@code RecipeCompiler} normalises
-     * to and {@code PipelineLift} carries), anything else is a direct path whose format comes from its
+     * to and {@code PipelineLift} carries), and so does the recipe's plural {@code references/<pipeline>}
+     * ({@link ReferenceBinding} — the same test the flat parser applies); anything else is a direct path whose format comes from its
      * extension. Splitting this out means the join node and an {@code *_enrich.toon} reference reach
      * {@link #sqlFor} as the same thing, so versioned/as-of semantics cannot diverge between them.
      */
@@ -83,10 +82,10 @@ public final class ReferenceReader {
         if (reference == null || reference.isBlank())
             throw new IllegalArgumentException("a reference is required (reference/<pipeline> or a path)");
         String s = reference.trim();
-        if (s.startsWith(REF_PREFIX)) {
-            String ref = s.substring(REF_PREFIX.length()).trim();
+        String ref = ReferenceBinding.name(s);
+        if (ref != null) {
             if (ref.isEmpty())
-                throw new IllegalArgumentException("reference '" + s + "' names no pipeline after '" + REF_PREFIX + "'");
+                throw new IllegalArgumentException("reference '" + s + "' names no pipeline after its prefix");
             return new EnrichmentConfig.Reference(ref, null, null, ref);
         }
         String format = s.toLowerCase(Locale.ROOT).endsWith(".parquet") ? "PARQUET" : "CSV";

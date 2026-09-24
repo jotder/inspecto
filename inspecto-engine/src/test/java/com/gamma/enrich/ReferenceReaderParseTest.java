@@ -20,6 +20,16 @@ class ReferenceReaderParseTest {
         assertFalse(r.hasAsOf(), "a join node carries no as_of — that stays an enrichment binding");
     }
 
+    /** The recipe's plural {@code references/} binds by name exactly like the singular (the flat parser agrees). */
+    @Test
+    void thePluralReferencesPrefixBindsByNameToo() {
+        var r = ReferenceReader.parse("references/region_dim");
+        assertTrue(r.byName());
+        assertEquals("region_dim", r.ref());
+        assertNull(r.path());
+        assertThrows(IllegalArgumentException.class, () -> ReferenceReader.parse("references/"));
+    }
+
     @Test
     void anythingElseIsAPath_withTheFormatTakenFromTheExtension() {
         var parquet = ReferenceReader.parse("/data/dims/region.parquet");
