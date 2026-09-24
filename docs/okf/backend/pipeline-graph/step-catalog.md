@@ -771,7 +771,7 @@ file to `archive/archive/…`).
 | Azure Blob & ADLS Gen2 ingest | `acquisition.file.azure` | `acquisition` — Connection kind exists (azure blob connector); ADLS Gen2 semantics not proven |
 | AWS S3 object ingest | `acquisition.file.s3` | `acquisition` — Connection kind exists (s3 connector, SDK-free SigV4; covers MinIO / GCS-interop); no proven end-to-end acquisition-node run |
 | Google Cloud Storage ingest | `acquisition.file.gcs` | `acquisition` — Connection kind exists (gcs connector, native GCS JSON API + service-account OAuth2); no proven end-to-end acquisition-node run |
-| Apache Kafka consumer | `acquisition.stream.kafka` | `acquisition` — Connection kind exists (kafka); consumer-group ingest as a Collector not proven |
+| Apache Kafka consumer | `acquisition.stream.kafka` | `acquisition` — Per-cycle Collector drain ships: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag exported (STREAM-CONSUMER-1); broker consumer groups out by decision; proven against MockConsumer and a fake connector only, never a real broker |
 
 **Planned — not yet available**
 

@@ -93,7 +93,7 @@ The single most important item for commercialization.
 
 ### 3.4 Pipeline authoring polish & streaming (T3) · Effort: **M**
 
-- **Scope:** round out the visual Pipeline editor (→ `../BACKLOG.md` §3 `AUTHORING-REDESIGN-1`, **P2**, open letters only); ✅ the dedicated **run endpoint** for authored Pipelines **SHIPPED** — `POST /pipelines/authored/{id}/run` (`CapabilityManifest`); the **adapter stream-consumer runtime** for streaming sources — the land-then-ack seam exists, the consumer loop does not; ⚠ this item was on **no board row** until 2026-09-10 (`acquisition.md` §"Open elsewhere" pointed back at this paragraph) — now `../BACKLOG.md` §3 **`STREAM-CONSUMER-1`** (P2).
+- **Scope:** round out the visual Pipeline editor (→ `../BACKLOG.md` §3 `AUTHORING-REDESIGN-1`, **P2**, open letters only); ✅ the dedicated **run endpoint** for authored Pipelines **SHIPPED** — `POST /pipelines/authored/{id}/run` (`CapabilityManifest`); the **adapter stream-consumer runtime** for streaming sources — ✅ **BUILT 2026-09-24** (`STREAM-CONSUMER-1`, row closed): the loop is the Collector scan, hardened to slice-level at-least-once (the frontier re-keys on land and survives a restart; one uncommitted slice per partition; lag exported) — `../okf/capabilities/acquisition/acquisition.md` §3.7, §3.9. A continuous `trigger: stream` lane is deferred until a latency target is named.
 - **Exit criteria:** an operator can author, validate, run, and observe a Pipeline entirely from the console; a streaming source lands records through the adapter with at-least-once semantics.
 
 ### 3.5 Config-authoring completion (T3) · Effort: **S**
@@ -148,7 +148,7 @@ N4 Edition realignment          [NFS/SMB-CIFS REFUSED, not open]         complet
 1. **Security first (3.1)** ✓ — it was the gating item for commercial deployment. Nothing else converted to revenue until a buyer could deploy securely. It was also self-contained (a new module behind an SPI), so it did not block other tracks.
 2. **Object storage second (3.2)** ✓ — the highest-demand ingestion gap, lowest technical risk (proven SPI + native engine support), compounding the value of the acquisition framework already shipped.
 3. **Parsing breadth third (3.3)** ✓ — widened the addressable feed set; modest effort; backward-compatible by construction.
-4. **Authoring polish fourth (3.4–3.5)** — compounds the value of everything beneath it and is the visible face of self-service, but depends on the platform underneath being solid first. ⚠ **Not "the front of the queue"** (corrected 2026-09-10): the board's §0 order is release notes for the next MAJOR, then the Step Processor catalog partials by name; every authoring row is **P2**, and the run endpoint and the temp-directory jail have shipped. What remains of 3.4–3.5 is `AUTHORING-REDESIGN-1`'s open letters and `STREAM-CONSUMER-1`.
+4. **Authoring polish fourth (3.4–3.5)** — compounds the value of everything beneath it and is the visible face of self-service, but depends on the platform underneath being solid first. ⚠ **Not "the front of the queue"** (corrected 2026-09-10): the board's §0 order is release notes for the next MAJOR, then the Step Processor catalog partials by name; every authoring row is **P2**, and the run endpoint and the temp-directory jail have shipped. What remains of 3.4–3.5 is `AUTHORING-REDESIGN-1`'s open letters (`STREAM-CONSUMER-1` closed 2026-09-24).
 5. **Distributed tier is demand-gated (L1)** — pulled forward only when a real workload requires it, never speculatively, to protect the lean single-node ethos.
 
 ---

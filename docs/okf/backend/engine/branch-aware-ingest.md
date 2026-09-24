@@ -155,7 +155,7 @@ would be the hand-mirrored-map drift this repo has already paid for three times.
 
 ## Multi-schema route — the segment-scoped lift (shipped 2026-09-24)
 
-Design + slice record: [`branch-aware-segment-lift-design.md`](../../../superpower/branch-aware-segment-lift-design.md).
+Design + slice record (archived): [`branch-aware-segment-lift-design.md`](../../../archived-documents/plans-archive/branch-aware-segment-lift-design.md).
 Operator decisions 2026-09-24: **one shared `route:`** for every schema (no per-schema route blocks);
 **`<branch database>/<segKey>/…`** landing (one store per branch × segment); a predicate binding in some
 schemas only **refuses arming**; the plugin `segments` path and the CSV `schemas[]` selector path ship
@@ -164,7 +164,9 @@ schemas only **refuses arming**; the plugin `segments` path and the CSV `schemas
 - **The walk runs on one schema's slice.** `PipelineLift.scope(graph, key)` is a VIEW over the one lift —
   `map_<key>` plus everything downstream, same node ids and configs (so branch↔sink pairing, ledger keys
   and park ids are unchanged); `null` key = identity. `admittedLift` admits, seeds and walks the scoped
-  graph whenever the write's key is known, on the route AND the non-route admission.
+  graph whenever the write's key is known, on the route AND the non-route admission. The STORED graph is
+  still the full lift, so `PipelineEditable.lower` and the round-trip are untouched — a scoped lift is never
+  a second emitter.
 - **The key.** A segments write: `segmentWrite(cfg, writeScope)` (the segment key IS the scope) → the
   lift's `routeKey`. A selector batch: `selectorWrite(cfg, selectedTable)` — the table its schema was
   selected under, passed to `writeAndTrace` as its OWN argument by all three selector call sites
@@ -194,6 +196,27 @@ schemas only **refuses arming**; the plugin `segments` path and the CSV `schemas
   short. The park path solved this with the `ParkedCommit` sidecar; the failure path has none.
 - ⚠ `ConsignmentGraphRunner.engages` / `dataFedSinkCount` still exclude a multi-schema parser's
   `route:<key>` dispatch edges; on a scoped graph there are none left to exclude.
+- **Arming (rule 4) is mutation-checked.** Re-inserting the old blanket multi-schema refusal turned 7 tests
+  red when S4 was built (the slice record's count, not re-run since), so the per-schema bind check cannot silently regress to a refusal.
+- ⚠ **The end-to-end "kill after segment 1" is a write failure, not a JVM kill.** `SegmentRouteEndToEndTest`
+  blocks segment 2's branch directory with a file, lets the batch FAIL after segment 1 committed, removes
+  the blocker and runs the next cycle. That leaves the same durable state a kill does (ledger, committed
+  files, inbox file), minus the FAILED audit row. Its fixture is a test-resources copy of the demo
+  `stock_movements` Pipeline with a `route:` on `QTY` — ⛔ never a `spaces/demo` edit.
+
+**Why the walk was already scoped, and why lifting the refusal alone was still wrong.** Since the
+per-segment `writeAndTrace` calls (2026-09-16), a segments walk seeded at `map_<key>` reached only that
+segment's route and sinks, because `PipelineExecutor` skips every node with no live inbound relation. That
+scoping was an accident of the seed. Everything that reasons about the graph before and after the walk —
+the seed choice for a selector batch (D1), the route admission, arming, crash drain, partial-batch retry —
+was not scoped, which is what the slices fixed.
+
+**Options not taken (2026-09-24).** *Fix only the seed and delete the refusal* — rejected: it leaves
+admission, arming, drain and retry unscoped, and scoping stays an emergent property of a skip rule nothing
+tests for this purpose. *Per-schema `route:` blocks* (`segments.<key>.route` / `schemas[i].route`) — not
+built, because the operator chose one shared block. It stays available as an ADDITIVE config home if
+per-segment routing semantics are ever wanted; it would need a new config home, spec/JSON-schema, editor,
+lowering and recipe-grammar changes.
 
 ## Traps pinned along the way
 
