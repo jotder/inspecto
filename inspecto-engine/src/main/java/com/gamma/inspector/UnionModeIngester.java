@@ -33,12 +33,10 @@ final class UnionModeIngester {
 
     private UnionModeIngester() {}
 
-    static IngestOutcome run(Consignment batch, PipelineConfig cfg) {
+    static IngestOutcome run(Consignment batch, PipelineConfig cfg, StreamingFileIngester ingester) {
         LocalDateTime batchStart = LocalDateTime.now();
         String batchStatus = "SUCCESS";
         String batchError  = "";
-
-        StreamingFileIngester ingester = instantiate(cfg);
 
         List<Consignment.Member> survivors    = new ArrayList<>();
         List<MemberAudit>  memberAudits = new ArrayList<>();
@@ -180,15 +178,5 @@ final class UnionModeIngester {
         String schemaNames = String.join(",", cfg.schemas().segments().keySet());
         return new IngestOutcome(batchStart, batchStatus, batchError, survivors, memberAudits,
                 allOutputs, allLineage, totalInputRows, schemaNames, allBounds, allSchemas);
-    }
-
-    private static StreamingFileIngester instantiate(PipelineConfig cfg) {
-        try {
-            return (StreamingFileIngester) Class.forName(cfg.schemas().ingesterClass())
-                    .getDeclaredConstructor().newInstance();
-        } catch (Exception e) {
-            throw new RuntimeException("Cannot instantiate streaming ingester: "
-                    + cfg.schemas().ingesterClass(), e);
-        }
     }
 }

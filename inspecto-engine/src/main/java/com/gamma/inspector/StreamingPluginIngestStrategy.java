@@ -48,11 +48,14 @@ final class StreamingPluginIngestStrategy implements ConsignmentIngestStrategy {
         // streaming; a chunking-sized input combined with multiple destinations is rare.)
         if (cfg.sinks().size() > 1) generationMode = false;
 
-        if (generationMode) {
-            long flush = forcedFlushRows > 0 ? forcedFlushRows
-                    : (cfg.processing().flushRecords() > 0 ? cfg.processing().flushRecords() : DEFAULT_FLUSH_ROWS);
-            return GenerationModeIngester.run(batch, cfg, flush);
+        // Slice P3: resolve through the owning pack's loader and keep that pack pinned for the whole batch.
+        try (PluginIngesters.Leased leased = PluginIngesters.open(cfg)) {
+            if (generationMode) {
+                long flush = forcedFlushRows > 0 ? forcedFlushRows
+                        : (cfg.processing().flushRecords() > 0 ? cfg.processing().flushRecords() : DEFAULT_FLUSH_ROWS);
+                return GenerationModeIngester.run(batch, cfg, leased.ingester(), flush);
+            }
+            return UnionModeIngester.run(batch, cfg, leased.ingester());
         }
-        return UnionModeIngester.run(batch, cfg);
     }
 }

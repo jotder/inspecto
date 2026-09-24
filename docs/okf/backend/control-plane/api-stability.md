@@ -104,6 +104,10 @@ above the generated commit list.
   is revoked. A pack whose parser id collides with a built-in, classpath or other pack's parser, or names
   an ingester class another parser names, is refused whole (`job.pack.rejected`).
 - `GET /parsers` rows gain an additive **`source`**: `builtin`, `classpath` or `pack:<jar filename>`.
+- A Pipeline naming a pack parser's ingester now ingests (the class resolves through the pack's loader,
+  and the pack stays pinned until the batch ends). A Pipeline whose ingester class nothing loaded provides
+  now fails its Run with `streaming ingester <fqcn> is not on the classpath and no loaded parser names it…`
+  instead of `Cannot instantiate streaming ingester` wrapping a `ClassNotFoundException`.
 
 **Whole-pipeline dry run (2026-09-20, `PIPELINE-DRYRUN-1` step 5)**
 - `POST /runs/{name}/trigger?dryRun=true` runs a pipeline and **lands nothing** — no outputs, no audit or

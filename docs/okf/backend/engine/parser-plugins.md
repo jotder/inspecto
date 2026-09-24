@@ -383,8 +383,31 @@ edition gate. **D8** no out-of-process host.
   kinds; a second pack claiming a taken id is rejected and the first keeps it). `ParsersTest` pins the
   overlay rules; `ControlApiParsersTest.catalogNamesEachParsersProvenanceIncludingAPacksParser` the wire.
 
-**Not built yet** (design §5): **P3**, ingester resolution through the owning loader and an ingest-time
-pack pin. **P4**, D4 preview gating. Still open from **P0**: staging under a server-owned dir instead of
+**As built (slice P3, a pack parser ingests):**
+- **One resolver**, `com.gamma.inspector.PluginIngesters.open(cfg)`, replaced the two one-argument
+  `Class.forName(ingesterClass)` sites (`GenerationModeIngester`, `UnionModeIngester`). They now receive the
+  ingester from `StreamingPluginIngestStrategy`. The Pipeline still stores only the FQCN
+  (`parsing.plugin.ingester`). The resolver finds the registered parser naming that class
+  (`Parsers.forIngester`). A pack-owned one is loaded through **the parser's own class loader**. Anything
+  else resolves on the engine loader, as before.
+- **The pack is pinned for the whole batch.** `PackRunLeases.acquire(owner)` is the same per-owner counter
+  a Job Run and a pipeline-graph walk take, released when the strategy's `try` closes. An unload or
+  revocation mid-ingest deregisters the parser at once, but the loader close is **deferred** until the
+  ingest ends, so the batch finishes on the vetted bytes it started with. The resolver re-checks the
+  registration after taking the pin, so an unload that won the race is reported, not half-used.
+- **Named failure.** A Pipeline whose ingester no loaded parser names and the engine loader cannot find
+  throws `IllegalStateException` "streaming ingester <fqcn> is not on the classpath and no loaded parser
+  names it; if a Job Pack provided it, that pack is not loaded (removed, revoked or refused, see GET
+  /jobs/packs)". There is no `ClassNotFoundException` in the cause chain. It fails the Run the same way the
+  old "Cannot instantiate" error did (out of `ConsignmentIngestor.process`). That message remains for a
+  class that is found but cannot be constructed.
+- Proof: `JobPackParserTest` — a pack ingester ingests two CALL rows end to end, paired with the probe that
+  `Class.forName(fqcn)` on the engine loader throws `ClassNotFoundException`. An unload while the ingester
+  is blocked leaves the pack draining until the ingest ends. **Mutation-checked**: with the pin removed,
+  that test goes red on the `isDraining` assertion. A Pipeline naming an unloaded pack's ingester gets the
+  named error.
+
+**Not built yet** (design §5): **P4**, D4 preview gating. Still open from **P0**: staging under a server-owned dir instead of
 the system temp dir. The decode-profile satellite (C1–C4) waits on D5/D6/D9/D10.
 
 ### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24

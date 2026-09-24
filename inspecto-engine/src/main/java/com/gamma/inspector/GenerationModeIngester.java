@@ -30,12 +30,10 @@ final class GenerationModeIngester {
 
     private GenerationModeIngester() {}
 
-    static IngestOutcome run(Consignment batch, PipelineConfig cfg, long flushRows) {
+    static IngestOutcome run(Consignment batch, PipelineConfig cfg, StreamingFileIngester ingester, long flushRows) {
         LocalDateTime batchStart = LocalDateTime.now();
         String batchStatus = "SUCCESS";
         String batchError  = "";
-
-        StreamingFileIngester ingester = instantiate(cfg);
 
         List<Consignment.Member> survivors    = new ArrayList<>();
         List<MemberAudit>  memberAudits = new ArrayList<>();
@@ -143,15 +141,5 @@ final class GenerationModeIngester {
         }
         log.warn("[INGEST] [{}] quarantined mid-file — discarded {} already-revealed generation file(s)",
                 m.file().getName(), revealed.size());
-    }
-
-    private static StreamingFileIngester instantiate(PipelineConfig cfg) {
-        try {
-            return (StreamingFileIngester) Class.forName(cfg.schemas().ingesterClass())
-                    .getDeclaredConstructor().newInstance();
-        } catch (Exception e) {
-            throw new RuntimeException("Cannot instantiate streaming ingester: "
-                    + cfg.schemas().ingesterClass(), e);
-        }
     }
 }

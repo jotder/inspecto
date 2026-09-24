@@ -46,6 +46,15 @@ public final class PackRunLeases {
 
     public static void uninstall(Leaser leaser) { LEASERS.remove(leaser); }
 
+    /** Pin one pack ({@code owner}, a jar filename) on every installed leaser — the ingest-time pin for a
+     *  pack parser's ingester (parser-plugins-trust-design.md slice P3). A no-op lease for {@code null}. */
+    public static Lease acquire(String owner) {
+        if (owner == null || LEASERS.isEmpty()) return NONE;
+        List<Leaser> held = List.copyOf(LEASERS);
+        for (Leaser l : held) l.acquireRun(owner);
+        return () -> { for (Leaser l : held) l.releaseRun(owner); };
+    }
+
     /** Pin every pack owning a node type in {@code g} on every installed leaser. A no-op lease when none do. */
     static Lease acquire(PipelineGraph g) {
         Set<String> owners = new LinkedHashSet<>();

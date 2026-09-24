@@ -313,7 +313,7 @@ Use `<scope>provided</scope>` because the deployment server already has the fat 
 
 - `mvn package` produces `your-ingester-x.y.z.jar`
 - On the server, put your JAR on the classpath alongside the inspecto JAR. The `run.sh` / `run.bat` wrappers shipped by `package.ps1` use `-jar inspecto.jar`; switch them to `-cp "inspecto.jar:your-ingester-*.jar" com.gamma.inspector.CollectorProcessor <pipeline.toon>` (use `;` instead of `:` on Windows).
-- Reference your class by FQCN in the pipeline toon: `processing.ingester: com.acme.events.MyIngester`. The framework loads it via `Class.forName(...).getDeclaredConstructor().newInstance()` — the class must be public with a no-arg constructor.
+- Reference your class by FQCN in the pipeline toon: `processing.ingester: com.acme.events.MyIngester`. The framework loads it by FQCN reflection and `getDeclaredConstructor().newInstance()` — the class must be public with a no-arg constructor. On the classpath it resolves on the engine loader. Shipped in an allowlisted Job Pack instead (no restart), it resolves through the pack's loader when the pack's `ParserPlugin` names it in `ingesterClass()` — see [parser-plugins.md](parser-plugins.md) *Drop-in parser jars*.
 
 **6. Production health checks.** The framework reports plugin loading at startup:
 

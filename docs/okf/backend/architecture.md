@@ -32,7 +32,7 @@ Inspecto is deliberately **framework-free**: no Spring, no web framework, no IoC
   [editions build flavors](./editions/editions-model.md).
   ⚠ **[`StreamingFileIngester`](./engine/ingestion.md) is NOT one of them** — despite sitting beside them
   conceptually, a plugin ingester is instantiated by **fully-qualified-name reflection** off
-  `schemas().ingesterClass()` (`UnionModeIngester.java:181`, `GenerationModeIngester.java:144`), so it has
+  `schemas().ingesterClass()` (one resolver, `PluginIngesters.open`, since 2026-09-25), so it has
   no `META-INF/services` entry and is not discovered. *(Corrected 2026-09-08: this bullet used to list it as
   the "ingestion SPI".)*
 * **Embedded DuckDB** — bulk ingest via the native Appender API; see [DuckDB](./engine/duckdb.md). Requires the
