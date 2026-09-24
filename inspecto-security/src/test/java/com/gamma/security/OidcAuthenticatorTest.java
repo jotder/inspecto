@@ -192,12 +192,15 @@ class OidcAuthenticatorTest {
         //   canAdminister         — ROUTE-UNGATED-DEFAULT-1, 2026-09-15 (installation administration:
         //                           Space create/update/DELETE were reachable by any authenticated caller
         //                           and could not be gated at all — no capability meant "administrator")
+        //   canRevealLinkEntities / canApproveLinkExpansions — LA-19, 2026-09-24 (reveal a masked entity id;
+        //                           approve another analyst's over-threshold expansion)
         String jwt = token(Instant.now().plusSeconds(60), List.of("admin"), RSA_KEY, ISSUER, AUDIENCE, "root");
         Subject admin = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt).orElseThrow();
         assertEquals(Set.of(Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_CONFIGURE_ACCESS,
                 Roles.CAN_APPROVE_SHARES, Roles.CAN_TRIAGE_REQUIREMENTS,
                 Roles.CAN_OFFER_DATASETS, Roles.CAN_CURATE_MENUS, Roles.CAN_MANAGE_INCIDENTS,
-                Roles.CAN_ADMINISTER), admin.capabilities());
+                Roles.CAN_ADMINISTER, Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_APPROVE_LINK_EXPANSIONS),
+                admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
                 "canAuthorWorkbench stays Builder-only");
     }
@@ -294,7 +297,8 @@ class OidcAuthenticatorTest {
                         Roles.CAN_TRIAGE_REQUIREMENTS, Roles.CAN_ONBOARD_CONNECTIONS,
                         Roles.CAN_CONFIGURE_ACCESS, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_OFFER_DATASETS,
                         Roles.CAN_REQUEST_SHARES, Roles.CAN_APPROVE_SHARES, Roles.CAN_CURATE_MENUS,
-                        Roles.CAN_ADMINISTER),   // ROUTE-UNGATED-DEFAULT-1, 2026-09-15 — the eleventh
+                        Roles.CAN_ADMINISTER,    // ROUTE-UNGATED-DEFAULT-1, 2026-09-15 — the eleventh
+                        Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_APPROVE_LINK_EXPANSIONS),  // LA-19, 2026-09-24
                 subject.get().capabilities());
     }
 
