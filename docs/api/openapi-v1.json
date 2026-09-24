@@ -3145,6 +3145,58 @@
         "x-generated" : true
       }
     },
+    "/space-comparisons" : {
+      "post" : {
+        "tags" : [ "space-comparisons" ],
+        "summary" : "Compare the storage growth of two or more hosted Spaces",
+        "operationId" : "postSpaceComparisons",
+        "description" : "Admits one ad-hoc space.comparison run over the maintenance_storage series of the named Spaces and returns 202 + runId + a Location to poll (GET /jobs/runs/{runId}). Gated on canAdminister: a cross-Space aggregate read. Nothing is persisted beyond the Run message and a space.comparison.completed signal in the requesting Space. 422 malformed body, 404 an unhosted Space, 409 a comparison already running here.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "spaces" ],
+                "properties" : {
+                  "spaces" : {
+                    "type" : "array",
+                    "minItems" : 2,
+                    "uniqueItems" : true,
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "The Space ids to compare"
+                  },
+                  "window_days" : {
+                    "type" : "integer",
+                    "minimum" : 1,
+                    "default" : 30
+                  },
+                  "axes" : {
+                    "type" : "array",
+                    "items" : {
+                      "type" : "string"
+                    },
+                    "description" : "Only these storage axes; every axis when omitted"
+                  },
+                  "top" : {
+                    "type" : "integer",
+                    "minimum" : 1,
+                    "default" : 5
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); 202 carries runId, spaces, status."
+          }
+        }
+      }
+    },
     "/bi/query" : {
       "post" : {
         "tags" : [ "bi" ],

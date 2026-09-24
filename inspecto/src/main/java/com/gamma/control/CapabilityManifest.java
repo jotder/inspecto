@@ -213,6 +213,10 @@ final class CapabilityManifest {
             // They stay in EXEMPTIONS as `recovery-route` because the manifest can express only all-or-nothing.
             new Entry("PUT", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
             new Entry("DELETE", "/spaces/([^/]+)", Roles.CAN_ADMINISTER),
+            // SpaceComparisonRoutes — a cross-Space AGGREGATE read (space-comparison design §5 Q2, decided
+            // 2026-09-24): it crosses the Space isolation "reads are open" rests on, so it is administration,
+            // not an open read. The route resolves the named Spaces only after this gate passes.
+            new Entry("POST", "/space-comparisons", Roles.CAN_ADMINISTER),
             // RunRoutes
             new Entry("POST", "/runs", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/runs/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),

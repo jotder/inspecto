@@ -452,8 +452,33 @@ for Alert Rules.
   over a `window_days` window (default 30), a projected `warn_bytes` breach ETA, and the fastest-growing axes as
   archive candidates; emits `maintenance.storage.trend` (WARN) when the breach is within `warn_days` (default 14).
   Read-only, fail-soft on <2 samples. The catalog's `created_ms` (epoch millis) is the sortable/filterable key —
-  ISO strings aren't reliably chronological across variable precision. Open COULD follow-ons: space-to-space
-  comparison, predictive maintenance (the latter is AGT-5/self-healing territory, deliberately deferred).
+  ISO strings aren't reliably chronological across variable precision. The series reader is `StorageSeries`,
+  shared with `space.comparison` (next bullet) so the two reports' slopes cannot disagree. Open COULD
+  follow-on: predictive maintenance (AGT-5/self-healing territory, deliberately deferred).
+* **Space comparison (COULD, shipped 2026-09-24)** — the `space.comparison` **Job Type** (`SpaceComparisonJob`)
+  compares the storage growth of two or more Spaces per axis over the same `maintenance_storage` series:
+  each Space's latest bytes and bytes/day, the spread (max − min) and the fastest grower; `top` axes by
+  spread, optional `axes` filter, `window_days` (default 30). ⛔ Storage growth only — **not** a config or
+  Pipeline diff. Fail-soft **per Space**: one with no history or < 2 in-window samples is reported *not
+  comparable* and the rest still compare. Output is the Run message plus one `space.comparison.completed`
+  signal (INFO) in the requesting Space — no Dataset, no catalog rows, no Run Artifacts (a cross-Space
+  residency call, deliberately not taken).
+  🔴 **Crossing the Space boundary goes through a grant, never a lookup.** In-process code can reach any hosted
+  Space and `SpaceConfigRoot` deliberately enumerates none, so the engine never resolves another Space: a run
+  reads only the data roots in its `SpaceStorageAccess` grant, checks EVERY requested Space against it
+  **before reading any**, and fails the whole run (`SecurityException`) on a refusal. The only grant that
+  names another Space is built by **`POST /space-comparisons`** (`SpaceComparisonRoutes`), gated on
+  **`canAdminister`** — a cross-Space aggregate crosses the isolation "reads are open" rests on (CC6) — which
+  resolves the named Spaces only AFTER the gate, then runs via `JobService.triggerSpaceComparisonRun`
+  (202 + `runId`, the `triggerMaterializeRun` idiom). ⚠ **An authored or scheduled `space.comparison` job is
+  refused by design**: the registered type carries `SpaceStorageAccess.ownSpaceOnly`, and a run with no Subject
+  has nothing to authorize a cross-Space read. Scheduling one needs a persisted, attributable grant — an open
+  decision (BACKLOG §3.7). ⚠ On Personal nothing authenticates, so the capability wrapper is a no-op there, as
+  for every gated route (the edition model, not a hole in this one). Why a Job Type and not a 22nd
+  maintenance task: every maintenance task is handed exactly one `dataDir`; the cross-Space grant does not
+  belong in that switch, and `BUILT_IN_TASKS` stays unchanged. Tests: `SpaceComparisonJobTest`,
+  `ControlApiSpaceComparisonTest`. Design + the four decisions (2026-09-24):
+  `archived-documents/plans-archive/space-comparison-design.md`.
 ### `incident_purge` — the archived-Incident retention sweep (MNT-14, shipped 2026-07-27)
 
 The retention model is **a retention tier, NOT archive-is-terminal** (BACKLOG D5, decided 2026-07-25):
