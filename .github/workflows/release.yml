@@ -220,18 +220,14 @@ jobs:
           bash tools/release-collect.sh enterprise
           cp inspecto-deploy/sbom/inspecto-enterprise.cdx.json inspecto-deploy/sbom/inspecto-enterprise.spdx.json release/
 
-      # Verify what we are about to publish with the PUBLIC half only — the same check a customer runs.
-      # ⚠ Push-only because a dispatch run is deliberately unsigned: the .asc files this checks do not
-      # exist there. The checksum half WOULD be meaningful on a dispatch run — splitting the two is
-      # tracked, not forgotten (RELEASE-PIPELINE-NEVER-EXECUTED-1 residual).
-      - name: Verify checksums and signatures
-        if: github.event_name == 'push'
+      # Verify what we are about to publish — the same checks a customer runs. Checksums and the bundle
+      # layout run on EVERY run, dispatch included; signatures are checked in the next step.
+      - name: Verify checksums
         run: |
           set -euo pipefail
           cd release
           for zip in *.zip; do
             (sha256sum -c "$zip.sha256" | grep -q ': OK') || { echo "::error::checksum mismatch for $zip"; exit 1; }
-            gpg --batch --verify "$zip.asc" "$zip"
             # The bundle's name, embedded JVM and DuckDB extension set must all agree — the mismatch that
             # RELEASE-BUNDLE-PLATFORM-MISMATCH-1 shipped (Linux JVM + windows_amd64 extensions) was visible
             # only in the zip's own entry table, never to the boot smoke, so it is asserted from the table.
@@ -253,6 +249,17 @@ jobs:
             fi
           done
           ls -la
+
+      # Verify signatures with the PUBLIC half only. ⚠ Push-only because a dispatch run is deliberately
+      # unsigned: the .asc files this checks do not exist there.
+      - name: Verify signatures
+        if: github.event_name == 'push'
+        run: |
+          set -euo pipefail
+          cd release
+          for zip in *.zip; do
+            gpg --batch --verify "$zip.asc" "$zip"
+          done
 
       - name: Publish the GitHub release
         if: github.event_name == 'push'

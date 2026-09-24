@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **41<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
+> **40<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -24,9 +24,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 23<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 22<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 18<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 41<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 40<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -58,7 +58,7 @@ rank.
 
 | State | P2 rows |
 |---|---|
-| **Startable now** — no gate, no owed decision | Onboarding D5-ref — ground the delete-feed first (§3.4) · `RELEASE-PIPELINE-NEVER-EXECUTED-1` — the checksum/signature split (§4) |
+| **Startable now** — no gate, no owed decision | Onboarding D5-ref — ground the delete-feed first (§3.4) |
 | **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | AI drafting on a non-`schema` kind (§3.1) · Platform Services Stage 2/3 (§3.2) · cross-Space consequence (§3.5) · Bundle "load as draft" (§3.7) · D6 `findings-spec` UI (§3.9) · policy-authoring UX (§3.8) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) · `DUCKLE-C1-DATASET-FRESHNESS-1` residual (2) (needs a design pass, §3.5) |
 
@@ -265,7 +265,6 @@ proofs live there, and nothing pending for it lives anywhere else. Geo map defer
 
 #### Release & CI
 
-- **P2** · `RELEASE-PIPELINE-NEVER-EXECUTED-1` — **the only buildable remainder is the checksum/signature split.** `release.yml` carries `workflow_dispatch`, and every signing or publishing step is gated on `github.event_name == 'push'`, so a dispatch run proves reactor-install → extension-cache → package → SBOM → smoke only. The checksum half of *Verify checksums and signatures* would be meaningful on a dispatch run; it is push-gated only because the `.asc` files do not exist there — split the two. ⛔ The tag-push half is **parked indefinitely** (operator 2026-09-20: no releases after 3.x, "just carry on master"); do not re-file it as engineering work — the first `v*` tag, if one is ever cut, IS the test. → `.github/workflows/release.yml`
 - **P3** · `REACTOR-VERDICT-CI-1` — **wire `check-reactor-verdict.mjs` into `ci.yml`** (residual of `REACTOR-HALT-IS-A-SILENT-PASS-1`). ⛔ **Not pre-push**, deliberately: every other hook guard is a ~1 s repo-state check, and this one judges a BUILD — producing a log at push time means a 20-minute reactor per push. CI already runs a full reactor, so the log is free there. Operator's call to wire. → `okf/backend/build-run/build-test.md`
 
 #### Test infrastructure
