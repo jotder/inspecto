@@ -1,0 +1,3 @@
+# Outbound object-storage export transports (EXPORT-1) - discovered by ExportConnectorFactory.forProfile
+# for the objectstore.export Job Type. HDFS is reached through its S3-compatible gateway, never hadoop-client.
+com.gamma.acquire.connectors.S3ConnectorFactory

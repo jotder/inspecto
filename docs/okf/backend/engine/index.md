@@ -10,7 +10,7 @@ lives in the engine modules extracted below the [core](../modules/engine.md) in 
 * [Ingestion](ingestion.md) - the `StreamingFileIngester` SPI, union vs generation mode, and the batch coordinators.
 * [DuckDB](duckdb.md) - Appender-based bulk ingest (~75×), thread auto-derivation, reserved-word quoting.
 * [Output & sinks](output-sinks.md) - `OutputFormat`, partitioned vs single-file writers, quarantine outcomes.
-* [Object-storage export](object-storage-export.md) - S3/HDFS export posture (DISCUSSED 2026-08-28, unscheduled — BACKLOG EXPORT-1): nothing pushes outbound today, space-local/data-tier-exported is the recommendation, HDFS only via an S3-compatible gateway.
+* [Object-storage export](object-storage-export.md) - the `objectstore.export` push post-action (SHIPPED 2026-09-24, EXPORT-1): a Job on `on_pipeline` delivers a data-root directory to an S3-compatible Connection, skip-unchanged, manifest last; space-local/data-tier-exported posture, HDFS only via an S3-compatible gateway.
 * [Ingest wrap-SPI](ingest-wrap-spi.md) - `StreamingFileIngester` + `RecordSink` → `DuckDbRecordSink` (Appender), Generation/Union drive modes, ASN.1 as reference; E1's optional partitioning + the two deliberate `partitions[]` contracts (2026-08-19).
 * [Transforms & seams](transforms-seams.md) - `TransformCompiler` and the `ConsignmentIngestStrategy` seam.
 * [Branch-aware ingest](branch-aware-ingest.md) - `route:` executing on the poll-driven path: the `writeAndTrace` divert, the flat-vs-graph lane fork (`graphLaneCarries`), the branch-counting engagement predicate, the durable `BranchCommitLog`, and the fail-closed `RouteArming` rules with their two callers (2026-08-26/29).

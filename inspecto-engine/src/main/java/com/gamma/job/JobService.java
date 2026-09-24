@@ -514,6 +514,9 @@ public final class JobService implements AutoCloseable {
         // committed Consignment. Its consignment_id parameter deduces from $signal.batchId, which
         // mirrorPipelineCommit populates — so an author's processor never mentions signals.
         registry.register(new ConsignmentProcessJobType(dataDir));
+        // objectstore.export (EXPORT-1): the push post-action — on_pipeline delivers a committed store's
+        // files to an S3-compatible Connection. The transport is ServiceLoader-found (inspecto-connectors).
+        registry.register(new ObjectStoreExportJobType(dataDir));
         // recon.run (DAT-7 Ops): schedule a saved Reconciliation; emits recon.run.completed with the Break
         // counts (WARNING when any break exists) — the ledger fact a future Alert Rule watches. Reads the
         // component registry from -Dassist.write.root at run time, like the maintenance/report jobs.

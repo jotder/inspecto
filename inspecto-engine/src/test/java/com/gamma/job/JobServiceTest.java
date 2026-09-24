@@ -201,6 +201,21 @@ class JobServiceTest {
         }
     }
 
+    /** EXPORT-1: the push post-action is a built-in, and its Connection + local path are the required pair. */
+    @Test
+    void theObjectStoreExportTypeIsBuiltInAndRequiresAConnectionAndALocalPath(@TempDir Path dir) throws Exception {
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            JobTypeDescriptor export = js.jobTypes().stream()
+                    .filter(d -> ObjectStoreExportJobType.TYPE_ID.equals(d.id())).findFirst()
+                    .orElseThrow(() -> new AssertionError("objectstore.export is not registered"));
+            var required = export.parameters().stream().filter(ParameterDecl::required).map(ParameterDecl::name)
+                    .collect(java.util.stream.Collectors.toSet());
+            assertEquals(java.util.Set.of("connection", "local_path"), required);
+        }
+    }
+
     @Test
     void manualTriggerRunsRecordsAndAudits(@TempDir Path dir) throws Exception {
         JobConfig hb = maintenance("hb", null, null, Map.of("task", "heartbeat"));

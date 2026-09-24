@@ -581,7 +581,7 @@ A structural comparison. Put your own figures against each line — the shape is
 | Engineering | platform/DevOps engineers to keep the seams alive | a fraction of one data-operations role |
 | Compliance | one review, pen-test and SBOM per vendor | one artifact, one SBOM, one review |
 | Time to first feed | a sprint of integration | one configuration file |
-| Extension | bespoke code at every seam | **21**<!--count:spi-extension-points--> **extension points** plus a services model |
+| Extension | bespoke code at every seam | **22**<!--count:spi-extension-points--> **extension points** plus a services model |
 
 ### 10.2 Editions — one codebase, three build flavours
 
@@ -682,7 +682,7 @@ reached through **one of three lanes, in order of cost**, with no fork and no in
 is a query in the Query Library; a new department is a Space started from a template; a system that needs the
 data pulls it over the versioned `/api/v1`. Nothing is compiled.
 
-**Lane 2 — the 21**<!--count:spi-extension-points--> **extension points.** Every seam where estates differ is a
+**Lane 2 — the 22**<!--count:spi-extension-points--> **extension points.** Every seam where estates differ is a
 Java interface the platform discovers on the classpath at start-up. A plugin jar dropped beside the artifact
 is live on the next start, versioned and audited like the product itself. Grouped by what you would need:
 

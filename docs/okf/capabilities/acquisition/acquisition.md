@@ -782,7 +782,6 @@ so they are not re-proposed as new ideas; none is scheduled.
 | Item | Board id | What remains |
 |---|---|---|
 | Adapter stream-consumer runtime | `STREAM-CONSUMER-1` (P2, filed 2026-09-10 — until then this cell pointed at ROADMAP §3.4, i.e. at no board row) | Option A (the hardened Collector scan) is built as of 2026-09-24: the frontier re-keys on land and survives a restart (§3.7), there is one uncommitted slice per partition, and lag is exported (§3.9). Still open: the `SP-ACQ-09` cell in `EDITIONS.md`. The `trigger: stream` lane is not built, by decision (Q2) |
-| Outbound object-store export | `EXPORT-1` (P3) | The inverse direction of ACQ-4 — recommendation of record only |
 | Vault / KMS secret provider | `GAP-6` | Deferred by the SEC-07 decision, not blocked |
 | "Listed-not-yet-fetched" gauge | branch-aware residual **(e)** | Observability gap: the queue between list and fetch is invisible |
 | Remote-fetch bandwidth cap (was `acquire.maxFilesPerCycle`) | branch-aware residual **(f)** | The per-cycle intake caps SHIPPED (`-Dingest.maxFilesPerCycle`, `-Dingest.maxBytesPerCycle`); both run after listing on local files, so a cap on what a cycle *fetches* needs a listing-with-sizes seam that does not exist |

@@ -1,25 +1,90 @@
 ---
 type: Reference
-title: Object-storage export (S3 / HDFS) — posture and options
-description: The grounded facts about exporting output to object storage, the options by ambition, and the recommendation of record. ⚠ Intent, not as-built — the schedulable row is EXPORT-1 in BACKLOG.md.
-resource: inspecto-connectors/src/main/java/com/gamma/acquire/connectors
-tags: [export, object-storage, s3, hdfs, options, intent]
-timestamp: 2026-08-28T00:00:00Z
+title: Object-storage export (S3 / HDFS) — the push post-action and its posture
+description: As built 2026-09-24 (EXPORT-1) — the objectstore.export Job Type pushes a directory under the Space data root to an S3-compatible Connection after a successful run (skip-unchanged, manifest last, fail-closed); plus the grounded posture facts and the options by ambition.
+resource: inspecto-engine/src/main/java/com/gamma/job/ObjectStoreExportJobType.java
+tags: [export, object-storage, s3, hdfs, job-type, post-action]
+timestamp: 2026-09-24T00:00:00Z
 ---
 
-# Object-storage export (S3 / HDFS) — posture and options
+# Object-storage export (S3 / HDFS) — the push post-action and its posture
 
-**Status:** DISCUSSED 2026-08-28, not scheduled — the operator asked for the analysis to be kept
-for later work. The schedulable row is **EXPORT-1** in [`BACKLOG.md`](../../../BACKLOG.md) §4.
-**Related:** [dataset consumption / the `dataset` connector](../../capabilities/acquisition/acquisition.md)
+**Status:** the push post-action **SHIPPED 2026-09-24** (`EXPORT-1`, built on the operator's request by
+name that day; the row is closed). Discussed 2026-08-28; the options analysis below is kept as the record
+of why this shape and not another.
+**Related:** [jobs](../control-plane/jobs.md) (the Job framework it runs in) · [dataset consumption / the `dataset` connector](../../capabilities/acquisition/acquisition.md)
 (the inbound mirror of this question) · [connectors](../acquisition/connectors.md) ·
 [operations reference](../build-run/operations-reference.md).
 
+## As built (2026-09-24) — `objectstore.export`
+
+A built-in **Job Type**, not a pipeline key: a Job with `on_pipeline: <name>` fires on that Pipeline's
+batch COMMIT and never on a failed run, which is exactly "after a successful run" — so the pipeline TOON
+learns nothing about exports.
+
+```toon
+job:
+  name: push_orders
+  type: objectstore.export
+  on_pipeline: orders
+  connection: lake
+  local_path: orders/database
+```
+
+| Param | | Meaning |
+|---|---|---|
+| `connection` | required | Id of an `s3` Connection (`*_connection.toon`). Its `base_path` = `bucket[/prefix]` is the export root; `username` / `password` are the access key and a `${ENV:…}`-style secret reference, resolved at signing time. ⛔ Credentials never appear in a pipeline or job TOON. |
+| `local_path` | required | A directory under the **Space data root** — a store's `database/`, or one Dataset's output directory. |
+| `remote_prefix` | optional | Key prefix under the Connection's `base_path`; default = `local_path`. A `.`/`..` segment is refused. |
+| `retries` | optional, `3` | Retries per request (0–10), exponential backoff with full jitter (`RetryPolicy`). |
+
+**The seams.**
+
+| Piece | Where | Note |
+|---|---|---|
+| `ExportConnector` / `ExportConnectorFactory` | `inspecto-acquire` `com.gamma.acquire` | The outbound mirror of `CollectorConnector` / `CollectorConnectorFactory`; `forProfile` is the `ServiceLoader` lookup by `connection.connector`. |
+| `S3Connector` implements `ExportConnector` too | `inspecto-connectors` | ONE class serves both directions, so `AwsSigV4` signing and the endpoint/`base_path` rules cannot drift. `stat` = HeadObject, `put` = PutObject streamed from disk with a signed `Content-MD5`. `S3ConnectorFactory` is listed in `META-INF/services/com.gamma.acquire.ExportConnectorFactory`. |
+| `ObjectStoreExportJobType` | `inspecto-engine` `com.gamma.job` | Registered as a built-in by `JobService` with the Space `dataDir`. |
+
+**The contract** (pinned by `ObjectStoreExportJobTest` in `inspecto-connectors`, against a JDK
+`HttpServer` fake S3 that re-computes each PUT's SigV4 signature and checks the body against the signed
+SHA-256 and `Content-MD5`):
+
+- **Idempotent.** A file is skipped when the remote object's size AND ETag equal the local size and MD5.
+  A single-part PUT's ETag is the body's MD5; any other ETag shape (multipart, SSE-KMS) never matches, so
+  the file is re-sent — the conservative answer, never a false skip.
+- **Upload, then manifest.** `_inspecto_export_manifest.json` (job, run id, time, every key + size + MD5)
+  is written at the export prefix LAST. A consumer that keys on the manifest never reads a half-delivered
+  export.
+- **Failure is failure.** A request that still fails after `retries` returns the run `FAILED` and the
+  manifest is not written. Files already sent stay (object stores have no transaction); the next run
+  skips them.
+- **Path-jailed local reads.** `local_path` is contained in the data root by `PathJail.require`; every
+  file is re-checked with `PathJail.contains`; a symlink anywhere in the tree refuses the run. All
+  refusals fire in the planning pass, before any byte is sent.
+- **Skipped locally:** hidden files and `*.tmp` (in-flight atomic writes).
+- **Dry run** (`POST /jobs/{name}/trigger?dryRun=true`) stats the remote side and reports what would be
+  uploaded; nothing is PUT, no manifest.
+
+**Deliberate limits.**
+
+- ⚠ **Single-part PUT only** — a file over 5 GiB refuses the run up front. Multipart upload is not built;
+  engine-written Parquet partitions sit far below it.
+- ⚠ A Connection that declares a `tunnel` or `proxy` is **refused**, as `WebhookSink` does: the export
+  transport does not dial through either, and silently bypassing an administrator's proxy is worse.
+- ⚠ **`local_path` is not in `ConfigSafetyValidator.JOB_PATH_KEYS`.** That list is for keys resolved
+  against `SpaceConfigRoot.jobPathBase`; this key resolves against the Space DATA root, so adding it
+  there would manufacture the gate/runtime split the list's own javadoc warns about. It is jailed at run
+  time. No pipeline key was added, so `ConfigSpecs` / `AcceptedConfigKeys` / the contract JSONs are
+  untouched.
+- Only `s3` has a transport. GCS (interoperability mode) and HDFS reach it through an S3-compatible
+  endpoint; ⛔ never `hadoop-client`.
+
 ## The grounded facts (2026-08-28)
 
-1. **Nothing pushes outbound today.** Every connector in `inspecto-connectors` (S3, GCS, Azure,
-   SFTP, FTP, Kafka, DB-export) is *acquisition-side* — they fetch **in**. Outputs are local
-   parquet written by `PartitionWriter`.
+1. **Nothing pushed outbound before `objectstore.export`.** Every connector in `inspecto-connectors`
+   (S3, GCS, Azure, SFTP, FTP, Kafka, DB-export) was *acquisition-side* — they fetch **in**. Outputs are
+   local parquet written by `PartitionWriter`.
 2. **`output.ducklake` registers, it does not relocate.** `DuckLakeRegistrar` ATTACHes a DuckLake
    catalog (`DATA_PATH` from config) and registers already-written *local* paths — bytes stay put.
 3. **The engine is deliberately local-filesystem-shaped.** Atomic temp+rename writes
@@ -43,8 +108,9 @@ for later work. The schedulable row is **EXPORT-1** in [`BACKLOG.md`](../../../B
 
 If the Hadoop cluster exposes an **S3-compatible gateway** (Ozone S3, MinIO, or the org's object
 store), everything reduces to the S3 column — reuse `AwsSigV4`, never take a Hadoop dependency.
-Sequence: **operator sync first** to prove the consumption pattern, then build the **push
-post-action** only if it earns a place. The full-space-on-S3 idea is recommended *against* for
+Sequence of record was **operator sync first** to prove the consumption pattern, then the **push
+post-action** only on demand — the operator asked for it by name 2026-09-24 and it shipped the same day
+(§*As built*). `aws s3 sync` / rclone remains a valid zero-code alternative. The full-space-on-S3 idea is recommended *against* for
 the semantic reasons in fact 3, not effort.
 
 ## The object-store lane, ACCEPTED against a live MinIO (2026-09-15)

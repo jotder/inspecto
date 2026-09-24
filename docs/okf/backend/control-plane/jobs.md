@@ -525,6 +525,15 @@ purging*. ⚠ **Nothing schedules `incident_purge`, and nothing should.** That i
 residual: a shipped default that hard-deletes business records is indefensible, so standing the job up is
 an operator act exactly like `receipt_prune`.
 
+## `objectstore.export` — the push post-action (shipped 2026-09-24)
+
+A built-in that delivers a directory under the Space data root (`local_path`, e.g. `orders/database`) to
+an S3-compatible Connection (`connection`) — armed with `on_pipeline:` so it runs only after a commit.
+Skip-unchanged by size + ETag, manifest written last, `FAILED` with no manifest when any object still
+fails after `retries`. The transport is the `ExportConnector` SPI (`inspecto-acquire`), implemented by
+`S3Connector`. As-built contract and limits:
+[`okf/backend/engine/object-storage-export.md`](../engine/object-storage-export.md).
+
 ## `consignment.process` — the third-party Consignment SPI (shipped 2026-08-04)
 
 The Job Type that lets someone outside this repo do work over one committed Consignment, from the
