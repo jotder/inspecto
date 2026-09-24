@@ -160,6 +160,47 @@ class ComponentDraftRepairLoopTest {
         assertFalse(offered.contains("\"config\":{\"type\":\"object\"}"), "the bare payload must be gone");
     }
 
+    // ── the transform component kind (AI drafting design S3/S6, D6/D7) ────────────
+
+    private static final List<Map<String, Object>> SAMPLE = List.of(
+            new java.util.LinkedHashMap<>(Map.of("id", "1", "amt", "150")),
+            new java.util.LinkedHashMap<>(Map.of("id", "2", "amt", "50")));
+    /** Spec-clean (it names a transform operator) — only the production preview sees the bad column. */
+    private static final Map<String, Object> PREVIEW_FAILS =
+            Map.of("type", "transform.filter", "where", "no_such_column > 1");
+    private static final Map<String, Object> PREVIEW_PASSES =
+            Map.of("type", "transform.filter", "where", "CAST(amt AS INT) >= 100");
+
+    private Map<String, Object> deriveTransform(LlmGateway gateway, Map<String, Object> paneArgs) {
+        InspectoIntelligenceAgent agent = open(gateway);
+        try {
+            return agent.deriveTool("component_draft", "keep rows whose amount is at least 100",
+                    paneArgs, null).orElseThrow();
+        } finally {
+            agent.close();
+        }
+    }
+
+    @Test
+    void aTransformThatOnlyFailsItsPreviewIsRepairedOnTheNextTurn() {
+        Map<String, Object> view = deriveTransform(new ScriptedModel(PREVIEW_FAILS, PREVIEW_PASSES),
+                Map.of("kind", "transform", "sampleRows", SAMPLE));
+
+        assertEquals(2, view.get("turns"), "a spec-only judge would have stopped on turn 1 with a broken draft");
+        assertEquals(true, value(view).get("clean"));
+        assertEquals(PREVIEW_PASSES, value(view).get("draft"));
+    }
+
+    @Test
+    void aTransformWithNoSampleNeverStopsTheLoopAsClean() {
+        // D6: without sample rows nothing ran, so the draft carries a WARNING — the vacuous spec check must
+        // not end the loop on turn 1 as though the draft had been judged.
+        Map<String, Object> view = deriveTransform(new ScriptedModel(PREVIEW_PASSES), Map.of("kind", "transform"));
+
+        assertEquals(InspectoIntelligenceAgent.MAX_REPAIR_TURNS, view.get("turns"));
+        assertEquals(false, value(view).get("clean"));
+    }
+
     @Test
     void aFirstTurnModelFailureIsTheCallersErrorAndNotAnEmptyDraft() {
         LlmGateway narrating = new LlmGateway() {

@@ -4,6 +4,7 @@ import com.eoiagent.core.RunId;
 import com.eoiagent.core.ToolCall;
 import com.eoiagent.core.ToolResult;
 import com.eoiagent.tool.Tool;
+import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.etl.ConsignmentAuditWriter;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.ComponentStore;
@@ -530,6 +531,85 @@ class InspectoToolsTest {
                 Map.of("kind", "expectation", "config", "not-a-map"), new RunId("t")));
         assertFalse(r.ok());
         assertTrue(r.error().contains("config is required"));
+    }
+
+    // ── AI drafting on the transform component kind (design S2/S3, D1/D3/D6/D7) ───
+
+    private static final List<Map<String, Object>> TRANSFORM_SAMPLE = List.of(
+            new java.util.LinkedHashMap<>(Map.of("id", "1", "amt", "150")),
+            new java.util.LinkedHashMap<>(Map.of("id", "2", "amt", "50")));
+
+    @Test
+    void componentDraftJudgesATransformByItsProductionPreview() {
+        Map<String, Object> out = invoke(draftTool(), Map.of("kind", "transform",
+                "config", Map.of("type", "transform.filter", "where", "CAST(amt AS INT) >= 100"),
+                "sampleRows", TRANSFORM_SAMPLE));
+        assertEquals("transform", out.get("type"));
+        assertEquals(true, out.get("clean"), () -> "a previewed, passing transform is clean: " + out.get("findings"));
+    }
+
+    /**
+     * D6 + §4-6: the transform spec requires only {@code type}, so spec-only judging would call this probe
+     * clean. Only the preview sees the unknown column. Mutation-checked: with the preview arm removed from
+     * {@code component_draft} this goes red on the {@code clean} VALUE (true), not on some other assertion.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aSpecCleanTransformThatFailsItsPreviewIsNotClean() {
+        Map<String, Object> out = invoke(draftTool(), Map.of("kind", "transform",
+                "config", Map.of("type", "transform.filter", "where", "no_such_column > 1"),
+                "sampleRows", TRANSFORM_SAMPLE));
+        assertEquals(false, out.get("clean"));
+        List<Map<String, Object>> findings = (List<Map<String, Object>>) out.get("findings");
+        assertEquals(1, findings.size(), () -> "findings: " + findings);
+        assertEquals("ERROR", findings.get(0).get("severity"));
+        assertEquals("", findings.get(0).get("fieldPath"), "preview findings are unanchored (D7)");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void aTransformWithNoSampleCarriesAWarningAndIsNeverClean() {
+        Map<String, Object> out = invoke(draftTool(), Map.of("kind", "transform",
+                "config", Map.of("type", "transform.filter", "where", "CAST(amt AS INT) >= 100")));
+        assertEquals(false, out.get("clean"), "an unpreviewed draft must not read as clean (D6)");
+        List<Map<String, Object>> findings = (List<Map<String, Object>>) out.get("findings");
+        assertEquals(List.of("WARNING"), findings.stream().map(f -> f.get("severity")).toList());
+    }
+
+    /** A spec ERROR is reported alone — the preview does not run over a draft that names no operator. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aTransformWithoutATypeIsAnAnchoredSpecErrorAndIsNotPreviewed() {
+        Map<String, Object> out = invoke(draftTool(), Map.of("kind", "transform",
+                "config", Map.of("where", "1=1"), "sampleRows", TRANSFORM_SAMPLE));
+        assertEquals(false, out.get("clean"));
+        List<Map<String, Object>> findings = (List<Map<String, Object>>) out.get("findings");
+        assertEquals(List.of("type"), findings.stream().map(f -> f.get("fieldPath")).distinct().toList(),
+                () -> "findings: " + findings);
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void configSchemaProjectsTheTransformComponentSpec() {
+        Map<String, Object> out = invoke(schemaTool(), Map.of("kind", "transform"));
+        assertEquals("transform", out.get("type"));
+        Map<String, Object> props = (Map<String, Object>) ((Map<String, Object>) out.get("schema")).get("properties");
+        assertTrue(props.containsKey("type"), () -> "props: " + props);
+        assertNotNull(InspectoTools.configSchemaJson("transform"), "the repair loop's constraint resolves it too");
+    }
+
+    /** ⛔ §2.2: the fallback must not have been achieved by widening the config admission gate. */
+    @Test
+    void theTransformKindIsResolvedBesideConfigSpecsNotInsideIt() {
+        assertNull(ConfigSpecs.forType("transform"));
+        assertEquals(List.of("pipeline", "enrichment", "job", "schema", "meta", "alert", "expectation",
+                "widget", "dashboard"), ConfigSpecs.TYPES);
+        // grammar/sink were not chosen (D1) and stay unvalidatable
+        for (String kind : List.of("grammar", "sink")) {
+            ToolResult r = draftTool().invoke(new ToolCall("component_draft",
+                    Map.of("kind", kind, "config", Map.of()), new RunId("t")));
+            assertFalse(r.ok(), kind);
+        }
     }
 
     // ── AGT-5 P2 slice 2: pipeline_author (parse + simulate) ─────────────────────

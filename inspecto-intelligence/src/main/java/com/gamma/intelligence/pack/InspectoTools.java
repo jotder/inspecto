@@ -28,6 +28,7 @@ import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNodeTypes;
 import com.gamma.pipeline.PipelineValidator;
 import com.gamma.pipeline.ViewStore;
+import com.gamma.pipeline.exec.ComponentSpecs;
 import com.gamma.pipeline.exec.PipelineDryRun;
 import com.gamma.query.ConditionSql;
 import com.gamma.query.DatasetRelation;
@@ -763,7 +764,7 @@ final class InspectoTools {
     private static Tool configSchema() {
         ToolSpec spec = new ToolSpec("config_schema",
                 "Get the JSON Schema for a component kind (pipeline|enrichment|job|schema|expectation|"
-                        + "alert-rule|widget|dashboard|meta) — the structural contract component_draft "
+                        + "alert-rule|widget|dashboard|meta|transform) — the structural contract component_draft "
                         + "validates against. Read this before composing a draft. Args: kind.",
                 "{\"type\":\"object\",\"properties\":{"
                         + "\"kind\":{\"type\":\"string\"}},"
@@ -776,7 +777,7 @@ final class InspectoTools {
             ConfigSpec cfgSpec = specFor(kind);
             if (cfgSpec == null) {
                 return error("no structural spec for kind '" + kind + "' (known kinds: "
-                        + String.join(", ", ConfigSpecs.TYPES) + ")");
+                        + String.join(", ", ConfigSpecs.TYPES) + ", " + String.join(", ", ComponentSpecs.KINDS) + ")");
             }
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("kind", kind);
@@ -789,12 +790,15 @@ final class InspectoTools {
     private static Tool componentDraft() {
         ToolSpec spec = new ToolSpec("component_draft",
                 "Validate a proposed component draft (kind: pipeline|enrichment|job|schema|expectation|"
-                        + "alert-rule|widget|dashboard) against the control plane's structural spec + hard-fail safety gate; "
-                        + "returns anchored findings to repair. Does not persist — a clean draft is one a "
+                        + "alert-rule|widget|dashboard|transform) against the control plane's structural spec + hard-fail safety gate; "
+                        + "returns anchored findings to repair. A transform is also run through the production "
+                        + "preview over sampleRows (post-parse records); its preview findings are unanchored, and "
+                        + "without sampleRows it is never clean. Does not persist — a clean draft is one a "
                         + "human can apply unchanged.",
                 "{\"type\":\"object\",\"properties\":{"
                         + "\"kind\":{\"type\":\"string\"},"
-                        + "\"config\":{\"type\":\"object\"}},"
+                        + "\"config\":{\"type\":\"object\"},"
+                        + "\"sampleRows\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}}},"
                         + "\"required\":[\"kind\",\"config\"]}",
                 false, Role.USER, Capability.AUTHOR_PIPELINE);
         return new FunctionTool(spec, call -> {
@@ -807,12 +811,19 @@ final class InspectoTools {
             if (cfgSpec == null) {
                 return error("no structural spec for kind '" + kind
                         + "' (validatable kinds: pipeline, enrichment, job, schema, expectation, alert-rule, "
-                        + "widget, dashboard)");
+                        + "widget, dashboard, transform)");
             }
             List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(cfgSpec, draft));
             // Agent drafts must clear the security boundary before a human ever sees them (plan §6.4):
             // the safety gate is always applied here, not opt-in as on the /validate route.
             findings.addAll(ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy()));
+            // A component kind's spec is thin by design (D7), so its TRUTH is the production preview: a
+            // draft is clean only when that preview ran and passed (D6), never from a vacuous spec check.
+            // Skipped over a spec ERROR, which already says the draft names no runnable operator.
+            if (ConfigSpecs.forType(type) == null
+                    && findings.stream().noneMatch(f -> f.severity() == com.gamma.config.spec.Severity.ERROR)) {
+                findings.addAll(ComponentSpecs.previewFindings(kind, draft, listOfMapsArg(call, "sampleRows")));
+            }
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("kind", kind);
             result.put("type", type);
@@ -1242,7 +1253,9 @@ final class InspectoTools {
      * ({@code {fields:[…]}}). Judging a pane draft by the config spec reported *"Missing required field
      * 'raw.name'"*, and the A5.2 repair loop then pushed the model toward a {@code {raw:{…}}} shape the pane
      * could not read back, so Apply silently no-opped. The word now has exactly one meaning — the config
-     * TOON — and {@code forType} is once again the whole answer. Do not reintroduce a component reading here.
+     * TOON — and {@code forType} is once again the whole answer for it. Do not reintroduce a component reading
+     * of {@code schema} here. (The {@link ComponentSpecs} fallback below, 2026-09-25, is only for a kind
+     * {@code forType} does not know at all — today {@code transform}.)
      *
      * <p>⚠ <b>Corrected 2026-08-18:</b> this note used to claim the registry {@code schema} component was
      * "retired (`ComponentStore.WRITABLE_TYPES`)". It was not — {@code schema} is still in that set, so
@@ -1256,7 +1269,10 @@ final class InspectoTools {
      * simplification: {@code validateType} guards {@code list}/{@code read}/{@code versions} as well.
      */
     private static ConfigSpec specFor(String kind) {
-        return ConfigSpecs.forType(configType(kind));
+        ConfigSpec config = ConfigSpecs.forType(configType(kind));
+        // A registry component kind that is not a config type (transform) resolves BESIDE forType, never
+        // inside it: forType is the control plane's config admission gate (design §2.2, operator D3).
+        return config != null ? config : ComponentSpecs.forKind(kind);
     }
 
     /**

@@ -63,6 +63,10 @@ class ControlApiConfigSpecTest {
                 assertTrue(spec.get("fields").size() > 0, type + " has fields");
             }
             assertEquals(404, get(c.port, "/config/spec/bogus").statusCode());
+            // ⛔ A component kind with a ComponentSpecs spec is NOT a config type (AI drafting design §2.2):
+            // it must never reach the config admission gate, or /config/write would gain a new surface.
+            for (String kind : com.gamma.pipeline.exec.ComponentSpecs.KINDS)
+                assertEquals(404, get(c.port, "/config/spec/" + kind).statusCode(), kind);
         }
     }
 

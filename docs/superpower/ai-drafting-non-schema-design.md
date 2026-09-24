@@ -246,3 +246,14 @@ The original questions, kept for provenance:
   `ComponentPreview` rather than in `com.gamma.pipeline`, so `pipeline` does not gain an edge onto `exec`.
   The `transform` spec is deliberately thin (`type` required, pattern `transform\..+`). Pinned by
   `ComponentSpecsTest`, including a negative pin that no kind in `KINDS` reaches `ConfigSpecs.forType`/`TYPES`.
+- **S2 + S3 (deterministic surface).** `InspectoTools.specFor` falls back to `ComponentSpecs.forKind` only
+  when `ConfigSpecs.forType` returns `null`, so `component_draft` and `config_schema` (and the repair loop's
+  `configSchemaJson` constraint) all resolve `transform`. `component_draft` gained an optional
+  `sampleRows` argument; for a component kind with no spec ERROR it appends
+  `ComponentSpecs.previewFindings`, so `clean` means *the production preview ran and passed* (D6).
+  **No route changed**, so none of the four ControlApi route gates applied. Tests:
+  `InspectoToolsTest` (+6: preview-passing clean · spec-clean-but-preview-failing NOT clean, mutation-checked
+  red on the `clean` value · no sample ⇒ WARNING, not clean · missing `type` ⇒ anchored spec ERROR, not
+  previewed · `config_schema` projects it · `TYPES` unchanged and grammar/sink still refused),
+  `ComponentDraftRepairLoopTest` (+2: a preview-only failure is repaired on turn 2; a no-sample draft never
+  stops the loop as clean), `ControlApiConfigSpecTest` (`/config/spec/transform` is still **404**).
