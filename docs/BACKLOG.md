@@ -4226,6 +4226,15 @@ Carried over 2026-09-23 when the MoSCoW spec (`archived-documents/plans-archive/
   is a leftover unstruck copy of the "Original row follows" text the sibling entry already reproduced and
   closed. Options (b) stays refused (would land stubs under the very trees the tier/audience guards forbid
   staging) and a fresh (c)-style README caveat would only restate what (a) already fixed.
+  🔴 **CORRECTED 2026-09-24 — "working as designed" was wrong.** A guard that does not model the fix it
+  measures cannot tell a fixed bundle from a broken one. The rewrite now lives in ONE module,
+  `tools/bundle-doc-rewrite.mjs`: `package.ps1` step 7 runs it, and the guard imports and applies it in
+  simulated mode. It also gained the class the regex missed — links to RELOCATED targets
+  (`inspecto/README.md` → `README.md`, `inspecto/examples/` → `examples/`, 15 links) are re-pointed — and
+  decides by resolving the target rather than substring-matching the tree name. **321 → 56**, identical in
+  simulated and `--bundle` mode; mutation-checked (a planted dead link reports, a planted withheld link is
+  neutralised, a disabled rewrite reports 321). ⚠ The 56 are all source-code / `compliance/` citations,
+  still an undecided class, so the guard stays out of CI.
   → `okf/backend/build-run/build-test.md`
 
 - ~~**P3** · **`WORKTREE-PROVISIONING-1`**~~ ✅ **CLOSED 2026-09-16 — one half FIXED, the other half

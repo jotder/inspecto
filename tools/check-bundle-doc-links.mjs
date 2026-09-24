@@ -42,11 +42,15 @@
  *     modelled, so a doc linking at one of those reads as dangling here and must be confirmed with
  *     `--bundle`. This exemption is PRINTED on every run: a guard's scope is a silent exemption.
  *
- * ⚠ NOT WIRED INTO CI OR pre-push, deliberately, as of 2026-09-16: it is RED on master today (323
- * dangling links, 224 of them caused by the withholding) and the remedy is an owed operator call —
- * BUNDLE-DANGLING-LINKS-1 offers rewrite at package time / marked stubs / accept-and-say-so. Wiring it
- * is part of whichever option wins; turning the build red on an undecided question would just teach the
- * next shift to ignore it.
+ * PACKAGE-TIME REWRITE. Step 7 runs `tools/bundle-doc-rewrite.mjs` over the staged docs (withheld target →
+ * `label (internal document - not shipped)`, relocated target → re-pointed). Simulated mode imports and
+ * applies that same module, so it reports only links that SURVIVE packaging; `--bundle` mode applies
+ * nothing, so there it also proves packaging ran the rewrite. Before 2026-09-24 the simulation skipped it
+ * and reported 321 where the shipped bundle had 56.
+ *
+ * ⚠ NOT WIRED INTO CI OR pre-push, deliberately: it is RED on master on the 56 source-code / `compliance/`
+ * citations the rewrite leaves alone, a class BUNDLE-DANGLING-LINKS-1 has not decided. Wire it when that
+ * class is decided; turning the build red on an undecided question would teach the next shift to ignore it.
  *
  * Pure Node, no dependencies.
  */
@@ -54,6 +58,7 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { join, sep, posix } from 'node:path';
 import { trackedPaths } from './tracked-paths.mjs';
+import { LINK, forEachLiveLine, repoToBundle, rewriteForBundle } from './bundle-doc-rewrite.mjs';
 
 const ROOT = process.cwd();
 const PACKAGE_PS1 = 'inspecto/package.ps1';
@@ -62,7 +67,6 @@ const PACKAGE_PS1 = 'inspecto/package.ps1';
 const MIN_FILES = 100;
 const MIN_LINKS = 400;
 
-const LINK = /\[[^\]]*\]\(\s*([^)\s]+?)(?:\s+"[^"]*")?\s*\)/g;
 const EXTERNAL = /^(https?:|mailto:|tel:|ftp:|data:|#)/i;
 
 const slash = (p) => p.split(sep).join('/');
@@ -116,10 +120,10 @@ function toBundlePath(rel, excl) {
         if (excl.trees.includes(top) || excl.files.includes(top)) return null;
         return rel;
     }
-    // step 4b: inspecto/examples/** → examples/**
-    if (rel.startsWith('inspecto/examples/')) return rel.slice('inspecto/'.length);
-    // step 7: inspecto/README.md → README.md (its `../docs/` links are rewritten to `docs/` there)
-    if (rel === 'inspecto/README.md') return 'README.md';
+    // step 4b (inspecto/examples/** → examples/**) and step 7 (inspecto/README.md → README.md): the
+    // relocation table is the rewrite's, so the file set and the link re-pointing cannot disagree.
+    const moved = repoToBundle(rel);
+    if (moved !== rel) return moved;
     // step 4: spaces/**, minus the runtime trees packaging skips
     if (parts[0] === 'spaces') {
         if (['uat', '_shared'].includes(parts[1])) return null;
@@ -195,30 +199,31 @@ let checked = 0;
 const dangling = [];
 
 /**
- * Step 7 does not only MOVE `inspecto/README.md` to the bundle root, it REWRITES its `../docs/` links to
- * `docs/` on the way. The simulation has to apply the same rewrite or it reports 35 phantom breaks in the
- * one file a customer opens first. (`--bundle` mode reads the already-rewritten file and skips this.)
+ * What the customer's copy of `file` says after packaging. Simulated mode applies step 7's two rewrites:
+ * the README's `../docs/` → `docs/` (a PowerShell one-liner in step 7), then THE link rewrite
+ * (`tools/bundle-doc-rewrite.mjs` — the same module step 7 runs, imported, never restated). Without the
+ * second, this guard reported 320 after the fix shipped: every link the fix neutralises, counted as
+ * dangling. `--bundle` mode reads the already-rewritten file and applies NOTHING — there the guard is
+ * the check that packaging actually ran the rewrite.
  */
+let neutralised = 0;
+let retargeted = 0;
 function bundleContent(file) {
     const raw = readFileSync(bundle.map.get(file), 'utf8');
-    if (bundle.excl && file === 'README.md') return raw.replace(/\.\.\/docs\//g, 'docs/');
-    return raw;
+    if (!bundle.excl) return raw;
+    const staged = file === 'README.md' ? raw.replace(/\.\.\/docs\//g, 'docs/') : raw;
+    const out = rewriteForBundle(staged, file, present, bundle.excl);
+    neutralised += out.neutralised;
+    retargeted += out.retargeted;
+    return out.text;
 }
 
 for (const file of markdown) {
-    const lines = bundleContent(file).split('\n');
-    let inFence = false;
-    lines.forEach((line, i) => {
-        const trimmed = line.trimStart();
-        if (trimmed.startsWith('```') || trimmed.startsWith('~~~')) {
-            inFence = !inFence;
-            return;
-        }
-        if (inFence) return;
+    forEachLiveLine(bundleContent(file).split('\n'), (line, i) => {
         let m;
         LINK.lastIndex = 0;
         while ((m = LINK.exec(line))) {
-            const raw = m[1];
+            const raw = m[2];
             if (EXTERNAL.test(raw)) continue;
             const target = raw.split('#')[0];
             if (!target) continue;
@@ -269,6 +274,7 @@ const scopeNote =
     `scope: ${bundle.label}; ${bundle.map.size} file(s) staged, ${markdown.length} of them markdown; ` +
     (bundle.excl
         ? `withheld by step 7 — trees: ${bundle.excl.trees.join(', ')}; files: ${bundle.excl.files.join(', ')}; ` +
+          `package-time rewrite applied: ${neutralised} neutralised, ${retargeted} re-pointed; ` +
           `⚠ ui/ and the generated launchers are NOT modelled here — confirm with --bundle`
         : `every target resolved against the real staged tree`);
 
@@ -286,10 +292,10 @@ if (dangling.length) {
     for (const [f, n] of [...byFile].sort((a, b) => b[1] - a[1]).slice(0, 10)) console.error(`    ${String(n).padStart(4)}  ${f}`);
     console.error(`\n  ${scopeNote}`);
     console.error(
-        `\n  ⚠ These links are FINE in the repo — \`tools/check-doc-links.mjs\` is green. They break only in` +
-            `\n  the bundle, because the target does not ship. See BUNDLE-DANGLING-LINKS-1: the remedy is an` +
-            `\n  owed product call (rewrite at package time · marked stubs · accept and say so in the README),` +
-            `\n  not a change to this guard.`,
+        `\n  ⚠ These links SURVIVE the package-time rewrite (tools/bundle-doc-rewrite.mjs), which fixes only` +
+            `\n  links into withheld docs and links to relocated targets. What is left is either a citation of a` +
+            `\n  file that never ships (fix the doc, or decide the source-path class — BUNDLE-DANGLING-LINKS-1)` +
+            `\n  or a link broken in the repo too.`,
     );
     process.exit(1);
 }

@@ -1737,37 +1737,26 @@ if (Test-Path $docsSrc) {
             throw "DOCS OVER-FILTERED: the bundle is missing docs\$entry, which is current-tier documentation that MUST ship. The exclusion in step 7 is too wide. See BUNDLE-SHIPS-THE-ARCHIVE-1."
         }
     }
-    # BUNDLE-DANGLING-LINKS-1 (2026-09-16). Withholding the two non-current tiers leaves the SHIPPED docs
-    # pointing INTO them: 224 markdown links over 124 distinct targets, 97 of them in INDEX.md alone - the
-    # customer's front door. Measured by tools/check-bundle-doc-links.mjs, which also proves this pass takes
-    # the count to zero.
+    # BUNDLE-DANGLING-LINKS-1 (2026-09-16, single-sourced 2026-09-24). Withholding the two non-current
+    # tiers leaves the SHIPPED docs pointing INTO them (250 links, ~100 in INDEX.md alone - the customer's
+    # front door), and relocating README.md / examples/ leaves 15 more pointing at the old place.
     #
-    # ⛔ Option (b), shipping a marked stub per withheld target, is REFUSED BY THIS SCRIPT'S OWN
-    # ASSERTIONS: every stub would land under docsrchived-documents\ or docs\superpower\, which the
-    # DOCS TIER LEAK / DOCS AUDIENCE LEAK throws above exist to forbid. So the link text is neutralised in
-    # place instead, which delivers the same information inline.
+    # The rewrite is tools/bundle-doc-rewrite.mjs - ONE implementation, which tools/check-bundle-doc-links.mjs
+    # imports and applies in its simulated mode. It used to be a regex here that the guard never modelled,
+    # so the guard stayed red at 321 after this fix shipped. Do not re-inline it. Per link (fence-aware):
+    #   withheld target  -> `label (internal document - not shipped)`
+    #   relocated target -> re-pointed at where it lands in the bundle
+    #   anything else    -> left alone (source-code citations; links broken in the repo too), so the
+    #                       guard still reports it - hiding those here would hide real rot.
     #
-    # ⚠ SCOPED to the withheld set ONLY. Links that dangle for other reasons are deliberately left alone:
-    # 66 cite repo source paths that never ship (a customer reading "see ControlApi.java" loses nothing),
-    # and 29 are broken IN THE REPOSITORY TOO - papering over those here would hide real rot from the
-    # repo's own guard. Fix those at the source, not at package time.
-    $withheldLinkRoots = $docsExcludedTrees + ($docsExcludedFiles | ForEach-Object { [IO.Path]::GetFileNameWithoutExtension($_) })
-    $linkPattern = '\[([^\]]*)\]\(([^)]*?(?:' + (($withheldLinkRoots | ForEach-Object { [Regex]::Escape($_) }) -join '|') + ')[^)]*)\)'
-    $neutralised = 0
-    Get-ChildItem -Path $docsOut -Recurse -File -Filter *.md | ForEach-Object {
-        $lines = [IO.File]::ReadAllLines($_.FullName)
-        $inFence = $false; $touched = $false
-        for ($i = 0; $i -lt $lines.Count; $i++) {
-            # Fence-aware: a link inside a ``` block is example TEXT, and rewriting it corrupts the example.
-            if ($lines[$i] -match '^\s*```') { $inFence = -not $inFence; continue }
-            if ($inFence) { continue }
-            $new = [Regex]::Replace($lines[$i], $linkPattern, {
-                param($m) $script:neutralised++; $m.Groups[1].Value + ' (internal document - not shipped)' })
-            if ($new -ne $lines[$i]) { $lines[$i] = $new; $touched = $true }
-        }
-        if ($touched) { [IO.File]::WriteAllLines($_.FullName, $lines) }
-    }
-    Write-Host "  docs: neutralised $neutralised link(s) into withheld trees" -ForegroundColor DarkGray
+    # Option (b), shipping a marked stub per withheld target, stays REFUSED BY THIS SCRIPT'S OWN
+    # ASSERTIONS: every stub would land under docs/archived-documents/ or docs/superpower/, which the
+    # DOCS TIER LEAK / DOCS AUDIENCE LEAK throws above exist to forbid.
+    Push-Location $sandboxRoot
+    & node (Join-Path $sandboxRoot 'tools\bundle-doc-rewrite.mjs') --bundle $bundleDir --withheld-trees ($docsExcludedTrees -join ',') --withheld-files ($docsExcludedFiles -join ',')
+    $rewriteExit = $LASTEXITCODE
+    Pop-Location
+    if ($rewriteExit -ne 0) { throw "docs link rewrite failed (exit $rewriteExit) - the bundle would ship links into withheld docs. See BUNDLE-DANGLING-LINKS-1." }
 
     $docsShipped = (Get-ChildItem -Path $docsOut -Recurse -File).Count
     Write-Host "  docs: staged $docsShipped files; withheld $docsSkipped (tiers: $($docsExcludedTrees -join ', '); audience: $($docsExcludedFiles -join ', '))" -ForegroundColor DarkGray
