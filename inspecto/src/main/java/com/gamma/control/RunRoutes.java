@@ -100,6 +100,11 @@ final class RunRoutes implements RouteModule {
             return Map.of("pipeline", ApiContext.name(m), "batchId", batchId, "status", "reprocessed");
         }));
 
+        // EXECUTION-RESIDUALS X4: replay ONE file's rejected records from its reject sidecar as a new
+        // Consignment — the file's good records already landed (eject-and-continue) and are not re-ingested.
+        api.post("/runs/([^/]+)/replay-rejects", ApiContext.withCapability("canOperateRuns", (e, m) ->
+                replayRejects(api, e, ApiContext.name(m))));
+
         // Phase 4 S4c (D-13): complete a Consignment that PARKED at a disabled route-branch sink.
         // Deliberately explicit — re-enabling the step is a CONFIG save and must not start batch work
         // as a side effect; the save surfaces the parked batch ids, the operator drains them here.
@@ -201,6 +206,45 @@ final class RunRoutes implements RouteModule {
         m.put("failed", r.failed());
         m.put("message", r.message());
         return m;
+    }
+
+    /**
+     * {@code POST /runs/{name}/replay-rejects {file}} — {@link com.gamma.inspector.RecordReplay}. Gates, in order:
+     * unknown pipeline 404 · template 409 · missing {@code file} 400 · a path, not a bare name, 403 (never
+     * resolved) · no reject sidecar 404 · not replayable (non-CSV frontend, no {@code raw_line}, possibly
+     * truncated) 422 · already replayed from this sidecar 409. A replay whose Consignment did not complete is a
+     * 200 with {@code status: FAILED} — nothing landed and the claim was released, so it may be retried.
+     */
+    private Object replayRejects(ApiContext api, HttpExchange e, String name) throws IOException {
+        if (api.service().pathFor(name).isEmpty()) throw notFound(name);
+        if (api.service().isTemplate(name))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + name + "' is a template and is not runnable");
+        String file = ApiContext.str(api.body(e), "file");
+        if (file == null || file.isBlank())
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'file' (the input file's name)");
+        if (file.contains("/") || file.contains("\\") || file.contains(".."))
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "'file' must be a bare file name, not a path");
+        com.gamma.inspector.RecordReplay.Result r;
+        try {
+            r = api.service().replayRejects(name, file).orElseThrow(() -> notFound(name));
+        } catch (java.nio.file.NoSuchFileException none) {
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, none.getMessage());
+        } catch (IllegalArgumentException unreplayable) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, unreplayable.getMessage());
+        } catch (IllegalStateException twice) {
+            throw new ApiException(409, ErrorCodes.CONFLICT, twice.getMessage());
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("pipeline", name);
+        out.put("file", r.file());
+        out.put("replayFile", r.replayFile());
+        out.put("batchId", r.batchId());
+        out.put("status", r.status());
+        out.put("records", r.records());
+        out.put("outputRows", r.outputRows());
+        out.put("errorRows", r.errorRows());
+        out.put("error", r.error());
+        return out;
     }
 
     /** Rejected-row detail is a diagnostic sample, not an export — a 4M-reject file must not be a response. */

@@ -38,8 +38,10 @@ batch** therefore hide on Quarantine rows (`visible: (r) => !!r['consignment_id'
 rows** is offered there, since a quarantined file's whole content was rejected. The Batches tab still shows
 Lineage/Reprocess normally — those rows do carry a `consignment_id`. Reprocess always asks
 `InspectoConfirmService.confirm()` before calling `POST /runs/{name}/reprocess {batchId}` — a real mutating
-action needs an explicit step, unlike the read-only tabs. Remaining known gap: no record-level replay —
-reprocess is still whole-batch only (tracked separately if ever prioritized).
+action needs an explicit step, unlike the read-only tabs. Remaining known gap: no record-level replay IN THE UI —
+reprocess is whole-batch only here. The backend route exists since 2026-09-25 (`POST /runs/{name}/replay-rejects
+{file}`, one file's rejected records from its reject sidecar, as a new Consignment — see
+[execution-lanes](../../backend/pipeline-graph/execution-lanes.md) X4); the Files/Quarantine tabs do not call it yet.
 
 **Files tab: real field names + the live step gauge (2026-08-13).** The Files tab's `GET /runs/{name}/files`
 rows are the `_status_` ledger header **verbatim** (`ConsignmentAuditWriter`): `start_time, end_time, filename,

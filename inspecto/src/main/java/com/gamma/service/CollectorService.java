@@ -1844,6 +1844,49 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         }
     }
 
+    /**
+     * Record-level replay (EXECUTION-RESIDUALS X4): re-ingest the rejected records of one file of
+     * {@code pipelineName} from its reject sidecar as a new Consignment — see {@link com.gamma.inspector.RecordReplay}.
+     * Runs on {@link #triggerWorkers} under the pipeline's {@link #runGuard} claim, exactly like
+     * {@link #runPipelineOffThread}, so no poll of the pipeline overlaps it and the request thread never holds the
+     * claim. Empty if no pipeline by that name; the replay's own refusals propagate unchanged.
+     */
+    public Optional<com.gamma.inspector.RecordReplay.Result> replayRejects(String pipelineName, String file)
+            throws IOException {
+        Optional<Path> path = pathFor(pipelineName);
+        if (path.isEmpty()) return Optional.empty();
+        refuseIfTemplate(pipelineName);
+        try {
+            return Optional.of(triggerWorkers.submit(() -> underSpace(() -> {
+                try (RunLease.Claim claim = runGuard.acquire(pipelineName)) {
+                    running.add(pipelineName);
+                    try {
+                        return com.gamma.inspector.RecordReplay.replay(
+                                com.gamma.etl.PipelineConfig.load(path.get().toString()), file, bus.sink());
+                    } finally {
+                        running.remove(pipelineName);
+                    }
+                } catch (IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                } catch (RuntimeException e) {
+                    throw e;
+                } catch (Exception e) {
+                    throw new RuntimeException(e.getMessage(), e);
+                } finally {
+                    syncStatus();
+                }
+            })).get());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("interrupted while replaying rejects of '" + pipelineName + "'", e);
+        } catch (java.util.concurrent.ExecutionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof java.io.UncheckedIOException u) throw u.getCause();
+            if (cause instanceof RuntimeException re) throw re;
+            throw new RuntimeException(cause == null ? e.getMessage() : cause.getMessage(), cause);
+        }
+    }
+
     /** {@link #triggerRunAsync(String)} with an explicit trigger label ({@code manual} | {@code notify} — ACQ-6). */
     public Optional<String> triggerRunAsync(String pipelineName, String trigger) {
         return triggerRunAsync(pipelineName, trigger, false);

@@ -673,8 +673,10 @@ End-to-end paths that tie the screens together. Each references the screens abov
    Decision Rule condition.
 3. Reprocess the batch (`POST /runs/{name}/reprocess`) once the fix is in place — it re-ingests the
    same batch through the corrected configuration. **This is API-only today: there is no UI action
-   for it yet**, and it works at whole-batch granularity — there is no separate "replay just the
-   quarantined rows" mechanism. Both gaps are open UI/product work, not documented elsewhere.
+   for it yet**, and it works at whole-batch granularity. To replay **just one file's rejected records**
+   (after fixing the Schema or mapping) without re-ingesting its good ones, call
+   `POST /runs/{name}/replay-rejects` with `{"file": "<file name>"}` — also API-only for now. Each file's
+   rejects can be replayed once; any that fail again get their own reject list, which can be replayed in turn.
 
 **Investigate a failure.**
 1. **Operations → Overview / Processing Status** — spot the anomaly.

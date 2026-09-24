@@ -1502,7 +1502,8 @@ public final class PipelineConfig {
              new Identity(src.identity.name(), src.identity.pipelineName(), runTimestamp),
              runTimestampedDirs(src, runTimestamp),
              src.sinks,
-             src.route);
+             src.route,
+             src.csv);
     }
 
     /**
@@ -1539,12 +1540,12 @@ public final class PipelineConfig {
      * the pairing — see {@link #forScratchRun(Path)}.
      */
     private PipelineConfig(PipelineConfig src, Identity identity, Dirs dirs, List<Sink> sinks,
-                           Map<String, Object> route) {
+                           Map<String, Object> route, CsvSettings csv) {
         this.identity = identity;
         this.dirs = dirs;
         this.sinks = sinks;
         this.processing = src.processing;
-        this.csv = src.csv;
+        this.csv = csv;
         this.output = src.output;
         this.steps = src.steps;   // the projection is order-sensitive, never re-derive it here
         this.explicitSteps = src.explicitSteps;
@@ -1641,7 +1642,27 @@ public final class PipelineConfig {
             scratchSinks.add(new Sink(dbDir, s.format(), s.compression(), Map.of(),  // duckLake: never register
                     s.filenameColumn()));
         }
-        return new PipelineConfig(this, identity, d, List.copyOf(scratchSinks), scratchRoute(rerooted));
+        return new PipelineConfig(this, identity, d, List.copyOf(scratchSinks), scratchRoute(rerooted), csv);
+    }
+
+    /**
+     * A copy of this config that reads a <b>record-replay input</b> (EXECUTION-RESIDUALS X4): a file of bare
+     * data lines taken verbatim from a reject sidecar's {@code raw_line} column, UTF-8 and uncompressed, so
+     * every line-framing knob that describes the ORIGINAL file is switched off — no pre-header lines, no
+     * header row, no junk scan, no footer. Everything that decides what a record MEANS (delimiter, quoting,
+     * formats, row filters, rejects capture) is kept. Fields map by selector index, never by header name,
+     * which is what makes {@code has_header: false} safe here. No disk I/O.
+     */
+    public PipelineConfig forRecordReplay() {
+        CsvSettings c = csv;
+        CsvSettings replay = new CsvSettings(c.delimiter(), c.quote(), c.escape(), c.comment(),
+                0, 0, 0, c.skipTailCols(), false,
+                c.engine(), c.dateFormats(), c.tsFormats(),
+                null, null, c.strictMode(), c.nullStrings(),
+                c.includePrefixes(), c.includeRegex(), c.excludePrefixes(), c.excludeRegex(),
+                c.filterTargetColumn(), c.where(),
+                c.ignoreErrors(), c.nullPadding(), c.rejects(), c.sourceTimezone());
+        return new PipelineConfig(this, identity, dirs, sinks, route, replay);
     }
 
     /**

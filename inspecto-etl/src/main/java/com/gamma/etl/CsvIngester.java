@@ -212,8 +212,10 @@ public final class CsvIngester {
                         String reason = String.format(
                                 "Insufficient columns (expected >%d, found %d)",
                                 maxSelector, row.length);
+                        // raw_line is the replay input (X4): RFC-4180 quote doubling keeps it byte-exact,
+                        // where the old quote→apostrophe rewrite split a quoted value on replay.
                         errOut.printf("%d,\"%s\",\"%s\"%n",
-                                procLineNum, reason, line.replace("\"", "'"));
+                                procLineNum, reason, line.replace("\"", "\"\""));
                         errorRows++;
                         continue;
                     }

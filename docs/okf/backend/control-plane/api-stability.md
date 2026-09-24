@@ -218,6 +218,14 @@ above the generated commit list.
   unchanged — renaming it is a separate, unmade decision.
 
 **Operator-visible behaviour**
+- **New route (additive, 2026-09-25, EXECUTION-RESIDUALS X4):** `POST /runs/{name}/replay-rejects {file}`
+  (`canOperateRuns`) replays ONE file's rejected records from its reject sidecar as a new Consignment,
+  without re-ingesting the file's good records; a second replay of the same sidecar is **409**.
+  [execution-lanes](../pipeline-graph/execution-lanes.md)
+- **Behaviour change — the reject sidecar's `raw_line` is now byte-exact** (2026-09-25): both CSV ingesters
+  escape an embedded `"` RFC-4180-style (`""`) in `<errors>/<file>_errors.csv` instead of rewriting it to
+  `'`, so `GET /runs/{name}/errors?file=` now shows the line's real quotes. A reader that split the column
+  itself on `'` must use an RFC-4180 reader. Sidecars written before the change keep the apostrophes.
 - `POST /spaces/{id}/import` (data-source / Space bundle) **no longer refuses a bundle that names a connection
   the target Space lacks** (operator, 2026-09-25). It was a **422** that registered nothing; now it is a
   **200** — every config needing the missing connection is written **switched off by its own switch**

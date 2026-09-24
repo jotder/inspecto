@@ -41,7 +41,8 @@ Two boundary rules the table encodes, worth stating once:
 
 **Recovery affordances per lane (2026-09-02):** ingest lanes — `POST /runs/{name}/reprocess`
 (whole-Consignment redo; refuses when an output was compacted away; **retracts the run's dedup-ledger
-claims beside `registry.supersede`** so a windowed dedup re-admits the redone rows); parked —
+claims beside `registry.supersede`** so a windowed dedup re-admits the redone rows), and since
+2026-09-25 `POST /runs/{name}/replay-rejects` (one file's rejected records only — X4, below); parked —
 `POST /runs/{name}/drain`; at-rest job lane — `POST /jobs/runs/{runId}/replay` (canOperateRuns;
 re-fires the job through the normal lifecycle with its configured defaults — the run ledger persists
 no per-run params, and the response `note` says so; the new run's `trigger` field carries
@@ -75,7 +76,54 @@ rows hold raw source data). Surface: `DryIngest.members()` and one `dry run: …
 N of M: line L (reason); …` log line per member — the trigger's HTTP response (`202 + {runId,…}`) does
 not carry it, so `docs/api/openapi-v1.json` is unchanged. Plugin decoders write no sidecar, so their
 members report `rejectTotal = 0`. **Decided 2026-09-25 (operator):** the replay default is
-**eject-and-continue**; this was its stated precondition, and replay itself is still unbuilt.
+**eject-and-continue**; this was its stated precondition.
+
+**Record-level replay (X4, first slice, 2026-09-25).** ✅ **Eject-and-continue was already the live
+behaviour** for a delimited file, on both CSV engines — nothing had to change to make it the default: a
+record that fails the column count goes to the sidecar (`line_number`, `reason`, `raw_line`), the file's
+other records land, and the file commits `SUCCESS` with `error_rows > 0` (pinned by
+`RecordReplayTest.ejectAndContinueIsTheLiveBehaviour…`, `java` + `duckdb`). Two edges are not "eject":
+a file with **zero** valid records is quarantined whole as `QUARANTINED_MISMATCH` (its sidecar moves with
+it), and a failed type **coercion** nulls the value and KEEPS the row (counted in `cast_failures`, no
+sidecar row). What was missing was only the replay, now `POST /runs/{name}/replay-rejects {file}`
+(`canOperateRuns`) → `CollectorService.replayRejects` → `RecordReplay.replay`. Its choices:
+
+- **Input = the sidecar's `raw_line`**, verbatim, in file order, written as a UTF-8 file of bare data lines
+  into the poll root as `<stem>__replay_<sha8>.<ext>` and parsed with `PipelineConfig.forRecordReplay()`,
+  which switches off every line-framing knob that described the ORIGINAL file (`skip_header_lines`,
+  `has_header`, `skip_junk_lines`, `skip_tail_lines`, encoding, compression) and keeps everything that
+  decides what a record means. Safe because fields map by selector index, never by header name. 🔴 This
+  forced one fix: both ingesters used to rewrite an embedded `"` in `raw_line` to `'`, which on replay
+  splits a quoted value into two columns and lands a **wrong row silently** (the mutant proves it); they now
+  double it (`""`). Sidecars written before 2026-09-25 still carry the apostrophes.
+- **Lane = the ordinary flat ingest over exactly that one file** — `CollectorProcessor.ingestCandidates`,
+  the post-discovery half of `ingest` — so the replay is a real Consignment with the whole commit tail
+  (outputs, manifest, backup, marker, audit, provenance, terminal event). Discovery is bypassed, so the name
+  need not match `file_pattern`, and the schema is selected by the **original** file's name. It runs on the
+  trigger pool under the pipeline's run claim, like a manual trigger, so no poll of it overlaps.
+- **Attribution = a durable replay record** `<status_dir>/replays/<sidecar-sha256>.json`: `originalFile`,
+  `sidecar`, `replayFile`, `batchId`, `status`, `outputRows`, `errorRows`, and `lines` — record *k* of the
+  replay input is the original file's line `lines[k-1]`. The replayed rows' own lineage names the replay
+  file; no per-row column was added.
+- **Idempotence = that record, claimed by an atomic create before anything is written**, keyed on the
+  sidecar's content hash: the same sidecar replayed again is **409** and lands nothing. A replay whose
+  Consignment did not complete (`FAILED` or thrown) deletes its input and **releases** the claim so it can be
+  retried; any other end keeps it. Records that are **still** rejected land in the replay input's OWN sidecar
+  (`<stem>__replay_<sha8>_errors.csv` — in `errors/`, or in quarantine when none landed), which is a
+  different sidecar and replayable in turn. ⚠ A crash mid-replay leaves an empty claim, refused as
+  "already replayed" — delete it by hand. ⚠ A whole-Consignment `reprocess` of the original rewrites the
+  same sidecar with the same content, so its replay stays refused — correctly, since the earlier replay's
+  rows were not superseded.
+- **Refused (422):** a non-delimited frontend or plugin decoder, a sidecar row with no `raw_line`, and a
+  sidecar whose row count reaches `rejects_limit` (it may be truncated).
+
+⛔ **Not built — the per-pipeline `all_or_nothing` switch.** It is not a small key: the decision must be taken
+per member **before** the write, and the single-member native path streams `read_csv → transform → COPY`
+in one pass, so its reject count is known only after the rows have landed; the Java loop, the three native
+streaming paths and the plugin lane would each need it. The nearest existing knob is
+`csv_settings.ignore_errors: false` (native engine only), which FAILS the batch on the first bad row — a
+retry-then-`retry_exhausted` end, not a whole-file quarantine. Also still open: the SPA action (Run Detail
+has no replay button) and the dry run's per-record rejects on the HTTP trigger response.
 
 ## Identity and status, per lane
 

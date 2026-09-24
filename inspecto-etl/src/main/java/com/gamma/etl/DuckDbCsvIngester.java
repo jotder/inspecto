@@ -786,7 +786,8 @@ public final class DuckDbCsvIngester {
                 : columns.get(0) + ".." + columns.get(columns.size() - 1) + " (" + columns.size() + ")";
         errOut.printf("%d,\"%s\",\"%s\",\"%s\"%n",
                 line, cols, String.join("; ", reasons),
-                raw == null ? "" : raw.replace("\"", "'"));
+                // RFC-4180 doubling, not quote→apostrophe: raw_line is the replay input (X4).
+                raw == null ? "" : raw.replace("\"", "\"\""));
     }
 
     private static long writeRejects(Connection conn, File file, String filePath,

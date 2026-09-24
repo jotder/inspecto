@@ -1844,6 +1844,44 @@
         "x-generated" : true
       }
     },
+    "/runs/{runId}/replay-rejects" : {
+      "post" : {
+        "tags" : [ "runs" ],
+        "summary" : "Replay one file's rejected records as a new Consignment (EXECUTION-RESIDUALS X4)",
+        "operationId" : "postRunsByRunIdReplayRejects",
+        "description" : "canOperateRuns. Re-ingests the rejected records of ONE file, read verbatim from its reject sidecar's raw_line column, as a new Consignment through the normal ingest lane; the file's good records (already landed under eject-and-continue) are not touched. Idempotent per sidecar: a second replay of the same sidecar is 409. 404 unknown pipeline or no sidecar; 400 missing file; 403 a path instead of a bare name; 409 template or already replayed; 422 not replayable (non-CSV frontend, no raw_line, possibly truncated by rejects_limit). A replay whose Consignment did not complete returns 200 with status FAILED and releases its claim.",
+        "parameters" : [ {
+          "name" : "runId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "file" ],
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "description" : "The input file's bare name, as the Files or Quarantine tab shows it"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {pipeline, file, replayFile, batchId, status, records, outputRows, errorRows, error}."
+          }
+        }
+      }
+    },
     "/trigger" : {
       "post" : {
         "tags" : [ "trigger" ],

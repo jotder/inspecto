@@ -153,6 +153,19 @@ public class CollectorProcessor {
             log.info("No new files to process in {}", root);
             return;
         }
+        ingestCandidates(cfg, candidates, null, onCommit, dryRun);
+    }
+
+    /**
+     * The half of {@link #ingest(PipelineConfig, java.util.function.Consumer, boolean)} after discovery: plan
+     * {@code candidates} into Consignments and run each through the full lane (commit tail, audit, event).
+     * {@code resolver} overrides schema selection by the candidate's own name — the record replay (X4) picks the
+     * ORIGINAL file's schema for a replay input whose name is its own; {@code null} = the pipeline's selector.
+     */
+    static void ingestCandidates(PipelineConfig cfg, List<File> candidates, ConsignmentPlanner.SchemaResolver resolver,
+                                 java.util.function.Consumer<ConsignmentEvent> onCommit, boolean dryRun)
+            throws Exception {
+        Path root           = Paths.get(cfg.dirs().poll()).toAbsolutePath();
 
         // ⚠ ONE Run id for the whole cycle, not one per Consignment. GLOSSARY §6-A is explicit —
         // Run ⊇ Consignment ⊇ File — so a Run CONTAINS the batches this cycle plans, and every registry
@@ -190,7 +203,7 @@ public class CollectorProcessor {
         }
 
         // ── plan batches ─────────────────────────────────────────────────────────
-        ConsignmentPlanner.SchemaResolver resolver = (cfg.schemas().selector() != null)
+        if (resolver == null) resolver = (cfg.schemas().selector() != null)
                 ? cfg.schemas().selector()::select
                 : f -> new SchemaSelector.Selection(cfg.schemas().single(), null);
 
