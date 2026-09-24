@@ -1,4 +1,4 @@
-package com.gamma.intelligence.investigation;
+package com.gamma.intelligence.triage;
 
 import org.junit.jupiter.api.Test;
 
@@ -8,21 +8,21 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class CaseStoreTest {
+class TriageRunStoreTest {
 
-    private static Case sample(String id) {
-        return new Case(id, "incident:" + id, Map.of("type", "pipeline.batch.failed"),
+    private static TriageRun sample(String id) {
+        return new TriageRun(id, "incident:" + id, Map.of("type", "pipeline.batch.failed"),
                 List.of(), List.of(), "open", List.of(), Instant.now());
     }
 
     @Test
     void recentReturnsNewestFirstCappedAtLimit() {
-        CaseStore store = new CaseStore();
+        TriageRunStore store = new TriageRunStore();
         store.add(sample("c1"));
         store.add(sample("c2"));
         store.add(sample("c3"));
 
-        List<Case> recent = store.recent(2);
+        List<TriageRun> recent = store.recent(2);
         assertEquals(2, recent.size());
         assertEquals("c3", recent.get(0).id());
         assertEquals("c2", recent.get(1).id());
@@ -30,19 +30,19 @@ class CaseStoreTest {
 
     @Test
     void evictsOldestWhenOverCapacity() {
-        CaseStore store = new CaseStore(2);
+        TriageRunStore store = new TriageRunStore(2);
         store.add(sample("c1"));
         store.add(sample("c2"));
         store.add(sample("c3"));
 
         assertEquals(2, store.size());
-        assertTrue(store.byId("c1").isEmpty(), "the oldest case is evicted");
+        assertTrue(store.byId("c1").isEmpty(), "the oldest Triage Run is evicted");
         assertTrue(store.byId("c3").isPresent());
     }
 
     @Test
     void byIdReturnsEmptyForUnknownId() {
-        CaseStore store = new CaseStore();
+        TriageRunStore store = new TriageRunStore();
         store.add(sample("c1"));
         assertTrue(store.byId("nope").isEmpty());
     }

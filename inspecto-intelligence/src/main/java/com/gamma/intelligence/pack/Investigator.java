@@ -12,8 +12,8 @@ import com.eoiagent.model.LlmGateway;
 import com.eoiagent.tool.Tool;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gamma.intelligence.investigation.Case;
-import com.gamma.intelligence.investigation.Incident;
+import com.gamma.intelligence.triage.TriageRun;
+import com.gamma.intelligence.triage.Incident;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.ReadModel;
 import com.gamma.util.BrowsableStore;
@@ -34,12 +34,12 @@ import java.util.function.Supplier;
  * the model judges it (D6): the playbook gathers a fixed-order evidence bundle by invoking the
  * analysis tools ({@code timeline_build} → {@code config_versions_diff} → {@code diff_batches} →
  * {@code anomaly_scan}, each best-effort), then asks the model ONCE to rank hypotheses and draft a
- * fix, producing a {@link Case}.
+ * fix, producing a {@link TriageRun}.
  *
  * <p>Single-shot synthesis (not model-driven ReAct) is deliberate for P1: the eoiagent session path
  * is hardwired to {@code GoalKind.QA} until the upstream {@code INVESTIGATION} seam (slice B) lands,
  * and a fixed recipe is fully deterministic under a stub gateway. When B lands, the synthesis step
- * can widen to model-driven tool selection without changing this class's inputs or the Case shape.
+ * can widen to model-driven tool selection without changing this class's inputs or the Triage Run shape.
  */
 public final class Investigator {
 
@@ -58,8 +58,8 @@ public final class Investigator {
         this.gateway = gateway;
     }
 
-    /** Root-cause investigation → a ranked-hypotheses {@link Case} with a fix draft (when warranted). */
-    public Case investigate(Incident incident) {
+    /** Root-cause investigation → a ranked-hypotheses {@link TriageRun} with a fix draft (when warranted). */
+    public TriageRun investigate(Incident incident) {
         Map<String, Object> p = incident.params();
         Map<String, Object> evidence = new LinkedHashMap<>();
 
@@ -89,12 +89,12 @@ public final class Investigator {
         String answer = synthesize(Playbooks.load(Playbooks.ROOT_CAUSE_ANALYSIS), incident, evidence);
         Synthesis s = parse(answer);
         List<String> fixRefs = writeFixDraft(s.fixDraft);
-        return new Case(UUID.randomUUID().toString(), incident.incidentRef(), incident.triggerSignal(),
+        return new TriageRun(UUID.randomUUID().toString(), incident.incidentRef(), incident.triggerSignal(),
                 timeline, s.hypotheses, s.outcome, fixRefs, Instant.now());
     }
 
     /** Impact / blast-radius investigation over the same synthesis path (timeline-grounded, P1 scope). */
-    public Case impact(Incident incident) {
+    public TriageRun impact(Incident incident) {
         Map<String, Object> p = incident.params();
         Map<String, Object> evidence = new LinkedHashMap<>();
         Map<String, Object> tl = invoke("timeline_build",
@@ -104,7 +104,7 @@ public final class Investigator {
 
         String answer = synthesize(Playbooks.load(Playbooks.IMPACT_ANALYSIS), incident, evidence);
         Synthesis s = parse(answer);
-        return new Case(UUID.randomUUID().toString(), incident.incidentRef(), incident.triggerSignal(),
+        return new TriageRun(UUID.randomUUID().toString(), incident.incidentRef(), incident.triggerSignal(),
                 timeline, s.hypotheses, s.outcome, List.of(), Instant.now());
     }
 
@@ -141,7 +141,7 @@ public final class Investigator {
                     ? JSON.convertValue(root.get("fixDraft"), MAP_TYPE) : null;
             return new Synthesis(hyps, outcome, fix);
         } catch (com.fasterxml.jackson.core.JsonProcessingException | RuntimeException e) {
-            log.warn("Unparseable RCA synthesis, filing inconclusive Case: {}", e.getMessage());
+            log.warn("Unparseable RCA synthesis, filing inconclusive Triage Run: {}", e.getMessage());
             return new Synthesis(List.of(), "inconclusive (unparseable answer)", null);
         }
     }

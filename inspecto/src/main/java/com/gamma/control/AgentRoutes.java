@@ -74,7 +74,7 @@ final class AgentRoutes implements RouteModule {
         // AGT-6a A5.1: the same dispatch, but the arguments come from one operator sentence. Registered
         // BEFORE the greedy /agent/tools/(.+) below, which would otherwise swallow it and treat "derive"
         // as part of the tool name (routes match in registration order, first-match — same reason
-        // /agent/cases/{id}/similar precedes /agent/cases/(.+)).
+        // /agent/triage-runs/{id}/similar precedes /agent/triage-runs/(.+)).
         //
         // The model contributes ARGUMENTS ONLY; the tool then runs through the identical deterministic
         // path, so this route adds a natural-language input, not a new way to act. It stays exactly as
@@ -130,35 +130,35 @@ final class AgentRoutes implements RouteModule {
             }
             return result.get("value");
         });
-        api.get("/agent/cases", (e, m) ->
-                Map.of("cases", agentOr503(api).recentCases(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
-        // AGT-5 P5 (Learning): case-similarity recall — prior Cases like this one. Registered BEFORE the
-        // greedy /agent/cases/(.+) so it wins (routes match in registration order, first-match). 404 when
-        // the base Case is unknown (read it first), else the (possibly empty) neighbour list.
-        api.get("/agent/cases/(.+)/similar", (e, m) -> {
+        api.get("/agent/triage-runs", (e, m) ->
+                Map.of("triageRuns", agentOr503(api).recentTriageRuns(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 50))));
+        // AGT-5 P5 (Learning): triage-run similarity recall — prior Triage Runs like this one. Registered BEFORE the
+        // greedy /agent/triage-runs/(.+) so it wins (routes match in registration order, first-match). 404 when
+        // the base Triage Run is unknown (read it first), else the (possibly empty) neighbour list.
+        api.get("/agent/triage-runs/(.+)/similar", (e, m) -> {
             String id = ApiContext.name(m);
             IntelligenceAgent agent = agentOr503(api);
-            if (agent.caseById(id).isEmpty()) throw new ApiException(404, "unknown case: '" + id + "'");
-            return Map.of("similar", agent.similarCases(id, ApiContext.parseIntOr(ApiContext.query(e, "k"), 5)));
+            if (agent.triageRunById(id).isEmpty()) throw new ApiException(404, "unknown triage run: '" + id + "'");
+            return Map.of("similar", agent.similarTriageRuns(id, ApiContext.parseIntOr(ApiContext.query(e, "k"), 5)));
         });
-        api.get("/agent/cases/(.+)", (e, m) ->
-                agentOr503(api).caseById(ApiContext.name(m))
-                        .orElseThrow(() -> new ApiException(404, "unknown case: '" + ApiContext.name(m) + "'")));
+        api.get("/agent/triage-runs/(.+)", (e, m) ->
+                agentOr503(api).triageRunById(ApiContext.name(m))
+                        .orElseThrow(() -> new ApiException(404, "unknown triage run: '" + ApiContext.name(m) + "'")));
 
-        // AGT-5 P5 (Learning): operator feedback on an investigation Case — the raw signal the learning
+        // AGT-5 P5 (Learning): operator feedback on a Triage Run — the raw signal the learning
         // tier turns into eval growth + per-skill tuning. The write is audited by ControlApi.dispatch.
-        api.post("/agent/cases/(.+)/feedback", ApiContext.withCapability("canAdminister", (e, m) -> {
+        api.post("/agent/triage-runs/(.+)/feedback", ApiContext.withCapability("canAdminister", (e, m) -> {
             Map<String, Object> body = api.body(e);
             if (ApiContext.str(body, "rating") == null) throw new ApiException(400, "rating is required");
             try {
-                return agentOr503(api).recordCaseFeedback(ApiContext.name(m), body, actorOrOperator(e))
-                        .orElseThrow(() -> new ApiException(404, "unknown case: '" + ApiContext.name(m) + "'"));
+                return agentOr503(api).recordTriageRunFeedback(ApiContext.name(m), body, actorOrOperator(e))
+                        .orElseThrow(() -> new ApiException(404, "unknown triage run: '" + ApiContext.name(m) + "'"));
             } catch (IllegalArgumentException bad) {   // unrecognized rating value → reject at the edge
                 throw new ApiException(400, bad.getMessage());
             }
         }));
         api.get("/agent/feedback", (e, m) -> Map.of("feedback",
-                agentOr503(api).recentCaseFeedback(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 100))));
+                agentOr503(api).recentTriageRunFeedback(ApiContext.parseIntOr(ApiContext.query(e, "limit"), 100))));
 
         // AGT-5 P3 (autonomy L2): the approvals inbox. A mutating agent tool call parks in the
         // intelligence module's ApprovalStore until an operator decides here; the decision POST resumes

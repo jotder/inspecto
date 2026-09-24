@@ -150,47 +150,47 @@ class InspectoIntelligenceAgentTest {
     }
 
     @Test
-    void recentCasesAndCaseByIdProjectTheStore() {
+    void recentTriageRunsAndTriageRunByIdProjectTheStore() {
         InspectoIntelligenceAgent agent = open(StubLlmGateway.builder().defaultReplyText("ok").build());
         try {
-            agent.caseStore().add(new com.gamma.intelligence.investigation.Case(
-                    "case-1", "incident:1", Map.of("type", "pipeline.batch.failed"),
+            agent.triageRunStore().add(new com.gamma.intelligence.triage.TriageRun(
+                    "run-1", "incident:1", Map.of("type", "pipeline.batch.failed"),
                     List.of(), List.of(), "open", List.of(), java.time.Instant.now()));
 
-            List<Map<String, Object>> recent = agent.recentCases(50);
+            List<Map<String, Object>> recent = agent.recentTriageRuns(50);
             assertEquals(1, recent.size());
-            assertEquals("case-1", recent.get(0).get("id"));
+            assertEquals("run-1", recent.get(0).get("id"));
 
-            assertEquals("open", agent.caseById("case-1").orElseThrow().get("outcome"));
-            assertTrue(agent.caseById("nope").isEmpty());
+            assertEquals("open", agent.triageRunById("run-1").orElseThrow().get("outcome"));
+            assertTrue(agent.triageRunById("nope").isEmpty());
         } finally {
             agent.close();
         }
     }
 
     @Test
-    void caseFeedbackIsRecordedValidatedAndFoldedIntoTheCaseView() {
+    void triageRunFeedbackIsRecordedValidatedAndFoldedIntoTheTriageRunView() {
         InspectoIntelligenceAgent agent = open(StubLlmGateway.builder().defaultReplyText("ok").build());
         try {
-            agent.caseStore().add(new com.gamma.intelligence.investigation.Case(
-                    "case-1", "incident:1", Map.of("type", "pipeline.batch.failed"),
+            agent.triageRunStore().add(new com.gamma.intelligence.triage.TriageRun(
+                    "run-1", "incident:1", Map.of("type", "pipeline.batch.failed"),
                     List.of(), List.of(), "open", List.of(), java.time.Instant.now()));
 
-            // Unknown case → empty (route maps to 404); a known case records + echoes the stored view.
-            assertTrue(agent.recordCaseFeedback("nope", Map.of("rating", "helpful"), "alice").isEmpty());
-            Map<String, Object> stored = agent.recordCaseFeedback(
-                    "case-1", Map.of("rating", "helpful", "note", "fixed it"), "alice").orElseThrow();
+            // Unknown Triage Run → empty (route maps to 404); a known one records + echoes the stored view.
+            assertTrue(agent.recordTriageRunFeedback("nope", Map.of("rating", "helpful"), "alice").isEmpty());
+            Map<String, Object> stored = agent.recordTriageRunFeedback(
+                    "run-1", Map.of("rating", "helpful", "note", "fixed it"), "alice").orElseThrow();
             assertEquals("HELPFUL", stored.get("rating"));
             assertEquals("alice", stored.get("submittedBy"));
 
             // A bad rating value throws (the route maps that to 400).
             assertThrows(IllegalArgumentException.class,
-                    () -> agent.recordCaseFeedback("case-1", Map.of("rating", "banana"), "alice"));
+                    () -> agent.recordTriageRunFeedback("run-1", Map.of("rating", "banana"), "alice"));
 
-            // Feedback is folded into the case's detail view and listed in the recent feed.
-            Object folded = agent.caseById("case-1").orElseThrow().get("feedback");
+            // Feedback is folded into the Triage Run detail view and listed in the recent feed.
+            Object folded = agent.triageRunById("run-1").orElseThrow().get("feedback");
             assertTrue(folded instanceof List<?> l && l.size() == 1);
-            assertEquals(1, agent.recentCaseFeedback(50).size());
+            assertEquals(1, agent.recentTriageRunFeedback(50).size());
         } finally {
             agent.close();
         }

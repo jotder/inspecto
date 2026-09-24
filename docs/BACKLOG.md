@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **48<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 22<!--count:backlog-p3--> × P3** —
+> **47<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 54 on 2026-09-24**: P2 `STREAM-CONSUMER-1` closed — Option A built, the `SP-ACQ-09` note updated, the plan distilled into `okf/capabilities/acquisition/acquisition.md` and archived.
 > ⬇ 55 → 54 on 2026-09-24: P3 `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` closed — its work had shipped in `d5f6353be`
@@ -22,8 +22,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 26<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 22<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 48<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 21<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 47<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -240,7 +240,6 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 - **P2** · **D6 spec-authoring UI (`findings-spec`)** — trigger FIRED 2026-09-15: a **non-engineer** needs to author a `findings-spec` (today TOON through generic `/components` CRUD). The deliverable is judged by whether an analyst can use it, not by whether it is faster than the generic path. → `okf/frontend/features/objects.md` · **design:** [`superpower/findings-spec-authoring-ui-design.md`](superpower/findings-spec-authoring-ui-design.md) (DESIGN ONLY 2026-09-24; 10 operator decisions owed, §9)
 - **P2** · **AGT-5 per-tool dry-run seam — BLOCKED-EXTERNAL** (re-gated 2026-09-16). The upstream `DryRunProvider` type ships, but the seam does not: `javap` on the pinned `eoiagent-platform` jar shows `PlatformBuilder` with `approvalHandler(...)` and `approvalDecisionStore(...)` and **no `dryRunProvider(...)`**. **Upstream ask (to `jotder/inspect-agent`): expose `PlatformBuilder.dryRunProvider(DryRunProvider)` and thread it to the gate builder.** Until then `AgentApprovals` stays as the previewer. ⛔ Do not re-discharge on the presence of the type — check the builder. `incident_explain` waits separately on the eoiagent host seam. → `archived-documents/plans-archive/agt-6-plan.md` §4.2 G2
-- **P3** · `GLOSSARY-CASE-1` — **split the two `Case`s in code** · RELEASE-GATED (next MAJOR), not demand-gated. `ObjectType.CASE` (groups Incidents) keeps the word; the Assistant's `com.gamma.intelligence.investigation.Case` — one RCA playbook run against one Incident — becomes **Triage** / **Triage Run** (operator decision `D-E1`, 2026-09-22; *Investigation* belongs to Link Analysis). ⚠ The gate premise did not survive verification — `v3.11.0` contains no `AgentRoutes` and no `/agent/cases`, so the published-breakage set is empty; re-gating is an operator call and is not made here. ⛔ Do not do the non-breaking half alone (two spellings for one concept); ⛔ do not rename `mode: case` or `caseType` (different words; `caseType` feeds RBAC data scopes). Touchpoints in `GLOSSARY.md` §13.
 - **P3** · `AGT-SEGMENT-1` — **the assistant's commercial framing is an unvalidated product read.** The tier packaging (A Explain / B Author-with-approval / C Bounded autonomy), the "Tier A is the wedge" argument and the SHADOW-first on-ramp were never validated against a client segment. ⛔ Decided 2026-09-10: keep the caveat and reopen on the first customer conversation — needs product input, not engineering; the framing is quoted in a stakeholder-facing doc, so it carries its caveat until this closes. → `stakeholders/PRODUCT_CAPABILITIES.md` §"How the ladder is packaged" · `archived-documents/plans-archive/agt-6-plan.md` §2
 
 ### 3.10 Deployment, Packaging & Scale-out

@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit coverage for the bounded/durable JSONL ring (M7) — the mechanic shared by ApprovalStore,
- * CaseStore, FeedbackStore, and RunbookRunStore. A tiny concrete String subclass exercises capacity
+ * TriageRunStore, FeedbackStore, and RunbookRunStore. A tiny concrete String subclass exercises capacity
  * eviction, newest-first snapshots, durability across a reload, in-memory mode, and corrupt-file
  * tolerance in one place.
  */

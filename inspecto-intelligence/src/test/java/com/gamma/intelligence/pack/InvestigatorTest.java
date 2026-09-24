@@ -1,8 +1,8 @@
 package com.gamma.intelligence.pack;
 
 import com.eoiagent.model.StubLlmGateway;
-import com.gamma.intelligence.investigation.Case;
-import com.gamma.intelligence.investigation.Incident;
+import com.gamma.intelligence.triage.TriageRun;
+import com.gamma.intelligence.triage.Incident;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
 import com.gamma.signal.Ref;
@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Golden test of the AGT-5 P1 slice C RCA playbook (the P1 exit criterion): a seeded incident —
  * a broken batch (FAILED signal on the ledger) plus a config change (two archived versions of an
- * expectation) — yields, deterministically under a stub gateway, a ranked RCA Case grounded in the
+ * expectation) — yields, deterministically under a stub gateway, a ranked RCA Triage Run grounded in the
  * real tool-gathered evidence with a persisted DRAFT fix.
  */
 class InvestigatorTest {
@@ -69,7 +69,7 @@ class InvestigatorTest {
         Incident incident = new Incident("incident:1", Map.of("type", "pipeline.batch.failed"),
                 Map.of("sinceMinutes", WIDE_WINDOW, "focusType", "expectation", "focusId", "amt-nonneg"));
 
-        Case c = investigator.investigate(incident);
+        TriageRun c = investigator.investigate(incident);
 
         // Ranked hypotheses, most-likely first.
         assertEquals(2, c.hypotheses().size());
@@ -91,12 +91,12 @@ class InvestigatorTest {
     }
 
     @Test
-    void unparseableSynthesisFilesAnInconclusiveCaseRatherThanThrowing(@TempDir Path dir) {
+    void unparseableSynthesisFilesAnInconclusiveTriageRunRatherThanThrowing(@TempDir Path dir) {
         CollectorService svc = new CollectorService(List.of(), 3600, 1);
         StubLlmGateway gateway = StubLlmGateway.builder().defaultReplyText("sorry, I can't tell").build();
         Investigator investigator = new Investigator(svc, null, List::of, gateway);
 
-        Case c = investigator.investigate(new Incident("incident:2", Map.of(), Map.of("sinceMinutes", WIDE_WINDOW)));
+        TriageRun c = investigator.investigate(new Incident("incident:2", Map.of(), Map.of("sinceMinutes", WIDE_WINDOW)));
 
         assertTrue(c.hypotheses().isEmpty());
         assertTrue(c.outcome().startsWith("inconclusive"));
@@ -109,7 +109,7 @@ class InvestigatorTest {
         StubLlmGateway gateway = StubLlmGateway.builder().defaultReplyText(RCA_JSON).build();
         Investigator investigator = new Investigator(svc, null, List::of, gateway); // no ComponentStore
 
-        Case c = investigator.investigate(new Incident("incident:3", Map.of(), Map.of("sinceMinutes", WIDE_WINDOW)));
+        TriageRun c = investigator.investigate(new Incident("incident:3", Map.of(), Map.of("sinceMinutes", WIDE_WINDOW)));
 
         assertEquals(2, c.hypotheses().size(), "hypotheses still produced");
         assertTrue(c.fixDraftRefs().isEmpty(), "no write root → draft not persisted");

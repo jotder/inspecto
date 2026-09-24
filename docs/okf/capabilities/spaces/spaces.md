@@ -333,7 +333,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 
 | Item | Board id | What remains |
 |---|---|---|
-| **Postgres multi-user** — pool behind `JdbcDrivers`, replace `browseConnection()`, **schema-per-Space** URL wiring, `CaseStore` PG impl, concurrency test | `BACKLOG.md` §3 *Postgres multi-user* — ⛔ **PARKED by §6**; `EDITIONS.md` OPS-03 | Isolation on Postgres is a **schema**, not a database (a connection binds one database) |
+| **Postgres multi-user** — pool behind `JdbcDrivers`, replace `browseConnection()`, **schema-per-Space** URL wiring, `TriageRunStore` PG impl, concurrency test | `BACKLOG.md` §3 *Postgres multi-user* — ⛔ **PARKED by §6**; `EDITIONS.md` OPS-03 | Isolation on Postgres is a **schema**, not a database (a connection binds one database) |
 | Canonical-pipeline selective bundle export / import; retire the `authored-pipeline` kind that still targets the retired `PipelineStore` | `BACKLOG.md` §3 *Canonical-pipeline selective bundle export/import* | |
 | Bundle residuals — `requires` present-but-different classification; per-editor "load as draft" import | `BACKLOG.md` §3 *Bundle / Exchange* | ⛔ do not fake a draft with a cross-kind `enabled: false` |
 | Space-to-space comparison (Maintenance COULD tier) | `BACKLOG.md` §3 *Job framework* | Builds on the preview's drift classification |

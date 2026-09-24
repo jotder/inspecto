@@ -3,15 +3,15 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { CaseFeedback, LearningService } from 'app/inspecto/api';
+import { TriageRunFeedback, LearningService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
 import { LearningComponent } from './learning.component';
 
-const FB = (id: string, rating: 'HELPFUL' | 'NOT_HELPFUL'): CaseFeedback => ({
+const FB = (id: string, rating: 'HELPFUL' | 'NOT_HELPFUL'): TriageRunFeedback => ({
     id,
-    caseId: 'case-' + id,
+    triageRunId: 'run-' + id,
     rating,
     note: 'note ' + id,
     submittedBy: 'alice',
@@ -22,8 +22,8 @@ async function create(overrides: Partial<Record<keyof LearningService, unknown>>
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
         feedback: () => of([FB('1', 'HELPFUL'), FB('2', 'HELPFUL'), FB('3', 'NOT_HELPFUL')]),
-        rateCase: vi.fn(),
-        similarCases: vi.fn(),
+        rateTriageRun: vi.fn(),
+        similarTriageRuns: vi.fn(),
         ...overrides,
     } as unknown as LearningService;
     TestBed.configureTestingModule({

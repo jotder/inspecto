@@ -73,6 +73,21 @@ above the generated commit list.
   overturns the old *"cron/event/signal fires are always real"* rule — a fire is dry exactly when the
   batch that caused it was simulated.
 
+**Breaking — the Assistant's RCA record is a Triage Run, not a Case (2026-09-24, `GLOSSARY-CASE-1`)**
+- Routes renamed, **no alias**: `GET /agent/cases` → `GET /agent/triage-runs` (list key `cases` →
+  `triageRuns`), `GET /agent/cases/{id}` → `/agent/triage-runs/{id}`, `GET /agent/cases/{id}/similar` →
+  `/agent/triage-runs/{id}/similar`, `POST /agent/cases/{id}/feedback` → `/agent/triage-runs/{id}/feedback`
+  (still `canAdminister`). Feedback views key on `triageRunId` (was `caseId`); the 404 reads
+  `unknown triage run: '<id>'`. None of the four existed in `v3.11.0`.
+- Java: package `com.gamma.intelligence.investigation` → `com.gamma.intelligence.triage`; `Case` →
+  `TriageRun`, `CaseStore` → `TriageRunStore`, `CaseSimilarity` → `TriageRunSimilarity`. SPI
+  `IntelligenceAgent`: `recentCases` / `caseById` / `similarCases` / `recordCaseFeedback` /
+  `recentCaseFeedback` → `recentTriageRuns` / `triageRunById` / `similarTriageRuns` /
+  `recordTriageRunFeedback` / `recentTriageRunFeedback`.
+- On disk: `<assist.write.root>/agent/cases.jsonl` → `agent/triage-runs.jsonl`. The old file is **not
+  read** (the Triage Run ring starts empty), and a `feedback.jsonl` whose rows key on `caseId` is ignored
+  with a load warning and overwritten on the next rating.
+
 **Breaking — route registration (2026-09-16, `ROUTE-UNGATED-DEFAULT-1` step 3)**
 - A **mutating route** (`POST`/`PUT`/`PATCH`/`DELETE`) that declares neither a capability
   (`ApiContext.withCapability`) nor a recorded `CapabilityManifest` exemption now **fails the server's

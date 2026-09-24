@@ -212,7 +212,7 @@ connection per store, opened at `CollectorService` construction, closed at shutd
 `postgres-multi-user-plan.md` (PARKED 2026-09-06) designed exactly what N pods need: **P1** a pool
 behind `JdbcDrivers` (HikariCP in-process, never a customer-run PgBouncer), **P2** a borrow-scoped
 replacement for `browseConnection()`, **P3** schema-per-Space URL wiring (not database-per-Space),
-**P4** a `CaseStore` seam for the JSONL ring. Its reopen trigger was *"the first multi-operator
+**P4** a `TriageRunStore` seam for the JSONL ring. Its reopen trigger was *"the first multi-operator
 install"*. **This plan is that trigger.**
 
 ✅ **S3 ANSWERED 2026-09-10 — HikariCP is available offline and needs NO dependency sign-off.** Measured, not
