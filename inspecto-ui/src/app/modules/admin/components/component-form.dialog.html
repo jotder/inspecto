@@ -71,8 +71,22 @@
             [disabledReason]="aiBlockedReason()"
             (applyDraft)="applyTransformDraft($event)"
         />
+        <!-- S6: a SECOND instance, not a mode switch — describing a transform and checking the one on
+             screen are different acts, and the check must keep working on a backend with no model. -->
+        <inspecto-ai-assist
+            tool="component_draft"
+            prompting
+            [args]="aiPromptArgs()"
+            [current]="aiCurrent()"
+            label="Describe the transform"
+            promptHint="keep rows whose amount is at least 100"
+            [disabled]="aiPromptBlockedReason() !== ''"
+            [disabledReason]="aiPromptBlockedReason()"
+            (applyDraft)="applyTransformDraft($event)"
+        />
         <p class="text-secondary text-xs">
-            Checked by previewing it over the sample rows below. Without a sample it is not run, and says so.
+            Both are checked by previewing the transform over the sample rows below. Without a sample it is not run, and
+            says so.
         </p>
         }
 

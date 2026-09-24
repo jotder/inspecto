@@ -242,7 +242,8 @@ contributes arguments and nothing else — it never reaches the tool, the draft,
 surface this is a **mode of `<inspecto-ai-assist>`** (`prompting`), not a fourth sibling: the draft,
 diff, Apply and `canAuthorWorkbench` gate are all unchanged, only the input differs.
 
-Adopted on **Queries only** (plan D10: opt-in per pane). A prompt box on a tool whose input the screen
+Adopted on **Queries** (plan D10: opt-in per pane), and since 2026-09-25 on the Components dialog's
+`transform` kind (see [*`transform` drafting*](#transform-drafting-shipped-2026-09-25)). A prompt box on a tool whose input the screen
 already holds is theatre — Expectations knows its `table`+`column`, and profiling them is deterministic
 SQL.
 
@@ -379,15 +380,18 @@ decided 2026-09-25). As built:
   surface now renders such a finding as its message alone instead of an empty `<code>` and a dangling dash.
 - **Host: `component-form.dialog`, transform kind only.** `[args]` = `{kind:'transform', config: <the draft
   as Save would write it>, sampleRows?}` — the deterministic path validates the draft the author typed, so
-  the config IS the argument here (the identity-only rule is for the NL `prompting` instance, which this
-  pane does not have yet). `sampleRows` is the Test panel's sample, which now shows **on create too** for a
+  the config IS the argument here. `sampleRows` is the Test panel's sample, which now shows **on create too** for a
   transform (the dry-run button stays edit-only). The affordance is **disabled with a reason** while the
   config or the sample is not valid JSON. **Apply** splits `type` into the Operator picker and the rest into
   the Config JSON, marks the form dirty and saves nothing; a draft whose `type` is not `transform.*` is
   refused with a toast, mirroring the server's own refusal.
-- **Not built:** the NL (`prompting`) instance on this dialog (design S6) — the backend loop already
-  resolves `transform` and threads a pane's `sampleRows` through, so it is a UI-only slice. `grammar` and
-  `sink` remain unspecced by decision.
+- **NL (S6): a SECOND `prompting` instance**, not a mode switch — describing a transform and checking the
+  one on screen are different acts, and the check must keep working on a backend with no model (the
+  Pipelines-pane precedent). ⚠ **Its `[args]` are `{kind, sampleRows?}` and never the config**: pane args
+  merge last and win, so sending the on-screen config would overwrite the transform the sentence produced.
+  No backend change was needed — the A5.2 loop already resolves `transform` through `configSchemaJson`
+  and keeps the pane's `sampleRows`, so every turn is judged by the preview. Apply is the same handler.
+- `grammar` and `sink` remain unspecced by decision (D1).
 
 ## Natural-language topologies (A5.3 — shipped 2026-07-27)
 
@@ -516,8 +520,8 @@ Generalize: where the declared schema is the unreliable artifact, enforcing it c
 into outages.
 
 So `ToolSchemaAdopterContractTest` (`inspecto-intelligence`) holds each schema against reality instead: every
-real `<inspecto-ai-assist>` adopter's payload — 7 payloads across 6 tools (2026-09-25: the phantom
-`component-form.dialog` row replaced by its real `transform` adoption, and the `dashboard-editor`
+real `<inspecto-ai-assist>` adopter's payload — 8 payloads across 6 tools (2026-09-25: the phantom
+`component-form.dialog` row replaced by its two real `transform` instances, and the `dashboard-editor`
 `kpi_report_builder` adopter added) — is checked against its tool's
 declared top-level property types. ⚠ **Keep the table in step when a pane's `[args]` changes**; that is the
 whole point. ⚠ It deliberately does **not** check `required`, because the NL variants of `query_author` and

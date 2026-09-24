@@ -2,7 +2,8 @@
 
 **State:** IN FLIGHT (2026-09-25). All seven operator decisions are DECIDED (§7): the named kind is
 `transform`. S1 (the `schema` slice, its own row) built 2026-09-25. Slices built for `transform`: S0 (record corrected + the `ComponentSpecs` spec home), S2+S3 (the
-deterministic, preview-backed `component_draft`), S4 (UI re-adoption in `ComponentFormDialog`). See §8.
+deterministic, preview-backed `component_draft`), S4 (UI re-adoption in `ComponentFormDialog`), S6 (the NL
+instance on the same dialog). See §8.
 **Board row:** `docs/BACKLOG.md` §3.1, *AI drafting on a non-`schema` kind* (P2, trigger fired 2026-09-15).
 **Owner doc:** [`okf/frontend/features/inline-ai-authoring.md`](../okf/frontend/features/inline-ai-authoring.md).
 **Grounded at:** `7bb36309c` (master). Every claim below cites the tree at that commit.
@@ -265,3 +266,11 @@ The original questions, kept for provenance:
   added to `ToolSchemaAdopterContractTest`. Vitest: `component-form.dialog.spec.ts` (+6),
   `ai-assist.component.spec.ts` (+1). ⚠ **Not driven live in the preview** (no backend with the
   intelligence module in this lane) — the owed live check is the design's S4 "drive it live".
+- **S6 (NL).** A second, `prompting` `<inspecto-ai-assist>` on the same dialog with identity-only args
+  `{kind:'transform', sampleRows?}` (never the config — pane args win). UI-only: the backend loop already
+  resolved `transform` after S2. Pinned by a vitest (exact args, no `config` key) and a second
+  `ToolSchemaAdopterContractTest` row; the pane-identity rule is `ArgumentDeriverTest.thePanesIdentityFieldsOutrankTheModels`.
+- **Remains:** the live preview drive of S4/S6 against a real backend (and with a configured model for S6);
+  the GAUNTLET before any push (this change touches `InspectoTools`, a shared seam, though not
+  `ComponentRoutes`). S1 is the other lane's row. Then distil into the owner doc (done for as-built) and
+  archive this plan.

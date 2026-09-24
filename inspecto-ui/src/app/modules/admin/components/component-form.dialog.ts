@@ -281,6 +281,20 @@ export class ComponentFormDialog {
         return { kind: 'transform', config: this.transformDraft() ?? {}, ...(rows ? { sampleRows: rows } : {}) };
     });
 
+    /**
+     * Args for the natural-language instance (S6). ⚠ Identity/context ONLY — never the config: pane args
+     * are applied AFTER the model's and win, so sending the form's config would overwrite the transform the
+     * sentence just produced and the draft would silently equal what is already on screen.
+     */
+    readonly aiPromptArgs = computed<Record<string, unknown>>(() => {
+        const rows = this.parsedSampleRows();
+        return { kind: 'transform', ...(rows ? { sampleRows: rows } : {}) };
+    });
+
+    readonly aiPromptBlockedReason = computed(() =>
+        this.parsedSampleRows() === null ? 'Sample rows must be a JSON array of objects.' : '',
+    );
+
     readonly aiCurrent = computed(() => this.transformDraft());
 
     readonly aiBlockedReason = computed(() => {

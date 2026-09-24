@@ -24,6 +24,7 @@ function create(kind: ComponentDef['type'] = 'grammar', def?: ComponentDef) {
     };
     // <inspecto-ai-assist> injects these three; the `transform` kind renders it (AI drafting S4).
     const runTool = vi.fn((..._args: unknown[]) => of({}));
+    const deriveTool = vi.fn((..._args: unknown[]) => of({}));
     const toastr = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
     localStorage.removeItem('inspecto.currentLens');
     TestBed.resetTestingModule(); // some cases build a second dialog to compare two stored shapes
@@ -35,13 +36,13 @@ function create(kind: ComponentDef['type'] = 'grammar', def?: ComponentDef) {
             { provide: MatDialogRef, useValue: ref },
             { provide: ComponentsService, useValue: api },
             { provide: ToastrService, useValue: toastr },
-            { provide: AgentService, useValue: { runTool, deriveTool: () => of({}) } },
+            { provide: AgentService, useValue: { runTool, deriveTool } },
             { provide: LensService, useValue: { canAuthorWorkbench: () => true } },
         ],
     });
     const fixture = TestBed.createComponent(ComponentFormDialog);
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, ref, api, runTool, toastr };
+    return { fixture, c: fixture.componentInstance, ref, api, runTool, deriveTool, toastr };
 }
 
 describe('ComponentFormDialog', () => {
@@ -243,6 +244,27 @@ describe('ComponentFormDialog', () => {
             expect(c.form.getRawValue()).toEqual(before);
             expect(c.form.dirty).toBe(false);
             expect(toastr.error).toHaveBeenCalled();
+        });
+
+        // S6: the natural-language instance. Its args are identity/context ONLY — a config sent here would
+        // win over the model's and the draft would silently equal what is already on screen.
+        it('derives from a sentence with identity-only args — never the config on screen', () => {
+            const { fixture, c, deriveTool } = create('transform');
+            c.form.patchValue({ config: '{ "where": "1=1" }' });
+            c.sampleRows.set('[{ "id": "1", "amt": "150" }]');
+            fixture.detectChanges();
+
+            const host = fixture.nativeElement.querySelectorAll('inspecto-ai-assist')[1] as HTMLElement;
+            const input = host.querySelector('input') as HTMLInputElement;
+            input.value = 'keep rows whose amount is at least 100';
+            input.dispatchEvent(new Event('input'));
+            fixture.detectChanges();
+            (host.querySelector('button') as HTMLButtonElement).click();
+
+            expect(deriveTool).toHaveBeenCalledWith('component_draft', 'keep rows whose amount is at least 100', {
+                kind: 'transform',
+                sampleRows: [{ id: '1', amt: '150' }],
+            });
         });
 
         it('renders with no a11y violations', async () => {

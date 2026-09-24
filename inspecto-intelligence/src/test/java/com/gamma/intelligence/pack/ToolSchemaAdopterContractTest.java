@@ -53,6 +53,9 @@ class ToolSchemaAdopterContractTest {
             new Payload("component_draft", "components/component-form.dialog.ts (transform, S4 2026-09-25)",
                     // `sampleRows` is the Test panel's sample, sent only when it parses
                     Map.of("kind", "string", "config", "object", "sampleRows", "array:object")),
+            new Payload("component_draft", "components/component-form.dialog.ts (transform, natural language, S6)",
+                    // identity/context only — no `config`, or it would overwrite the model's draft
+                    Map.of("kind", "string", "sampleRows", "array:object")),
             new Payload("kpi_report_builder", "studio/dashboards/dashboard-editor.component.ts (natural language)",
                     // identity-only: `title` is sent only when the form has a name
                     Map.of("dataset", "string", "title", "string")),
