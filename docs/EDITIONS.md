@@ -38,6 +38,31 @@
 > for Personal, which the code never enforced** — the claim, not the behaviour, was the defect. Pinned by
 > `ControlApiBindTest`.
 
+## Preview — not a customer-facing tier
+
+**Preview exists only for testing/incubation (operator decision, 2026-09-21) and is deliberately not a
+row in the matrix above.** It is the one place this document's organising rule gets an exception on
+purpose: *"a feature an edition lacks is a module that edition does not bundle"* still holds, but Preview
+answers it by bundling **every** optional module unconditionally, so a module still in incubation is
+reachable for testing the day it compiles — without an edition decision having been made yet for where it
+eventually lands (Personal/Professional/Enterprise).
+
+- `mvn -o clean package -Pedition-preview` (`pom.xml`) and `pwsh -File inspecto/package.ps1 -Edition
+  Preview` build/stage it.
+- `tools/bundle-modules.mjs`'s `bundleModules('Preview')` takes the whole module table unconditionally
+  (not floor-based like the other editions), so a brand-new optional module needs **no edit there** to
+  reach Preview the moment it exists. `pom.xml`'s `edition-preview` profile is static XML and does
+  **not** auto-union — a new module must be added to it by hand or Preview silently stops being
+  "everything" (comment at the profile, `pom.xml`).
+- Today Preview's module set is byte-identical to Enterprise's (nothing is currently incubation-only)
+  — `serve.bat`/`serve.sh` auto-detect edition purely from jar presence, so a Preview bundle reports
+  `edition: Enterprise` at boot. That's expected; the distinction only starts to matter once an
+  incubating module exists that Enterprise doesn't carry.
+- Never ship Preview to a customer, never advertise it externally, and never let it gate a compliance
+  claim — it carries no compliance-scope guarantee at all.
+- See [`okf/backend/editions/local-testing-without-iam.md`](okf/backend/editions/local-testing-without-iam.md)
+  for the companion fake-auth/no-Postgres local testing path, which composes with Preview.
+
 ## Assembly model (how an edition is produced)
 
 | Mechanism | Used for |

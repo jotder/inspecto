@@ -65,17 +65,20 @@ const text = readFileSync(join(repoRoot, SCRIPT), 'utf8');
 
 // ── A. the `$modules` assignment: the Maven modules built per edition ────────────────────────────
 const modulesAssign =
-    /\$modules\s*=\s*if\s*\(\s*\$Edition\s+-eq\s+'Enterprise'\s*\)\s*\{\s*'([^']+)'\s*\}\s*else\s*\{\s*'([^']+)'\s*\}/.exec(
+    /\$modules\s*=\s*if\s*\(\s*\$Edition\s+-eq\s+'Enterprise'\s+-or\s+\$Edition\s+-eq\s+'Preview'\s*\)\s*\{\s*'([^']+)'\s*\}\s*else\s*\{\s*'([^']+)'\s*\}/.exec(
         text,
     );
 if (!modulesAssign) {
     fail(
-        `${SCRIPT} has no parseable \`$modules = if ($Edition -eq 'Enterprise') { … } else { … }\` ` +
+        `${SCRIPT} has no parseable \`$modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { … } else { … }\` ` +
             `assignment. Either it was restructured (fix this parser) or the per-edition module list is ` +
             `gone. A guard that silently matches nothing is worse than no guard.`,
     );
 }
+// Preview builds Enterprise's list: today the two sets are identical (docs/EDITIONS.md "Preview"). The
+// per-edition check below fails the day bundle-modules.mjs gives Preview a module Enterprise lacks.
 const psModules = {
+    Preview: modulesAssign[1].split(',').map((s) => s.trim()).filter(Boolean),
     Enterprise: modulesAssign[1].split(',').map((s) => s.trim()).filter(Boolean),
     Professional: modulesAssign[2].split(',').map((s) => s.trim()).filter(Boolean),
 };
@@ -150,7 +153,7 @@ if (!maximalCheck.same) {
 }
 
 // Per-edition membership comes from $modules, which names reactor DIRECTORIES.
-for (const edition of ['Professional', 'Enterprise']) {
+for (const edition of ['Professional', 'Enterprise', 'Preview']) {
     const expected = set(editionOnlyModules(edition).map((m) => m.dir));
     const check = diff(set(psModules[edition]), expected);
     if (!check.same) {
@@ -199,7 +202,7 @@ for (const m of bundleModules('Enterprise')) {
 // That file's `bundleModules` doc comment names the counts a reader will trust without running
 // anything. It drifted the moment inspecto-agent arrived (PKG-5) and said 2/10/11 against a real
 // 2/11/12 for five days. Prose beside a list is not checked by the list, so check it here.
-const COUNTS = /Personal (\d+), Professional (\d+), Enterprise (\d+)/.exec(
+const COUNTS = /Personal (\d+), Professional (\d+), Enterprise (\d+), Preview (\d+)/.exec(
     readFileSync(join(repoRoot, 'tools/bundle-modules.mjs'), 'utf8'),
 );
 if (!COUNTS) {
@@ -209,7 +212,7 @@ if (!COUNTS) {
             `or it was dropped — a count nobody asserts is how that comment went stale in the first place.`,
     );
 }
-const stated = { Personal: +COUNTS[1], Professional: +COUNTS[2], Enterprise: +COUNTS[3] };
+const stated = { Personal: +COUNTS[1], Professional: +COUNTS[2], Enterprise: +COUNTS[3], Preview: +COUNTS[4] };
 for (const edition of EDITIONS) {
     const actual = bundleModules(edition).length;
     if (stated[edition] !== actual) {

@@ -71,7 +71,12 @@ param(
     # core jar; serve.sh/serve.bat auto-detect its presence and wire -Dauth.mode=oidc from env vars.
     # 'Enterprise' is Professional PLUS inspecto-policy (the ABAC AccessDecider SPI impl) — the same
     # superset relation the -Pedition-enterprise Maven profile encodes, so it bundles BOTH extra jars.
-    [ValidateSet('Personal', 'Professional', 'Standard', 'Enterprise')]
+    # 'Preview' is NOT a customer-facing tier (operator decision 2026-09-21): it is Enterprise's exact
+    # staging path internally (byte-identical bundle today), but is labeled 'Preview' in the SBOM and
+    # is meant for testing/incubation — a module still in incubation ships here first via
+    # -Pedition-preview (pom.xml) / tools/bundle-modules.mjs, without an edition decision being made
+    # for it yet.
+    [ValidateSet('Personal', 'Professional', 'Standard', 'Enterprise', 'Preview')]
     [string]$Edition = 'Personal',
     # ── release integrity (SOC 2 CC8-04) ──
     # SHA-256 checksums are ALWAYS written next to each artifact (no key needed). -Sign additionally
@@ -264,7 +269,7 @@ $agentJarSrc    = $null
 if ($Edition -eq 'Standard') { $Edition = 'Professional' }
 if ($Edition -ne 'Personal') {
     # NB: not $profile — that is a PowerShell automatic variable.
-    $editionProfile = if ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-professional' }
+    $editionProfile = if ($Edition -eq 'Preview') { 'edition-preview' } elseif ($Edition -eq 'Enterprise') { 'edition-enterprise' } else { 'edition-professional' }
     # EDG-01 cell 1: inspecto-notify-channels rides with security in BOTH non-Personal editions — CP-15
     # is "Professional and above", and Enterprise is a superset of Professional.
     # EDG-01 cell 2: inspecto-backup (OPS-06) rides alongside, Professional and above.
@@ -278,7 +283,7 @@ if ($Edition -ne 'Personal') {
     # Personal already carries the ~32 MB connector sidecar. NB inspecto-agent is in the DEFAULT
     # reactor (not profile-scoped like the modules beside it); it is listed here only so this pass
     # builds its `sidecar` artifact for the editions that stage it.
-    $modules = if ($Edition -eq 'Enterprise') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' }
+    $modules = if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') { 'inspecto-security,inspecto-policy,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' } else { 'inspecto-security,inspecto-notify-channels,inspecto-backup,inspecto-geo-link,inspecto-exchange,inspecto-metrics,inspecto-events,inspecto-ops,inspecto-agent' }
     if (-not $NoBuild) {
         Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
@@ -364,12 +369,12 @@ if ($Edition -ne 'Personal') {
     if (-not $opsJarSrc -or -not (Test-Path $opsJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $opsTargetDir\inspecto-ops-*.jar."
     }
-    if ($Edition -eq 'Enterprise') {
+    if ($Edition -eq 'Enterprise' -or $Edition -eq 'Preview') {
         $policyTargetDir = Join-Path $sandboxRoot 'inspecto-policy\target'
         $policyJarSrc = Get-ChildItem -Path $policyTargetDir -Filter 'inspecto-policy-*.jar' -ErrorAction SilentlyContinue |
                          Select-Object -First 1 -ExpandProperty FullName
         if (-not $policyJarSrc -or -not (Test-Path $policyJarSrc)) {
-            throw "Enterprise edition requested but no JAR found matching $policyTargetDir\inspecto-policy-*.jar."
+            throw "$Edition edition requested but no JAR found matching $policyTargetDir\inspecto-policy-*.jar."
         }
     }
 }

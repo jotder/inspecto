@@ -25,7 +25,11 @@
 /** The third-party JDBC sidecar package.ps1 stages for Standard and Enterprise (PG-1). */
 export const PG_SIDECAR = 'postgresql.jar';
 
-export const EDITIONS = ['Personal', 'Professional', 'Enterprise'];
+// Preview is not a customer-facing tier (operator decision 2026-09-21): it exists for testing/
+// incubation and bundles EVERY optional module unconditionally — see bundleModules() below, which
+// gives it a dedicated branch instead of a 'from' floor so a brand-new module needs no edit here to
+// be included in Preview the day it's added to MODULES.
+export const EDITIONS = ['Personal', 'Professional', 'Enterprise', 'Preview'];
 
 /**
  * artifactId → { dir, bundleFile, from }.
@@ -67,6 +71,7 @@ const MODULES = [
 
 /** The Maven profile that activates an edition's extra modules, or null for Personal. */
 export function editionProfile(edition) {
+    if (edition === 'Preview') return 'edition-preview';
     if (edition === 'Enterprise') return 'edition-enterprise';
     if (edition === 'Professional' || edition === 'Standard') return 'edition-professional';
     return null;
@@ -74,7 +79,7 @@ export function editionProfile(edition) {
 
 /**
  * The first-party modules staged for `edition`, in package.ps1's staging order.
- * Personal 2, Professional 11, Enterprise 12 — first-party only; add PG_SIDECAR for the jar count.
+ * Personal 2, Professional 11, Enterprise 12, Preview 12 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those three numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this
  * very line. They said 2/10/11 from EDG-01 until 2026-09-17, missing inspecto-agent (PKG-5, 2026-09-12);
  * the assertion exists so the next module to arrive cannot leave them wrong again.
@@ -82,6 +87,9 @@ export function editionProfile(edition) {
 export function bundleModules(edition) {
     const normalized = edition === 'Standard' ? 'Professional' : edition;
     if (!EDITIONS.includes(normalized)) throw new Error(`unknown edition '${edition}'`);
+    // Preview: every module, unconditionally — deliberately not floor-based, so a module added at any
+    // 'from' tier (including a future one) needs no edit here to reach Preview.
+    if (normalized === 'Preview') return MODULES.slice();
     return MODULES.filter(
         (m) =>
             m.from === 'all' ||

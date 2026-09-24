@@ -124,6 +124,30 @@
                 <module>inspecto-ops</module>
             </modules>
         </profile>
+        <!-- Preview: EVERYTHING, for testing/incubation — never a customer-facing tier (docs/EDITIONS.md,
+             operator decision 2026-09-21). The rule this repo enforces elsewhere ("a feature an edition
+             LACKS is a module that edition does not bundle") gets one exception here on purpose: Preview
+             bundles every optional module that exists, so a module in incubation is reachable for testing
+             the day it compiles, without waiting on an edition decision for where it eventually lands.
+             ⚠ MAINTENANCE: unlike tools/bundle-modules.mjs's Preview handling (which is automatic — it
+             takes the whole MODULES table unconditionally), THIS list is static XML and does NOT
+             auto-union edition-professional/edition-standard/edition-enterprise's modules. Adding a new
+             optional module to ANY edition profile above means adding it here too, or Preview silently
+             stops being "everything". -->
+        <profile>
+            <id>edition-preview</id>
+            <modules>
+                <module>inspecto-security</module>
+                <module>inspecto-policy</module>
+                <module>inspecto-notify-channels</module>
+                <module>inspecto-backup</module>
+                <module>inspecto-geo-link</module>
+                <module>inspecto-exchange</module>
+                <module>inspecto-metrics</module>
+                <module>inspecto-events</module>
+                <module>inspecto-ops</module>
+            </modules>
+        </profile>
         <!-- Enterprise = Professional + the ABAC policy engine (rbac-abac-plan §5): the same one-version
              reactor gains inspecto-policy (com.gamma.control.AccessDecider via ServiceLoader).
              "mvn -o clean test -Pedition-enterprise" builds/tests all optional modules. -->

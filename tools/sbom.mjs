@@ -30,7 +30,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
-import { bundleModules, editionProfile } from './bundle-modules.mjs';
+import { bundleModules, editionProfile, EDITIONS } from './bundle-modules.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -42,10 +42,10 @@ let edition = arg('--edition', 'Personal');
 if (edition === 'Standard') edition = 'Professional';
 const bundleDir = arg('--bundle', null);
 if (!bundleDir) {
-    console.error('usage: node tools/sbom.mjs --edition <Personal|Professional|Enterprise> --bundle <dir>');
+    console.error('usage: node tools/sbom.mjs --edition <Personal|Professional|Enterprise|Preview> --bundle <dir>');
     process.exit(2);
 }
-if (!['Personal', 'Professional', 'Enterprise'].includes(edition)) {
+if (!EDITIONS.includes(edition)) {
     console.error(`✖ SBOM: unknown edition '${edition}'`);
     process.exit(2);
 }

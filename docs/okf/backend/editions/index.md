@@ -18,3 +18,4 @@ idea: **editions are build flavors, never git branches.**
 * [Editions model](editions-model.md) - build flavors via Maven profiles + ServiceLoader + -D flags.
 * [Auth & security](auth-security.md) - auth-free core; the Authenticator/Subject/AccessDecider SPIs; Standard RBAC (data-driven roles, Access-Profile + sharing enforcement, OIDC/gateway); the Enterprise `inspecto-policy` ABAC engine (authored Access Policies, space isolation, decision audit); the separate write-gate.
 * [Branching & release](branching-release.md) - versions=branches, merge-forward propagation, SemVer + Conventional Commits.
+* [Local testing without a real IAM or Postgres](local-testing-without-iam.md) - the fake-auth `LocalTestAuthenticator` local path (feature-testing Professional/Enterprise route modules with zero external dependencies) vs. the real Professional/Enterprise release path (genuine OIDC provider, optional Postgres).
