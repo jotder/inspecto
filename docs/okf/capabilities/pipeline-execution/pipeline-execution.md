@@ -470,19 +470,43 @@ worst failure this feature can have and **must not depend on a caller rememberin
 hold. The job framework's unrelated `JobContext.dryRun()` (a genuine at-rest preview) keeps its own name
 and shares no method on this chain.
 
-🔴 **`strategy.ingest` is skipped WHOLE rather than substituted, and that is the load-bearing decision.**
+🔴 **`strategy.ingest` is CONTAINED, never substituted, and that is the load-bearing decision.**
 A survey of the lane found **~20** durable sites inside it — `PartitionWriter.write`,
 `QuarantineManager.quarantine` (×3), `SchemaDriftSignal.emit`, the `BranchCommitLog` write, the park-home
 parquet `COPY`, `ParkedBranches.record`, `ConsignmentGraphRunner`'s branch commits, and the unpack plugins'
 scratch expansion. Substituting each is exactly the *"every sink honours a flag"* shape that misses one —
-the failure mode `DryRunServices`' own javadoc names. **Skipping the pass is true by construction: no write
-can be missed if no writer runs.** The gated list is therefore not "every write I found" but "every call
-that could reach a write", and it is short enough to read in one screen.
+the failure mode `DryRunServices`' own javadoc names. From 2026-09-20 the pass was therefore **skipped
+whole** (true by construction, but it parsed nothing). Since 2026-09-24 (`FLAT-DRYRUN-COUNTS-ZERO-1`) it
+**runs for real inside three containments**, each true by construction because nothing inside the pass is
+told it is a dry run — `PipelineTestRun.dryIngest`, shared with the builder's test run:
 
-⚖ **The deliberate deferral, stated plainly so it is not mis-assumed: a dry run answers "what would this
-cycle touch", NOT "would these files parse".** Because ingest is skipped whole, nothing re-validates
-parsing, schema drift or record shape. The per-node `preview`/`test` POSTs remain the way to answer that
-question. ⛔ Do not read a green dry run as a parse check.
+1. **Call graph** — only `strategy.ingest` runs; `commit` / `writeAudit` / `recordProvenance` stay the
+   gated tail below.
+2. **Filesystem** — the pass runs over **copies** of the members (a quarantine is a `Files.move` of the
+   *source*) against `PipelineConfig.forScratchRun`, which re-roots every destination under a scratch root
+   on the data volume (`processing.duckdb.temp_directory`, else `dirs.temp`, else the JVM temp dir); the
+   root is deleted before the result returns. The pass runs under `<batchId>__dryrun`, because the branch
+   commit log is keyed by batch id and lives in the explicit DuckDB temp dir when one is set — a directory
+   `forScratchRun` does not re-root — so the real id could have resumed or appended to a real batch's log.
+3. **Ambient emitters** — `EventLog.CONTAINED` (a `ScopedValue` consulted by `EventLog.current()`) is bound
+   to a throwaway log for the pass, so the schema-drift Signal, the dedup-dropped event and the capture
+   appender's lines never reach the space's ledger. One seam at the lookup, not a flag per emitter. ⚠ It
+   does not follow work onto another thread. The builder's test run gained the same binding (before it, a
+   test run over a drifted file raised a real WARN Signal).
+
+✅ **So a dry run now DOES parse.** Each member is reported in the run log, keyed on the member vocabulary:
+`dry run: consignment <id> member <file> → <kind> (<MemberStatus>): N parsed, M rejected row(s) — <reason>`,
+where the kind (`PipelineTestRun.MemberKind`) is **`WOULD_LAND`** (`SUCCESS` in a batch that did not fail),
+**`REJECTED`** (`QUARANTINED_*` — validation; the batch carries on), **`SKIPPED`** (`SKIPPED_UNREADABLE`) or
+**`FAULT`** (the batch threw — even a member that parsed lands nothing; status `not reached` when the lane
+had not audited it yet, which the native union lane never has before its one transform). ⚠ Two facts the
+kinds pin: a **plugin decoder that throws on one file is `REJECTED`** (`QUARANTINED_UNREADABLE`, caught per
+member), not a fault; and **`SKIPPED` is unreachable under a dry run today** — `SKIPPED_UNREADABLE` comes from
+the unpack stage, which a dry run skips because it writes expanded copies. The batch line carries the real
+parsed and would-land totals. ⚠ Residuals: the pass **copies** every member (a dry run over a large inbox
+costs its size in scratch), a `route:` pipeline with a **disabled branch sink** faults in the pass (the park
+hook needs `dirs.backup`, which `forScratchRun` nulls — shared with the test run), and per-record offsets are
+not reported (the reject sidecar `<errors>/<file>_errors.csv` is written in the scratch root and deleted).
 
 **It PUBLISHES, marked — and that is safe because the consumer set is CLOSED.** `ConsignmentEvent` gained a
 `boolean dryRun` component (11 in total; the pre-existing 7-arg back-compat constructor absorbed the 3 main
@@ -523,16 +547,19 @@ run writes — `parse` and `sink`, one per node, keyed by the batch id the marke
 carries — through the same `ProvenanceStores` seam, marked the way the job/graph lane's
 `PipelineJobRunner` marks its own (`ProvenanceRow.simulated`). It is **metadata only and the only write**:
 no sink file, marker, status CSV, backup, quarantine — and no commit log (its constructor wrote the CSV
-header, so `CollectorProcessor.ingest` now passes it no commit-log path on a dry run). ⚠ **The counts are
-zeros, truthfully**: the strategy was skipped whole, so nothing was parsed and nothing landed — the row
-makes the dry run *visible*, it does not estimate it (real counts would need a parse pass on a dry run —
-`FLAT-DRYRUN-COUNTS-ZERO-1`, demand-gated). With provenance disabled (no store registered, the
+header, so `CollectorProcessor.ingest` now passes it no commit-log path on a dry run). ✅ **The counts are
+real** (`FLAT-DRYRUN-COUNTS-ZERO-1`, 2026-09-24): `parse` = rows the contained pass accepted, `sink` = rows it
+would have landed. Until then they were the zeros of a skipped pass — the row made the dry run *visible*
+but did not estimate it. As on a real run the record is written for a `SUCCESS` batch only, so a dry run
+whose every member is rejected shows in the run log, not the overlay. With provenance disabled (no store registered, the
 `-Dprovenance.backend` default) nothing is written at all, the same as a real run. Half (b), the UI
 marking, shipped 2026-09-23 (`e02eeab2`): `GET /provenance/batches` carries a per-batch `simulated`, and
 the Pipeline editor's run overlay labels, dashes and annotates a dry-run batch
 ([pipeline editor](../../frontend/features/pipeline-editor.md)) — so a dry run is now visible **and**
 marked on both lanes. Pinned by `FlatLaneDryRunTest` (a filesystem diff of the whole pipeline tree plus
-the store's `batches()` read, and its real-run control).
+the store's `batches()` read, and its real-run control) and `FlatLaneDryRunParseTest` (per-kind outcomes,
+and zero side effects against probes the real pass trips — the quarantine move and the DB-export
+watermark, each with its real-run control).
 
 **References.** Provenance: the archived plan
 [`archived-documents/plans-archive/pipeline-dryrun-design.md`](../../../archived-documents/plans-archive/pipeline-dryrun-design.md).
@@ -623,6 +650,7 @@ and `ControlApiAsyncV1Test.pipelineTriggerDryRunImpliesSkipPostAction`.
 | 2026-09-20 (**`PIPELINE-DRYRUN-1`**) | **`?dryRun=true` IMPLIES `?skipPostAction=true`**, OR-ed in at two levels — a dry run that acked and deleted the customer remote file is the worst failure the feature can have, and must not depend on a caller remembering | engineering |
 | 2026-09-20 (**`PIPELINE-DRYRUN-1`**) | **The dry run PUBLISHES a MARKED `ConsignmentEvent`**, which narrowly overturns *cron/event/signal fires are always real* — safe only because there is exactly ONE fan-out, so the consumer set is closed and each was made to honour or refuse loudly (§3.11) | engineering |
 | 2026-09-23 (**`DRYRUN-INVISIBLE-ON-FLAT-LANE-1` a**) | **A flat-lane dry run writes ONE provenance record flagged `simulated`** — a deliberate exception to *skip the pass whole*, metadata only and the ONLY write a dry run makes (counts are the truthful zeros of a skipped pass), so the overlay promise holds on the lane the feature shipped for rather than being retracted (§3.11) | operator |
+| 2026-09-24 (**`FLAT-DRYRUN-COUNTS-ZERO-1`**) | **A dry run PARSES: `strategy.ingest` runs CONTAINED instead of skipped** — over member copies, against `forScratchRun`, under a suffixed batch id, with `EventLog.CONTAINED` bound — so the 2026-09-20 row's accepted cost is lifted without substituting a single site; provenance counts become real and each member is reported by kind (`WOULD_LAND` / `REJECTED` / `SKIPPED` / `FAULT`), the evidence X4's replay default waits on. ⛔ No replay default was picked (§3.11) | engineering |
 
 ## 5. Not built
 
@@ -788,7 +816,7 @@ current citations name classes the 2026-08-31 rename removed (§5.3 item 7).
 | Pipeline triggers | `PipelineTrigger` (5 kinds + a scheduler enum) | ⚠ The glossary's trigger entry omits a shipped kind |
 | The commit bus | `ConsignmentEventBus` | ⚠ Cited under its **old** name in a concept page |
 | The lane fork | `ConsignmentIngestStrategy.admittedLift` / `flatReason` | — |
-| The whole-pipeline dry run | `RunRoutes.triggerPipeline`, `CollectorProcessor.run`/`ingest`, `ConsignmentIngestor.process`, `ConsignmentAuditWriter` | §3.11 — `strategy.ingest` is skipped whole, so parsing is NOT re-validated |
+| The whole-pipeline dry run | `RunRoutes.triggerPipeline`, `CollectorProcessor.run`/`ingest`, `ConsignmentIngestor.process`, `PipelineTestRun.dryIngest`, `EventLog.CONTAINED`, `ConsignmentAuditWriter` | §3.11 — `strategy.ingest` runs contained (member copies, scratch root, throwaway event log), so parsing IS re-validated and reported per member |
 | The graph runner | `ConsignmentGraphRunner` — `engages`, `run`, `dataFedSinkCount` | 🔴 The backlog names a **non-existent** class and denies its callers (§2.3) |
 | Route arming | `RouteArming.refusals` | One statement, two callers |
 | The two lifts | `PipelineLift.lift` / `.stageTwo` | ⚠ Both live; see §3.5 before citing either |
