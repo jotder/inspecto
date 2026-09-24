@@ -28,6 +28,7 @@ numbers rather than three different things wearing one name.
 | Per space | `max_concurrent_consignments` | space `scheduler.toon` · Settings ▸ Scheduler | across that space |
 | Per server | `max_concurrent_consignments` | system `scheduler.toon` · Settings ▸ Scheduler | across the whole process |
 | Share weight | `processing.priority` (1–3) | pipeline TOON (editor: sink node) | who wins a freed slot |
+| Named pool | `pools:` (name → cap) · chosen by `processing.pool` | **system** `scheduler.toon` · `PUT /system/scheduler` | Consignments admitted in that pool (§2a) |
 
 ⚠ **`processing.threads` IS the per-pipeline Consignment cap.** The name predates the concept and is
 kept only because renaming it is a GLOSSARY §13 decision; its help text says what it means.
@@ -57,6 +58,46 @@ Process-wide singleton (`shared()`/`use()`, the `IntakeGovernor` idiom). A worke
   to execution* is shared.
 - **Nested semaphores per tier.** No global view for the fairness decision, and cross-tier ordering
   is a deadlock hazard. One monitor guarding three counters instead.
+
+## 2a. Named execution pools — admission only (2026-09-24, `DUCKLE-C10-ADMISSION-POOLS-1`)
+
+A fourth broker tier, with five binding rules (adopted 2026-09-15, scale-out plan §4.1; built 2026-09-24):
+
+1. **Admission only.** A pool answers *"may this Consignment start now"*; `grantNext` skips a waiter
+   whose pool is full, so a pool can only refuse a grant the other tiers allow. It **never widens**
+   `processing.threads`, a space cap, the server cap or any memory limit (pinned by
+   `ConcurrencyBrokerPoolTest.aPoolNeverWidensThePipelineOrServerCap`).
+2. **Server-defined only.** Pools live in the **server-wide** `scheduler.toon` as `pools: {name: cap}`
+   (`0` = unbounded), installed at boot and hot-applied by `PUT /system/scheduler` `{"pools":{…}}`
+   (absent = preserve, `null`/`{}` = clear, any bad name or cap 422s the whole write). Never in a
+   space document. A Pipeline only **chooses** one with `processing.pool` (sink node ▸ *Execution
+   pool*); the validator checks only the name's shape (`ConfigSafetyValidator.POOL_NAME`, shared by
+   both sides). **Unknown ⇒ `default`** (`ConcurrencyBroker.resolvePool`) — neither a refusal nor an
+   implicit new pool. `default` always exists and is unbounded unless the server caps it.
+3. **Waiting is a recorded state.** `admit(space, pipeline, pool, cap, priority, ticketId)` takes the
+   Consignment id (`batchId`) as the ticket id, so the admission is listed in `snapshot().admissions`
+   **before** it is granted: `state: queued` with a `queueReason` naming the tier that held it
+   (`pool 'heavy' full (2 in use)`, `pipeline cap reached …`, `space cap …`, `server cap …`), then
+   `state: running` with `queueMs`. The `Permit` carries the same (`id()`, `queueReason()`,
+   `queueMs()`), and `CollectorProcessor` logs every admission that queued. The listing is capped at
+   100 rows with `admissions_total` / `admissions_truncated` beside it, because a cycle submits every
+   Consignment up front and they all park on `admit`.
+4. **⛔ A supervisor takes no slot.** There is no API to admit a dispatcher. `CollectorProcessor`'s
+   batch loop submits every Consignment and waits on the futures holding **no** permit; a supervisor
+   holding one while its children need the same pool deadlocks at exactly the pool size. Pinned both
+   ways: `aSupervisorHoldingNoSlotCompletesItsChildrenInAPoolOfOne` (with a timeout) and its
+   counterfactual `theCounterfactualSupervisorHoldingASlotWedgesItsChild`, plus the real dispatcher
+   in `CollectorProcessorPoolTest` (four Consignments through a pool of one, under a timeout).
+5. **Metric = free permits per pool**: `freePermits(pool)` (`null` when unbounded — "not applicable"
+   stays distinct from a real zero), `snapshot().pools.<name>.{cap,in_flight,free}` on
+   `GET /system/scheduler` `live.pools`, and the Prometheus gauge `inspecto_pool_free_permits{pool=…}`
+   (bounded pools only).
+
+⚠ **Deliberate limits.** The ticket list is JVM-local and in memory, like every broker counter — the
+id is durable because it is the Consignment's, not because the queue is persisted; moving admission
+state to Postgres is phase B's U2 work. A gauge series for a pool the server has since removed keeps its
+last value until restart (`MetricRegistry` has no series removal). `JobService`'s Run bound
+(§3) is **not** pooled.
 
 ## 3. ⛔ The run budget is NOT redundant with the broker
 

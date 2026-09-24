@@ -304,6 +304,10 @@ public final class ConfigSpecs {
                         "Share weight (1-3) for this pipeline's Consignments when execution slots are "
                                 + "contended: 3 gets ~3x the throughput share of 1. Shares, never "
                                 + "precedence - a priority-1 pipeline always keeps making progress."),
+                FieldSpec.of("processing.pool", "Execution pool", FieldType.STRING,
+                        "Named execution pool this pipeline's Consignments are admitted in. Pools are defined "
+                                + "server-side (scheduler settings); admission only - a pool never widens the "
+                                + "thread or memory caps. A name the server does not define runs in 'default'."),
                 FieldSpec.of("processing.duckdb.temp_directory", "DuckDB scratch dir", FieldType.FILEPATH,
                         "Directory for the per-batch temp DB and DuckDB spill; defaults to dirs.temp (never the system /tmp). Point at the roomiest disk for very large files."),
                 FieldSpec.of("processing.duckdb.memory_limit", "DuckDB memory limit", FieldType.STRING,

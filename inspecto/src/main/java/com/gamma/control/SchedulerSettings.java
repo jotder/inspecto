@@ -22,22 +22,26 @@ import java.util.Map;
  *
  * <p>Like {@code branding.toon}, the filename is deliberately not a {@code *_pipeline.toon}-style
  * suffix, so recursive config discovery never mistakes it for a runnable config.
+ *
+ * <p>{@code pools} is the server-wide document's <b>named execution pools</b> (name → cap, {@code 0} =
+ * unbounded; {@code DUCKLE-C10-ADMISSION-POOLS-1}) — the ONE place a pool is defined; a Pipeline only
+ * chooses one via {@code processing.pool}. {@code null} when none are stored. Never in a space document.
  */
 record SchedulerSettings(Integer maxConcurrentConsignments, Integer pollSeconds, Integer acquirePollSeconds,
                          Integer intakeMaxFilesPerCycle, Integer intakeMinFilesPerCycle, Boolean intakeAdaptive,
-                         String duckdbMemoryLimit, Integer maxConcurrentJobRuns) {
+                         String duckdbMemoryLimit, Integer maxConcurrentJobRuns, Map<String, Integer> pools) {
 
     static final String FILE = "scheduler.toon";
     static final SchedulerSettings EMPTY = new SchedulerSettings(null);
 
     /** Cap-only settings. Cadence is a per-space concern; the intake globals a server-wide one. */
     SchedulerSettings(Integer maxConcurrentConsignments) {
-        this(maxConcurrentConsignments, null, null, null, null, null, null, null);
+        this(maxConcurrentConsignments, null, null, null, null, null, null, null, null);
     }
 
     /** Space-tier settings (cap + cadences; the intake globals never live in a space document). */
     SchedulerSettings(Integer maxConcurrentConsignments, Integer pollSeconds, Integer acquirePollSeconds) {
-        this(maxConcurrentConsignments, pollSeconds, acquirePollSeconds, null, null, null, null, null);
+        this(maxConcurrentConsignments, pollSeconds, acquirePollSeconds, null, null, null, null, null, null);
     }
 
     /** Write to {@code scheduler.toon} at {@code path} (canonical TOON, crash-safe). Every key —
@@ -56,6 +60,7 @@ record SchedulerSettings(Integer maxConcurrentConsignments, Integer pollSeconds,
         if (duckdbMemoryLimit != null && !duckdbMemoryLimit.isBlank())
             m.put("duckdb_memory_limit", duckdbMemoryLimit.trim());
         if (maxConcurrentJobRuns != null) m.put("max_concurrent_job_runs", maxConcurrentJobRuns);
+        if (pools != null && !pools.isEmpty()) m.put("pools", new LinkedHashMap<>(pools));
         AtomicFiles.write(path, JToon.encode(m).getBytes(StandardCharsets.UTF_8), ".scheduler-");
     }
 
@@ -69,7 +74,7 @@ record SchedulerSettings(Integer maxConcurrentConsignments, Integer pollSeconds,
                     optInt(m, "poll_seconds", 1), optInt(m, "acquire_poll_seconds", 1),
                     optInt(m, "intake_max_files_per_cycle", 0), optInt(m, "intake_min_files_per_cycle", 1),
                     optBool(m, "intake_adaptive"),
-                    mem.isBlank() ? null : mem, optInt(m, "max_concurrent_job_runs", 0));
+                    mem.isBlank() ? null : mem, optInt(m, "max_concurrent_job_runs", 0), optPools(m));
         } catch (Exception e) {
             return EMPTY;
         }
@@ -84,6 +89,24 @@ record SchedulerSettings(Integer maxConcurrentConsignments, Integer pollSeconds,
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /** The stored pools; a malformed entry (bad name, non-integer or negative cap) is dropped rather than
+     *  failing the read — the PUT is where a bad pool is refused. {@code null} when none survive. */
+    private static Map<String, Integer> optPools(Map<String, Object> m) {
+        if (!(m.get("pools") instanceof Map<?, ?> raw)) return null;
+        Map<String, Integer> out = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : raw.entrySet()) {
+            String name = String.valueOf(e.getKey()).trim();
+            if (!com.gamma.config.safety.ConfigSafetyValidator.POOL_NAME.matcher(name).matches()) continue;
+            try {
+                int cap = Integer.parseInt(String.valueOf(e.getValue()).trim());
+                if (cap >= 0) out.put(name, cap);
+            } catch (NumberFormatException skip) {
+                // dropped — see method doc
+            }
+        }
+        return out.isEmpty() ? null : out;
     }
 
     private static Boolean optBool(Map<String, Object> m, String key) {

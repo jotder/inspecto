@@ -56,6 +56,10 @@ public final class ConfigSafetyValidator {
     /** Same rule as the ETL layer's {@code Identifiers.validate} — values interpolated into SQL. */
     private static final Pattern SQL_IDENTIFIER = Pattern.compile("^[A-Za-z_][A-Za-z0-9_]*$");
 
+    /** The one shape of a named execution pool (DUCKLE-C10-ADMISSION-POOLS-1): the server's pool
+     *  definitions and a Pipeline's {@code processing.pool} choice are both held to it. */
+    public static final Pattern POOL_NAME = Pattern.compile("[a-z][a-z0-9_]{0,63}");
+
     private static final String[] PIPELINE_DIRS = {
             "dirs.poll", "dirs.database", "dirs.backup", "dirs.temp", "dirs.errors",
             "dirs.quarantine", "dirs.markers", "dirs.status_dir", "dirs.log_dir"
@@ -236,6 +240,12 @@ public final class ConfigSafetyValidator {
             }
         }
         checkIntBound(raw, "processing.priority", 1, 3, out);
+        // A pool is CHOSEN here, never defined: only the shape is checked. A well-formed name the server
+        // does not define is admitted in `default` — not a refusal (scale-out plan §4.1 rule 2).
+        String pool = RawConfig.str(raw, "processing.pool");
+        if (pool != null && !pool.isBlank() && !POOL_NAME.matcher(pool.trim()).matches())
+            out.add(Finding.error("processing.pool", "pool '" + pool + "' must be a lowercase identifier "
+                    + "(letters, digits, '_'; at most 64 chars)"));
 
         for (String f : PIPELINE_SKIPS) {
             if (RawConfig.at(raw, f) != null && RawConfig.intOr(raw, f, 0) < 0) {

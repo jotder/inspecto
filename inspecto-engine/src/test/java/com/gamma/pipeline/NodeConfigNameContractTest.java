@@ -184,6 +184,8 @@ class NodeConfigNameContractTest {
                 // IntakeGovernor via PipelineConfig.intake().
                 new Contract("sink.persistent", "priority", "priority", 3,
                         c -> c.processing().priority(), 3),
+                new Contract("sink.persistent", "pool", "pool", "heavy",
+                        c -> c.processing().pool(), "heavy"),
                 new Contract("sink.persistent", "intake__max_files_per_cycle", "intake.max_files_per_cycle", 250,
                         c -> c.intake().maxFilesPerCycle(), 250),
                 new Contract("sink.persistent", "intake__min_files_per_cycle", "intake.min_files_per_cycle", 7,

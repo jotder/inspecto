@@ -95,9 +95,10 @@ Rules that cut across blocks:
 
 ## `processing.*` blocks
 
-Declared (14): `threads`, `duckdb_threads`, `file_pattern`, `schema_file`, `ingester`,
+Declared (15): `threads`, `duckdb_threads`, `file_pattern`, `schema_file`, `ingester`,
 `grammar` (deprecated alias — `parsing.grammar` wins, WARNING at save), `csv_settings`, `unpack`,
-`batch` (deprecated alias — `collector.consignment` is canonical, healed on save), `priority`, `duckdb`,
+`batch` (deprecated alias — `collector.consignment` is canonical, healed on save), `priority`, `pool`
+(named execution pool, admission only — added 2026-09-24, `DUCKLE-C10-ADMISSION-POOLS-1`), `duckdb`,
 `chunking`, `intake`, `streaming`.
 
 Parser-only (10):
@@ -271,6 +272,7 @@ against, round-tripped untouched.
 | `processing.join` | parser-only |
 | `processing.map` | parser-only |
 | `processing.mapping_file` | parser-only |
+| `processing.pool` | spec |
 | `processing.priority` | spec |
 | `processing.profile` | spec |
 | `processing.schema_file` | spec |

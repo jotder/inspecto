@@ -13,14 +13,14 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
+> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 28<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 55<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 54<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -166,10 +166,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 - **P2** · **Consignment addressing** — the ingest-side Consignment-scoped accessor waits for a consumer. ⚠ `DatasetRelation.temporalColumn` has no caller and cannot safely gain one on a write path. Settled — do not re-open: torn multi-file reads (closed by the pinned `ConsignmentSelector` list); `generation` IS read back (`DbConsignmentOutputStore`); `retire_superseded` is warned about, not silent, and ships as a disabled demo job (`spaces/demo/config/jobs/retire_superseded_job.toon`) — ⛔ its default is **not** flipped, because enabling retirement by default deletes bytes operators may rely on. → `okf/backend/engine/consignment-addressing.md`
 - **P2** · **Consignment ELT** — the surviving item is `generation`, **kept OPEN by operator choice 2026-09-23**: it is always a literal `0` (`ConsignmentOutputs.java:375`), nothing reads it for staging, and revisions use batch-id file names instead. The per-schema outputs decision shipped 2026-09-15 (the existing `consignment_outputs` child table made per-schema accurate; `batches` stays one row per ingest). ⛔ Pointers to `CONSIGNMENT-OUTPUTS-NULLRUN-1` are dead (refuted 2026-09-15). Deliberately unbuilt: the §7.4 rollup cache (until read-time aggregation is measurably slow); the §7.3 unpartitioned fallback stands by operator call. → `okf/backend/engine/db-layer.md` §3.9
-
-#### Admission
-
-- **P3** · `DUCKLE-C10-ADMISSION-POOLS-1` — **named execution pools are ADMISSION ONLY.** A pool answers "may this start now" and never widens thread or memory caps; a Pipeline may choose a pool but never define one the server lacks (unknown ⇒ `default`); a queued run gets a durable id immediately with `queueReason`, becoming `running` with `queueMs`; a supervisor takes **no slot** (holding one while waiting for a child that needs the same pool deadlocks); metric = free permits per pool. ✅ The rule set is recorded in the scale-out plan §4.1 beside the `ConcurrencyBroker` seam; the FEATURE is not built. → `superpower/enterprise-scale-out-plan.md` phase B
 
 ### 3.3 Acquisition, Collectors & Parsing
 

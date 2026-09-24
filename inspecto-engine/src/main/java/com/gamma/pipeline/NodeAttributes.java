@@ -289,6 +289,10 @@ public final class NodeAttributes {
         attrs.add(NodeAttribute.of("priority", "Priority", "number", "advanced")
                 .min(1).max(3)
                 .help("Share weight (1-3) for this pipeline's consignments when execution slots are contended: 3 gets ~3x the throughput share of 1. Shares, never precedence — a priority-1 pipeline always keeps making progress. Blank = 1."));
+        // Named execution pool (DUCKLE-C10-ADMISSION-POOLS-1): SINK_PROC_OWNED like priority. A CHOICE of a
+        // server-defined pool — admission only, and a name the server lacks runs in `default`.
+        attrs.add(NodeAttribute.of("pool", "Execution pool", "string", "advanced")
+                .help("Named execution pool this pipeline's consignments are admitted in. Pools are defined server-side (scheduler settings); admission only — a pool never widens the thread or memory caps. A name the server does not define runs in 'default'. Blank = default."));
         attrs.add(NodeAttribute.of("intake__max_files_per_cycle", "Intake cap (files/cycle)", "number", "advanced")
                 .min(0)
                 .help("This pipeline's admission cap, overriding the -Dingest.maxFilesPerCycle global; 0 = explicitly unbounded (exempts this pipeline from a fleet-wide cap). Blank = inherit the global."));
