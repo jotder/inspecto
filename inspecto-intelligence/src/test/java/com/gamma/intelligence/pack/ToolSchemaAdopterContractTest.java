@@ -46,7 +46,7 @@ class ToolSchemaAdopterContractTest {
      * an adapter branch, but no pane calls it, so there is no contract to pin.
      */
     private static final List<Payload> ADOPTERS = List.of(
-            new Payload("component_draft", "components/component-form.dialog.ts",
+            new Payload("component_draft", "components/schema-editor.dialog.ts",
                     Map.of("kind", "string")),
             new Payload("query_author", "studio/queries/queries.component.ts (structured)",
                     Map.of("dataset", "string", "when", "object", "name", "string")),

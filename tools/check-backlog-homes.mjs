@@ -201,7 +201,10 @@ for (const row of rows) {
 // 2026-09-25: 44 → 41. RELEASE-PIPELINE-NEVER-EXECUTED-1, EMPTY-GRID-HSCROLL-1, JOB-RUNS-DIALOG-DEAD-1,
 // DUCKLE-C7-AFFECTED-CONTRACTS-1 and LEGACY-ASN-SRC-TREE-UNBUILT-1 left the board and took their pointers;
 // the grammar is unchanged — every surviving row's pointer still parses.
-const MIN_DOC_POINTERS = 41;
+// 2026-09-25: 41 → 40. AI-ASSIST-SCHEMA-DIALOG-1 was filed and shipped the same day, taking its
+// pointer (→ inline-ai-authoring.md) with it; BUNDLE-DANGLING-LINKS-1 and REACTOR-VERDICT-CI-1 closed
+// earlier the same day without dropping the count. The grammar is unchanged.
+const MIN_DOC_POINTERS = 40;
 
 const scope =
     `scope: ${rows.length} board row(s), ${identified} with an identifier and ` +
