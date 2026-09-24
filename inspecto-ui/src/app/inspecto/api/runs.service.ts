@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { JobRunRow } from './jobs.service';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { apiUrl, toParams } from './api-base';
+import { apiErrorMessage, apiUrl, toParams } from './api-base';
 import {
     AuditRow,
     DrainResult,
@@ -12,7 +12,30 @@ import {
     ReportWindow,
     InboxStatus,
     RejectedRows,
+    ReplayRejectsResult,
 } from './models';
+
+/**
+ * The operator-facing message for a refused `POST /runs/{name}/replay-rejects`. Each refusal names its
+ * NEXT step, since the server's own message says only what failed: 409 = already replayed (or one in
+ * flight), 422 = this file's rejects cannot be replayed, 403 = refused (a missing capability, or a
+ * non-bare file name). The server's reason is appended whenever it sent one.
+ */
+export function replayRejectsErrorMessage(err: unknown, file: string): string {
+    const status = (err as { status?: number } | null)?.status;
+    const reason = apiErrorMessage(err, '');
+    const why = reason ? ` (${reason})` : '';
+    switch (status) {
+        case 409:
+            return `Not replayed: the rejected records of "${file}" were already replayed from this reject file, or a replay is still running — replaying again would land them twice${why}.`;
+        case 422:
+            return `The rejected records of "${file}" cannot be replayed${why}.`;
+        case 403:
+            return `Replay refused: it needs the canOperateRuns capability and a bare file name${why}.`;
+        default:
+            return apiErrorMessage(err, `Replay failed for "${file}"`);
+    }
+}
 
 /** One registered output file of a Consignment. */
 export interface ConsignmentOutputRow {
@@ -82,6 +105,15 @@ export class RunsService {
      */
     drain(name: string, batchId: string): Observable<DrainResult> {
         return this.http.post<DrainResult>(apiUrl(`/runs/${encodeURIComponent(name)}/drain`), { batchId });
+    }
+    /**
+     * Replay ONE file's rejected records from its reject file as a new Consignment (X4). Once per reject
+     * file: a second call is 409. Map refusals with {@link replayRejectsErrorMessage}.
+     */
+    replayRejects(name: string, file: string): Observable<ReplayRejectsResult> {
+        return this.http.post<ReplayRejectsResult>(apiUrl(`/runs/${encodeURIComponent(name)}/replay-rejects`), {
+            file,
+        });
     }
     commits(name: string): Observable<string[]> {
         return this.http.get<string[]>(apiUrl(`/runs/${encodeURIComponent(name)}/commits`));

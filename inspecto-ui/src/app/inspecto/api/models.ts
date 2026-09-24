@@ -76,6 +76,24 @@ export interface RejectedRows {
     rows: AuditRow[];
 }
 
+/**
+ * `POST /runs/{name}/replay-rejects {file}` (X4): one file's rejected records replayed as a new Consignment.
+ * `status` is that Consignment's terminal status — `SUCCESS`, or e.g. `EMPTY` when every record was rejected
+ * again (they are then in `replayFile`'s own reject file), or `FAILED` when nothing committed (the claim was
+ * released, so it may be retried; `error` says why).
+ */
+export interface ReplayRejectsResult {
+    pipeline: string;
+    file: string;
+    replayFile: string;
+    batchId: string | null;
+    status: string;
+    records: number;
+    outputRows: number;
+    errorRows: number;
+    error: string | null;
+}
+
 // ── status + reports ───────────────────────────────────────────────────────────
 export interface RunStatus {
     pipeline: string;

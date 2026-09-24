@@ -110,8 +110,13 @@ sidecar row). What was missing was only the replay, now `POST /runs/{name}/repla
   Consignment did not complete (`FAILED` or thrown) deletes its input and **releases** the claim so it can be
   retried; any other end keeps it. Records that are **still** rejected land in the replay input's OWN sidecar
   (`<stem>__replay_<sha8>_errors.csv` — in `errors/`, or in quarantine when none landed), which is a
-  different sidecar and replayable in turn. ⚠ A crash mid-replay leaves an empty claim, refused as
-  "already replayed" — delete it by hand. ⚠ A whole-Consignment `reprocess` of the original rewrites the
+  different sidecar and replayable in turn. **Abandoned claims (2026-09-25):** a completed record is
+  never stale, but an **empty** claim (a replay that never wrote its record) is refused as *in progress* while
+  younger than `RecordReplay.ABANDONED_CLAIM_AFTER` (30 min) and, once older, treated as a crash's leftover —
+  its leftover input (and `.writing` temp) is deleted from the poll root and the claim re-taken atomically
+  (pinned by three `RecordReplayTest` cases). ⚠ Residual: a crash in the few statements AFTER the replay
+  Consignment committed but BEFORE its record was moved into place also leaves an empty claim, and
+  reclaiming that one would land the records twice. ⚠ A whole-Consignment `reprocess` of the original rewrites the
   same sidecar with the same content, so its replay stays refused — correctly, since the earlier replay's
   rows were not superseded.
 - **Refused (422):** a non-delimited frontend or plugin decoder, a sidecar row with no `raw_line`, and a
@@ -122,8 +127,13 @@ per member **before** the write, and the single-member native path streams `read
 in one pass, so its reject count is known only after the rows have landed; the Java loop, the three native
 streaming paths and the plugin lane would each need it. The nearest existing knob is
 `csv_settings.ignore_errors: false` (native engine only), which FAILS the batch on the first bad row — a
-retry-then-`retry_exhausted` end, not a whole-file quarantine. Also still open: the SPA action (Run Detail
-has no replay button) and the dry run's per-record rejects on the HTTP trigger response.
+retry-then-`retry_exhausted` end, not a whole-file quarantine. **Audit:** the replay is recorded by the
+single `AuditTrail` seam every mutating route goes through (actor, capability `canOperateRuns`, IP), under
+its own action `pipeline.rejects_replayed` since 2026-09-25 — before that it fell to the POST default and
+read as `pipeline.created`; `reprocess` was already `pipeline.reprocessed` the same way. **SPA:** the
+rejected-rows dialog on Run Detail carries the action since 2026-09-25 — see
+[run-detail](../../frontend/features/run-detail.md). Still open: the dry run's per-record rejects on the HTTP
+trigger response.
 
 ## Identity and status, per lane
 

@@ -204,6 +204,7 @@ final class AuditTrail {
                 case "pause" -> "paused";
                 case "resume" -> "resumed";
                 case "reprocess" -> "reprocessed";
+                case "replay-rejects" -> "rejects_replayed";   // POST /runs/{name}/replay-rejects (X4)
                 case "approve" -> "approved";     // POST /exchange/grants/{id}/approve
                 case "deny" -> "denied";
                 case "revoke" -> "revoked";

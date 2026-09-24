@@ -30,6 +30,15 @@ class AuditTrailTest {
                 AuditTrail.classify("POST", "/expectations/rows/baseline/clear"));
     }
 
+    /** X4: a record-level replay is audited under its own verb, not the POST default "pipeline.created". */
+    @Test
+    void classifiesReplayRejectsAsReplayed() {
+        assertEquals(new AuditTrail.Action("pipeline.rejects_replayed", "data_mutation"),
+                AuditTrail.classify("POST", "/runs/orders/replay-rejects"));
+        assertEquals(new AuditTrail.Action("pipeline.reprocessed", "data_mutation"),
+                AuditTrail.classify("POST", "/runs/orders/reprocess"));
+    }
+
     @Test
     void classifiesConfigAndExport() {
         assertEquals("configuration", AuditTrail.classify("POST", "/config/write").category());

@@ -4,7 +4,7 @@ title: Run Detail
 description: One running Pipeline's batches, files, lineage, quarantine, commits, and report tabs, with a batch-detail dialog. Carries a breadcrumb.
 resource: inspecto-ui/src/app/modules/admin/run-detail/run-detail.routes.ts
 tags: [feature, runs, detail, breadcrumb]
-timestamp: 2026-07-07T00:00:00Z
+timestamp: 2026-09-25T00:00:00Z
 ---
 
 # Run Detail
@@ -38,10 +38,29 @@ batch** therefore hide on Quarantine rows (`visible: (r) => !!r['consignment_id'
 rows** is offered there, since a quarantined file's whole content was rejected. The Batches tab still shows
 Lineage/Reprocess normally — those rows do carry a `consignment_id`. Reprocess always asks
 `InspectoConfirmService.confirm()` before calling `POST /runs/{name}/reprocess {batchId}` — a real mutating
-action needs an explicit step, unlike the read-only tabs. Remaining known gap: no record-level replay IN THE UI —
-reprocess is whole-batch only here. The backend route exists since 2026-09-25 (`POST /runs/{name}/replay-rejects
-{file}`, one file's rejected records from its reject sidecar, as a new Consignment — see
-[execution-lanes](../../backend/pipeline-graph/execution-lanes.md) X4); the Files/Quarantine tabs do not call it yet.
+action needs an explicit step, unlike the read-only tabs.
+
+**Record-level replay (X4, shipped in the UI 2026-09-25).** The **rejected-rows dialog** (`rejected-rows.dialog.ts`
+— opened by *View the rejected rows* on a Files row with `error_rows > 0` and on every Quarantine row) carries a
+**Replay rejected records** action → `RunsService.replayRejects` → `POST /runs/{name}/replay-rejects {file}`
+(backend: [execution-lanes](../../backend/pipeline-graph/execution-lanes.md) X4). Rules it follows:
+
+- Offered only once the reject file loaded with `rowCount > 0` — never on the 404 empty state or a load error.
+- Always asks `InspectoConfirmService.confirm()` first; the text says it replays **only the rejected lines, as a
+  new Consignment**, **once per reject file**, and warns that reject files written **before 2026-09-25** may have
+  turned `"` into `'` (the ingester fix that date), so a quoted value there can land split or altered.
+- ⚠ **Disabled, not hidden**, without `lens.canOperateRuns()` — the button stays with a visible reason line and
+  a tooltip. This deliberately differs from the grid row actions above (reprocess/drain *hide* for the
+  Business lens): inside an already-open dialog a vanished button just looks broken.
+- Success renders an `<inspecto-alert variant="success">` with the new Consignment id and an **Open Consignment**
+  button (the batch-detail dialog), and the replay button stays disabled — a reject file replays once. A
+  non-`SUCCESS` terminal status (every record rejected again) is a warning naming the replay file whose own reject
+  file holds them. A `200 status: FAILED` is **not stored**: the server released its claim, so a warning toast
+  says nothing landed and the button stays usable.
+- Refusals go through `replayRejectsErrorMessage(err, file)` (`inspecto/api/runs.service.ts`), which prefixes the
+  next step to the server's reason: **409** already replayed / still in flight, **422** cannot be replayed
+  (non-CSV, no `raw_line`, possibly truncated at `rejects_limit`), **403** needs `canOperateRuns` and a bare file
+  name; anything else falls back to `apiErrorMessage`. Pinned by `rejected-rows.dialog.spec.ts`.
 
 **Files tab: real field names + the live step gauge (2026-08-13).** The Files tab's `GET /runs/{name}/files`
 rows are the `_status_` ledger header **verbatim** (`ConsignmentAuditWriter`): `start_time, end_time, filename,

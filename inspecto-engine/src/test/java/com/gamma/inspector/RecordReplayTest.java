@@ -172,6 +172,72 @@ class RecordReplayTest {
         assertEquals(4, landedRows(cfg).size(), "nothing landed twice");
     }
 
+    /** The claim path a replay of {@code feed.csv} would take — keyed on the sidecar's content hash. */
+    private static Path claimFor(PipelineConfig cfg) throws Exception {
+        Path sidecar = Path.of(cfg.dirs().errors()).resolve("feed_errors.csv");
+        String hash = java.util.HexFormat.of().formatHex(
+                java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(sidecar)));
+        return Path.of(cfg.dirs().manifestsDir()).toAbsolutePath().resolveSibling("replays").resolve(hash + ".json");
+    }
+
+    /**
+     * A crash mid-replay leaves an EMPTY claim (created before anything was written, never completed) and maybe
+     * a half-written input in the poll root. Once it is older than {@link RecordReplay#ABANDONED_CLAIM_AFTER} it
+     * is treated as abandoned: reclaimed, the leftover input replaced, and the replay lands exactly once.
+     */
+    @Test
+    void anEmptyClaimOlderThanTheStaleAgeIsReclaimed(@TempDir Path dir) throws Exception {
+        ingestOnce(dir, "java");
+        Files.writeString(dir.resolve("mini_schema.toon"), SCHEMA_V2);
+        PipelineConfig cfg = PipelineConfig.load(dir.resolve("mini_pipeline.toon").toString());
+        Path claim = claimFor(cfg);
+        Files.createDirectories(claim.getParent());
+        Files.createFile(claim);                                               // the crash's leftover claim
+        Files.setLastModifiedTime(claim, java.nio.file.attribute.FileTime.from(
+                java.time.Instant.now().minus(RecordReplay.ABANDONED_CLAIM_AFTER).minusSeconds(60)));
+        String hash = claim.getFileName().toString().replace(".json", "");
+        Path leftover = Path.of(cfg.dirs().poll()).resolve(RecordReplay.replayName("feed.csv", hash));
+        Files.writeString(leftover, "short1,3.0,20");                        // half-written input
+
+        RecordReplay.Result r = RecordReplay.replay(cfg, "feed.csv", null);
+
+        assertEquals("SUCCESS", r.status(), r.toString());
+        assertEquals(4, landedRows(cfg).size(), "two good + two replayed, once: " + landedRows(cfg));
+        assertTrue(Files.readString(claim).contains("\"batchId\""), "the reclaimed record is completed");
+    }
+
+    /** A FRESH empty claim may be a replay still in flight (another node, a slow run) — it stays refused. */
+    @Test
+    void aFreshEmptyClaimIsStillRefused(@TempDir Path dir) throws Exception {
+        ingestOnce(dir, "java");
+        Files.writeString(dir.resolve("mini_schema.toon"), SCHEMA_V2);
+        PipelineConfig cfg = PipelineConfig.load(dir.resolve("mini_pipeline.toon").toString());
+        Path claim = claimFor(cfg);
+        Files.createDirectories(claim.getParent());
+        Files.createFile(claim);
+
+        IllegalStateException refused = assertThrows(IllegalStateException.class,
+                () -> RecordReplay.replay(cfg, "feed.csv", null));
+        assertTrue(refused.getMessage().contains("in progress"), refused.getMessage());
+        assertEquals(2, landedRows(cfg).size(), "nothing landed");
+    }
+
+    /** A COMPLETED record is never stale, however old — it is the proof the records already landed. */
+    @Test
+    void anOldCompletedRecordIsNeverReclaimed(@TempDir Path dir) throws Exception {
+        ingestOnce(dir, "java");
+        Files.writeString(dir.resolve("mini_schema.toon"), SCHEMA_V2);
+        PipelineConfig cfg = PipelineConfig.load(dir.resolve("mini_pipeline.toon").toString());
+        RecordReplay.Result first = RecordReplay.replay(cfg, "feed.csv", null);
+        Files.setLastModifiedTime(Path.of(first.recordPath()), java.nio.file.attribute.FileTime.from(
+                java.time.Instant.now().minus(java.time.Duration.ofDays(30))));
+
+        IllegalStateException again = assertThrows(IllegalStateException.class,
+                () -> RecordReplay.replay(cfg, "feed.csv", null));
+        assertTrue(again.getMessage().contains("already replayed"), again.getMessage());
+        assertEquals(4, landedRows(cfg).size(), "nothing landed twice");
+    }
+
     /**
      * A replay whose records STILL fail (no fix applied) lands nothing and is quarantined whole — with its own
      * sidecar under its own name, so those records remain replayable in turn. The claim is kept: the original

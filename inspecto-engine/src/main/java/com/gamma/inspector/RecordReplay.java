@@ -18,6 +18,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
@@ -46,7 +47,8 @@ import java.util.stream.Stream;
  *   <li><b>Idempotence</b> — that record is CLAIMED with an atomic create before anything is written, keyed on
  *       the sidecar's content hash, so a second replay of the same sidecar is refused. A replay whose
  *       Consignment did not complete (FAILED, or thrown) removes its input and releases the claim; any other
- *       end keeps it — records still rejected are in the replay input's OWN sidecar, replayable in turn.</li>
+ *       end keeps it — records still rejected are in the replay input's OWN sidecar, replayable in turn.
+ *       An EMPTY claim older than {@link #ABANDONED_CLAIM_AFTER} is a crashed replay and may be reclaimed.</li>
  * </ul>
  *
  * <p>Refusals follow {@link DrainCommand}: {@link NoSuchFileException} = no sidecar (404),
@@ -60,6 +62,14 @@ public final class RecordReplay {
     /** Outcome of one replay. {@code status} is the Consignment's terminal status. */
     public record Result(String file, String replayFile, String batchId, String status, int records,
                          long outputRows, long errorRows, String error, String recordPath) {}
+
+    /**
+     * An EMPTY claim (never completed into a record) older than this is treated as abandoned by a crash and may be
+     * reclaimed. A completed record is never stale. ⚠ A crash in the narrow window AFTER the replay Consignment
+     * committed but BEFORE its record was written also leaves an empty claim — reclaiming that one would land
+     * the records twice; the window is the few statements between the commit and the record move.
+     */
+    static final Duration ABANDONED_CLAIM_AFTER = Duration.ofMinutes(30);
 
     private RecordReplay() {}
 
@@ -98,16 +108,32 @@ public final class RecordReplay {
         String hash = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(sidecar)));
         Path claim = Paths.get(manifests).toAbsolutePath().resolveSibling("replays").resolve(hash + ".json");
         Files.createDirectories(claim.getParent());
-        try {
-            Files.createFile(claim);
-        } catch (FileAlreadyExistsException twice) {
-            throw new IllegalStateException("'" + file + "' was already replayed from this sidecar (record "
-                    + claim + ") — replaying it again would land its records twice");
-        }
-
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         String replayName = replayName(file, hash);
         Path input = poll.resolve(replayName);
+        try {
+            Files.createFile(claim);
+        } catch (FileAlreadyExistsException twice) {
+            if (Files.size(claim) > 0)      // a completed record — the proof the records already landed
+                throw new IllegalStateException("'" + file + "' was already replayed from this sidecar (record "
+                        + claim + ") — replaying it again would land its records twice");
+            // An EMPTY claim is a replay that never completed: in flight, or a crash between the claim and the
+            // record. Fresh ⇒ refuse (it may still be running); older than the stale age ⇒ abandoned, reclaim.
+            Instant claimedAt = Files.getLastModifiedTime(claim).toInstant();
+            if (claimedAt.isAfter(Instant.now().minus(ABANDONED_CLAIM_AFTER)))
+                throw new IllegalStateException("a replay of '" + file + "' from this sidecar is in progress (claimed "
+                        + claimedAt + "; treated as abandoned after " + ABANDONED_CLAIM_AFTER.toMinutes() + " min)");
+            log.warn("[REPLAY] {} — reclaiming an abandoned replay claim from {} ({})", file, claimedAt, claim);
+            Files.deleteIfExists(input);                          // the crashed replay's leftover input, if any
+            Files.deleteIfExists(poll.resolve(replayName + ".writing"));
+            Files.delete(claim);
+            try {
+                Files.createFile(claim);
+            } catch (FileAlreadyExistsException raced) {
+                throw new IllegalStateException("a replay of '" + file + "' from this sidecar is in progress");
+            }
+        }
+
         Map<String, Object> record = new LinkedHashMap<>();
         record.put("originalFile", file);
         record.put("sidecar", sidecar.toString());
