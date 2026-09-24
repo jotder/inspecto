@@ -25,11 +25,18 @@ import java.util.List;
  * @param uiHint       optional rendering hint (e.g. {@code "select"}, {@code "cron-editor"})
  * @param visibleWhen  optional {@code "otherPath=value"} UI predicate for conditional display
  *                     (a rendering hint only — never evaluated server-side)
+ * @param items        for a {@link FieldType#LIST} of OBJECTS: the fields every element carries, their
+ *                     paths relative to the element ({@code "database"}, {@code "ducklake.enabled"}).
+ *                     Empty (never {@code null}) for every other field — a plain scalar list included.
+ *                     Non-empty makes the list strict: validation refuses a non-list or a non-map
+ *                     element, and applies each item field to every element
+ *                     ({@code ConfigLoader.validate}); {@link ConfigJsonSchema} projects it as the
+ *                     array's {@code items} object.
  */
 @PublicApi(since = "4.0.0")
 public record FieldSpec(String path, String label, String description, FieldType type,
                         boolean required, Object defaultValue, List<String> enumValues,
-                        String pattern, String uiHint, String visibleWhen) {
+                        String pattern, String uiHint, String visibleWhen, List<FieldSpec> items) {
 
     public FieldSpec {
         path = path == null ? "" : path;
@@ -37,6 +44,15 @@ public record FieldSpec(String path, String label, String description, FieldType
         description = description == null ? "" : description;
         type = type == null ? FieldType.STRING : type;
         enumValues = enumValues == null ? List.of() : List.copyOf(enumValues);
+        items = items == null ? List.of() : List.copyOf(items);
+    }
+
+    /** A field with no element fields — every shape except a list of objects. */
+    public FieldSpec(String path, String label, String description, FieldType type,
+                     boolean required, Object defaultValue, List<String> enumValues,
+                     String pattern, String uiHint, String visibleWhen) {
+        this(path, label, description, type, required, defaultValue, enumValues, pattern, uiHint, visibleWhen,
+                List.of());
     }
 
     // ── concise builders for the common shapes (keeps ConfigSpecs readable) ──────
@@ -62,5 +78,11 @@ public record FieldSpec(String path, String label, String description, FieldType
                                       Object defaultValue, String description) {
         return new FieldSpec(path, label, description, FieldType.ENUM, false, defaultValue,
                 values, null, "select", null);
+    }
+
+    /** An optional LIST of objects, each element carrying {@code items} (paths relative to the element). */
+    public static FieldSpec listOf(String path, String label, String description, List<FieldSpec> items) {
+        return new FieldSpec(path, label, description, FieldType.LIST, false, null, List.of(), null, null, null,
+                items);
     }
 }

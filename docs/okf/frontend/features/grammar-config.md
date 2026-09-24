@@ -54,6 +54,21 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   Keep rejected rows for review · Stop after this many bad rows · …). Mockup rows with NO engine key
   (decimal/thousands separator, "an empty cell means", "words for yes/no", extra-columns handling, a
   Day/Month/Year picker) were **not built — nothing is faked**.
+- **"Sample resolves to" under a row** (AUTHORING-REDESIGN-1 (i), SHIPPED 2026-09-24). After a Test
+  parse of a **delimited** sample, the dialect rows (Column separator · Text quote · Escape character ·
+  Ignore lines starting with · First row is the header · Skip lines at the top · Date/Timestamp formats
+  to try) carry a line saying what the sample resolves to. The host is the SERVER, not the client: the
+  existing delimited previews (`POST /parsers/delimited/preview` and `POST /config/preview/parsing`) now
+  return an additive `resolved` map from DuckDB's `sniff_csv` over the scratch sample
+  (`ComponentPreview.sniffDialect`), keyed by the `parsing.delimited.*` option — no new route. It is run
+  with **no authored options**, so it is the FILE's answer, not an echo: authoring `,` over a `;` file
+  shows `;` under the separator row. The UI maps it onto spec keys in `sampleResolutions`
+  (`inspecto-ui/src/app/inspecto/grammar/sample-resolution.ts`; tab → "tab", an empty quote/escape/comment → "none") and
+  `<inspecto-schema-form [sampleValues]>` renders it (flat mode only) — display only, never written into
+  the form, so it cannot arm a save. ⚠ Why not client-side: `sniffFrontend` guesses the separator
+  alone; DuckDB's sniff is the engine's own reading (header, quote, escape, skip, date formats), so the
+  line cannot disagree with what Test parse then does. Advisory like `columnTypes`: a failed sniff, an old
+  server or a non-delimited format simply shows no line.
 - **Compact flat rows** (R10): `<inspecto-schema-form [flat]>` (`schema-form.component.ts:748`) renders
   label · current value · pencil on one ~32px line; help becomes an info-icon tooltip; the row shows the
   real default for an untouched grammar as text and the pencil opens the dense inline control (booleans

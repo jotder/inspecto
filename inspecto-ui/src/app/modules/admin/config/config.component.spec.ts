@@ -112,6 +112,27 @@ describe('ConfigComponent', () => {
         expect(JSON.parse(c.assembledPreview())).toEqual({ pipeline: 'cdr', source: { threads: 2 } });
     });
 
+    it('skips a list-of-objects field (items) instead of offering it as comma text', () => {
+        const withSinks = {
+            ...SPEC,
+            fields: [
+                ...SPEC.fields,
+                {
+                    path: 'sinks',
+                    label: 'Destinations',
+                    type: 'LIST',
+                    required: false,
+                    items: [{ path: 'database', label: 'Database', type: 'FILEPATH', required: true }],
+                },
+            ],
+        } as ConfigSpec;
+        const fixture = create({ spec: () => of(withSinks) });
+        const c = fixture.componentInstance;
+        expect(c.spec()!.fields.map((f) => f.path)).not.toContain('sinks');
+        expect(c.attrSpecs().map((a) => a.label)).not.toContain('sinks');
+        expect(c.attrSpecs()).toHaveLength(SPEC.fields.length);
+    });
+
     it('renders findings with a severity badge', () => {
         const fixture = create({
             validateDraft: () =>

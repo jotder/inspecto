@@ -196,4 +196,50 @@ class ConfigLoaderTest {
         assertTrue(loader.validate(null, Map.of()).isEmpty());
         assertTrue(loader.validate(ConfigSpecs.job(), null).isEmpty());
     }
+
+    // ── sinks: a list of OBJECTS (FieldSpec.items) ────────────────────────────────
+
+    private List<Finding> sinkErrors(Object sinks) {
+        Map<String, Object> raw = new java.util.LinkedHashMap<>(Map.of(
+                "name", "ACME",
+                "dirs", Map.of("poll", "/in", "database", "/out"),
+                "processing", Map.of("threads", 1)));
+        raw.put("sinks", sinks);
+        return errors(loader.validate(ConfigSpecs.pipeline(), raw)).stream()
+                .filter(f -> f.fieldPath().startsWith("sinks")).toList();
+    }
+
+    @Test
+    void wellFormedSinksPass() {
+        assertEquals(List.of(), sinkErrors(List.of(
+                Map.of("database", "/hot", "format", "parquet"),
+                Map.of("database", "/cold", "ducklake", Map.of("enabled", true, "table", "t")))));
+    }
+
+    @Test
+    void sinksThatIsNotAListIsRefused() {
+        // Both used to parse as "no sinks" — the parser only reads a List — and the pipeline silently
+        // wrote to its single output: instead of the destinations the author declared.
+        assertTrue(hasFindingAt(sinkErrors(Map.of("database", "/hot")), "sinks"));
+        assertTrue(hasFindingAt(sinkErrors("/hot,/cold"), "sinks"),
+                "the comma-string shorthand a scalar list tolerates is not a list of objects");
+    }
+
+    @Test
+    void aSinkEntryWithoutADatabaseIsRefusedAtItsIndex() {
+        // PipelineConfigParser throws on this at config LOAD; the spec now refuses it at save.
+        List<Finding> errs = sinkErrors(List.of(Map.of("database", "/hot"), Map.of("format", "CSV")));
+        assertEquals(List.of("sinks[1].database"), errs.stream().map(Finding::fieldPath).toList());
+    }
+
+    @Test
+    void aNonMapEntryAndAMistypedItemFieldAreRefused() {
+        List<Finding> errs = sinkErrors(List.of(
+                "/hot",
+                Map.of("database", "/a", "format", "JSON"),
+                Map.of("database", "/b", "ducklake", "yes"),
+                Map.of("database", "/c", "ducklake", Map.of("enabled", "maybe"))));
+        assertEquals(List.of("sinks[0]", "sinks[1].format", "sinks[2].ducklake", "sinks[3].ducklake.enabled"),
+                errs.stream().map(Finding::fieldPath).toList());
+    }
 }

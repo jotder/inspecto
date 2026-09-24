@@ -639,6 +639,11 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                     @if (spec.type !== 'select' && rowError(spec)) {
                         <p class="text-warn m-0 pl-40 text-xs" role="alert">{{ rowError(spec) }}</p>
                     }
+                    @if (sampleValues?.[spec.key]; as sample) {
+                        <p class="text-secondary m-0 pl-40 text-xs" [attr.data-sample-for]="spec.key">
+                            Sample resolves to <span class="font-mono">{{ sample }}</span>
+                        </p>
+                    }
                 }
             </ng-template>
         </form>
@@ -795,6 +800,12 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
      * byte-identical for every other adopter.
      */
     @Input() flat = false;
+    /**
+     * Flat mode only: per-key "Sample resolves to …" lines under a property row — what the host's sample
+     * makes of that property (the Parse pane passes the dialect sniff, `sampleResolutions`). Display
+     * only: never written into the form, so it cannot change a value or arm a save.
+     */
+    @Input() sampleValues: Record<string, string> | undefined;
     readonly showOptional = signal(false);
     readonly showAdvanced = signal(false);
     readonly tiers = signal<ReturnType<typeof byTier>>({ required: [], optional: [], advanced: [] });

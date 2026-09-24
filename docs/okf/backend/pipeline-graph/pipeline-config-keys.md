@@ -40,13 +40,15 @@ There is also a **third, utility-only reader family** outside both authorities: 
 
 | Scope | Blocks the parser reads | Declared in `ConfigSpecs.pipeline()` | Parser-only (ratchet list) |
 |---|---|---|---|
-| Top-level | 18 | 12 | 6 |
+| Top-level | 18 | 13 | 5 |
 | `processing.*` | 24 | 14 | 10 |
-| **Total** | **42** | **26** | **16** |
+| **Total** | **42** | **27** | **15** |
 
 History: 18 parser-only when the ratchet landed (2026-08-31); 17 after `output_store` was declared the
 same day (gap 8); **16** after CONSIGNMENT-HOME-1 declared `collector.consignment.max_files`
-(2026-09-02), which took `collector` off the list. The 16 current entries are exactly
+(2026-09-02), which took `collector` off the list; **15** after `sinks` was declared (2026-09-24) as a
+list of objects WITH an item spec (`FieldSpec.items`) — the facility whose absence is why `steps` was
+refused above, so `sinks` is visible to validation and to `ConfigJsonSchema`, not merely delisted. The 15 current entries are exactly
 `UNDECLARED_BLOCKS`.
 
 ⚠ **Granularity is the block, deliberately.** Leaf drift *inside* a declared block is not covered —
@@ -76,7 +78,7 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `processing` | spec block (see next table) | ingest runtime | Parse drawer + per-key surfaces below |
 | `output` | spec (`format`/`compression`/`filename_column`) | ingest strategies / `PartitionWriter` | sink node config |
 | `output_store` | spec (since 2026-08-31, gap 8) | `PipelineConfig.prepare()` **arming condition** for `steps:`/`dedup`/`summarize`/`join`/`webhook`; `PipelineLift.stageTwo`; `SchedulerAuditTask` orphan report | hand / schema form; required to arm a Stage-2 chain (`stage-two-blocks-require-output-store`, ERROR at save) |
-| `sinks` | parser-only | `IngestSinkWriter` / `ConsignmentGraphRunner` — `database` is the branch↔sink join key | canvas (multiple destinations) |
+| `sinks` | spec — a list of objects: `FieldSpec.listOf` with an item spec (`database` required; `format`/`compression`/`filename_column`/`ducklake.*` optional, since an omitted key inherits `output:`), so a non-list, a non-map entry or an entry with no `database` is a 422 at save rather than a load-time throw ([output-sinks](../engine/output-sinks.md)) | `IngestSinkWriter` / `ConsignmentGraphRunner` — `database` is the branch↔sink join key | canvas (multiple destinations) |
 | `route` | parser-only | `ConsignmentGraphRunner` — branch-aware **ingest lane only**; refused inside `steps:` by both paths | canvas route node + branch predicates |
 | `steps` | parser-only — **entry kept deliberately** (no item-schema facility; declaring it would game the ratchet) | `PipelineLift` authored-order chain → at-rest `pipeline_config:` job | Recipe view step cards (`<app-pipeline-step-cards>`) |
 | `trigger` | parser-only | `PipelineScheduler` (`every:`/`cron:` per-tick gate); dataset-commit trigger (`on:dataset`) | canvas trigger nodes (`trigger__every`/`trigger__cron` borrow the top-level keys); `trigger.type` is derived |
@@ -202,7 +204,7 @@ top-level and `processing.*` read and compares against `ConfigSpecs.pipeline()`:
 
 - a **new undeclared block fails the build** immediately;
 - a **newly declared block must leave** `UNDECLARED_BLOCKS` or the stale-entry test fails;
-- the list **only ever shrinks** — its size (16) is the remaining gap-10 debt;
+- the list **only ever shrinks** — its size (15) is the remaining gap-10 debt;
 - the scan is **self-falsifying**: pinned certainly-read blocks, a minimum count (≥ 35), and a pinned
   count of the two `raw`-shadowing locals guard against the scan silently matching nothing.
 
@@ -286,7 +288,7 @@ against, round-tripped untouched.
 | `reference.load` | spec |
 | `reference.refresh_seconds` | spec |
 | `route` | parser-only |
-| `sinks` | parser-only |
+| `sinks` | spec |
 | `steps` | parser-only |
 | `stream` | spec |
 | `template` | parser-only |

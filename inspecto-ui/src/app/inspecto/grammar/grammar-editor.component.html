@@ -148,6 +148,7 @@
                         [initial]="seedValue()"
                         [flat]="true"
                         [readOnly]="readOnly"
+                        [sampleValues]="sampleResolved()"
                         (submitted)="submitted.emit()"
                     />
                     @if (s.id === 'dialect' && !pluginDef() && frontend() === 'fixedwidth') {
@@ -169,7 +170,7 @@
             }
         </mat-accordion>
     } @else {
-        <inspecto-schema-form [specs]="specs()" [initial]="seedValue()" [flat]="true" [readOnly]="readOnly" (submitted)="submitted.emit()" />
+        <inspecto-schema-form [specs]="specs()" [initial]="seedValue()" [flat]="true" [readOnly]="readOnly" [sampleValues]="sampleResolved()" (submitted)="submitted.emit()" />
         <!-- Unsectioned formats still render the host's slotted content — below the flat form. -->
         <ng-content select="[tabTypes]"></ng-content>
     }

@@ -190,6 +190,27 @@ describe('GrammarEditorComponent', () => {
         expect(c.rows()).toEqual([{ id: 1, msisdn: 'x' }]);
     });
 
+    it('shows what the sample resolves to under the delimited property rows after a test parse', () => {
+        const fixture = create({ frontend: 'delimited', delimited: { delimiter: ',' } }, [], {
+            ...TABLE,
+            resolved: { delimiter: ';', has_header: 'true' },
+        });
+        const c = fixture.componentInstance;
+        expect(fixture.nativeElement.querySelector('[data-sample-for]')).toBeNull(); // nothing before a parse
+        c.sample = 'id;msisdn\n1;x';
+
+        c.test();
+        fixture.detectChanges();
+
+        const line = (key: string): string | undefined =>
+            (fixture.nativeElement.querySelector(`[data-sample-for="${key}"]`) as HTMLElement | null)?.textContent ??
+            undefined;
+        expect(line('delimited__delimiter')).toContain(';');
+        expect(line('delimited__has_header')).toContain('yes');
+        // The authored value is untouched: the line is the file's answer, not an edit.
+        expect((c.value()['delimited'] as Record<string, unknown>)['delimiter']).toBe(',');
+    });
+
     it('surfaces a parse failure instead of a stale result', () => {
         const fixture = create({}, [], 'fail');
         const c = fixture.componentInstance;

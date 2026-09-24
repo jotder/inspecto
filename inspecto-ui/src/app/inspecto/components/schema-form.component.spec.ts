@@ -727,6 +727,25 @@ describe('InspectoSchemaFormComponent', () => {
             expect(fixture.nativeElement.querySelector('mat-label')).toBeNull();
         });
 
+        it('shows a "Sample resolves to" line under a row the host has a sample value for, display only', () => {
+            TestBed.configureTestingModule({
+                imports: [InspectoSchemaFormComponent],
+                providers: [provideNoopAnimations()],
+            });
+            const fixture = TestBed.createComponent(InspectoSchemaFormComponent);
+            fixture.componentInstance.flat = true;
+            fixture.componentInstance.specs = FLAT;
+            fixture.componentInstance.sampleValues = { quote: 'none', unknown_key: 'x' };
+            fixture.detectChanges();
+            const lines = Array.from(fixture.nativeElement.querySelectorAll('[data-sample-for]')) as HTMLElement[];
+            expect(lines.map((l) => l.getAttribute('data-sample-for'))).toEqual(['quote']);
+            expect(lines[0].textContent).toContain('Sample resolves to');
+            expect(lines[0].textContent).toContain('none');
+            // Never written into the form: the row keeps its own value and nothing is dirty.
+            expect(fixture.componentInstance.value()['quote']).toBe('"');
+            expect(fixture.componentInstance.form.dirty).toBe(false);
+        });
+
         it('renders a boolean as a toggle with no pencil', () => {
             const fixture = createFlat();
             const r = row(fixture, 'header');

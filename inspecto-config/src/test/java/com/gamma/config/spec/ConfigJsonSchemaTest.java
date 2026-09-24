@@ -165,6 +165,22 @@ class ConfigJsonSchemaTest {
     }
 
     @Test
+    void aListOfObjectsProjectsItsItemSpecAsTheArraysItems() {
+        Map<String, Object> sinks = leaf(props(ConfigJsonSchema.forType("pipeline")), "sinks");
+        assertEquals("array", sinks.get("type"));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> items = (Map<String, Object>) sinks.get("items");
+        assertEquals("object", items.get("type"));
+        assertEquals(List.of("database"), items.get("required"), "database is the one key an entry cannot inherit");
+        assertEquals("string", type(props(items), "database"));
+        assertEquals(List.of("CSV", "PARQUET"), leaf(props(items), "format").get("enum"));
+        assertEquals("boolean", type(props(leaf(props(items), "ducklake")), "enabled"),
+                "an item's dotted path nests inside the element, not at the root");
+        assertFalse(props(ConfigJsonSchema.forType("pipeline")).containsKey("database"),
+                "item fields never leak to the root");
+    }
+
+    @Test
     void uiOnlyHintsAreNotProjected() {
         ConfigSpec spec = new ConfigSpec("t", List.of(
                 new FieldSpec("f", "F", "d", FieldType.STRING, false, null, List.of(), null,

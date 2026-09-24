@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -99,6 +100,20 @@ class ControlApiParsersTest {
             assertEquals("BIGINT", types.get(0).get("type").asText());
             assertEquals("DATE", types.get(1).get("type").asText());
             assertEquals("VARCHAR", types.get(2).get("type").asText());
+        }
+    }
+
+    /** AUTHORING-REDESIGN-1 (i): the delimited preview serves what the SAMPLE resolves to, per option. */
+    @Test
+    void builtinPreviewCarriesTheDialectTheSampleResolvesTo(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg)) {
+            JsonNode r = json(send(c.port, "POST", "/parsers/delimited/preview",
+                    "{\"grammar\":{\"delimited\":{\"delimiter\":\",\"}},"
+                            + "\"sample_text\":\"id|city\\n1|london\\n2|paris\\n3|rome\\n\"}"));
+            JsonNode resolved = r.get("resolved");
+            assertNotNull(resolved, r.toString());
+            assertEquals("|", resolved.get("delimiter").asText(), "the file's answer, not the grammar's: " + resolved);
+            assertEquals("true", resolved.get("has_header").asText(), resolved.toString());
         }
     }
 

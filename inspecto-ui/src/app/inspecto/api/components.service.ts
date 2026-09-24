@@ -138,6 +138,10 @@ export interface ParserTablePreview {
     /** B2, additive: per-column INFERRED types from the server's auto_detect sniff — advisory
      *  (ingest stays all-VARCHAR); absent for formats without a sniff and from old servers. */
     columnTypes?: { name: string; type: string }[];
+    /** Additive (AUTHORING-REDESIGN-1 (i)): what the server's dialect sniff resolves the SAMPLE to, keyed
+     *  by the `parsing.delimited.*` option (`delimiter`, `has_header`, …). Delimited only; absent from old
+     *  servers. Read through `sampleResolutions` (`inspecto/grammar`). */
+    resolved?: Record<string, string>;
 }
 
 /** Hierarchical parse preview — a forest of records for the collapsible tree view. */

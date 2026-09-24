@@ -157,6 +157,31 @@ class ControlApiSinkDuckLakeSharedTableTest {
     }
 
     @Test
+    @DisplayName("/config/write refuses a malformed sinks: block — 422 naming the entry, nothing written")
+    void writeRefusesAMalformedSinksBlock(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        // The sinks item spec (ConfigSpecs.pipeline): before it, a sinks: MAP parsed as "no sinks" and an
+        // entry without a database threw at config LOAD — both saved with 200.
+        try (Ctx c = open(cfg, root)) {
+            String[][] cases = {
+                    {"sinks_map", "{\"database\":\"out/hot\"}", "\"sinks\""},
+                    {"sinks_no_db", "[{\"database\":\"out/hot\"},{\"format\":\"CSV\"}]", "sinks[1].database"}};
+            for (String[] t : cases) {
+                String body = """
+                        {"type":"pipeline","config":{"name":"%s","active":false,
+                           "dirs":{"poll":"in","database":"out"},
+                           "processing":{"threads":1,"schema_file":"cdr.toon"},
+                           "sinks":%s}}""".formatted(t[0], t[1]);
+                HttpResponse<String> r = send(c.port, "POST", "/config/write", body);
+                assertEquals(422, r.statusCode(), t[0] + ": " + r.body());
+                JsonNode out = V1Body.envelope(r.body()).get("error").get("details");
+                assertFalse(out.get("written").asBoolean());
+                assertTrue(out.get("findings").toString().contains(t[2]), t[0] + ": " + out);
+                assertFalse(Files.exists(root.resolve(t[0] + "_pipeline.toon")));
+            }
+        }
+    }
+
+    @Test
     @DisplayName("PUT /pipelines/{name}/graph refuses two sink nodes sharing one lake table")
     void graphSaveRefusesTheSharedTable(@TempDir Path dir) throws Exception {
         Path wr = dir.resolve("wr");

@@ -170,7 +170,8 @@ final class BuiltinParsers {
                     : "parquet".equals(id)
                     ? ComponentPreview.parsingParquet(cfg, sample)
                     : ComponentPreview.parsing(cfg, new String(sample, charsetOf(grammar)));
-            return new ParseResult.Table(r.columns(), r.rows(), r.rowCount(), r.rejectedRows(), r.columnTypes());
+            return new ParseResult.Table(r.columns(), r.rows(), r.rowCount(), r.rejectedRows(), r.columnTypes(),
+                    r.resolved());
         }
     }
 

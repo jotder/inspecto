@@ -69,6 +69,25 @@ class ComponentPreviewParsingTest {
         assertInstanceOf(String.class, r.rows().get(0).get("when"));
     }
 
+    /**
+     * AUTHORING-REDESIGN-1 (i): the dialect the SAMPLE resolves to, per grammar option — the file's own
+     * answer, not an echo of the grammar. Authored here as comma-delimited with no header, while the
+     * sample is semicolon-delimited with one: the resolved line must say so, which is what makes it
+     * worth showing beside the property it describes.
+     */
+    @Test
+    void delimitedReportsWhatTheSampleResolvesToIndependentOfTheGrammar() throws Exception {
+        PipelineConfig c = cfg(Map.of("delimited", Map.of("delimiter", ",", "has_header", false)));
+        ComponentPreview.GrammarResult r = ComponentPreview.parsing(c,
+                "id;when;city\n1;2026-07-15;london\n2;2026-07-16;paris\n3;2026-07-17;rome\n");
+        assertEquals(";", r.resolved().get("delimiter"), r.resolved().toString());
+        assertEquals("true", r.resolved().get("has_header"), r.resolved().toString());
+        assertEquals("0", r.resolved().get("skip_header_lines"), r.resolved().toString());
+        assertTrue(r.resolved().keySet().stream().allMatch(k -> java.util.Set.of("delimiter", "quote", "escape",
+                "comment", "has_header", "skip_header_lines", "date_format", "timestamp_format").contains(k)),
+                "only grammar option names are served: " + r.resolved());
+    }
+
     @Test
     void nonDelimitedFrontendsCarryNoInferredTypes() throws Exception {
         PipelineConfig c = cfg(Map.of(
@@ -76,6 +95,7 @@ class ComponentPreviewParsingTest {
                 "text_regex", Map.of("pattern", "(?P<level>[A-Z]+) (?P<msg>.+)")));
         ComponentPreview.GrammarResult r = ComponentPreview.parsing(c, "INFO started\n");
         assertTrue(r.columnTypes().isEmpty());
+        assertTrue(r.resolved().isEmpty(), "no dialect sniff for a non-delimited frontend");
     }
 
     @Test
