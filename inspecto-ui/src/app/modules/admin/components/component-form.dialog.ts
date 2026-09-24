@@ -239,12 +239,11 @@ export class ComponentFormDialog {
         }
     }
 
-    // AI drafting (AGT-6a A5.2) lived here and was offered ONLY for the `schema` kind — a validator over
-    // the control plane's ConfigSpecs, and of this dialog's kinds only `schema` had one. `schema` is no
-    // longer a registry component (retired 2026-07-31, unification W1: a schema lives solely in the config
-    // TOON the engine executes), so the affordance has no applicable kind and was removed WITH it rather
-    // than left rendering "no structural spec for kind" on every use. To bring it back, give another kind a
-    // structural ConfigSpec first — the bounded repair loop on the backend is untouched and still generic.
+    // AI drafting (AGT-6a A5.2) lived here for the `schema` kind only — the one kind with a ConfigSpec.
+    // The pane routes `schema` to SchemaEditorDialog, so the affordance now lives THERE
+    // (AI-ASSIST-SCHEMA-DIALOG-1). This dialog's kinds (grammar/transform/sink) have no structural spec,
+    // so component_draft would answer "no structural spec for kind" on every use — give a kind a spec
+    // first (superpower/ai-drafting-non-schema-design.md, S2–S4).
 
     addPartition(event: MatChipInputEvent): void {
         const value = event.value.trim();

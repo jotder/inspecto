@@ -2,9 +2,12 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { describe, expect, it, vi } from 'vitest';
-import { of, throwError } from 'rxjs';
+import { DebugElement } from '@angular/core';
+import { By } from '@angular/platform-browser';
+import { Observable, of, throwError } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { ComponentDef, ComponentsService, ConfigService } from 'app/inspecto/api';
+import { AgentService, ComponentDef, ComponentsService, ConfigService, LensService } from 'app/inspecto/api';
+import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -53,6 +56,7 @@ function create(
     home?: 'registry' | 'config',
     subdir?: string,
     pipeline?: string,
+    ai: { derive?: () => Observable<unknown>; canAuthor?: boolean } = {},
 ) {
     const ref = { close: vi.fn(), disableClose: false };
     // An EDIT saves here (the registry component); only a CREATE goes to ConfigService.write.
@@ -100,6 +104,9 @@ function create(
         ...config,
     };
     const confirm = { confirmDestructive: vi.fn().mockResolvedValue(true) };
+    // <inspecto-ai-assist> (AI-ASSIST-SCHEMA-DIALOG-1) injects these; stubbed — the surface has its own specs.
+    const agent = { runTool: vi.fn(() => of({})), deriveTool: vi.fn(ai.derive ?? (() => of({}))) };
+    const canAuthor = ai.canAuthor ?? true;
     TestBed.configureTestingModule({
         imports: [SchemaEditorDialog],
         providers: [
@@ -110,15 +117,22 @@ function create(
             { provide: ComponentsService, useValue: comps },
             {
                 provide: ToastrService,
-                useValue: { success: () => undefined, warning: () => undefined, error: () => undefined },
+                useValue: {
+                    success: () => undefined,
+                    warning: () => undefined,
+                    error: () => undefined,
+                    info: () => undefined,
+                },
             },
             { provide: InspectoConfirmService, useValue: confirm },
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
+            { provide: AgentService, useValue: agent },
+            { provide: LensService, useValue: { canAuthorWorkbench: () => canAuthor } },
         ],
     });
     const fixture = TestBed.createComponent(SchemaEditorDialog);
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, ref, api, comps, confirm };
+    return { fixture, c: fixture.componentInstance, ref, api, comps, confirm, agent };
 }
 
 describe('SchemaEditorDialog', () => {
@@ -352,5 +366,140 @@ describe('SchemaEditorDialog satellite home (SCHEMA-SATELLITE-SUBDIR-1)', () => 
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('inspecto-derived-schema-panel')).toBeNull();
         expect(api.derivedSchema).not.toHaveBeenCalled();
+    });
+
+    // ── AI-ASSIST-SCHEMA-DIALOG-1: inline component_draft (design S1 / Option C) ──────────────────────
+
+    const DRAFT = {
+        label: 'orders',
+        clean: true,
+        findings: [],
+        config: {
+            raw: {
+                name: 'orders',
+                fields: [
+                    { name: 'ORDER_ID', selector: '0', type: 'BIGINT' },
+                    { name: 'AMOUNT', selector: '1', type: 'DOUBLE', unit: 'EUR' },
+                ],
+            },
+        },
+    };
+
+    function assist(fixture: { debugElement: DebugElement }): AiAssistComponent {
+        return fixture.debugElement.query(By.directive(AiAssistComponent)).componentInstance as AiAssistComponent;
+    }
+
+    it('hosts component_draft in prompt mode with identity-only args {kind: "schema"}', async () => {
+        const { fixture, agent } = create(DEF);
+        const a = assist(fixture);
+        expect(a.tool()).toBe('component_draft');
+        expect(a.prompting()).toBe(true);
+        expect(a.args()).toEqual({ kind: 'schema' });
+        // the diff baseline is the grid's own rows, in the spec's raw.fields[] shape
+        expect(a.current()).toEqual({
+            raw: {
+                fields: [
+                    { name: 'ID', selector: '0', type: 'VARCHAR' },
+                    { name: 'QTY', selector: '1', type: 'INTEGER', description: 'count' },
+                ],
+            },
+        });
+        a.setPrompt('an orders schema with an id and an amount');
+        a.run();
+        expect(agent.deriveTool).toHaveBeenCalledWith('component_draft', 'an orders schema with an id and an amount', {
+            kind: 'schema',
+        });
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('Apply replaces the grid rows only — nothing is written until the operator presses Save', () => {
+        const { c, comps, api } = create(DEF);
+        c.applyDraft(DRAFT);
+        expect(comps.update).not.toHaveBeenCalled();
+        expect(api.write).not.toHaveBeenCalled();
+        expect(c.rows().map((r) => r['name'])).toEqual(['ORDER_ID', 'AMOUNT']);
+
+        c.save();
+        expect(comps.update).toHaveBeenCalledWith(
+            'schema',
+            'ev',
+            expect.objectContaining({
+                // only raw.fields came from the draft: the name, format and mapping are the dialog's own
+                mapping: { canonicalName: 'events' },
+                raw: {
+                    name: 'ev',
+                    format: 'CSV',
+                    fields: [
+                        { name: 'ORDER_ID', selector: '0', type: 'BIGINT' },
+                        { name: 'AMOUNT', selector: '1', type: 'DOUBLE', unit: 'EUR' },
+                    ],
+                },
+            }),
+            { ifMatch: 'abc123' },
+        );
+    });
+
+    it('marks the dialog dirty on Apply, so closing asks before discarding the draft', async () => {
+        const { c, confirm, ref } = create(DEF);
+        confirm.confirmDestructive.mockResolvedValue(false);
+        c.applyDraft(DRAFT);
+        await c.requestClose();
+        expect(confirm.confirmDestructive).toHaveBeenCalled();
+        expect(ref.close).not.toHaveBeenCalled();
+    });
+
+    it('a clean:false draft still applies, and the server refusal lands on its cells on Save', () => {
+        const refusal = {
+            status: 422,
+            error: {
+                error: {
+                    details: {
+                        findings: [{ severity: 'ERROR', fieldPath: 'raw.fields[AMOUNT].type', message: 'bad type' }],
+                    },
+                },
+            },
+        };
+        const { c, ref } = create(DEF, {}, undefined, { update: vi.fn().mockReturnValue(throwError(() => refusal)) });
+        c.applyDraft({
+            ...DRAFT,
+            clean: false,
+            findings: [{ severity: 'ERROR', fieldPath: 'raw.fields[AMOUNT].type', message: 'bad type' }],
+        });
+        expect(c.rows()).toHaveLength(2);
+        c.save();
+        expect(ref.close).not.toHaveBeenCalled();
+        expect(c.cellFindings().get('1|type')).toMatchObject({ severity: 'error', message: 'bad type' });
+    });
+
+    it('ignores a draft carrying no field list rather than emptying the grid', () => {
+        const { c } = create(DEF);
+        c.applyDraft({ label: 'empty', clean: false, findings: [], config: { raw: { name: 'x' } } });
+        c.applyDraft({ label: 'empty', clean: false, findings: [], config: { raw: { fields: [] } } });
+        expect(c.rows().map((r) => r['name'])).toEqual(['ID', 'QTY']);
+    });
+
+    it('a 503 (no model / module absent) latches the affordance disabled; the dialog still saves', () => {
+        const { fixture, c, comps } = create(DEF, {}, undefined, {}, undefined, undefined, undefined, {
+            derive: () => throwError(() => ({ status: 503 })),
+        });
+        const a = assist(fixture);
+        a.setPrompt('orders');
+        a.run();
+        expect(a.noModel()).toBe(true);
+        expect(a.blocked()).toBe(true);
+        c.save();
+        expect(comps.update).toHaveBeenCalled();
+    });
+
+    it('is disabled with a reason on a lens that cannot author', () => {
+        const { fixture, agent } = create(DEF, {}, undefined, {}, undefined, undefined, undefined, {
+            canAuthor: false,
+        });
+        const a = assist(fixture);
+        a.setPrompt('orders');
+        expect(a.blocked()).toBe(true);
+        expect(a.blockedReason()).toContain('cannot author');
+        a.run();
+        expect(agent.deriveTool).not.toHaveBeenCalled();
     });
 });

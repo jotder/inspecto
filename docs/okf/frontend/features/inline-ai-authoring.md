@@ -78,6 +78,7 @@ sent, never by prompt inspection.
 | `pipelines/pipeline-editor` | `pipeline_author` | `model()` → `{name, nodes, edges}` | `model.set(...)` + `dirty.set(true)`; operator presses the existing Save |
 | `studio/queries` | `query_author` | form `datasetId` + `structuredModel().where` | `form.controls.text`; operator presses the existing Save |
 | `expectations/expectation-form.dialog` | `suggest_expectations` | `target` + `column` controls | `schemaForm.form.patchValue(...)` + `markAsDirty()`; operator completes the two-step save |
+| `components/schema-editor.dialog` | `component_draft` (NL, `prompting`) | identity only: `{kind:'schema'}` | grid rows ← draft `raw.fields[]` + dirty; operator presses the existing Save (2026-09-25) |
 | `studio/link-analysis` query panel | `projection_author` | `datasetId` + the panel's own `datasetColumns()` | `patchFormFromQuery(...)` + `markAsDirty()`; operator presses Run, then the host's Save |
 
 ⚠ **The Link Analysis adopter is the one whose args the backend could not have resolved itself** — no tool
@@ -321,6 +322,30 @@ every use. The backend repair loop is untouched and still generic: to bring the 
 dialog kind a structural `ConfigSpec` first. The rest of this section describes the mechanism, which is
 still accurate for the surfaces that do have specs.
 
+✅ **RE-ADOPTED 2026-09-25 in `SchemaEditorDialog` (`AI-ASSIST-SCHEMA-DIALOG-1`, design S1 / Option C).**
+🔴 The "retired" premise above is **false**: `schema` is still in `ComponentStore.WRITABLE_TYPES`, the
+Components pane routes it to `SchemaEditorDialog` (not `component-form.dialog`, which only ever lost a
+host), and `ComponentRoutes.validateKind` gates its save with `ConfigSpecs.forType("schema")` — the very
+spec `component_draft(kind='schema')` judges by. So no backend work was needed. As built
+(`modules/admin/components/schema-editor.dialog.ts`):
+
+- `<inspecto-ai-assist tool="component_draft" prompting [args]="{kind:'schema'}">` sits above the field
+  grid, labelled *Draft fields*. ⚠ **`[args]` is identity-only**: the derive route merges pane args OVER
+  the model's, so passing the grid's `config` would overwrite the model's draft.
+- `[current]` is the grid's named rows as `{raw:{fields}}` (null while the grid is empty), so the diff
+  compares like with like.
+- **Apply replaces the grid rows with the draft's `raw.fields[]` only** (through `onRows`: dirty set, prior
+  findings cleared). The name, `raw.format` and `mapping` stay the dialog's own, even if the draft proposed
+  them. A draft with no field list is ignored, never an emptied grid. Nothing is written — the operator
+  presses the existing Save, which `PUT /components/schema/{id}` gates; a `clean:false` draft still applies
+  and its refusal lands on grid cells like a typed edit's.
+- ⚠ The Type column is free text, so the blank-dropdown trap below cannot recur here — but any drafted
+  type lands, and an invalid one is refused only at Save.
+- Unconfigured backend: the surface's own convention — a 503 latches it disabled with an inline
+  explanation (no model → *No local model configured*), a non-authoring lens disables it with a reason.
+  The rest of the dialog is unaffected. Pinned by `schema-editor.dialog.spec.ts` (7 cases).
+- ⚠ Not driven live: NL drafting needs a configured model on a real backend.
+
 ⚠ **A derived field type must come from the schema form's own vocabulary**
 (`string|integer|bigint|double|boolean|date|timestamp`). An early cut emitted `number`, which applied
 silently and left the row's type dropdown **blank** — it looked like the draft had worked, and it was
@@ -518,7 +543,8 @@ by design here. Runtime validation is revisitable, but only after all 23 schemas
 
 ## Open rows this concept owns
 
-- **`AI-ASSIST-SCHEMA-DIALOG-1`** — re-enable `<inspecto-ai-assist>` for the `schema` kind inside
+- ~~**`AI-ASSIST-SCHEMA-DIALOG-1`** — re-enable `<inspecto-ai-assist>` for the `schema` kind inside
   `SchemaEditorDialog` (design S1 / Option C in `superpower/ai-drafting-non-schema-design.md`). Filed
   2026-09-25 as its own row by operator decision D2: it does not answer the `transform` ask (D1), so
-  closing it must not close that row.
+  closing it must not close that row.~~ ✅ **SHIPPED 2026-09-25** — as-built under *Its host* above. The
+  `transform` row stays open.

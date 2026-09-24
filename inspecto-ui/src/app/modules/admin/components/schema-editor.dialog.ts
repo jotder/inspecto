@@ -8,6 +8,8 @@ import { MatInputModule } from '@angular/material/input';
 import { map, Observable } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ComponentDef, ComponentsService, ConfigService, Finding } from 'app/inspecto/api';
+import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { DerivedSchemaPanelComponent } from 'app/inspecto/schema';
 import {
@@ -113,6 +115,7 @@ const COLUMNS: EditableGridColumn[] = [
         EditableGridComponent,
         InspectoAlertComponent,
         DerivedSchemaPanelComponent,
+        AiAssistComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -135,6 +138,23 @@ const COLUMNS: EditableGridColumn[] = [
                 One row per typed field. Selector is the raw column the field reads from; type is a DuckDB SQL type
                 (VARCHAR, INTEGER, BIGINT, DOUBLE, DATE, TIMESTAMP, …).
             </p>
+            <!--
+              AI-ASSIST-SCHEMA-DIALOG-1 (design S1 / Option C): describe the fields in a sentence.
+              component_draft judges the draft against ConfigSpecs.schema() — the same spec
+              PUT /components/schema/{id} gates Save with — and the backend repairs it over up to 3 turns.
+              Apply only replaces the grid rows; nothing is written until the operator presses Save.
+              A 503 (module absent / no model) and a non-authoring lens disable it with a reason.
+            -->
+            <inspecto-ai-assist
+                class="mb-3 block"
+                tool="component_draft"
+                prompting
+                [args]="aiDraftArgs"
+                [current]="aiCurrent()"
+                label="Draft fields"
+                promptHint="e.g. an orders schema with an id, an amount and an event date"
+                (applyDraft)="applyDraft($event)"
+            ></inspecto-ai-assist>
             <inspecto-editable-grid
                 [columns]="columns"
                 [rows]="rows()"
@@ -234,6 +254,37 @@ export class SchemaEditorDialog {
         }
         return map;
     });
+
+    /**
+     * `component_draft` args — identity ONLY. The NL route merges pane args OVER the model's derived ones,
+     * so passing `config` here would overwrite the model's draft with the grid's current rows.
+     */
+    readonly aiDraftArgs: Record<string, unknown> = { kind: 'schema' };
+
+    /** The diff baseline: the grid's named rows as `raw.fields[]`, or null while the grid is empty. */
+    readonly aiCurrent = computed<Record<string, unknown> | null>(() => {
+        const fields = this.rows()
+            .filter((r) => r['name'].trim().length)
+            .map((r) => Object.fromEntries(COLUMNS.map((c) => [c.key, r[c.key] ?? '']).filter(([, v]) => v !== '')));
+        return fields.length ? { raw: { fields } } : null;
+    });
+
+    /**
+     * Apply a drafted schema: its `raw.fields[]` REPLACE the grid rows (dirty, findings cleared) and the
+     * operator reviews and presses Save — the surface has no write path. Only `raw.fields` lands: the name
+     * and every other section stay the dialog's own. A draft with no field list is ignored, never an
+     * emptied grid. ⚠ Type is free text here, so any drafted type lands; an invalid one is refused 422 on
+     * Save with cell findings, like a typed one.
+     */
+    applyDraft(draft: AiDraft): void {
+        const drafted = (draft.config?.['raw'] as Record<string, unknown> | undefined)?.['fields'];
+        if (!Array.isArray(drafted) || !drafted.length) return;
+        this.onRows(
+            (drafted as Record<string, unknown>[]).map((f) =>
+                Object.fromEntries(COLUMNS.map((c) => [c.key, String(f?.[c.key] ?? '')])),
+            ),
+        );
+    }
 
     /** True while the suggest route is in flight — gates the button, never the grid. */
     readonly suggesting = signal(false);
