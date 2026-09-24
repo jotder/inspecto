@@ -40,6 +40,7 @@ export function statusTone(value: string | null | undefined): StatusTone {
         case 'DENIED':
         case 'REVOKED':
         case 'RED': // RAG — KPI below its red threshold (TM Forum scorecard convention)
+        case 'CONFIRMED': // leakage / fraud case — loss confirmed, recovery pending
             return 'error';
         case 'WARN':
         case 'WARNING':
@@ -51,6 +52,7 @@ export function statusTone(value: string | null | undefined): StatusTone {
         case 'QUARANTINED':
         case 'EXPIRED':
         case 'AMBER': // RAG — between target and the red threshold
+        case 'INVESTIGATING':
             return 'warning';
         case 'INFO':
         case 'OPEN':
@@ -72,6 +74,8 @@ export function statusTone(value: string | null | undefined): StatusTone {
         case 'LIVE':
         case 'PASS':
         case 'GREEN': // RAG — on or better than target
+        case 'RECOVERED': // leakage case — value recovered
+        case 'CLOSED - NO LOSS':
             return 'success';
         default:
             return 'neutral';

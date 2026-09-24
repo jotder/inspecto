@@ -58,4 +58,12 @@ describe('table columns — status badges', () => {
         expect(statusTone('red')).toBe('error');
         expect(statusTone('Pass')).toBe('success');
     });
+
+    it('leakage / fraud case states map to tones (Open stays info)', () => {
+        expect(statusTone('Open')).toBe('info');
+        expect(statusTone('Investigating')).toBe('warning');
+        expect(statusTone('Confirmed')).toBe('error');
+        expect(statusTone('Recovered')).toBe('success');
+        expect(statusTone('Closed - no loss')).toBe('success');
+    });
 });
