@@ -110,6 +110,18 @@ Propagation is breadth-first, so a chain is the shortest one, e.g.
   diffs `baseRev` against the working tree with `git diff --name-status --no-renames` (a rename is a delete
   + an add) and reads pre-change content with `git show`. Exit 1 only when asked: `--fail-on-affected` when
   something is affected or uncertain, `--fail-on-breaking` when any verdict is BREAKING.
+  ⚠ It hosts no Space, so it needs `-Dassist.safety.roots=<space base>`: without a jail root every Pipeline
+  fails to load (*no allowed roots configured*) and the report is all UNCERTAIN, judging nothing — measured
+  over `spaces/ucc/config` on 2026-09-24 before the CI step passed it.
+- **Non-Pipeline dependents** (`Report.dependents()`, CLI lines `DEPENDENT <kind>:<name>  via <key>  <chain>`):
+  every `PipelineDependents.scan` hit of every reached Pipeline — enrichment (`references.<n>.ref`,
+  `triggers.on_pipeline`), job (`on_pipeline`), Expectation / Decision Rule (`target`), Dataset, Widget,
+  Dashboard — each with the reached Pipeline's chain plus itself, first (shortest) chain kept. A directly
+  changed Dataset adds its own Widgets and their Dashboards, so a Dataset shown on a Dashboard but consumed by
+  no Pipeline is reported, not IGNORED. They are **listed, not followed**: what an enrichment or a job then
+  writes is not traced on. A scan cut at `PipelineDependents.MAX_DEPENDENTS` is UNCERTAIN, never silent
+  (`AffectedPipelinesTest.enrichmentAndJobLinksOfEveryReachedPipelineAreListedWithTheirChains`,
+  `…aChangedDatasetListsItsWidgetsAndDashboardsEvenWithNoConsumer`).
 - **`collector.dataset: datasets/<id>`** is the Dataset link, not uncertain: the check reads the parsed
   `PipelineConfig.collector().dataset()`, which the parser has already stripped of that prefix
   (`AffectedPipelinesTest.aDatasetsPrefixedReferenceIsTheDatasetLinkNotUncertain`).
@@ -121,8 +133,8 @@ Propagation is breadth-first, so a chain is the shortest one, e.g.
 
 | Tier | When |
 |---|---|
-| **BREAKING** | a removed or **retyped** column that a reader in config reads; every reader of a **deleted producer** or a **deleted Dataset** |
-| **POSSIBLY_BREAKING** | a removed or retyped column that **no reader in config reads** — never "compatible", because a reader outside config (a query, a BI tool, an export) may |
+| **BREAKING** | a removed or **retyped** column that a reader in config reads; every reader of a **deleted producer** (its enrichment and job links included) or a **deleted Dataset** |
+| **POSSIBLY_BREAKING** | a removed or retyped column that **no reader in config is known to read** — never "compatible", because a reader outside config (a query, a BI tool, an export) may; emitted alongside any REVALIDATE for a reader whose use is unknown |
 | **REVALIDATE** | the producer's output or a reader's column use **cannot be determined** — a transform step, free SQL, a non-parquet consumer — and everything downstream of a reader that broke or cannot be judged |
 | **ADDITIVE** | a new column: stated explicitly, because it is not a contract break, not because it was left out |
 
@@ -147,20 +159,46 @@ means there is no column lineage through it ⇒ REVALIDATE, not a guess.
 | consumer Pipeline (`collector.dataset`) | parquet frontend: `raw.fields[].selector` IS the parquet column name (`DuckDbCsvIngester.buildParquetReadSpec`) | any other frontend, a multi-schema consumer, one that does not load |
 | the Dataset itself | declared `columns[].name` (none declared = reads nothing by name) | it has `calculated` columns (free SQL) |
 | Widget (`datasetId`) | every `controls.*.field` | a `queryId` (saved query, free SQL), or no `controls` at all (shows the columns wholesale) |
+| enrichment (`references.<n>.ref`, `triggers.on_pipeline`), job (`on_pipeline`), Expectation / Decision Rule (`target`) — they name the **Pipeline**, not a Dataset | never known: enrichment and rule bodies are free SQL, a job reads whatever its type does | **always** — per changed column, and on the whole-producer paths |
+
+**What "reads" means, and why it fails toward reporting.** A reader *reads* a column only when structured
+config names that column (the three rows above with a column-use rule). A reader whose use is not in
+structured config is never treated as reading nothing — it is REVALIDATE, the weaker-certainty verdict, and
+the column itself stays POSSIBLY_BREAKING rather than BREAKING, because nothing proves the read. Only a
+proven read is BREAKING; only a proven non-read by every reader leaves POSSIBLY_BREAKING standing alone.
 
 **Downstream.** A consumer that BREAKS, or cannot be judged, taints its own Datasets: every reader past it
-is REVALIDATE (*"column lineage past a consuming Pipeline is not traced"*). A consumer that provably reads
-none of the changed columns taints nothing.
+is REVALIDATE (*"column lineage past a consuming Pipeline is not traced"*), its enrichment / job / rule
+links included. A consumer that provably reads none of the changed columns taints nothing.
 
 **Dataset definitions.** A deleted `registry/datasets/<id>.toon` is BREAKING for its consumers and Widgets;
 a modified one is REVALIDATE for them only when `physicalRef`, `sourceName`, `columns` or `calculated`
 changed (a description or tag edit has no verdict).
 
-- ⛔ **Deferred:** CI wiring (the entry point and exit flags exist; no pipeline runs them); Measures in
-  materialize / report jobs, saved queries, Expectations and Alert Rules as readers (a saved-query Widget
-  is REVALIDATE today); column lineage *through* a consumer (its downstream is REVALIDATE, never judged
-  column by column); diffing a multi-schema or plugin producer; non-Pipeline dependents in the affected
-  list; enrichment `references.<n>.ref` and job `on_pipeline` as Pipeline-to-Pipeline edges.
+**Mutation-checked (2026-09-24).** Each rule was reverted in turn and the two test classes re-run
+(23 tests): a read column not BREAKING, an unread column dropped, a transform step treated as
+shape-preserving, an unknown reader treated as reading nothing, no downstream taint, no Pipeline-level
+readers, no ADDITIVE, no dependents listed, no Widgets on a changed Dataset — every one of the nine turned
+at least one test red.
+
+### CI wiring (2026-09-24)
+
+`.github/workflows/ci.yml`, job `test`, step *Report — Pipelines, dependents and contracts this PR's config
+change reaches*, after the reactor `install` (it runs the shaded `inspecto/target/inspecto-processor-*.jar`
+that step builds). `pull_request` only; one run per `spaces/*/config` root, base `HEAD^1` — GitHub's PR merge
+commit's first parent is the base tip, so the diff is exactly the PR (the checkout has `fetch-depth: 2`).
+**It runs offline**: the checked-out tree, `git show` of the base, and the DuckDB embedded in the fat JAR —
+verified by running the same loop locally against all three Spaces. **Report only by default**: every exit is
+a warning. The repository variable `AFFECTED_CONTRACTS_FLAGS` (`--fail-on-breaking`, `--fail-on-affected`)
+turns it into a gate.
+
+- ⛔ **Deferred:** Measures in materialize / report jobs and saved queries parsed for their columns (a
+  saved-query Widget and every enrichment / job / rule link are REVALIDATE today); column lineage *through*
+  a consumer or an enrichment (its downstream is REVALIDATE or merely listed, never judged column by
+  column); diffing a multi-schema or plugin producer; Alert Rules — `AlertRule` carries `onPipeline` and
+  `dataset`, but `PipelineDependents` (kept key-for-key with the rename path) has no Alert Rule scanner, so
+  an Alert Rule is neither listed nor judged. That is an under-report, the one gap here that fails the
+  wrong way; it belongs with the scanner, not with this check.
 
 ## Related
 

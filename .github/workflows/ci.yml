@@ -263,6 +263,8 @@ jobs:
           --health-retries 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2   # the affected-contracts report diffs against HEAD^1 (the PR merge commit's base)
 
       - name: Set up JDK 27
         uses: actions/setup-java@v4
@@ -334,6 +336,38 @@ jobs:
         run: >-
           mvn --batch-mode --no-transfer-progress install -Pedition-enterprise -Pcoverage
           '-Dinspecto.test.pg.url=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'
+
+      # DUCKLE-C7-AFFECTED-CONTRACTS-1 (2026-09-24): which Pipelines, non-Pipeline dependents and contracts a
+      # PR's config change reaches, one `spaces/<id>/config` root at a time. Runs offline: it reads the checked-out
+      # tree plus `git show` of the base, and the DuckDB it DESCRIBEs with is the embedded one in the fat JAR the
+      # step above just built — no network, no service. The base is `HEAD^1`: on `pull_request` the checkout is
+      # GitHub's merge commit, whose first parent is the base branch tip, so the diff is exactly what the PR
+      # adds (hence `fetch-depth: 2` on the checkout above).
+      # ⚠ `-Dassist.safety.roots` is LOAD-BEARING: the entry point hosts no Space, so without it the path jail
+      # has no roots and EVERY Pipeline fails to load ("no allowed roots configured") — the report then reads
+      # as all-UNCERTAIN and judges nothing. The root is the Space base, the one `SpaceBootstrap` would register.
+      # ⛔ REPORT ONLY by default — every exit is swallowed into a warning. Set the repository variable
+      # `AFFECTED_CONTRACTS_FLAGS` (e.g. `--fail-on-breaking`, or `--fail-on-affected`) to make it gate; then a
+      # non-zero exit from any root fails the step. See okf/backend/control-plane/pipeline-related.md.
+      - name: Report — Pipelines, dependents and contracts this PR's config change reaches
+        if: github.event_name == 'pull_request'
+        env:
+          FLAGS: ${{ vars.AFFECTED_CONTRACTS_FLAGS }}
+        run: |
+          jar=$(ls inspecto/target/inspecto-processor-*.jar | grep -v -e '/original-' -e sources -e tests | head -1)
+          status=0
+          for root in spaces/*/config; do
+            echo "::group::$root"
+            code=0
+            java --enable-native-access=ALL-UNNAMED "-Dassist.safety.roots=$PWD/$(dirname "$root")" -cp "$jar" \
+              com.gamma.service.AffectedPipelines "$root" HEAD^1 $FLAGS || code=$?
+            echo "::endgroup::"
+            if [ "$code" -ne 0 ]; then
+              echo "::warning::AffectedPipelines exited $code for $root"
+              status=$code
+            fi
+          done
+          if [ -n "$FLAGS" ]; then exit $status; fi
 
       # Keep the reports so a trend is visible run-to-run — without this the number exists only in the
       # log and nobody can say whether it moved.

@@ -186,4 +186,55 @@ class AffectedPipelinesTest {
         assertTrue(r.affected().isEmpty());
         assertEquals("no Pipeline reads this file", r.ignored().get(0).reason());
     }
+
+    @Test
+    void enrichmentAndJobLinksOfEveryReachedPipelineAreListedWithTheirChains(@TempDir Path root) throws Exception {
+        fixture(root);
+        Files.writeString(root.resolve("prod_enrich.toon"),
+                "name: prod_enrich\nreferences:\n  base:\n    ref: prod\n");
+        Files.writeString(root.resolve("trig_enrich.toon"), "name: trig_enrich\ntriggers:\n  on_pipeline: cons\n");
+        Path jobs = Files.createDirectories(root.resolve("jobs"));
+        Files.writeString(jobs.resolve("after_cons_job.toon"), "type: report\non_pipeline: cons\n");
+        Files.writeString(jobs.resolve("after_other_job.toon"), "type: report\non_pipeline: other\n");
+        Path schema = root.resolve("prod/prod_schema.toon");
+        String before = Files.readString(schema);
+        Files.writeString(schema, before.replace("AMT,\"1\",DOUBLE", "AMT,\"1\",BIGINT"));
+
+        Report r = AffectedPipelines.analyze(root, List.of(new Change(schema, Status.MODIFIED, before)));
+
+        java.util.Map<String, List<String>> chains = new java.util.LinkedHashMap<>();
+        for (AffectedPipelines.Dependent d : r.dependents()) chains.put(d.kind() + ":" + d.name(), d.chain());
+        assertEquals(List.of("file:prod/prod_schema.toon", "pipeline:prod", "enrichment:prod_enrich"),
+                chains.get("enrichment:prod_enrich"), AffectedPipelines.render(r));
+        assertEquals(List.of("file:prod/prod_schema.toon", "pipeline:prod", "dataset:prod_ds", "pipeline:cons",
+                "job:after_cons_job"), chains.get("job:after_cons_job"));
+        assertEquals(List.of("file:prod/prod_schema.toon", "pipeline:prod", "dataset:prod_ds", "pipeline:cons",
+                "enrichment:trig_enrich"), chains.get("enrichment:trig_enrich"));
+        assertFalse(chains.containsKey("job:after_other_job"), "a job on an unreached Pipeline is not listed");
+        assertTrue(AffectedPipelines.render(r).contains("DEPENDENT job:after_cons_job  via on_pipeline"),
+                AffectedPipelines.render(r));
+    }
+
+    @Test
+    void aChangedDatasetListsItsWidgetsAndDashboardsEvenWithNoConsumer(@TempDir Path root) throws Exception {
+        pipeline(root, "prod", "");
+        Path dsDir = Files.createDirectories(root.resolve("registry/datasets"));
+        Path ds = dsDir.resolve("lone_ds.toon");
+        Files.writeString(ds, "name: lone_ds\nphysicalRef: prod/db\n");
+        Path widgets = Files.createDirectories(root.resolve("registry/widgets"));
+        Files.writeString(widgets.resolve("lone_kpi.toon"), "vizType: kpi\ndatasetId: lone_ds\n");
+        Path boards = Files.createDirectories(root.resolve("registry/dashboards"));
+        Files.writeString(boards.resolve("board.toon"), "tiles[1]{widgetId}:\n  lone_kpi\n");
+        String before = Files.readString(ds);
+        Files.writeString(ds, before + "sourceName: prod\n");
+
+        Report r = AffectedPipelines.analyze(root, List.of(new Change(ds, Status.MODIFIED, before)));
+
+        assertTrue(r.affected().isEmpty(), AffectedPipelines.render(r));
+        assertEquals(List.of("widget:lone_kpi", "dashboard:board"),
+                r.dependents().stream().map(d -> d.kind() + ":" + d.name()).toList(), AffectedPipelines.render(r));
+        assertEquals(List.of("file:registry/datasets/lone_ds.toon", "dataset:lone_ds", "widget:lone_kpi",
+                "dashboard:board"), r.dependents().get(1).chain());
+        assertTrue(r.ignored().isEmpty(), "a Dataset a Widget shows is not ignored: " + r.ignored());
+    }
 }
