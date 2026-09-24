@@ -431,14 +431,16 @@ class ControlApiPipelineCrudTest {
     void anEnrichmentNodesCompanionBindingSavesOverHttp(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
             String b = dir.toString().replace('\\', '/');
+            // The shape graph/raw synthesizes: the companion hangs off the sink by the derived companion
+            // edge. (It used to sit mid-walk, p → enrich → out, which is ENRICHMENT_NOT_TERMINAL since 2026-09-24.)
             String pipeline = """
                 {"active":true,
                  "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"%1$s/in"}},
                           {"id":"p","type":"parser","config":{"schema_file":"%1$s/s.toon"}},
                           {"id":"enrich","type":"enrichment","use":"enrichment/customer_lookup"},
                           {"id":"out","type":"sink.persistent","config":{"database":"%1$s/db"}}],
-                 "edges":[{"from":"acq","rel":"data","to":"p"},{"from":"p","rel":"data","to":"enrich"},
-                          {"from":"enrich","rel":"data","to":"out"}]}""".formatted(b);
+                 "edges":[{"from":"acq","rel":"data","to":"p"},{"from":"p","rel":"data","to":"out"},
+                          {"from":"out","rel":"companion","to":"enrich","derived":true}]}""".formatted(b);
 
             HttpResponse<String> r = send(c.port, "PUT", "/pipelines/enrich_rt/graph", pipeline);
             assertEquals(200, r.statusCode(), r.body());

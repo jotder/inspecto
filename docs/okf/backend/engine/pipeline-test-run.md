@@ -161,6 +161,23 @@ it over the sample would preview something no real run does. **Why not a refusal
 preview of every graph with an enrichment in it, because of one node the rest of the walk doesn't need.
 Any future node type the walk has no executor for gets the same named warning.
 
+✅ **A mid-walk enrichment cannot be SAVED (2026-09-24, `ENRICHMENT-MIDWALK-LANES-DISAGREE-1`, operator
+decision).** The two lanes disagreed about it: `PipelineExecutor.execute` skips the node and starves
+everything below it, while `PipelineEditable.lower` drops the node and so the flat file feeds its downstream
+from its upstream. `PipelineEditable.lower` now refuses any `enrichment` node with an edge to another node in
+the graph: **422** `{written: false, refusals: [{code: "ENRICHMENT_NOT_TERMINAL", nodeId, message}]}`, and the
+message names the nodes it feeds. The canvas shows it through the same `refusals[]` path as every other lower
+refusal (`showRefusals` → the Validation dock, next to the node). ⚖ The refusal sits at the SAVE, not in `PipelineValidator`. The
+candidate dry run and run-to-here still accept the shape and give the named warning above, so a draft can
+still be previewed. What a real run executes always comes from a saved file, and a saved file can no longer
+hold this shape. A terminal enrichment still saves. So does the derived `companion` edge, because it points
+INTO the enrichment and `withoutDerivedEdges` drops it before parsing anyway. Pinned by
+`ControlApiEnrichmentMidWalkRefusalTest` (3, real HTTP). `ControlApiPipelineGraphRoundTripSweepTest` stays
+green, so no shipped Pipeline is refused. `ControlApiPipelineCrudTest#anEnrichmentNodesCompanionBindingSavesOverHttp`
+used to author the mid-walk shape and now uses the companion shape `graph/raw` really serves. Falsified: with
+the check disabled the 422 test fails with the old `200 written:true`, and refusing every enrichment turns the
+terminal and companion tests red.
+
 ✅ **The companion shape now reaches the walk (2026-09-24, `GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1`).**
 `GET /pipelines/{name}/graph/raw` joins a `*_enrich.toon` companion to the sink with a **derived display-only**
 edge `{rel: "companion", derived: true}` instead of a `data` edge (which `PipelineValidator` refuses
@@ -312,7 +329,7 @@ then removed; red with the rollback disabled, and separately with only the branc
 `corruptGzipChunkedFileIsQuarantinedUnreadable`, and `chunkedTransformFailureFailsTheBatchAndLeavesTheFileInTheInbox`
 (red when the per-chunk catch swallows `TransformFailedException`).
 
-✅ **`PARKED-BRANCH-LEAK-ON-FAILED-BATCH-1` FIXED 2026-09-23:** `ConsignmentIngestor.process` now drains the batch's `ParkedBranches` entry on EVERY non-dry-run outcome — a non-SUCCESS batch (FAILED, `QUARANTINED_UNREADABLE`, …) drains and discards it, so the static registry never outlives its batch; a re-run re-parks to the same `<backup>/parked/<batchId>__<node>.parquet`. Pinned by `ChunkedStreamingTest#parkedBranchEntryIsDrainedWhenTheBatchDoesNotSucceed`. ✅ `GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1` FIXED 2026-09-24 — the companion edge is a derived display-only `rel: companion` edge the save path drops (see above). ⚠ **Open (filed 2026-09-23):** `ENRICHMENT-MIDWALK-LANES-DISAGREE-1` — a mid-walk enrichment is skipped by `PipelineExecutor.execute` (downstream sinks starve) but dropped by `PipelineEditable.lower` (the flat lane feeds them).
+✅ **`PARKED-BRANCH-LEAK-ON-FAILED-BATCH-1` FIXED 2026-09-23:** `ConsignmentIngestor.process` now drains the batch's `ParkedBranches` entry on EVERY non-dry-run outcome — a non-SUCCESS batch (FAILED, `QUARANTINED_UNREADABLE`, …) drains and discards it, so the static registry never outlives its batch; a re-run re-parks to the same `<backup>/parked/<batchId>__<node>.parquet`. Pinned by `ChunkedStreamingTest#parkedBranchEntryIsDrainedWhenTheBatchDoesNotSucceed`. ✅ `GRAPH-RAW-COMPANION-ENRICHMENT-ILLEGAL-EMIT-1` FIXED 2026-09-24 — the companion edge is a derived display-only `rel: companion` edge the save path drops (see above). ✅ `ENRICHMENT-MIDWALK-LANES-DISAGREE-1` FIXED 2026-09-24 — a mid-walk enrichment is refused at save, `ENRICHMENT_NOT_TERMINAL` (see *Two blind spots closed* above).
 
 ✅ **A failed partition write fails the batch; it never quarantines the input**
 (`WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1`, fixed 2026-09-23). A scratch path near 250 characters failed the

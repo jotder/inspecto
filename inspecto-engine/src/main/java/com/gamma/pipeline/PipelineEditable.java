@@ -26,7 +26,8 @@ import static com.gamma.util.Values.putIfPresent;
  * (the graph is the truth for an {@code active} pipeline) and left untouched in lenient mode (an
  * inactive draft may simply not have authored it yet). {@code enrichment} nodes are ignored by
  * {@link #lower} — their truth is the registered {@code *_enrich.toon} companion (W4b), never a
- * mirror in the pipeline file.
+ * mirror in the pipeline file — and one with a node downstream of it refuses
+ * {@link #ENRICHMENT_NOT_TERMINAL}.
  */
 @PublicApi(since = "4.0.0")
 public final class PipelineEditable {
@@ -87,6 +88,15 @@ public final class PipelineEditable {
      * rather than lowering a topology the next lift cannot reproduce.
      */
     public static final String UNSUPPORTED_BRANCH_STEP = "UNSUPPORTED_BRANCH_STEP";
+    /**
+     * An {@code enrichment} node with a node downstream of it (ENRICHMENT-MIDWALK-LANES-DISAGREE-1, operator
+     * decision 2026-09-24). An enrichment is a post-commit Stage-2 job, not a walk step, so a mid-walk one
+     * had two meanings: the graph lane ({@code PipelineExecutor.execute}) skipped it and starved everything
+     * below it, while this lower dropped the node and fed its downstream from its upstream. Refused by name
+     * instead. The derived {@code companion} edge (sink → enrichment) is dropped before a save parses, and
+     * it points INTO the enrichment anyway, so a terminal enrichment is untouched.
+     */
+    public static final String ENRICHMENT_NOT_TERMINAL = "ENRICHMENT_NOT_TERMINAL";
     /** A {@code transform.sql} node whose {@code sql} is absent or blank — the one key the step cannot do without. */
     public static final String SQL_STEP_EMPTY = "SQL_STEP_EMPTY";
     /** Author SQL the sandbox guard refuses. Carries the guard's own message, so the author is told
@@ -833,7 +843,17 @@ public final class PipelineEditable {
                 }
             }
             // (transform.map reaches mapNodes through isProjectionSlot above.)
-            // enrichment: companion-persisted — nothing to lower
+            // enrichment: companion-persisted — nothing to lower, but it must be terminal
+            else if (BuiltinNodeType.ENRICHMENT.type().equals(t)) {
+                List<String> downstream = g.edgesFrom(n.id()).stream().map(PipelineEdge::to)
+                        .filter(to -> g.node(to).isPresent()).distinct().toList();
+                if (!downstream.isEmpty())
+                    refusals.add(new PipelineCompileException.Refusal(ENRICHMENT_NOT_TERMINAL, n.id(),
+                            "an enrichment is a post-commit Stage-2 job, so nothing can run downstream of it — "
+                                    + "'" + n.id() + "' feeds " + downstream.stream().map(d -> "'" + d + "'")
+                                    .collect(java.util.stream.Collectors.joining(", "))
+                                    + "; make the enrichment a terminal node"));
+            }
         }
         // MIDBRANCH-1 (R3): pull each route node's flattened branch chain OUT of the trunk chain —
         // those nodes lower into route.branches[].steps (routeSection), never into the trunk
