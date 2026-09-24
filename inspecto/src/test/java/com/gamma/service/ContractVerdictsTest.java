@@ -380,7 +380,7 @@ class ContractVerdictsTest {
 
         Report r = removeAmt(root, schema);
 
-        assertEquals(List.of("alert-rule:on_prod", "alert-rule:on_ds"),
+        assertEquals(List.of("alert-rule:on_ds", "alert-rule:on_prod"),
                 of(r, Tier.REVALIDATE).stream().map(Verdict::reader).toList(), AffectedPipelines.render(r));
     }
 }

@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -200,7 +201,10 @@ public final class PipelineDependents {
      * A rule naming neither watches every pipeline and belongs to the space, not to this one.
      */
     private static void alertRules(ComponentStore store, String id, Set<String> datasets, List<Dependent> out) {
-        for (ComponentRegistry.Component c : store.list("alert-rule")) {
+        // Sorted by name: the store lists in directory order, which is not stable across platforms.
+        List<ComponentRegistry.Component> rules = new ArrayList<>(store.list("alert-rule"));
+        rules.sort(Comparator.comparing(ComponentRegistry.Component::name));
+        for (ComponentRegistry.Component c : rules) {
             Map<String, Object> content = c.content();
             String on = content.get("onPipeline") == null ? "" : String.valueOf(content.get("onPipeline")).trim();
             if (!on.isEmpty() && (on.equalsIgnoreCase(id) || on.replace(' ', '_').equalsIgnoreCase(id))) {
