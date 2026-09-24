@@ -68,6 +68,11 @@ above the generated commit list.
   `DELETE /notifications/{id}` and `PUT /notifications/preferences` now require **`canAdminister`** (403
   `PERMISSION_DENIED` otherwise). They were exempt as per-caller, but the feed state and the preference grid
   are one shared state per Space. Personal (no authenticator) is unchanged.
+- **Breaking (every edition):** `X-Forwarded-For` is **ignored by default** — the client IP recorded in the
+  audit trail and used as the unauthenticated rate-limit key is the socket peer unless the peer is listed
+  in the new `-Dcontrol.trustedProxies` (IPs/CIDRs), and then the right-most untrusted hop wins, not the
+  first. A deployment behind a proxy must list it, or it audits and throttles every caller as the proxy.
+  An unparseable entry fails the boot.
 
 **Whole-pipeline dry run (2026-09-20, `PIPELINE-DRYRUN-1` step 5)**
 - `POST /runs/{name}/trigger?dryRun=true` runs a pipeline and **lands nothing** — no outputs, no audit or

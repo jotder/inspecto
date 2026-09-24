@@ -382,6 +382,16 @@ Standard/Enterprise install unreachable on upgrade. `ControlApiBindTest` pins it
 fails a test instead of surprising an operator. ⛔ `EDITIONS.md` asserted "bind localhost only" for years
 without the code enforcing it — the claim was the defect, and it now states the exposure instead.
 
+🔴 **Client IP behind a proxy — `-Dcontrol.trustedProxies` (SEC review F3, 2026-09-24).** A comma-separated
+list of IP literals and CIDR ranges (`10.0.0.0/8, 192.168.1.5, fd00::/8`). **Unset ⇒ `X-Forwarded-For` is
+ignored** and the client IP — the audit trail's `ip`, and the per-IP rate-limit key for unauthenticated
+callers — is the socket peer. When the direct peer is listed, the header is read right to left and the
+first hop NOT in the list is the client; hops are parsed as literals only (never resolved). An unparseable
+entry **fails the boot**, like `-Dcontrol.bind`. ⚠ Behind a reverse proxy or gateway (WSO2, nginx, an LB)
+list its address, or every request audits and throttles as the proxy. ⛔ Until this flag the FIRST XFF
+entry was believed from any caller, so the audit IP and the throttle key were caller-chosen.
+Pinned by `TrustedProxiesTest` + `ControlApiClientIpTest`.
+
 **Auth model (editions realignment, 2026-06-16).** The common core is **auth-free**: on the Personal
 edition every route is open — no token, guard, or login (the old `CONTROL`/`assist.*` token scopes were
 removed). The **Standard** edition re-adds authentication out-of-band via the `Authenticator` / `Subject` /

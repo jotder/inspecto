@@ -71,6 +71,8 @@ public interface ApiContext {
     String ATTR_IDEMPOTENCY_KEY   = "inspecto.idempotency.key";
     /** The request body's raw bytes, cached because {@code ex.getRequestBody()} is single-read (D8). */
     String ATTR_RAW_BODY          = "inspecto.rawBody";
+    /** The client IP resolved against the trusted-proxy list at dispatch start ({@link #ip}, SEC review F3). */
+    String ATTR_CLIENT_IP         = "inspecto.clientIp";
     /** The authenticated {@link Subject} (W6), set by {@link ControlApi#dispatch} once an
      *  {@link Authenticator} validates the request; absent on Personal edition (no Authenticator present)
      *  and on the public bootstrap/health surface. */
@@ -347,14 +349,13 @@ public interface ApiContext {
         return (agentSession != null && !agentSession.isBlank()) ? "agent" : "user";
     }
 
-    /** The originating client IP — the first {@code X-Forwarded-For} hop when present (proxy/dev), else
-     *  the socket peer address. {@code null} only if the address is somehow unavailable. */
+    /** The originating client IP, as resolved once per request by {@code ControlApi} against
+     *  {@code -Dcontrol.trustedProxies} ({@link TrustedProxies}, SEC review F3): {@code X-Forwarded-For} is
+     *  believed only from a trusted direct peer, right-most untrusted hop first. Without that stamp (an
+     *  exchange that never went through the pipeline) it is the socket peer — never a header value.
+     *  {@code null} only if the address is somehow unavailable. */
     static String ip(HttpExchange ex) {
-        String fwd = ex.getRequestHeaders().getFirst("X-Forwarded-For");
-        if (fwd != null && !fwd.isBlank()) {
-            int comma = fwd.indexOf(',');
-            return (comma > 0 ? fwd.substring(0, comma) : fwd).trim();
-        }
+        if (attr(ex, ATTR_CLIENT_IP) instanceof String stamped) return stamped;
         var addr = ex.getRemoteAddress();
         return addr == null || addr.getAddress() == null ? null : addr.getAddress().getHostAddress();
     }

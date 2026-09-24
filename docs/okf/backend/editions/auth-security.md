@@ -338,6 +338,14 @@ for everyone. All four are now `canAdminister` (fail closed; reads stay open), p
 `ControlApiNotificationsTest`. ⚠ Consequence: a non-admin's bell can no longer mark read or dismiss; per-user
 read state (a recipient-keyed store) is what would let those four become self-service again.
 
+🔴 **The client IP is the socket peer unless a trusted proxy vouches otherwise** (SEC review F3,
+2026-09-24). `ApiContext.ip` — the audit trail's `ip` and the throttle key for callers with no Subject —
+took the first `X-Forwarded-For` entry from ANY caller, so both were caller-chosen: forge the audit IP, or
+rotate the header to get a fresh rate-limit bucket per request. It now reads the value `ControlApi`
+resolves once per request against `-Dcontrol.trustedProxies` (`TrustedProxies`: default empty ⇒ ignore
+XFF; with a list, only from a listed peer, right-most untrusted hop). Operator detail in
+[operations reference](../build-run/operations-reference.md).
+
 **Evidence** is `compliance/evidence/route-gating.md`, whose inventory table is **generated** by
 `tools/route-gating-report.mjs` and CI-enforced in `--check` mode — the document cannot say something the
 code does not. Plan of record: `archived-documents/plans-archive/route-gating-compliance-plan.md`.

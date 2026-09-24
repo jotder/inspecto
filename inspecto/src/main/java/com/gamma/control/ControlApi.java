@@ -205,6 +205,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     /** S6 — the composed request pipeline: an ordered chain of cross-cutting {@link Middleware} wrapping the
      *  terminal route dispatch. Built once in the constructor, after the route table is registered. */
     private final Chain pipeline;
+    /** Peers whose {@code X-Forwarded-For} is believed ({@code -Dcontrol.trustedProxies}); empty ⇒ none (default). */
+    private final TrustedProxies trustedProxies;
     /** Allowed CORS origin ({@code -Dcontrol.cors}); {@code null} ⇒ CORS disabled (default). */
     private final String corsOrigin;
     /** Static SPA root ({@code -Dui.dir}); {@code null} ⇒ no static serving (default). */
@@ -248,6 +250,11 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         this.spaces = spaces;
         String cors  = System.getProperty("control.cors");
         this.corsOrigin = blank(cors) ? null : cors.trim();
+        try {
+            this.trustedProxies = TrustedProxies.fromSystemProperty();
+        } catch (IllegalArgumentException bad) {
+            throw new IOException("-D" + TrustedProxies.PROPERTY + ": " + bad.getMessage());
+        }
         String ui    = System.getProperty("ui.dir");
         this.uiDir   = blank(ui) ? null : Path.of(ui.trim()).toAbsolutePath().normalize();
         String wr    = System.getProperty("assist.write.root");
@@ -575,7 +582,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     static final String[] REQUEST_SCOPED_ATTRS = {
             ApiContext.ATTR_CORRELATION_ID, ApiContext.ATTR_START_NANOS, ApiContext.ATTR_SELF_PATH,
             ApiContext.ATTR_ERROR_CODE, ApiContext.ATTR_IDEMPOTENCY_STORE, ApiContext.ATTR_IDEMPOTENCY_KEY,
-            ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_CAPABILITY,
+            ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_CLIENT_IP, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_CAPABILITY,
             ApiContext.ATTR_RESOURCE_PERMISSIONS,
             ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ATTR_EFFECTIVE_PATH,
             Roles.ATTR_CONFIG_ROOT, AccessDecider.ATTR_MATCHED_POLICY };
@@ -609,6 +616,10 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      *  its finally closes the exchange once the whole chain has unwound. */
     private void correlation(HttpExchange ex, Chain next) throws Exception {
         clearRequestScope(ex);   // SEC-EXCHANGE-ATTRS: nothing from a previous request may be readable
+        var peer = ex.getRemoteAddress();
+        String clientIp = trustedProxies.clientIp(peer == null ? null : peer.getAddress(),
+                ex.getRequestHeaders().get("X-Forwarded-For"));
+        if (clientIp != null) ApiContext.attr(ex, ApiContext.ATTR_CLIENT_IP, clientIp);
         String cid = ex.getRequestHeaders().getFirst("Correlation-ID");
         cid = (cid == null || cid.isBlank()) ? java.util.UUID.randomUUID().toString() : cid.trim();
         ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID, cid);
