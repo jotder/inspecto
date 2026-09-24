@@ -164,6 +164,19 @@ report mtimes against the build window it computes from Maven's own `Finished at
 footer — and refuses a pass unless every module is `SUCCESS` and every report was written by *that*
 build. ⚠ `-fae` does not help: `--fail-at-end` still skips modules that *depend* on a failed one.
 
+**CI runs this guard on every push/PR** (`REACTOR-VERDICT-CI-1`, operator 2026-09-25 — CI, ⛔ not
+pre-push). `ci.yml`'s `test` job is the ONLY workflow reactor that runs tests (`release.yml` builds with
+`-DskipTests`; `launchers-windows` runs no Maven), so it is the one wired: the `reactor` step tees its
+`--batch-mode` run to `$RUNNER_TEMP/reactor.log`, and a following `if: always()` step runs the guard on
+it with `--root .`. ⚠ **`shell: bash` on that step is load-bearing**: an unspecified shell runs as
+`bash -e` WITHOUT pipefail, so `mvn … | tee` would hand back tee's exit 0 and a red reactor would go
+green; an explicit `shell: bash` is `bash -eo pipefail` (restated with `set -o pipefail`). The guard
+step is skipped only when the reactor step never started (no log exists). ⛔ **No `--expect-modules` in
+CI** — the count moves with every edition module and a hard-coded number would drift; the guard's own
+Reactor-Build-Order cross-check already fails on an under-parse. The residual it leaves is the one its
+header states: a reactor that LOST a module (a dropped `-Pedition-*`) is invisible to it. The job pins
+Node 22 for this step because the guard uses `fs.globSync`.
+
 🔴 **Check for a live build BEFORE every `mvn`, not just when you remember.** ⚠ Recorded twice on
 2026-09-08 because writing it down once did not prevent the second occurrence: a targeted
 `mvn -pl asn-parser/asn-decoders/asn-core test` was fired while a full-reactor coverage run was in
@@ -317,9 +330,10 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
   dependents are BANNED by Maven even under `--fail-at-end`, so a red `OpenApiPathsContractTest` silently
   left ~850 tests across twelve Professional/Enterprise modules unexercised (20 modules built vs 32).
 
-- **`REACTOR-VERDICT-CI-1`** — wire `check-reactor-verdict.mjs` into `ci.yml`. ⛔ Deliberately NOT
-  pre-push: it judges a *build*, not repo state, and producing a log at push time means a ~20-minute
-  reactor per push. CI already runs one, so the log is free there.
+- ~~**`REACTOR-VERDICT-CI-1`**~~ ✅ **CLOSED 2026-09-25** — `ci.yml`'s `test` job tees its reactor run
+  to a log under pipefail and gates on `check-reactor-verdict.mjs` in an `if: always()` step; as-built in
+  *A halted reactor is a SILENT PASS* above. ⛔ Deliberately NOT pre-push (operator 2026-09-25): it judges
+  a *build*, not repo state, and producing a log at push time means a ~20-minute reactor per push.
 - **`BUNDLE-DANGLING-LINKS-1`** — the withheld-doc and relocated-target links are FIXED at package
   time by `tools/bundle-doc-rewrite.mjs` (shared with the guard, 2026-09-24); the guard reports
   **56** that survive packaging, every one a source-code or `compliance/` citation. Still owed: decide
@@ -333,7 +347,7 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
 - ~~**`EDITION-GATED-TESTS-IN-WRONG-HOME-1`**~~ ✅ **CLOSED 2026-09-25 (this commit)** — test classes that
   guarded CORE behaviour from inside `inspecto-ops`, which the default reactor never builds
   (`mvn -o -pl inspecto-ops -am test` does not even resolve without `-Pedition-standard`). Severity was LOW:
-  `ci.yml:303` runs `-Pedition-enterprise` with tests, so CI always ran them — the exposure was the local
+  `ci.yml:364` runs `-Pedition-enterprise` with tests, so CI always ran them — the exposure was the local
   `mvn -o clean test` loop only. `RepoSpacesConfigValidationTest` moved to `inspecto`; `ControlApiDbBrowserTest`,
   `ControlApiDecisionRulesTest` and `PostgresStateStoreTest` SPLIT (ops siblings `ControlApiDbBrowserOpsTablesTest`,
   `ControlApiDecisionRuleApplyTest`, `PostgresOpsStoreTest`); `ControlApiReconPromoteTest` moved (`2f0b181f9`);

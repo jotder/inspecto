@@ -43,8 +43,9 @@
 // that fails or stalls on some machines gets `core.hooksPath` unset entirely, after which NO layer
 // runs locally. This is a VERIFY-TIME tool. It belongs where a verdict is claimed — the `build-verify`
 // skill's verdict step and the `verify-runner` agent, both of which now call it.
-// ⇒ RECOMMENDED for `ci.yml` instead, where a full reactor already runs: pipe that run to a log with
-// `-B` and gate on this guard. NOT wired here — CI wiring is the operator's call.
+// ⇒ WIRED INTO `ci.yml` instead (REACTOR-VERDICT-CI-1, operator 2026-09-25), where a full reactor already
+// runs: the `test` job tees its `-B` reactor run to `$RUNNER_TEMP/reactor.log` under pipefail and gates on
+// this guard in an `if: always()` step.
 
 import { readFileSync, statSync, existsSync } from 'node:fs';
 import { globSync } from 'node:fs';

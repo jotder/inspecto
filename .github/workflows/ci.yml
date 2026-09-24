@@ -350,10 +350,38 @@ jobs:
       # denominator rather than dragging it down — immaterial here (~800 lines across 4 modules) but the
       # reason the percentage is not a measure of "code with tests". See
       # okf/backend/build-run/guard-coverage.md.
+      #
+      # Tee'd to a log for the reactor-verdict guard below (REACTOR-VERDICT-CI-1, 2026-09-25). ⚠ `shell: bash`
+      # is LOAD-BEARING, not decoration: GitHub runs an unspecified shell as `bash -e {0}` WITHOUT pipefail,
+      # so `mvn … | tee` would report tee's exit 0 and a red reactor would turn this step green. An explicit
+      # `shell: bash` runs `bash -eo pipefail`; the `set -o pipefail` restates it so the line survives a
+      # shell change. The log lives in runner.temp, outside the tree the later guards walk.
       - name: Run tests (all editions) with coverage, and install so the dependency guard can resolve the reactor
-        run: >-
-          mvn --batch-mode --no-transfer-progress install -Pedition-enterprise -Pcoverage
-          '-Dinspecto.test.pg.url=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'
+        id: reactor
+        shell: bash
+        run: |
+          set -o pipefail
+          mvn --batch-mode --no-transfer-progress install -Pedition-enterprise -Pcoverage \
+            '-Dinspecto.test.pg.url=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres' \
+            2>&1 | tee "$RUNNER_TEMP/reactor.log"
+
+      # REACTOR-HALT-IS-A-SILENT-PASS-1 → REACTOR-VERDICT-CI-1 (operator 2026-09-25: CI, NOT pre-push). The exit
+      # code alone cannot prove every module RAN: a SKIPPED module is unverified, and surefire reports older than
+      # this build are leftovers. The guard cross-checks the Reactor Summary, BUILD SUCCESS and report mtimes.
+      # `always()` so a red reactor still gets its diagnosis (which modules FAILED vs were merely SKIPPED);
+      # skipped when the reactor step never started (an earlier step failed), since there is then no log.
+      # ⛔ No `--expect-modules`: the count moves with every edition module, and the guard already fails on
+      # its own parse against Maven's Reactor Build Order, so a hard-coded number would only add drift.
+      # Node 22+ is required (the guard uses `fs.globSync`); the runner's preinstalled Node is not pinned.
+      - name: Set up Node 22 for the reactor-verdict guard
+        if: always() && steps.reactor.outcome != 'skipped'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Guard — the reactor log proves every module ran (reactor verdict)
+        if: always() && steps.reactor.outcome != 'skipped'
+        run: node tools/check-reactor-verdict.mjs "$RUNNER_TEMP/reactor.log" --root .
 
       # DUCKLE-C7-AFFECTED-CONTRACTS-1 (2026-09-24): which Pipelines, non-Pipeline dependents and contracts a
       # PR's config change reaches, one `spaces/<id>/config` root at a time. Runs offline: it reads the checked-out
