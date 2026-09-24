@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **38<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** —
+> **37<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 15<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -25,8 +25,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 22<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 16<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 38<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 15<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 37<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -266,7 +266,6 @@ proofs live there, and nothing pending for it lives anywhere else. Geo map defer
 #### Release & CI
 
 - **P3** · `BUNDLE-DANGLING-LINKS-1` — **56 doc links still dangle in the shipped bundle, and the guard that counts them is kept out of CI.** The withheld-doc links are rewritten at package time (`tools/bundle-doc-rewrite.mjs`, shared with the guard since 2026-09-24); what survives is one class: source-code citations (38 in `okf/backend/engine/db-layer.md`), `../compliance/…` links (5 in `INDEX.md`) and 2 in `inspecto/README.md` pointing above the bundle root. ⚠ The row was struck 2026-09-16 and this residual lived only in `okf/backend/build-run/build-test.md` — re-listed 2026-09-25. **Operator's call:** fix the docs, or neutralise that class at package time too; then wire `check-bundle-doc-links.mjs` into CI. → `okf/backend/build-run/build-test.md`
-- **P3** · `REACTOR-VERDICT-CI-1` — **wire `check-reactor-verdict.mjs` into `ci.yml`** (residual of `REACTOR-HALT-IS-A-SILENT-PASS-1`). ⛔ **Not pre-push**, deliberately: every other hook guard is a ~1 s repo-state check, and this one judges a BUILD — producing a log at push time means a 20-minute reactor per push. CI already runs a full reactor, so the log is free there. Operator's call to wire. → `okf/backend/build-run/build-test.md`
 
 #### Test infrastructure
 
