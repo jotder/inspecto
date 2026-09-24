@@ -134,6 +134,8 @@ public final class JobService implements AutoCloseable {
 
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
     private final Map<String, Job> jobs = new LinkedHashMap<>();
+    /** Names of the platform-armed system jobs ({@link #upsertSystemJob}) — never persisted, re-derived at boot. */
+    private final Set<String> systemJobs = ConcurrentHashMap.newKeySet();
     private final Map<String, CronExpression> crons = new ConcurrentHashMap<>();
     private final Map<String, Scheduler.CronHandle> cronHandles = new ConcurrentHashMap<>();
     private final LockingRunner runner = new LockingRunner();
@@ -303,9 +305,12 @@ public final class JobService implements AutoCloseable {
 
     /** A job's identity + state for the Control API listing. {@code onSignal} carries the signal-type
      *  trigger (P1c) so a signal-driven job is distinguishable from a manual one in the list; the
-     *  {@code when} guard is detail-only. */
+     *  {@code when} guard is detail-only. {@code system} marks a job the platform arms and disarms
+     *  itself ({@link #upsertSystemJob}) — listed like any other so it is never a hidden thread, but
+     *  owned by the platform, not by an author. */
     public record JobView(String name, String type, String cron, String onPipeline, String onSignal,
-                          boolean enabled, String lastStatus, String lastRunTime, String nextFire) {}
+                          boolean enabled, String lastStatus, String lastRunTime, String nextFire,
+                          boolean system) {}
 
     public JobService(List<JobConfig> configs, ConsignmentEventBus bus, Scheduler scheduler,
                       ReportRunner reports, String auditDir) {
@@ -1556,7 +1561,7 @@ public final class JobService implements AutoCloseable {
             out.add(new JobView(c.name(), c.type(), c.cron(), c.onPipeline(), c.onSignal(), c.enabled(),
                     last == null ? "" : last.status(),
                     last == null ? "" : last.endTime(),
-                    nextFire));
+                    nextFire, systemJobs.contains(c.name())));
         }
         return out;
     }
@@ -1765,6 +1770,40 @@ public final class JobService implements AutoCloseable {
 
     /** Whether any job by this name is registered and enabled. */
     public boolean has(String name) { return jobs.containsKey(name); }
+
+    // -- system jobs (platform-armed) ----------------------------------------------------------------
+
+    /**
+     * Arm a <b>system job</b> — one the platform derives from other state (e.g. the DUCKLE-C1 freshness
+     * sweep, derived from "an Alert Rule with {@code maximumAge} exists") rather than one an author
+     * saved. It is registered through the same {@link #upsertJob} path as an authored job, so it has a
+     * cron handle, a run ledger and a {@link JobView} like any other; it is simply never persisted,
+     * because it is re-derived on every boot — which is what makes arming idempotent across restarts.
+     *
+     * <p>Idempotent: re-arming an identical config is a no-op (no cron re-arm, no fire lost). ⛔ Never
+     * clobbers an AUTHORED job of the same name — that is refused with a WARN and returns {@code false}.
+     */
+    public synchronized boolean upsertSystemJob(JobConfig c) {
+        if (systemJobs.contains(c.name())) {
+            if (configFor(c.name()).map(c::equals).orElse(false)) return true;
+        } else if (configFor(c.name()).isPresent()) {
+            log.warn("[JOB] system job '{}' NOT armed: an authored job already holds that name", c.name());
+            return false;
+        }
+        systemJobs.add(c.name());
+        upsertJob(c);
+        return true;
+    }
+
+    /** Disarm a system job armed by {@link #upsertSystemJob}; a no-op for an authored job or an unknown name. */
+    public synchronized void removeSystemJob(String name) {
+        if (systemJobs.remove(name)) removeJob(name);
+    }
+
+    /** Whether {@code name} is a platform-armed system job (the Control API refuses to edit one). */
+    public boolean isSystemJob(String name) {
+        return systemJobs.contains(name);
+    }
 
     // ── scheduler_audit seams (System Maintenance MNT-4) ─────────────────────────
 

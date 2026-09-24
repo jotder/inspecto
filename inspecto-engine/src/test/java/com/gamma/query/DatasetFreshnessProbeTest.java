@@ -116,4 +116,26 @@ class DatasetFreshnessProbeTest {
         // throws would take the whole sweep down with it.
         assertTrue(probe.apply("sales_ds").isEmpty());
     }
+
+    /**
+     * The upgrade path of the durable floor: a space whose publication is still in the event store but
+     * which has no floor file yet (it predates the floor). The first cold-start scan must SEED the floor,
+     * or the next prune would still take the only record and the retention hole stays open for it.
+     */
+    @Test
+    void aColdStartScanHitSeedsTheDurableFloor(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) {
+        java.nio.file.Path floor = dir.resolve(DatasetFreshnessProbe.FLOOR_FILE);
+        DatasetFreshnessProbe before = new DatasetFreshnessProbe(
+                store(new AtomicInteger(), null, write("sales_ds", 7_000L)), floor);
+        assertEquals(OptionalLong.of(7_000L), before.apply("sales_ds"));
+        assertTrue(java.nio.file.Files.isRegularFile(floor), "the scan hit was written through to the floor");
+
+        // after a prune + restart: the store is empty, the floor alone answers — and never goes backwards
+        DatasetFreshnessProbe after = new DatasetFreshnessProbe(store(new AtomicInteger(), null), floor);
+        assertEquals(OptionalLong.of(7_000L), after.apply("sales_ds"));
+        after.subscriber().accept(write("sales_ds", 1_000L));
+        assertEquals(OptionalLong.of(7_000L), new DatasetFreshnessProbe(store(new AtomicInteger(), null), floor)
+                .apply("sales_ds"), "an older publication must not lower the durable floor");
+        assertTrue(after.apply("never_written_ds").isEmpty(), "the floor never invents a publication");
+    }
 }

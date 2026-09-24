@@ -302,4 +302,57 @@ class FreshnessAlertTest {
         assertThrows(IllegalStateException.class, grant::evaluateFreshnessRules,
                 "evaluation is the whole work; a missing engine must not read as 'nothing stale'");
     }
+
+    // -- retention (duckle S2) ---------------------------------------------------------------------
+
+    /** A {@code dataset.write} Signal event, built the way {@code DatasetWriteSignal} builds one. */
+    private static Event publication(String dataset, long ts) {
+        return new com.gamma.signal.Signal(null, com.gamma.signal.DatasetWriteSignal.TYPE,
+                java.time.Instant.ofEpochMilli(ts), com.gamma.signal.Severity.INFO,
+                com.gamma.signal.Ref.of("dataset", dataset), com.gamma.signal.Ref.of("dataset", dataset),
+                null, null, null, null, com.gamma.signal.DatasetWriteSignal.TYPE,
+                Map.of("dataset", dataset, "rows", 10L), 1).toEvent();
+    }
+
+    /**
+     * 🔴 The duckle S2 acceptance criterion. A Dataset last published 400 days ago; the audit
+     * retention window (365 days) drops the event partition holding that publication; the process
+     * restarts. The Dataset is now the STALEST it has ever been, and before the durable floor its
+     * freshness rule went silent - the cold-start scan found nothing, "never published" reads as
+     * unknown, and unknown never fires. Under-reporting exactly the breach the rule exists for.
+     */
+    @Test
+    void aBreachSurvivesThePruneOfItsLastPublicationAndARestart(@TempDir Path dir) throws Exception {
+        Path eventsDir = dir.resolve("events");
+        Path floor = dir.resolve("audit").resolve(com.gamma.query.DatasetFreshnessProbe.FLOOR_FILE);
+        long now = System.currentTimeMillis();
+        long lastPublished = now - Duration.ofDays(400).toMillis();
+
+        // -- process 1: the publication is emitted, recorded, and then aged out by event_prune --
+        com.gamma.event.ParquetEventStore before = com.gamma.event.ParquetEventStore.open(eventsDir);
+        com.gamma.query.DatasetFreshnessProbe live = new com.gamma.query.DatasetFreshnessProbe(before, floor);
+        Event write = publication("sales_ds", lastPublished);
+        before.append(write);
+        live.subscriber().accept(write);
+        assertEquals(OptionalLong.of(lastPublished), live.apply("sales_ds"));
+        assertEquals(1, before.prune(java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(365), false),
+                "premise: retention drops the one partition holding the publication");
+        before.close();
+
+        // -- process 2: a fresh store over the pruned directory, a fresh probe --
+        com.gamma.event.ParquetEventStore after = com.gamma.event.ParquetEventStore.open(eventsDir);
+        try {
+            assertTrue(after.query(com.gamma.event.EventQuery.builder().type(EventType.SIGNAL).build()).isEmpty(),
+                    "premise: the event store has genuinely forgotten the publication");
+            AlertService svc = service(dir, freshnessRule("sales_ds", "1d"));
+            svc.freshnessProbe(new com.gamma.query.DatasetFreshnessProbe(after, floor));
+            List<Alert> fired = svc.evaluate(null, now);
+            assertEquals(1, fired.size(), "a 400-day-old Dataset against a 1-day limit is a breach, and "
+                    + "pruning the evidence must not make it invisible");
+            assertEquals(Duration.ofDays(400).toSeconds(), fired.get(0).value(), 1.0,
+                    "the age is measured from the REAL last publication, not from the restart");
+        } finally {
+            after.close();
+        }
+    }
 }

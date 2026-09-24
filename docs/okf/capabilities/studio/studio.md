@@ -219,6 +219,36 @@ means "not on this page", not "never published" (hence the 500 limit rather than
 degrades to "no limit". ⛔ No stale flag is persisted (the `stale-tiles.ts` objection) and
 `CatalogOverlay`/`latestRunTime` is never read — a pipeline run is not a Dataset publication.
 
+**A freshness Alert Rule arms its own minute sweep** (2026-09-24, residual 1). While any armed Alert Rule
+carries `maximumAge`, the platform keeps a **system job** `system.freshness-sweep` — `alert.evaluate`,
+cron `* * * * *`, `scope: freshness` — and removes it when the last such rule goes
+(`com.gamma.job.FreshnessSweep`, re-derived in `CollectorService.start()` and after every
+`AlertService.upsert/remove`). It is an ordinary registered job (run ledger, next fire, cross-pod arming
+claim, a `GET /jobs` row with `system: true`), not a thread. **Nothing is persisted for it**: every boot
+re-derives it from the rules, and re-arming an identical config is a no-op — that is the idempotence.
+Job CRUD answers **409** to `PUT`/`DELETE`/`enable`/`disable`/`reschedule` on it, because a delete or a
+disable would quietly switch freshness off; it stays triggerable. ⚠ An *authored* job that already holds
+the name wins — the sweep is refused with a WARN, never clobbered. ⚠ The Scheduler UI does not yet badge
+`system`.
+
+**The freshness clock survives retention** (2026-09-24, residual 3, duckle S2). `event_prune` drops whole
+day partitions, so a Dataset silent for longer than the audit window lost its only `dataset.write`, and after
+a restart its rule read *unknown* — silent, for exactly the stalest Dataset. `DatasetFreshnessProbe` now
+keeps a durable floor, `<audit dir>/dataset-publications.tsv` (one `<dataset>\t<epoch ms>` line each),
+rewritten whenever a Dataset's newest publication advances — from the bus **or** from a cold-start scan, so
+a space that predates the file seeds it on its first sweep. The cold-start answer is `max(scan, floor)`.
+Kept only over a durable event store (none on `-Devents.backend=memory`, which forgets everything on
+restart anyway). ⛔ A **prune floor** (sparing the partition that holds each last publication) was
+rejected: it would keep whole days of unrelated audit past the window, forever, for precisely the Dataset
+that never publishes again — making the stated retention false — and would teach both event stores what a
+Signal is. The file is a timestamp, not a stale flag; staleness is still computed at read time.
+Pinned by `FreshnessAlertTest.aBreachSurvivesThePruneOfItsLastPublicationAndARestart` (red before the floor).
+
+**`ConfigSpecs.alert()` is shape-aware** (2026-09-24). `metric`/`threshold`/`window` are no longer flatly
+required; the `alert-metric-by-shape` / `alert-window-by-shape` / `alert-threshold-positive` rules require
+them per shape, decided in `AlertRule`'s own order (investigation → freshness → measure → ledger), so a
+freshness rule written through `/config/write` is no longer refused for omitting what the engine refuses.
+
 **A Measure is a client-side `NamedMeasure`** — `{id, expression, label}` — authored per Dataset in the
 Dataset's Measures editor and previewed client-side. There is **no server-side Measure entity**: what
 crosses the wire is always a validated `{agg, field}` pair, so a named-Measure expression is exactly the

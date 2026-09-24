@@ -345,7 +345,7 @@ artifacts (`-Djobs.runlog.maxEntries`, default 10,000); `runlog_prune` is its re
 | `runlog_prune` | Run history JSONL + artifacts + the `inspecto_job_runs` projection | core | |
 | `status_prune` | the run-timestamped `_status_`/`_batches_`/`_lineage_`/`_unpack_` CSVs under each Pipeline's `status/` | core | STATUS-CSV-RETENTION-1 — the commit log and `manifests/` are excluded by a positive filter |
 | `notification_prune`, `receipt_prune` | in-app feed entries (any read state); delivery receipts | core | the receipt store's 5,000 cap is a **backstop, not retention** |
-| `event_prune` | the Parquet event store's day-partitions older than the window | core | COMPLY-3; one-year window is policy; `-1` on the memory backend |
+| `event_prune` | the Parquet event store's day-partitions older than the window | core | COMPLY-3; one-year window is policy; `-1` on the memory backend. Dataset freshness does not depend on the pruned rows — its last-publication floor lives in `<audit dir>/dataset-publications.tsv` (studio §3.4) |
 | `partition_prune` | a sink store's `year=/month=/day=` directories older than the window (path-jailed) | core | 2026-09-06; whole days only, catalog rows stay |
 | `retire_superseded` | the **bytes** of output revisions the outputs catalog marks `SUPERSEDED` | core | ⚠ **the one retention task a correctness fix depends on** — without it every full recompute leaves a complete extra copy forever; since 2026-08-29 the runner **WARNs** after a recompute when no enabled job exists |
 | `storage_report`, `storage_trend` | per-axis usage (+ a queryable `maintenance_storage` sample on a real run); two-point growth slope, breach ETA, archive candidates | core | trend emits `maintenance.storage.trend` (WARN) inside `warn_days` |

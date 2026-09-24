@@ -8,6 +8,10 @@ import com.gamma.event.EventType;
 import com.gamma.signal.DatasetWriteSignal;
 import com.gamma.signal.Signal;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,6 +51,22 @@ import java.util.function.Function;
  * evaluator reads as {@code unknown} — not as {@code fresh}. Under-reporting freshness is the safe
  * direction: {@code unknown} is silent, whereas a fabricated recent timestamp would report a dead
  * Dataset green.
+ *
+ * <h3>The durable floor — why retention cannot make a breach invisible (duckle S2)</h3>
+ * The event store is not a durable record of the LAST publication: {@code event_prune} drops whole day
+ * partitions past the audit-retention window. A Dataset that stopped publishing longer ago than the
+ * window loses its only {@code dataset.write} to the prune, and after a restart the cold-start scan
+ * finds nothing — "never published" reads as {@code unknown}, and {@code unknown} never fires. The
+ * stalest Dataset in the space would go silent, exactly when its rule matters most.
+ *
+ * <p>So an optional {@link #FLOOR_FILE} keeps one line per Dataset — its newest known publication —
+ * rewritten whenever that value advances (from the bus or from a scan, so a space upgraded onto this
+ * recovers its floor on the first sweep). The cold-start answer is the MAX of the scan and the floor.
+ * ⛔ It is chosen over a prune floor (keeping the partition that holds each Dataset's last publication)
+ * because that would hold whole days of unrelated audit past the retention window, indefinitely, for
+ * precisely the Dataset that never publishes again — making the stated window false — and would teach
+ * both event-store implementations what a Signal is. ⚠ It is a <b>fact</b> (a timestamp), not a stale
+ * flag: staleness is still computed at read time from it and the clock, as {@code AlertService} requires.
  */
 public final class DatasetFreshnessProbe implements Function<String, OptionalLong> {
 
@@ -57,9 +77,16 @@ public final class DatasetFreshnessProbe implements Function<String, OptionalLon
      */
     static final int SCAN_LIMIT = 10_000;
 
+    /** The durable last-publication floor's file name (one {@code <dataset>\t<epoch ms>} line per Dataset). */
+    public static final String FLOOR_FILE = "dataset-publications.tsv";
+
     /** Last publication per dataset id; {@code -1} = scanned and not found (a cached miss). */
     private final Map<String, Long> lastWrite = new ConcurrentHashMap<>();
     private final EventStore store;
+    /** The durable floor, or {@code null} when none is kept (a non-durable event store keeps none). */
+    private final Path floorFile;
+    /** The floor as last read or written — what {@link #floorFile} holds. */
+    private final Map<String, Long> floor = new ConcurrentHashMap<>();
 
     /** Reads the ambient space's event store. */
     public DatasetFreshnessProbe() {
@@ -68,7 +95,18 @@ public final class DatasetFreshnessProbe implements Function<String, OptionalLon
 
     /** Explicit store — the unit-test seam, and the way a caller that already holds one avoids the MDC. */
     public DatasetFreshnessProbe(EventStore store) {
+        this(store, null);
+    }
+
+    /**
+     * Explicit store plus the durable last-publication floor (see the class doc). A {@code null}
+     * {@code floorFile} keeps no floor; an unreadable one starts empty — the floor can only ever raise
+     * an answer, so losing it degrades to the scan-only behaviour, never to a fabricated timestamp.
+     */
+    public DatasetFreshnessProbe(EventStore store, Path floorFile) {
         this.store = store;
+        this.floorFile = floorFile;
+        if (floorFile != null) loadFloor();
     }
 
     /**
@@ -82,6 +120,7 @@ public final class DatasetFreshnessProbe implements Function<String, OptionalLon
             // merge, not put: subscribers are not ordered, and a publication that is older than one
             // already recorded must never move the clock backwards.
             lastWrite.merge(dataset, event.ts(), Math::max);
+            raiseFloor(dataset, event.ts());
         };
     }
 
@@ -91,9 +130,46 @@ public final class DatasetFreshnessProbe implements Function<String, OptionalLon
         String id = datasetId.trim();
         Long known = lastWrite.get(id);
         if (known != null) return known < 0 ? OptionalLong.empty() : OptionalLong.of(known);
-        long found = scan(id);
+        long found = Math.max(scan(id), floor.getOrDefault(id, -1L));
         lastWrite.merge(id, found, Math::max);   // caches the miss (-1) too — see the class doc
+        if (found >= 0) raiseFloor(id, found);   // a scan hit seeds the floor before a prune can take it
         return found < 0 ? OptionalLong.empty() : OptionalLong.of(found);
+    }
+
+    /** Persist {@code ts} as {@code dataset}'s floor when it advances it; never throws (it runs on emit). */
+    private void raiseFloor(String dataset, long ts) {
+        if (floorFile == null || dataset.indexOf('\t') >= 0 || dataset.indexOf('\n') >= 0) return;
+        synchronized (floor) {
+            if (floor.getOrDefault(dataset, -1L) >= ts) return;
+            floor.put(dataset, ts);
+            StringBuilder out = new StringBuilder();
+            for (var e : new java.util.TreeMap<>(floor).entrySet())
+                out.append(e.getKey()).append('\t').append(e.getValue()).append('\n');
+            try {
+                com.gamma.util.AtomicFiles.write(floorFile, out.toString().getBytes(StandardCharsets.UTF_8),
+                        ".pub-");
+            } catch (IOException | RuntimeException e) {
+                // The in-memory floor still answers for this process; only the restart guarantee is
+                // lost, and only until the next publication rewrites the file.
+            }
+        }
+    }
+
+    private void loadFloor() {
+        try {
+            if (!Files.isRegularFile(floorFile)) return;
+            for (String line : Files.readAllLines(floorFile, StandardCharsets.UTF_8)) {
+                int tab = line.indexOf('\t');
+                if (tab <= 0) continue;
+                try {
+                    floor.merge(line.substring(0, tab), Long.parseLong(line.substring(tab + 1).trim()), Math::max);
+                } catch (NumberFormatException skip) {
+                    // a malformed line is ignored: the floor may only raise an answer, never invent one
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            floor.clear();
+        }
     }
 
     /** The newest {@code dataset.write} for {@code id} in the store, or {@code -1} when there is none. */

@@ -621,15 +621,22 @@ public final class ConfigSpecs {
         List<FieldSpec> fields = List.of(
                 FieldSpec.required("alert.name", "Rule name", FieldType.STRING,
                         "Unique, kebab-case alert rule name."),
+                // DUCKLE-C1: metric / threshold / window are required PER SHAPE, not per field - a
+                // freshness rule takes none of them, a measure or Investigation rule takes a threshold
+                // but no window. FieldSpec has no conditional-required (the expectation spec below hit
+                // the same wall), so the requirement lives in the alert-*-by-shape rules at the end.
                 FieldSpec.enumField("alert.metric", "Metric",
                         List.of("error_rate", "failed_batches", "rejected_files", "duration_ms"), null,
-                        "The batches-ledger metric the rule watches."),
+                        "The batches-ledger metric the rule watches. Required for a ledger rule."),
                 FieldSpec.enumField("alert.comparator", "Comparator",
                         List.of("gt", "gte", "lt", "lte"), "gt", "How the value meets the threshold."),
-                FieldSpec.required("alert.threshold", "Threshold", FieldType.STRING,
-                        "Positive number; error_rate is a fraction in (0, 1]."),
-                FieldSpec.required("alert.window", "Window", FieldType.STRING,
-                        "Ns/Nm/Nh/Nd elapsed time, or Nb = the last N batches (e.g. 1h, 30m, 20b)."),
+                FieldSpec.of("alert.threshold", "Threshold", FieldType.STRING,
+                        "Positive number; error_rate is a fraction in (0, 1]. Required unless the rule "
+                                + "checks freshness (alert.maximumAge)."),
+                FieldSpec.of("alert.window", "Window", FieldType.STRING,
+                        "Ns/Nm/Nh/Nd elapsed time, or Nb = the last N batches (e.g. 1h, 30m, 20b). "
+                                + "Required for a ledger rule; a Dataset, freshness or Investigation rule "
+                                + "takes none."),
                 FieldSpec.enumField("alert.severity", "Severity",
                         List.of("INFO", "WARNING", "CRITICAL"), "WARNING", "Operator-facing severity."),
                 FieldSpec.of("alert.onPipeline", "Pipeline", FieldType.STRING,
@@ -653,11 +660,29 @@ public final class ConfigSpecs {
         );
         List<CrossFieldRule> rules = List.of(
                 new CrossFieldRule(
+                        "alert-metric-by-shape",
+                        "alert.metric is required for a ledger rule (one with no alert.dataset, "
+                                + "alert.maximumAge or alert.investigation).",
+                        Severity.ERROR,
+                        List.of("alert.metric"),
+                        raw -> !"ledger".equals(alertShape(raw)) || nonBlank(raw, "alert.metric")),
+                new CrossFieldRule(
+                        "alert-window-by-shape",
+                        "alert.window is required for a ledger rule (one with no alert.dataset, "
+                                + "alert.maximumAge or alert.investigation).",
+                        Severity.ERROR,
+                        List.of("alert.window"),
+                        raw -> !"ledger".equals(alertShape(raw)) || nonBlank(raw, "alert.window")),
+                new CrossFieldRule(
                         "alert-threshold-positive",
-                        "alert.threshold must be a positive number.",
+                        "alert.threshold must be a positive number (a freshness rule, alert.maximumAge, "
+                                + "takes none).",
                         Severity.ERROR,
                         List.of("alert.threshold"),
                         raw -> {
+                            if ("freshness".equals(alertShape(raw))) {
+                                return true;
+                            }
                             String t = str(raw, "alert.threshold");
                             if (t == null) {
                                 return false;
@@ -675,10 +700,29 @@ public final class ConfigSpecs {
                         List.of("alert.window"),
                         raw -> {
                             String w = str(raw, "alert.window");
-                            return w != null && w.trim().toLowerCase().matches("\\d+[smhdb]");
+                            return w == null || w.trim().toLowerCase().matches("\\d+[smhdb]");
                         })
         );
         return new ConfigSpec("alert", fields, rules);
+    }
+
+    /**
+     * Which of {@code AlertRule}'s four shapes a raw {@code alert} block is, decided in the SAME order
+     * the record's compact constructor decides it: investigation, then freshness, then measure, else
+     * the historic ledger rule. The order matters - a freshness rule also carries
+     * {@code alert.dataset}, so testing dataset first would call it a measure rule.
+     */
+    private static String alertShape(Map<String, Object> raw) {
+        if (nonBlank(raw, "alert.investigation")) return "investigation";
+        if (nonBlank(raw, "alert.maximumAge")) return "freshness";
+        if (nonBlank(raw, "alert.dataset")) return "measure";
+        return "ledger";
+    }
+
+    /** Present and not blank — {@code AlertRule} reads a blank value as absent, so the spec must too. */
+    private static boolean nonBlank(Map<String, Object> raw, String path) {
+        String v = str(raw, path);
+        return v != null && !v.isBlank();
     }
 
     // ── expectation (ING-6) ──────────────────────────────────────────────────────

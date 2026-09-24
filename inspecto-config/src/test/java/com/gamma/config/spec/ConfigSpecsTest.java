@@ -525,4 +525,49 @@ class ConfigSpecsTest {
         assertTrue(fire(e, rule, Map.of("kind", "non_null", "column", "ID")).isEmpty(),
                 "the other four kinds ignore when");
     }
+
+    // -- alert shapes (DUCKLE-C1) ------------------------------------------------------------------
+
+    private static List<String> alertErrors(Map<String, Object> alert) {
+        return com.gamma.config.io.ConfigLoader.filesystem()
+                .validate(ConfigSpecs.alert(), Map.of("alert", alert)).stream()
+                .filter(f -> f.severity() == Severity.ERROR).map(Finding::fieldPath).toList();
+    }
+
+    /**
+     * A freshness rule takes no metric, threshold or window - {@code AlertRule} REFUSES a metric or a
+     * window on one - so a spec that required them refused, through {@code /config/write}, the exact
+     * shape the engine accepts.
+     */
+    @Test
+    void aFreshnessRuleIsNotRefusedForOmittingTheLedgerFields() {
+        assertEquals(List.of(), alertErrors(Map.of("name", "sales-fresh", "dataset", "sales_ds",
+                "maximumAge", "6h", "severity", "WARNING")));
+        for (String f : List.of("alert.metric", "alert.threshold", "alert.window"))
+            assertFalse(ConfigSpecs.alert().field(f).orElseThrow().required(),
+                    f + " is required per shape, never flatly");
+    }
+
+    /** ...while the ledger rule keeps every requirement it had, now stated per shape. */
+    @Test
+    void aLedgerRuleStillNeedsMetricThresholdAndWindow() {
+        assertEquals(List.of("alert.metric", "alert.window", "alert.threshold"),
+                alertErrors(Map.of("name", "ledger-bare", "severity", "WARNING")));
+        assertEquals(List.of(), alertErrors(Map.of("name", "ledger-ok", "metric", "failed_batches",
+                "threshold", "3", "window", "1h", "severity", "WARNING")));
+        assertEquals(List.of("alert.window"), alertErrors(Map.of("name", "ledger-badwin",
+                "metric", "failed_batches", "threshold", "3", "window", "soon", "severity", "WARNING")));
+    }
+
+    /** A measure rule (dataset, no maximumAge) takes a threshold but no metric or window. */
+    @Test
+    void aMeasureRuleNeedsAThresholdButNoWindow() {
+        assertEquals(List.of(), alertErrors(Map.of("name", "m-ok", "dataset", "sales_ds",
+                "measure", "count", "threshold", "10", "severity", "WARNING")));
+        assertEquals(List.of("alert.threshold"), alertErrors(Map.of("name", "m-bare", "dataset", "sales_ds",
+                "measure", "count", "severity", "WARNING")));
+        // a blank maximumAge is absent (AlertRule reads it so), which makes this a measure rule again
+        assertEquals(List.of("alert.threshold"), alertErrors(Map.of("name", "m-blank", "dataset", "sales_ds",
+                "measure", "count", "maximumAge", " ", "severity", "WARNING")));
+    }
 }
