@@ -59,6 +59,34 @@ lane-wide since 2026-09-01: the Stage-2 **orphan-`output_store:` check is defaul
 space (transition-debounced signal; `-Djobs.orphan.audit=false` to disable) — see
 [stage1-architecture](../engine/stage1-architecture.md) §Step 3.
 
+**The COMMIT retry affordance (X1 deferrals, 2026-09-25; decisions Q1–Q4 in
+[retry-affordance-design](../../../superpower/retry-affordance-design.md)).** Three routes over
+`CommitRetry`, **per pipeline** (Q4) and addressed by the **poll-relative FILE path, never `batchId`**
+(minted per cycle, so a batch-keyed route would be dead by the second cycle):
+`GET /runs/{name}/retries` (open read; bounded at 500 with `truncated` + the true `total`),
+`POST /runs/{name}/retries/retry-now {file}` and `POST /runs/{name}/retries/cancel {file}` (both
+`canOperateRuns`, string literal). As built:
+
+* **retry-now clears `nextRetryAt` ONLY — the attempt count is kept** (Q2), and the response's `note` says
+  how many attempts remain before `retry_exhausted`; resetting attempts would make a poison file immortal.
+* **cancel = quarantine NOW under `retry_cancelled`** (Q1) and spend the record — the same "fate decided"
+  end as exhaustion. ⛔ It never merely drops the sidecar: with no sidecar the file is retried *unboundedly*
+  (the trap the old "delete the sidecar by hand" workaround fell into).
+* **The engine half never throws.** `CommitRetry.list/retryNow/cancel` return a `Listing` / `Outcome`
+  (`RESCHEDULED`, `CANCELLED`, `NO_RETRY_STATE`, `NO_RECORD`, `NOT_IN_INBOX`, `ALREADY_QUARANTINED`, `BUSY`,
+  `FAILED`); an unreadable sidecar is listed with `readable: false`, never a 500. The route maps the
+  non-acting outcomes to **404** (no record / not in the inbox) and **409** (no retry state, already
+  quarantined — naming the reason directory found in the quarantine tree — mid-cycle, or could not act),
+  each with the reason, so nothing appears to act that did not.
+* **`keepsRetryState: false` ≠ an empty list.** No `dirs.status_dir` ⇒ no records at all ⇒ unbounded retry;
+  the list says so in a `note` rather than returning a reassuring `[]`.
+* **Serialised against the poll**: `CollectorService.commitRetryAct` takes the pipeline's run claim with
+  `tryAcquire` (never blocks) — a pipeline mid-cycle answers `BUSY` (409) and nothing is attempted, so a
+  cancel can never move a file a cycle is ingesting.
+* The per-file `CommitRetry.clear(File, cfg)` sits beside `clear(Consignment, cfg)`, which now loops over it;
+  `CommitRetry.inboxFile(cfg, rel)` is the path jail (blank, absolute or escaping ⇒ `null` ⇒ 403).
+* ⛔ **No UI yet** (Q3: routes first). The Run Detail pane is the natural home; it needs its own design.
+
 **Record-level replay evidence (X4, 2026-09-24/25).** The ingest lane's `?dryRun=true` runs the real
 ingest pass over member copies in a deleted scratch root (`PipelineTestRun.dryIngest`, contained;
 zero side effects pinned by `FlatLaneDryRunParseTest`) and reports per member a `MemberOutcome`:

@@ -239,6 +239,15 @@ above the generated commit list.
   (`canOperateRuns`) replays ONE file's rejected records from its reject sidecar as a new Consignment,
   without re-ingesting the file's good records; a second replay of the same sidecar is **409**.
   [execution-lanes](../pipeline-graph/execution-lanes.md)
+- **New routes (additive, 2026-09-25, X1 deferrals — the COMMIT retry affordance):**
+  `GET /runs/{name}/retries[?limit=]` (open read) lists the files waiting on a bounded COMMIT retry, by
+  poll-relative path, with `keepsRetryState: false` when the pipeline has no `dirs.status_dir` (no retry
+  state at all — NOT the same answer as an empty list). `POST /runs/{name}/retries/retry-now {file}` and
+  `POST /runs/{name}/retries/cancel {file}` (`canOperateRuns`) act on ONE file: retry-now clears the backoff
+  **only — the attempt count is kept** (the response says so); cancel **quarantines the file now under the
+  new reason `retry_cancelled`**. A file already quarantined, a pipeline with no retry state, or a pipeline
+  mid-cycle is a **409** that says so; no record / not in the inbox is **404**.
+  [execution-lanes](../pipeline-graph/execution-lanes.md)
 - **Behaviour change — the reject sidecar's `raw_line` is now byte-exact** (2026-09-25): both CSV ingesters
   escape an embedded `"` RFC-4180-style (`""`) in `<errors>/<file>_errors.csv` instead of rewriting it to
   `'`, so `GET /runs/{name}/errors?file=` now shows the line's real quotes. A reader that split the column

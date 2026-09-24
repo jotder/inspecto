@@ -252,11 +252,13 @@ system: the evidence cannot say something the code does not.
 | POST | `/requirements/([^/]+)/deliver` | gated | `canTriageRequirements` | `inspecto/src/main/java/com/gamma/control/RequirementRoutes.java:41` |
 | POST | `/rule-templates/([^/]+)/simulate` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/RuleRoutes.java:52` |
 | POST | `/runs` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:49` |
-| POST | `/runs/([^/]+)/drain` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:111` |
+| POST | `/runs/([^/]+)/drain` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:120` |
 | POST | `/runs/([^/]+)/pause` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:55` |
 | POST | `/runs/([^/]+)/replay-rejects` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:105` |
 | POST | `/runs/([^/]+)/reprocess` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:93` |
 | POST | `/runs/([^/]+)/resume` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:59` |
+| POST | `/runs/([^/]+)/retries/cancel` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:114` |
+| POST | `/runs/([^/]+)/retries/retry-now` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:112` |
 | POST | `/runs/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:50` |
 | PUT | `/settings/branding` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:49` |
 | PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:52` |
@@ -278,7 +280,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/tags/rules` | gated | `canAuthorWorkbench` | `inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:55` |
 | DELETE | `/tags/rules/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:56` |
 | POST | `/tags/rules/([^/]+)/apply` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:58` |
-| POST | `/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:133` |
+| POST | `/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:142` |
 | POST | `/validate` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:40` |
 
 <!--route-gating:end-->

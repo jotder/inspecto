@@ -105,6 +105,15 @@ final class RunRoutes implements RouteModule {
         api.post("/runs/([^/]+)/replay-rejects", ApiContext.withCapability("canOperateRuns", (e, m) ->
                 replayRejects(api, e, ApiContext.name(m))));
 
+        // X1 deferrals (retry-affordance-design.md, operator decisions 2026-09-25): the bounded COMMIT retry
+        // queue of ONE pipeline (Q4), and retry-now / cancel for one FILE — addressed by poll-relative path,
+        // never batchId, because batchId is minted per cycle and the file is the only stable identity.
+        api.get("/runs/([^/]+)/retries", (e, m) -> listRetries(api, e, m));
+        api.post("/runs/([^/]+)/retries/retry-now", ApiContext.withCapability("canOperateRuns", (e, m) ->
+                retryAct(api, e, ApiContext.name(m), false)));
+        api.post("/runs/([^/]+)/retries/cancel", ApiContext.withCapability("canOperateRuns", (e, m) ->
+                retryAct(api, e, ApiContext.name(m), true)));
+
         // Phase 4 S4c (D-13): complete a Consignment that PARKED at a disabled route-branch sink.
         // Deliberately explicit — re-enabling the step is a CONFIG save and must not start batch work
         // as a side effect; the save surfaces the parked batch ids, the operator drains them here.
@@ -244,6 +253,113 @@ final class RunRoutes implements RouteModule {
         out.put("outputRows", r.outputRows());
         out.put("errorRows", r.errorRows());
         out.put("error", r.error());
+        return out;
+    }
+
+    /** The retry queue is a diagnostic read, not an export. */
+    private static final int MAX_RETRIES_LISTED = 500;
+
+    /**
+     * {@code GET /runs/{name}/retries[?limit=]} — the files waiting on a bounded COMMIT retry
+     * ({@link com.gamma.inspector.CommitRetry}), with attempts, due time and last error. {@code keepsRetryState:false}
+     * is NOT "nothing pending": the pipeline has no {@code dirs.status_dir}, so nothing is recorded and a failed
+     * Consignment is retried every cycle without bound. Bounded ({@code truncated} + the true {@code total}); an
+     * unreadable record is listed with {@code readable:false}, never a 500. Gates: unknown pipeline 404, bad limit 400.
+     */
+    private Object listRetries(ApiContext api, HttpExchange e, Matcher m) {
+        PipelineConfig cfg = cfg(api, m);
+        int limit = MAX_RETRIES_LISTED;
+        String raw = ApiContext.query(e, "limit");
+        if (raw != null && !raw.isBlank()) {
+            try {
+                limit = Integer.parseInt(raw.trim());
+            } catch (NumberFormatException bad) {
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "?limit= must be an integer");
+            }
+            if (limit < 0) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "?limit= must be >= 0");
+            limit = Math.min(limit, MAX_RETRIES_LISTED);
+        }
+        com.gamma.inspector.CommitRetry.Listing l = com.gamma.inspector.CommitRetry.list(cfg, limit);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("pipeline", ApiContext.name(m));
+        out.put("keepsRetryState", l.keepsRetryState());
+        if (!l.keepsRetryState())
+            out.put("note", "this pipeline has no dirs.status_dir, so it keeps no retry state: a failed Consignment "
+                    + "is retried every cycle without bound, and nothing can be listed, retried now or cancelled");
+        out.put("policy", policyView(l.policy()));
+        out.put("total", l.total());
+        out.put("truncated", l.truncated());
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (com.gamma.inspector.CommitRetry.Pending p : l.retries()) {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("file", p.file());
+            r.put("attempts", p.attempts());
+            r.put("firstFailedAt", p.firstFailedAt());
+            r.put("lastFailedAt", p.lastFailedAt());
+            r.put("nextRetryAt", p.nextRetryAt());
+            r.put("due", p.due());
+            r.put("lastError", p.lastError());
+            r.put("inInbox", p.inInbox());
+            r.put("readable", p.readable());
+            rows.add(r);
+        }
+        out.put("retries", rows);
+        if (l.error() != null) out.put("error", l.error());
+        return out;
+    }
+
+    private static Map<String, Object> policyView(com.gamma.inspector.CommitRetry.Policy p) {
+        Map<String, Object> v = new LinkedHashMap<>();
+        v.put("maxAttempts", p.maxAttempts());
+        v.put("initialBackoffMs", p.initialMs());
+        v.put("maxBackoffMs", p.maxMs());
+        v.put("bounded", p.bounded());
+        return v;
+    }
+
+    /**
+     * {@code POST /runs/{name}/retries/retry-now|cancel {file}} — act on ONE file's COMMIT retry, addressed by its
+     * poll-relative path. retry-now clears the backoff ONLY and keeps the attempt count (Q2 — the response says so);
+     * cancel quarantines the file NOW under {@code retry_cancelled} (Q1). Gates, in order: unknown pipeline 404 ·
+     * template 409 · missing {@code file} 400 · a path that is absolute or leaves the poll root 403 (never resolved
+     * outside it) · then the act, which never throws: no retry record / not in the inbox 404; the pipeline keeps no
+     * retry state, the file is already quarantined, the pipeline is mid-cycle, or the record could not be acted on
+     * 409 — each with the reason, so nothing appears to act that did not.
+     */
+    private Object retryAct(ApiContext api, HttpExchange e, String name, boolean cancel) throws IOException {
+        PipelineConfig cfg = api.service().configFor(name).orElseThrow(() -> notFound(name));
+        if (api.service().isTemplate(name))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + name + "' is a template and is not runnable");
+        String rel = ApiContext.str(api.body(e), "file");
+        if (rel == null || rel.isBlank())
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'file' (the poll-relative path)");
+        java.io.File file = com.gamma.inspector.CommitRetry.inboxFile(cfg, rel);
+        if (file == null)
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "'file' must be a path relative to the poll directory");
+        com.gamma.inspector.CommitRetry.Outcome o = api.service().commitRetryAct(name, file, cancel)
+                .orElseThrow(() -> notFound(name));
+        switch (o.result()) {
+            case NO_RECORD, NOT_IN_INBOX -> throw new ApiException(404, ErrorCodes.NOT_FOUND, "'" + rel + "': " + o.detail());
+            case NO_RETRY_STATE, ALREADY_QUARANTINED, BUSY, FAILED ->
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "'" + rel + "': " + o.detail());
+            default -> { }
+        }
+        com.gamma.inspector.CommitRetry.Policy policy = com.gamma.inspector.CommitRetry.policy(cfg);
+        int attempts = o.record() == null ? 0 : o.record().attempts;
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("pipeline", name);
+        out.put("file", rel);
+        out.put("outcome", cancel ? "cancelled" : "rescheduled");
+        out.put("attempts", attempts);
+        out.put("maxAttempts", policy.maxAttempts());
+        if (cancel) {
+            out.put("quarantineReason", o.quarantineReason());
+        } else {
+            out.put("attemptsKept", true);
+            out.put("note", "retry-now clears the backoff only; the attempt count is kept (" + attempts + " of "
+                    + policy.maxAttempts() + " used), so the file is quarantined under retry_exhausted if it fails "
+                    + Math.max(0, policy.maxAttempts() - attempts) + " more time(s)");
+        }
         return out;
     }
 

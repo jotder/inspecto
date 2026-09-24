@@ -1887,6 +1887,28 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         }
     }
 
+    /**
+     * An operator act on ONE file's COMMIT retry record (X1 deferrals): {@code cancel} ⇒
+     * {@link com.gamma.inspector.CommitRetry#cancel}, else {@link com.gamma.inspector.CommitRetry#retryNow}. Taken
+     * under the pipeline's {@link #runGuard} claim WITHOUT blocking, so it never races a cycle that is ingesting the
+     * same file — a pipeline mid-cycle reports {@code BUSY} and nothing is attempted. Empty if no pipeline by that
+     * name; never throws for the act itself (every failure is an {@code Outcome}).
+     */
+    public Optional<com.gamma.inspector.CommitRetry.Outcome> commitRetryAct(String pipelineName, java.io.File file,
+                                                                            boolean cancel) {
+        Optional<PipelineConfig> cfg = configFor(pipelineName);
+        if (cfg.isEmpty()) return Optional.empty();
+        RunLease.Claim claim = runGuard.tryAcquire(pipelineName);
+        if (claim == null)
+            return Optional.of(new com.gamma.inspector.CommitRetry.Outcome(com.gamma.inspector.CommitRetry.Result.BUSY,
+                    null, null, "the pipeline is running a cycle now; nothing was changed — try again when it finishes"));
+        try (claim) {
+            return Optional.of(underSpace(() -> cancel
+                    ? com.gamma.inspector.CommitRetry.cancel(cfg.get(), file)
+                    : com.gamma.inspector.CommitRetry.retryNow(cfg.get(), file)));
+        }
+    }
+
     /** {@link #triggerRunAsync(String)} with an explicit trigger label ({@code manual} | {@code notify} — ACQ-6). */
     public Optional<String> triggerRunAsync(String pipelineName, String trigger) {
         return triggerRunAsync(pipelineName, trigger, false);

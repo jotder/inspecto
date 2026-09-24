@@ -78,14 +78,14 @@ public final class CommitRetry {
     }
 
     /** The resolved policy — read per call so a {@code -D} set in a test (or by an operator restart) applies. */
-    record Policy(int maxAttempts, long initialMs, long maxMs) {
+    public record Policy(int maxAttempts, long initialMs, long maxMs) {
         static Policy current() {
             return new Policy(
                     Integer.getInteger("ingest.retry.max", 5),
                     Long.getLong("ingest.retry.backoff.initialMs", 60_000L),
                     Long.getLong("ingest.retry.backoff.maxMs", 3_600_000L));
         }
-        boolean bounded() { return maxAttempts > 0; }
+        public boolean bounded() { return maxAttempts > 0; }
         long delayMs(int attempt) {
             double base = Math.min((double) initialMs * Math.pow(2, Math.max(0, attempt - 1)), (double) maxMs);
             double jitter = 1.0 + (ThreadLocalRandom.current().nextDouble() * 0.2 - 0.1);
@@ -141,14 +141,17 @@ public final class CommitRetry {
 
     /** The Consignment committed (or parked): its members' attempt records are spent. */
     public static void clear(Consignment batch, PipelineConfig cfg) {
+        for (Consignment.Member m : batch.members()) clear(m.file(), cfg);
+    }
+
+    /** One FILE's attempt record is spent — the per-file variant the operator affordance needs. */
+    public static void clear(File file, PipelineConfig cfg) {
         Path root = root(cfg);
         if (root == null) return;
-        for (Consignment.Member m : batch.members()) {
-            try {
-                Files.deleteIfExists(sidecar(root, m.file(), cfg));
-            } catch (IOException | RuntimeException e) {
-                log.debug("Could not clear retry record for {}: {}", m.file().getName(), e.getMessage());
-            }
+        try {
+            Files.deleteIfExists(sidecar(root, file, cfg));
+        } catch (IOException | RuntimeException e) {
+            log.debug("Could not clear retry record for {}: {}", file.getName(), e.getMessage());
         }
     }
 
@@ -191,7 +194,189 @@ public final class CommitRetry {
         return root == null ? null : read(sidecar(root, file, cfg));
     }
 
+    // ── operator affordance (X1 deferrals, decisions 2026-09-25) ────────────────
+
+    /** Quarantine reason for a file whose retries an operator CANCELLED (Q1: cancel decides its fate now). */
+    public static final String REASON_RETRY_CANCELLED = "retry_cancelled";
+
+    /** One pending retry, addressed by its poll-relative path ({@code /}-separated). */
+    public record Pending(String file, int attempts, String firstFailedAt, String lastFailedAt,
+                          String nextRetryAt, boolean due, String lastError, boolean inInbox, boolean readable) {}
+
+    /**
+     * A pipeline's retry queue. {@code keepsRetryState=false} means NO {@code status_dir}: nothing is ever
+     * recorded and a failed Consignment is retried every cycle without bound — the opposite of an empty queue.
+     * {@code error} is set (and the list partial) when the retry directory could not be walked.
+     */
+    public record Listing(boolean keepsRetryState, Policy policy, int total, boolean truncated,
+                          List<Pending> retries, String error) {}
+
+    /** What an operator act did. Only {@link #RESCHEDULED} and {@link #CANCELLED} changed anything;
+     *  {@link #BUSY} is the caller's (the pipeline was mid-cycle, so nothing was attempted). */
+    public enum Result { RESCHEDULED, CANCELLED, NO_RETRY_STATE, NO_RECORD, NOT_IN_INBOX, ALREADY_QUARANTINED, BUSY, FAILED }
+
+    /** The report of one act — {@code record} is the (post-act) attempt record when there was one. */
+    public record Outcome(Result result, Record record, String quarantineReason, String detail) {
+        public boolean acted() { return result == Result.RESCHEDULED || result == Result.CANCELLED; }
+    }
+
+    /** The retry policy in force for {@code cfg}. */
+    public static Policy policy(PipelineConfig cfg) {
+        return Policy.current();
+    }
+
+    /**
+     * {@code rel} resolved under the poll root, or {@code null} when it is blank, absolute, or escapes the
+     * root — the path jail for a caller-supplied file key.
+     */
+    public static File inboxFile(PipelineConfig cfg, String rel) {
+        if (rel == null || rel.isBlank() || rel.startsWith("/") || rel.startsWith("\\")) return null;
+        try {
+            if (Paths.get(rel).isAbsolute()) return null;
+            Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+            Path f = poll.resolve(rel).normalize();
+            return f.startsWith(poll) && !f.equals(poll) ? f.toFile() : null;
+        } catch (RuntimeException invalid) {
+            return null;
+        }
+    }
+
+    /** The retry queue of {@code cfg}, sorted by file, at most {@code limit} entries ({@code total} is true). */
+    public static Listing list(PipelineConfig cfg, int limit) {
+        Policy policy = policy(cfg);
+        Path root = root(cfg);
+        if (root == null) return new Listing(false, policy, 0, false, List.of(), null);
+        List<Path> sides = new ArrayList<>();
+        String error = null;
+        if (Files.isDirectory(root)) {
+            try (var walk = Files.walk(root)) {
+                walk.filter(p -> p.getFileName().toString().endsWith(SUFFIX) && Files.isRegularFile(p))
+                        .sorted().forEach(sides::add);
+            } catch (IOException | RuntimeException e) {
+                error = "could not list the retry records: " + e.getMessage();
+                log.warn("Could not list COMMIT retry records for {}: {}", cfg.identity().pipelineName(), e.getMessage());
+            }
+        }
+        Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+        Instant now = Instant.now();
+        int shown = Math.min(sides.size(), Math.max(0, limit));
+        List<Pending> out = new ArrayList<>(shown);
+        for (Path side : sides.subList(0, shown)) {
+            String rel = root.relativize(side).toString().replace('\\', '/');
+            rel = rel.substring(0, rel.length() - SUFFIX.length());
+            boolean inInbox = Files.exists(poll.resolve(rel));
+            Record r;
+            try {
+                r = read(side);
+            } catch (RuntimeException unreadable) {
+                out.add(new Pending(rel, 0, null, null, null, true, String.valueOf(unreadable.getMessage()), inInbox, false));
+                continue;
+            }
+            if (r == null) continue;   // spent between the walk and the read
+            out.add(new Pending(rel, r.attempts, r.firstFailedAt, r.lastFailedAt, r.nextRetryAt,
+                    isDue(r, now), r.lastError, inInbox, true));
+        }
+        return new Listing(true, policy, sides.size(), shown < sides.size(), List.copyOf(out), error);
+    }
+
+    /**
+     * Retry {@code file} on the next cycle: its backoff is cleared, its attempt count is KEPT (Q2) — so the
+     * cap still bites and a poison file cannot be made immortal by pressing "retry now".
+     */
+    public static Outcome retryNow(PipelineConfig cfg, File file) {
+        Path root = root(cfg);
+        if (root == null) return noRetryState();
+        Outcome gone = notActionable(cfg, file);
+        if (gone != null) return gone;
+        try {
+            Path side = sidecar(root, file, cfg);
+            Record r = read(side);
+            if (r == null) return noRecord();
+            r.nextRetryAt = null;
+            Files.writeString(side, GSON.toJson(r), StandardCharsets.UTF_8);
+            return new Outcome(Result.RESCHEDULED, r, null, null);
+        } catch (IOException | RuntimeException e) {
+            return failed(file, e);
+        }
+    }
+
+    /**
+     * Cancel {@code file}'s retries: quarantine it NOW under {@link #REASON_RETRY_CANCELLED} and spend its
+     * record (Q1). ⛔ Never "drop the record" alone — with no record the file is retried without bound.
+     */
+    public static Outcome cancel(PipelineConfig cfg, File file) {
+        Path root = root(cfg);
+        if (root == null) return noRetryState();
+        Outcome gone = notActionable(cfg, file);
+        if (gone != null) return gone;
+        try {
+            Record r = read(sidecar(root, file, cfg));
+            if (r == null) return noRecord();
+            QuarantineManager.quarantine(file, REASON_RETRY_CANCELLED, false, cfg);
+            clear(file, cfg);
+            log.warn("COMMIT retries of {} cancelled after {} attempt(s); quarantined under {}",
+                    file.getName(), r.attempts, REASON_RETRY_CANCELLED);
+            return new Outcome(Result.CANCELLED, r, REASON_RETRY_CANCELLED, null);
+        } catch (IOException | RuntimeException e) {
+            return failed(file, e);
+        }
+    }
+
+    private static Outcome noRetryState() {
+        return new Outcome(Result.NO_RETRY_STATE, null, null,
+                "this pipeline keeps no retry state (no dirs.status_dir): nothing is recorded, so a failed "
+                        + "Consignment is retried every cycle without bound");
+    }
+
+    private static Outcome noRecord() {
+        return new Outcome(Result.NO_RECORD, null, null, "no retry is pending for this file");
+    }
+
+    /** A file no longer in the inbox: quarantined (its fate is decided — say so), or simply gone. */
+    private static Outcome notActionable(PipelineConfig cfg, File file) {
+        if (file.exists()) return null;
+        String reason = quarantinedUnder(cfg, file);
+        if (reason != null)
+            return new Outcome(Result.ALREADY_QUARANTINED, null, reason,
+                    "already quarantined under '" + reason + "': its fate is decided and it is not retried");
+        return new Outcome(Result.NOT_IN_INBOX, null, null, "the file is not in the inbox");
+    }
+
+    /** The reason directory {@code file} sits under in the quarantine tree, or {@code null}. */
+    private static String quarantinedUnder(PipelineConfig cfg, File file) {
+        try {
+            String q = cfg.dirs().quarantine();
+            if (q == null || q.isBlank()) return null;
+            Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+            Path relParent = poll.relativize(file.toPath().toAbsolutePath().normalize().getParent());
+            Path base = Paths.get(q).toAbsolutePath().resolve(relParent);
+            if (!Files.isDirectory(base)) return null;
+            try (var reasons = Files.list(base)) {
+                return reasons.filter(d -> Files.isRegularFile(d.resolve(file.getName())))
+                        .map(d -> d.getFileName().toString()).sorted().findFirst().orElse(null);
+            }
+        } catch (IOException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static Outcome failed(File file, Exception e) {
+        log.warn("Could not act on the COMMIT retry record for {}: {}", file.getName(), e.getMessage());
+        return new Outcome(Result.FAILED, null, null, "could not act on the retry record: " + e.getMessage());
+    }
+
+    private static boolean isDue(Record r, Instant now) {
+        if (r.nextRetryAt == null || r.nextRetryAt.isBlank()) return true;
+        try {
+            return !Instant.parse(r.nextRetryAt).isAfter(now);
+        } catch (RuntimeException malformed) {
+            return true;
+        }
+    }
+
     // ── layout ──────────────────────────────────────────────────────────────
+
+    private static final String SUFFIX = ".retry.json";
 
     /** {@code <status_dir>/retries}, or {@code null} when the pipeline writes no audit at all. */
     private static Path root(PipelineConfig cfg) {
@@ -204,7 +389,7 @@ public final class CommitRetry {
     private static Path sidecar(Path root, File file, PipelineConfig cfg) {
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         Path rel  = poll.relativize(file.toPath().toAbsolutePath().normalize());
-        return root.resolve(rel.toString() + ".retry.json");
+        return root.resolve(rel.toString() + SUFFIX);
     }
 
     private static Record read(Path side) {

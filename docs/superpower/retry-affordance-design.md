@@ -4,7 +4,7 @@
 ⛔ **X4 is NOT in scope and must not be started**: the row records that the operator refused its question —
 the replay default is to be *scoped against a sandbox*, i.e. `PIPELINE-DRYRUN-1`, and both options are risky
 to default to until a dry-run makes the choice observable.
-**Status:** DESIGN ONLY, written 2026-09-16. Decisions owed in §5.
+**Status:** written 2026-09-16 as design only. **All four §5 decisions answered by the operator 2026-09-25** (each as recommended) and the affordance **BUILT** the same day — as-built facts in [execution-lanes](../okf/backend/pipeline-graph/execution-lanes.md) § *The COMMIT retry affordance*.
 
 ## 1. What exists today (grounded, not assumed)
 
@@ -74,29 +74,29 @@ already uses it for the neighbouring act.
 * ⚠ **`clear(batch, cfg)` takes a Consignment**, so a per-file variant is needed; adding it is the first code
   step, and it belongs beside the existing method rather than in the route.
 
-## 5. ⛔ Decisions owed before code
+## 5. Decisions — ANSWERED 2026-09-25 (operator)
 
 **Q1 — What does "cancel" MEAN?** (a) **Quarantine now** under a distinct reason (e.g. `retry_cancelled`),
 deciding the file's fate exactly as exhaustion does — consistent with how the system already ends a retry
 loop, and the file stops being reconsidered; or (b) **drop the record only**, which — read carefully — does
 not stop anything: with no sidecar the file is retried *unboundedly*, i.e. "cancel" would restore the
-pre-X1 poison behaviour under a reassuring name. **Recommendation: (a).** ⛔ (b) is the trap the row's
+pre-X1 poison behaviour under a reassuring name. **Recommendation: (a).** ✅ **Decided 2026-09-25: (a) — quarantine now under `retry_cancelled`, never "drop the record".** ⛔ (b) is the trap the row's
 "delete the sidecar" workaround already falls into, and naming it "cancel" makes it worse.
 
 **Q2 — Does "retry now" reset the ATTEMPT COUNT, or only the due time?** Resetting attempts makes a poison
 file immortal (the cap never bites); resetting only the due time keeps the cap meaningful.
-**Recommendation: due time only**, and say so in the response — an operator who expects a full reset and
+**Recommendation: due time only**, and say so in the response. ✅ **Decided 2026-09-25: due time/backoff only, attempt count kept — the response's `attemptsKept` + `note` say so** — an operator who expects a full reset and
 gets exhaustion two cycles later will file a bug against the cap.
 
 **Q3 — Whose surface is this: a route, the UI, or both?** The row calls it an "affordance" without saying.
 A route alone is usable via the API; the run-detail pane is where an operator would look
 (`okf/frontend/features/run-detail.md` already carries the *"reprocess is whole-batch only"* note this row is
 paired with). **Recommendation: route first**, UI as a separate follow-up — the route is testable and the
-pane needs its own design.
+pane needs its own design. ✅ **Decided 2026-09-25: routes first, UI later (not built).**
 
 **Q4 — Is the LIST route per pipeline, or global?** Per pipeline matches where `status_dir` lives and keeps
 it space-scoped by construction; a global list would need to enumerate pipelines and re-raise the
-cross-space question that postponed the space-comparison row. **Recommendation: per pipeline.**
+cross-space question that postponed the space-comparison row. **Recommendation: per pipeline.** ✅ **Decided 2026-09-25: per pipeline.**
 
 ## 6. Verification, when it is built
 

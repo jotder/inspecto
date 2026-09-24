@@ -1882,6 +1882,103 @@
         }
       }
     },
+    "/runs/{runId}/retries" : {
+      "get" : {
+        "tags" : [ "runs" ],
+        "summary" : "List one pipeline's pending COMMIT retries (X1 deferrals)",
+        "operationId" : "getRunsByRunIdRetries",
+        "description" : "Open read. The files waiting on a bounded COMMIT retry, by poll-relative path: attempts, firstFailedAt, lastFailedAt, nextRetryAt, due, lastError, inInbox, readable. keepsRetryState=false means the pipeline has no dirs.status_dir and keeps NO retry state (a failed Consignment is retried every cycle without bound) — not the same answer as an empty list. Bounded by ?limit= (max 500) with truncated + the true total; an unreadable record is listed with readable=false, never a 500. 404 unknown pipeline; 400 a non-integer or negative limit.",
+        "parameters" : [ {
+          "name" : "runId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {pipeline, keepsRetryState, note?, policy:{maxAttempts, initialBackoffMs, maxBackoffMs, bounded}, total, truncated, retries[], error?}."
+          }
+        }
+      }
+    },
+    "/runs/{runId}/retries/retry-now" : {
+      "post" : {
+        "tags" : [ "runs" ],
+        "summary" : "Retry one file's COMMIT on the next cycle (X1 deferrals)",
+        "operationId" : "postRunsByRunIdRetriesRetryNow",
+        "description" : "canOperateRuns. Clears the file's backoff ONLY; the attempt count is kept (the response says so), so the cap still bites. Taken under the pipeline's run claim without blocking. 404 unknown pipeline, no retry record, or the file is not in the inbox; 400 missing file; 403 an absolute path or one leaving the poll directory; 409 template, no retry state (no dirs.status_dir), already quarantined, the pipeline is mid-cycle, or the record could not be acted on.",
+        "parameters" : [ {
+          "name" : "runId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "file" ],
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "description" : "The file's path relative to the pipeline's poll directory, as GET /runs/{runId}/retries lists it"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {pipeline, file, outcome: rescheduled, attempts, maxAttempts, attemptsKept: true, note}."
+          }
+        }
+      }
+    },
+    "/runs/{runId}/retries/cancel" : {
+      "post" : {
+        "tags" : [ "runs" ],
+        "summary" : "Cancel one file's COMMIT retries: quarantine it now under retry_cancelled (X1 deferrals)",
+        "operationId" : "postRunsByRunIdRetriesCancel",
+        "description" : "canOperateRuns. Quarantines the file NOW under reason retry_cancelled and spends its retry record — it decides the file's fate exactly as exhaustion does; it never merely drops the record (which would restore unbounded retry). Same gates and refusals as retry-now; a second cancel reports already quarantined (409) instead of appearing to act.",
+        "parameters" : [ {
+          "name" : "runId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "file" ],
+                "properties" : {
+                  "file" : {
+                    "type" : "string",
+                    "description" : "The file's path relative to the pipeline's poll directory, as GET /runs/{runId}/retries lists it"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {pipeline, file, outcome: cancelled, attempts, maxAttempts, quarantineReason: retry_cancelled}."
+          }
+        }
+      }
+    },
     "/trigger" : {
       "post" : {
         "tags" : [ "trigger" ],
