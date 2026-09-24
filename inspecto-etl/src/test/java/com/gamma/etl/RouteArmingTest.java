@@ -36,29 +36,31 @@ class RouteArmingTest {
                 "mode", "case",
                 "default", "apac",
                 "branches", List.of(branch("emea", "emea_db"), branch("apac", "apac_db")));
-        assertEquals(List.of(), RouteArming.refusals(route, List.of("emea_db", "apac_db"), false));
+        assertEquals(List.of(), RouteArming.refusals(route, List.of("emea_db", "apac_db"), null));
     }
 
     @Test
     @DisplayName("no route at all is not a refusal")
     void noRouteIsSilent() {
-        assertEquals(List.of(), RouteArming.refusals(null, List.of("a"), false));
+        assertEquals(List.of(), RouteArming.refusals(null, List.of("a"), null));
     }
 
     @Test
     @DisplayName("EVERY refusal is reported, not just the first — the reason this is not prepare()")
     void reportsEveryRefusal() {
-        // Three independent problems at once: an unmatched database, no usable default, and
-        // multi-schema (clone mode ARMS since 2026-09-06). prepare() would surface only the first.
+        // Three independent problems at once: an unmatched database, no usable default, and a
+        // predicate one schema of a multi-schema pipeline cannot bind (clone mode ARMS since
+        // 2026-09-06). prepare() would surface only the first.
         Map<String, Object> route = Map.of(
                 "mode", "clone",
                 "branches", List.of(branch("emea", "nowhere_db")));
-        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), true);
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"),
+                Map.of("calls", List.of(col("ID")), "sms", List.of(col("MSISDN"))));
 
         assertEquals(3, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("matches no sinks[] destination"), refusals.get(0));
         assertTrue(refusals.get(1).contains("needs default:"), refusals.get(1));
-        assertTrue(refusals.get(2).contains("multi-schema"), refusals.get(2));
+        assertTrue(refusals.get(2).contains("does not bind in schema(s) [sms]"), refusals.get(2));
     }
 
     @Test
@@ -68,13 +70,14 @@ class RouteArmingTest {
                 "mode", "clone",
                 "default", "apac",
                 "branches", List.of(branch("emea", "emea_db"), branch("apac", "apac_db")));
-        assertEquals(List.of(), RouteArming.refusals(route, List.of("emea_db", "apac_db"), false));
+        assertEquals(List.of(), RouteArming.refusals(route, List.of("emea_db", "apac_db"), null));
     }
 
     @Test
     @DisplayName("an empty branch list short-circuits — every later rule reads that list")
     void emptyBranchesIsTheOnlyRefusal() {
-        List<String> refusals = RouteArming.refusals(Map.of("branches", List.of()), List.of(), true);
+        List<String> refusals = RouteArming.refusals(Map.of("branches", List.of()), List.of(),
+                Map.of("calls", List.of(col("ID"))));
         assertEquals(1, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("non-empty branches list"), refusals.get(0));
     }
@@ -85,7 +88,7 @@ class RouteArmingTest {
         Map<String, Object> route = Map.of(
                 "default", "emea",
                 "branches", List.of(branch("emea", "one_db"), branch("apac", "one_db")));
-        List<String> refusals = RouteArming.refusals(route, List.of("one_db"), false);
+        List<String> refusals = RouteArming.refusals(route, List.of("one_db"), null);
         assertEquals(1, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("branches share database 'one_db'"), refusals.get(0));
     }
@@ -96,7 +99,7 @@ class RouteArmingTest {
         Map<String, Object> route = Map.of(
                 "default", "apac",
                 "branches", List.of(Map.of("key", "emea"), branch("apac", "nowhere_db")));
-        List<String> refusals = RouteArming.refusals(route, List.of("apac_db"), false);
+        List<String> refusals = RouteArming.refusals(route, List.of("apac_db"), null);
         assertEquals(2, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("needs both a key and a database"), refusals.get(0));
         assertTrue(refusals.get(1).contains("matches no sinks[] destination"), refusals.get(1));
@@ -111,7 +114,7 @@ class RouteArmingTest {
         Map<String, Object> route = Map.of(
                 "default", "emea",
                 "branches", List.of(Map.of("key", "emea", "database", "emea_db")));
-        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), null);
         assertEquals(1, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("branch 'emea' has no where:"), refusals.get(0));
     }
@@ -122,7 +125,7 @@ class RouteArmingTest {
         Map<String, Object> route = Map.of(
                 "default", "emea",
                 "branches", List.of(Map.of("key", "emea", "database", "emea_db", "where", "   ")));
-        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), null);
         assertEquals(1, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("has no where:"), refusals.get(0));
     }
@@ -136,7 +139,7 @@ class RouteArmingTest {
                 "default", "rest",
                 "branches", List.of(branch("emea", "emea_db"),
                         Map.of("key", "rest", "database", "rest_db")));
-        List<String> refusals = RouteArming.refusals(route, List.of("emea_db", "rest_db"), false);
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db", "rest_db"), null);
         assertEquals(1, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("branch 'rest' has no where:"), refusals.get(0));
     }
@@ -164,7 +167,7 @@ class RouteArmingTest {
                                 Map.of("summarize", Map.of("group_by", List.of("DAY"),
                                         "measures", List.of("count"))))),
                         branch("apac", "apac_db")));
-        assertEquals(List.of(), RouteArming.refusals(route, List.of("emea_db", "apac_db"), false));
+        assertEquals(List.of(), RouteArming.refusals(route, List.of("emea_db", "apac_db"), null));
     }
 
     @Test
@@ -174,7 +177,7 @@ class RouteArmingTest {
                 "default", "emea",
                 "branches", List.of(branchWithSteps("emea", "emea_db",
                         List.of(Map.of("join", Map.of("reference", "reference/geo", "on", List.of("ID")))))));
-        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), null);
         assertEquals(1, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("'join' step, which cannot execute mid-branch"), refusals.get(0));
         assertTrue(refusals.get(0).contains("reference resolver"), refusals.get(0));
@@ -188,7 +191,7 @@ class RouteArmingTest {
                 "branches", List.of(branchWithSteps("emea", "emea_db", List.of(
                         Map.of("dedup", Map.of("keys", List.of("ID"), "order_by", "TS DESC",
                                 "scope", "window(P4D)"))))));
-        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), null);
         assertEquals(1, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("windowed dedup"), refusals.get(0));
         // …while an explicit consignment scope stays armable — it is the default spelled out.
@@ -196,7 +199,7 @@ class RouteArmingTest {
                 "default", "emea",
                 "branches", List.of(branchWithSteps("emea", "emea_db", List.of(
                         Map.of("dedup", Map.of("keys", List.of("ID"), "scope", "consignment"))))));
-        assertEquals(List.of(), RouteArming.refusals(ok, List.of("emea_db"), false));
+        assertEquals(List.of(), RouteArming.refusals(ok, List.of("emea_db"), null));
     }
 
     @Test
@@ -207,7 +210,7 @@ class RouteArmingTest {
                 "branches", List.of(branchWithSteps("emea", "emea_db", List.of(
                         Map.of("route", Map.of("branches", List.of())),
                         Map.of("filter", Map.of())))));
-        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), null);
         assertEquals(2, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("'route' step, which cannot execute mid-branch"), refusals.get(0));
         assertTrue(refusals.get(1).contains("filter with no where:"), refusals.get(1));
@@ -220,7 +223,7 @@ class RouteArmingTest {
                 "default", "emea",
                 "branches", List.of(branchWithSteps("emea", "emea_db", List.of(
                         Map.of("filter", Map.of("where", "AMT > 0", "include_regex", List.of("^E")))))));
-        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), false);
+        List<String> refusals = RouteArming.refusals(route, List.of("emea_db"), null);
         assertEquals(1, refusals.size(), refusals.toString());
         assertTrue(refusals.get(0).contains("pre-parse key 'include_regex'"), refusals.get(0));
     }
@@ -246,5 +249,58 @@ class RouteArmingTest {
         // A single-schema pipeline is not multi-schema, and neither is an EMPTY declaration.
         assertTrue(!RouteArming.draftIsMultiSchema(Map.of("schema_file", "one.toon"), Map.of()));
         assertTrue(!RouteArming.draftIsMultiSchema(Map.of("schemas", List.of()), Map.of()));
+    }
+
+    private static TypeFlow.Column col(String name) {
+        return new TypeFlow.Column(name, "VARCHAR");
+    }
+
+    // ── rule (4): one shared route: over a multi-schema pipeline (operator Q1/Q3, 2026-09-24) ──
+
+    private static final Map<String, Object> SHARED = Map.of(
+            "mode", "case", "default", "normal",
+            "branches", List.of(
+                    Map.of("key", "bulk", "database", "bulk_db", "where", "QTY > 1000"),
+                    Map.of("key", "normal", "database", "normal_db", "where", "true")));
+
+    @Test
+    @DisplayName("multi-schema ARMS when every predicate binds in every schema — the blanket refusal is gone")
+    void multiSchemaArmsWhenEveryPredicateBindsEverywhere() {
+        Map<String, List<TypeFlow.Column>> schemas = new java.util.LinkedHashMap<>();
+        schemas.put("receipt", List.of(col("MOVEMENT_ID"), new TypeFlow.Column("QTY", "INTEGER"), col("SUPPLIER")));
+        schemas.put("dispatch", List.of(col("MOVEMENT_ID"), new TypeFlow.Column("QTY", "INTEGER"), col("SALES_ORDER")));
+        assertEquals(List.of(), RouteArming.refusals(SHARED, List.of("bulk_db", "normal_db"), schemas));
+    }
+
+    @Test
+    @DisplayName("a predicate binding in SOME schemas only refuses, naming where it binds and where it cannot")
+    void aPredicateBindingInSomeSchemasOnlyRefuses() {
+        Map<String, Object> route = Map.of("mode", "case", "default", "normal", "branches", List.of(
+                Map.of("key", "bulk", "database", "bulk_db", "where", "qty_received > 1000"),
+                Map.of("key", "normal", "database", "normal_db", "where", "true")));
+        Map<String, List<TypeFlow.Column>> schemas = new java.util.LinkedHashMap<>();
+        schemas.put("receipt", List.of(col("MOVEMENT_ID"), new TypeFlow.Column("QTY_RECEIVED", "INTEGER")));
+        schemas.put("dispatch", List.of(col("MOVEMENT_ID"), new TypeFlow.Column("QTY", "INTEGER")));
+        schemas.put("transfer", List.of(col("MOVEMENT_ID"), new TypeFlow.Column("QTY", "INTEGER")));
+
+        List<String> refusals = RouteArming.refusals(route, List.of("bulk_db", "normal_db"), schemas);
+        assertEquals(1, refusals.size(), refusals.toString());
+        String r = refusals.get(0);
+        assertTrue(r.contains("branch 'bulk'") && r.contains("[dispatch, transfer]") && r.contains("binds in [receipt]"), r);
+        assertTrue(r.contains("qty_received"), "DuckDB's own message names the column: " + r);
+    }
+
+    @Test
+    @DisplayName("an unreadable schema is not judged, and a guarded-out predicate is never bound")
+    void unknownSchemasAndGuardedPredicatesAreNotJudged() {
+        Map<String, List<TypeFlow.Column>> schemas = new java.util.LinkedHashMap<>();
+        schemas.put("receipt", List.of(new TypeFlow.Column("QTY", "INTEGER")));
+        schemas.put("dispatch", List.of());   // the caller could not read it: unknown, not empty
+        assertEquals(List.of(), RouteArming.refusals(SHARED, List.of("bulk_db", "normal_db"), schemas));
+
+        Map<String, List<TypeFlow.Column>> missing = Map.of("dispatch", List.of(col("OTHER")));
+        assertEquals(1, RouteArming.refusals(SHARED, List.of("bulk_db", "normal_db"), missing).size());
+        assertEquals(List.of(), RouteArming.refusals(SHARED, List.of("bulk_db", "normal_db"), missing, w -> false),
+                "the caller's guard decides whether a predicate reaches the binder at all");
     }
 }

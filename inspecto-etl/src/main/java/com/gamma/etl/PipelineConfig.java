@@ -1807,6 +1807,32 @@ public final class PipelineConfig {
      * <b>versioned reference store</b> ({@code reference.load: upsert|scd2}) with more than one destination —
      * its single version history is ill-defined across destinations — so that is refused here.
      */
+    /**
+     * Every schema's MAPPED columns (the row a {@code route:} branch predicate sees) for a multi-schema
+     * pipeline — selector tables or plugin segment keys → {@link TypeFlow#transformedColumns} — or
+     * {@code null} for a single-schema one ({@link RouteArming#refusals}' rule (4) input). A schema whose
+     * mapping does not compile maps to {@code null}: not judged here, the run's transform names it.
+     */
+    private Map<String, List<TypeFlow.Column>> mappedColumnsBySchema() {
+        LinkedHashMap<String, Map<String, Object>> bySchema = new LinkedHashMap<>();
+        if (schemas.selector() != null && schemas.selector().hasSchemas())
+            for (SchemaSelector.Selection s : schemas.selector().entries()) bySchema.put(s.table(), s.schema());
+        else if (schemas.segments() != null && !schemas.segments().isEmpty())
+            bySchema.putAll(schemas.segments());
+        else
+            return null;
+        boolean typedSource = schemas.ingesterClass() != null && !schemas.ingesterClass().isBlank();
+        Map<String, List<TypeFlow.Column>> out = new LinkedHashMap<>();
+        bySchema.forEach((name, schema) -> {
+            try {
+                out.put(name, TypeFlow.transformedColumns(schema, this, typedSource));
+            } catch (RuntimeException doesNotCompile) {
+                out.put(name, null);
+            }
+        });
+        return out;
+    }
+
     public void prepare() throws IOException {
         requireRunnable();
         createStatusDir();
@@ -1869,9 +1895,7 @@ public final class PipelineConfig {
             // throws; the save path reports the whole list instead.
             java.util.List<String> sinkDbs = new java.util.ArrayList<>();
             for (Sink d : sinks) sinkDbs.add(d.database());
-            boolean multiSchema = schemas.selector() != null
-                    || (schemas.segments() != null && !schemas.segments().isEmpty());
-            List<String> refusals = RouteArming.refusals(route, sinkDbs, multiSchema);
+            List<String> refusals = RouteArming.refusals(route, sinkDbs, mappedColumnsBySchema());
             if (!refusals.isEmpty()) throw new IllegalStateException(refusals.get(0));
         }
         // processing.disabled_steps (Phase 4 S4 / D-13): only an armed route: pipeline's branch

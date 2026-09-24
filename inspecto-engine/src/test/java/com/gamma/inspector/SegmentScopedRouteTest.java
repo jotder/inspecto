@@ -97,10 +97,32 @@ class SegmentScopedRouteTest {
                 "only SMS's branch sinks were written");
     }
 
+    /**
+     * S4: an ACTIVE multi-schema route ARMS at registration when its predicates bind in every schema — the
+     * blanket clause-(4) refusal is gone (re-inserting it turns both loads here red).
+     */
+    @Test
+    void anActiveMultiSchemaRouteArmsWhenItsPredicatesBindEverywhere(@TempDir Path dir) throws Exception {
+        assertTrue(PipelineConfig.load(segmentRoutePipeline(dir.resolve("seg"), true).toString()).active());
+        assertTrue(PipelineConfig.load(selectorRoutePipeline(dir.resolve("sel"), true).toString()).active());
+    }
+
+    /** S4 / Q3: a predicate reading a column only SOME schemas map refuses arming, naming them. */
+    @Test
+    void anActiveMultiSchemaRouteOnAOneSchemaColumnRefusesArming(@TempDir Path dir) throws Exception {
+        Path toon = selectorRoutePipeline(dir, true);
+        Files.writeString(toon, Files.readString(toon).replace("\"ID LIKE 'B%'\"", "\"NOTE = 'bulk'\""));
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+                () -> PipelineConfig.load(toon.toString()));
+        assertTrue(e.getMessage().contains("does not bind in schema(s) [alpha]"), e.getMessage());
+        assertTrue(e.getMessage().contains("binds in [beta]"), e.getMessage());
+    }
+
     // ── fixtures (shared with the later slices' tests) ────────────────────────
 
     /** A CSV {@code schemas[2]} selector (alpha: 3 columns, beta: 4) with a two-branch route on {@code ID}. */
     static Path selectorRoutePipeline(Path dir, boolean active) throws Exception {
+        Files.createDirectories(dir);
         String d = dir.toString().replace("\\", "/");
         Path sa = dir.resolve("alpha_schema.toon");
         Path sb = dir.resolve("beta_schema.toon");
@@ -164,6 +186,7 @@ class SegmentScopedRouteTest {
 
     /** A plugin {@code segments} pipeline (CALL / SMS via the stub ingester) with a two-branch route on {@code ID}. */
     static Path segmentRoutePipeline(Path dir, boolean active) throws Exception {
+        Files.createDirectories(dir);
         String d = dir.toString().replace("\\", "/");
         Path call = dir.resolve("call_schema.toon");
         Path sms = dir.resolve("sms_schema.toon");

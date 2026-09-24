@@ -51,11 +51,25 @@ public final class RouteArming {
      * @param route           the authored {@code route:} block; {@code null} = no route, no refusals
      * @param sinkDatabases   the {@code database} of every {@code sinks[]} destination — the branch↔sink
      *                        join key, so this is the set a branch's {@code database} must hit
-     * @param multiSchema     true when the pipeline selects among schemas ({@code processing.schemas[]}
-     *                        or plugin {@code segments}); the lift emits one route node per schema
-     *                        branch and the divert executes exactly one
+     * @param schemaColumns   {@code null} for a single-schema pipeline; for a multi-schema one
+     *                        ({@code processing.schemas[]} or plugin {@code segments}) every schema's name →
+     *                        its MAPPED columns (the row a branch predicate sees), in declaration order. A
+     *                        {@code null}/empty value means the caller could not read that schema — it is
+     *                        then not judged (the save path's "unknown ≠ empty" contract)
      */
-    public static List<String> refusals(Map<?, ?> route, Collection<String> sinkDatabases, boolean multiSchema) {
+    public static List<String> refusals(Map<?, ?> route, Collection<String> sinkDatabases,
+                                        Map<String, List<TypeFlow.Column>> schemaColumns) {
+        return refusals(route, sinkDatabases, schemaColumns, predicate -> true);
+    }
+
+    /**
+     * As above, with {@code mayBind} deciding whether a branch predicate may be handed to DuckDB's binder
+     * at all. The save path passes its {@code SqlGuard} check (an authored predicate is untrusted input
+     * there); {@code prepare()} binds what the run itself will execute.
+     */
+    public static List<String> refusals(Map<?, ?> route, Collection<String> sinkDatabases,
+                                        Map<String, List<TypeFlow.Column>> schemaColumns,
+                                        java.util.function.Predicate<String> mayBind) {
         List<String> out = new ArrayList<>();
         if (route == null) return out;
 
@@ -123,20 +137,63 @@ public final class RouteArming {
         if (def == null || !keys.contains(String.valueOf(def)))
             out.add("an armed route: needs default: naming one of its branch keys (" + keys + ") — "
                     + "without it a row matching no branch is silently dropped");
-        // (4) multi-schema stays authoring-only with route:. ⛔ Do NOT lift this by "fixing the branch
-        //     count" — that was investigated 2026-08-26 and is the WRONG fix. The mechanism, grounded:
-        //     `ConsignmentIngestStrategy.writeAndTrace` is called ONCE PER SEGMENT (see
-        //     `UnionModeIngester`'s loop, destTable = "transformed_" + segKey), while the branch-aware
-        //     divert inside it lifts `PipelineLift.lift(cfg)` — the WHOLE multi-schema graph. Arming
-        //     would therefore execute EVERY schema's route tree against EVERY segment's table.
-        //     A real fix needs a segment-scoped lift (only the current schema's subtree) — a design
-        //     change, not an unrefusal. `ConsignmentGraphRunner.dataFedSinkCount`'s collapsing of identical
-        //     route keys across schema branches is real but harmless: it feeds `engages()` (a `> 1`
-        //     test, and any multi-schema+route count is already > 1) and one diagnostic log line.
-        if (multiSchema)
-            out.add("route: on a multi-schema pipeline (selector/segments) is authoring-only — arm it "
-                    + "on a single-schema pipeline");
+        // (4) multi-schema ARMS (branch-aware-segment-lift-design.md S4, operator decisions 2026-09-24).
+        //     The blanket refusal it replaces existed because the divert once walked the WHOLE lift for
+        //     every per-schema write; each write now runs on its own schema's slice (PipelineLift.scope,
+        //     seeded by segment key or selected table — S3). What stays is Q1 + Q3: ONE shared route:
+        //     block applies to every schema, so each branch predicate must bind against EVERY schema's
+        //     mapped row — one binding in some schemas only would fail mid-run on the others, after the
+        //     earlier schemas' branches committed. Fail closed, at authoring time.
+        if (schemaColumns != null) schemaBindRefusals(rawBranches, schemaColumns, mayBind, out);
         return out;
+    }
+
+    /**
+     * Rule (4): every branch {@code where:} of the shared {@code route:} block, bound
+     * ({@code SELECT * FROM input WHERE <predicate>}, {@link TypeFlow#describe}) against each schema's
+     * mapped columns. Only a genuine unknown-column binder error refuses — the same line
+     * {@code ConfigRoutes.routeColumnFindings} draws, because a save-time column model is approximate and
+     * must never refuse a config that runs over what it cannot model; any other bind failure is the run's
+     * to name.
+     */
+    private static void schemaBindRefusals(List<?> rawBranches, Map<String, List<TypeFlow.Column>> schemaColumns,
+                                           java.util.function.Predicate<String> mayBind, List<String> out) {
+        for (Object b : rawBranches) {
+            if (!(b instanceof Map<?, ?> m) || m.get("where") == null) continue;
+            String where = String.valueOf(m.get("where"));
+            if (where.isBlank() || !mayBind.test(where)) continue;   // blank is rule (2b)'s refusal
+            List<String> bindsIn = new ArrayList<>();
+            Map<String, String> failsIn = new java.util.LinkedHashMap<>();
+            for (Map.Entry<String, List<TypeFlow.Column>> e : schemaColumns.entrySet()) {
+                if (e.getValue() == null || e.getValue().isEmpty()) continue;   // unknown ≠ empty
+                try {
+                    TypeFlow.describe(e.getValue(), "SELECT * FROM \"input\" WHERE " + where);
+                    bindsIn.add(e.getKey());
+                } catch (IllegalArgumentException doesNotBind) {
+                    if (isUnknownColumn(doesNotBind.getMessage())) failsIn.put(e.getKey(), doesNotBind.getMessage());
+                    else bindsIn.add(e.getKey());   // not this rule's failure — see the javadoc
+                }
+            }
+            if (failsIn.isEmpty()) continue;
+            out.add("route: branch '" + m.get("key") + "' has a where: predicate that does not bind in schema(s) "
+                    + failsIn.keySet() + (bindsIn.isEmpty() ? "" : " (it binds in " + bindsIn + ")")
+                    + " — one route: block applies to every schema of a multi-schema pipeline, so each "
+                    + "predicate may only read columns every schema maps: "
+                    + binderClause(failsIn.values().iterator().next()));
+        }
+    }
+
+    /** DuckDB's {@code Referenced column "X" not found …} clause out of a JDBC message that may wrap it in a
+     *  generic "unsuccessful pending query" prefix; the whole message when no such clause is found. */
+    private static String binderClause(String message) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("Referenced column \"[^\"]*\" not found[^\\n]*")
+                .matcher(message);
+        return m.find() ? m.group() : message;
+    }
+
+    /** Is this DuckDB bind failure a genuine unknown-column error (the only kind rule (4) refuses)? */
+    public static boolean isUnknownColumn(String message) {
+        return message != null && message.contains("Referenced column") && message.contains("not found");
     }
 
     /** The steps[] kinds a route branch may arm with — what the ingest walk can actually run with

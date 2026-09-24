@@ -162,7 +162,7 @@ final class ConfigRoutes {
      * registration is all-or-nothing, but an author fixing a branch list wants the whole list rather
      * than a one-at-a-time game.
      */
-    static List<Finding> routeArmingFindings(String type, Map<String, Object> draft) {
+    static List<Finding> routeArmingFindings(String type, Map<String, Object> draft, Path configDir) {
         if (!"pipeline".equals(type)) return List.of();
         if (!(draft.get("route") instanceof Map<?, ?> route)) return List.of();
         boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
@@ -170,9 +170,13 @@ final class ConfigRoutes {
         Map<?, ?> proc    = draft.get("processing") instanceof Map<?, ?> m ? m : Map.of();
         Map<?, ?> parsing = draft.get("parsing")    instanceof Map<?, ?> m ? m : Map.of();
         List<Finding> out = new ArrayList<>();
+        Map<String, List<TypeFlow.Column>> schemaColumns = RouteArming.draftIsMultiSchema(proc, parsing)
+                ? draftSchemaColumns(proc, parsing, configDir) : null;
+        // 🔴 SqlGuard the ASSEMBLED probe before any predicate reaches DuckDB's binder — an authored
+        // predicate is untrusted input here, exactly as in routeColumnFindings.
         for (String refusal : RouteArming.refusals(route,
-                RouteArming.draftSinkDatabases(draft.get("sinks")),
-                RouteArming.draftIsMultiSchema(proc, parsing))) {
+                RouteArming.draftSinkDatabases(draft.get("sinks")), schemaColumns,
+                where -> SqlGuard.check("SELECT * FROM \"input\" WHERE " + where).isEmpty())) {
             // The RouteArming message names the offending entities AND its own fix (shared verbatim
             // with prepare()'s throw); guidance carries the save-time what-to-do half that used to
             // ride fused into the inactive message.
@@ -180,6 +184,40 @@ final class ConfigRoutes {
                     active ? FindingCodes.ERR_ROUTE_UNARMABLE : FindingCodes.WARN_ROUTE_UNARMABLE,
                     active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE));
         }
+        return out;
+    }
+
+    /**
+     * Each schema of a multi-schema draft → its MAPPED columns (raw ∪ {@code mapping.fields[]}, as
+     * {@link #routeColumnFindings} models one schema), keyed by selector table or segment key, for
+     * {@code RouteArming} rule (4). A schema that cannot be read maps to an empty list — not judged,
+     * per {@link #declaredColumns}' "unknown ≠ empty" contract. Segment maps are read in
+     * {@code PipelineConfigParser}'s precedence ({@code parsing.plugin.segments} over
+     * {@code processing.segments}).
+     */
+    private static Map<String, List<TypeFlow.Column>> draftSchemaColumns(Map<?, ?> proc, Map<?, ?> parsing,
+                                                                         Path configDir) {
+        Map<String, Object> refs = new java.util.LinkedHashMap<>();
+        if (proc.get("schemas") instanceof List<?> l && !l.isEmpty()) {
+            for (Object e : l)
+                if (e instanceof Map<?, ?> m && m.get("table") != null)
+                    refs.put(String.valueOf(m.get("table")), m.get("schema_file"));
+        } else {
+            Object plugin = parsing.get("plugin");
+            Object seg = plugin instanceof Map<?, ?> pm && pm.get("segments") != null
+                    ? pm.get("segments") : proc.get("segments");
+            if (seg instanceof Map<?, ?> sm) sm.forEach((k, v) -> refs.put(String.valueOf(k), v));
+        }
+        Map<String, List<TypeFlow.Column>> out = new java.util.LinkedHashMap<>();
+        refs.forEach((name, ref) -> {
+            List<TypeFlow.Column> columns = new ArrayList<>();
+            if (ref instanceof String file && !file.isBlank()) {
+                Map<String, Object> one = Map.of("processing", Map.of("schema_file", file));
+                columns.addAll(declaredColumns(one, configDir));
+                if (!columns.isEmpty()) addMappedColumns(one, configDir, columns);
+            }
+            out.put(name, columns);
+        });
         return out;
     }
 
@@ -424,7 +462,7 @@ final class ConfigRoutes {
      * must never refuse a config that runs because of what it cannot model.
      */
     private static boolean isUnknownColumn(String message) {
-        return message != null && message.contains("Referenced column") && message.contains("not found");
+        return RouteArming.isUnknownColumn(message);   // one line drawn in one place — rule (4) draws it too
     }
 
     /** Walks one {@code steps[]} chain at {@code prefix}; returns the columns known after it (null = unknown). */

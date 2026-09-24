@@ -218,6 +218,68 @@ class ControlApiRouteArmingTest {
         }
     }
 
+    // ── rule (4): one shared route: over a multi-schema pipeline (segment lift S4) ─────────
+
+    /** A plugin-segments draft (receipt / dispatch) whose bulk branch reads {@code column}. */
+    private static String segmentsRoute(String column) {
+        return """
+                {"type":"pipeline","config":{
+                   "name":"stock_routed",
+                   "active":true,
+                   "dirs":{"poll":"in","database":"out"},
+                   "processing":{"threads":1},
+                   "parsing":{"frontend":"plugin","plugin":{"ingester":"com.gamma.ingester.XmlRecordIngester",
+                       "segments":{"receipt":"receipt_schema.toon","dispatch":"dispatch_schema.toon"}}},
+                   "sinks":[{"database":"bulk_db"},{"database":"normal_db"}],
+                   "route":{"mode":"case","default":"normal","branches":[
+                       {"key":"bulk","database":"bulk_db","where":"%s > 1000"},
+                       {"key":"normal","database":"normal_db","where":"true"}]}}}""".formatted(column);
+    }
+
+    private static void writeSegmentSchemas(Path root) throws Exception {
+        java.nio.file.Files.writeString(root.resolve("receipt_schema.toon"), """
+                raw:
+                  name: receipt
+                  fields[3]{name,selector,type}:
+                    MOVEMENT_ID,"@id",VARCHAR
+                    QTY,"qty",INTEGER
+                    QTY_RECEIVED,"received",INTEGER
+                """);
+        java.nio.file.Files.writeString(root.resolve("dispatch_schema.toon"), """
+                raw:
+                  name: dispatch
+                  fields[2]{name,selector,type}:
+                    MOVEMENT_ID,"@id",VARCHAR
+                    QTY,"qty",INTEGER
+                """);
+    }
+
+    @Test
+    @DisplayName("rule (4): an active multi-schema route whose predicates bind in every schema saves clean")
+    void multiSchemaRouteBindingEverywhereSavesClean(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        writeSegmentSchemas(root);
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", segmentsRoute("QTY"));
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+            assertTrue(out.get("written").asBoolean(), r.body());
+            assertFalse(out.get("findings").toString().contains("route:"), out.get("findings").toString());
+        }
+    }
+
+    @Test
+    @DisplayName("rule (4): a predicate on a column only SOME schemas map is refused at the save")
+    void multiSchemaRouteBindingInSomeSchemasOnlyIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        writeSegmentSchemas(root);
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = post(c.port, "/config/write", segmentsRoute("QTY_RECEIVED"));
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("does not bind in schema(s) [dispatch]"), r.body());
+            assertTrue(r.body().contains("binds in [receipt]"), r.body());
+            assertTrue(r.body().contains("ERR_ROUTE_UNARMABLE"), r.body());
+        }
+    }
+
     // ── MIDBRANCH-1 (R3): per-branch steps[] sub-chains at the same gate ─────────────────
 
     private static String branchSteps(boolean active, String stepsJson) {

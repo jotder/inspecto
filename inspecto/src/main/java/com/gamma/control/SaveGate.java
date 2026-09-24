@@ -75,7 +75,7 @@ final class SaveGate {
         // Arming (ERROR when active, WARNING on an inactive draft): an active config that cannot arm
         // registers and is then silently skipped every cycle.
         f.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, draft));
-        f.addAll(ConfigRoutes.routeArmingFindings(type, draft));
+        f.addAll(ConfigRoutes.routeArmingFindings(type, draft, configDir));
         f.addAll(ConfigRoutes.stepDisableFindings(type, draft));
         f.addAll(ConfigRoutes.dedupWindowFindings(type, draft));
         f.addAll(ConfigRoutes.stepConfigFindings(type, draft, configDir));   // G4: the run's step refusals
