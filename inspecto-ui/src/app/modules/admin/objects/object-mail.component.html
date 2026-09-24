@@ -152,6 +152,14 @@
                             >
                                 <mat-icon svgIcon="heroicons_outline:bolt"></mat-icon>
                             </button>
+                            <button
+                                mat-icon-button
+                                (click)="openFindingsFields()"
+                                matTooltip="Findings fields (what your team records)"
+                                aria-label="Findings fields"
+                            >
+                                <mat-icon svgIcon="heroicons_outline:clipboard-document-list"></mat-icon>
+                            </button>
                         }
                         <button mat-icon-button (click)="reload()" matTooltip="Refresh" aria-label="Refresh">
                             <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>

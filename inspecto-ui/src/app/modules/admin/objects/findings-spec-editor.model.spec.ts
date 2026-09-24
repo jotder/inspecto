@@ -12,6 +12,7 @@ import {
     labelToOptionValue,
     newChoice,
     newField,
+    toSections,
     toWire,
     validateDraft,
 } from './findings-spec-editor.model';
@@ -124,7 +125,11 @@ describe('fromWire / toWire', () => {
                 },
             ],
         });
-        expect(fields[4].showWhen).toEqual({ targetUid: fields[0].uid, negated: false, value: fields[0].choices[2].uid });
+        expect(fields[4].showWhen).toEqual({
+            targetUid: fields[0].uid,
+            negated: false,
+            value: fields[0].choices[2].uid,
+        });
         expect(fields[4].tier).toBe('optional');
     });
 
@@ -177,7 +182,10 @@ describe('validateDraft', () => {
         f.type = 'select';
         expect(messages([f])).toEqual(['“Root cause” needs at least one choice.']);
         f.choices = [newChoice(''), newChoice('A'), newChoice('a')];
-        expect(messages([f])).toEqual(['“Root cause” has a choice with no name.', '“Root cause” has two choices called “a”.']);
+        expect(messages([f])).toEqual([
+            '“Root cause” has a choice with no name.',
+            '“Root cause” has two choices called “a”.',
+        ]);
     });
 
     it('refuses a smallest allowed above the largest', () => {
@@ -223,6 +231,20 @@ describe('fieldsAbove', () => {
         expect(above).toEqual(['disposition', 'impactAmount']);
         expect(above).not.toContain('summary');
         expect(above).not.toContain('recordsAffected');
+    });
+
+    it('never offers a Number field (compared as text by the server) and compares Yes/No as a boolean', () => {
+        const amount = newField('Amount');
+        amount.type = 'number';
+        const flag = newField('Chargeback filed');
+        flag.type = 'boolean';
+        const note = newField('Chargeback reference');
+        note.showWhen = { targetUid: flag.uid, negated: false, value: 'true' };
+        const fields = [amount, flag, note];
+        expect(fieldsAbove(fields, note.uid).map((f) => f.label)).toEqual(['Chargeback filed']);
+        const s = (toWire('case', fields).sections as Record<string, unknown>[])[2];
+        expect(s['dependsOn']).toEqual({ key: 'chargebackFiled', equals: true });
+        expect(fromWire({ objectType: 'case', sections: toSections(fields) })[2].showWhen?.value).toBe('true');
     });
 });
 

@@ -276,17 +276,23 @@ export function toSections(fields: FieldDraft[]): FindingsSection[] {
     });
 }
 
-function showWhenWireValue(target: FieldDraft, value: string): string {
+/** The wire `equals`/`notEquals`. A Yes/No target compares as a real boolean — the renderer uses `===`. */
+function showWhenWireValue(target: FieldDraft, value: string): string | boolean {
+    if (target.type === 'boolean') return value === 'true';
     if (!usesChoices(target.type)) return value;
     return resolveChoiceValues(target).get(value) ?? value;
 }
 
 // ── rules ────────────────────────────────────────────────────────────────────────
 
-/** The fields a "Show only when" may point at: those above `uid` (a form reads top to bottom). */
+/**
+ * The fields a "Show only when" may point at: those above `uid` (a form reads top to bottom), and never a
+ * Number or List of values — the renderer compares with `===`, so a number target would need a numeric
+ * value the server then compares as text (`5` vs `5.0`), and a list has no single value to compare.
+ */
 export function fieldsAbove(fields: FieldDraft[], uid: string): FieldDraft[] {
     const i = fields.findIndex((f) => f.uid === uid);
-    return i < 0 ? [] : fields.slice(0, i);
+    return i < 0 ? [] : fields.slice(0, i).filter((f) => f.type !== 'number' && f.type !== 'list');
 }
 
 const quote = (s: string): string => `“${s.trim()}”`;
@@ -338,8 +344,11 @@ export function validateDraft(fields: FieldDraft[]): DraftProblem[] {
             if (at < 0) add(f, `${label}: “Show only when” points at a field that was removed.`);
             else if (at >= i) add(f, `${label}: “Show only when” must point at a field above it.`);
             else if (!f.showWhen.value.trim()) add(f, `${label}: pick a value for “Show only when”.`);
-            else if (usesChoices(fields[at].type) && fields[at].type === 'select'
-                && !fields[at].choices.some((c) => c.uid === f.showWhen!.value)) {
+            else if (
+                usesChoices(fields[at].type) &&
+                fields[at].type === 'select' &&
+                !fields[at].choices.some((c) => c.uid === f.showWhen!.value)
+            ) {
                 add(f, `${label}: “Show only when” points at a choice that was removed.`);
             }
         }

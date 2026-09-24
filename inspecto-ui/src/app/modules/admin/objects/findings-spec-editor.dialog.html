@@ -1,0 +1,353 @@
+<h2 mat-dialog-title inspectoDialogResize #chrome="inspectoDialogResize" class="flex items-center gap-3">
+    <span class="flex-auto">Findings fields — {{ data.typeLabel }}</span>
+    @if (!loading() && !loadError()) {
+    <inspecto-status-badge [value]="authored() ? 'info' : 'neutral'" [label]="authored() ? 'Customised' : 'Built-in'" />
+    } @if (authored()) {
+    <button mat-icon-button type="button" (click)="openHistory()" matTooltip="History" aria-label="History">
+        <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
+    </button>
+    }
+    <button
+        mat-icon-button
+        type="button"
+        (click)="chrome.toggleMaximize()"
+        [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+        [matTooltip]="chrome.maximized() ? 'Exit full screen' : 'Full screen'"
+    >
+        <mat-icon
+            [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in' : 'heroicons_outline:arrows-pointing-out'"
+        ></mat-icon>
+    </button>
+</h2>
+
+<mat-dialog-content class="flex flex-col gap-4 pt-2">
+    @if (loading()) {
+    <inspecto-skeleton [lines]="6" />
+    } @else if (loadError()) {
+    <inspecto-alert variant="error" title="Could not load the Findings fields">
+        {{ loadError() }}
+        <button mat-button type="button" (click)="load()">Try again</button>
+    </inspecto-alert>
+    } @else {
+    <p class="text-secondary text-sm">
+        These are the questions your team answers in a {{ data.typeLabel }}'s Findings panel. A change applies to every
+        {{ data.typeLabel }}.
+    </p>
+    @if (!canEdit()) {
+    <inspecto-alert variant="info" title="View only">
+        Changing the Findings fields needs permission to manage Incidents and Cases.
+    </inspecto-alert>
+    } @if (conflict()) {
+    <inspecto-alert variant="warning" title="Someone else changed these fields">
+        Your changes were not saved, so nothing was overwritten. Reload to see their version, then make your change
+        again.
+        <button mat-button type="button" (click)="load()">Reload</button>
+    </inspecto-alert>
+    }
+
+    <div class="grid grid-cols-1 gap-4 md:grid-cols-[15rem_minmax(0,1fr)_minmax(0,1fr)]">
+        <!-- Fields -->
+        <section aria-labelledby="ff-list-heading" class="flex min-w-0 flex-col gap-2">
+            <h3 id="ff-list-heading" class="text-xs font-bold uppercase tracking-wider opacity-60">Fields</h3>
+            <ul class="flex flex-col gap-1" aria-label="Findings fields">
+                @for (f of fields(); track f.uid; let first = $first; let last = $last) {
+                <li
+                    class="flex items-center gap-1 rounded border px-2 py-1"
+                    [style.border-color]="
+                                f.uid === selectedUid() ? 'var(--gamma-primary)' : 'var(--gamma-border)'
+                            "
+                >
+                    <button
+                        type="button"
+                        class="min-w-0 flex-auto rounded text-left focus-visible:ring-2"
+                        (click)="select(f.uid)"
+                        [attr.aria-current]="f.uid === selectedUid() ? 'true' : null"
+                    >
+                        <span class="block truncate text-sm font-medium">{{ f.label.trim() || 'Untitled' }}</span>
+                        <span class="text-secondary block truncate text-xs">
+                            {{ controlLabel(f.type) }}@if (f.required) { · must be filled }@if (f.tier === 'optional') {
+                            · under More }@if (f.showWhen) { · shown only when… }
+                        </span>
+                    </button>
+                    @if (canEdit()) {
+                    <button
+                        mat-icon-button
+                        type="button"
+                        class="shrink-0"
+                        [disabled]="first"
+                        (click)="move(f.uid, -1)"
+                        [attr.aria-label]="'Move ' + (f.label.trim() || 'field') + ' up'"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-up"></mat-icon>
+                    </button>
+                    <button
+                        mat-icon-button
+                        type="button"
+                        class="shrink-0"
+                        [disabled]="last"
+                        (click)="move(f.uid, 1)"
+                        [attr.aria-label]="'Move ' + (f.label.trim() || 'field') + ' down'"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-down"></mat-icon>
+                    </button>
+                    <button
+                        mat-icon-button
+                        type="button"
+                        class="shrink-0"
+                        (click)="removeField(f)"
+                        [attr.aria-label]="'Remove ' + (f.label.trim() || 'field')"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:trash"></mat-icon>
+                    </button>
+                    }
+                </li>
+                } @empty {
+                <li class="text-secondary text-sm">No fields yet.</li>
+                }
+            </ul>
+            @if (canEdit()) {
+            <button mat-stroked-button type="button" class="self-start" (click)="addField()">
+                <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                Add field
+            </button>
+            }
+        </section>
+
+        <!-- Field -->
+        <section aria-labelledby="ff-edit-heading" class="flex min-w-0 flex-col gap-2">
+            <h3 id="ff-edit-heading" class="text-xs font-bold uppercase tracking-wider opacity-60">Field</h3>
+            @if (selected(); as f) {
+            <form [formGroup]="fieldForm" class="flex flex-col gap-3" (submit)="$event.preventDefault()">
+                <mat-form-field subscriptSizing="dynamic">
+                    <mat-label>Name</mat-label>
+                    <input matInput formControlName="label" placeholder="e.g. Root cause category" />
+                </mat-form-field>
+                <mat-form-field subscriptSizing="dynamic">
+                    <mat-label>Help text</mat-label>
+                    <input matInput formControlName="help" placeholder="Shown under the field" />
+                </mat-form-field>
+
+                <inspecto-option-picker
+                    label="Kind of answer"
+                    formControlName="type"
+                    [options]="controlOptions(f.type)"
+                    [readOnly]="!canEdit()"
+                />
+
+                <div class="flex flex-col gap-1">
+                    <span id="ff-appears-label" class="text-sm font-medium">Where it appears</span>
+                    <mat-radio-group
+                        formControlName="tier"
+                        class="flex flex-wrap gap-4"
+                        aria-labelledby="ff-appears-label"
+                    >
+                        <mat-radio-button value="required">Always shown</mat-radio-button>
+                        <mat-radio-button value="optional">Under “More”</mat-radio-button>
+                        @if (f.tier === 'advanced') {
+                        <mat-radio-button value="advanced">Behind the settings gear (kept as saved)</mat-radio-button>
+                        }
+                    </mat-radio-group>
+                </div>
+
+                <mat-slide-toggle formControlName="required">Must be filled in</mat-slide-toggle>
+                @if (f.required) {
+                <p class="text-secondary -mt-2 text-xs">Findings can’t be saved while this is empty.</p>
+                } @if (usesChoices(f.type)) {
+                <fieldset class="flex flex-col gap-2" formArrayName="choices">
+                    <legend class="mb-1 text-sm font-medium">
+                        {{ f.type === 'select' ? 'Choices' : 'Suggested values' }}
+                    </legend>
+                    @for (c of choiceControls.controls; track $index; let i = $index; let cf = $first; let cl = $last) {
+                    <div class="flex items-center gap-1">
+                        <mat-form-field class="flex-auto" subscriptSizing="dynamic">
+                            <mat-label>Choice {{ i + 1 }}</mat-label>
+                            <input matInput [formControlName]="i" />
+                        </mat-form-field>
+                        @if (canEdit()) {
+                        <button
+                            mat-icon-button
+                            type="button"
+                            [disabled]="cf"
+                            (click)="moveChoice(i, -1)"
+                            [attr.aria-label]="'Move choice ' + (i + 1) + ' up'"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-up"></mat-icon>
+                        </button>
+                        <button
+                            mat-icon-button
+                            type="button"
+                            [disabled]="cl"
+                            (click)="moveChoice(i, 1)"
+                            [attr.aria-label]="'Move choice ' + (i + 1) + ' down'"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-down"></mat-icon>
+                        </button>
+                        <button
+                            mat-icon-button
+                            type="button"
+                            (click)="removeChoice(i)"
+                            [attr.aria-label]="'Remove choice ' + (i + 1)"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        </button>
+                        }
+                    </div>
+                    } @if (canEdit()) {
+                    <button mat-button type="button" class="self-start" (click)="addChoice()">
+                        <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                        Add choice
+                    </button>
+                    }
+                </fieldset>
+                } @if (f.type === 'number') {
+                <div class="flex gap-3">
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                        <mat-label>Smallest allowed</mat-label>
+                        <input matInput type="number" formControlName="min" />
+                    </mat-form-field>
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                        <mat-label>Largest allowed</mat-label>
+                        <input matInput type="number" formControlName="max" />
+                    </mat-form-field>
+                </div>
+                } @if (f.type !== 'boolean' && f.type !== 'select') {
+                <mat-form-field subscriptSizing="dynamic">
+                    <mat-label>Placeholder</mat-label>
+                    <input matInput formControlName="placeholder" placeholder="Greyed-out hint inside the box" />
+                </mat-form-field>
+                }
+
+                <div class="flex flex-col gap-2">
+                    <mat-slide-toggle formControlName="showWhenOn"
+                        >Show only when another field has an answer</mat-slide-toggle
+                    >
+                    @if (fieldForm.controls.showWhenOn.value) { @if (targetOptions(f.uid).length) {
+                    <div class="flex flex-wrap items-end gap-3">
+                        <inspecto-option-picker
+                            class="min-w-40 flex-1"
+                            label="Show only when"
+                            formControlName="showWhenTarget"
+                            [options]="targetOptions(f.uid)"
+                            placeholder="Pick a field"
+                            [readOnly]="!canEdit()"
+                        />
+                        <inspecto-option-picker
+                            class="w-28"
+                            label="Condition"
+                            formControlName="showWhenSense"
+                            [options]="senseOptions"
+                            [readOnly]="!canEdit()"
+                        />
+                        @if (fieldForm.controls.showWhenTarget.value) { @if
+                        (valueOptions(fieldForm.controls.showWhenTarget.value); as opts) {
+                        <inspecto-option-picker
+                            class="min-w-40 flex-1"
+                            label="Answer"
+                            formControlName="showWhenValue"
+                            [options]="opts"
+                            placeholder="Pick an answer"
+                            [readOnly]="!canEdit()"
+                        />
+                        } @else {
+                        <mat-form-field class="min-w-40 flex-1" subscriptSizing="dynamic">
+                            <mat-label>Answer</mat-label>
+                            <input matInput formControlName="showWhenValue" />
+                        </mat-form-field>
+                        } }
+                    </div>
+                    } @else {
+                    <p class="text-secondary text-xs">
+                        Move this field below the one it depends on — it can only depend on a field above it.
+                    </p>
+                    } }
+                </div>
+
+                <!-- D6: technical settings stay behind a collapsed disclosure. -->
+                <div class="flex flex-col gap-2 border-t pt-2" style="border-color: var(--gamma-border)">
+                    <button
+                        mat-button
+                        type="button"
+                        class="self-start"
+                        (click)="showTechnical.set(!showTechnical())"
+                        [attr.aria-expanded]="showTechnical()"
+                        aria-controls="ff-technical"
+                    >
+                        <mat-icon
+                            [svgIcon]="showTechnical() ? 'heroicons_outline:chevron-down' : 'heroicons_outline:chevron-right'"
+                        ></mat-icon>
+                        Technical details
+                    </button>
+                    @if (showTechnical()) {
+                    <div id="ff-technical" class="flex flex-col gap-2">
+                        <p class="text-secondary text-xs">
+                            {{ keyNote(f) }} — values are stored under this name, so it never changes once saved, even
+                            when you rename the field.
+                        </p>
+                        @if (usesChoices(f.type) && f.choices.length) {
+                        <p class="text-secondary text-xs">Choices are stored as: {{ choiceValues(f).join(', ') }}</p>
+                        } @if (usesPattern(f.type)) {
+                        <mat-form-field subscriptSizing="dynamic">
+                            <mat-label>Pattern (regular expression)</mat-label>
+                            <input matInput formControlName="pattern" placeholder="e.g. ^[A-Z]{3}-[0-9]+$" />
+                        </mat-form-field>
+                        }
+                        <p class="text-secondary text-xs">
+                            While this is open, “Kind of answer” also offers ID-style text, List of values and Suggested
+                            values.
+                        </p>
+                    </div>
+                    }
+                </div>
+            </form>
+            } @else {
+            <p class="text-secondary text-sm">Pick a field to edit it.</p>
+            }
+        </section>
+
+        <!-- Preview -->
+        <section aria-labelledby="ff-preview-heading" class="flex min-w-0 flex-col gap-2">
+            <h3 id="ff-preview-heading" class="text-xs font-bold uppercase tracking-wider opacity-60">Preview</h3>
+            <p class="text-secondary text-xs">
+                What your team sees in a {{ data.typeLabel }}. Try it out — nothing you type here is saved.
+            </p>
+            <div class="rounded border p-3" style="border-color: var(--gamma-border)">
+                <inspecto-schema-form #preview [initial]="previewSeed()" [specs]="previewSpecs()" />
+            </div>
+            <button mat-button type="button" class="self-start" (click)="resetPreview()">Reset preview</button>
+        </section>
+    </div>
+
+    @if (canEdit() && problems().length) {
+    <inspecto-alert
+        variant="warning"
+        [title]="problems().length === 1 ? '1 problem to fix before saving' : problems().length + ' problems to fix before saving'"
+    >
+        <ul class="list-disc pl-5">
+            @for (p of problems(); track $index) {
+            <li>{{ p.message }}</li>
+            }
+        </ul>
+    </inspecto-alert>
+    } @if (serverError()) {
+    <inspecto-alert variant="error" title="The server refused the save">{{ serverError() }}</inspecto-alert>
+    } }
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="requestClose()">{{ canEdit() ? 'Cancel' : 'Close' }}</button>
+    @if (canEdit() && authored()) {
+    <button mat-stroked-button color="warn" type="button" [disabled]="saving()" (click)="restoreBuiltIn()">
+        Restore built-in
+    </button>
+    } @if (canEdit()) {
+    <button
+        mat-flat-button
+        color="primary"
+        type="button"
+        [disabled]="loading() || !dirty() || problems().length > 0 || saving()"
+        (click)="save()"
+    >
+        Save
+    </button>
+    }
+</mat-dialog-actions>

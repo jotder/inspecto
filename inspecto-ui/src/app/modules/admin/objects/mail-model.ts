@@ -5,7 +5,15 @@ import {
     OperationalObject,
     WorkflowDef,
 } from 'app/inspecto/api';
-import { AttributeSpec, AttributeTier, AttributeType } from 'app/inspecto/component-model';
+// The exported unions, never a hand-kept copy: a local list here had drifted to omit `list`, so a served
+// "List of values" Findings field was silently dropped from the panel (found building the editor, 2026-09-25).
+import {
+    ATTRIBUTE_TIERS,
+    ATTRIBUTE_TYPES,
+    AttributeSpec,
+    AttributeTier,
+    AttributeType,
+} from 'app/inspecto/component-model';
 
 export { normalizeIncidentStatus };
 
@@ -193,17 +201,6 @@ export function findingsAttributes(spec: FindingsSpecDef | null): AttributeSpec[
     }
     return out;
 }
-
-const ATTRIBUTE_TYPES: AttributeType[] = [
-    'string',
-    'identifier',
-    'number',
-    'boolean',
-    'select',
-    'autocomplete',
-    'multiline',
-];
-const ATTRIBUTE_TIERS: AttributeTier[] = ['required', 'optional', 'advanced'];
 
 /** The served `{key, equals|notEquals}` clause, kept as exactly one sense (`AttributeSpec.dependsOn`). */
 function dependsOnOf(s: FindingsSection): AttributeSpec['dependsOn'] {

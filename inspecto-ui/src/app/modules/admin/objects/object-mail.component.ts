@@ -57,6 +57,7 @@ import {
 } from './mail-model';
 import { CaseAnalyticsDialog } from './case-analytics.dialog';
 import { CaseRulesDialog } from './case-rules.dialog';
+import { FindingsSpecEditorDialog } from './findings-spec-editor.dialog';
 import { CategorizeDialog } from './categorize.dialog';
 import { MergeCasesDialog } from './merge-cases.dialog';
 import { ObjectCreateDialog } from './object-create.dialog';
@@ -659,6 +660,29 @@ export class ObjectMailComponent implements OnInit {
             .afterClosed()
             .subscribe((changed?: boolean) => {
                 if (changed) this.reload();
+            });
+    }
+
+    /**
+     * Findings fields (findings-spec authoring UI, D4) — the Case desk edits what its Findings panel asks.
+     * Opened for everyone (read-only without `canManageIncidents`, D1); a persisted change refetches the
+     * effective spec so the open Case's panel redraws with it.
+     */
+    openFindingsFields(): void {
+        this.dialog
+            .open(FindingsSpecEditorDialog, {
+                width: '1180px',
+                maxWidth: '96vw',
+                maxHeight: '90vh',
+                data: { objectType: this.type, typeLabel: this.isIncident ? 'Incident' : 'Case' },
+            })
+            .afterClosed()
+            .subscribe((changed?: boolean) => {
+                if (!changed) return;
+                this.api.findingsSpec(this.type).subscribe({
+                    next: (spec) => this.findingsSpec.set(spec),
+                    error: () => undefined,
+                });
             });
     }
 
