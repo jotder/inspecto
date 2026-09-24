@@ -1753,8 +1753,10 @@ if (Test-Path $docsSrc) {
     # so the guard stayed red at 321 after this fix shipped. Do not re-inline it. Per link (fence-aware):
     #   withheld target  -> `label (internal document - not shipped)`
     #   relocated target -> re-pointed at where it lands in the bundle
-    #   anything else    -> left alone (source-code citations; links broken in the repo too), so the
-    #                       guard still reports it - hiding those here would hide real rot.
+    #   repo-only target -> `label (`repo/path` - not shipped)` (source-code citations, compliance/,
+    #                       sibling modules above the bundle root; operator decision 2026-09-25)
+    #   anything else    -> left alone (a link broken in the repo too), so the guard still reports
+    #                       it - hiding that here would hide real rot.
     #
     # Option (b), shipping a marked stub per withheld target, stays REFUSED BY THIS SCRIPT'S OWN
     # ASSERTIONS: every stub would land under docs/archived-documents/ or docs/superpower/, which the

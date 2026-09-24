@@ -19,14 +19,20 @@
  *   2. RELOCATED — the target ships, but packaging moved it (`inspecto/README.md` → `README.md`,
  *      `inspecto/examples/` → `examples/`), or moved the linking file: the link is re-pointed at where the
  *      target actually is in the bundle.
- *   3. Anything else is LEFT ALONE and the guard reports it: a source-code citation that never ships, or a
- *      link broken in the repo too. Hiding those at package time would hide real rot.
+ *   3. CITED — the target EXISTS IN THE REPO but never ships (a source-code citation, root `compliance/`,
+ *      a sibling module above the bundle root): the link is replaced by `label (`repo/path` - not shipped)`
+ *      — the same shape as class 1, the label kept and the repo path kept in code so a reader holding the
+ *      source can still find it. Operator decision 2026-09-25 (BUNDLE-DANGLING-LINKS-1): the repo docs
+ *      keep their citations; only the bundle copy changes.
+ *   4. Anything else — a target that exists NEITHER in the bundle NOR in the repo — is LEFT ALONE and the
+ *      guard reports it. That is a link broken in the repo too; hiding it at package time would hide rot.
  *
  * Decided by RESOLVING the target, not by a substring match on the tree name (the old PowerShell pattern
  * also neutralised any link whose text merely contained `BACKLOG` or `superpower`).
  *
  * CLI:  node tools/bundle-doc-rewrite.mjs --bundle <dir> --withheld-trees a,b --withheld-files x.md,y.md
  *       Rewrites every shipped markdown file in place; prints the counts. Exit 2 on bad arguments.
+ *       "Exists in the repo" (class 3) is judged against the checkout this script lives in (`tools/..`).
  */
 
 import { readdirSync, readFileSync, writeFileSync, existsSync, statSync } from 'node:fs';
@@ -36,6 +42,8 @@ import { fileURLToPath } from 'node:url';
 export const LINK = /\[([^\]]*)\]\(\s*([^)\s]+?)(?:\s+"[^"]*")?\s*\)/g;
 const EXTERNAL = /^(https?:|mailto:|tel:|ftp:|data:|#)/i;
 export const NOT_SHIPPED = ' (internal document - not shipped)';
+/** Class 3's suffix: the same `label (… - not shipped)` shape, naming the repo path in code. */
+export const citedSuffix = (repoPath) => ` (\`${repoPath}\` - not shipped)`;
 
 /**
  * Repo path prefix → bundle path prefix for everything packaging MOVES. Mirrors `package.ps1` step 4b
@@ -86,12 +94,14 @@ const decode = (t) => {
 
 /**
  * Rewrite one shipped markdown file. `bundleFile` is its path in the bundle; `present(p)` says whether a
- * bundle path (file or directory) ships; `excl` is step 7's `{ trees, files }`.
+ * bundle path (file or directory) ships; `excl` is step 7's `{ trees, files }`; `inRepo(p)` says whether a
+ * repo path (file or directory) exists in the checkout.
  */
-export function rewriteForBundle(text, bundleFile, present, excl) {
+export function rewriteForBundle(text, bundleFile, present, excl, inRepo) {
     const lines = text.split('\n');
     let neutralised = 0;
     let retargeted = 0;
+    let cited = 0;
     const bundleDir = posix.dirname(bundleFile);
     const repoDir = posix.dirname(bundleToRepo(bundleFile));
     forEachLiveLine(lines, (line, i) => {
@@ -103,7 +113,8 @@ export function rewriteForBundle(text, bundleFile, present, excl) {
             const decoded = decode(target);
             const inBundle = posix.normalize(posix.join(bundleDir, decoded)).replace(/\/$/, '');
             if (present(inBundle)) return whole;
-            const viaRepo = repoToBundle(posix.normalize(posix.join(repoDir, decoded)).replace(/\/$/, ''));
+            const repoPath = posix.normalize(posix.join(repoDir, decoded)).replace(/\/$/, '');
+            const viaRepo = repoToBundle(repoPath);
             if (isWithheld(inBundle, excl) || isWithheld(viaRepo, excl)) {
                 neutralised++;
                 return label + NOT_SHIPPED;
@@ -114,10 +125,14 @@ export function rewriteForBundle(text, bundleFile, present, excl) {
                 const at = whole.indexOf(raw, whole.indexOf(']('));
                 return whole.slice(0, at) + rel + (hash >= 0 ? raw.slice(hash) : '') + whole.slice(at + raw.length);
             }
+            if (!repoPath.startsWith('..') && inRepo(repoPath)) {
+                cited++;
+                return label + citedSuffix(repoPath + (target.endsWith('/') ? '/' : ''));
+            }
             return whole;
         });
     });
-    return { text: lines.join('\n'), neutralised, retargeted };
+    return { text: lines.join('\n'), neutralised, retargeted, cited };
 }
 
 function cli(argv) {
@@ -142,17 +157,22 @@ function cli(argv) {
     };
     walk(dir, '');
     const excl = { trees, files };
+    const repoRoot = fileURLToPath(new URL('..', import.meta.url));
+    const inRepo = (p) => existsSync(join(repoRoot, p));
     let neutralised = 0;
     let retargeted = 0;
+    let cited = 0;
     for (const rel of [...all].filter((p) => p.endsWith('.md'))) {
         const abs = join(dir, rel);
         const before = readFileSync(abs, 'utf8');
-        const out = rewriteForBundle(before, rel, (p) => all.has(p), excl);
+        const out = rewriteForBundle(before, rel, (p) => all.has(p), excl, inRepo);
         neutralised += out.neutralised;
         retargeted += out.retargeted;
+        cited += out.cited;
         if (out.text !== before) writeFileSync(abs, out.text, 'utf8');
     }
-    console.log(`docs: neutralised ${neutralised} link(s) into withheld docs; re-pointed ${retargeted} link(s) at relocated targets`);
+    console.log(`docs: neutralised ${neutralised} link(s) into withheld docs; re-pointed ${retargeted} link(s) at relocated targets; ` +
+            `unlinked ${cited} citation(s) of repo files that never ship`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) cli(process.argv.slice(2));

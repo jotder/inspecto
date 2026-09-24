@@ -190,6 +190,18 @@ if ! run_guard tools/check-doc-links.mjs "doc-link guard" \
   exit 1
 fi
 
+# Bundle-doc-link guard (2026-09-25, BUNDLE-DANGLING-LINKS-1). The SECOND HALF of the doc-link guard above:
+# that one resolves links against the repo, this one against the bundle the customer unzips (two doc trees
+# and two files withheld, no source tree), after the package-time rewrite tools/bundle-doc-rewrite.mjs
+# applies. Simulated — no pwsh, no build. What still fails points at nothing in the repo either.
+if ! run_guard tools/check-bundle-doc-links.mjs "bundle-doc-link guard" \
+     "CI runs it too — a dangling bundle link there is a red master."; then
+  echo "pre-push: refusing to push — a shipped doc links to something the bundle does not have (above)." >&2
+  echo "          Fix the LINK in the doc. Withheld, relocated and repo-only targets are already handled at" >&2
+  echo "          package time; what is left does not exist in the repo either." >&2
+  exit 1
+fi
+
 # Citation guard (2026-09-09, SPEC-STALEREF-1). The link guard above sees markdown `[text](target)` links.
 # It cannot see the commoner way a doc points at the tree: a backticked path or class name in PROSE. That
 # was unchecked and had rotted — the 17-spec consolidation measured 23 stale citations and this guard,

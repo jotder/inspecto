@@ -117,6 +117,15 @@ jobs:
       - name: Guard — every relative doc link resolves
         run: node tools/check-doc-links.mjs
 
+      # Bundle-doc-link guard (2026-09-25, BUNDLE-DANGLING-LINKS-1). The guard above proves links resolve
+      # IN THE REPO; this one proves they resolve in the BUNDLE the customer unzips, which withholds two doc
+      # trees + two files and carries no source tree. Simulated mode (no pwsh, no build): the bundle's file
+      # set from git ls-files + the exclusion lists parsed out of package.ps1, with the package-time rewrite
+      # (tools/bundle-doc-rewrite.mjs, the one step 7 runs) applied. Wired once that rewrite covered every
+      # class it can decide; what still fails is a link whose target exists nowhere — real rot.
+      - name: Guard — every link in a shipped doc resolves inside the bundle
+        run: node tools/check-bundle-doc-links.mjs
+
       # Citation guard (2026-09-09, SPEC-STALEREF-1). The link guard above only sees markdown links; the
       # commoner way a doc points at the tree is a backticked path or class name in PROSE, and nothing
       # checked those. The consolidation measured 23 stale citations by hand; this guard's first run found

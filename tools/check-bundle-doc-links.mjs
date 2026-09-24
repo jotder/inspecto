@@ -43,14 +43,15 @@
  *     `--bundle`. This exemption is PRINTED on every run: a guard's scope is a silent exemption.
  *
  * PACKAGE-TIME REWRITE. Step 7 runs `tools/bundle-doc-rewrite.mjs` over the staged docs (withheld target →
- * `label (internal document - not shipped)`, relocated target → re-pointed). Simulated mode imports and
- * applies that same module, so it reports only links that SURVIVE packaging; `--bundle` mode applies
- * nothing, so there it also proves packaging ran the rewrite. Before 2026-09-24 the simulation skipped it
- * and reported 321 where the shipped bundle had 56.
+ * `label (internal document - not shipped)`, relocated target → re-pointed, a repo file that never ships →
+ * `label (`repo/path` - not shipped)`). Simulated mode imports and applies that same module, so it reports
+ * only links that SURVIVE packaging; `--bundle` mode applies nothing, so there it also proves packaging ran
+ * the rewrite. Before 2026-09-24 the simulation skipped it and reported 321 where the shipped bundle had 56;
+ * the 56 source-code / `compliance/` citations were neutralised at package time too on 2026-09-25
+ * (operator decision, BUNDLE-DANGLING-LINKS-1), so what survives now is only a link whose target exists
+ * neither in the bundle nor in the repo — real rot.
  *
- * ⚠ NOT WIRED INTO CI OR pre-push, deliberately: it is RED on master on the 56 source-code / `compliance/`
- * citations the rewrite leaves alone, a class BUNDLE-DANGLING-LINKS-1 has not decided. Wire it when that
- * class is decided; turning the build red on an undecided question would teach the next shift to ignore it.
+ * Wired into `ci.yml` and `.githooks/pre-push` (simulated mode) since 2026-09-25.
  *
  * Pure Node, no dependencies.
  */
@@ -208,13 +209,15 @@ const dangling = [];
  */
 let neutralised = 0;
 let retargeted = 0;
+let cited = 0;
 function bundleContent(file) {
     const raw = readFileSync(bundle.map.get(file), 'utf8');
     if (!bundle.excl) return raw;
     const staged = file === 'README.md' ? raw.replace(/\.\.\/docs\//g, 'docs/') : raw;
-    const out = rewriteForBundle(staged, file, present, bundle.excl);
+    const out = rewriteForBundle(staged, file, present, bundle.excl, (p) => bundle.repo.has(p));
     neutralised += out.neutralised;
     retargeted += out.retargeted;
+    cited += out.cited;
     return out.text;
 }
 
@@ -274,7 +277,7 @@ const scopeNote =
     `scope: ${bundle.label}; ${bundle.map.size} file(s) staged, ${markdown.length} of them markdown; ` +
     (bundle.excl
         ? `withheld by step 7 — trees: ${bundle.excl.trees.join(', ')}; files: ${bundle.excl.files.join(', ')}; ` +
-          `package-time rewrite applied: ${neutralised} neutralised, ${retargeted} re-pointed; ` +
+          `package-time rewrite applied: ${neutralised} neutralised, ${retargeted} re-pointed, ${cited} repo citation(s) unlinked; ` +
           `⚠ ui/ and the generated launchers are NOT modelled here — confirm with --bundle`
         : `every target resolved against the real staged tree`);
 
@@ -292,10 +295,9 @@ if (dangling.length) {
     for (const [f, n] of [...byFile].sort((a, b) => b[1] - a[1]).slice(0, 10)) console.error(`    ${String(n).padStart(4)}  ${f}`);
     console.error(`\n  ${scopeNote}`);
     console.error(
-        `\n  ⚠ These links SURVIVE the package-time rewrite (tools/bundle-doc-rewrite.mjs), which fixes only` +
-            `\n  links into withheld docs and links to relocated targets. What is left is either a citation of a` +
-            `\n  file that never ships (fix the doc, or decide the source-path class — BUNDLE-DANGLING-LINKS-1)` +
-            `\n  or a link broken in the repo too.`,
+        `\n  ⚠ These links SURVIVE the package-time rewrite (tools/bundle-doc-rewrite.mjs), which fixes links` +
+            `\n  into withheld docs, links to relocated targets, and citations of repo files that never ship.` +
+            `\n  What is left points at nothing in the repo either — fix the link in the doc.`,
     );
     process.exit(1);
 }
