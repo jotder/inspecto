@@ -293,7 +293,8 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   under `ingester_config.grammar` all along — and is now wholly wrong: preview, `frontend: asn1` and
   the drawer all take `asn1.grammar_file`, see "A grammar is either pasted TEXT or a stored `.asn`
   FILE" above.)* A per-vendor module is stored as a `.asn` file in the Space's config (the corpus
-  keeps them that way, e.g. `mtnOCC.asn`). A per-vendor tx/transform config still has no home.
+  keeps them that way, e.g. `mtnOCC.asn`). One vendor's decode settings have a home since 2026-09-25: the
+  **Decode Profile** (below).
 - ~~**The Maven coordinate split**~~ **RESOLVED 2026-08-01.** The root `pom.xml` now aggregates
   `asn-parser/asn-decoders`, so `com.gamma.asn:asn-facade` resolves from the reactor and the manual
   `mvn install` is gone (verified with the local repo's `com/gamma/asn` deleted: 23 modules,
@@ -326,10 +327,11 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   without the data; the data alone no longer runs them without the property (2026-08-01).
 - **Drop-in parser jars** and the **segments editor** (unlock guided Save for ingestable custom parsers)
   — apply to any custom parser, not ASN.1-specific. The drop-in half's design is
-  [`parser-plugins-trust-design.md`](../../../superpower/parser-plugins-trust-design.md); what has shipped
-  is below.
+  [`parser-plugins-trust-design.md`](../../../superpower/parser-plugins-trust-design.md) (every slice
+  shipped 2026-09-25; kept in `superpower/` only until the BACKLOG row's link to it is repointed). What
+  shipped is below; this concept is now the current knowledge, the design is provenance.
 
-### Drop-in parser jars — trust gate, pack parsers, ingest and preview gate SHIPPED (2026-09-25)
+### Drop-in parser jars — trust gate, staging dir, pack parsers, ingest and preview gate SHIPPED (2026-09-25)
 
 Operator decisions 2026-09-25: **D1** a parser arrives as a **fifth Job Pack kind** through the existing
 `JobPackManager` loader (`-Djobs.packs.dir`). There is no second `plugins/` directory. **D2** T1 SHA-256
@@ -425,8 +427,115 @@ edition gate. **D8** no out-of-process host.
   pack's `preview` is never called; the same request as an author gets 200; the same viewer previews
   `delimited`; an unknown id is still 404; no authenticator ⇒ 200. The refusal test was red before the gate.
 
-Still open from **P0**: staging under a server-owned dir instead of
-the system temp dir. The decode-profile satellite (C1–C4) waits on D5/D6/D9/D10.
+**As built (slice P0, where the loaded bytes live):**
+- The staged copy is what the `URLClassLoader` reads **and** what the allowlist hash is taken of, so it no
+  longer sits in the system temp dir, which any local process can write. `JobService` passes
+  `JobPackManager.stagingRootFor(auditDir)`: `-Djobs.packs.stagingDir` when set, else
+  `<auditDir>/job-packs-staging` (the Space's own server-written state dir). Each manager creates one
+  unique owner-only `job-packs-*` dir inside it, so Spaces sharing a JVM-wide root never delete each
+  other's copies.
+- **A staging root inside the packs dir refuses boot** (`IllegalStateException` naming both paths): a
+  packs-dir writer could otherwise rewrite staged bytes after they were hashed.
+- The 4- and 5-argument constructors are test conveniences that stage in the sibling `<packs dir>.staging`.
+  Production never uses them.
+- ⚠ A crashed process leaves its `job-packs-*` dir behind. The copies in it are inert (a manager only loads
+  from the dir it created this run), and can be deleted by hand.
+- Proof: `JobPackStagingTest` (the copy's parent is the given root; a root inside the packs dir refuses
+  boot; the root is the audit dir unless overridden). **Mutation-checked**: back on `createTempDirectory`,
+  the first test goes red on the parent assertion.
+
+### Decode Profile — one vendor's decode settings, kept once (2026-09-25, slices C1–C4)
+
+Operator decisions 2026-09-25: **D5** a key the Pipeline sets wins, and `segments` is **replaced whole**,
+never merged. **D6** a bundle carries the profile as its own satellite and rewrites the refs inside it,
+refusing basename collisions, and never inlines it. **D9** no explode-style option for repeated children
+until prevalence is measured. **D10** the name is **Decode Profile** (GLOSSARY §5).
+
+**Shape.** A satellite `.toon` whose one top-level block is `asn1:`, holding the same keys a Pipeline's
+`parsing.asn1` takes. It is not a registry kind and has no routes of its own. It is written, read and
+jailed like the grammar file.
+
+```
+config/vendors/ericsson_msc/ericsson_msc.decode.toon      asn1:
+                                                            grammar_file: ericsson_msc.asn
+                                                            root_type: CallEventRecord
+                                                            strictness: BER
+                                                            segments:
+                                                              moCallRecord: mo_call_schema.toon
+config/msc/msc_switch1_pipeline.toon                      parsing:
+                                                            frontend: asn1
+                                                            asn1:
+                                                              profile_file: ../vendors/ericsson_msc/ericsson_msc.decode.toon
+                                                              max_value_bytes: 4194304
+```
+
+**One rule, `com.gamma.etl.DecodeProfile.overlay`.** The load (`PipelineConfigParser.asn1PluginBlock`, before
+its required-key checks, so a profile-backed Pipeline hits the same refusals) and the preview
+(`Asn1ParserPlugin.preview`) both call it, so a profile that previews is the profile that ingests:
+- `profile_file` must end `.toon`. That is checked before anything touches the disk. The ref resolves
+  beside the referring config (`PathJail.resolveConfigRef`) and is jailed (`requireUnderAny(allowedRoots())`)
+  **before** the readability probe, so an escaping ref is an escape (403 on the preview), never "not
+  readable".
+- Every relative ref **inside** the profile (`grammar_file`, the `segments` values) resolves **beside the
+  profile** and comes back absolute. The downstream resolvers still jail it: `Asn1GrammarSource` for the
+  grammar, `resolveSchemaRef` for a segment. A `schema/<id>` registry ref is left as an id.
+- Keys the Pipeline sets win, key by key. A **null or blank value is unset**, not an override, so an empty
+  `grammar_file` cannot clear the profile's.
+- Refused at load: a profile that names another `profile_file` (no nesting), a file with no `asn1:` block,
+  and a file holding anything besides `asn1:`.
+- ⚠ **Nothing of a non-profile file is echoed.** The ASN.1 preview is open to any authenticated user and
+  any `.toon` under the roots can be named, so a TOON parse failure does not quote the codec's message and a
+  file without `asn1:` does not list its keys. Only a real profile's own extra keys are named.
+- The profile, its grammar and its segment schemas are in `referencedFiles()` (reload trigger + bundle
+  closure). A segment the Pipeline replaced is not.
+
+**Save gate.** `ConfigSafetyValidator` (pipeline) refuses a `parsing.asn1.profile_file` that is not `.toon`,
+or that escapes, with an ERROR finding, so `/config/write`, `/config/patch` and bundle import answer 422
+before the load would refuse it. Not a `ConfigSpecs` / accepted-key census entry: the census stops at the
+top-level `parsing` block, and the served `grammarSchema` (which now lists `asn1.profile_file`) is the
+declaration for `asn1.*`.
+
+**The Parse drawer (UI).** The served form holds every `asn1.*` field at its default. On the server every
+key the Pipeline sets wins over the profile, so persisting the whole form would silently fork the Pipeline
+off its profile (`record_header_length: 0` over the profile's `4`). `decodeProfileOverrides`
+(`pipeline-parse-definition.component.ts`) keeps only `profile_file`, `segments`, keys the saved block
+already carried, and keys the user changed (`GrammarEditorComponent.dirtyKeys`). Blank values are always
+dropped. The drawer's preview sends the same subset with its `subdir`. A block without a profile is
+untouched.
+⚠ **Residual:** the form still shows the served defaults for keys the profile sets, not the profile's
+effective values (the drawer does not read the profile back). The help text on `asn1.profile_file` says the
+Pipeline's keys win.
+
+**Bundles (D6).** Export ships the profile byte-verbatim as its own satellite beside its grammar and schemas,
+and the Pipeline keeps only `profile_file` (never inlined, which would import as N un-shared copies). Two
+different files under one basename are the existing **409**. Import rewrites `parsing.asn1.profile_file`
+(`rewriteSatelliteRefs`) and, inside the landed profile, `asn1.grammar_file` and the `segments` values
+(`PipelineBundleRoutes.rewriteProfile`) to the bundled basenames, before the satellites land and the save
+gate runs. The manifest sha256 is checked against the bytes as shipped.
+
+**Scope.** ASN.1 only. XML's `ingester_config` has the same per-vendor shape but no customer asking. The
+legacy tree operations on repeated children (`flattenList` / `reduce` / `cartesianJoin`) have no home on
+purpose (D9, below).
+
+Proof: `UnifiedParsingBlockTest` (profile-only load with refs beside the profile; Pipeline scalar wins;
+blank is unset; `segments` replaced whole; escape; `.txt` refused; nesting and extra blocks refused),
+`ConfigSafetyValidatorTest.aDecodeProfileRefIsJailedAndMustNameAToonFile`,
+`ControlApiParsersTest.asn1PreviewHonoursADecodeProfileBesideThePipelineSubdir` (profile preview equals
+inline, the Pipeline's `root_type` wins, escape 403),
+`ControlApiPipelineBundleTest.aDecodeProfileTravelsAsItsOwnSatelliteAndItsRefsAreRewritten` +
+`twoProfileSatellitesSharingABasenameAreRefused`,
+`DemoCorpusIngestTest.mscCdrSplitIntoADecodeProfilePreviewsAndIngestsIdenticallyToInline` (the msc_cdr demo
+split into profile + Pipeline: same preview tree, the same rows in every segment), and the drawer spec
+`decodeProfileOverrides`. **Mutation-checked**: merging `segments`, probing readability before the jail,
+dropping the preview overlay, and dropping the in-profile import rewrite each go red.
+
+### Deferred by decision (the trust design's open items)
+
+- **D8 — out-of-process parser host (T5).** The only real containment for parser code, deferred until a
+  customer requires running parser code nobody has reviewed. Classloader isolation is not a security claim.
+- **D9 — tree operations on repeated children.** Measure first: count repeated fields carrying required
+  columns across the operator's vendor grammars. The corpus is gitignored, so this is a main-checkout task.
+- **T2 — signer anchoring** (`-Djobs.packs.trustStore`, SEC-7). Not built. D2 made T1 the required gate.
 
 ### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24
 

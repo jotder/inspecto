@@ -1,11 +1,13 @@
 # Design: parser plugins without a rebuild — trust model + the per-vendor decode profile
 
-> **State, 2026-09-25: slices P1 (the T1 trust gate), P2 (pack parser registration), P3 (pack
-> ingester resolution + ingest-time pin) and P4 (the D4 preview gate) SHIPPED. P0 is half done (its
-> staged-bytes fix is `f90ddcf25`; the server-owned staging dir is still open). P5 (the plan archive and
-> `jobs.md`) and C1–C4 are not built.** Operator decisions 2026-09-25 (all ten answered): D1 = fifth
-> Job Pack kind, D2 = T1 required (T2 not built), D3 = refuse, D4 = the Pipeline-authoring capability for
-> pack parsers only, D7 = no edition gate, D8 = defer. As-built facts are in the owner concept's *Drop-in parser jars* section.
+> **State, 2026-09-25: EVERY SLICE SHIPPED — P0 (staged-bytes fix `f90ddcf25` + the server-owned staging
+> dir), P1–P4, P5 (`jobs.md` + the owner concept), C1–C4 (the Decode Profile).** Operator decisions
+> 2026-09-25 (all ten answered): D1 = fifth Job Pack kind, D2 = T1 required (T2 not built), D3 = refuse,
+> D4 = the Pipeline-authoring capability for pack parsers only, D5 = `segments` replaced whole, D6 = carry
+> the profile as its own satellite and rewrite refs, D7 = no edition gate, D8 = defer, D9 = defer until
+> measured, D10 = "Decode Profile". **This plan is now PROVENANCE**: current knowledge is the owner
+> concept's *Drop-in parser jars* and *Decode Profile* sections. It stays in `superpower/` only until the
+> BACKLOG row's links to this path are repointed, then it is `git mv`ed to `archived-documents/plans-archive/`.
 >
 > *Original header:* **State: DESIGN ONLY, 2026-09-24 — nothing built.** Owner concept:
 > [`okf/backend/engine/parser-plugins.md`](../okf/backend/engine/parser-plugins.md). BACKLOG row:
@@ -245,7 +247,7 @@ Semantics (each one a test in slices C1–C3):
 | **C2** | Preview honours `profile_file` through `subdir` | C1 | `ControlApiParsersTest`: profile-backed preview tree == inline preview tree; escaping profile → 403 |
 | **C3** | Bundle export/import carries the profile + its satellites | C1, D6 | `ControlApiPipelineBundleTest`: export → import → preview equals inline; two satellites with one basename are refused or renamed, never silently collapsed |
 | **C4** | Demo proof | C1 | `DemoCorpusIngestTest`: `msc_cdr` split into profile + Pipeline ingests the same rows per segment as the committed inline original (the pattern of `mscCdrWithItsGrammarInAnAsnFilePreviewsAndIngestsIdenticallyToInline`) |
-| **P0** — ◐ staged-bytes half ✅ `f90ddcf25`; server-owned staging dir ❌ open | Hash **and** verify the staged copy; stage under a server-owned dir, not system temp | nothing — a fix | `JobPackManagerTest`: the inventory hash equals SHA-256 of the file the loader opened; a jar mutated after staging is not what is loaded |
+| **P0** — ✅ staged-bytes half `f90ddcf25`; server-owned staging dir ✅ 2026-09-25 | Hash **and** verify the staged copy; stage under a server-owned dir, not system temp | nothing — a fix | `JobPackManagerTest`: the inventory hash equals SHA-256 of the file the loader opened; a jar mutated after staging is not what is loaded |
 | **P1** — ✅ SHIPPED 2026-09-25 (T1 only; `PackAllowlist`, `JobPackTrustTest`, mutation-checked; allowlist also refused inside the packs dir, under `assist.write.root` / `spaces.root`; revocation unloads on rescan; refused jars listed in `GET /jobs/packs`) | Trust gate T1 (+ T2 if D3 chooses it), fail closed | D2, D3 | `JobPackManagerTest`: no allowlist ⇒ every jar rejected with the named cause; listed hash loads; one flipped byte ⇒ rejected; allowlist under a write root ⇒ boot refuses. **Mutation check:** revert the gate and confirm those tests go red on the *rejection* assertions, not on setup |
 | **P2** — ✅ SHIPPED 2026-09-25 (`Parsers` overlay also refuses a second parser naming a taken ingester FQCN; `GET /parsers` gains `source`; `JobPackParserTest`) | `Parsers` becomes an owner-keyed overlay (`register(ParserPlugin, owner)` / `deregister(owner)`, built-in collision refused, first pack wins, catalog order kept — never `Map.copyOf`); `JobPackManager.load` gains the fifth `ServiceLoader` loop and the fifth rollback | D1 | `ParsersTest`: pack parser appears after built-ins; colliding with a built-in refused; deregister restores the catalog. `JobPackManagerTest`: a parser-only pack loads; a pack whose parser collides is rejected whole, other kinds rolled back |
 | **P3** — ✅ SHIPPED 2026-09-25 (`PluginIngesters` + `PackRunLeases.acquire(owner)`; mutation-checked) | Ingester resolution through the owning loader: replace the two `Class.forName(name)` sites with one resolver that looks the FQCN up via the registered plugin's class loader; pin the pack for the duration of an ingest (the `acquireRun`/`releaseRun` pair, extended beyond Jobs) | P2 | ingest a fixture through a pack-loaded ingester end to end; unload mid-ingest defers the loader close; a Pipeline naming an unloaded parser fails its next Run with a named error, not `ClassNotFoundException` |

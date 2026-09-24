@@ -109,8 +109,16 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   when the SHA-256 of its staged bytes is listed in `-Djobs.packs.allowlist`. With no allowlist, every jar
   is refused. The file is re-read on every rescan, so removing a line unloads the pack. Boot is refused when
   the allowlist is inside the packs dir or under a control-plane write root. Refused jars show as
-  `state: "rejected"` rows with a cause. Details: [parser-plugins.md](../engine/parser-plugins.md),
-  *Drop-in parser jars*. **2026-07-20 SHIPPED the classloader half of quiesce:**
+  `state: "rejected"` rows with a cause. The gate is the same for every pack kind: Job Types, expression
+  tokens, node types, node executors, and (since 2026-09-25) **parsers**, the fifth kind. Details:
+  [parser-plugins.md](../engine/parser-plugins.md), *Drop-in parser jars*.
+  **2026-09-25: the staged copies live under a server-owned dir** (trust design slice P0), not the system
+  temp dir that any local process can write: `<auditDir>/job-packs-staging` (the Space's own audit dir), or
+  `-Djobs.packs.stagingDir` when set, one unique `job-packs-*` dir per manager inside it. A staging root
+  inside the packs dir refuses boot, because a packs-dir writer could then rewrite staged bytes after they
+  were hashed. ⚠ A crashed process leaves its staged copies behind; they are inert (nothing loads from a
+  dir it did not create this run) and can be deleted by hand.
+  **2026-07-20 SHIPPED the classloader half of quiesce:**
   `JobPackManager.acquireRun`/`releaseRun` pin a pack's active-run count for the duration of a Run's
   `Job.run(ctx)` (`JobService.runJob`); `unload()` still deregisters the pack's types immediately (so a
   reload's new types are usable at once), but defers closing the old `URLClassLoader` + deleting its staged
@@ -125,8 +133,8 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   so a reloaded pack's fresh Job runs normally again.
   **2026-09-24 FIXED a verify/load TOCTOU (SEC-7 signing gate):** `load()` used to signature-verify the
   jar in the WATCHED dir and only then copy it to staging, so a jar swapped between verify and copy loaded
-  unverified. It now **stages first** (a fresh `createTempFile` in the owner-only `createTempDirectory`
-  staging dir, out of the watched-dir writer's reach), then hashes **and** `verifySignature`s the staged
+  unverified. It now **stages first** (a fresh `createTempFile` in the owner-only staging dir, out of the
+  watched-dir writer's reach), then hashes **and** `verifySignature`s the staged
   copy and loads exactly those bytes; the recorded `hash` (inventory, `job.pack.*` payloads) is the staged
   file's sha256, and a verification failure deletes the staged copy. The watched jar's hash remains only
   the rescan change trigger — if it differs from the recorded one after a mid-load swap, the next rescan
@@ -284,7 +292,7 @@ It replaced the hardcoded `$`-vocabulary described in the *Parameters* bullet ab
   with `total` still reporting the true count. Same fixed-sub-path-before-`/jobs/{name}` ordering rule as
   `/jobs/expressions`. ⚠ **Empty on a stock install** — the product ships no processor implementation — so a
   client must treat an empty catalog as normal and keep accepting a typed id. ⛔ A Job Pack cannot contribute
-  a processor (`JobPackManager` registers four other SPIs), so the `ServiceLoader` set is authoritative and
+  a processor (`JobPackManager` registers five other SPIs, parsers the fifth since 2026-09-25), so the `ServiceLoader` set is authoritative and
   there is no overlay to merge. 🔴 It loads through the *same* `ServiceLoader.load` call as
   `ConsignmentProcessJobType.fromServiceLoader`, so the catalog cannot disagree with the lookup that
   resolves an id at run time; a provider the classpath cannot produce is **counted and skipped, and the scan

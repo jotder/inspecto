@@ -120,6 +120,16 @@ above the generated commit list.
   packs dir or under `assist.write.root`, `spaces.root` or an `assist.safety.roots` root.
 - `GET /jobs/packs` now also lists refused jars as `{file, hash, state: "rejected", cause}` beside the
   `state: "loaded"` rows. A client that treated every row as loaded must filter on `state`.
+- **Staged copies moved out of the system temp dir (slice P0).** They live under
+  `<auditDir>/job-packs-staging`, or the new **`-Djobs.packs.stagingDir`**. A staging dir inside the packs
+  dir **fails boot**.
+
+**Additive — the Decode Profile (2026-09-25, parser-plugins trust design C1–C4)**
+- New Pipeline key **`parsing.asn1.profile_file`**: a `.toon` satellite holding one `asn1:` block that
+  several Pipelines share. Pipeline keys win; `segments` is replaced whole. `GET /parsers` serves the field
+  in the ASN.1 `grammarSchema`, `POST /parsers/asn1/preview` honours it (403 on an escaping ref), and a
+  Pipeline bundle carries the profile as its own satellite. See
+  [parser-plugins.md](../engine/parser-plugins.md), *Decode Profile*.
 
 **Parsers from Job Packs (2026-09-25, parser-plugins trust design slices P2–P4)**
 - A `ParserPlugin` in an allowlisted Job Pack now registers (the fifth pack kind). It appears in
