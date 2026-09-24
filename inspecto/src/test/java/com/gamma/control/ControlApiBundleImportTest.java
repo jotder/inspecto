@@ -250,24 +250,67 @@ class ControlApiBundleImportTest {
     }
 
     /**
-     * W3, 2026-07-31 — the import-time referential-integrity gate. Before it, a bundle naming a connection
-     * nobody has was written and then registered in *manifest order*, so the failure surfaced one file at a
-     * time as a 422 from `registerPipeline` (or not until the first poll), potentially after other pipelines
-     * in the same bundle had already gone live. Now nothing is registered unless every reference resolves.
+     * Operator decision 2026-09-25 — a missing connection WARNS, it no longer refuses. Until then (W3,
+     * 2026-07-31) a bundle naming a connection the target lacks was a 422 that registered nothing, which made
+     * moving a data source into a Space that has not yet onboarded its connection impossible. Now the import
+     * succeeds and every config that needs the connection lands switched OFF by its OWN switch — a pipeline's
+     * {@code active}, a job's {@code job.enabled} — with one structured warning per missing connection naming
+     * what it disabled. A config that does not need it is left exactly as bundled.
      */
     @Test
-    void aBundleNamingAnUnknownConnectionIsRejectedAndRegistersNothing(@TempDir Path root) throws Exception {
+    void aBundleNamingAnUnknownConnectionImportsWithItsDependentsDisabledAndAWarning(@TempDir Path root)
+            throws Exception {
         try (Ctx c = open(root)) {
-            byte[] bundle = bundleReferencingConnection(root, "absent_conn", false);
+            byte[] bundle = bundleReferencingConnection(root, "absent_conn", false, true);
+            Path scratch = root.resolve("scratch-absent_conn").resolve("config");
+            assertTrue(Files.readString(scratch.resolve("etl_pipeline.toon")).contains("active: true"),
+                    "the bundled pipeline is ACTIVE, or 'lands disabled' would pass vacuously");
 
             HttpResponse<String> imp = post(c.port, "/spaces/beta/import", bundle);
-            assertEquals(422, imp.statusCode(), imp.body());
-            String details = V1Body.envelope(imp.body()).get("error").get("details").toString();
-            assertTrue(details.contains("absent_conn"), "names the unresolvable connection: " + details);
-            assertTrue(details.contains("collector.connection"), "attributes it to the right key: " + details);
+            assertEquals(200, imp.statusCode(), imp.body());
+            JsonNode body = V1Body.of(imp.body());
+            assertEquals("[\"test_etl\"]", body.get("pipelines").toString(), "the pipeline still registers");
+            assertTrue(idList(c.port, "/spaces/beta/datasources").contains("test_etl"));
 
-            assertTrue(idList(c.port, "/spaces/beta/datasources").isEmpty(),
-                    "nothing was registered — the gate is all-or-nothing, not best-effort");
+            // The switch each kind really reads, on the file that landed.
+            Path beta = root.resolve("beta").resolve("config");
+            java.util.Map<String, Object> pipeline = com.gamma.config.io.ConfigCodec.toMap(
+                    Files.readString(beta.resolve("etl_pipeline.toon")));
+            assertEquals("false", String.valueOf(pipeline.get("active")), "pipeline lands inactive: " + pipeline);
+            assertFalse(pipeline.containsKey("enabled"), "no cross-kind stamp on a pipeline: " + pipeline);
+            java.util.Map<?, ?> job = (java.util.Map<?, ?>) com.gamma.config.io.ConfigCodec.toMap(
+                    Files.readString(beta.resolve("export_job.toon"))).get("job");
+            assertEquals("false", String.valueOf(job.get("enabled")), "the job needing it lands disabled: " + job);
+            assertEquals(Files.readString(scratch.resolve("report_job.toon")),
+                    Files.readString(beta.resolve("report_job.toon")),
+                    "a job that does not need the connection is untouched, byte for byte");
+
+            JsonNode warnings = body.get("connectionWarnings");
+            assertNotNull(warnings, "the response carries the warnings: " + body);
+            assertEquals(1, warnings.size(), "one warning per missing connection: " + warnings);
+            JsonNode w = warnings.get(0);
+            assertEquals("absent_conn", w.get("connection").asText());
+            assertEquals("WARN_UNRESOLVED_CONNECTION", w.get("code").asText());
+            assertTrue(w.get("message").asText().contains("connect absent_conn to enable"), w.toString());
+            java.util.Set<String> disabled = new java.util.HashSet<>();
+            w.get("disabled").forEach(d -> disabled.add(d.get("kind").asText() + ":" + d.get("name").asText()
+                    + "@" + d.get("file").asText()));
+            assertEquals(java.util.Set.of("pipeline:test_etl@etl_pipeline.toon", "job:export_x@export_job.toon"),
+                    disabled);
+        }
+    }
+
+    /** No missing connection ⇒ no warning, and nothing is switched off. */
+    @Test
+    void aBundleWhoseConnectionsAllResolveCarriesNoWarningsAndStaysActive(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            HttpResponse<String> imp = post(c.port, "/spaces/beta/import",
+                    bundleReferencingConnection(root, "carried_conn", true, true));
+            assertEquals(200, imp.statusCode(), imp.body());
+            assertEquals("[]", V1Body.of(imp.body()).get("connectionWarnings").toString());
+            Path beta = root.resolve("beta").resolve("config");
+            assertEquals("true", String.valueOf(com.gamma.config.io.ConfigCodec.toMap(
+                    Files.readString(beta.resolve("etl_pipeline.toon"))).get("active")));
         }
     }
 
@@ -330,22 +373,31 @@ class ControlApiBundleImportTest {
         }
     }
 
-    /** Preview must agree with commit about a missing connection, or `valid:true` invites a 422. */
+    /**
+     * Preview must agree with commit about a missing connection: commit now imports it with its dependents
+     * disabled, so preview says {@code valid: true}, reports a WARNING (not an ERROR) finding, and carries the
+     * same {@code connectionWarnings} the commit will return.
+     */
     @Test
-    void previewReportsAnUnknownConnectionToo(@TempDir Path root) throws Exception {
+    void previewReportsAnUnknownConnectionAsAWarningToo(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             byte[] bundle = bundleReferencingConnection(root, "absent_conn", false);
 
             HttpResponse<String> pv = post(c.port, "/spaces/beta/import/preview", bundle);
             assertEquals(200, pv.statusCode(), pv.body());
             JsonNode r = V1Body.of(pv.body());
-            assertFalse(r.get("valid").asBoolean(), "preview agrees the bundle is not importable");
-            assertTrue(r.get("findings").toString().contains("absent_conn"), r.get("findings").toString());
+            assertTrue(r.get("valid").asBoolean(), "a missing connection no longer blocks the import: " + r);
+            String findings = r.get("findings").toString();
+            assertTrue(findings.contains("absent_conn") && findings.contains("WARNING")
+                    && !findings.contains("ERROR"), findings);
+            assertEquals("absent_conn", r.get("connectionWarnings").get(0).get("connection").asText(), r.toString());
+            assertTrue(idList(c.port, "/spaces/beta/datasources").isEmpty(), "preview wrote nothing");
 
-            // And the same bundle carrying the connection previews clean.
+            // And the same bundle carrying the connection previews with no warning at all.
             JsonNode ok = V1Body.of(post(c.port, "/spaces/beta/import/preview",
                     bundleReferencingConnection(root, "carried_conn", true)).body());
             assertTrue(ok.get("valid").asBoolean(), "findings: " + ok.get("findings"));
+            assertEquals("[]", ok.get("connectionWarnings").toString());
         }
     }
 
@@ -370,6 +422,13 @@ class ControlApiBundleImportTest {
 
     private static byte[] bundleReferencingConnection(Path root, String connId, boolean carryConnection)
             throws Exception {
+        return bundleReferencingConnection(root, connId, carryConnection, false);
+    }
+
+    /** @param withJobs also carry {@code export_job.toon} (an object-store export binding {@code connId}) and
+     *                  {@code report_job.toon} (binding nothing) */
+    private static byte[] bundleReferencingConnection(Path root, String connId, boolean carryConnection,
+                                                      boolean withJobs) throws Exception {
         Path config = root.resolve("scratch-" + connId).resolve("config");
         Files.createDirectories(config);
         // TestConfigs writes `pipeline_<hash>.toon`; the `*_pipeline.toon` suffix is what marks a file as a
@@ -390,8 +449,18 @@ class ControlApiBundleImportTest {
         try (var s = Files.list(config)) {
             s.filter(f -> f.getFileName().toString().startsWith("schema_")).forEach(schemas::add);
         }
+        java.util.List<Path> jobs = new java.util.ArrayList<>();
+        if (withJobs) {
+            Path export = config.resolve("export_job.toon");
+            Files.writeString(export, "job:\n  name: export_x\n  type: objectstore.export\n  on_pipeline: test_etl\n"
+                    + "  connection: " + connId + "\n  local_path: out\n  remote_prefix: drop/\n");
+            Path report = config.resolve("report_job.toon");
+            Files.writeString(report, "job:\n  name: report_x\n  type: report\n  on_pipeline: test_etl\n");
+            jobs.add(export);
+            jobs.add(report);
+        }
         return BundleExporter.exportDataSource(
-                new DataSourceBundle("test_etl", pipeline, conn, schemas, java.util.List.of(), java.util.List.of(), java.util.List.of(), java.util.List.of()), config, "alpha");
+                new DataSourceBundle("test_etl", pipeline, conn, schemas, jobs, java.util.List.of(), java.util.List.of(), java.util.List.of()), config, "alpha");
     }
 
     // ── apply order (pipeline spec gap 6c) ───────────────────────────────────────────────────────────

@@ -43,6 +43,45 @@ class BundleImporterTest {
         assertEquals(List.of("voucher_etl"), BundleImporter.pipelineIds(BundleImporter.parse(zip)));
     }
 
+    /**
+     * A missing connection disables every config that needs it, by that kind's own switch, and yields one
+     * warning per connection. A pipeline needs a connection through {@code collector.connection} OR
+     * {@code webhook.connection}; a job through {@code job.connection}. A carried or registered connection
+     * disables nothing, and an untouched entry keeps its exact bytes.
+     */
+    @Test
+    void disableForMissingConnectionsSwitchesOffEachDependentByItsOwnSwitch() throws Exception {
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("bundle.toon", "kind: datasource\n");
+        files.put("a_pipeline.toon", "name: A_ETL\nactive: true\ncollector:\n  connection: gone\n");
+        files.put("b_pipeline.toon", "name: B_ETL\nactive: true\nwebhook:\n  connection: gone\n");
+        files.put("c_pipeline.toon", "name: C_ETL\nactive: true\ncollector:\n  connection: carried\n");
+        files.put("d_pipeline.toon", "name: D_ETL\nactive: true\ncollector:\n  connection: registered\n");
+        files.put("x_job.toon", "job:\n  name: X\n  type: objectstore.export\n  connection: other_gone\n");
+        files.put("carried_connection.toon", "connection:\n  id: carried\n  connector: sftp\n");
+        BundleImporter.Bundle in = BundleImporter.parse(zip(files));
+
+        BundleImporter.MissingConnections r = BundleImporter.disableForMissingConnections(in, java.util.Set.of("registered"));
+
+        Map<String, byte[]> out = r.bundle().configEntries();
+        assertEquals("false", String.valueOf(toMap(out.get("a_pipeline.toon")).get("active")));
+        assertEquals("false", String.valueOf(toMap(out.get("b_pipeline.toon")).get("active")));
+        assertEquals("false", String.valueOf(((Map<?, ?>) toMap(out.get("x_job.toon")).get("job")).get("enabled")));
+        for (String kept : List.of("c_pipeline.toon", "d_pipeline.toon", "carried_connection.toon"))
+            assertArrayEquals(in.configEntries().get(kept), out.get(kept), kept + " is untouched");
+
+        assertEquals(List.of("gone", "other_gone"), r.warnings().stream().map(w -> w.get("connection")).toList());
+        assertEquals(List.of(Map.of("kind", "pipeline", "name", "a_etl", "file", "a_pipeline.toon"),
+                        Map.of("kind", "pipeline", "name", "b_etl", "file", "b_pipeline.toon")),
+                r.warnings().get(0).get("disabled"));
+        assertEquals(List.of(Map.of("kind", "job", "name", "X", "file", "x_job.toon")),
+                r.warnings().get(1).get("disabled"));
+    }
+
+    private static Map<String, Object> toMap(byte[] toon) {
+        return com.gamma.config.io.ConfigCodec.toMap(new String(toon, StandardCharsets.UTF_8));
+    }
+
     @Test
     void writeConfigUnpacksEntriesUnderConfigDir(@TempDir Path tmp) throws Exception {
         Path config = tmp.resolve("config");

@@ -8,7 +8,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ImportPreview, SpacesService } from 'app/inspecto/api';
+import { apiErrorMessage, ConnectionWarning, ImportPreview, SpacesService } from 'app/inspecto/api';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -48,6 +49,7 @@ export interface ImportBundleData {
         MatIconModule,
         MatInputModule,
         MatProgressSpinnerModule,
+        InspectoAlertComponent,
         StatusBadgeComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -138,6 +140,13 @@ export interface ImportBundleData {
                             </div>
                             <mat-checkbox [formControl]="overwrite">Overwrite existing data sources</mat-checkbox>
                         </div>
+                    }
+
+                    @for (w of p.connectionWarnings ?? []; track w.connection) {
+                        <inspecto-alert variant="warning" [title]="'Connect ' + w.connection + ' to enable'">
+                            This space has no connection “{{ w.connection }}”. These will import disabled:
+                            {{ disabledNames(w) }}.
+                        </inspecto-alert>
                     }
 
                     @if (findingEntries(p).length) {
@@ -247,6 +256,10 @@ export class ImportBundleDialog {
             next: (r) => {
                 this.busy.set(false);
                 this.toastr.success(`Imported ${r.imported.length} data source(s) into "${this.data.spaceId}"`);
+                for (const w of r.connectionWarnings ?? [])
+                    this.toastr.warning(
+                        `Connect ${w.connection} to enable: ${this.disabledNames(w)} imported disabled.`,
+                    );
                 this.ref.close(true);
             },
             error: (err) => {
@@ -281,6 +294,11 @@ export class ImportBundleDialog {
                 this.toastr.error(msg);
             },
         });
+    }
+
+    /** "pipeline orders_etl, job export_x" — what a missing connection switched off. */
+    disabledNames(w: ConnectionWarning): string {
+        return w.disabled.map((d) => `${d.kind} ${d.name}`).join(', ');
     }
 
     findingEntries(p: ImportPreview): { file: string; findings: ImportPreview['findings'][string] }[] {

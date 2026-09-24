@@ -108,6 +108,89 @@ public final class BundleImporter {
         return new Narrowed(new Bundle(bundle.kind(), bundle.manifest(), entries, bundle.spaceToon()), List.copyOf(kept));
     }
 
+    /** A bundle with its connection-dependent configs switched off, and one warning per missing connection. */
+    public record MissingConnections(Bundle bundle, List<Map<String, Object>> warnings) {}
+
+    /**
+     * Switch OFF every config that needs a connection the target has neither registered nor receives in this
+     * bundle, and report one warning per such connection (operator decision 2026-09-25 — a missing connection
+     * warns; until then it refused the whole import). Each config is disabled by the switch <b>its own kind
+     * reads</b>, never a cross-kind stamp: a pipeline's top-level {@code active} (PipelineConfigParser — the
+     * poll cycle runs only an active pipeline) and a job's {@code job.enabled} (JobConfig — the scheduler arms
+     * only an enabled job). A pipeline needs a connection through {@code collector.connection} or
+     * {@code webhook.connection}; a job through {@code job.connection} ({@code objectstore.export}).
+     *
+     * <p>Only a disabled entry is re-serialised; every other entry keeps its exact bytes. An entry that will
+     * not parse is left alone — the import's own gates report it.
+     *
+     * @param registered the connection ids the target space already holds
+     * @return the bundle to write, and warnings {@code {connection, code, message, disabled:[{kind,name,file}]}}
+     *         in first-seen order
+     */
+    public static MissingConnections disableForMissingConnections(Bundle bundle, Set<String> registered) {
+        Set<String> known = new HashSet<>(registered);
+        for (Map.Entry<String, byte[]> e : bundle.configEntries().entrySet()) {
+            if (!e.getKey().endsWith("_connection.toon")) continue;
+            Map<String, Object> doc = parseOrNull(e.getValue());
+            Object id = doc == null ? null
+                    : (doc.get("connection") instanceof Map<?, ?> m ? m : doc).get("id");
+            if (id != null && !String.valueOf(id).isBlank()) known.add(String.valueOf(id).trim());
+        }
+
+        LinkedHashMap<String, byte[]> entries = new LinkedHashMap<>(bundle.configEntries());
+        Map<String, List<Map<String, Object>>> byConnection = new LinkedHashMap<>();
+        for (Map.Entry<String, byte[]> e : bundle.configEntries().entrySet()) {
+            String file = e.getKey();
+            boolean pipeline = file.endsWith("_pipeline.toon");
+            if (!pipeline && !file.endsWith("_job.toon")) continue;
+            Map<String, Object> doc = parseOrNull(e.getValue());
+            if (doc == null) continue;
+            Map<String, Object> switchHolder = pipeline ? doc : subMap(doc, "job");
+            if (switchHolder == null) continue;
+            Set<String> missing = new java.util.LinkedHashSet<>();
+            for (String block : pipeline ? List.of("collector", "webhook") : List.of("job")) {
+                Map<String, Object> m = subMap(doc, block);
+                Object conn = m == null ? null : m.get("connection");
+                String id = conn == null ? "" : String.valueOf(conn).trim();
+                if (!id.isEmpty() && !known.contains(id)) missing.add(id);
+            }
+            if (missing.isEmpty()) continue;
+            switchHolder.put(pipeline ? "active" : "enabled", false);
+            entries.put(file, ConfigCodec.toToon(doc).getBytes(StandardCharsets.UTF_8));
+            Object name = switchHolder.get("name");
+            Map<String, Object> disabled = Map.of("kind", pipeline ? "pipeline" : "job",
+                    "name", name == null ? "" : pipeline ? name.toString().toLowerCase() : name.toString(),
+                    "file", file);
+            for (String id : missing) byConnection.computeIfAbsent(id, k -> new ArrayList<>()).add(disabled);
+        }
+
+        List<Map<String, Object>> warnings = new ArrayList<>();
+        byConnection.forEach((id, disabled) -> {
+            Map<String, Object> w = new LinkedHashMap<>();
+            w.put("connection", id);
+            w.put("code", com.gamma.config.spec.FindingCodes.WARN_UNRESOLVED_CONNECTION);
+            w.put("message", "connect " + id + " to enable — this space has no such connection profile, so "
+                    + disabled.size() + " imported config(s) that need it landed disabled");
+            w.put("disabled", List.copyOf(disabled));
+            warnings.add(w);
+        });
+        return new MissingConnections(new Bundle(bundle.kind(), bundle.manifest(), entries, bundle.spaceToon()),
+                List.copyOf(warnings));
+    }
+
+    private static Map<String, Object> parseOrNull(byte[] toon) {
+        try {
+            return ConfigCodec.toMap(new String(toon, StandardCharsets.UTF_8));
+        } catch (RuntimeException bad) {
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> subMap(Map<String, Object> doc, String key) {
+        return doc.get(key) instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
+    }
+
     /** What an unpack did: the config-relative paths written. */
     public record Unpacked(List<String> paths) {}
 

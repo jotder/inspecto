@@ -218,6 +218,15 @@ above the generated commit list.
   unchanged — renaming it is a separate, unmade decision.
 
 **Operator-visible behaviour**
+- `POST /spaces/{id}/import` (data-source / Space bundle) **no longer refuses a bundle that names a connection
+  the target Space lacks** (operator, 2026-09-25). It was a **422** that registered nothing; now it is a
+  **200** — every config needing the missing connection is written **switched off by its own switch**
+  (a Pipeline's `active: false`, a job's `job.enabled: false`) and the response carries a new
+  `connectionWarnings: [{connection, code: WARN_UNRESOLVED_CONNECTION, message: "connect X to enable …",
+  disabled: [{kind, name, file}]}]`. `POST /spaces/{id}/import/preview` agrees: the finding is a **WARNING**
+  (`valid` stays `true`) and the same `connectionWarnings` is returned. A client that treated the 422 as
+  "nothing imported" must now read `connectionWarnings` instead.
+  [editable round-trip §22](../pipeline-graph/editable-round-trip.md)
 - `DELETE /spaces/{id}?purge=true` answers **409** when it would remove the **last Space directory on disk** (D4); deregister-only on the last Space stays allowed. *(This line stated the rule backwards — "409 unless `?purge=true`" — until 2026-09-08; `SpaceRoutes.java:120-127`.)*
 - Full recomputes write a sibling `<pipeline>_<batchId>` table and supersede the old revision in the
   catalog; **nothing deletes the bytes** until a `retire_superseded` maintenance job is configured.

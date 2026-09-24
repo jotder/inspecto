@@ -570,10 +570,28 @@ shares, the same schema — rides once.
 listing only the entries that Reference alone brought. On `POST /spaces/{id}/import` (and its preview),
 `BundleImporter.keepExistingReferences` drops every carried Reference the target already hosts — its entries
 are not written and it is not a 409 conflict — and reports it in `referencesKept`; under
-`?on_conflict=overwrite` nothing is narrowed and the carried copy replaces the target's. ⚠ The data-source
-import's connection gate is an **ERROR** (422, nothing registered), unlike `POST /pipelines/import`, where an
-unresolved connection is a WARNING because that bundle never carries a profile; the forward closure carries
-the producer's connection precisely so this gate stays unchanged. An imported companion `*_enrich.toon` is
+`?on_conflict=overwrite` nothing is narrowed and the carried copy replaces the target's.
+
+**A missing connection warns, it does not refuse (operator, 2026-09-25).** Until then the data-source
+import's connection gate was an ERROR — 422, nothing registered — which made moving a data source into a
+Space that has not yet onboarded its connection impossible. Now `BundleImporter.disableForMissingConnections`
+runs on the zip entries **before** the write: a connection id is known when the target's registry holds it or
+the bundle carries its `*_connection.toon`; every config that names an unknown one is written **switched off
+by the switch its own kind reads** — a Pipeline (`collector.connection` or `webhook.connection`) gets
+top-level `active: false` (`PipelineConfigParser`; the poll cycle runs only an active Pipeline), a job
+(`job.connection`, `objectstore.export`) gets `job.enabled: false` (`JobConfig`). No cross-kind stamp: a
+Pipeline has no `enabled` key, and a job no `active`. Only a disabled entry is re-serialised (canonical TOON);
+every other entry keeps its exact bytes. The Pipeline still **registers** — it is present and inactive, so an
+operator connects the profile and activates it in place. The response (and the preview) carries
+`connectionWarnings: [{connection, code: WARN_UNRESOLVED_CONNECTION, message: "connect X to enable …",
+disabled: [{kind, name, file}]}]`, one per missing connection; the preview's per-file finding is a WARNING, so
+`valid` no longer goes false for this. The schema-existence and containment halves of the commit gate
+(`DataSourceRoutes.referentialFindings`) are unchanged and still refuse the whole bundle. This now matches
+`POST /pipelines/import`, which always warned (and always lands `active: false`). ⚠ `POST /spaces/import`
+(seed a **new** Space from a whole-Space bundle) never ran this gate and still does not — a whole-Space export
+carries its connections. Pinned by `ControlApiBundleImportTest.aBundleNamingAnUnknownConnectionImportsWith…`,
+`…AllResolveCarriesNoWarnings…`, `previewReportsAnUnknownConnectionAsAWarningToo` and
+`BundleImporterTest.disableForMissingConnections…`. An imported companion `*_enrich.toon` is
 written but not hot-registered — it goes live on the Space's next boot, as in a whole-Space import.
 
 Pinned by `DataSourceBundleResolverTest.carriesTheReferenceDatasetsThePipelineReadsAndNothingElse` (all

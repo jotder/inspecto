@@ -4,7 +4,7 @@ title: Exchange — Cross-Space Sharing
 description: Grant-mediated, read-only Dataset/Widget sharing across Spaces — offer/request/approve ledger, snapshot/live delivery, version pin + drift, the sharing.component UI.
 resource: inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java
 tags: [control-plane, multi-space, exchange, sharing]
-timestamp: 2026-09-24T00:00:00Z
+timestamp: 2026-09-25T00:00:00Z
 ---
 
 # Exchange — Cross-Space Sharing
@@ -181,7 +181,10 @@ Jobs, Queries, Expectations — cross-instance/staging transport for those stays
 (copy semantics), or the per-data-source zip bundle, whose closure carries a Pipeline's bound components and
 — since 2026-09-24 — the Reference Datasets it reads, as their producing Pipelines
 ([editable round-trip §22](../pipeline-graph/editable-round-trip.md)). Neither is sharing: a Reference that
-travels in a bundle is copied into the target Space, never granted. No cross-space writes, ever. No per-row/column masking in v1 (an owner shares the
+travels in a bundle is copied into the target Space, never granted. A connection is the one dependency a
+bundle may leave behind: since 2026-09-25 importing one that names a connection the target lacks **succeeds**,
+lands each Pipeline/job needing it disabled (`active: false` / `job.enabled: false`), and returns a
+`connectionWarnings` entry per missing connection ("connect X to enable") instead of the former 422. No cross-space writes, ever. No per-row/column masking in v1 (an owner shares the
 whole Dataset or offers a pre-filtered derived one). No wholesale/public scope.
 
 ## Design-of-record

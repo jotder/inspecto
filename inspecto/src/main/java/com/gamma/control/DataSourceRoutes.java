@@ -8,6 +8,7 @@ import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
 import com.gamma.event.EventLog;
 import com.gamma.service.BundleExporter;
@@ -100,14 +101,12 @@ final class DataSourceRoutes implements RouteModule {
         List<String> dataSources = BundleImporter.pipelineIds(bundle);
         List<String> conflicts = dataSources.stream().filter(existing::contains).sorted().toList();
 
-        // The connection half of the import gate, evaluated from the zip bytes so preview agrees with commit
-        // about a missing connection rather than reporting `valid: true` on a bundle the commit then 422s.
-        Set<String> knownConnections = new TreeSet<>(api.service().connections().keySet());
-        bundle.configEntries().forEach((name, bytes) -> {
-            if (!name.endsWith("_connection.toon")) return;
-            String id = connectionIdOf(bytes);
-            if (id != null) knownConnections.add(id);
-        });
+        // The connection half, evaluated from the zip bytes exactly as commit evaluates it, so preview names
+        // the same missing connections and the same configs the commit will land disabled. A WARNING, not an
+        // ERROR: since 2026-09-25 a missing connection disables its dependents rather than refusing the import.
+        List<Map<String, Object>> connectionWarnings = BundleImporter.disableForMissingConnections(
+                bundle, api.service().connections().keySet()).warnings();
+        Map<String, Set<String>> missingByFile = missingConnectionsByFile(connectionWarnings);
 
         Map<String, List<Finding>> findings = new LinkedHashMap<>();
         boolean valid = true;
@@ -116,10 +115,12 @@ final class DataSourceRoutes implements RouteModule {
             // judged from where the entry would land, so its data paths resolve under this Space
             List<Finding> fs = new ArrayList<>(validatePipeline(entry.getValue(),
                     config.resolve(entry.getKey()).getParent()));
-            String conn = connectionRefOf(entry.getValue());
-            if (conn != null && !knownConnections.contains(conn))
-                fs.add(new Finding(Severity.ERROR, "collector.connection",
-                        "unknown connection '" + conn + "' — it is neither in this space nor in the bundle"));
+            for (String conn : missingByFile.getOrDefault(entry.getKey(), Set.of()))
+                fs.add(new Finding(Severity.WARNING, "connection",
+                        "unknown connection '" + conn + "' — it is neither in this space nor in the bundle;"
+                                + " the pipeline imports disabled — connect " + conn + " to enable",
+                        FindingCodes.WARN_UNRESOLVED_CONNECTION,
+                        "register the connection, then activate the pipeline"));
             if (!fs.isEmpty()) findings.put(entry.getKey(), fs);
             if (fs.stream().anyMatch(f -> f.severity() == Severity.ERROR)) valid = false;
         }
@@ -133,6 +134,7 @@ final class DataSourceRoutes implements RouteModule {
         r.put("conflicts", conflicts);
         r.put("referencesKept", narrowed.referencesKept());
         r.put("findings", findings);
+        r.put("connectionWarnings", connectionWarnings);
         r.put("valid", valid);
         return r;
     }
@@ -173,22 +175,11 @@ final class DataSourceRoutes implements RouteModule {
      * <p>⚠ That reuse answers <b>existence</b> only. Containment is a separate question and comes from
      * {@link ConfigSafetyValidator}, which is why both are called here — see the note at the call site.
      *
-     * <p>A connection is checked by <b>id</b>, against the union of this space's registry and the ids the
-     * bundle itself carries — a bundle that brings its own connection is complete, even though that
-     * connection is not registered yet at this point.
+     * <p>⚠ A <b>connection</b> is deliberately NOT part of this gate any more (operator, 2026-09-25): a missing
+     * one is handled before the write by {@link BundleImporter#disableForMissingConnections}, which lands every
+     * config that needs it disabled and returns a warning, instead of refusing the whole bundle.
      */
-    private static Map<String, List<Finding>> referentialFindings(ApiContext api, Path config, List<String> written) {
-        Set<String> knownConnections = new TreeSet<>(api.service().connections().keySet());
-        for (String rel : written) {
-            if (!rel.endsWith("_connection.toon")) continue;
-            try {
-                knownConnections.add(ConnectionProfile.load(config.resolve(rel)).id());
-            } catch (RuntimeException | IOException ignored) {
-                // A connection file that will not load is reported against the pipeline that needs it
-                // (below) rather than here: "pipeline X wants connection Y" is the actionable message.
-            }
-        }
-
+    private static Map<String, List<Finding>> referentialFindings(Path config, List<String> written) {
         Map<String, List<Finding>> out = new LinkedHashMap<>();
         for (String rel : written) {
             if (!rel.endsWith("_pipeline.toon")) continue;
@@ -209,44 +200,19 @@ final class DataSourceRoutes implements RouteModule {
             // then refused one file at a time by registerPipeline below — the exact mid-walk partial
             // registration this whole gate exists to prevent.
             fs.addAll(ConfigSafetyValidator.check("pipeline", map, SafetyPolicy.defaultPolicy(), file.getParent()));
-            String conn = connectionRef(map);
-            if (conn != null && !knownConnections.contains(conn))
-                fs.add(new Finding(Severity.ERROR, "collector.connection",
-                        "unknown connection '" + conn + "' — it is neither in this space nor in the bundle;"
-                                + " import the connection first or add it to the bundle"));
             if (!fs.isEmpty()) out.put(rel, fs);
         }
         return out;
     }
 
-    /** {@link #connectionRef} over raw TOON bytes (preview works from the zip, not from disk). */
-    private static String connectionRefOf(byte[] toon) {
-        try {
-            return connectionRef(ConfigCodec.toMap(new String(toon, StandardCharsets.UTF_8)));
-        } catch (RuntimeException bad) {
-            return null;   // a parse failure is already reported as its own ERROR by validatePipeline
-        }
-    }
-
-    /** The in-file id of a {@code *_connection.toon} from its bytes, or {@code null} if it will not parse. */
-    private static String connectionIdOf(byte[] toon) {
-        try {
-            Map<String, Object> doc = ConfigCodec.toMap(new String(toon, StandardCharsets.UTF_8));
-            Object block = doc.get("connection");
-            Object id = (block instanceof Map<?, ?> m ? m : doc).get("id");
-            return id == null || String.valueOf(id).isBlank() ? null : String.valueOf(id).trim();
-        } catch (RuntimeException bad) {
-            return null;
-        }
-    }
-
-    /** A pipeline's bound connection id ({@code collector.connection}), or {@code null} for a local source. */
-    private static String connectionRef(Map<String, Object> pipeline) {
-        if (!(pipeline.get("collector") instanceof Map<?, ?> collector)) return null;
-        Object id = collector.get("connection");
-        if (id == null) return null;
-        String s = String.valueOf(id).trim();
-        return s.isEmpty() ? null : s;
+    /** The missing connection ids each disabled file needs, inverted from the {@code connectionWarnings}. */
+    private static Map<String, Set<String>> missingConnectionsByFile(List<Map<String, Object>> warnings) {
+        Map<String, Set<String>> out = new LinkedHashMap<>();
+        for (Map<String, Object> w : warnings)
+            for (Object d : (List<?>) w.get("disabled"))
+                out.computeIfAbsent(String.valueOf(((Map<?, ?>) d).get("file")), k -> new TreeSet<>())
+                        .add(String.valueOf(w.get("connection")));
+        return out;
     }
 
     /** Unpack a bundle zip into the bound space's {@code config/} and make the new configs live. */
@@ -278,6 +244,13 @@ final class DataSourceRoutes implements RouteModule {
                     "error", "data-source id(s) already exist; re-send with ?on_conflict=overwrite to replace",
                     "conflicts", conflicts));
 
+        // A connection neither this space nor the bundle has WARNS, it does not refuse (operator, 2026-09-25):
+        // every config that needs it is written switched off by its own switch, and the response names each
+        // missing connection with the configs it disabled — "connect X to enable".
+        BundleImporter.MissingConnections missing = BundleImporter.disableForMissingConnections(
+                bundle, api.service().connections().keySet());
+        bundle = missing.bundle();
+
         BundleImporter.Unpacked unpacked;
         try {
             unpacked = BundleImporter.writeConfig(bundle, config);
@@ -286,11 +259,11 @@ final class DataSourceRoutes implements RouteModule {
         }
         List<String> written = unpacked.paths();
 
-        // Referential integrity BEFORE anything goes live: a bundle whose pipeline names a connection or a
-        // schema file nobody has is rejected as a whole, listing every problem at once. Without this the
-        // registration loop below discovered the same breakage one file at a time and threw mid-walk,
+        // Referential integrity BEFORE anything goes live: a bundle whose pipeline names a schema file nobody
+        // has (or one escaping the allowed roots) is rejected as a whole, listing every problem at once. Without
+        // this the registration loop below discovered the same breakage one file at a time and threw mid-walk,
         // leaving some pipelines live and the rest not — and it could only ever report the first fault.
-        Map<String, List<Finding>> broken = referentialFindings(api, config, written);
+        Map<String, List<Finding>> broken = referentialFindings(config, written);
         if (!broken.isEmpty())
             return ApiContext.respondJson(e, 422, Map.of(
                     "error", "bundle references things this space does not have; nothing was registered",
@@ -321,6 +294,7 @@ final class DataSourceRoutes implements RouteModule {
         body.put("pipelines", pipelines);
         body.put("referencesKept", referencesKept);
         body.put("overwritten", overwrite && !conflicts.isEmpty());
+        body.put("connectionWarnings", missing.warnings());
         return body;
     }
 

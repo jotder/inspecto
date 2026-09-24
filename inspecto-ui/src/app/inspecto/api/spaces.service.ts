@@ -48,12 +48,24 @@ export interface DeleteSpaceResult {
     purged: boolean;
 }
 
+/**
+ * One connection a bundle needs that the target space lacks (2026-09-25: the import no longer refuses —
+ * every config needing it lands disabled, and this names them: "connect X to enable").
+ */
+export interface ConnectionWarning {
+    connection: string;
+    code: string;
+    message: string;
+    disabled: { kind: string; name: string; file: string }[];
+}
+
 /** POST /spaces/{id}/import success body — what was unpacked + made live. */
 export interface BundleImportResult {
     kind: string;
     imported: string[];
     pipelines: string[];
     overwritten: boolean;
+    connectionWarnings?: ConnectionWarning[];
 }
 
 /** One structural-validation finding for a bundle file (ERROR fails the import preview). */
@@ -76,6 +88,8 @@ export interface ImportPreview {
     hasSpaceToon: boolean;
     conflicts: string[];
     findings: Record<string, PreviewFinding[]>;
+    /** The same warnings the commit will return — the configs it will land disabled. */
+    connectionWarnings?: ConnectionWarning[];
     valid: boolean;
 }
 
