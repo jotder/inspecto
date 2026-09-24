@@ -155,6 +155,15 @@ if ! run_guard tools/check-gate-tally.mjs "gate-tally guard"      "CI runs it to
   exit 1
 fi
 
+# Board-heads guard (BOARD-STALE-HEADS-1). A closed row that keeps a live head, or a ranked row whose
+# headline says CLOSED, sends the next shift to finished work — on 2026-09-19 six of nine grounded rows
+# were. Local as well as CI because the board is edited by hand on every shift.
+if ! run_guard tools/check-board-heads.mjs "board-heads guard"      "CI runs it too — a stale head there is a red master."; then
+  echo "pre-push: refusing to push — a BACKLOG row head is closed, struck-and-live, or ranked twice (above)." >&2
+  echo "          Closed rows are DELETED, not struck: mark the ship in the row's OKF concept, then delete it." >&2
+  exit 1
+fi
+
 # Family-count guard (2026-09-12). Adding an OperationalDb.Family entry means updating NINE statements
 # outside the enum; it was missed by hand twice in two shifts, each time surfacing only after a full
 # reactor run. This turns a 14-minute discovery into an instant one.

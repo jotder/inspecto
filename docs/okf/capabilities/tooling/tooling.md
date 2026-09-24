@@ -105,10 +105,10 @@ sentence this whole area turns on: **a clean run says nothing about what it decl
 
 ### 3.2 The guard roster
 
-This is the inventory that existed nowhere. **Fourteen guard scripts, plus two inline pipeline checks** —
-eleven under `tools/` (`check-vocabulary` · `check-secrets` · `check-doc-links` · `check-doc-citations` ·
-`check-doc-counts` · `check-nul-bytes` · `check-gate-tally` · `check-coverage` · `check-dependencies` ·
-`check-sbom-modules` · `check-launchers`), one under the client tree
+This is the inventory that existed nowhere. **Fifteen guard scripts, plus two inline pipeline checks** —
+twelve under `tools/` (`check-vocabulary` · `check-secrets` · `check-doc-links` · `check-doc-citations` ·
+`check-doc-counts` · `check-nul-bytes` · `check-gate-tally` · `check-board-heads` · `check-coverage` ·
+`check-dependencies` · `check-sbom-modules` · `check-launchers`), one under the client tree
 (`inspecto-ui/tools/check-design-tokens.mjs`), and two `--check` modes of scripts that are not themselves
 guards (`tools/render-processor-board.mjs`, `tools/fetch-duckdb-extensions.mjs`).
 
@@ -141,6 +141,7 @@ platforms, so each release zip now sheds roughly that much.
 | **Secrets** | Tracked files across sixteen extensions, plus a **push-range** pass over the pushed objects | Untracked files; worktrees; every other extension including keys, certificates and extensionless files | No path allowlist. A per-line hatch, indirect-key suffixes, sixteen placeholder patterns, a minimum length | 0 / 1 / **2 below a 1,000-file floor**; refuses rather than vouches when it cannot read the range | pipeline + hook (both passes) |
 | **Doc links** | Three roots plus root markdown; targets resolved against the CHECKOUT INDEX (`git ls-files`), **case-exact** | Two module documentation directories; the client tree; the tooling markdown | None. One exemption — archive-internal links — **printed on every run, pass or fail** | 0 / 1 / **2 when it cannot reach git**, with file and link floors | pipeline + hook |
 | **Gate tally** | One section of one file | Everything else | None | 0 / 1, with a row floor | pipeline + hook |
+| **Board heads** | The first line of every ranked `docs/BACKLOG.md` row: id heads anywhere, head clauses in §3–§5 (`BOARD-STALE-HEADS-1`) | Row bodies; §6/§7 tables; rows with a prose name get only the marker check | None. The closed-marker list is narrow and written in the script header | 0 / 1, with ranked-row and id floors | pipeline + hook |
 | **Coverage floors** | Every module coverage report it can find, summed; the client summary | 🔴 **No minimum module count** | None | 0 / 1; **no cannot-run code** | pipeline only |
 | **Dependency review** | The resolved runtime graph under the enterprise profile, against a committed lock | Test scope; **the entire client dependency tree** | The lock *is* the waiver surface — a change is legitimised by committing the regenerated lock | 0 / 1 / **2 in three distinct ways**. The best separation of the nine | pipeline only |
 | **Processor board** | Two files: a served contract and one table | Everything else in that file | Three sets of identifiers holding **operator product decisions**, with **no reason field and no stale detection** | 0 / 1 / 2 | pipeline only |

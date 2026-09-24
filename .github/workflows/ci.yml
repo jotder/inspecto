@@ -85,6 +85,17 @@ jobs:
       - name: Guard — BACKLOG §2's gate tally matches its table
         run: node tools/check-gate-tally.mjs
 
+      # Board-heads guard (2026-09-25, BOARD-STALE-HEADS-1). On 2026-09-19 six of nine rows a shift
+      # grounded were already shipped, blocked or duplicates: closed rows kept live heads beside struck
+      # copies, and rows stayed RANKED while their own headline said CLOSED. This refuses a board where
+      # a row id is both struck and live, a §3–§5 ranked head carries a closed marker (a deliberately
+      # narrow list, documented in the script), or an id is ranked twice. Pure Node, ~instant.
+      # Falsified before wiring: each of (a) struck+live (row-struck, id-struck-in-place, unranked
+      # strike), (b) CLOSED / ✅ SHIPPED / "had shipped" / a struck ranked row, (c) a duplicated row,
+      # the row floor and a renumbered board went RED on a planted copy; `fail CLOSED` stayed green.
+      - name: Guard — no BACKLOG row head is closed, struck-and-live, or ranked twice
+        run: node tools/check-board-heads.mjs
+
       # Family-count guard (2026-09-12). OperationalDb.Family's size is restated in NINE places outside
       # the enum — two test tripwires and seven sentences across three docs — and the hand sweep was
       # missed TWICE IN TWO SHIFTS (EVENTS took it 12->13, RUN_LEASE 13->14). The tripwires caught both,

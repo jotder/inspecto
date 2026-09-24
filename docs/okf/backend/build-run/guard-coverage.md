@@ -196,6 +196,28 @@ caught its own section going stale within minutes of being written.
 matches the check's own pattern. **Anchor a stated check (`^| NFR-7 ·`) or it counts its own
 documentation.**
 
+### The board's other self-claim: a row HEAD (`tools/check-board-heads.mjs`, 2026-09-25)
+
+A ranked row's headline is also a claim about the row, and it rots the same way: on 2026-09-19 six of
+nine rows a shift grounded were already shipped, blocked or duplicates (`BOARD-STALE-HEADS-1`). The
+board-heads guard refuses `docs/BACKLOG.md` when **(a)** a row id heads a struck row *and* a live
+ranked row, **(b)** a ranked row in §3–§5 carries a closed marker in its *head clause* (head + headline,
+never the body), or **(c)** an id heads two ranked rows. Wired in `ci.yml` and `.githooks/pre-push`
+beside the gate-tally guard; `node tools/check-board-heads.mjs [file]` takes an optional path so a
+planted copy can be checked without touching the board.
+
+* **The markers are deliberately narrow** — uppercase `CLOSED` (except `fail CLOSED`), `✅` directly
+  followed by SHIPPED/CLOSED/DONE, `had`/`already shipped|closed`, a `**SHIPPED`/`**DONE` headline, a
+  strike in the head, and a wholly struck ranked row. Lowercase `shipped`, `BUILT` and `decided` are
+  *not* markers: open rows on today's board use them for the parts that shipped around a residual
+  (`✅ the comparison SHIPPED … (residuals)`), and a guard that matched them would be mostly exemption.
+* **The head clause must end at the headline.** The first cut took the first ` — ` anywhere in the row,
+  and on a head whose bold name itself contains a dash it swallowed half the body. The separator now has
+  to follow the name token directly.
+* **Floors from a measurement:** 37 ranked rows, 13 with an id head on 2026-09-25; `MIN_RANKED = 20`,
+  `MIN_IDS = 8`. Falsified on planted copies: every (a)/(b)/(c) shape, the floor and a renumbered board
+  exited 1; `fail CLOSED` in a headline stayed green.
+
 ## Instance, 2026-09-12: a number with NINE mirrors, missed by hand twice in two shifts
 
 `tools/check-family-count.mjs` is the third-shape guard (§"a NUMBER a human wrote") applied to a count
