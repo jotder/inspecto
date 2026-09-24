@@ -49,6 +49,7 @@ public final class FakeOffsetTailConnectorFactory implements CollectorConnectorF
         @Override public EnumSet<Capability> capabilities() { return EnumSet.of(Capability.STREAM); }
 
         @Override public List<RemoteFile> discover(DiscoveryContext ctx) {
+            if (AcquisitionLedgers.hasPendingDbWatermark(WATERMARK_KEY)) return List.of();   // the in-flight fence
             long from = AcquisitionLedgers.shared().dbWatermark(WATERMARK_KEY).map(Long::parseLong).orElse(0L);
             long to = END.get();
             if (from >= to) return List.of();

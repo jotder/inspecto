@@ -385,6 +385,10 @@ public class CollectorProcessor {
                 return 0;
             }
 
+            // Re-stash the frontier of any landed-but-uncommitted slice from its durable record, so after a restart
+            // the connector's in-flight fence still sees it and mints no overlapping slice (STREAM-CONSUMER-1).
+            SliceFrontiers.restore(cfg);
+
             // Discover, with retry/backoff (Phase F) for transient remote faults. Connectivity success/failure
             // feeds the breaker so a flapping endpoint trips it.
             List<RemoteFile> discovered;

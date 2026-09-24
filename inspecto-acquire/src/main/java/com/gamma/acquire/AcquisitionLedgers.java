@@ -114,6 +114,9 @@ public final class AcquisitionLedgers {
     // (a crash mid-ingest re-exports the slice; at-least-once / resumable). A batch that never commits leaves a
     // small orphan entry (harmless — recomputed on the next successful run). The connection-profile id travels
     // with the value so the commit side stays source-type-agnostic (it just forwards the key+value).
+    // On a REMOTE land the engine takes the stash from the staging path, persists it durably beside the landed
+    // slice (com.gamma.inspector.SliceFrontiers), and re-stashes it under the inbox path the commit reads — so a
+    // restart between land and commit loses nothing (STREAM-CONSUMER-1).
 
     /** A stashed DB-export watermark: the connection-profile {@code key} it belongs to and its opaque {@code value}. */
     public record DbWatermark(String key, String value) {}
@@ -130,19 +133,43 @@ public final class AcquisitionLedgers {
         return java.util.Optional.ofNullable(PENDING_DB_WATERMARKS.remove(key(dest)));
     }
 
-    /**
-     * Move the watermark stashed for {@code from} (the staging file a remote connector wrote) to {@code to} (the
-     * inbox path it was landed at), because the commit side looks it up by the landed path (KAFKA-OFFSET-REKEY-1).
-     * Called by the remote land step right after the move; a no-op when nothing was stashed for {@code from}.
-     */
-    public static void rekeyDbWatermark(Path from, Path to) {
-        DbWatermark wm = PENDING_DB_WATERMARKS.remove(key(from));
-        if (wm != null) PENDING_DB_WATERMARKS.put(key(to), wm);
-    }
-
     /** Drop any watermark stashed for {@code staged}: its slice failed to land or was quarantined, so it must never commit. */
     public static void discardDbWatermark(Path staged) {
         PENDING_DB_WATERMARKS.remove(key(staged));
+    }
+
+    /**
+     * Re-stash a frontier recovered from a landed slice's durable record after a restart (STREAM-CONSUMER-1 Q3), so
+     * the in-flight fence ({@link #hasPendingDbWatermark}) sees it again. Never overwrites a live in-memory stash.
+     */
+    public static void restoreDbWatermark(Path landed, String sourceKey, String value) {
+        if (sourceKey != null && value != null) PENDING_DB_WATERMARKS.putIfAbsent(key(landed), new DbWatermark(sourceKey, value));
+    }
+
+    /**
+     * The in-flight fence (STREAM-CONSUMER-1 design slice 2): is a slice for {@code sourceKey} fetched or landed but
+     * not yet committed? A connector's {@code discover} skips that partition / export while this is true, so no
+     * overlapping slice is ever minted (the overlap is what re-ingested rows). A stash whose slice file is gone
+     * (quarantined, or backed up after commit) or whose value the ledger already holds is spent, and is pruned
+     * here — so a poisoned or stale slice can never hold the fence forever.
+     */
+    public static boolean hasPendingDbWatermark(String sourceKey) {
+        if (sourceKey == null) return false;
+        java.util.Optional<String> committed = null;
+        for (var e : PENDING_DB_WATERMARKS.entrySet()) {
+            if (!sourceKey.equals(e.getValue().key())) continue;
+            if (committed == null) committed = shared().dbWatermark(sourceKey);
+            boolean spent = !java.nio.file.Files.exists(Path.of(e.getKey()))
+                    || committed.map(e.getValue().value()::equals).orElse(false);
+            if (spent) PENDING_DB_WATERMARKS.remove(e.getKey(), e.getValue());
+            else return true;
+        }
+        return false;
+    }
+
+    /** Test seam: forget every in-memory stashed frontier — what a process restart does to this map. */
+    static void clearPendingDbWatermarks() {
+        PENDING_DB_WATERMARKS.clear();
     }
 
     /**

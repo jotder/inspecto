@@ -10,6 +10,7 @@ import com.gamma.inspector.CollectorProcessor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -71,6 +72,105 @@ class DbExportWatermarkCycleTest {
                 () -> assertEquals("3", wm2, "watermark after cycle 2"),
                 () -> assertEquals(4, rows3, "cycle 3 adds only r4 — every row exactly once"),
                 () -> assertEquals("4", wm3, "watermark after cycle 3"));
+        } finally {
+            AcquisitionLedgers.use(original);
+            ConnectionRegistry.remove(id);
+        }
+    }
+
+    /** What a process restart does to the in-memory frontier stash (the package-private seam, reflectively). */
+    private static void forgetInMemoryFrontiers() throws Exception {
+        Method m = AcquisitionLedgers.class.getDeclaredMethod("clearPendingDbWatermarks");
+        m.setAccessible(true);
+        m.invoke(null);
+    }
+
+    /** A db profile exporting {@code events} incrementally over {@code UPDATED_AT}, seeded with r1..r3. */
+    private static String source(Path dir, String id) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("export_src.duckdb").toString().replace("\\", "/");
+        sql(url, "CREATE TABLE events(ID VARCHAR, AMT DOUBLE, EVENT_DATE DATE, UPDATED_AT BIGINT)");
+        sql(url, "INSERT INTO events VALUES ('r1',1,DATE '2020-04-03',1),('r2',1,DATE '2020-04-03',2),"
+                + "('r3',1,DATE '2020-04-03',3)");
+        ConnectionRegistry.register(new ConnectionProfile(id, "db", null, 0, null, null, null, null,
+                Map.of("jdbc_url", url, "export_name", "events_{HHmmssSSS}.csv",
+                        "query", "SELECT ID, AMT, EVENT_DATE, UPDATED_AT FROM events WHERE UPDATED_AT > :watermark ORDER BY UPDATED_AT",
+                        "watermark_column", "UPDATED_AT", "watermark_type", "long", "watermark_initial", "0"), null));
+        return url;
+    }
+
+    /**
+     * STREAM-CONSUMER-1 Q3: a restart between land and commit must not lose the watermark. The export lands, the
+     * in-memory stash is wiped (the restart), the ingest commits — and the watermark must still advance, so no
+     * later cycle re-exports the landed rows.
+     */
+    @Test
+    void aRestartBetweenLandAndCommitKeepsTheWatermark(@TempDir Path dir) throws Exception {
+        String id = "restart-db";
+        String url = source(dir, id);
+        AcquisitionLedger original = AcquisitionLedgers.shared();
+        InMemoryAcquisitionLedger ledger = new InMemoryAcquisitionLedger();
+        AcquisitionLedgers.use(ledger);
+        try {
+            PipelineConfig cfg = load(dir, "RESTART_DB_PIPE", "collector:\n  connector: db\n  connection: " + id + "\n");
+
+            assertEquals(1, CollectorProcessor.acquire(cfg), "the export lands");
+            forgetInMemoryFrontiers();                       // the restart: landed, not yet committed
+            CollectorProcessor.ingest(cfg, e -> { });
+            String wm1 = ledger.dbWatermark(id).orElse("<none>");
+
+            Thread.sleep(20);
+            CollectorProcessor.run(cfg);                     // no new source rows
+            long rows2 = rows(cfg);
+
+            sql(url, "INSERT INTO events VALUES ('r4',1,DATE '2020-04-03',4)");
+            Thread.sleep(20);
+            CollectorProcessor.run(cfg);
+
+            assertAll(
+                () -> assertEquals("3", wm1, "the commit recovers the landed export's watermark after a restart"),
+                () -> assertEquals(3, rows2, "the next cycle re-exports nothing"),
+                () -> assertEquals(4, rows(cfg), "every row exactly once"),
+                () -> assertEquals("4", ledger.dbWatermark(id).orElse("<none>")));
+        } finally {
+            AcquisitionLedgers.use(original);
+            ConnectionRegistry.remove(id);
+        }
+    }
+
+    /**
+     * Design slice 2, the in-flight fence: while an export is landed but uncommitted, further acquisition cycles
+     * (the split acquire/ingest timers) must not export the same rows again — in-process or after a restart.
+     */
+    @Test
+    void aLandedButUncommittedExportFencesTheNextExport(@TempDir Path dir) throws Exception {
+        String id = "fence-db";
+        String url = source(dir, id);
+        AcquisitionLedger original = AcquisitionLedgers.shared();
+        InMemoryAcquisitionLedger ledger = new InMemoryAcquisitionLedger();
+        AcquisitionLedgers.use(ledger);
+        try {
+            PipelineConfig cfg = load(dir, "FENCE_DB_PIPE", "collector:\n  connector: db\n  connection: " + id + "\n");
+
+            int first = CollectorProcessor.acquire(cfg);
+            Thread.sleep(20);
+            int second = CollectorProcessor.acquire(cfg);    // same process, still uncommitted
+            forgetInMemoryFrontiers();
+            Thread.sleep(20);
+            int third = CollectorProcessor.acquire(cfg);     // after a restart, still uncommitted
+            CollectorProcessor.ingest(cfg, e -> { });
+            long rows1 = rows(cfg);
+
+            sql(url, "INSERT INTO events VALUES ('r4',1,DATE '2020-04-03',4)");
+            Thread.sleep(20);
+            CollectorProcessor.run(cfg);                     // committed ⇒ the fence is released
+
+            assertAll(
+                () -> assertEquals(1, first, "the first export lands"),
+                () -> assertEquals(0, second, "no second export while the first is uncommitted"),
+                () -> assertEquals(0, third, "the fence survives a restart"),
+                () -> assertEquals(3, rows1, "r1..r3 exactly once"),
+                () -> assertEquals(4, rows(cfg), "r4 exported once the fence released"),
+                () -> assertEquals("4", ledger.dbWatermark(id).orElse("<none>")));
         } finally {
             AcquisitionLedgers.use(original);
             ConnectionRegistry.remove(id);

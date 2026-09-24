@@ -877,6 +877,9 @@ curl -s localhost:8080/metrics
 | `inspecto_bytes_transferred_total` | counter | `pipeline` | bytes retrieved from source connectors |
 | `inspecto_fetch_seconds` | histogram | `pipeline` | time to fetch one remote file |
 | `inspecto_active_connections` | gauge | `pipeline` | open source-connector sessions |
+| `inspecto_stream_lag_records` | gauge | `connection`, `topic`, `partition` | **lag** — Kafka records past the committed frontier |
+| `inspecto_stream_slices_drained_total` | counter | `connection`, `topic` | Kafka partition slices drained |
+| `inspecto_slice_frontiers_committed_total` | counter | `pipeline` | Kafka / DB-export slices whose frontier advanced at commit |
 
 Eager metrics are recorded off the batch-commit event; the point-in-time gauges (lag, quarantine depth, commit count) are computed lazily when `/metrics` is scraped, so they reflect current state without a polling loop.
 

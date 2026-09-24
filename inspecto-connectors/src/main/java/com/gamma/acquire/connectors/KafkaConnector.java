@@ -8,6 +8,7 @@ import com.gamma.acquire.PostAction;
 import com.gamma.acquire.RemoteFile;
 import com.gamma.acquire.SecretResolver;
 import com.gamma.acquire.CollectorConnector;
+import com.gamma.metrics.MetricRegistry;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
@@ -147,6 +148,15 @@ public final class KafkaConnector implements CollectorConnector {
                         .map(Long::parseLong)
                         .orElse(startLatest ? end.get(tp) : begin.get(tp));
                 from = Math.max(from, begin.get(tp));   // retention may have pruned past the stored frontier
+                // Lag = records on the broker past the COMMITTED frontier (a landed-but-uncommitted slice still
+                // counts: its rows are not durable in Inspecto yet). Refreshed every cycle, fenced or not.
+                MetricRegistry.global().setGauge("inspecto_stream_lag_records",
+                        "Records on a Kafka partition past its committed frontier",
+                        Map.of("connection", profile.id(), "topic", topic, "partition", Integer.toString(tp.partition())),
+                        Math.max(0, end.get(tp) - from));
+                // In-flight fence: one uncommitted slice per partition. A slice from here would re-read the
+                // uncommitted one's range under a new name, and those rows would ingest twice.
+                if (AcquisitionLedgers.hasPendingDbWatermark(watermarkKey(tp.partition()))) continue;
                 long to = Math.min(end.get(tp), from + maxRecords);
                 if (to <= from) continue;               // no backlog on this partition
                 String name = topic + "-p" + tp.partition() + "-" + from + "-" + to + "." + ext;
@@ -223,6 +233,8 @@ public final class KafkaConnector implements CollectorConnector {
             // Advance the frontier only after the batch commits — stash it for ConsignmentIngestor to persist
             // (the DB-export watermark machinery; key is per topic-partition).
             AcquisitionLedgers.stashDbWatermark(dest, watermarkKey(partition), Long.toString(pos));
+            MetricRegistry.global().inc("inspecto_stream_slices_drained_total", "Kafka partition slices drained",
+                    Map.of("connection", profile.id(), "topic", topic));
             log.info("Kafka drain {} p{} [{},{}) → {} record(s) → {}", topic, partition, from, pos, written,
                     dest.getFileName());
             return dest;

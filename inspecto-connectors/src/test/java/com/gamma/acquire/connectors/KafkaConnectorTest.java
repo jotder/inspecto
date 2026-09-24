@@ -191,4 +191,53 @@ class KafkaConnectorTest {
                 () -> connector(Map.of("payload", "avro")), "unknown payload mode must fail at load");
         assertThrows(IllegalArgumentException.class, () -> connector(Map.of("max_records", "0")));
     }
+
+    /**
+     * STREAM-CONSUMER-1 design slice 2: while a drained slice is uncommitted, discover mints no second slice for that
+     * partition — the new one would start at the same stored frontier and re-read the uncommitted range. Once the
+     * ledger holds the slice's frontier (the commit), the fence releases and discovery resumes past it.
+     */
+    @Test
+    void anUncommittedSliceFencesItsPartitionUntilTheCommit(@TempDir Path dir) throws Exception {
+        broker(0, 3);
+        KafkaConnector c = connector(Map.of());
+        RemoteFile slice = c.discover(ALL).getFirst();
+        mock.schedulePollTask(() -> { for (long o = 0; o < 3; o++) mock.addRecord(rec(o, null, "v" + o)); });
+        Path dest = dir.resolve(slice.relativePath());
+        c.fetchTo(slice, dest);                                 // stashed, not committed
+
+        mock.updateEndOffsets(Map.of(P0, 5L));                  // the backlog grows before the commit
+        assertTrue(c.discover(ALL).isEmpty(), "no overlapping [0,5) while [0,3) is uncommitted");
+        assertEquals(5.0, lag(), "lag counts from the COMMITTED frontier — the uncommitted slice is not durable yet");
+
+        var wm = AcquisitionLedgers.takeDbWatermark(dest).orElseThrow();   // what ConsignmentIngestor.commit does
+        ledger.recordDbWatermark(wm.key(), wm.value());
+        assertEquals("cdr-p0-3-5.ndjson", c.discover(ALL).getFirst().relativePath(), "the commit releases the fence");
+        assertEquals(2.0, lag(), "end 5 − committed 3");
+    }
+
+    /** The {@code inspecto_stream_lag_records} gauge for this test's connection, partition 0. */
+    @SuppressWarnings("unchecked")
+    private static double lag() {
+        var entry = (Map<String, Object>) com.gamma.metrics.MetricRegistry.global()
+                .snapshot("inspecto_stream_lag_records"::equals).get("inspecto_stream_lag_records");
+        for (Map<String, Object> row : (List<Map<String, Object>>) entry.get("series")) {
+            String labels = (String) row.get("labels");
+            if (labels.contains("kafka-test") && labels.contains("partition=\"0\"")) return (Double) row.get("value");
+        }
+        throw new AssertionError("no lag series: " + entry);
+    }
+
+    @Test
+    void aSpentStashNeverHoldsTheFence(@TempDir Path dir) throws Exception {
+        broker(0, 5);
+        Path landed = Files.writeString(dir.resolve("cdr-p0-0-3.ndjson"), "x\n");
+        AcquisitionLedgers.stashDbWatermark(landed, "kafka:kafka-test:cdr:p0", "3");
+        ledger.recordDbWatermark("kafka:kafka-test:cdr:p0", "3");   // committed; only the take was lost
+        assertEquals("cdr-p0-3-5.ndjson", connector(Map.of()).discover(ALL).getFirst().relativePath(),
+                "a stash the ledger already holds is spent, not in flight");
+
+        AcquisitionLedgers.stashDbWatermark(dir.resolve("gone.ndjson"), "kafka:kafka-test:cdr:p0", "9");
+        assertEquals(1, connector.discover(ALL).size(), "a stash whose slice file is gone (quarantined) is spent");
+    }
 }

@@ -342,13 +342,37 @@ stash their reached offset / row watermark in `AcquisitionLedgers` keyed by the 
 **staging** path — while `ConsignmentIngestor` takes it at commit by the **inbox** path. Until this fix the
 two never met: the frontier was never recorded, so every later cycle re-read from the start (DB export 3 → 6
 → 10 rows over three cycles; Kafka 7 rows for 4 offsets). The one seam is `RemoteAcquisitionHandler.land`:
-right after the move it calls `AcquisitionLedgers.rekeyDbWatermark(staged, target)`; a failed move, and a
-slice rejected by `fetchAndVerify` (quarantine / skip), call `discardDbWatermark` so no stale frontier lingers
-under a staging path (the next cycle re-fetches and re-stashes). No connector changed. Pinned by
-`RemoteSliceFrontierRekeyTest` (engine), `RemoteSliceFrontierCommitTest` (inspecto) and
-`DbExportWatermarkCycleTest` (connectors). ⚠ **Still open: restart durability.** The stash is an in-process
-static map — a process restart between land and commit loses the frontier, and the slice is re-read
-(at-least-once, duplicates possible). Whether to persist it is an open operator question; not addressed here.
+it takes the stash from the staging path, persists it (below), moves the slice, and re-stashes it under the
+inbox path; a failed move drops the durable record, and a slice rejected by `fetchAndVerify` (quarantine /
+skip) calls `discardDbWatermark`, so no stale frontier lingers (the next cycle re-fetches and re-stashes).
+
+**The frontier survives a restart (STREAM-CONSUMER-1, operator decision Q3 2026-09-24).** The stash is an
+in-process map, so a restart between land and commit used to lose it: the slice committed without advancing
+the frontier and the next cycle re-read it. Now `SliceFrontiers` (`inspecto-engine`) writes one JSON record
+`{"key","value"}` per landed slice under `<staging>/.frontier/`, mirrored by poll-relative path (the
+`CommitRetry` sidecar idiom). Three orderings carry it:
+
+- **Record before land.** It is written (temp file + atomic rename) *before* the slice's own atomic move into
+  the inbox, so a slice is never in the inbox without its frontier. If the record cannot be written the land
+  fails and the bytes stay staged — a slice without a durable frontier is the defect itself.
+- **Delete after the ledger.** `ConsignmentIngestor` reads the record when the in-memory stash is empty, and
+  deletes it only after `recordDbWatermark` — a crash in between re-records the same value.
+- **Restore before discovery.** `CollectorProcessor.acquire` calls `SliceFrontiers.restore` before
+  `discover`: every record whose slice is still in the inbox is re-stashed, so the in-flight fence (§3.9)
+  holds across a restart; a record whose slice is gone, or whose value the ledger already holds, is removed.
+
+⚠ **Durable exactly as far as the ledger is.** Under the default in-memory ledger (§3.5) the *committed*
+frontier is itself lost on restart, and a Kafka Collector re-reads from `options.start` whatever this record
+says. Restart-safe delivery needs `-Dacquire.ledger.backend=db`. ⚠ `.frontier` is reserved inside the
+staging tree: a listing path that would stage into it is skipped as a fetch failure. ⛔ **Why not the slice
+name.** The design proposed renaming a Kafka slice to its reached range and deriving the frontier from the
+name. Refused on the code: the commit is source-agnostic and the ledger key (profile id, topic, partition) is
+not in the name, and a DB-export watermark (a timestamp with `:`) cannot live in a portable file name. One
+record serves both connectors.
+
+Pinned by `RemoteSliceFrontierRekeyTest` (engine), `RemoteSliceFrontierCommitTest` (inspecto: restart and
+fence against the scheduler's split timers) and `DbExportWatermarkCycleTest` (connectors: restart and fence
+against a real DuckDB export).
 
 **Integrity (§11).** `IntegrityChecker` applies two independent, cheap-to-skip checks to the staged copy:
 *size* (staged bytes == the listing's `RemoteFile.size()`, skipped on `SIZE_UNKNOWN`, since some FTP servers
@@ -475,7 +499,25 @@ materialises the result as CSV; `kafka` drains a partition's unconsumed backlog 
 `<topic>-p<partition>-<from>-<to>.<ext>`, which flows through the normal batch path — **no core-engine
 change**. Kafka offsets are **not** a broker consumer group: the connector `assign()`+`seek()`s and the
 consumed frontier rides the ledger watermark, persisted only after the batch commits (at-least-once; a crash
-mid-ingest re-drains the slice rather than skipping it).
+mid-ingest re-drains the slice rather than skipping it). Broker consumer groups stay out by operator decision
+(STREAM-CONSUMER-1 Q4, 2026-09-24): one offset store, fewer ACLs, no broker-visible lag. The loop is the
+Collector scan; no continuous `trigger: stream` lane exists (Q2 — no latency target was named).
+
+**One uncommitted slice per partition — the in-flight fence (STREAM-CONSUMER-1, 2026-09-24).** With split
+acquire and ingest timers, a second acquisition cycle before the commit read the same stored frontier and
+minted an overlapping slice under a new name, and the overlap ingested twice. Now `KafkaConnector.discover`
+skips a partition, and an incremental `db` export (`watermark_column` set) skips its export, while
+`AcquisitionLedgers.hasPendingDbWatermark(key)` is true: a stash for that key exists, its slice file still
+exists, and its value is not already the committed one. The last two conditions make the fence release
+itself. A slice quarantined out of the inbox, or a stash that outlived its commit, cannot hold a partition
+forever. After a restart, `SliceFrontiers.restore` (§3.7) re-arms it. ⚠ **A slice that never ingests holds its
+partition.** For example, a slice whose name the pipeline's `file_pattern` rejects stays in the inbox, so
+nothing further drains from that partition. Before the fence, such a Collector re-drained a growing
+overlapping slice every cycle instead. **Lag:** `inspecto_stream_lag_records{connection,topic,partition}` =
+end offset − *committed* frontier, refreshed on every discovery (a landed-but-uncommitted slice still counts).
+Also exported: `inspecto_stream_slices_drained_total{connection,topic}` and
+`inspecto_slice_frontiers_committed_total{pipeline}` (Kafka and DB export), all three on `GET
+/metrics/acquisition`.
 
 ### 3.10 Connection profiles, secrets, and the SEC-07 gate
 
@@ -629,7 +671,9 @@ Metrics, all labelled by pipeline: `inspecto_files_discovered_total` · `inspect
 `inspecto_downloads_failed_total` · `inspecto_duplicates_skipped_total` · `inspecto_watermark_skipped_total`
 · `inspecto_post_actions_failed_total` · `inspecto_bytes_transferred_total` · `inspecto_fetch_seconds`
 (histogram) · `inspecto_active_connections` (gauge) · `inspecto_files_waiting_stability` (gauge) ·
-`inspecto_acquire_backpressure_skips_total`. `AcquisitionTelemetry` methods are pure leaves — each only
+`inspecto_acquire_backpressure_skips_total` · `inspecto_slice_frontiers_committed_total`. Two more are labelled
+by connection instead (§3.9): `inspecto_stream_lag_records` (gauge, + `topic`, `partition`) and
+`inspecto_stream_slices_drained_total` (+ `topic`). `AcquisitionTelemetry` methods are pure leaves — each only
 emits an event or bumps a metric, carrying no acquisition logic.
 
 ### 3.15 Network shares — the declined design, recorded once
@@ -737,7 +781,7 @@ so they are not re-proposed as new ideas; none is scheduled.
 
 | Item | Board id | What remains |
 |---|---|---|
-| Adapter stream-consumer runtime | `STREAM-CONSUMER-1` (P2, filed 2026-09-10 — until then this cell pointed at ROADMAP §3.4, i.e. at no board row) | The land-then-ack seam exists; the consumer loop does not |
+| Adapter stream-consumer runtime | `STREAM-CONSUMER-1` (P2, filed 2026-09-10 — until then this cell pointed at ROADMAP §3.4, i.e. at no board row) | Option A (the hardened Collector scan) is built as of 2026-09-24: the frontier re-keys on land and survives a restart (§3.7), there is one uncommitted slice per partition, and lag is exported (§3.9). Still open: the `SP-ACQ-09` cell in `EDITIONS.md`. The `trigger: stream` lane is not built, by decision (Q2) |
 | Outbound object-store export | `EXPORT-1` (P3) | The inverse direction of ACQ-4 — recommendation of record only |
 | Vault / KMS secret provider | `GAP-6` | Deferred by the SEC-07 decision, not blocked |
 | "Listed-not-yet-fetched" gauge | branch-aware residual **(e)** | Observability gap: the queue between list and fetch is invisible |
@@ -915,7 +959,9 @@ classes also live in this module but are a **notification** subject, not ACQ.
   passive-port-range parsing) · `S3ConnectorTest` · `AzureBlobConnectorTest` · `GcsConnectorTest` (each:
   discover w/ pagination + etag, depth bound, fetch, move+delete post-actions) · `KafkaConnectorTest`
   (offset-range discover, **ledger-watermark resume**, NDJSON envelope drain, raw-payload mode,
-  non-RETAIN post-action rejection) · `DbExportConnectorTest` (query→CSV, `:watermark` placeholder rewrite,
+  non-RETAIN post-action rejection, the **in-flight fence** and its self-release, the lag gauge) ·
+  `DbExportWatermarkCycleTest` (real poll cycles: frontier advances, **restart between land and commit**,
+  fence across a restart) · `DbExportConnectorTest` (query→CSV, `:watermark` placeholder rewrite,
   incremental export **commits then advances**).
 - Auth signing, which is what "SDK-free" rests on: `AwsSigV4Test` (vanilla vector, S3 sha256, RFC3986
   encoding) · `AzureSharedKeyTest` (string-to-sign, `x-ms-` headers, canonicalized resource).

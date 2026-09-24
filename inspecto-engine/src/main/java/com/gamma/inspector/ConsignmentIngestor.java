@@ -595,20 +595,29 @@ public final class ConsignmentIngestor {
 
         // Row-level DB-export watermark LAST too, and independently of dedup mode: a DB-export connector stashes the
         // new max watermark during fetchTo; advance it only now that the batch is durable (resumable). Source-type-
-        // agnostic — takeDbWatermark is empty for any file no connector stashed.
+        // agnostic — takeDbWatermark is empty for any file no connector stashed. A remote slice's frontier is also on
+        // disk (SliceFrontiers, written before its land): read when a restart emptied the in-memory stash, and
+        // deleted only once the ledger holds the value (STREAM-CONSUMER-1 Q3).
         AcquisitionLedger wmLedger = null;
         List<Consignment.Member> watermarked = new ArrayList<>();
+        boolean remoteSlices = SliceFrontiers.root(cfg) != null;
         for (Consignment.Member m : survivors) {
             Path filePath = m.file().toPath().toAbsolutePath().normalize();
             var wm = AcquisitionLedgers.takeDbWatermark(filePath);
+            if (wm.isEmpty() && remoteSlices) wm = SliceFrontiers.read(cfg, filePath);
             if (wm.isPresent()) {
                 if (wmLedger == null) wmLedger = AcquisitionLedgers.shared();
                 wmLedger.recordDbWatermark(wm.get().key(), wm.get().value());
                 watermarked.add(m);
             }
+            if (remoteSlices) SliceFrontiers.delete(cfg, filePath);
         }
-        if (!watermarked.isEmpty())
+        if (!watermarked.isEmpty()) {
             recordStages(stageSourceId, batchIdForStages, watermarked, cfg, FileStage.WATERMARK_ADVANCED);
+            com.gamma.metrics.MetricRegistry.global().inc("inspecto_slice_frontiers_committed_total",
+                    "Slices (Kafka partition drains / DB exports) whose frontier advanced at commit",
+                    java.util.Map.of("pipeline", cfg.identity().pipelineName()), watermarked.size());
+        }
 
         // Unpack scratch LAST of all — the expanded temp copies (and their origin mappings) are only
         // released once every side effect above is durable; a crash before this line just leaves temp

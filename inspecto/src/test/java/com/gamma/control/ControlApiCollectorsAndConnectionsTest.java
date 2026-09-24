@@ -134,6 +134,21 @@ class ControlApiCollectorsAndConnectionsTest {
         }
     }
 
+    /** STREAM-CONSUMER-1 slice 3: the stream lag gauge and the slice drain/commit counters ride the same snapshot. */
+    @Test
+    void acquisitionMetricsCarryTheStreamLagAndSliceCounters(@TempDir Path cfg) throws Exception {
+        MetricRegistry.global().setGauge("inspecto_stream_lag_records", "lag",
+                Map.of("connection", "k", "topic", "t", "partition", "0"), 7);
+        MetricRegistry.global().inc("inspecto_stream_slices_drained_total", "drained", Map.of("connection", "k", "topic", "t"));
+        MetricRegistry.global().inc("inspecto_slice_frontiers_committed_total", "committed", Map.of("pipeline", "P"));
+        try (Ctx c = open(cfg, null)) {
+            JsonNode m = V1Body.of(send(c.port, "GET", "/metrics/acquisition", null).body());
+            assertEquals("gauge", m.get("inspecto_stream_lag_records").get("type").asText());
+            assertTrue(m.has("inspecto_stream_slices_drained_total"), m.toString());
+            assertTrue(m.has("inspecto_slice_frontiers_committed_total"), m.toString());
+        }
+    }
+
     // ── connection CRUD ──────────────────────────────────────────────────────────
 
     private static String conn(String id, String host) {

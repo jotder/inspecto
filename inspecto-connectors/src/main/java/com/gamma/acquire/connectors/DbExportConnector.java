@@ -113,6 +113,9 @@ public final class DbExportConnector implements CollectorConnector {
     @Override
     public List<RemoteFile> discover(DiscoveryContext ctx) {
         // One logical export per cycle: the resolved export_name. No DB access here (discovery stays cheap).
+        // In-flight fence (incremental only): while an export is fetched or landed but uncommitted, the stored
+        // watermark has not moved, so another export would re-read the same rows under a new name.
+        if (watermarkColumn != null && AcquisitionLedgers.hasPendingDbWatermark(profile.id())) return List.of();
         String name = resolveTokens(nameTemplate, ZonedDateTime.now());
         PatternFilter filter = new PatternFilter(ctx.includes(), ctx.excludes());
         if (!filter.accepts(name)) return List.of();

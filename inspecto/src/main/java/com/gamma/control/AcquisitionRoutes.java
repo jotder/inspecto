@@ -15,7 +15,8 @@ final class AcquisitionRoutes implements RouteModule {
     private static final Set<String> ACQ_METRICS = Set.of(
             "inspecto_files_discovered_total", "inspecto_files_downloaded_total", "inspecto_downloads_failed_total",
             "inspecto_post_actions_failed_total", "inspecto_watermark_skipped_total", "inspecto_bytes_transferred_total",
-            "inspecto_fetch_seconds", "inspecto_active_connections", "inspecto_files_waiting_stability");
+            "inspecto_fetch_seconds", "inspecto_active_connections", "inspecto_files_waiting_stability",
+            "inspecto_stream_lag_records", "inspecto_stream_slices_drained_total", "inspecto_slice_frontiers_committed_total");
 
     @Override
     public void register(ApiContext api) {

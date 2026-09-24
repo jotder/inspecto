@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -171,6 +172,88 @@ class RemoteSliceFrontierCommitTest {
                 () -> assertEquals(4, rowsAfter3, "every offset ingested exactly once"),
                 () -> assertEquals("4", frontierAfter3, "frontier after cycle 3"),
                 () -> assertEquals("<none>", orphan, "no reached offset left orphaned under the staging path"));
+        } finally {
+            svc.close();
+        }
+    }
+
+    /** What a process restart does to the in-memory frontier stash (the package-private seam, reflectively). */
+    private static void forgetInMemoryFrontiers() throws Exception {
+        Method m = AcquisitionLedgers.class.getDeclaredMethod("clearPendingDbWatermarks");
+        m.setAccessible(true);
+        m.invoke(null);
+    }
+
+    private static void awaitLanded(Path dir, int n) throws Exception {
+        assertTrue(awaitTrue(() -> files(dir.resolve("inbox"), ".csv").size() >= n),
+                "acquisition did not land " + n + " slice(s): inbox=" + files(dir.resolve("inbox"), ".csv"));
+        Thread.sleep(300);                                  // let the land's bookkeeping finish
+    }
+
+    /**
+     * STREAM-CONSUMER-1 Q3: a restart between land and commit must not lose the frontier. The slice lands, the
+     * in-memory stash is wiped (the restart), then the commit runs: it must still advance the frontier, so the
+     * next cycle drains only the new offset — never the landed range again.
+     */
+    @Test
+    void aRestartBetweenLandAndCommitKeepsTheFrontier(@TempDir Path dir) throws Exception {
+        FakeOffsetTailConnectorFactory.FETCHED.clear();
+        FakeOffsetTailConnectorFactory.END.set(3);
+        CollectorService svc = new CollectorService(List.of(pipeline(dir)), 3600, 1);
+        try {
+            scheduler(svc).dispatchAcquireCycle();
+            awaitLanded(dir, 1);
+            forgetInMemoryFrontiers();                      // the restart: landed, not yet committed
+
+            scheduler(svc).dispatchCycle();
+            assertTrue(awaitTrue(() -> files(dir.resolve("markers"), ".processed").size() == 1), "slice committed");
+            Thread.sleep(300);
+            String frontier = ledger.dbWatermark(FakeOffsetTailConnectorFactory.WATERMARK_KEY).orElse("<none>");
+
+            FakeOffsetTailConnectorFactory.END.set(4);      // one new message
+            cycle(svc, dir);
+
+            assertAll(
+                () -> assertEquals("3", frontier, "the commit recovers the landed slice's frontier after a restart"),
+                () -> assertEquals(List.of("tail-p0-0-3.csv", "tail-p0-3-4.csv"), FakeOffsetTailConnectorFactory.FETCHED,
+                        "the next cycle drains only the new offset"),
+                () -> assertEquals(4, outputRows(dir.resolve("db")), "no row ingested twice"),
+                () -> assertEquals("4", ledger.dbWatermark(FakeOffsetTailConnectorFactory.WATERMARK_KEY).orElse("<none>")));
+        } finally {
+            svc.close();
+        }
+    }
+
+    /**
+     * Design slice 2, the in-flight fence: while a slice is landed but uncommitted, a second acquisition cycle
+     * must not fetch an overlapping slice for the same partition — even across a restart.
+     */
+    @Test
+    void aLandedButUncommittedSliceFencesItsPartition(@TempDir Path dir) throws Exception {
+        FakeOffsetTailConnectorFactory.FETCHED.clear();
+        FakeOffsetTailConnectorFactory.END.set(3);
+        CollectorService svc = new CollectorService(List.of(pipeline(dir)), 3600, 1);
+        try {
+            scheduler(svc).dispatchAcquireCycle();
+            awaitLanded(dir, 1);
+
+            FakeOffsetTailConnectorFactory.END.set(4);      // backlog grows before the commit
+            scheduler(svc).dispatchAcquireCycle();          // same process: fenced
+            Thread.sleep(500);
+            forgetInMemoryFrontiers();                      // restart: the fence must survive it too
+            scheduler(svc).dispatchAcquireCycle();
+            Thread.sleep(500);
+            List<String> fetchedBeforeCommit = List.copyOf(FakeOffsetTailConnectorFactory.FETCHED);
+
+            cycle(svc, dir);                                // commits [0,3), then the next acquire drains [3,4)
+            cycle(svc, dir);
+
+            assertAll(
+                () -> assertEquals(List.of("tail-p0-0-3.csv"), fetchedBeforeCommit,
+                        "no second slice while [0,3) is landed but uncommitted"),
+                () -> assertEquals(List.of("tail-p0-0-3.csv", "tail-p0-3-4.csv"), FakeOffsetTailConnectorFactory.FETCHED),
+                () -> assertEquals(4, outputRows(dir.resolve("db")), "every offset ingested exactly once"),
+                () -> assertEquals("4", ledger.dbWatermark(FakeOffsetTailConnectorFactory.WATERMARK_KEY).orElse("<none>")));
         } finally {
             svc.close();
         }

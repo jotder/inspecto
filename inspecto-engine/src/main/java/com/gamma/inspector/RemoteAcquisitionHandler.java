@@ -185,6 +185,12 @@ final class RemoteAcquisitionHandler {
         Path part   = contained(stagingRoot, rf.relativePath(), cfg, rf);
         Path target = contained(pollRoot,    rf.relativePath(), cfg, rf);
         if (part == null || target == null) return;
+        if (part.startsWith(stagingRoot.resolve(SliceFrontiers.DIR))) {   // reserved: the durable frontier records
+            AcquisitionTelemetry.incDownloadsFailed(cfg);
+            log.warn("Remote listing on {} offered a path inside the reserved {} tree: {} — skipping",
+                    cfg.identity().pipelineName(), SliceFrontiers.DIR, rf.relativePath());
+            return;
+        }
 
         Path fetched = fetchAndVerify(cfg, connector, rf, part, etagAlgo, retry);
         if (fetched == null) {         // failure already handled (event + metric + quarantine/skip)
@@ -218,7 +224,7 @@ final class RemoteAcquisitionHandler {
      * already forbids every other dir from living under the inbox for the same family of reasons, and
      * {@code resolvePostAction} sets the precedent for failing a remote cycle here rather than later.
      */
-    private static Path stagingRoot(PipelineConfig cfg, PipelineConfig.Fetch fetch) {
+    static Path stagingRoot(PipelineConfig cfg, PipelineConfig.Fetch fetch) {
         String configured = fetch.stagingDir();
         String temp = cfg.dirs().temp();
         if ((configured == null || configured.isBlank()) && (temp == null || temp.isBlank()))
@@ -263,8 +269,14 @@ final class RemoteAcquisitionHandler {
      * {@code staging_dir} and {@code dirs.poll} are on different filesystems and should be moved together.
      */
     private static Path land(PipelineConfig cfg, RemoteFile rf, Path staged, Path target) {
+        // The connector stashed this slice's frontier (Kafka offset / DB-export watermark) under the staging path;
+        // the commit takes it by the inbox path. Persist it durably for the inbox path BEFORE the move, so a slice
+        // is never in the inbox without its frontier and a restart before the commit cannot lose it
+        // (STREAM-CONSUMER-1 Q3). Failing to persist it fails the land: the bytes stay staged.
+        var frontier = com.gamma.acquire.AcquisitionLedgers.takeDbWatermark(staged);
         try {
             if (target.getParent() != null) Files.createDirectories(target.getParent());
+            SliceFrontiers.write(cfg, target, frontier);
             try {
                 Files.move(staged, target, StandardCopyOption.ATOMIC_MOVE);
             } catch (AtomicMoveNotSupportedException e) {
@@ -273,13 +285,12 @@ final class RemoteAcquisitionHandler {
                         rf.relativePath(), cfg.identity().pipelineName());
                 Files.move(staged, target, StandardCopyOption.REPLACE_EXISTING);
             }
-            // The connector stashed this slice's frontier (Kafka offset / DB-export watermark) under the staging
-            // path; the commit takes it by the inbox path, so hand it over with the move (KAFKA-OFFSET-REKEY-1).
-            com.gamma.acquire.AcquisitionLedgers.rekeyDbWatermark(staged, target);
+            frontier.ifPresent(wm -> com.gamma.acquire.AcquisitionLedgers.stashDbWatermark(target, wm.key(), wm.value()));
             return target;
         } catch (java.io.IOException e) {
             // Not landed: the next cycle re-fetches (and re-stashes) the slice, so this frontier must not linger.
-            com.gamma.acquire.AcquisitionLedgers.discardDbWatermark(staged);
+            // (Already taken from the in-memory stash above; only the durable record is left to drop.)
+            SliceFrontiers.delete(cfg, target);
             AcquisitionTelemetry.incDownloadsFailed(cfg);
             AcquisitionTelemetry.emitFileEvent(cfg, EventType.FILE_FETCH_FAILED,
                     "Could not land " + rf.relativePath() + " in the inbox (" + e.getMessage() + ")",

@@ -1,6 +1,8 @@
 # Stream consumer — design pass (`STREAM-CONSUMER-1`)
 
-**Status:** DESIGN — awaiting operator answers (§6). No code written. Written 2026-09-24.
+**Status:** Option A is BUILT (slices 0–3, 2026-09-24). All four §6 questions are answered, and slice 4 is
+dropped by Q2. What remains open is only the `SP-ACQ-09` cell in `EDITIONS.md`. As-built truth lives in
+`okf/capabilities/acquisition/acquisition.md` §3.7 and §3.9. Written 2026-09-24.
 Board row: `BACKLOG.md` §3 `STREAM-CONSUMER-1` · ROADMAP §3.4 · `okf/capabilities/acquisition/acquisition.md` §3.9.
 
 ## 1. Problem
@@ -108,17 +110,26 @@ only if an operator names a latency target the poll cadence cannot meet.
 
 ## 5. Build plan (ordered slices)
 
-| # | Slice | Test strategy |
-|---|---|---|
-| 0 | **Reproduce §2.2(1)–(3)** end to end: a fake `CollectorConnector` stashing via `stashDbWatermark`, driven through `RemoteAcquisitionHandler` with a staging dir, then commit; assert the ledger watermark. Expected RED. | New engine test; mutation-check it goes green only with the fix |
-| 1 | **Frontier survives land + restart:** slice renamed to reached range before land; commit derives the frontier from the landed name (Kafka) / re-keys the stash on land (DB export) | Slice-0 test green; restart variant (clear in-memory map between land and commit) green |
-| 2 | **In-flight fence** in `KafkaConnector.discover` (skip partition with an uncommitted slice in staging/inbox) | Unit: two cycles before commit ⇒ one slice; integration: no overlapping ranges ingested |
-| 3 | **Lag + counters** metrics, Collector status field; `SP-ACQ-09` cell + `acquisition.md` §3.9 updated | Metric unit test; doc guards |
-| 4 | *(Gated on Q2)* `trigger: stream` lane in `PipelineScheduler` + lifecycle on space close | Real-HTTP activate/deactivate test; scheduler unit test with a fake clock |
+| # | Slice | Test strategy | Status (2026-09-24) |
+|---|---|---|---|
+| 0 | **Reproduce §2.2(1)–(3)** end to end: a fake `CollectorConnector` stashing via `stashDbWatermark`, driven through `RemoteAcquisitionHandler` with a staging dir, then commit; assert the ledger watermark. Expected RED. | New engine test; mutation-check it goes green only with the fix | ✅ Reproduced RED: DB export 3 → 6 → 10 rows, Kafka 7 rows for 4 offsets |
+| 1 | **Frontier survives land + restart:** slice renamed to reached range before land; commit derives the frontier from the landed name (Kafka) / re-keys the stash on land (DB export) | Slice-0 test green; restart variant (clear in-memory map between land and commit) green | ✅ Re-key on land `6fecec831`. Restart half built differently: one durable record per landed slice, for **both** connectors, under `<staging>/.frontier/`. It is written before the land, read at commit, and restored before discovery. The name-derived variant was refused (acquisition.md §3.7). |
+| 2 | **In-flight fence** in `KafkaConnector.discover` (skip partition with an uncommitted slice in staging/inbox) | Unit: two cycles before commit ⇒ one slice; integration: no overlapping ranges ingested | ✅ `AcquisitionLedgers.hasPendingDbWatermark`, used by Kafka (per partition) and incremental DB export. It releases itself when the slice file is gone or the value is already committed. |
+| 3 | **Lag + counters** metrics, Collector status field; `SP-ACQ-09` cell + `acquisition.md` §3.9 updated | Metric unit test; doc guards | ✅ Metrics built: `inspecto_stream_lag_records`, `…_slices_drained_total` and `inspecto_slice_frontiers_committed_total`, on `GET /metrics/acquisition` (that JSON is the status surface; no field was added to `GET /collectors`), with acquisition.md updated. ⏳ The `SP-ACQ-09` cell in `EDITIONS.md` is not updated: this lane was barred from staging that file. |
+| 4 | *(Gated on Q2)* `trigger: stream` lane in `PipelineScheduler` + lifecycle on space close | Real-HTTP activate/deactivate test; scheduler unit test with a fake clock | ⛔ Dropped. Q2 named no latency target. |
 
 Per CLAUDE.md, each slice runs its affected test classes only (`-pl <module> -Dtest=A,B`).
 
-## 6. Open questions for the operator
+## 6. Questions for the operator — ANSWERED 2026-09-24
+
+| # | Answer (operator, 2026-09-24) |
+|---|---|
+| Q1 | **No separate P1.** The fix lands inside `STREAM-CONSUMER-1`. |
+| Q2 | **No latency target.** Option A, the hardened Collector-scan loop, closes the row, and no stream lane (slice 4) is built. |
+| Q3 | **The frontier must be recoverable after a restart, for BOTH Kafka and DB export**, so that a restart never re-ingests. Built as a durable per-slice record written atomically before the land (slice 1 row above). |
+| Q4 | **Keep the ledger-watermark model.** No broker consumer groups. |
+
+The questions as they were put:
 
 1. **Is §2.2 a P1?** If slice 0 reproduces it, every Kafka and DB-export Collector re-delivers rows today. Promote slices 0–2 to a P1 row of their own, or keep them inside `STREAM-CONSUMER-1` (P2)?
 2. **Is there a latency target?** Option B is only worth building if some deployment needs sub-cadence delivery. Name it, or accept A as closing the row.
