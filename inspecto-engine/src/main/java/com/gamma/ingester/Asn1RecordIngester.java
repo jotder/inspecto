@@ -12,6 +12,7 @@ import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.RecordSink;
 import com.gamma.etl.StreamingFileIngester;
 import com.gamma.parse.Asn1GrammarSource;
+import com.gamma.parse.Asn1ParserPlugin;
 
 import java.io.File;
 import java.io.IOException;
@@ -65,6 +66,7 @@ import java.util.Set;
  *       strictness: BER                     # BER (default) | DER | CER
  *       file_header_length: 0               # optional, see Asn1ParserPlugin
  *       record_header_length: 0             # optional
+ *       max_value_bytes: 67108864           # optional single-value cap (default 64 MiB)
  * </pre>
  *
  * <h3>Failure handling</h3>
@@ -116,7 +118,9 @@ public final class Asn1RecordIngester implements StreamingFileIngester {
         List<ParseError> errors = new ArrayList<>();
         try (ByteSource src = ByteSource.map(file.toPath())) {
             Iterator<NamedNode> records = decoder.decode(src, framing(ic), strictness(str(ic.get("strictness"))),
-                    RecoveryPolicy.STOP_FILE, errors::add).iterator();
+                    RecoveryPolicy.STOP_FILE, errors::add,
+                    Asn1ParserPlugin.maxValueBytes(ic.get("max_value_bytes"), "ingester_config.max_value_bytes"))
+                    .iterator();
             while (records.hasNext()) {
                 NamedNode record = records.next();
                 List<String> selectors = selectorsByKey.get(record.name());

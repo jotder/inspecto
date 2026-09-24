@@ -35,6 +35,11 @@ public record Tlv(
 
     /** e.g. {@code [APPLICATION 3]}, {@code [2]} (context), {@code UNIVERSAL 16}. */
     public String tagString() {
+        return tagString(tagClass, tagNumber);
+    }
+
+    /** {@link #tagString()} for a tag not yet built into a node — e.g. one refused while parsing. */
+    static String tagString(TagClass tagClass, long tagNumber) {
         return switch (tagClass) {
             case UNIVERSAL -> "UNIVERSAL " + tagNumber;
             case APPLICATION -> "[APPLICATION " + tagNumber + "]";

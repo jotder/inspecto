@@ -210,6 +210,38 @@ class Asn1ParserPluginTest {
     }
 
     @Test
+    void aValueOverTheCapFailsItsRecordInThePreviewTooNamingTagLengthAndCap() {
+        // name "hi" is 2 bytes, over a cap of 1 — the same refusal the ingester makes, so a cap that
+        // previews is the cap that ingests (BER-VALID-BUT-HUGE-ALLOCATION-1)
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> asn1.preview(hex(RECORD_1_HEX),
+                        grammar("grammar", GRAMMAR, "root_type", "Record", "max_value_bytes", 1)));
+        assertTrue(e.getMessage().contains("value of [1] declares 2 bytes, over the max_value_bytes cap of 1"),
+                e.getMessage());
+    }
+
+    @Test
+    void theStructuralDumpHonoursTheCapToo() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> asn1.preview(hex(RECORD_1_HEX), grammar("max_value_bytes", 1)));
+        assertTrue(e.getMessage().contains("over the max_value_bytes cap of 1"), e.getMessage());
+    }
+
+    @Test
+    void aValueExactlyAtTheCapPreviews() throws Exception {
+        ParseResult.Tree t = (ParseResult.Tree) asn1.preview(hex(RECORD_1_HEX),
+                grammar("grammar", GRAMMAR, "root_type", "Record", "max_value_bytes", 2));
+        assertEquals("hi", t.nodes().get(0).children().get(1).value());
+    }
+
+    @Test
+    void aNonNumericCapIsACallerError() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> asn1.preview(hex(RECORD_1_HEX), grammar("max_value_bytes", "lots")));
+        assertTrue(e.getMessage().contains("asn1.max_value_bytes"), e.getMessage());
+    }
+
+    @Test
     void aNegativeFramingLengthIsACallerError() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> asn1.preview(hex(RECORD_1_HEX),

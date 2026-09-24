@@ -1830,7 +1830,8 @@ final class PipelineConfigParser {
         if (!grammar.isEmpty()) ic.put("grammar_text", grammar);
         if (!grammarFile.isEmpty()) ic.put("grammar", grammarFile);
         ic.put("root_type", rootType);
-        for (String k : new String[]{"strictness", "file_header_length", "record_header_length"})
+        for (String k : new String[]{"strictness", "file_header_length", "record_header_length",
+                "max_value_bytes"})
             if (a.get(k) != null) ic.put(k, a.get(k));
         Map<String, Object> plugin = new LinkedHashMap<>();
         plugin.put("ingester", ASN1_INGESTER);

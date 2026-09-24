@@ -20,6 +20,7 @@ public final class RecordReader implements Iterator<Tlv> {
     private final Strictness strictness;
     private final RecoveryPolicy policy;
     private final ErrorListener listener;
+    private final int maxValueBytes;
 
     private final long contentEnd;
     private long pos;
@@ -32,11 +33,24 @@ public final class RecordReader implements Iterator<Tlv> {
 
     public RecordReader(ByteSource src, Framing framing, Strictness strictness,
                         RecoveryPolicy policy, ErrorListener listener) {
+        this(src, framing, strictness, policy, listener, BerReader.DEFAULT_MAX_VALUE_BYTES);
+    }
+
+    /**
+     * @param maxValueBytes the single-value cap handed to {@link BerReader#read}: a primitive value
+     *                      declaring more is a record failure like any other parse error
+     */
+    public RecordReader(ByteSource src, Framing framing, Strictness strictness,
+                        RecoveryPolicy policy, ErrorListener listener, int maxValueBytes) {
+        if (maxValueBytes < 1) {
+            throw new IllegalArgumentException("maxValueBytes must be at least 1, got " + maxValueBytes);
+        }
         this.src = src;
         this.framing = framing;
         this.strictness = strictness;
         this.policy = policy;
         this.listener = listener == null ? e -> { } : listener;
+        this.maxValueBytes = maxValueBytes;
         this.pos = framing.fileHeaderLength(src);
         this.contentEnd = src.size() - framing.trailerLength(src);
     }
@@ -100,7 +114,7 @@ public final class RecordReader implements Iterator<Tlv> {
                 throw new BerParseException(recordStart,
                         "record header declares " + declared + " bytes, past end of content");
             }
-            Tlv tlv = BerReader.read(src, payloadStart, limit, strictness);
+            Tlv tlv = BerReader.read(src, payloadStart, limit, strictness, maxValueBytes);
             pos = declared > 0 ? recordStart + declared : tlv.endOffset();
             recordsOk++;
             pending = tlv;

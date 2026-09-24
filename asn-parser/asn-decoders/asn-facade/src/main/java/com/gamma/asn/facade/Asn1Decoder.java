@@ -1,5 +1,6 @@
 package com.gamma.asn.facade;
 
+import com.gamma.asn.core.BerReader;
 import com.gamma.asn.core.ByteSource;
 import com.gamma.asn.core.Framing;
 import com.gamma.asn.core.RecordReader;
@@ -76,11 +77,21 @@ public final class Asn1Decoder {
      * Decode every record in {@code src} into a schema-bound {@link NamedNode} tree, lazily — the
      * returned stream drives one {@link RecordReader} under the given wire framing/strictness/recovery.
      * The caller owns {@code src} (open/close it, typically via try-with-resources); this method does
-     * not close it.
+     * not close it. Primitive values are capped at {@link BerReader#DEFAULT_MAX_VALUE_BYTES}.
      */
     public Stream<NamedNode> decode(ByteSource src, Framing framing, Strictness strictness,
                                      RecoveryPolicy policy, RecordReader.ErrorListener errors) {
-        RecordReader reader = new RecordReader(src, framing, strictness, policy, errors);
+        return decode(src, framing, strictness, policy, errors, BerReader.DEFAULT_MAX_VALUE_BYTES);
+    }
+
+    /**
+     * As {@link #decode(ByteSource, Framing, Strictness, RecoveryPolicy, RecordReader.ErrorListener)},
+     * with an explicit single-value cap: a primitive value declaring more than {@code maxValueBytes}
+     * fails its record through {@code errors} before any array is sized by it.
+     */
+    public Stream<NamedNode> decode(ByteSource src, Framing framing, Strictness strictness,
+                                     RecoveryPolicy policy, RecordReader.ErrorListener errors, int maxValueBytes) {
+        RecordReader reader = new RecordReader(src, framing, strictness, policy, errors, maxValueBytes);
         SchemaBinder binder = new SchemaBinder(schema, src, registry);
         Iterator<NamedNode> it = new Iterator<>() {
             @Override

@@ -190,6 +190,7 @@ class UnifiedParsingBlockTest {
                     root_type: Record
                     strictness: DER
                     file_header_length: 50
+                    max_value_bytes: 1024
                     segments:
                       Record: %s
                 """.formatted(seg.toString().replace('\\', '/')));
@@ -201,6 +202,8 @@ class UnifiedParsingBlockTest {
         assertEquals("Record", cfg.schemas().ingesterConfig().get("root_type"));
         assertEquals("DER", cfg.schemas().ingesterConfig().get("strictness"));
         assertEquals("50", String.valueOf(cfg.schemas().ingesterConfig().get("file_header_length")));
+        assertEquals("1024", String.valueOf(cfg.schemas().ingesterConfig().get("max_value_bytes")),
+                "the single-value cap travels to the ingester like the framing knobs");
     }
 
     /** An empty grammar is preview-only TLV inspection — an ingest config must carry the module. */

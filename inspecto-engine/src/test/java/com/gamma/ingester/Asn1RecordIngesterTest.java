@@ -137,6 +137,44 @@ class Asn1RecordIngesterTest {
     }
 
     @Test
+    void aValueOverTheConfiguredCapFailsTheFileNamingTagLengthAndCap(@TempDir Path dir) throws Exception {
+        // BER-VALID-BUT-HUGE-ALLOCATION-1: party.number "9999" is 4 bytes, over a cap of 3 — a VALID
+        // length, so only the cap refuses it, and it does so before any value array is sized
+        PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, MO_CALL_SCHEMA,
+                "grammar: %s\n    root_type: CallEventRecord\n    max_value_bytes: 3"
+                        .formatted(grammarPath(dir))).toString());
+        File dat = write(dir, "cdr.ber", hex(MO_CALL_HEX));
+
+        IOException e = assertThrows(IOException.class,
+                () -> new Asn1RecordIngester().ingest(dat, new CapturingSink(), 0, cfg));
+        assertTrue(e.getMessage().contains("value of [0] declares 4 bytes, over the max_value_bytes cap of 3"),
+                e.getMessage());
+    }
+
+    @Test
+    void aValueExactlyAtTheConfiguredCapIngests(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, MO_CALL_SCHEMA,
+                "grammar: %s\n    root_type: CallEventRecord\n    max_value_bytes: 4"
+                        .formatted(grammarPath(dir))).toString());
+        File dat = write(dir, "cdr.ber", hex(MO_CALL_HEX));
+
+        CapturingSink sink = new CapturingSink();
+        new Asn1RecordIngester().ingest(dat, sink, 0, cfg);
+        assertArrayEquals(new Object[]{"42", "7", "9999", "moCallRecord"}, sink.emitted.get(0));
+    }
+
+    @Test
+    void aNonPositiveCapIsAConfigError(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(writePipeline(dir, MO_CALL_SCHEMA,
+                "grammar: %s\n    root_type: CallEventRecord\n    max_value_bytes: 0"
+                        .formatted(grammarPath(dir))).toString());
+        File dat = write(dir, "cdr.ber", hex(MO_CALL_HEX));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> new Asn1RecordIngester().ingest(dat, new CapturingSink(), 0, cfg));
+        assertTrue(e.getMessage().contains("ingester_config.max_value_bytes"), e.getMessage());
+    }
+
+    @Test
     void missingGrammarOrRootTypeIsAConfigError(@TempDir Path dir) throws Exception {
         PipelineConfig noRoot = PipelineConfig.load(
                 writePipeline(dir, MO_CALL_SCHEMA, "grammar: %s".formatted(grammarPath(dir))).toString());

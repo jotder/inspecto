@@ -174,4 +174,23 @@ class RecordReaderTest {
         assertEquals(1, errors.size());
         assertTrue(errors.getFirst().message().contains("past end"));
     }
+
+    @Test
+    void valueOverTheCapFailsItsRecordThroughTheListenerAndTheNextRecordStillReads() {
+        // two length-prefixed records; the first holds a 3-byte OCTET STRING, over a cap of 2
+        byte[] data = hex("00 05 04 03 01 02 03 00 03 02 01 06");
+        Framing framing = Framing.of(new Framing.FramingSpec(0, 0, Set.of(),
+                new Framing.RecordHeaderSpec(2, 0, 2, true, false)));
+        List<ParseError> errors = new ArrayList<>();
+        RecordReader r = new RecordReader(ByteSource.of(data), framing, Strictness.BER,
+                RecoveryPolicy.SKIP_RECORD, errors::add, 2);
+        List<Tlv> records = new ArrayList<>();
+        r.forEachRemaining(records::add);
+        assertEquals(1, records.size());
+        assertEquals(1, r.recordsFailed());
+        assertEquals(0, errors.getFirst().recordIndex());
+        assertEquals(RecoveryPolicy.SKIP_RECORD, errors.getFirst().action());
+        assertEquals("value of UNIVERSAL 4 declares 3 bytes, over the max_value_bytes cap of 2 (at offset 4)",
+                errors.getFirst().message());
+    }
 }

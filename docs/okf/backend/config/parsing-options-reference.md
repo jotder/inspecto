@@ -296,6 +296,8 @@ parsing:
     strictness: BER            # BER (default) | DER | CER
     file_header_length: 0      # bytes skipped once at file start (e.g. 50, Huawei framing)
     record_header_length: 0    # bytes preceding each record's TLV (e.g. 4)
+    max_value_bytes: 67108864  # optional cap on ONE primitive value (default 64 MiB); a larger
+                               # declared length fails the record (and so the file) before allocation
     segments:                  # {recordName: schemaPath}, required to ingest
       moCallRecord: config/cdr/mo_call_schema.toon
 

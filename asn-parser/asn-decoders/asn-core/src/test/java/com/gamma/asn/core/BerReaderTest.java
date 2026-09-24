@@ -161,4 +161,93 @@ class BerReaderTest {
             // rejecting it is the other allowed outcome
         }
     }
+
+    // ---- BER-VALID-BUT-HUGE-ALLOCATION-1: a VALID length over the single-value cap ----------
+
+    /**
+     * A {@link ByteSource} reporting {@code size} bytes: {@code head} at offset 0, zeros after.
+     * Any value copy fails the test — the whole point is that the cap refuses before one happens.
+     */
+    private static ByteSource huge(long size, String headHex) {
+        byte[] head = HexFormat.of().parseHex(headHex.replace(" ", ""));
+        return new ByteSource() {
+            @Override
+            public long size() {
+                return size;
+            }
+
+            @Override
+            public int byteAt(long offset) {
+                return offset < head.length ? head[(int) offset] & 0xFF : 0;
+            }
+
+            @Override
+            public void copyTo(long offset, byte[] dst, int dstOffset, int length) {
+                throw new AssertionError("value bytes were copied (" + length + " bytes)");
+            }
+
+            @Override
+            public byte[] bytes(long offset, int length) {
+                throw new AssertionError("a " + length + "-byte value array was allocated");
+            }
+        };
+    }
+
+    @Test
+    void validLengthOverTheDefaultCapRefusedAtParseNotAtAllocation() {
+        // the row's measured case: 04 84 95 02 F9 00 = OCTET STRING of 2,500,000,000 bytes, genuinely
+        // inside a 3 GB source — every bounds check passes, so only a cap can say no
+        ByteSource src = huge(3_000_000_000L, "04 84 95 02 F9 00");
+        BerParseException e = assertThrows(BerParseException.class,
+                () -> BerReader.read(src, 0, src.size(), Strictness.BER));
+        assertTrue(e.getMessage().contains("UNIVERSAL 4"), e.getMessage());
+        assertTrue(e.getMessage().contains("2500000000"), e.getMessage());
+        assertTrue(e.getMessage().contains("67108864"), e.getMessage());
+    }
+
+    @Test
+    void validLengthJustUnderTwoGibRefusedInsteadOfAllocated() {
+        // 0x71000000 = 1,895,825,408 bytes: fits an int, so before the cap Tlv.value() would have
+        // allocated a byte[] of that size from attacker-chosen input
+        ByteSource src = huge(2_000_000_000L, "04 84 71 00 00 00");
+        assertThrows(BerParseException.class, () -> BerReader.read(src, 0, src.size(), Strictness.BER));
+    }
+
+    private static Tlv parseCapped(String hex, int maxValueBytes) {
+        byte[] bytes = HexFormat.of().parseHex(hex.replace(" ", ""));
+        return BerReader.read(ByteSource.of(bytes), 0, bytes.length, Strictness.BER, maxValueBytes);
+    }
+
+    @Test
+    void valueOneByteOverAConfiguredCapRefusedNamingTagLengthAndCap() {
+        // [APPLICATION 3] primitive, 5 bytes, all present — valid, and one byte over a cap of 4
+        BerParseException e = assertThrows(BerParseException.class,
+                () -> parseCapped("43 05 01 02 03 04 05", 4));
+        assertEquals("value of [APPLICATION 3] declares 5 bytes, over the max_value_bytes cap of 4 (at offset 2)",
+                e.getMessage());
+        assertEquals(2, e.offset());
+    }
+
+    @Test
+    void valueExactlyAtTheCapDecodes() {
+        byte[] bytes = HexFormat.of().parseHex("0404CAFEBABE");
+        Tlv t = BerReader.read(ByteSource.of(bytes), 0, bytes.length, Strictness.BER, 4);
+        assertEquals(4, t.valueLength());
+        assertEquals(4, t.value(ByteSource.of(bytes)).length);
+    }
+
+    @Test
+    void capIsPerPrimitiveValueNotPerConstructedRecord() {
+        // SEQUENCE of 9 content bytes holding three 1-byte INTEGERs: the record is over a cap of 2,
+        // each value is under it — nothing copies a constructed value, so only values are capped
+        Tlv t = parseCapped("30 09 02 01 01 02 01 02 02 01 03", 2);
+        assertEquals(3, t.children().size());
+        assertThrows(BerParseException.class, () -> parseCapped("30 05 04 03 01 02 03", 2),
+                "a nested primitive over the cap fails the whole TLV");
+    }
+
+    @Test
+    void nonPositiveCapRejected() {
+        assertThrows(IllegalArgumentException.class, () -> parseCapped("02 01 2A", 0));
+    }
 }

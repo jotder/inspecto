@@ -76,7 +76,8 @@ depended on as `com.gamma.asn:asn-facade:0.1.0-SNAPSHOT`, installed to the local
 separate `asn-parser/asn-decoders` reactor — not yet resolved from this build, see the coordinate
 note below). Grammar: `asn1.grammar` (the ASN.1 module text) **or** `asn1.grammar_file` (a stored
 `.asn` module, 2026-09-23 — see below) / `asn1.root_type` / `asn1.strictness`
-(BER/DER/CER) / `asn1.file_header_length` / `asn1.record_header_length` / `asn1.max_records`.
+(BER/DER/CER) / `asn1.file_header_length` / `asn1.record_header_length` / `asn1.max_value_bytes`
+(the single-value cap, see *BER hostile-input handling* below) / `asn1.max_records`.
 No `suggest()`.
 
 **A grammar is either pasted TEXT or a stored `.asn` FILE (operator decision 2026-09-23).** A stored
@@ -270,7 +271,7 @@ remains equivalent.
 
 `ingester_config`: `grammar` (path to the `.asn` module) or `grammar_text` (inline module; wins when
 both are set) — one of the two required · `root_type` (required) ·
-`strictness` · `file_header_length` · `record_header_length`.
+`strictness` · `file_header_length` · `record_header_length` · `max_value_bytes`.
 
 Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
 - ~~**Declarative decode profile — the grammar source.**~~ **CLOSED 2026-09-23.** Framing was served
@@ -303,7 +304,7 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
 - **Drop-in `plugins/` jar directory** and the **segments editor** (unlock guided Save for
   ingestable custom parsers) — unchanged from before, apply to any custom parser, not ASN.1-specific.
 
-### BER hostile-input handling — fixed 2026-09-17, and one hazard left open
+### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24
 
 ✅ **`BER-LENGTH-OVERFLOW-1` (P1) is closed.** A long-form 8-byte length of `Long.MAX_VALUE` made
 `valueOffset + valueLength` wrap negative, so the `end > limit` guard passed and `BerReader` returned a Tlv
@@ -316,8 +317,33 @@ overflow. ✅ **`BER-FRAMING-UNCHECKED-READ-1` too**: `Framing.Fixed.recordLengt
 ⚠ **A truncated TAIL reports `ParseError(STOP_FILE)` even under `RecoveryPolicy.SKIP_RECORD`** — a header that
 cannot be read yields no boundary to resync to. Records already read are still delivered.
 
-⬜ **`BER-VALID-BUT-HUGE-ALLOCATION-1` remains open and is a different shape.** A length that is *valid* but
-enormous still allocates: measured with a 3 GB stub source, `04 84 95 02 F9 00` parses cleanly and just under
-2 GB would allocate a `byte[]` sized by attacker-controlled input. ⛔ No bounds check can reject it — the
-length is legitimate — so it needs a cap or a streaming accessor, a design call on `Tlv.value()`'s `byte[]`
-return type. Reachable only via `ByteSource.map`.
+✅ **`BER-VALID-BUT-HUGE-ALLOCATION-1` is closed (2026-09-24) with a configurable single-value cap** —
+operator decision: a cap, not a streaming accessor, so `Tlv.value()` keeps its `byte[]` return type. The
+hazard was a length that is *valid* but enormous: measured with a 3 GB stub source, `04 84 95 02 F9 00`
+parsed cleanly, and just under 2 GB `Tlv.value()` would have allocated a `byte[]` sized by
+attacker-controlled input. No bounds check can reject that, because the length is legitimate.
+
+- **Where it lives:** `BerReader.read(src, offset, limit, strictness, maxValueBytes)` refuses a
+  **primitive** value whose declared length exceeds the cap, as a `BerParseException`:
+  `value of [APPLICATION 3] declares 5 bytes, over the max_value_bytes cap of 4 (at offset 2)`. The check runs
+  at parse time, after the in-bounds check (a truncated value still reports truncation), so no Tlv exists
+  for anything to allocate from. The cap passes through `RecordReader` (6-arg constructor) and
+  `Asn1Decoder.decode(…, maxValueBytes)`. The old signatures still exist and use the default. A
+  refusal is an ordinary record failure: it reaches the `ErrorListener` as a `ParseError`, and
+  `SKIP_RECORD` skips a length-prefixed record the way it skips any other bad record.
+- **Constructed values are not capped.** Their length only bounds where children are parsed, and no
+  decoder copies a constructed value. A record far larger than the cap decodes as long as each leaf is under it.
+- **Default `BerReader.DEFAULT_MAX_VALUE_BYTES` = 64 MiB.** Measured 2026-09-24 over every shipped
+  sample (`MSC01_20260801_0800.ber`, `CDR_20260801.ber`, `corpus-synthetic`) and the operator corpus
+  (Huawei IMS/MSC, Ericsson CCN/OCC/SDP, IMS and SGSN CDRs): the largest primitive value is **128 bytes** and
+  the largest record about 9 KB. 64 MiB therefore refuses no real file and still caps the worst case at an
+  allocation any JVM that runs the engine can afford.
+- **Pipeline config:** `asn1.max_value_bytes` (a served `grammarSchema` field, so the preview and the Parse
+  drawer honour it) and `ingester_config.max_value_bytes`. `frontend: asn1` carries it across the same way
+  as the framing knobs (`PipelineConfigParser.asn1PluginBlock`). One parser, `Asn1ParserPlugin.maxValueBytes`,
+  serves both spellings, so the cap a preview uses is the cap an ingest uses. Unset or blank means the
+  default. Anything that is not a whole number ≥ 1 is a config error naming the key. Because of the
+  *any parse error fails the file* rule above, an over-cap value quarantines the file `QUARANTINED_UNREADABLE`.
+- Not a `ConfigSpecs` / accepted-key census entry: `ConfigSpecs` declares no `parsing.asn1.*` key,
+  and the pipeline census stops at the top-level `parsing` block. The parser's served
+  `grammarSchema` is the declaration for `asn1.*`.

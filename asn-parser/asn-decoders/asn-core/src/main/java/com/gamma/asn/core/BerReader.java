@@ -13,17 +13,42 @@ public final class BerReader {
     private BerReader() {
     }
 
-    /** Parses one complete TLV starting at {@code offset}; nothing past {@code limit} is read. */
+    /**
+     * Default cap on one primitive value's declared length: 64 MiB. A BER length can be perfectly
+     * valid and still enormous, and {@link Tlv#value} copies a value into a {@code byte[]}, so without
+     * a cap the allocation is sized by the input (BER-VALID-BUT-HUGE-ALLOCATION-1). Measured
+     * 2026-09-24 over every shipped sample and the operator corpus (telecom CDRs from six vendors):
+     * the largest primitive value is 128 bytes and the largest record ~9 KB, so 64 MiB refuses no real
+     * file while bounding the worst case to an allocation any JVM that runs the engine can afford.
+     */
+    public static final int DEFAULT_MAX_VALUE_BYTES = 64 * 1024 * 1024;
+
+    /** Parses one complete TLV under the {@link #DEFAULT_MAX_VALUE_BYTES default} single-value cap. */
     public static Tlv read(ByteSource src, long offset, long limit, Strictness strictness) {
+        return read(src, offset, limit, strictness, DEFAULT_MAX_VALUE_BYTES);
+    }
+
+    /**
+     * Parses one complete TLV starting at {@code offset}; nothing past {@code limit} is read. A
+     * PRIMITIVE value declaring more than {@code maxValueBytes} is refused as a
+     * {@link BerParseException} naming its tag, declared length and the cap — at parse time, so no
+     * {@code byte[]} is ever sized by it. Constructed values are not capped: their length only bounds
+     * where children are parsed, and no decoder copies a constructed value.
+     */
+    public static Tlv read(ByteSource src, long offset, long limit, Strictness strictness, int maxValueBytes) {
+        if (maxValueBytes < 1) {
+            throw new IllegalArgumentException("maxValueBytes must be at least 1, got " + maxValueBytes);
+        }
         if (limit > src.size()) {
             limit = src.size();
         }
-        return readNode(src, offset, limit, strictness, 0);
+        return readNode(src, offset, limit, strictness, maxValueBytes, 0);
     }
 
     private static final int MAX_DEPTH = 200;
 
-    private static Tlv readNode(ByteSource src, long offset, long limit, Strictness strictness, int depth) {
+    private static Tlv readNode(ByteSource src, long offset, long limit, Strictness strictness,
+                                int maxValueBytes, int depth) {
         if (depth > MAX_DEPTH) {
             throw new BerParseException(offset, "nesting deeper than " + MAX_DEPTH + " levels");
         }
@@ -105,6 +130,13 @@ public final class BerReader {
                 throw new BerParseException(valueOffset,
                         "value of " + valueLength + " bytes runs past limit " + limit);
             }
+            // a length can be in bounds and still enormous — refuse it here, before Tlv.value() sizes
+            // an array by it (BER-VALID-BUT-HUGE-ALLOCATION-1)
+            if (valueLength > maxValueBytes) {
+                throw new BerParseException(valueOffset,
+                        "value of " + Tlv.tagString(tagClass, tagNumber) + " declares " + valueLength
+                                + " bytes, over the max_value_bytes cap of " + maxValueBytes);
+            }
             long end = valueOffset + valueLength;
             return new Tlv(tagClass, tagNumber, false, false, offset, valueOffset, valueLength, end, List.of());
         }
@@ -121,7 +153,7 @@ public final class BerReader {
                     return new Tlv(tagClass, tagNumber, true, true, offset, valueOffset,
                             contentEnd - valueOffset, cursor + 2, children);
                 }
-                Tlv child = readNode(src, cursor, limit, strictness, depth + 1);
+                Tlv child = readNode(src, cursor, limit, strictness, maxValueBytes, depth + 1);
                 children.add(child);
                 cursor = child.endOffset();
             }
@@ -138,7 +170,7 @@ public final class BerReader {
                 throw new BerParseException(cursor,
                         "end-of-contents marker inside a definite-length constructed value");
             }
-            Tlv child = readNode(src, cursor, contentEnd, strictness, depth + 1);
+            Tlv child = readNode(src, cursor, contentEnd, strictness, maxValueBytes, depth + 1);
             children.add(child);
             cursor = child.endOffset();
         }

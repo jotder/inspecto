@@ -1,5 +1,6 @@
 package com.gamma.parse;
 
+import com.gamma.asn.core.BerReader;
 import com.gamma.asn.core.ByteSource;
 import com.gamma.asn.core.Framing;
 import com.gamma.asn.core.ParseError;
@@ -104,6 +105,12 @@ public final class Asn1ParserPlugin implements ParserPlugin {
                 FieldSpec.withDefault("asn1.record_header_length", "Record header bytes", FieldType.INT, 0,
                         "Bytes preceding each record's TLV, skipped (e.g. 4 for Huawei-framed files). "
                                 + "0 = bare back-to-back TLVs. Records stay delimited by their own BER length."),
+                FieldSpec.withDefault("asn1.max_value_bytes", "Max value bytes", FieldType.INT,
+                        BerReader.DEFAULT_MAX_VALUE_BYTES,
+                        "Largest single primitive value accepted, in bytes (default 64 MiB). A value "
+                                + "declaring more fails its record with a parse error naming the tag, the "
+                                + "declared length and this cap — before any memory is allocated for it. "
+                                + "Real CDR values are well under 1 KB."),
                 FieldSpec.withDefault("asn1.max_records", "Preview records", FieldType.INT, DEFAULT_RECORDS,
                         "Records materialized into the preview tree (max " + MAX_RECORDS + ")."));
     }
@@ -122,6 +129,7 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         Strictness strictness = strictness(trimOrEmpty(asn1.get("strictness")));
         Framing framing = framing(asn1);
         int maxRecords = clampRecords(asn1.get("max_records"));
+        int maxValueBytes = maxValueBytes(asn1.get("max_value_bytes"), "asn1.max_value_bytes");
         // Inline text wins over the .asn file ref — the ingester's rule, through the ingester's resolver.
         // A relative ref resolves beside the Pipeline's config dir when the caller has one (the drawer
         // sends it — the Pipeline's own spelling); with no Pipeline context, against the bound Space's
@@ -137,7 +145,7 @@ public final class Asn1ParserPlugin implements ParserPlugin {
                         "asn1.root_type was set without a grammar — supply asn1.grammar or "
                                 + "asn1.grammar_file to bind against '" + rootType
                                 + "', or clear root_type for a structural dump");
-            return structural(sample, framing, strictness, maxRecords);
+            return structural(sample, framing, strictness, maxRecords, maxValueBytes);
         }
         if (rootType.isEmpty())
             throw new IllegalArgumentException("asn1.root_type is required when a grammar is supplied");
@@ -152,8 +160,8 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         List<ParseError> errors = new ArrayList<>();
         List<NamedNode> records;
         try (ByteSource src = ByteSource.of(sample)) {
-            records = decoder.decode(src, framing, strictness, RecoveryPolicy.SKIP_RECORD, errors::add)
-                    .toList();
+            records = decoder.decode(src, framing, strictness, RecoveryPolicy.SKIP_RECORD, errors::add,
+                    maxValueBytes).toList();
         }
         if (records.isEmpty()) {
             throw new IllegalArgumentException(errors.isEmpty()
@@ -174,13 +182,13 @@ public final class Asn1ParserPlugin implements ParserPlugin {
      * what it can rather than fail whole on one bad record.
      */
     private static ParseResult.Tree structural(byte[] sample, Framing framing, Strictness strictness,
-                                               int maxRecords) throws Exception {
+                                               int maxRecords, int maxValueBytes) throws Exception {
         List<ParseError> errors = new ArrayList<>();
         List<ParseResult.Node> nodes = new ArrayList<>();
         int total = 0;
         try (ByteSource src = ByteSource.of(sample)) {
             RecordReader reader = new RecordReader(src, framing, strictness,
-                    RecoveryPolicy.SKIP_RECORD, errors::add);
+                    RecoveryPolicy.SKIP_RECORD, errors::add, maxValueBytes);
             while (reader.hasNext()) {
                 Tlv record = reader.next();
                 total++;
@@ -275,6 +283,23 @@ public final class Asn1ParserPlugin implements ParserPlugin {
             throw new IllegalArgumentException(field + " must be a number, got: " + v);
         }
         if (n < 0) throw new IllegalArgumentException(field + " must not be negative, got: " + n);
+        return n;
+    }
+
+    /**
+     * The single-value cap (BER-VALID-BUT-HUGE-ALLOCATION-1); unset = asn-core's 64 MiB default.
+     * Public because {@code Asn1RecordIngester} reads the same key from {@code ingester_config}, so a
+     * cap that previews is the cap that ingests.
+     */
+    public static int maxValueBytes(Object v, String field) {
+        if (v == null || String.valueOf(v).isBlank()) return BerReader.DEFAULT_MAX_VALUE_BYTES;
+        int n;
+        try {
+            n = Integer.parseInt(String.valueOf(v).trim());
+        } catch (NumberFormatException bad) {
+            throw new IllegalArgumentException(field + " must be a whole number of bytes, got: " + v);
+        }
+        if (n < 1) throw new IllegalArgumentException(field + " must be at least 1, got: " + n);
         return n;
     }
 
