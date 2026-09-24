@@ -419,6 +419,22 @@ class ConfigSafetyValidatorTest {
         assertTrue(hasError(f, "retention_days"));
     }
 
+    /** DUCKLE-C10-ADMISSION-POOLS-1: a Pipeline CHOOSES a pool, so only its shape is gated — a
+     *  well-formed name the server does not define is accepted (it is admitted in `default`). */
+    @Test
+    void processingPoolIsShapeCheckedButAnUndefinedNameIsNotRefused(@TempDir Path root) {
+        Map<String, Object> raw = pipeline(safeDirs(root));
+        Map<String, Object> proc = new LinkedHashMap<>();
+        proc.put("pool", "Heavy Pool!");
+        raw.put("processing", proc);
+        assertTrue(hasError(ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.withRoots(root)),
+                "processing.pool"), "a malformed pool name must be refused");
+
+        proc.put("pool", "not_defined_anywhere");
+        assertFalse(hasError(ConfigSafetyValidator.check("pipeline", raw, SafetyPolicy.withRoots(root)),
+                "processing.pool"), "an undefined but well-formed pool resolves to default, never a refusal");
+    }
+
     /** CONSIGNMENT-HOME-1: the canonical home collector.consignment.* is bounded like the legacy one. */
     @Test
     void collectorConsignmentCapsAreBounded(@TempDir Path root) throws Exception {

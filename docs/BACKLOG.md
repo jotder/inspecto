@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **45<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 24<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** —
+> **44<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 24<!--count:backlog-p2--> × P2 · 20<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 54 on 2026-09-24**: P2 `STREAM-CONSUMER-1` closed — Option A built, the `SP-ACQ-09` note updated, the plan distilled into `okf/capabilities/acquisition/acquisition.md` and archived.
 > ⬇ 55 → 54 on 2026-09-24: P3 `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` closed — its work had shipped in `d5f6353be`
@@ -22,8 +22,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 24<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 21<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 45<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 20<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 44<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -165,10 +165,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 #### Consignments
 
 - **P2** · **Consignment addressing** — the ingest-side Consignment-scoped accessor waits for a consumer. ⚠ `DatasetRelation.temporalColumn` has no caller and cannot safely gain one on a write path. Settled — do not re-open: torn multi-file reads (closed by the pinned `ConsignmentSelector` list); `generation` was DELETED 2026-09-24 — nothing read it (`okf/backend/engine/db-layer.md` §3.9); `retire_superseded` is warned about, not silent, and ships as a disabled demo job (`spaces/demo/config/jobs/retire_superseded_job.toon`) — ⛔ its default is **not** flipped, because enabling retirement by default deletes bytes operators may rely on. → `okf/backend/engine/consignment-addressing.md`
-
-#### Admission
-
-- **P3** · `DUCKLE-C10-ADMISSION-POOLS-1` — **named execution pools are ADMISSION ONLY.** A pool answers "may this start now" and never widens thread or memory caps; a Pipeline may choose a pool but never define one the server lacks (unknown ⇒ `default`); a queued run gets a durable id immediately with `queueReason`, becoming `running` with `queueMs`; a supervisor takes **no slot** (holding one while waiting for a child that needs the same pool deadlocks); metric = free permits per pool. ✅ The rule set is recorded in the scale-out plan §4.1 beside the `ConcurrencyBroker` seam; the FEATURE is not built. → `superpower/enterprise-scale-out-plan.md` phase B
 
 ### 3.3 Acquisition, Collectors & Parsing
 

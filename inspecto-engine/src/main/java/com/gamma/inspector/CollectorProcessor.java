@@ -225,11 +225,15 @@ public class CollectorProcessor {
         // system Consignment caps when configured (scheduler-system-config plan Part B; with no caps
         // configured this is exactly the old run-local Semaphore(threads)). Every batch is submitted
         // up front; all but the granted ones simply park on admit().
+        // Named pool (DUCKLE-C10-ADMISSION-POOLS-1): admission only, unknown => `default`. ⛔ THIS thread is
+        // the supervisor: it waits on the batch futures below and must never hold a permit itself, or a
+        // pool of size N deadlocks once N supervisors wait on children queued in the same pool.
         int maxConcurrent  = Math.max(1, cfg.processing().threads());
         ConcurrencyBroker broker = ConcurrencyBroker.shared();
         String spaceId     = com.gamma.event.EventLog.currentSpaceId();
         String pipelineId  = cfg.identity().pipelineName();
         int priority       = cfg.processing().priority();
+        String pool        = cfg.processing().pool();
         int failedBatches  = 0;
 
         // Propagate the caller's space (MDC) onto each batch worker: the commit listener (the service's event-bus
@@ -243,7 +247,10 @@ public class CollectorProcessor {
                     if (mdc != null) MDC.setContextMap(mdc);
                     try {
                         try (ConcurrencyBroker.Permit permit =
-                                     broker.admit(spaceId, pipelineId, maxConcurrent, priority)) {
+                                     broker.admit(spaceId, pipelineId, pool, maxConcurrent, priority, b.batchId())) {
+                            if (permit.queueReason() != null)
+                                log.info("Consignment {} running in pool '{}' after {} ms queued ({})",
+                                        permit.id(), permit.pool(), permit.queueMs(), permit.queueReason());
                             try {
                                 ConsignmentIngestor.process(b, cfg, audit, cycleRunId, dryRun);
                             } catch (Exception thrown) {

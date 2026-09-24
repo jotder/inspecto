@@ -396,6 +396,7 @@ describe('PipelineConfigDefinitionComponent', () => {
             'compression',
             'filename_column',
             'priority',
+            'pool',
             'intake__max_files_per_cycle',
             'intake__min_files_per_cycle',
             'intake__adaptive',

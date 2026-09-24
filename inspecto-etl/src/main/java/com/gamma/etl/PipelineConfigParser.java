@@ -227,6 +227,10 @@ final class PipelineConfigParser {
         if (b.priority < 1 || b.priority > 3)
             throw new IllegalArgumentException(
                     "processing.priority must be 1..3, got " + b.priority);
+        // Named execution pool (DUCKLE-C10-ADMISSION-POOLS-1): a CHOICE of a server-defined pool, never a
+        // definition — an unknown name is admitted in `default` by the broker, so it is not refused here.
+        String pool = opt(proc, "pool", "").trim();
+        b.pool = pool.isEmpty() ? null : pool;
 
         // ── consignment caps (CONSIGNMENT-HOME-1, 2026-09-02) ──────────────────
         // Canonical home: collector.consignment: {max_files, max_bytes, order} — the ConsignmentPlanner

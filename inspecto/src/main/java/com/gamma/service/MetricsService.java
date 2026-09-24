@@ -66,6 +66,19 @@ public final class MetricsService {
     // ── scrape-time gauges (computed lazily on /metrics) ─────────────────────────
 
     private void collectGauges() {
+        // Free permits per named execution pool (DUCKLE-C10-ADMISSION-POOLS-1) — the pool metric is free
+        // capacity, not queue depth. Process-wide, so every space's collector writes the same series.
+        // An unbounded pool has no free-permit count and emits no series.
+        com.gamma.inspector.ConcurrencyBroker broker = com.gamma.inspector.ConcurrencyBroker.shared();
+        java.util.Set<String> pools = new java.util.LinkedHashSet<>();
+        pools.add(com.gamma.inspector.ConcurrencyBroker.DEFAULT_POOL);
+        pools.addAll(broker.pools().keySet());
+        for (String pool : pools) {
+            Integer free = broker.freePermits(pool);
+            if (free != null)
+                reg.setGauge("inspecto_pool_free_permits", "Free admission permits per named execution pool",
+                        Map.of("pool", pool), free);
+        }
         for (PipelineView pv : svc.pipelines()) {
             PipelineConfig cfg;
             try {

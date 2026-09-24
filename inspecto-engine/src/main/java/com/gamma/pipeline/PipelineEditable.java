@@ -504,7 +504,7 @@ public final class PipelineEditable {
      * {@code batch_max_files}/{@code batch_max_bytes} spellings (write-only, G3) are healed by lift and
      * removed by lower.
      */
-    private static final Set<String> SINK_PROC_OWNED = Set.of("threads", "duckdb_threads", "priority");
+    private static final Set<String> SINK_PROC_OWNED = Set.of("threads", "duckdb_threads", "priority", "pool");
 
     /** The sinks[]-entry keys the graph models (and therefore owns) — everything else in a
      *  pre-existing entry is preserved verbatim through a save, per lower()'s contract. */

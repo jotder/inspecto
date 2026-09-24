@@ -383,6 +383,64 @@ class ControlApiSchedulerSettingsTest {
         }
     }
 
+    // ── DUCKLE-C10-ADMISSION-POOLS-1: named execution pools, server-defined only ─────
+
+    @Test
+    void poolsRoundTripOnTheServerDocumentHotApplyAndReportFreePermits(@TempDir Path root) throws Exception {
+        ConcurrencyBroker.use(null);
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            JsonNode def = json(send(c.port, "GET", "/system/scheduler", null));
+            assertEquals(0, def.get("system").get("pools").size(), "no pools until the server defines one");
+            assertTrue(def.get("live").get("pools").has("default"), "default always exists");
+
+            HttpResponse<String> put = send(c.port, "PUT", "/system/scheduler",
+                    "{\"pools\":{\"heavy\":2,\"default\":0}}");
+            assertEquals(200, put.statusCode(), put.body());
+            assertEquals(2, json(put).get("system").get("pools").get("heavy").asInt());
+            assertEquals(2, json(put).get("live").get("pools").get("heavy").get("free").asInt());
+            assertTrue(Files.readString(root.resolve("scheduler.toon")).contains("heavy"), "pools not persisted");
+            assertEquals("heavy", ConcurrencyBroker.shared().resolvePool("heavy"), "hot-apply failed");
+
+            // The metric: free permits per pool, on the scrape — bounded pools only.
+            try (ConcurrencyBroker.Permit p = ConcurrencyBroker.shared().admit("acme", "x", "heavy", 4, 1, "m")) {
+                String scrape = MetricRegistry.global().scrape();
+                assertTrue(scrape.contains("inspecto_pool_free_permits{pool=\"heavy\"} 1"), scrape);
+                assertFalse(scrape.contains("inspecto_pool_free_permits{pool=\"default\"}"),
+                        "an unbounded pool has no free-permit count");
+            }
+
+            // A save that never mentions pools preserves them; an explicit null clears them, live.
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler", "{\"maxConcurrentConsignments\":8}").statusCode());
+            assertEquals("heavy", ConcurrencyBroker.shared().resolvePool("heavy"));
+            assertEquals(200, send(c.port, "PUT", "/system/scheduler", "{\"pools\":null}").statusCode());
+            assertEquals(ConcurrencyBroker.DEFAULT_POOL, ConcurrencyBroker.shared().resolvePool("heavy"));
+        }
+    }
+
+    @Test
+    void aMalformedPoolRefusesTheWholeWrite(@TempDir Path root) throws Exception {
+        ConcurrencyBroker.use(null);
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            assertEquals(422, send(c.port, "PUT", "/system/scheduler",
+                    "{\"pools\":{\"ok\":1,\"Bad Name\":2}}").statusCode());
+            assertEquals(422, send(c.port, "PUT", "/system/scheduler", "{\"pools\":{\"heavy\":-1}}").statusCode());
+            assertEquals(422, send(c.port, "PUT", "/system/scheduler", "{\"pools\":[\"heavy\"]}").statusCode());
+            assertEquals(ConcurrencyBroker.DEFAULT_POOL, ConcurrencyBroker.shared().resolvePool("ok"),
+                    "a refused write must apply nothing");
+        }
+    }
+
+    @Test
+    void storedPoolsInstallAtBoot(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("scheduler.toon"), "pools:\n  heavy: 3\n");
+        ConcurrencyBroker.use(null);
+        try (Ctx c = open(root)) {
+            assertEquals(3, ConcurrencyBroker.shared().freePermits("heavy"), "pools not installed at boot");
+        }
+    }
+
     // ── BACKLOG D11: the resource pair, served with provenance ───────────────────────
 
     @Test

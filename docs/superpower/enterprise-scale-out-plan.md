@@ -401,9 +401,13 @@ the broker's three tiers become **approximate** per-pod unless the counters move
 approximation first — exact global fairness is not worth a round trip per admission); and **ordering needs
 a decision**, because the broker deliberately preserves FIFO per Pipeline and distribution breaks that.
 
-**Admission-pool rules — ADOPTED 2026-09-15 as a design constraint on phase B (`DUCKLE-C10-ADMISSION-POOLS-1`,
-the rule set only; the feature is unbuilt).** Recorded here because `RunLease` + `ConcurrencyBroker` are the
-seam they bind, and the deadlock rule is cheap to honour up front and expensive to retrofit:
+**Admission-pool rules — ADOPTED 2026-09-15 as a design constraint on phase B (`DUCKLE-C10-ADMISSION-POOLS-1`);
+✅ BUILT 2026-09-24 on `ConcurrencyBroker`, JVM-local** — as-built in
+[consignment-concurrency §2a](../okf/backend/engine/consignment-concurrency.md) (server `scheduler.toon`
+`pools:`, Pipeline `processing.pool`, tickets with `queueReason`/`queueMs`, gauge
+`inspecto_pool_free_permits`). ⚠ Distributing the pool counters across pods is still U2's open work below.
+Recorded here because `RunLease` + `ConcurrencyBroker` are the seam they bind, and the deadlock rule is
+cheap to honour up front and expensive to retrofit:
 
 1. A named execution pool answers **"may this start now"** and **never widens** a thread or memory cap — a
    pool is admission, the caps stay where `processing.threads` / D11 put them.
@@ -412,9 +416,9 @@ seam they bind, and the deadlock rule is cheap to honour up front and expensive 
 3. A queued run gets a **durable id immediately**, with `queueReason`; it becomes `running` carrying `queueMs`.
    Waiting is a recorded state, not an absence.
 4. **A supervisor takes no slot.** Holding a permit while waiting for a child that needs the same pool
-   deadlocks at exactly the pool size. ⚠ Today this holds by accident — the broker admits Consignments, not the
-   dispatcher, so nothing waits on a child while holding a permit. The rule exists so U2's "single dispatcher,
-   N workers" cannot break it.
+   deadlocks at exactly the pool size. The broker admits Consignments, never the dispatcher — since
+   2026-09-24 that is pinned by a timeout test on the real `CollectorProcessor` dispatcher, not left to
+   accident, so U2's "single dispatcher, N workers" cannot break it silently.
 5. The metric is **free permits per pool**, not queue depth alone.
 
 **What still does not scale, honestly:** a **single Pipeline with a single enormous feed** remains bounded

@@ -23,7 +23,8 @@ import java.util.Map;
  * <pre>
  *   GET /system/scheduler     server-wide cap (value + provenance), the bound space's cap,
  *                             host cores, and the broker's live occupancy snapshot
- *   PUT /system/scheduler     replace the server-wide cap (write-root gated, canOperateRuns)
+ *   PUT /system/scheduler     replace the server-wide cap (write-root gated, canOperateRuns), and
+ *                             optionally the named execution pools ({@code pools}: name → cap)
  *   GET /settings/scheduler   the bound space's cap + cadences (stored values, provenance, and the
  *                             effective cadences on the running timers)
  *   PUT /settings/scheduler   replace the bound space's cap and optionally its poll/acquire cadence
@@ -85,6 +86,7 @@ final class SchedulerRoutes implements RouteModule {
             ConcurrencyBroker broker = ConcurrencyBroker.shared();
             broker.setSystemCap(effectiveSystemCap(api));
             SchedulerSettings sys = SchedulerSettings.read(systemDocPath(api));
+            broker.setPools(sys.pools());
             IntakeGovernor.shared().setGlobalPolicy(effectiveIntake(sys));
             installResourceCaps(api, sys);
             if (api.spaces() != null) {
@@ -153,6 +155,9 @@ final class SchedulerRoutes implements RouteModule {
                 : (propRuns != null ? propRuns : com.gamma.job.JobService.DEFAULT_MAX_CONCURRENT_RUNS));
         system.put("maxConcurrentJobRunsSource", storedRuns != null ? "file"
                 : (propRuns != null ? "property" : "default"));
+        // Named execution pools (DUCKLE-C10-ADMISSION-POOLS-1): server-defined only, file-owned (no -D
+        // home). `default` is implicit and unbounded unless stated; live free permits are under live.pools.
+        system.put("pools", ss.pools() != null ? ss.pools() : Map.of());
         IntakeGovernor.Policy live = IntakeGovernor.shared().policy();
         Map<String, Object> intake = new LinkedHashMap<>();
         intake.put("maxFilesPerCycle", live.baseCap());
@@ -231,10 +236,12 @@ final class SchedulerRoutes implements RouteModule {
                 ? requireMemoryLimit(body) : stored.duckdbMemoryLimit();
         Integer jobRuns = body.containsKey("maxConcurrentJobRuns")
                 ? optIntField(body, "maxConcurrentJobRuns", 0) : stored.maxConcurrentJobRuns();
-        SchedulerSettings next = new SchedulerSettings(cap, null, null, inMax, inMin, inAdaptive, mem, jobRuns);
+        Map<String, Integer> pools = body.containsKey("pools") ? optPools(body) : stored.pools();
+        SchedulerSettings next = new SchedulerSettings(cap, null, null, inMax, inMin, inAdaptive, mem, jobRuns, pools);
         next.write(doc);
         // Hot-apply the EFFECTIVE cap (stored → -D → unbounded): a cleared cap reverts, live, to the flag.
         ConcurrencyBroker.shared().setSystemCap(effectiveSystemCap(api));
+        ConcurrencyBroker.shared().setPools(pools);
         IntakeGovernor.shared().setGlobalPolicy(effectiveIntake(next));
         installResourceCaps(api, next);
         journal(api, ex, "server-wide", null, stored, next);
@@ -370,7 +377,8 @@ final class SchedulerRoutes implements RouteModule {
                 new Field("acquire_poll_seconds", before.acquirePollSeconds(), after.acquirePollSeconds()),
                 new Field("intake_max_files_per_cycle", before.intakeMaxFilesPerCycle(), after.intakeMaxFilesPerCycle()),
                 new Field("intake_min_files_per_cycle", before.intakeMinFilesPerCycle(), after.intakeMinFilesPerCycle()),
-                new Field("intake_adaptive", before.intakeAdaptive(), after.intakeAdaptive()))) {
+                new Field("intake_adaptive", before.intakeAdaptive(), after.intakeAdaptive()),
+                new Field("pools", before.pools(), after.pools()))) {
             if (java.util.Objects.equals(f.before(), f.after())) continue;
             out.put(f.name(), render(f.before()) + " -> " + render(f.after()));
         }
@@ -395,6 +403,36 @@ final class SchedulerRoutes implements RouteModule {
         if (v < floor || v > 10_000_000)
             throw new ApiException(422, key + " must be " + floor + "..10000000, got " + v);
         return v;
+    }
+
+    /**
+     * The stated {@code pools} field: {@code null} or an empty object = clear (no named pools, everything
+     * runs in {@code default}); otherwise an object of pool name → cap ({@code 0} = unbounded), every
+     * name a {@link ConcurrencyBroker#POOL_NAME} identifier and every cap {@code 0..}{@link #MAX_CAP}, or
+     * the whole write is refused (422) — a half-applied pool set is worse than none.
+     */
+    private static Map<String, Integer> optPools(Map<String, Object> body) {
+        Object raw = body.get("pools");
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?> m))
+            throw new ApiException(422, "pools must be an object of pool name -> cap");
+        Map<String, Integer> out = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : m.entrySet()) {
+            String name = String.valueOf(e.getKey());
+            if (!ConcurrencyBroker.POOL_NAME.matcher(name).matches())
+                throw new ApiException(422, "pool name '" + name + "' must be a lowercase identifier "
+                        + "(letters, digits, '_'; at most 64 chars)");
+            int cap;
+            try {
+                cap = Integer.parseInt(String.valueOf(e.getValue()).trim());
+            } catch (NumberFormatException nfe) {
+                throw new ApiException(422, "pool '" + name + "' cap must be an integer, got '" + e.getValue() + "'");
+            }
+            if (cap < 0 || cap > MAX_CAP)
+                throw new ApiException(422, "pool '" + name + "' cap must be 0.." + MAX_CAP + ", got " + cap);
+            out.put(name, cap);
+        }
+        return out.isEmpty() ? null : out;
     }
 
     /** A stated optional boolean field: {@code null} = clear; otherwise strictly true/false. */

@@ -64,13 +64,18 @@ public final class PipelineConfig {
      * (huge single files), otherwise <em>union mode</em> (many small files packed → one transform/
      * write). {@code <= 0} forces union mode always. {@code flushRecords} is the per-generation row
      * budget used in generation mode.
+     *
+     * <p>{@code pool} is the named execution pool this Pipeline's Consignments are admitted in
+     * ({@code processing.pool}, {@code DUCKLE-C10-ADMISSION-POOLS-1}); {@code null} when unstated. It is
+     * a <em>choice</em> only: pools are defined server-side and a name the server lacks is admitted
+     * in {@code default} ({@code ConcurrencyBroker.resolvePool}).
      */
     @PublicApi(since = "2.0.0")
     public record Processing(int threads, int duckdbThreads, String filePattern,
                              int batchMaxFiles, long batchMaxBytes, String batchOrder,
                              boolean duplicateCheckEnabled, String markerExtension,
                              int retentionDays, long largeFileBytes, long flushRecords,
-                             int priority) {}
+                             int priority, String pool) {}
 
     /**
      * Delimited-text parse settings. {@code engine} is {@code "auto"}/{@code "duckdb"}/
@@ -1413,7 +1418,7 @@ public final class PipelineConfig {
         this.processing = new Processing(b.threads, b.duckdbThreads, b.filePattern,
                 b.batchMaxFiles, b.batchMaxBytes, b.batchOrder, b.duplicateCheckEnabled,
                 b.markerExtension, b.retentionDays, b.largeFileBytes, b.flushRecords,
-                b.priority);
+                b.priority, b.pool);
         this.csv = new CsvSettings(b.delimiter, b.quote, b.escape, b.comment,
                 b.skipHeaderLines, b.skipJunkLines,
                 b.skipTailLines, b.skipTailCols, b.hasHeader, b.csvEngine,
@@ -2054,6 +2059,7 @@ public final class PipelineConfig {
         long   batchMaxBytes   = Long.MAX_VALUE;
         String batchOrder      = "mtime";         // ConsignmentPlanner.Order — arrival order (operator 2026-08-12); name = opt-in
         int    priority        = 1;               // ConcurrencyBroker share weight 1..3 (Part B); 1 = baseline
+        String pool;                              // named execution pool (admission only); null = default
         long   largeFileBytes  = 268_435_456L;   // 256 MB: streaming plugin generation-mode threshold
         long   flushRecords    = 5_000_000L;      // streaming plugin generation row budget
         String duckMemoryLimit;
