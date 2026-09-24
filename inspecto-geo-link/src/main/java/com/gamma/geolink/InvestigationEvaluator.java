@@ -37,6 +37,8 @@ import java.util.TreeSet;
  *       reports it as {@code protected} rather than silently succeeding.</li>
  *   <li>{@code hide {ids}} — display-only: still traversed and counted (the difference from exclude).</li>
  *   <li>{@code keep {ids}} — pins an entity against later excludes.</li>
+ *   <li>{@code annotate {ids, note}} (LA-19) — attaches the note to each named entity in the Working Set. It changes
+ *       nothing about traversal, display or counts; a later exclusion keeps the note, because a note is history.</li>
  *   <li>{@code window {window}} (LA-13) — sets the window later {@code expand}s inherit ({@code null} clears it).
  *       It re-filters nothing already admitted: a sealed row is a folded count with no timestamps left in it, and
  *       an earlier step's read is evidence as it was made. Each expand's rows are already in-window (the route
@@ -67,6 +69,9 @@ final class InvestigationEvaluator {
     /** Why an id is excluded, and by which step. */
     record Exclusion(int step, String reason) {}
 
+    /** One analyst note on one entity (LA-19), and the step that made it. */
+    record Annotation(int step, String note) {}
+
     /** The Working Set at one log position. Mutable only inside this class. */
     static final class State {
         final TreeMap<String, Entity> entities = new TreeMap<>();
@@ -74,6 +79,8 @@ final class InvestigationEvaluator {
         final TreeMap<String, Exclusion> excluded = new TreeMap<>();
         final TreeSet<String> hidden = new TreeSet<>();
         final TreeSet<String> kept = new TreeSet<>();
+        /** Per-entity notes (LA-19), in step order per entity. They outlive a later exclusion: a note is history. */
+        final TreeMap<String, List<Annotation>> annotations = new TreeMap<>();
         /** The window the latest {@code window} op set (LA-13), inherited by later expands; null = the full range. */
         Map<String, Object> window;
 
@@ -115,6 +122,19 @@ final class InvestigationEvaluator {
             out.put("excluded", xs);
             // Only when set: a state no window op touched hashes exactly as it did before LA-13.
             if (window != null) out.put("window", window);
+            // Only when present, for the same reason: an unannotated state hashes exactly as it did before LA-19.
+            if (!annotations.isEmpty()) {
+                List<Map<String, Object>> as = new ArrayList<>();
+                for (var a : annotations.entrySet())
+                    for (Annotation n : a.getValue()) {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("id", a.getKey());
+                        m.put("step", n.step());
+                        m.put("note", n.note());
+                        as.add(m);
+                    }
+                out.put("annotations", as);
+            }
             return out;
         }
 
@@ -246,6 +266,12 @@ final class InvestigationEvaluator {
                 for (String id : ids) if (s.entities.containsKey(id)) s.kept.add(id);
             }
             case "window" -> s.window = p.get("window") instanceof Map<?, ?> w ? (Map<String, Object>) w : null;
+            case "annotate" -> {
+                String note = String.valueOf(p.get("note"));
+                for (String id : ids)
+                    if (s.entities.containsKey(id))
+                        s.annotations.computeIfAbsent(id, k -> new ArrayList<>()).add(new Annotation(step, note));
+            }
             default -> throw new IllegalStateException("op '" + entry.get("op") + "' in a sealed log is not evaluable");
         }
     }

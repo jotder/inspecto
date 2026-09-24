@@ -85,14 +85,15 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
 public final class InvestigationRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    /** The six ops this slice evaluates (LA-10's five + LA-13's {@code window}). */
-    private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window");
+    /** The seven ops evaluated so far (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate}). */
+    private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window", "annotate");
     /** The rest of the closed vocabulary (plan §2.2): named so they refuse as "not yet", never as "unknown". */
-    private static final Set<String> DEFERRED = Set.of("seedBy", "excludeBy", "threshold", "annotate", "snapshot");
+    private static final Set<String> DEFERRED = Set.of("seedBy", "excludeBy", "threshold", "snapshot");
     /** An {@code expand} rung's traversal direction (plan §2.4). */
     private static final List<String> DIRECTIONS = List.of("either", "out", "in", "reciprocal");
     private static final int MAX_IDS = 1_000;
     private static final int MAX_ID_LENGTH = 512;
+    private static final int MAX_NOTE_LENGTH = 2_000;
     private static final int MAX_FRONTIER = 1_000;
     private static final int MAX_LINK_KINDS = 100;
     private static final int DEFAULT_EXPAND_BUDGET = 2_000;
@@ -188,7 +189,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (op == null) throw new ApiException(422, "body must include 'op'");
         if (DEFERRED.contains(op))
             throw new ApiException(422, "op '" + op + "' is in the closed vocabulary but not implemented yet (LA-10 "
-                    + "and LA-13 ship seed, expand, exclude, hide, keep, window)");
+                    + "LA-13 and LA-19 ship seed, expand, exclude, hide, keep, window, annotate)");
         if (!SHIPPED.contains(op))
             throw new ApiException(422, "op '" + op + "' is not in the closed op vocabulary");
         Map<String, Object> params = params(op, body);
@@ -198,7 +199,7 @@ public final class InvestigationRoutes implements RouteModule {
             List<Map<String, Object>> log = readLog(inv);
             InvestigationEvaluator.State before = evaluate(log, -1, null);
             List<String> ids = strings(params.get("ids"));
-            if (op.equals("hide") || op.equals("keep") || (op.equals("expand") && !ids.isEmpty()))
+            if (op.equals("hide") || op.equals("keep") || op.equals("annotate") || (op.equals("expand") && !ids.isEmpty()))
                 for (String i : ids)
                     if (!before.entities.containsKey(i))
                         throw new ApiException(422, "'" + i + "' is not in the Working Set");
@@ -777,6 +778,17 @@ public final class InvestigationRoutes implements RouteModule {
                 if (reason.length() > 200) throw new ApiException(422, "'reason' is at most 200 chars");
                 p.put("reason", reason);
             }
+            case "annotate" -> {
+                // LA-19. 'confidence' is in plan §2.2's parameter list but its scale is undecided — refused, never dropped.
+                if (body.containsKey("confidence"))
+                    throw new ApiException(422, "'confidence' is not accepted yet — its scale is an open operator "
+                            + "decision (LA-19); annotate with 'note' only");
+                String note = ApiContext.str(body, "note");
+                if (note == null || note.isBlank()) throw new ApiException(422, "'annotate' requires a 'note'");
+                if (note.length() > MAX_NOTE_LENGTH)
+                    throw new ApiException(422, "'note' is at most " + MAX_NOTE_LENGTH + " chars");
+                p.put("note", note);
+            }
             default -> { }
         }
         return p;
@@ -888,6 +900,7 @@ public final class InvestigationRoutes implements RouteModule {
                     + " (reason: " + p.get("reason") + "): " + list(ids) + ".";
             case "hide" -> "Hid " + list(ids) + " from display (still traversed and counted).";
             case "keep" -> "Kept " + list(ids) + " (protected from later exclusion).";
+            case "annotate" -> "Annotated " + list(ids) + ": \"" + p.get("note") + "\"";
             default -> "Applied " + e.get("op") + ".";
         };
     }

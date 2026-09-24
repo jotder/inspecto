@@ -6,3 +6,4 @@ com.gamma.geolink.DossierRoutes
 com.gamma.geolink.WorkingSetRoutes
 com.gamma.geolink.InvestigationTemplateRoutes
 com.gamma.geolink.InvestigationMeasureRoutes
+com.gamma.geolink.InvestigationCoverageRoutes

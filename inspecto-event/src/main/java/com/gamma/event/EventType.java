@@ -188,6 +188,9 @@ public final class EventType {
      *  {@code equivalent} reports the incremental/replay equivalence check; with {@code reread},
      *  {@code diverged} reports whether current data no longer matches a sealed read. */
     public static final String LINK_INVESTIGATION_REPLAYED = "LINK_INVESTIGATION_REPLAYED";
+    /** An Investigation's data coverage was assessed ({@code GET /inv/investigations/{id}/coverage}, LA-19).
+     *  {@code dataset}, {@code expectedDays} and {@code missingDays} (days in the window with no rows at all). */
+    public static final String LINK_INVESTIGATION_COVERAGE = "LINK_INVESTIGATION_COVERAGE";
     /** An Investigation's Dossier was issued ({@code GET /inv/investigations/{id}/dossier}, LA-12). {@code at},
      *  {@code format}, the SHA-256 manifest {@code root} and {@code intact} (whether the stored evidence still
      *  agrees with its own recorded hashes) carry what was handed over — issuing evidence is an act, not a view. */

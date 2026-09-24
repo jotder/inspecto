@@ -575,6 +575,7 @@ final class GraphDossierBuilder {
                     + " (reason: " + p.get("reason") + "): " + String.join(", ", ids) + ".";
             case "hide" -> "Hid " + head(ids) + " from display (still traversed and counted).";
             case "keep" -> "Kept " + head(ids) + " (protected from later exclusion).";
+            case "annotate" -> "Annotated " + String.join(", ", ids) + ": \"" + p.get("note") + "\"";
             default -> "Applied " + e.get("op") + ".";
         };
     }

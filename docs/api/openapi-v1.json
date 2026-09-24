@@ -7402,6 +7402,29 @@
         "x-optional-module" : true
       }
     },
+    "/inv/investigations/{investigationId}/coverage" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "GET /inv/investigations/{investigationId}/coverage (generated skeleton)",
+        "operationId" : "getInvInvestigationsByInvestigationIdCoverage",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
     "/components/sql/ast" : {
       "post" : {
         "tags" : [ "components" ],

@@ -49,7 +49,7 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  *       LA-13). A template names no entities, so an expand that named its
  *       frontier becomes an expand of the whole Working Set; it is listed under {@code generalised}, with
  *       {@code exact} saying whether the named frontier WAS the whole Working Set at that step.</li>
- *   <li>{@code exclude}, {@code hide}, {@code keep} → DROPPED. They name entities of this one graph with an
+ *   <li>{@code exclude}, {@code hide}, {@code keep}, {@code annotate} (LA-19) → DROPPED. They name entities of this one graph with an
  *       analyst's reason, which D-E8 keeps with the Investigation that made the call. Only their COUNT is listed
  *       under {@code dropped} — never the ids or the reason text, which are case data.</li>
  *   <li>Any other op is carried verbatim. Named reference lists travel with a template (D-E8), and the op that
@@ -74,7 +74,7 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
 public final class InvestigationTemplateRoutes implements RouteModule {
 
     /** Extensional ops that name entities of one graph with an analyst's judgement — they stay with the case. */
-    static final Set<String> CASE_OPS = Set.of("exclude", "hide", "keep");
+    static final Set<String> CASE_OPS = Set.of("exclude", "hide", "keep", "annotate");
 
     @Override
     public void register(ApiContext api) {
