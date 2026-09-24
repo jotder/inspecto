@@ -27,8 +27,11 @@ import java.util.Map;
  *   <li>{@code additionalProperties} is left unset (i.e. permitted). A {@link ConfigSpec} enumerates
  *       the fields it can <i>validate</i>, not every key a kind accepts, so {@code false} here would
  *       reject configs the control plane happily applies.</li>
- *   <li>{@link FieldType#LIST} yields a bare {@code "array"} with no {@code items} — the element type
- *       is not part of the spec model, and guessing one would constrain a model away from valid input.</li>
+ *   <li>A scalar {@link FieldType#LIST} yields a bare {@code "array"} with no {@code items} — its
+ *       element type is not part of the spec model, and guessing one would constrain a model away from
+ *       valid input. A list of OBJECTS ({@link FieldSpec#items()} non-empty) is the exception: its
+ *       element fields ARE declared, so they project as the array's {@code items} object, built by this
+ *       same projection with paths relative to the element.</li>
  *   <li>{@link FieldSpec#visibleWhen()} and {@link FieldSpec#uiHint()} are rendering hints with no
  *       JSON Schema meaning and are not projected.</li>
  * </ul>
@@ -121,6 +124,9 @@ public final class ConfigJsonSchema {
         }
         if (field.pattern() != null) s.put("pattern", field.pattern());
         if (field.defaultValue() != null) s.put("default", field.defaultValue());
+        if (field.type() == FieldType.LIST && !field.items().isEmpty()) {
+            s.put("items", of(new ConfigSpec("", field.items(), List.of())));
+        }
         return s;
     }
 

@@ -256,10 +256,9 @@ public final class ConfigSafetyValidator {
 
         // ── processing.map (the authored half of the projection slot — a Record Transformer) ──
         // The third hand-rolled list-of-objects walker in this file, for the same reason as the other
-        // two: FieldType has scalar LIST and untyped MAP only, no list-of-objects primitive, so a
-        // declared FieldSpec cannot express this shape. (Building that primitive and migrating
-        // schemas/sinks/map onto it is its own BACKLOG item; bundling it here would turn a config-format
-        // addition into a spec-layer refactor under two already-validated shapes.)
+        // two. A list-of-objects primitive now exists (FieldSpec.items, 2026-09-24 — `sinks:` is its first
+        // user), but these walkers also check cross-entry uniqueness, which an item spec cannot express;
+        // migrating schemas/map onto it is not bundled here.
         checkMapEntries(RawConfig.at(raw, "processing.map.columns"), "processing.map.columns",
                 "name", "expr", out);
         checkMapEntries(RawConfig.at(raw, "processing.map.rules"), "processing.map.rules",
@@ -269,7 +268,8 @@ public final class ConfigSafetyValidator {
 
         // ── sinks (plural destinations) ──
         // Each entry is a {database, format, compression, ducklake} tuple; validate the same path-jail /
-        // allow-list surface the single output: has. (Multi-destination ingest is executable; the one
+        // allow-list surface the single output: has. (The entry SHAPE — a list, map entries, a non-blank
+        // database — is ConfigSpecs.pipeline()'s `sinks` item spec, checked by ConfigLoader.validate.) (Multi-destination ingest is executable; the one
         // unsupported combination — a versioned reference store with >1 destination — is refused at load,
         // PipelineConfig.prepare().)
         if (raw.get("sinks") instanceof List<?> sinks) {

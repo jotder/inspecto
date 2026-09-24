@@ -349,7 +349,38 @@ public final class ConfigSpecs {
                 FieldSpec.withDefault("output.ducklake.schema", "DuckLake schema", FieldType.STRING, "main",
                         "Catalog schema the table is registered in."),
                 FieldSpec.of("output.ducklake.table", "DuckLake table", FieldType.STRING,
-                        "Table the files are registered into. Required when enabled.")
+                        "Table the files are registered into. Required when enabled."),
+                // The plural destination block (PipelineConfigParser.parseOutputAndSinks). A list of
+                // OBJECTS, so its element shape is declared here and refused at save when malformed —
+                // before, a sinks: map, a comma string or an entry with no database parsed as "no sinks"
+                // or threw at config load. An entry key it omits inherits output:'s value, so no item
+                // but database is required. The path jail + format/compression allow-list and the
+                // enabled-ducklake requirements stay ConfigSafetyValidator.checkSink's.
+                FieldSpec.listOf("sinks", "Destinations",
+                        "Where the pipeline writes, one entry per destination; each writes the same rows. "
+                                + "Absent = the single output: + dirs.database destination.",
+                        List.of(
+                                FieldSpec.required("database", "Database directory", FieldType.FILEPATH,
+                                        "This destination's output root; resolved under the Space and path-jailed."),
+                                new FieldSpec("format", "Output format",
+                                        "This destination's file format; omitted = output.format.",
+                                        FieldType.ENUM, false, null, List.of("CSV", "PARQUET"), null, "select", null),
+                                FieldSpec.of("compression", "Output compression", FieldType.STRING,
+                                        "This destination's codec; omitted = output.compression."),
+                                FieldSpec.of("filename_column", "Source filename column", FieldType.STRING,
+                                        "This destination's source-file column; omitted = output.filename_column."),
+                                FieldSpec.of("ducklake", "DuckLake registration", FieldType.MAP,
+                                        "This destination's own DuckLake block; omitted = output.ducklake."),
+                                FieldSpec.of("ducklake.enabled", "Register in DuckLake", FieldType.BOOL,
+                                        "Register this destination's files into a DuckLake table."),
+                                FieldSpec.of("ducklake.catalog_url", "DuckLake catalog URL", FieldType.STRING,
+                                        "Required when enabled."),
+                                FieldSpec.of("ducklake.data_path", "DuckLake data path", FieldType.FILEPATH,
+                                        "Required when enabled; path-jailed."),
+                                FieldSpec.of("ducklake.schema", "DuckLake schema", FieldType.STRING,
+                                        "Catalog schema; default main."),
+                                FieldSpec.of("ducklake.table", "DuckLake table", FieldType.STRING,
+                                        "Required when enabled.")))
         );
 
         int cores = Runtime.getRuntime().availableProcessors();

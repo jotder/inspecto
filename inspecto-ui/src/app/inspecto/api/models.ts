@@ -363,6 +363,9 @@ export interface FieldSpec {
     uiHint?: string | null;
     /** Optional "otherPath=value" display predicate — advisory only, unused by current specs. */
     visibleWhen?: string | null;
+    /** For a LIST of objects (e.g. a pipeline's `sinks`): each element's fields, paths relative to the
+     *  element. Empty for every other field. */
+    items?: FieldSpec[];
 }
 
 export interface CrossFieldRule {

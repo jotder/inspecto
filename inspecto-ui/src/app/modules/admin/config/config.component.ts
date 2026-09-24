@@ -189,8 +189,12 @@ export class ConfigComponent implements OnInit {
         this.specLoading.set(true);
         this.api.spec(this.typeCtrl.value).subscribe({
             next: (s) => {
-                this.spec.set(s);
-                this.attrSpecs.set(toAttrSpecs(s.fields));
+                // A list of OBJECTS (`items`, e.g. a pipeline's `sinks`) has no flat control: the
+                // comma-text a scalar LIST gets here would author string entries the spec refuses.
+                // Those blocks are authored on their own surface (the canvas), so the draft form skips them.
+                const fields = s.fields.filter((f) => !f.items?.length);
+                this.spec.set({ ...s, fields });
+                this.attrSpecs.set(toAttrSpecs(fields));
                 this.specLoading.set(false);
             },
             error: (e) => {

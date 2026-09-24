@@ -139,7 +139,9 @@ public final class AcceptedConfigKeys {
      * after being declared.
      *
      * <p>18 when the ratchet landed (2026-08-31); 17 after gap 8 declared {@code output_store} the same
-     * day; 16 after CONSIGNMENT-HOME-1 declared {@code collector.consignment.max_files} (2026-09-02).
+     * day; 16 after CONSIGNMENT-HOME-1 declared {@code collector.consignment.max_files} (2026-09-02); 15
+     * after {@code sinks} was declared as a list of objects WITH an item spec (2026-09-24) — the item
+     * spec is what makes it a declaration and not a ratchet game (see {@code steps} below).
      *
      * <p>🔴 {@code collector} is NOT on this list (it is declared, via a few leaves) and that is what makes
      * the {@code collect:} round trip safe: {@code RecipeConverter} round-trips arbitrary collector-block
@@ -151,7 +153,6 @@ public final class AcceptedConfigKeys {
             // ── top-level ────────────────────────────────────────────────────────
             "active",              // the arming switch itself — authored on every runnable pipeline
             "route",               // gap 9's block — the branch-aware ingest lane
-            "sinks",               // the plural destination block
             "steps",               // the ordered Stage-2 chain (gap 11)
             "template",            // template: true ⇒ never registered, so never runnable
             "trigger",             // schedule / on:dataset

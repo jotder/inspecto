@@ -76,51 +76,86 @@ public final class ConfigLoader {
     // ── per-field checks ──────────────────────────────────────────────────────────
 
     private void validateField(FieldSpec f, Map<String, Object> raw, List<Finding> out) {
+        validateField(f, raw, "", out);
+    }
+
+    /**
+     * One field against {@code raw}. {@code prefix} is where {@code raw} sits in the whole config
+     * ({@code ""} at the root, {@code "sinks[2]."} for a list element), so a finding names the path an
+     * author can find — {@code sinks[2].database}, not {@code database}.
+     */
+    private void validateField(FieldSpec f, Map<String, Object> raw, String prefix, List<Finding> out) {
+        String where = prefix + f.path();
         boolean present = RawConfig.present(raw, f.path());
         if (!present) {
             if (f.required()) {
-                out.add(Finding.error(f.path(), "Missing required field '" + f.path() + "'"));
+                out.add(Finding.error(where, "Missing required field '" + where + "'"));
             }
             return; // absent-and-optional: nothing more to check (default applies at parse time)
         }
         Object value = RawConfig.at(raw, f.path());
         switch (f.type()) {
-            case INT -> requireParsable(f, value, out, true);
-            case LONG -> requireParsable(f, value, out, false);
+            case INT -> requireParsable(where, value, out, true);
+            case LONG -> requireParsable(where, value, out, false);
             case BOOL -> {
                 String s = value.toString().trim();
                 if (!s.equalsIgnoreCase("true") && !s.equalsIgnoreCase("false")) {
-                    out.add(Finding.error(f.path(), "Field '" + f.path() + "' must be true/false, got: " + s));
+                    out.add(Finding.error(where, "Field '" + where + "' must be true/false, got: " + s));
                 }
             }
             case ENUM -> {
                 String s = value.toString().trim();
                 boolean ok = f.enumValues().stream().anyMatch(v -> v.equalsIgnoreCase(s));
                 if (!ok) {
-                    out.add(Finding.error(f.path(), "Field '" + f.path() + "' must be one of "
+                    out.add(Finding.error(where, "Field '" + where + "' must be one of "
                             + f.enumValues() + ", got: " + s));
                 }
             }
             case MAP -> {
                 if (!(value instanceof Map<?, ?>)) {
-                    out.add(Finding.error(f.path(), "Field '" + f.path() + "' must be a map/object"));
+                    out.add(Finding.error(where, "Field '" + where + "' must be a map/object"));
                 }
             }
             case LIST -> {
+                if (!f.items().isEmpty()) {
+                    // A list of OBJECTS: the comma-string shorthand a scalar list tolerates is a
+                    // malformed block here, and so is any element that is not a map.
+                    validateItems(f, where, value, out);
+                    return;
+                }
                 if (!(value instanceof List<?>) && !(value instanceof String)) {
-                    out.add(Finding.error(f.path(), "Field '" + f.path() + "' must be a list"));
+                    out.add(Finding.error(where, "Field '" + where + "' must be a list"));
                 }
             }
             default -> { /* STRING / FILEPATH / CRON / SQL — free text at field level */ }
         }
         if (f.pattern() != null && !f.pattern().isBlank()
                 && !value.toString().matches(f.pattern())) {
-            out.add(Finding.error(f.path(), "Field '" + f.path()
+            out.add(Finding.error(where, "Field '" + where
                     + "' does not match pattern " + f.pattern()));
         }
     }
 
-    private void requireParsable(FieldSpec f, Object value, List<Finding> out, boolean intNotLong) {
+    /** Every element of a list-of-objects field is a map, and carries {@link FieldSpec#items()}. */
+    @SuppressWarnings("unchecked")
+    private void validateItems(FieldSpec f, String where, Object value, List<Finding> out) {
+        if (!(value instanceof List<?> list)) {
+            out.add(Finding.error(where, "Field '" + where + "' must be a list of objects"));
+            return;
+        }
+        for (int i = 0; i < list.size(); i++) {
+            String at = where + "[" + i + "]";
+            if (!(list.get(i) instanceof Map<?, ?> element)) {
+                out.add(Finding.error(at, "each " + where + "[] entry must be a map"));
+                continue;
+            }
+            for (FieldSpec item : f.items()) {
+                validateField(item, (Map<String, Object>) element, at + ".", out);
+            }
+        }
+    }
+
+    private void requireParsable(String where, Object value, List<Finding> out, boolean intNotLong) {
         String s = value.toString().trim();
         try {
             if (intNotLong) {
@@ -130,8 +165,8 @@ public final class ConfigLoader {
             }
         } catch (NumberFormatException e) {
             String t = intNotLong ? "an integer" : "a long";
-            out.add(new Finding(Severity.ERROR, f.path(),
-                    "Field '" + f.path() + "' must be " + t + ", got: " + s));
+            out.add(new Finding(Severity.ERROR, where,
+                    "Field '" + where + "' must be " + t + ", got: " + s));
         }
     }
 }

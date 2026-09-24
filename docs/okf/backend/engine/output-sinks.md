@@ -57,6 +57,21 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
   (synthesises the shorthand, never throws); `PipelineConfigParser` parses the `sinks:` list (each entry
   needs a non-blank `database`); `ConfigSafetyValidator.checkSink` path-jails every `database` /
   `ducklake.data_path` and allow-lists format/compression.
+* **Structural spec — refused at SAVE, not at run (2026-09-24).** `ConfigSpecs.pipeline()` declares
+  `sinks` as a **list of objects**: `FieldSpec.listOf` with an item spec (`FieldSpec.items`, the
+  list-of-objects facility added for it). `database` is the one required item key — every other key
+  inherits `output:` (below), so requiring it would refuse valid files; `format` is the `CSV|PARQUET`
+  enum, `ducklake` a map, `ducklake.enabled` a boolean. `ConfigLoader.validate` refuses a `sinks:` that is
+  not a list (a map, or the comma-string a scalar list tolerates), a non-map entry and an entry with no
+  `database`, naming the index (`sinks[1].database`) — so `/config/write` and every other save path
+  answer **422**. Before, a `sinks:` map parsed as *no sinks* (the pipeline silently wrote to its one
+  `output:`) and a missing `database` threw at config load. `ConfigJsonSchema` projects the item spec as
+  the array's `items`, so an LLM author sees the element shape; the `/config` draft pane skips a field
+  with `items` (it has no flat control for one — the canvas authors destinations). ⚠ The item spec is
+  what let `sinks` leave `AcceptedConfigKeys.PARSER_ONLY` honestly — delisting `steps` without one was
+  refused as gaming the ratchet ([pipeline-config-keys](../pipeline-graph/pipeline-config-keys.md)).
+  Tests: `ConfigLoaderTest` (the four `sinks` cases), `ConfigJsonSchemaTest.aListOfObjectsProjectsItsItemSpecAsTheArraysItems`,
+  `ControlApiSinkDuckLakeSharedTableTest.writeRefusesAMalformedSinksBlock` (real HTTP).
 * **Ingest fan-out** — `ConsignmentIngestStrategy.writeAndTrace` (the shared choke point) fans the main
   partitioned write to every `cfg.sinks()` destination, each under its own `database` root (the `dbDir`
   suffix beyond `dirs.database` is preserved) and its own format/compression. **Predicate =
@@ -80,6 +95,15 @@ one-element shorthand; `PipelineConfig.sinks()` is never empty (it synthesises t
   ill-defined across destinations). **Decision-rule *routing* + `sinks>1`** is refused at runtime in
   `writeAndTrace` (routed outputs are single-destination). Multi-sink commit is **not** cross-branch
   transactional (B9 stands) — a clone may have some destinations committed and others retrying.
+  ⚠ **Neither is a one-line lift (re-grounded 2026-09-24).** Routing: `DecisionRuleApplier.RouteSink`
+  writes a routed rule's rows ONCE, to `Paths.get(dbDir, dest)` — `dbDir` is the PRIMARY destination —
+  and DELETEs them from the relation before the fan-out. Dropping the refusal would silently land routed
+  rows under the first destination only, so it needs a decision first: **replicate** routed rows under
+  every `sinks[].database` (the fan-out's own rule for the remainder) or **primary only**; the refusal
+  sites are `flatWriteAndTrace` and `graphWriteAndTrace` (both lanes). Versioned reference: the stamp
+  reads ONE prior version store (`existingStoreReader(dbDir, …)`) to skip unchanged rows, so N
+  destinations are N version histories that the enrichment views would each read as the truth — the same
+  "one history is ill-defined across branches" rule `graphWriteAndTrace` holds permanently for `route:`.
 
 ⚠ **Toon authoring:** in the indexed-tuple form `sinks[N]{database,format}:`, a `database` path
 (contains `:` and `/`) **must be quoted** — `"/data/hot",PARQUET` — or the tabular decoder reads 0 rows.
