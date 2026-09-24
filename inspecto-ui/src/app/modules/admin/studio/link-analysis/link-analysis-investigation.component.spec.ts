@@ -89,7 +89,7 @@ const COVERAGE: InvestigationCoverage = {
         { date: '2026-09-03', rows: 0 },
     ],
     readAt: '',
-    collectors: { assessed: false, note: 'a Dataset row carries no Collector attribution' },
+    collectors: { assessed: false, note: 'per-Collector coverage is not assessed: a Dataset row carries no Collector attribution' },
 };
 
 const refused = (message: string) =>
@@ -297,7 +297,7 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
         expect(section.textContent).toContain('2 of 3 days in the window have zero rows in calls (UTC)');
         expect(section.textContent).toContain('2026-09-02, 2026-09-03');
         expect(section.textContent).not.toContain('2026-09-01');
-        expect(section.textContent).toContain('Per-Collector coverage is not assessed');
+        expect(section.textContent?.match(/per-Collector coverage is not assessed/gi)).toHaveLength(1);
         await expectNoA11yViolations(el);
 
         inv.investigationCoverage.mockReturnValue(refused('coverage needs a bounded window'));

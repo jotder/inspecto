@@ -279,7 +279,7 @@
                     }
                     @if (!c.collectors.assessed) {
                         <p class="text-secondary m-0 text-xs">
-                            Per-Collector coverage is not assessed — {{ c.collectors.note }}.
+                            {{ c.collectors.note || 'Per-Collector coverage is not assessed.' }}
                         </p>
                     }
                 }
