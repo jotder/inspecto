@@ -2,7 +2,6 @@ package com.gamma.pipeline;
 
 import com.gamma.etl.ExcelExtension;
 
-import com.gamma.util.SqlIdent;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -59,31 +58,44 @@ public final class PipelineDocumentXlsx {
      * {@code 0012} as the number 12, or a version as a date, would corrupt the very thing being signed off.
      */
     public static void write(PipelineDocumentModel.Doc doc, Path target) throws Exception {
-        Files.createDirectories(target.toAbsolutePath().getParent());
+        Path parent = target.toAbsolutePath().getParent();
+        Files.createDirectories(parent);
         try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
              Statement st = conn.createStatement()) {
             ExcelExtension.ensureLoaded(conn);
 
             Set<String> taken = new java.util.LinkedHashSet<>();
-            List<String> selects = new ArrayList<>();
+            List<String> bodies = new ArrayList<>();
+            List<String> names = new ArrayList<>();
             for (PipelineDocumentModel.Section section : doc.sections()) {
                 List<List<String>> grid = grid(section);
                 if (grid.isEmpty()) continue;
-                selects.add(relation(grid) + " AS " + quote(sheetName(section.heading(), taken)));
+                bodies.add(relation(grid));
+                names.add(sheetName(section.heading(), taken));
             }
-            if (selects.isEmpty()) selects.add(relation(List.of(List.of("(no content)"))) + " AS \"Pipeline\"");
+            if (bodies.isEmpty()) {
+                bodies.add(relation(List.of(List.of("(no content)"))));
+                names.add("Pipeline");
+            }
 
-            // One COPY per sheet: DuckDB writes a single relation per workbook, so the sheets are written
-            // in turn with (HEADER false) - the grid already carries its own header rows, which is what
-            // keeps a stacked section (several tables) readable in one sheet.
-            boolean first = true;
-            for (String rel : selects) {
-                String sheet = rel.substring(rel.lastIndexOf(" AS ") + 4);
-                String body = rel.substring(0, rel.lastIndexOf(" AS "));
-                st.execute("COPY (" + body + ") TO " + literal(target.toString().replace('\\', '/'))
-                        + " (FORMAT xlsx, SHEET " + literal(unquote(sheet)) + ", HEADER false"
-                        + (first ? "" : ", APPEND true") + ")");
-                first = false;
+            // 🔴 One WORKBOOK per sheet, then merged (XLSX-EXPORT-LAST-SECTION-ONLY-1): the 1.5.2 writer
+            // accepts APPEND true but rewrites the file, so one COPY per sheet into the same file kept only
+            // the last section. (HEADER false) - the grid already carries its own header rows.
+            Path parts = Files.createTempDirectory(parent, ".xlsx-parts-");
+            try {
+                List<Path> files = new ArrayList<>();
+                for (int i = 0; i < bodies.size(); i++) {
+                    Path part = parts.resolve("part" + i + ".xlsx");
+                    st.execute("COPY (" + bodies.get(i) + ") TO " + literal(part.toString().replace('\\', '/'))
+                            + " (FORMAT xlsx, SHEET " + literal(names.get(i)) + ", HEADER false)");
+                    files.add(part);
+                }
+                XlsxSheetMerger.merge(files, names, target);
+            } finally {
+                try (var walk = Files.list(parts)) {
+                    for (Path p : walk.toList()) Files.deleteIfExists(p);
+                }
+                Files.deleteIfExists(parts);
             }
         }
     }
@@ -116,12 +128,6 @@ public final class PipelineDocumentXlsx {
 
     private static String literal(String s) {
         return "'" + strOrEmpty(s).replace("'", "''") + "'";
-    }
-
-    private static String quote(String s) { return SqlIdent.q(s); }
-
-    private static String unquote(String s) {
-        return s.startsWith("\"") ? s.substring(1, s.length() - 1).replace("\"\"", "\"") : s;
     }
 
     /** Convenience: build the model for a recipe and write it, the shape a route calls. */

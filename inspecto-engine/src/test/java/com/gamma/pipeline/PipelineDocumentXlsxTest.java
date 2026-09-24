@@ -111,6 +111,24 @@ class PipelineDocumentXlsxTest {
         byte[] head = Files.readAllBytes(out);
         assertEquals('P', head[0], "xlsx is a zip container");
         assertEquals('K', head[1]);
+
+        // XLSX-EXPORT-LAST-SECTION-ONLY-1: open the zip — every section is its own sheet, in reading order,
+        // and each sheet holds its own section (its first cell is the heading), not the last one's.
+        PipelineDocumentModel.Doc doc = PipelineDocument.model("cdr_ingest", recipe(), Map.of(), "abc123");
+        Set<String> taken = new java.util.LinkedHashSet<>();
+        Map<String, String> expected = new java.util.LinkedHashMap<>();
+        for (PipelineDocumentModel.Section s : doc.sections()) {
+            List<List<String>> grid = PipelineDocumentXlsx.grid(s);
+            if (!grid.isEmpty()) expected.put(PipelineDocumentXlsx.sheetName(s.heading(), taken), grid.get(0).get(0));
+        }
+        assertTrue(expected.size() >= 4, "the fixture must exercise several sections: " + expected.keySet());
+
+        Map<String, List<String>> sheets = XlsxSheetMergerTest.sheets(out);
+        assertEquals(List.copyOf(expected.keySet()), List.copyOf(sheets.keySet()),
+                "one sheet per section, in order");
+        expected.forEach((sheet, firstCell) -> assertEquals(firstCell, sheets.get(sheet).get(0),
+                "sheet '" + sheet + "' must hold its own section: " + sheets.get(sheet)));
+        assertEquals(List.of(), Files.list(dir).filter(p -> !p.equals(out)).toList(), "temp parts cleaned up");
     }
 
     /**

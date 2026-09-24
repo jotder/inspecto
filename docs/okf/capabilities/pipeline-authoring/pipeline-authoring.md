@@ -174,8 +174,17 @@ keeps it honest:
   afterwards (no INSTALL wrote a cache). With the binary removed the same request returned 500 naming
   `…\duckdb-extensions\windows_amd64\excel.duckdb_extension`. `PipelineDocumentXlsxTest` runs the real
   write in staged mode (skips only where no stageable binary exists — CI) plus an ungated missing-binary test.
-  🔴 **The same run found the workbook holds only the LAST section** — one `COPY … APPEND true` per sheet,
-  and the 1.5.2 writer ignores `APPEND` — filed as `XLSX-EXPORT-LAST-SECTION-ONLY-1` (`BACKLOG.md` §3.6).
+  🔴 **One sheet per section, assembled by zip (`XLSX-EXPORT-LAST-SECTION-ONLY-1`, fixed 2026-09-24, operator's choice).** The same run found
+  the workbook held only the LAST section: the 1.5.2 writer accepts `COPY … (APPEND true)` without error
+  but rewrites the file. Each section is now COPYed to its own one-sheet workbook in a temp directory
+  beside the target (removed in `finally`), and `XlsxSheetMerger` stitches them with `java.util.zip` —
+  workbook 1 is the base; every further `xl/worksheets/sheet1.xml` becomes `sheetN.xml` with its
+  `<sheet>`, Relationship and content-type Override. ⚠ It re-maps neither shared strings nor styles, because
+  the writer emits neither: every cell is `t="inlineStr"` (the `sst` is empty) and `styles.xml` is
+  byte-identical across workbooks (inspected on 1.5.2). ⛔ A later sheet with a `t="s"` cell or a differing
+  `styles.xml` makes the merge THROW, so a writer upgrade fails the export instead of mis-rendering it.
+  `PipelineDocumentXlsxTest` opens the zip and asserts the sheet list and each sheet's first cell (red on
+  the old code: `[Guarantees]` alone); `XlsxSheetMergerTest` covers the merger ungated on hand-built parts.
   ⚠ Linux bundles still ship no `excel` until a `v1.5.2/linux_amd64` binary is fetched.
 
 ⚠ **`parse` and `map` serve `attributes: []` deliberately** — each has a richer editor of its own, so a
