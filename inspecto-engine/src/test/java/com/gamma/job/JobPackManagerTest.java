@@ -688,7 +688,7 @@ class JobPackManagerTest {
      * {@code @JobTypeMeta.id} is {@code metaId} (equal ⇒ valid pack; different ⇒ rejected), plus its Job,
      * and package them with a {@code META-INF/services} entry + {@code Pack-Id}/{@code Pack-Version} manifest.
      */
-    private static Path buildPackJar(Path work, Path jar, String descriptorId, String metaId,
+    static Path buildPackJar(Path work, Path jar, String descriptorId, String metaId,
                                      String cls, String packId, String version) throws Exception {
         String fqcn = "com.acme.pack." + cls;
         String src = """
