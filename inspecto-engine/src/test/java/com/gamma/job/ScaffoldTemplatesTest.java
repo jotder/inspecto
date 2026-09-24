@@ -51,6 +51,7 @@ class ScaffoldTemplatesTest {
             Map.entry("className", "AcmeReconcile"),
             Map.entry("artifactId", "acme-reconcile"),
             Map.entry("packageName", "com.example.pack"),
+            Map.entry("typeSuffix", "acme_reconcile"),
             Map.entry("engineGroupId", "com.gamma.inspector"),
             Map.entry("engineArtifactId", "inspecto-engine"),
             Map.entry("engineVersion", "0-test"),
@@ -124,6 +125,22 @@ class ScaffoldTemplatesTest {
         assertEquals("com.example.pack.AcmeReconcileProcessor",
                 Files.readString(services).trim(),
                 "the ServiceLoader entry must name the generated class");
+    }
+
+    /** NODETYPE-SCAFFOLD-EMITS-A-COPY-1: the generated Executor compiles against the canonical
+     *  {@code SqlIdent} and does not carry a private quoting copy of its own. */
+    @Test
+    void theNodetypeTemplateCompiles(@TempDir Path work) throws Exception {
+        Path project = stamp(templates().resolve("nodetype"), work.resolve("project"));
+
+        compile(project, work.resolve("classes"));
+
+        String executor = Files.readString(
+                project.resolve("src/main/java/com/example/pack/AcmeReconcileExecutor.java"));
+        assertTrue(executor.contains("SqlIdent.q("), "the Executor must quote through SqlIdent");
+        assertTrue(!executor.contains(".replace(\"\\\"\", \"\\\"\\\"\")")
+                        && !executor.contains(".replace(\"'\", \"''\")"),
+                "the Executor re-grew a private SQL-quoting copy — call SqlIdent instead");
     }
 
     // ── the scaffolder's substitution, in Java ────────────────────────────────
