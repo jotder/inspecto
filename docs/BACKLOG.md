@@ -13,14 +13,14 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
+> **56<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 1<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 28<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 55<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 56<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -48,13 +48,13 @@ changes**; a row that cannot is a decision (§1) or a design (P2). **P2** = buil
 or decision lands. **P3** = demand-gated; build only when someone asks by name. Every §3–§5 row carries its
 rank.
 
-**P1 is empty.** The P2 rows split three ways — pick from the first group:
+**P1:** `XLSX-EXPORT-LAST-SECTION-ONLY-1` (§3.6). The P2 rows split three ways — pick from the first group:
 
 | State | P2 rows |
 |---|---|
 | **Startable now** — no gate, no owed decision | `STREAM-CONSUMER-1` close-out — the `SP-ACQ-09` cell (§3.3) · Onboarding D5-ref — ground the delete-feed first (§3.4) · `RELEASE-PIPELINE-NEVER-EXECUTED-1` — the checksum/signature split (§4) |
 | **Design first** — the trigger fired, the shape is not decided | AI drafting on a non-`schema` kind (§3.1) · Platform Services Stage 2/3 (§3.2) · cross-Space consequence (§3.5) · Bundle "load as draft" (§3.7) · D6 `findings-spec` UI (§3.9) · policy-authoring UX (§3.8) |
-| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · space-to-space comparison (postponed) · W5 forward closure (operator decision) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
+| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · space-to-space comparison (postponed) · W5 forward closure (operator decision) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
 
 **Standing rules for editing this board** (distilled from the shifts that grew the old page to 644 KB):
 
@@ -96,7 +96,6 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | 3.2 | EXECUTION-RESIDUALS X4 + X1 | X4's replay default — ⛔ not yet, the evidence it needs does not exist; X1's §5 decisions in `superpower/retry-affordance-design.md` |
 | 3.3 | `LEGACY-ASN-SRC-TREE-UNBUILT-1` | wire, rename or delete the 21 uncompiled test-tree files |
 | 3.4 | Onboarding ↔ Pipeline W5 | carry the reference Datasets a Pipeline reads in its export (forward closure) |
-| 3.6 | D-8 XLSX export | does it work in a shipped / air-gapped bundle? |
 | 3.11 | `API-DEAD-METHODS-1` · `JOB-RUNS-DIALOG-DEAD-1` | wire or delete; retain as a test vehicle or delete |
 | 4 | `REACTOR-VERDICT-CI-1` | wire `check-reactor-verdict.mjs` into `ci.yml` |
 | 3.12 | Link Analysis | every open D-U* / LA-* call lives in `superpower/link-analysis-backlog-plan.md` |
@@ -213,7 +212,8 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 ### 3.6 Analytics — Queries, BI, Studio & Export
 
-- **P2** · **D-8 XLSX export — prove it in a shipped bundle** — the export shipped 2026-09-16 through DuckDB's `excel` extension (`PipelineDocumentXlsx`, `COPY … (FORMAT xlsx)`); ⛔ **do not add POI** (and `grep poi` over the poms matches only "point"/"policy" — match `org.apache.poi`). Open, owed to the operator: whether it works in a **shipped or air-gapped bundle**. On a clean CI runner the extension cannot load — `PipelineDocumentXlsxTest.writesARealWorkbook` now skips when it is absent — and no release has ever shipped a DuckDB extension, because CI populates no cache; staged is not loadable (autoload ignores `-Dduckdb.extension.dir`). A green reactor is not evidence this works for a customer. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
+- **P1** · `XLSX-EXPORT-LAST-SECTION-ONLY-1` — **the Pipeline Document workbook keeps ONLY its last section.** Found 2026-09-24 by the D-8 bundle proof: `GET /api/v1/pipelines/csv_example/document?format=xlsx` returned HTTP 200 and a valid 3,791-byte workbook holding ONE sheet, `Referenced components` (4 rows), while the Markdown rendering of the same document has Steps, four Step sections, Guarantees and Referenced components. `PipelineDocumentXlsx.write` issues one `COPY … (FORMAT xlsx, SHEET …, APPEND true)` per section, and DuckDB 1.5.2's `excel` writer accepts `APPEND` without error but rewrites the file each time — so every section but the last is silently lost. `PipelineDocumentXlsxTest` checks only the size (> 1000 bytes) and the `PK` magic, which is why it stayed green. Fix in `inspecto-engine/src/main/java/com/gamma/pipeline/PipelineDocumentXlsx.java`, and ⚠ the shape is a choice: (a) all sections stacked in ONE sheet (blank-row separated — the grid already carries its own headers), or (b) write each section to its own workbook and assemble the sheets with `java.util.zip` (keeps one sheet per section, more code). ⛔ Still no POI. Either way the test must open the zip and assert every section heading is present. → `okf/capabilities/pipeline-authoring/pipeline-authoring.md` §3.0
+- **P2** · **D-8 XLSX export — bundle proof, two residuals** — the air-gapped half is PROVEN (2026-09-24, as-built in `okf/capabilities/pipeline-authoring/pipeline-authoring.md` §3.0): in STAGED mode (`-Dduckdb.extension.dir`, set by every launcher) `DuckDbExtension` now loads ONLY `<dir>/<name>.duckdb_extension` by path and a missing file fails loudly — never a fall-through to `INSTALL`; and the real route produced a workbook from a bundle with DuckDB's own cache made unreachable. `PipelineDocumentXlsxTest` now RUNS (not skips) wherever a stageable binary exists. Open: **(1)** the bundle used for the proof was the last `package.ps1` Enterprise output with `inspecto.jar` rebuilt, the policy jar removed and `spaces/` re-staged by package.ps1's step-4 rule — the session could not launch PowerShell — so one end-to-end `pwsh inspecto/package.ps1 -Edition Professional` run is owed; **(2)** no `linux_amd64` binary exists on the desk (`~/.duckdb/extensions/v1.5.2/` holds `windows_amd64` only), so a Linux zip still ships no `excel`: it needs `v1.5.2/linux_amd64/excel.duckdb_extension` from `http://extensions.duckdb.org/v1.5.2/linux_amd64/excel.duckdb_extension.gz` (what `node tools/fetch-duckdb-extensions.mjs` fetches), then `-RequireExtensions`. ⛔ **Do not add POI.** → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (The DuckDB `spatial` extension itself: zero demand, re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 - **P3** · **EXPORT-1 outbound object-storage export (S3 / HDFS)** — sequence of record: an operator `aws s3 sync`/rclone of `data/<store>/database/` first (zero code); build the push post-action (the outbound mirror of the connector SPI, reusing `AwsSigV4`) only on demand; HDFS only via an S3-compatible gateway — ⛔ never `hadoop-client`. → `okf/backend/engine/object-storage-export.md`
 

@@ -41,8 +41,9 @@
 # air-gapped deployment needs the files shipped (multiformat X1 for `excel`/frontend: xlsx;
 # AIRGAP-EXTENSIONS-1 for `ducklake`/output.ducklake.enabled). See DuckDbExtension.tryLoad and
 # -DuckdbExtensionCache below. Missing = a warning, never a build failure — serve/run/ura auto-detect
-# the directory and the loader falls back to a networked INSTALL on first use if there's no cached
-# binary and the deployment has network access.
+# the directory and set -Dduckdb.extension.dir to it, and from then on (D-8, 2026-09-24) the loader
+# reads ONLY that directory: a missing binary fails its feature loudly, naming the file, and never
+# falls back to a networked INSTALL. A bundle staging nothing for a platform keeps the INSTALL path.
 #
 # The zip is a self-contained deployment unit.  On the target server:
 #   1. Unzip inspecto-deploy.zip  →  inspecto-deploy/
@@ -1540,12 +1541,18 @@ $bundledAnyExt = $false
 # FAILS, against a `<version>/<platform>` tree it succeeds. So every autoloaded extension needs a named
 # call site calling `DuckDbExtension.ensureLoaded`, or its staged file is dead weight.
 $duckdbExtNames = @('excel', 'ducklake', 'postgres_scanner', 'httpfs', 'aws')
+# D-8 (2026-09-24): match the extension ABI directory of the DuckDB this bundle actually ships
+# (duckdb.version 1.5.2.1 -> v1.5.2), not "the first file of that name anywhere in the cache". A cache
+# holding v1.5.2 AND v1.5.5 (this desk's, measured) otherwise staged whichever the recursive walk met
+# first -- and a wrong-ABI binary is refused at LOAD, which since D-8 is a hard failure in a bundle.
+$duckdbAbi = 'v' + ((([xml](Get-Content (Join-Path $sandboxRoot 'pom.xml'))).project.properties.'duckdb.version' -split '\.')[0..2] -join '.')
 if ($duckdbExtCacheDir) {
     foreach ($plat in @('windows_amd64', 'linux_amd64')) {
         foreach ($extName in $duckdbExtNames) {
             $extFile = "$extName.duckdb_extension"
             $found = Get-ChildItem -Path $duckdbExtCacheDir -Recurse -Filter $extFile -ErrorAction SilentlyContinue |
-                     Where-Object { $_.FullName -match [regex]::Escape($plat) } | Select-Object -First 1
+                     Where-Object { $_.FullName -match ('[\\/]' + [regex]::Escape($duckdbAbi) + '[\\/]' + [regex]::Escape($plat) + '[\\/]') } |
+                     Select-Object -First 1
             if ($found) {
                 $dest = Join-Path $duckdbExtOut $plat
                 New-Item -ItemType Directory -Path $dest -Force | Out-Null
@@ -1553,9 +1560,9 @@ if ($duckdbExtCacheDir) {
                 Write-Host "Bundled DuckDB $extName extension ($plat) -> duckdb-extensions/$plat/" -ForegroundColor Green
                 $bundledAnyExt = $true
             } elseif ($RequireExtensions) {
-                throw "-RequireExtensions: no cached $extFile for $plat under $duckdbExtCacheDir. This bundle would ship without it, and an air-gapped install would reach for a network INSTALL at run time — which is FATAL on a partitioned topology (D10). Populate the cache first: node tools/fetch-duckdb-extensions.mjs"
+                throw "-RequireExtensions: no cached $extFile for $plat ($duckdbAbi) under $duckdbExtCacheDir. This bundle would ship without it, and since D-8 the launcher points -Dduckdb.extension.dir at duckdb-extensions/$plat/, where a missing file FAILS that feature outright (no INSTALL fallback). Populate the cache first: node tools/fetch-duckdb-extensions.mjs"
             } else {
-                Write-Host "  (no cached $extFile for $plat under $duckdbExtCacheDir — that feature needs network on first run, or a manual -Dduckdb.extension.dir)" -ForegroundColor Yellow
+                Write-Host "  (no cached $extFile for $plat ($duckdbAbi) under $duckdbExtCacheDir — in a bundle that stages ANY extension for $plat, that feature now FAILS LOUDLY at first use; fetch it: node tools/fetch-duckdb-extensions.mjs)" -ForegroundColor Yellow
             }
         }
     }
