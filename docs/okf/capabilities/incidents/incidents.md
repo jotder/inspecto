@@ -139,7 +139,8 @@ promoted off raw `*_alert.toon` files 2026-07-18. ⚠ A leftover `*_alert.toon` 
 `WARNING`** (both the `ConfigSpecs.alert` defaults, applied in the `AlertRule` constructor); an unknown value
 of either is a 422 on `/alerts/rules`. ⚠ Until 2026-09-24 an absent comparator or severity was an HTTP
 **500**: `Set.of(..).contains(null)` throws NPE rather than answering false, so the check escaped
-validation. The agent's draft validator (`AlertRuleValidator`) still requires `comparator` outright.
+validation. The agent's draft validator (`AlertRuleValidator`, `diagnose-and-alert`) agrees: it flags only
+an unknown comparator/severity, and the skill writes the defaults into the draft explicitly.
 
 **Evaluation.** `AlertService` polls on a window-derived floor of 1 min, default 10 min
 (`AlertService.java:411-413`); a breach emits `EventType.ALERT_FIRED` (`:227`) and the canonical
