@@ -37,6 +37,79 @@ export function replayRejectsErrorMessage(err: unknown, file: string): string {
     }
 }
 
+/**
+ * The operator-facing message for a refused `POST /runs/{name}/retries/retry-now|cancel` (X1). As with
+ * {@link replayRejectsErrorMessage}, each refusal names its NEXT step and the server's reason is appended.
+ * A 409 has three distinct causes the server tells apart only in its reason text — the pipeline is
+ * mid-cycle (try again), it keeps no retry state (nothing to act on), or the file is already quarantined
+ * (its fate is decided) — so the reason picks the prefix. 404 = no retry record / the file left the inbox.
+ */
+export function commitRetryErrorMessage(err: unknown, file: string, action: 'retry-now' | 'cancel'): string {
+    const status = (err as { status?: number } | null)?.status;
+    const reason = apiErrorMessage(err, '');
+    const why = reason ? ` (${reason})` : '';
+    const verb = action === 'cancel' ? 'Not cancelled' : 'Not retried';
+    switch (status) {
+        case 409:
+            if (/running a cycle/i.test(reason))
+                return `${verb}: the pipeline is processing a cycle right now and nothing was changed — try again when it finishes${why}.`;
+            if (/no retry state/i.test(reason))
+                return `${verb}: this pipeline keeps no retry state (no dirs.status_dir), so there is nothing to act on${why}.`;
+            if (/already quarantined/i.test(reason))
+                return `${verb}: "${file}" is already quarantined — its fate is decided and it is not retried${why}.`;
+            return `${verb}: the retry record of "${file}" could not be acted on${why}.`;
+        case 404:
+            return `${verb}: "${file}" has no retry record any more, or is no longer in the inbox — reload the list${why}.`;
+        case 403:
+            return `${verb}: it needs the canOperateRuns capability and a path inside the poll directory${why}.`;
+        default:
+            return apiErrorMessage(err, `${action === 'cancel' ? 'Cancel' : 'Retry now'} failed for "${file}"`);
+    }
+}
+
+/** One file waiting on a bounded COMMIT retry (`GET /runs/{name}/retries`). */
+export interface CommitRetryRow {
+    /** Poll-relative path — the key retry-now / cancel take (never a batch id). */
+    file: string;
+    attempts: number;
+    firstFailedAt: string | null;
+    lastFailedAt: string | null;
+    /** ISO instant; blank/absent ⇒ due now. */
+    nextRetryAt: string | null;
+    due: boolean;
+    lastError: string | null;
+    inInbox: boolean;
+    /** false ⇒ the sidecar could not be parsed; it is listed rather than failing the read. */
+    readable: boolean;
+}
+
+/**
+ * A pipeline's COMMIT retry queue. ⚠ `keepsRetryState: false` is NOT an empty queue: with no
+ * `dirs.status_dir` nothing is recorded and a failed Consignment is retried every cycle without bound.
+ */
+export interface CommitRetriesPage {
+    pipeline: string;
+    keepsRetryState: boolean;
+    note?: string;
+    policy: { maxAttempts: number; initialBackoffMs: number; maxBackoffMs: number; bounded: boolean };
+    total: number;
+    truncated: boolean;
+    retries: CommitRetryRow[];
+    error?: string;
+}
+
+/** A successful retry-now / cancel. retry-now keeps the attempt count, and its `note` says so. */
+export interface CommitRetryActResult {
+    pipeline: string;
+    file: string;
+    outcome: 'rescheduled' | 'cancelled';
+    attempts: number;
+    maxAttempts: number;
+    attemptsKept?: boolean;
+    quarantineReason?: string;
+    note?: string;
+}
+
 /** One registered output file of a Consignment. */
 export interface ConsignmentOutputRow {
     tableName: string;
@@ -112,6 +185,25 @@ export class RunsService {
      */
     replayRejects(name: string, file: string): Observable<ReplayRejectsResult> {
         return this.http.post<ReplayRejectsResult>(apiUrl(`/runs/${encodeURIComponent(name)}/replay-rejects`), {
+            file,
+        });
+    }
+    /** The COMMIT retry queue of ONE pipeline (X1). Bounded server-side — see `truncated` / `total`. */
+    retries(name: string, limit?: number): Observable<CommitRetriesPage> {
+        return this.http.get<CommitRetriesPage>(apiUrl(`/runs/${encodeURIComponent(name)}/retries`), {
+            params: toParams({ limit }),
+        });
+    }
+    /** Clear ONE file's backoff so the next cycle admits it — the attempt count is KEPT. Map refusals with
+     *  {@link commitRetryErrorMessage}. */
+    retryNow(name: string, file: string): Observable<CommitRetryActResult> {
+        return this.http.post<CommitRetryActResult>(apiUrl(`/runs/${encodeURIComponent(name)}/retries/retry-now`), {
+            file,
+        });
+    }
+    /** Stop retrying ONE file: it is quarantined NOW under `retry_cancelled` and never retried again. */
+    cancelRetry(name: string, file: string): Observable<CommitRetryActResult> {
+        return this.http.post<CommitRetryActResult>(apiUrl(`/runs/${encodeURIComponent(name)}/retries/cancel`), {
             file,
         });
     }

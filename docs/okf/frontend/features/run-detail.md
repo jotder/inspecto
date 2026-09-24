@@ -1,7 +1,7 @@
 ---
 type: Feature
 title: Run Detail
-description: One running Pipeline's batches, files, lineage, quarantine, commits, and report tabs, with a batch-detail dialog. Carries a breadcrumb.
+description: One running Pipeline's batches, files, lineage, quarantine, commits, commit retries and report tabs, with a batch-detail dialog. Carries a breadcrumb.
 resource: inspecto-ui/src/app/modules/admin/run-detail/run-detail.routes.ts
 tags: [feature, runs, detail, breadcrumb]
 timestamp: 2026-09-25T00:00:00Z
@@ -11,7 +11,7 @@ timestamp: 2026-09-25T00:00:00Z
 
 Route `/runs/:name` (carries a list→name [breadcrumb](../conventions/routing-and-navigation.md)), dir
 `modules/admin/run-detail/`. Drills into one running Pipeline across tabs — batches / files / lineage
-(filterable by batch id) / quarantine / commits / report — in **standard**
+(filterable by batch id) / quarantine / commits / commit retries / report — in **standard**
 [data-tables](../design-system/data-table.md); a row opens the **batch-detail dialog** (mini/single-select
 grids inside). Backed by `RunsService`.
 
@@ -61,6 +61,33 @@ action needs an explicit step, unlike the read-only tabs.
   next step to the server's reason: **409** already replayed / still in flight, **422** cannot be replayed
   (non-CSV, no `raw_line`, possibly truncated at `rejects_limit`), **403** needs `canOperateRuns` and a bare file
   name; anything else falls back to `apiErrorMessage`. Pinned by `rejected-rows.dialog.spec.ts`.
+
+**Commit retries tab (X1 UI, shipped 2026-09-25).** `CommitRetriesPanelComponent`
+(`commit-retries.panel.ts`) lists `GET /runs/{name}/retries` — the files of THIS pipeline waiting on a bounded
+COMMIT retry (backend: [execution-lanes](../../backend/pipeline-graph/execution-lanes.md) § *The COMMIT retry
+affordance*). The panel loads itself when the tab opens and reloads when the bound pipeline changes; Run Detail's
+own `loadTab()` skips it. Rules it follows:
+
+- 🔴 **"keeps no retry state" is its own warning, never the empty state.** `keepsRetryState: false` (no
+  `dirs.status_dir`: failures are retried every cycle without bound) renders an `<inspecto-alert variant="warning">`;
+  only a pipeline that keeps state and has nothing waiting gets the *No retries pending* `<inspecto-empty-state>`.
+  The two look identical as an empty list and mean opposite things.
+- Columns: file (the poll-relative path, the key both actions take), **attempts / max** (`/ unbounded` when the
+  policy is not bounded), **next retry** (a `due` status badge, else the time), last error, and a **Record** column
+  that badges `unreadable` sidecars (their attempts read `—`); a warning above the grid counts them. A policy line
+  (cap, backoff range) sits beside the reload button. `truncated` shows *first N of total*.
+- **Retry now** posts `{file}` and renders the server's `note` in a success alert — it says the attempt count was
+  **kept** and how many attempts remain (Q2). **Cancel** first asks `confirmDestructive()`, which says the file is
+  quarantined **now under `retry_cancelled`** and **not retried again**, then posts.
+- ⚠ **Disabled, not hidden**, without `lens.canOperateRuns()` — both row actions stay with a tooltip reason and a
+  reason line above the grid (the rejected-rows replay convention).
+- Refusals go through `commitRetryErrorMessage(err, file, action)` (`inspecto/api/runs.service.ts`, sibling of
+  `replayRejectsErrorMessage`). A **409** has three causes the server tells apart only in its reason text, so the
+  reason picks the prefix: the pipeline is **mid-cycle** (try again when it finishes), it **keeps no retry state**,
+  or the file is **already quarantined** (its fate is decided); anything else is "could not be acted on". **404** =
+  no record any more / left the inbox (reload), **403** = capability or a path outside the poll directory. The
+  server's reason is always appended. Pinned by `commit-retries.panel.spec.ts` (HTTP mocked with
+  `HttpTestingController`, plus an axe check).
 
 **Files tab: real field names + the live step gauge (2026-08-13).** The Files tab's `GET /runs/{name}/files`
 rows are the `_status_` ledger header **verbatim** (`ConsignmentAuditWriter`): `start_time, end_time, filename,

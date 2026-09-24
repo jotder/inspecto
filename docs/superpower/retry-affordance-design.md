@@ -4,7 +4,7 @@
 ⛔ **X4 is NOT in scope and must not be started**: the row records that the operator refused its question —
 the replay default is to be *scoped against a sandbox*, i.e. `PIPELINE-DRYRUN-1`, and both options are risky
 to default to until a dry-run makes the choice observable.
-**Status:** written 2026-09-16 as design only. **All four §5 decisions answered by the operator 2026-09-25** (each as recommended) and the affordance **BUILT** the same day — as-built facts in [execution-lanes](../okf/backend/pipeline-graph/execution-lanes.md) § *The COMMIT retry affordance*. The §2 `processing.retry` block was **also built** the same day (the `AcceptedConfigKeys` work §2 waited on had landed): see execution-lanes § *Per-pipeline `processing.retry`*. ⚠ Of the "two committed contracts" §2 names, only `node-attributes.contract.json` still exists — the step-types contract was deleted 2026-09-24 (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`). Open: the UI (Q3).
+**Status:** written 2026-09-16 as design only. **All four §5 decisions answered by the operator 2026-09-25** (each as recommended) and the affordance **BUILT** the same day — as-built facts in [execution-lanes](../okf/backend/pipeline-graph/execution-lanes.md) § *The COMMIT retry affordance*. The §2 `processing.retry` block was **also built** the same day (the `AcceptedConfigKeys` work §2 waited on had landed): see execution-lanes § *Per-pipeline `processing.retry`*. ⚠ Of the "two committed contracts" §2 names, only `node-attributes.contract.json` still exists — the step-types contract was deleted 2026-09-24 (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`). **The UI (Q3) was BUILT the same day** too — the Run Detail *Commit retries* tab, as-built in [run-detail](../okf/frontend/features/run-detail.md) § *Commit retries tab*. **Nothing in this design is open** — it is ready to move to `archived-documents/plans-archive/`; the move waits only on repointing the two links into it (the `BACKLOG.md` §3.2 index row and `execution-lanes.md`) in the same change.
 
 ## 1. What exists today (grounded, not assumed)
 
@@ -92,7 +92,7 @@ gets exhaustion two cycles later will file a bug against the cap.
 A route alone is usable via the API; the run-detail pane is where an operator would look
 (`okf/frontend/features/run-detail.md` already carries the *"reprocess is whole-batch only"* note this row is
 paired with). **Recommendation: route first**, UI as a separate follow-up — the route is testable and the
-pane needs its own design. ✅ **Decided 2026-09-25: routes first, UI later (not built).**
+pane needs its own design. ✅ **Decided 2026-09-25: routes first, UI later.** ✅ **UI DONE 2026-09-25** — the Run Detail *Commit retries* tab (see [run-detail](../okf/frontend/features/run-detail.md)).
 
 **Q4 — Is the LIST route per pipeline, or global?** Per pipeline matches where `status_dir` lives and keeps
 it space-scoped by construction; a global list would need to enumerate pipelines and re-raise the

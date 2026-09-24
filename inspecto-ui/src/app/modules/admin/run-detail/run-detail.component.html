@@ -223,7 +223,11 @@
                 and retried — they reappear as Pending on the Files tab without any action needed.
             </inspecto-alert>
         }
-        @if (activeTab !== 'report' && activeTab !== 'files' && !loading()) {
+        <!-- Commit retries (X1): the per-pipeline bounded COMMIT retry queue, with retry-now / cancel -->
+        @if (activeTab === 'retries') {
+            <app-commit-retries-panel [pipeline]="name" />
+        }
+        @if (activeTab !== 'report' && activeTab !== 'files' && activeTab !== 'retries' && !loading()) {
             <inspecto-data-table
                 class="mt-4 block"
                 tier="standard"

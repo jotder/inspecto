@@ -38,9 +38,10 @@ import { FmtPercentPipe } from 'app/inspecto/format';
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { BatchDetailDialog } from './batch-detail.dialog';
 import { RejectedRowsDialog } from './rejected-rows.dialog';
+import { CommitRetriesPanelComponent } from './commit-retries.panel';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
-type TabKey = 'batches' | 'files' | 'lineage' | 'quarantine' | 'commits' | 'report';
+type TabKey = 'batches' | 'files' | 'lineage' | 'quarantine' | 'commits' | 'retries' | 'report';
 type FileFilter = 'ALL' | 'SUCCESS' | 'REJECTED' | 'ERRORED';
 
 /**
@@ -72,6 +73,7 @@ type FileFilter = 'ALL' | 'SUCCESS' | 'REJECTED' | 'ERRORED';
         FmtPercentPipe,
         InspectoAlertComponent,
         RouterLink,
+        CommitRetriesPanelComponent,
     ],
     templateUrl: './run-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -117,6 +119,7 @@ export class RunDetailComponent implements OnInit {
         { id: 'lineage', label: 'Lineage' },
         { id: 'quarantine', label: 'Quarantine' },
         { id: 'commits', label: 'Commits' },
+        { id: 'retries', label: 'Commit retries' },
         { id: 'report', label: 'Report' },
     ];
     selectedIndex = 0;
@@ -162,6 +165,7 @@ export class RunDetailComponent implements OnInit {
             this.loadFiles();
             return;
         }
+        if (tab === 'retries') return; // the Commit retries panel loads itself (per pipeline, X1)
         this.loading.set(true);
         const call: Observable<AuditRow[] | string[]> =
             tab === 'batches'

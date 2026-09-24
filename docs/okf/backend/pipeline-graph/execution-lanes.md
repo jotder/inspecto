@@ -85,7 +85,8 @@ space (transition-debounced signal; `-Djobs.orphan.audit=false` to disable) — 
   cancel can never move a file a cycle is ingesting.
 * The per-file `CommitRetry.clear(File, cfg)` sits beside `clear(Consignment, cfg)`, which now loops over it;
   `CommitRetry.inboxFile(cfg, rel)` is the path jail (blank, absolute or escaping ⇒ `null` ⇒ 403).
-* ⛔ **No UI yet** (Q3: routes first). The Run Detail pane is the natural home; it needs its own design.
+* **UI (Q3) shipped 2026-09-25** as the Run Detail **Commit retries** tab — see
+  [run-detail](../../frontend/features/run-detail.md) § *Commit retries*. The routes came first, as Q3 decided.
 
 **Per-pipeline `processing.retry` (X1 deferral, 2026-09-25).** The cap and backoff are now per pipeline:
 
