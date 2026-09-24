@@ -294,6 +294,16 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   ⚠ **`asn-parser/src/main/java` survives the deletion and must not be cleaned up as an orphan** —
   `legacy-code/pom.xml` compiles it via `<sourceDirectory>../../src/main/java</sourceDirectory>`
   (45 files, confirmed in the build log). It retires with `legacy-code` after Phase 4.
+- ⚠ **`asn-parser/src/test/` is a tree of manual scratch programs, NOT tests** (operator decision
+  2026-09-24, `LEGACY-ASN-SRC-TREE-UNBUILT-1`: rename, don't wire). No `testSourceDirectory` points
+  at it, so its 21 files compile on no build path. The six that carried `*Test` names were renamed
+  to the `*Harness` convention so nothing claims coverage it lacks: `Test` → `SchemaCsvHarness`,
+  `ASNFileReaderTest` → `ASNFileReaderHarness`, `BERDecoderTest` → `BERDecoderHarness`,
+  `SbinHuaMscAsnTest` → `SbinHuaMscAsnHarness`, `FixedLengthFileReaderTest` →
+  `FixedLengthFileReaderHarness`, `RTDMS_ASN_Test` → `RTDMS_ASN_Harness`. `asn-golden`'s
+  `GoldenCapture` cites `RTDMS_ASN_Harness.<method>` as provenance for 7 of its 9 golden cases —
+  rename that file again only together with those comments. Real ASN.1 coverage lives in the
+  `asn-parser/asn-decoders` modules.
 - ⚠ **Corpus-backed tests are opt-in AND data-gated** (DATA-GOV-1). `RealGrammarsTest` (asn-schema)
   and `ParityCheckTest` (asn-golden) `assumeTrue` on **both** `-Dasn.corpus.tests=true` **and** the
   operator data being present on disk, so by default — and on any corpus-less checkout, including a

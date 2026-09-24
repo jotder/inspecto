@@ -16,7 +16,7 @@ import java.util.stream.Stream;
 
 //import static org.junit.jupiter.api.Assertions.*;
 
-class FixedLengthFileReaderTest {
+class FixedLengthFileReaderHarness {
 
     private static String readStringFromFile(Path path) throws IOException {
         byte[] bytes = Files.readAllBytes(path);

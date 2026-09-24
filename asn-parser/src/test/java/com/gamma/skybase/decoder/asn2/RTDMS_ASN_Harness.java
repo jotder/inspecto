@@ -15,9 +15,10 @@ import java.util.Objects;
  * annotation, and its {@code main()} dispatches to hardcoded-path methods, most commented
  * out. Kept verbatim as documented provenance for several {@code asn-golden} GoldenCapture
  * cases (see docs/BACKLOG.md, RTDMS-ASN-HARNESS-1) — do not delete or rename without
- * updating those citations.
+ * updating those citations. Renamed from {@code RTDMS_ASN_Test} on 2026-09-24
+ * (LEGACY-ASN-SRC-TREE-UNBUILT-1) so its name no longer claims test coverage.
  */
-class RTDMS_ASN_Test {
+class RTDMS_ASN_Harness {
 
     static Map<String, Object> headerInfo = new LinkedHashMap<>();
     static String srcDir, fileNamePattern = "[A-Za-z0-9_]+", defFil, txConf;
