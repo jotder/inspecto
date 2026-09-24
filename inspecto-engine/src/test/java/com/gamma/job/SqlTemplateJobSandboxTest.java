@@ -105,20 +105,23 @@ class SqlTemplateJobSandboxTest {
         assertTrue(r.message().contains("refused"), "refused by the guard, not by DuckDB: " + r.message());
     }
 
-    /** The connection layer on its own: {@code parquet_metadata(...)} is not on {@code SqlGuard}'s function
-     *  blocklist, so the lexical check passes it and only the sealed connection keeps a file outside the data
-     *  root (its schema, row counts and min/max statistics) out of the snapshot. */
+    /** The connection layer on its own: a replacement-scan literal after a FROM-list COMMA is not judged by
+     *  {@code SqlGuard} ({@code SQLGUARD-COMMA-RELATION-1}), so the lexical check passes it and only the sealed
+     *  connection keeps a file outside the data root out of the snapshot. (Until 2026-09-24 this probe used
+     *  {@code parquet_metadata(...)}; {@code SQLGUARD-PARQUET-METADATA-1} closed that gap.) When the comma gap
+     *  is fixed the premise assert goes red — find another vector the guard passes, or retire the probe. */
     @Test
-    void aFileFunctionTheGuardMissesIsStoppedByTheConnectionSeal(@TempDir Path dir) throws Exception {
+    void aFileLiteralTheGuardMissesIsStoppedByTheConnectionSeal(@TempDir Path dir) throws Exception {
         Path outside = Files.createDirectories(dir.resolve("outside")).resolve("other.parquet");
         DuckDbUtil.loadDriver();
         try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
             st.execute("COPY (SELECT 42 AS secret) TO " + lit(outside) + " (FORMAT PARQUET)");
         }
-        assertTrue(com.gamma.sql.SqlGuard.check("SELECT * FROM parquet_metadata(" + lit(outside) + ")").isEmpty(),
-                "premise: the lexical guard passes this call, so the seal is what is under test");
-        JobRun r = run(dir, "SELECT * FROM parquet_metadata(" + lit(outside) + ")");
-        assertNotEquals("SUCCESS", r.status(), "parquet_metadata of a file outside the data root ran: " + r.message());
+        String sql = "SELECT b.secret FROM (SELECT 1 AS x) a, " + lit(outside) + " b";
+        assertTrue(com.gamma.sql.SqlGuard.check(sql).isEmpty(),
+                "premise: the lexical guard passes this query, so the seal is what is under test");
+        JobRun r = run(dir, sql);
+        assertNotEquals("SUCCESS", r.status(), "a file outside the data root was read: " + r.message());
     }
 
     @Test

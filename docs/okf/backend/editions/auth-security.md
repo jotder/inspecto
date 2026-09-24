@@ -428,8 +428,47 @@ seal turns `aFileFunctionTheGuardMissesIsStoppedByTheConnectionSeal` red.
 🔴 **That second probe is also a finding against `SqlGuard` itself:** `parquet_metadata('<any file>')` passes
 the lexical check (it is not `read_*`/`*_scan`, and `FROM parquet_metadata(` is not path-like), and it
 returns the file's schema, row counts and min/max statistics. Any caller that relies on `SqlGuard` **alone**
-on an unsealed connection — `QueryExecutor` documents exactly that posture — is exposed. Not fixed here;
-tracked as `SQLGUARD-PARQUET-METADATA-1` in [BACKLOG](../../../BACKLOG.md) §3.8.
+on an unsealed connection — `QueryExecutor` documents exactly that posture — was exposed. Fixed the same day
+as `SQLGUARD-PARQUET-METADATA-1`, next section.
+
+## SqlGuard refuses every table function except path-free generators (`SQLGUARD-PARQUET-METADATA-1`, 2026-09-24)
+
+`SqlGuard` had a hand-kept block-list (`read_*`, `*_scan`, `glob`, …) and the file **inspectors** were not on
+it. The fix makes the function check **fail-closed over table functions**: every function call in the text
+— bare **or double-quoted**, because DuckDB resolves `"PARQUET_SCHEMA"('<file>')` as the function (the old
+`\bread_csv\s*\(` regex was bypassed by `"read_csv"(…)` too) — is tested by whole name against one pattern,
+and the only table functions allowed are the generators in `SqlGuard.SAFE_TABLE_FUNCTIONS`: `range`,
+`generate_series`, `unnest`, `repeat`, `repeat_row`, `json_each`, `json_tree`, `pg_timezone_names`,
+`icu_calendar_names`. Refused, beyond the old list: `parquet_metadata`/`_schema`/`_file_metadata`/
+`_kv_metadata`/`_full_metadata`/`_bloom_probe`, `duckdb_*` and `pragma_*` (settings, databases and
+extensions expose paths), `which_secret`, `enable_logging`/`enable_profiling` (take a storage path),
+`force_checkpoint`, `truncate_duckdb_logs`, `json_execute_serialized_sql`, `summary`/`histogram*`, and the
+autoloadable extensions' surfaces (ducklake, postgres, sqlite, mysql, odbc, iceberg, delta, azure, aws,
+excel `read_xlsx`, spatial `st_read*`, vortex, lance, motherduck `md_*`, ui, tpch/tpcds `dbgen`/`dsdgen`).
+
+**Derived, not hand-typed — `SqlGuardFileFunctionContractTest`** (DuckDB `1.5.2.1`): it LOADs every
+installed extension best-effort, reads `duckdb_functions()`, and asserts every `table`/`table_macro`
+function is refused unless `SAFE_TABLE_FUNCTIONS` names it (and every SAFE entry is still a table function
+and still passes), and every scalar whose parameter is *named* like a path (`path`/`file`/`url`/`uri`/
+`location`/`directory`) is refused unless it is one of the pure string splitters `parse_path`/
+`parse_dirname`/`parse_dirpath`/`parse_filename`. **A DuckDB upgrade that adds a table function fails the
+build until it is classified.** Extensions not installed offline (iceberg, delta, spatial, …) cannot be
+enumerated, so a short hand-kept list pins them. Mutation-checked: dropping `parquet_\w+` from the pattern
+reports exactly the six `parquet_*` inspectors; dropping the quoted-name handling turns
+`aQuotedFunctionNameIsStillRefused` red.
+
+⚠ **Known false rejects, accepted:** the `histogram(x)` **aggregate** shares its name with the table
+macro and is refused too, as is a CTE with a column list named like a blocked function
+(`WITH summary(a) AS …`). A false reject costs a repair round; a false accept is a file read. The
+`read_parquet('<registered path>')` masking in `GuardedDerivedTableEmitter` is unaffected — it masks the
+call to an identifier before the guard runs.
+
+🔴 **Found while closing it, NOT fixed here — `SQLGUARD-COMMA-RELATION-1`** ([BACKLOG](../../../BACKLOG.md)
+§3.8): the replacement-scan check (`RELATION_REF`) judges only the token after `FROM`/`JOIN`, so
+`SELECT b.secret FROM (SELECT 1) a, '<any file>' b` passes the guard and returns the file's **rows** on an
+unsealed connection. It is now the seal-only probe in `SqlTemplateJobSandboxTest`
+(`aFileLiteralTheGuardMissesIsStoppedByTheConnectionSeal`, mutation-checked: removing the seal turns it
+red); that test's premise assert goes red when the comma gap is fixed.
 
 ⚠ `SqlSandbox.open` was not reused for the job: its interactive memory/timeout caps (`assist.sql.*`) do not
 fit a batch job. The two static helpers are the same statements `open`/`seal` now call, so there is still

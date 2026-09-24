@@ -22,7 +22,9 @@ import java.util.regex.Pattern;
  *       {@code DROP}/{@code ALTER}/{@code MERGE}/{@code TRUNCATE}/{@code ATTACH}/{@code COPY}/…).</li>
  *   <li><b>File/extension/system functions</b> — {@code read_*}/{@code write_*}/{@code *_scan}/
  *       {@code copy}/{@code getenv}/{@code glob}/{@code sniff_csv}/{@code system}/{@code shell}/
- *       {@code query}/{@code query_table}/{@code read_blob}/{@code read_text}/…; the {@code install}/
+ *       {@code query}/{@code query_table}/{@code read_blob}/{@code read_text}/{@code parquet_metadata}/…
+ *       — every DuckDB table function except the path-free generators in {@link #SAFE_TABLE_FUNCTIONS},
+ *       bare or double-quoted (see {@link #BLOCKED_FUNCTION}); the {@code install}/
  *       {@code load}/{@code pragma}/{@code set} configuration verbs.</li>
  *   <li><b>Comment-smuggling</b> — line ({@code --}) and block ({@code /* *}{@code /}) comments are
  *       stripped (outside string literals) <em>before</em> the token scan, with block comments removed
@@ -40,11 +42,46 @@ public final class SqlGuard {
 
     private SqlGuard() {}
 
-    /** Functions whose presence (name followed by {@code (}) is rejected outright. */
-    private static final Pattern BLOCKED_FUNCTIONS = Pattern.compile(
-            "\\b(read_\\w+|write_\\w+|\\w*_scan|copy|getenv|glob|sniff_csv|system|shell|exec|eval"
-                    + "|query|query_table|read_blob|read_text|read_json\\w*)\\s*\\(",
-            Pattern.CASE_INSENSITIVE);
+    /**
+     * Every function call in the text: a name — bare or double-quoted, since DuckDB resolves
+     * {@code "read_csv"('x')} exactly like {@code read_csv('x')} — followed by {@code (}. Each name is
+     * then tested against {@link #BLOCKED_FUNCTION}.
+     */
+    private static final Pattern FUNCTION_CALL = Pattern.compile("\"?\\b([A-Za-z_]\\w*)\"?\\s*\\(");
+
+    /**
+     * Function names rejected outright (matched against the WHOLE lower-cased name). 🔴 Fail-closed
+     * ({@code SQLGUARD-PARQUET-METADATA-1}): every DuckDB <b>table function</b> is refused unless it is in
+     * {@link #SAFE_TABLE_FUNCTIONS} — the file readers ({@code read_*}, {@code *_scan}, {@code glob},
+     * {@code sniff_csv}), the file INSPECTORS that are not readers ({@code parquet_metadata}/{@code _schema}/
+     * {@code _file_metadata}/{@code _kv_metadata}/{@code _full_metadata}/{@code _bloom_probe}, which leak a
+     * file's schema, row counts and min/max statistics), the path-exposing catalog functions
+     * ({@code duckdb_*}, {@code pragma_*}, {@code which_secret}), the ones that write or mutate
+     * ({@code enable_logging}/{@code enable_profiling} take a storage path; {@code force_checkpoint};
+     * {@code truncate_duckdb_logs}), SQL-executing ones ({@code query}, {@code query_table},
+     * {@code json_execute_serialized_sql}, {@code summary}/{@code histogram}, which run {@code query_table}
+     * over a caller-named relation), and the autoloadable extensions' surfaces (ducklake, postgres, sqlite,
+     * mysql, odbc, iceberg, delta, azure, aws, excel, spatial, vortex, lance, motherduck, ui, tpch/tpcds).
+     * {@code SqlGuardFileFunctionContractTest} derives the table-function list from {@code duckdb_functions()}
+     * and fails the build when a DuckDB upgrade adds one that this pattern does not refuse.
+     */
+    private static final Pattern BLOCKED_FUNCTION = Pattern.compile(
+            "read_\\w+|write_\\w+|\\w*_scan|\\w*_scan_\\w+|copy|getenv|glob|sniff_csv|system|shell|exec|eval"
+                    + "|query|query_table|summary|histogram\\w*|json_execute_serialized_sql"
+                    + "|parquet_\\w+|\\w*duckdb_\\w+|pragma_\\w+|which_secret|test_\\w+_types"
+                    + "|\\w*checkpoint|\\w+_logging|\\w+_profiling"
+                    + "|\\w+_attach|\\w+_query|\\w+_execute|\\w+_clear_cache|clear_\\w+_cache|pg_clear_cache"
+                    + "|load_aws_credentials|(ducklake|postgres|sqlite|mysql|odbc|iceberg|delta|azure|aws|vortex"
+                    + "|lance|md|motherduck|ui)_\\w+|st_read\\w*|start_ui|stop_ui_server|dbgen|dsdgen");
+
+    /**
+     * The DuckDB table functions a read-only query may call: pure generators over their arguments, with no
+     * file, catalog or setting behind them. Package-private for the contract test, which fails when an entry
+     * here stops being a table function (a stale exemption) or when {@link #BLOCKED_FUNCTION} refuses one.
+     */
+    static final java.util.Set<String> SAFE_TABLE_FUNCTIONS = java.util.Set.of(
+            "range", "generate_series", "unnest", "repeat", "repeat_row", "json_each", "json_tree",
+            "pg_timezone_names", "icu_calendar_names");
 
     /** Keyword verbs that have no place in a read-only SELECT (matched as whole words, anywhere). */
     private static final Pattern BLOCKED_KEYWORDS = Pattern.compile(
@@ -57,7 +94,7 @@ public final class SqlGuard {
      * A relation reference — the token after {@code FROM} or {@code JOIN}. DuckDB's REPLACEMENT SCAN turns a
      * string literal, or an identifier that looks like a path, into an implicit file read:
      * {@code SELECT * FROM 'C:/any/file.csv'} reads the file with no {@code read_csv(} token anywhere in the
-     * text, so {@link #BLOCKED_FUNCTIONS} never sees it. 🔴 Found live 2026-09-17: {@code POST /db/query}
+     * text, so {@link #FUNCTION_CALL} never sees it. 🔴 Found live 2026-09-17: {@code POST /db/query}
      * returned the rows of {@code spaces/demo/audit/jobs_runs.csv} — a file outside every store — to a
      * caller with no capability. The relation position is the only place a path can do harm, so it is
      * the only place this looks.
@@ -126,10 +163,14 @@ public final class SqlGuard {
                     "only a single read-only query is allowed — it must begin with SELECT or WITH"));
         }
 
-        var fm = BLOCKED_FUNCTIONS.matcher(noTrailing);
-        if (fm.find()) {
-            out.add(Finding.error("sql", "the function '" + fm.group(1).toLowerCase()
-                    + "(...)' is not allowed (file/extension/system access is forbidden in a KPI query)"));
+        var fm = FUNCTION_CALL.matcher(noTrailing);
+        while (fm.find()) {
+            String name = fm.group(1).toLowerCase(java.util.Locale.ROOT);
+            if (BLOCKED_FUNCTION.matcher(name).matches()) {
+                out.add(Finding.error("sql", "the function '" + name
+                        + "(...)' is not allowed (file/extension/system access is forbidden in a KPI query)"));
+                break;
+            }
         }
 
         var km = BLOCKED_KEYWORDS.matcher(noTrailing);
