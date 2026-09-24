@@ -537,7 +537,25 @@ in place rather than quietly corrected, because a register that silently repairs
   Working Set, so link annotation needs one defined (e.g. `source|target|kind`). Per-Collector coverage
   needs a decided attribution (a Collector column on the Dataset, or lineage from consignments).
 
-✅ **GROUNDED 2026-09-24 — evidence only; ⛔ NONE of D-U5…D-U9 is answered.** *Recommended* = a reading of the
+✅ **ANSWERED 2026-09-24 (operator) — four of five; D-U7 still owed:**
+
+* **D-U5 → purpose + OPTIONAL `caseId`.** A purpose / legal-basis header field (absent when null), shown in the
+  Dossier *Scope.*; a `caseId`, when given, must name a Case the caller can see — checked at create and on
+  every `open()` (both copies), inherited by forks, carried into the PDP resource. ⛔ Not data containment.
+* **D-U6 → Professional carve-out** (NOT SEC-08-only). Render-time masking of entity ids when either bound
+  column is classified PII, across Working Set / log / Dossier; per-entity stateless reveal `POST` under a NEW
+  capability, one audit event. Minimises the hand-over, not the analyst's view.
+* **D-U8 → whole-Investigation purge + legal hold.** An `investigation_purge` maintenance task on the
+  `incident_purge` pattern (dry-run, `max_count`, skips held), removing the Investigation, its forks and
+  anchored snapshots, audited, leaving a *purged* marker so `verify` answers "purged"; a hold record in the
+  Investigation dir; audit-log retention via `event_prune`.
+* **D-U9 → a two-axis 3 × 3 grade.** Glossary term ***Assessment Grade*** (never bare *confidence*):
+  source reliability **A–C** × information credibility **1–3** *(axis labels = implementer's reading of
+  "3×3", confirm)*, optional on `annotate`, absent when empty. Links annotated via a structured
+  `links:[{source,target,kind}]`. Coverage keeps answering the EVENT-day question; per-Collector stays
+  unassessed until chosen.
+
+✅ **GROUNDED 2026-09-24 — evidence only.** *Recommended* = a reading of the
 evidence. Paths under `inspecto-geo-link/src/main/java/com/gamma/geolink/` unless stated.
 
 | Id | True today | Ruled out | Survivors + cost | Recommended reading |
