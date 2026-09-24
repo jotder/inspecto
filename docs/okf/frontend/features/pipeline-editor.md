@@ -693,13 +693,23 @@ effect re-enters `ApplicationRef.tick` (NG0101), and neither fakeAsync nor `vi.u
 survives it in this runner — specs capture the armed callback and fire it deterministically.
 
 **Config history survives a reload** (`PIPELINE-CONFIG-HISTORY-1`, 2026-09-24): every successful save
-of a Pipeline config — from any door, not only this editor — leaves a server-side version (the newest 50
-kept, the same cap as undo/redo). The ⋮ menu's **History…** opens `PipelineHistoryDialog`
-(`pipeline-history.dialog.ts`): the versions newest first, and a READ-ONLY line diff of the selected one
+of a Pipeline config — from any door, not only this editor — leaves a server-side version. **Retention is a
+per-Space setting**: the newest 50 are kept by default (the same cap as undo/redo) — a default the operator
+can change with `PUT /settings/pipeline-history {keep: 1..1000}` (no Settings pane yet; the dialog states the
+number in force). The ⋮ menu's **History…** opens `PipelineHistoryDialog`
+(`pipeline-history.dialog.ts`): the versions newest first, and a line diff of the selected one
 against the version before it (the default) or against the current config — the oldest kept version has no
 previous one, so it falls back to current. Removed lines are `<del>`, added lines `<ins>` (text tone only, no
-tinted fills). It writes nothing: restoring a version is not offered. ⚠ The entry sits in the author-gated
-⋮ menu with the other pipeline verbs, so the Business lens does not see it although the routes are reads.
+tinted fills). **Restore v*N*** (after a confirm that says unsaved tab edits are lost when the tab is dirty)
+calls `POST /pipelines/{id}/history/{N}/restore` — a SERVER save of the version, recorded as a new version, so
+the history is never rewritten and a restore is undone by restoring the version it replaced (a config last
+written outside Inspecto — a hand edit, a whole-Space import — has no such version). On success the
+editor drops the tab's model, undo/redo and dirty flag (they describe the replaced config) and reloads it from
+`GET …/graph/raw`; a refusal (422 the version fails today's content gate, 409 a version saved before a rename)
+shows the server's message and keeps the dialog open. ⚠ Restore is NOT a client-side `/config/write` of the
+version: that route files a Pipeline by the identity in the body and would fork a second file for any
+Pipeline registered under another filename. ⚠ The entry sits in the author-gated ⋮ menu with the other
+pipeline verbs, so the Business lens does not see it (the reads are ungated; restore needs `canAuthorWorkbench`).
 Storage, routes and rename/delete behaviour: [Pipeline identity § Config history](../../backend/control-plane/pipeline-identity.md).
 
 Known save-path defects are tracked in [BACKLOG](../../../BACKLOG.md) — see *Known gaps* below

@@ -15,6 +15,7 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
@@ -203,6 +204,52 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** PIPELINE-CONFIG-HISTORY-1: history retention is a per-Space setting over a shipped default of 50. */
+    @Test
+    void pipelineHistoryRetentionRoundTripsPerSpaceAndRefusesBadValues(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"beta\"}").statusCode());
+
+            JsonNode def = json(send(c.port, "GET", "/spaces/acme/settings/pipeline-history", null));
+            assertTrue(def.get("keep").isNull(), "no document ⇒ the shipped default: " + def);
+            assertEquals(PipelineHistorySettings.DEFAULT_KEEP, def.get("effectiveKeep").asInt());
+            assertEquals(PipelineHistorySettings.DEFAULT_KEEP, def.get("defaultKeep").asInt());
+            assertEquals(PipelineHistorySettings.MAX_KEEP, def.get("maxKeep").asInt());
+
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/pipeline-history", "{\"keep\":7}");
+            assertEquals(200, put.statusCode(), put.body());
+            assertEquals(7, json(put).get("effectiveKeep").asInt());
+            assertTrue(Files.exists(root.resolve("acme").resolve("config").resolve(PipelineHistorySettings.FILE)));
+            assertEquals(7, json(send(c.port, "GET", "/spaces/acme/settings/pipeline-history", null)).get("keep").asInt());
+            assertTrue(json(send(c.port, "GET", "/spaces/beta/settings/pipeline-history", null)).get("keep").isNull(),
+                    "per-Space: beta still has the default");
+
+            for (String bad : List.of("0", "1001", "\"lots\"")) {
+                HttpResponse<String> r = send(c.port, "PUT", "/spaces/acme/settings/pipeline-history", "{\"keep\":" + bad + "}");
+                assertEquals(422, r.statusCode(), bad + " → " + r.body());
+                assertTrue(r.body().contains("keep"), r.body());
+            }
+            assertEquals(7, json(send(c.port, "GET", "/spaces/acme/settings/pipeline-history", null)).get("keep").asInt(),
+                    "a refused write left the last good value standing");
+
+            HttpResponse<String> cleared = send(c.port, "PUT", "/spaces/acme/settings/pipeline-history", "{\"keep\":null}");
+            assertEquals(200, cleared.statusCode(), cleared.body());
+            assertTrue(json(cleared).get("keep").isNull());
+            assertEquals(PipelineHistorySettings.DEFAULT_KEEP, json(cleared).get("effectiveKeep").asInt());
+        }
+    }
+
+    /** A hand-edited out-of-range value reads as the default — `keep: 0` must never prune every version. */
+    @Test
+    void anOutOfRangeStoredRetentionReadsAsTheDefault(@TempDir Path dir) throws Exception {
+        Path f = dir.resolve(PipelineHistorySettings.FILE);
+        Files.writeString(f, "keep: 0\n");
+        assertEquals(PipelineHistorySettings.DEFAULT_KEEP, PipelineHistorySettings.read(f).effectiveKeep());
+        Files.writeString(f, "keep: 12\n");
+        assertEquals(12, PipelineHistorySettings.read(f).effectiveKeep());
+    }
+
     /** LA-19 (D-U6, D-U7): the masking mode and the two four-eyes thresholds share the document and its rules. */
     @Test
     void linkAnalysisMaskingAndFourEyesRoundTripAndRefuseBadValues(@TempDir Path root) throws Exception {
@@ -275,6 +322,16 @@ class ControlApiSettingsTest {
             HttpResponse<String> allowed = sendAs(c.port, "PUT", "/spaces/acme/settings/link-analysis",
                     body, "Bearer valid");
             assertEquals(200, allowed.statusCode(), "a Subject WITH the capability is allowed: " + allowed.body());
+
+            // PIPELINE-CONFIG-HISTORY-1: the retention setting is gated the same way.
+            String keep = "{\"keep\":5}";
+            assertEquals(401, send(c.port, "PUT", "/spaces/acme/settings/pipeline-history", keep).statusCode());
+            HttpResponse<String> keepDenied = sendAs(c.port, "PUT", "/spaces/acme/settings/pipeline-history", keep, "Bearer plain");
+            assertEquals(403, keepDenied.statusCode(), keepDenied.body());
+            assertTrue(keepDenied.body().contains("canAuthorWorkbench"), keepDenied.body());
+            assertEquals(200, sendAs(c.port, "GET", "/spaces/acme/settings/pipeline-history", null, "Bearer plain").statusCode());
+            HttpResponse<String> keepAllowed = sendAs(c.port, "PUT", "/spaces/acme/settings/pipeline-history", keep, "Bearer valid");
+            assertEquals(200, keepAllowed.statusCode(), keepAllowed.body());
         } finally {
             Authenticators.forTest(null);
         }

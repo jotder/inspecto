@@ -1249,6 +1249,21 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     }
 
     /**
+     * Re-read the registered configs NOW instead of at the next poll cycle — for a caller that has just
+     * overwritten a registered file and serves a read of it next ({@code PIPELINE-CONFIG-HISTORY-1}: a
+     * restored version, which the editor reloads at once). Mtime-cached like every rebuild, so only a
+     * changed file is re-parsed; an unparseable one is warned and skipped exactly as the poll would.
+     */
+    public void refreshConfigs() {
+        registryLock.lock();
+        try {
+            configRegistry.rebuild(registry);
+        } finally {
+            registryLock.unlock();
+        }
+    }
+
+    /**
      * Remove a pipeline config path from the active registry immediately (v5.2.0) — the counterpart to
      * {@link #registerPipeline(Path)}. Without this, a deleted config file only drops out of the read
      * surface ({@link #pipelines()}, the catalog) on the <em>next</em> poll cycle (up to {@code pollSeconds}

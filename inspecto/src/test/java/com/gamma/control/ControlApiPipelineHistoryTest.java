@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * {@code PIPELINE-CONFIG-HISTORY-1} over real HTTP: every successful Pipeline-config save leaves one
  * version under {@code <write-root>/.history/pipelines/<id>/}, a refused save leaves none, the newest
- * {@value PipelineHistory#KEEP} are kept, versions diff against each other and the current config, a
+ * {@value PipelineHistorySettings#DEFAULT_KEEP} are kept, versions diff against each other and the current config, a
  * rename carries the history to the new id, a delete purges it, and the read routes are gated exactly
  * like {@code GET /pipelines/{name}/graph/raw} (authenticated, no capability).
  *
@@ -65,7 +65,7 @@ class ControlApiPipelineHistoryTest {
 
             JsonNode list = V1Body.of(get(c.port, "/pipelines/" + name + "/history").body());
             assertEquals(name, list.get("pipeline").asText());
-            assertEquals(PipelineHistory.KEEP, list.get("keep").asInt());
+            assertEquals(PipelineHistorySettings.DEFAULT_KEEP, list.get("keep").asInt());
             assertEquals(1, list.get("versions").size(), list.toString());
             assertEquals(1, list.get("versions").get(0).get("version").asInt());
 
@@ -100,21 +100,144 @@ class ControlApiPipelineHistoryTest {
         Path wr = dir.resolve("wr");
         Files.createDirectories(wr);
         try (Ctx c = open(dir, wr)) {
-            for (int i = 1; i <= PipelineHistory.KEEP + 1; i++) {
+            for (int i = 1; i <= PipelineHistorySettings.DEFAULT_KEEP + 1; i++) {
                 Map<String, Object> d = base(dir, "kept");
                 d.put("description", "save " + i);
                 assertEquals(200, write(c, d).statusCode());
             }
             JsonNode list = V1Body.of(get(c.port, "/pipelines/kept/history").body());
-            assertEquals(PipelineHistory.KEEP, list.get("total").asInt());
+            assertEquals(PipelineHistorySettings.DEFAULT_KEEP, list.get("total").asInt());
             JsonNode versions = list.get("versions");
-            assertEquals(PipelineHistory.KEEP, versions.size());
-            assertEquals(PipelineHistory.KEEP + 1, versions.get(0).get("version").asInt(), "newest first");
+            assertEquals(PipelineHistorySettings.DEFAULT_KEEP, versions.size());
+            assertEquals(PipelineHistorySettings.DEFAULT_KEEP + 1, versions.get(0).get("version").asInt(), "newest first");
             assertEquals(2, versions.get(versions.size() - 1).get("version").asInt(), "the oldest was pruned");
             assertEquals(404, get(c.port, "/pipelines/kept/history/1").statusCode(), "v1 is gone");
             try (var files = Files.list(wr.resolve(".history/pipelines/kept"))) {
-                assertEquals(PipelineHistory.KEEP, files.count());
+                assertEquals(PipelineHistorySettings.DEFAULT_KEEP, files.count());
             }
+        }
+    }
+
+    @Test
+    void retentionFollowsTheSpaceSettingAndALowerValuePrunesOnTheNextSave(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Files.createDirectories(wr);
+        try (Ctx c = open(dir, wr)) {
+            for (int i = 1; i <= 5; i++) {
+                Map<String, Object> d = base(dir, "tuned");
+                d.put("description", "save " + i);
+                assertEquals(200, write(c, d).statusCode());
+            }
+            assertEquals(5, V1Body.of(get(c.port, "/pipelines/tuned/history").body()).get("total").asInt());
+
+            HttpResponse<String> put = send(c.port, "PUT", "/settings/pipeline-history", "{\"keep\":2}");
+            assertEquals(200, put.statusCode(), put.body());
+            assertEquals(2, V1Body.of(get(c.port, "/pipelines/tuned/history").body()).get("keep").asInt());
+            try (var files = Files.list(wr.resolve(".history/pipelines/tuned"))) {
+                assertEquals(5, files.count(), "lowering the setting deletes nothing by itself");
+            }
+
+            Map<String, Object> d = base(dir, "tuned");
+            d.put("description", "save 6");
+            assertEquals(200, write(c, d).statusCode());
+            JsonNode list = V1Body.of(get(c.port, "/pipelines/tuned/history").body());
+            assertEquals(2, list.get("total").asInt(), list.toString());
+            assertEquals(6, list.get("versions").get(0).get("version").asInt());
+            assertEquals(5, list.get("versions").get(1).get("version").asInt());
+        }
+    }
+
+    // ── restore: a save of a kept version, recorded as a new version ─────────────
+
+    @Test
+    void aRestoreSavesTheVersionOverTheRegisteredFileAndIsLiveAtOnce(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Files.createDirectories(wr);
+        // Registered as mini_pipeline.toon while its identity is MINI_ETL — the shape a POST /config/write of
+        // the version would FORK (it files under the identity), which is why restore is its own route.
+        Path pipe = PipelineConfigBatchTest.writePipeline(wr, "", false);
+        try (Ctx c = open(dir, wr, pipe)) {
+            assertEquals(200, patch(c, "first").statusCode());
+            assertEquals(200, patch(c, "second").statusCode());
+            // /config/patch does not refresh the registry, so it still holds the fixture's description — the
+            // staleness the restore must not leave behind.
+            assertNotEquals("first", c.svc().configFor("mini_etl").orElseThrow().description());
+            assertEquals("mini_etl", V1Body.of(get(c.port, "/pipelines/mini_etl/history/1").body()).get("id").asText());
+
+            HttpResponse<String> r = post(c.port, "/pipelines/mini_etl/history/1/restore", "{}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode body = V1Body.of(r.body());
+            assertEquals(1, body.get("restored").asInt());
+            assertEquals(3, body.get("version").asInt(), "the restore is itself a new version: " + body);
+            assertNotNull(r.headers().firstValue("ETag").orElse(null), "the handle for the next save");
+
+            assertEquals(Files.readString(wr.resolve(".history/pipelines/mini_etl/v1.toon")), Files.readString(pipe),
+                    "the version's exact bytes, over the REGISTERED file");
+            try (var files = Files.list(wr)) {
+                assertEquals(List.of("mini_pipeline.toon"), files.map(f -> f.getFileName().toString())
+                        .filter(n -> n.endsWith("_pipeline.toon")).toList(), "no second file was forked");
+            }
+            JsonNode vsCurrent = V1Body.of(get(c.port, "/pipelines/mini_etl/history/diff?from=1").body());
+            assertEquals(0, vsCurrent.get("added").asInt() + vsCurrent.get("removed").asInt(), vsCurrent.toString());
+            // Poll is 3600 s here: only the restore's own registry refresh makes this true now — without it the
+            // editor's reload would lift (and its next graph save lower) the pre-restore config.
+            assertEquals("first", c.svc().configFor("mini_etl").orElseThrow().description());
+        }
+    }
+
+    @Test
+    void theRestoreGatesFailClosedInOrder(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Files.createDirectories(wr);
+        Path pipe = PipelineConfigBatchTest.writePipeline(wr, "", false);
+        try (Ctx c = open(dir, wr, pipe)) {
+            assertEquals(200, patch(c, "first").statusCode());
+            assertEquals(404, post(c.port, "/pipelines/nope/history/1/restore", "{}").statusCode());
+            assertEquals(400, post(c.port, "/pipelines/mini_etl/history/x/restore", "{}").statusCode());
+            assertEquals(404, post(c.port, "/pipelines/mini_etl/history/9/restore", "{}").statusCode());
+
+            // 422: a kept version that today's content gate refuses (planted — no save path would keep one).
+            Path planted = wr.resolve(".history/pipelines/mini_etl/v8.toon");
+            Files.writeString(planted, Files.readString(pipe).stripTrailing() + "\nbogus_block:\n  x: 1\n");
+            HttpResponse<String> refused = post(c.port, "/pipelines/mini_etl/history/8/restore", "{}");
+            assertEquals(422, refused.statusCode(), refused.body());
+            assertFalse(Files.readString(pipe).contains("bogus_block"), "a refused restore wrote nothing");
+
+            // 409: a stale If-Match.
+            HttpResponse<String> stale = send(c.port, "POST", "/pipelines/mini_etl/history/1/restore", "{}",
+                    "If-Match", "\"sha256:stale\"");
+            assertEquals(409, stale.statusCode(), stale.body());
+            assertEquals(2, V1Body.of(get(c.port, "/pipelines/mini_etl/history").body()).get("versions").size(),
+                    "a refused restore records no version (v1 + the planted v8 only)");
+        }
+    }
+
+    @Test
+    void aRestoreOfAFileOutsideTheWriteRootIsRefused(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        Files.createDirectories(wr);
+        try (Ctx c = open(dir, wr)) {   // the fixture is registered from dir, OUTSIDE the write root
+            Path hist = wr.resolve(".history/pipelines/mini_etl");
+            Files.createDirectories(hist);
+            Files.writeString(hist.resolve("v1.toon"), Files.readString(dir.resolve("mini_pipeline.toon")));
+            HttpResponse<String> r = post(c.port, "/pipelines/mini_etl/history/1/restore", "{}");
+            assertEquals(403, r.statusCode(), r.body());
+        }
+    }
+
+    @Test
+    void aRestoreIsRefusedWhenWritesAreDisabled(@TempDir Path dir) throws Exception {
+        CollectorService svc = new CollectorService(List.of(PipelineConfigBatchTest.writePipeline(dir, "")), 3600, 1);
+        ControlApi api = new ControlApi(svc, 0);   // no assist.write.root ⇒ read-only
+        api.start();
+        try {
+            assertEquals(503, send(api.port(), "POST", "/pipelines/mini_etl/history/1/restore", "{}").statusCode());
+            assertEquals(503, send(api.port(), "PUT", "/settings/pipeline-history", "{\"keep\":2}").statusCode());
+            JsonNode s = V1Body.of(get(api.port(), "/settings/pipeline-history").body());
+            assertEquals(PipelineHistorySettings.DEFAULT_KEEP, s.get("effectiveKeep").asInt(), "a read still answers");
+        } finally {
+            api.close();
+            svc.close();
         }
     }
 
@@ -189,8 +312,13 @@ class ControlApiPipelineHistoryTest {
             assertEquals(2, list.get("versions").size(), "the label save plus the rename itself: " + list);
             assertTrue(V1Body.of(get(c.port, "/pipelines/mini_v2/history/2").body()).get("text").asText()
                     .contains("mini_v2"));
-            assertTrue(V1Body.of(get(c.port, "/pipelines/mini_v2/history/1").body()).get("text").asText()
-                    .contains("Mini Relabelled"));
+            JsonNode preRename = V1Body.of(get(c.port, "/pipelines/mini_v2/history/1").body());
+            assertTrue(preRename.get("text").asText().contains("Mini Relabelled"));
+            // A pre-rename version declares the OLD id — what the client checks before offering a restore.
+            assertEquals("mini_v2", preRename.get("pipeline").asText());
+            assertEquals("mini_etl", preRename.get("id").asText());
+            HttpResponse<String> reKey = post(c.port, "/pipelines/mini_v2/history/1/restore", "{}");
+            assertEquals(409, reKey.statusCode(), "restoring a pre-rename version would re-key the Pipeline: " + reKey.body());
             assertFalse(Files.exists(root.resolve(".history/pipelines/mini_etl")));
             assertEquals(404, get(c.port, "/pipelines/mini_etl/history").statusCode());
         }
@@ -232,6 +360,15 @@ class ControlApiPipelineHistoryTest {
             assertFalse(Files.exists(wr.resolve(".history/pipelines/mini_etl")), "a 403 save leaves no version");
             HttpResponse<String> saved = send(c.port, "POST", "/config/patch", patchBody("gated"), "Authorization", "Bearer author");
             assertEquals(200, saved.statusCode(), saved.body());
+
+            // Restore is a save: gated exactly like one.
+            String restore = "/pipelines/mini_etl/history/1/restore";
+            assertEquals(401, send(c.port, "POST", restore, "{}").statusCode());
+            HttpResponse<String> denied = send(c.port, "POST", restore, "{}", "Authorization", "Bearer plain");
+            assertEquals(403, denied.statusCode(), denied.body());
+            assertTrue(denied.body().contains("canAuthorWorkbench"), denied.body());
+            HttpResponse<String> allowed = send(c.port, "POST", restore, "{}", "Authorization", "Bearer author");
+            assertEquals(200, allowed.statusCode(), allowed.body());
 
             for (String path : List.of("/pipelines/mini_etl/graph/raw", "/pipelines/mini_etl/history",
                     "/pipelines/mini_etl/history/1", "/pipelines/mini_etl/history/diff?from=1")) {

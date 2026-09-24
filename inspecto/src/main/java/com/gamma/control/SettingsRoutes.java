@@ -15,6 +15,9 @@ import java.util.Map;
  *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
  *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove} (nulls = shipped defaults)
  *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
+ *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
+ *                                    versions kept per Pipeline (keep null = the shipped default)
+ *   PUT /settings/pipeline-history   replace it (same gates as branding)
  *   GET /config/icon-map     the space's processor-icon map { "&lt;type&gt;": {glyph,color}, … } ({} = none) [v5.0.0]
  *   PUT /config/icon-map     replace the space's icon map (same gates as branding)                          [v5.0.0]
  * </pre>
@@ -51,6 +54,9 @@ final class SettingsRoutes implements RouteModule {
         api.get("/settings/link-analysis", (e, m) -> ETags.respond(e, readLinkAnalysis(api)));
         api.put("/settings/link-analysis", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> writeLinkAnalysis(api, api.body(e))));
+        api.get("/settings/pipeline-history", (e, m) -> ETags.respond(e, readPipelineHistory(api)));
+        api.put("/settings/pipeline-history", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> writePipelineHistory(api, api.body(e))));
         api.get("/config/icon-map", (e, m) -> ETags.respond(e, readIconMap(api)));
         api.put("/config/icon-map", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> writeIconMap(api, api.body(e))));
@@ -155,6 +161,38 @@ final class SettingsRoutes implements RouteModule {
         if (v < 1 || v > MAX_NODE_CAP)
             throw new ApiException(422, key + " must be 1.." + MAX_NODE_CAP + ", got " + v);
         return v;
+    }
+
+    private Object readPipelineHistory(ApiContext api) {
+        return pipelineHistoryShape(PipelineHistorySettings.forRoot(api.writeRoot()));
+    }
+
+    /** {@code keep}: {@code null}/absent = the shipped default; else an int in {@code 1..MAX_KEEP} or 422 — never clamped. */
+    private Object writePipelineHistory(ApiContext api, Map<String, Object> body) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "pipeline-history settings write");
+        Object raw = body.get("keep");
+        Integer keep = null;
+        if (raw != null) {
+            try {
+                keep = Integer.parseInt(String.valueOf(raw).trim());
+            } catch (NumberFormatException e) {
+                throw new ApiException(422, "keep must be an integer, got '" + raw + "'");
+            }
+            if (keep < 1 || keep > PipelineHistorySettings.MAX_KEEP)
+                throw new ApiException(422, "keep must be 1.." + PipelineHistorySettings.MAX_KEEP + ", got " + keep);
+        }
+        PipelineHistorySettings s = new PipelineHistorySettings(keep);
+        s.write(root.resolve(PipelineHistorySettings.FILE));
+        return pipelineHistoryShape(s);
+    }
+
+    private static Map<String, Object> pipelineHistoryShape(PipelineHistorySettings s) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("keep", s.keep());
+        m.put("effectiveKeep", s.effectiveKeep());
+        m.put("defaultKeep", PipelineHistorySettings.DEFAULT_KEEP);
+        m.put("maxKeep", PipelineHistorySettings.MAX_KEEP);
+        return m;
     }
 
     private Object readIconMap(ApiContext api) {
