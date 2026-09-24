@@ -1,6 +1,7 @@
 package com.gamma.config.safety;
 
 import com.gamma.api.PublicApi;
+import com.gamma.util.CurrentSpace;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -67,11 +68,15 @@ public record SafetyPolicy(
     }
 
     /**
-     * The production default: the <b>union</b> of the operator-declared {@code -Dassist.safety.roots}
-     * (a {@code ;}-separated list — destinations outside the space layout, e.g. {@code /mnt/backups})
-     * and every hosted space base pushed into {@link DiscoveredRoots} by the space lifecycle; caps
-     * sized to this box. Recomputed per call, so a space created at runtime is an allowed root on the
-     * very next check — no restart.
+     * The production default: {@link #forSpace(String)} for the Space the calling thread is bound to
+     * ({@link CurrentSpace#id()} — the request's {@code /spaces/{id}} binding, a job's run, a collector
+     * cycle). Recomputed per call, so a space created at runtime is an allowed root on the very next
+     * check — no restart.
+     *
+     * <p>🔴 <b>Not a union of every hosted Space</b> ({@code CROSS-SPACE-JAIL-1}, 2026-09-24): until then
+     * this unioned every registered base, so a config in Space A could name a path inside Space B's base
+     * and pass. A thread with no Space binding is the {@code default} Space, and gets only that Space's
+     * base (if one is registered) — never another Space's.
      *
      * <p>⚠ There is <b>no working-directory fallback</b> — with the property unset and no spaces
      * hosted the root list is <b>empty</b>, and {@link PathJail#requireUnderAny} throws on that, so
@@ -81,12 +86,23 @@ public record SafetyPolicy(
      * until later the same day — the claim is now true.)
      */
     public static SafetyPolicy defaultPolicy() {
+        return forSpace(CurrentSpace.id());
+    }
+
+    /**
+     * One Space's policy: the operator-declared {@code -Dassist.safety.roots} (a {@code ;}-separated list —
+     * destinations outside the space layout, e.g. {@code /mnt/backups}) plus <b>that Space's own base</b>
+     * as registered in {@link DiscoveredRoots}; caps sized to this box. Another Space's base is never an
+     * allowed root here. For a caller that already holds the Space id; everyone else takes
+     * {@link #defaultPolicy()}.
+     */
+    public static SafetyPolicy forSpace(String spaceId) {
         List<Path> roots = new ArrayList<>();
         String prop = System.getProperty("assist.safety.roots", "");
         for (String s : prop.split(";")) {
             if (!s.isBlank()) roots.add(Paths.get(s.trim()).toAbsolutePath().normalize());
         }
-        roots.addAll(DiscoveredRoots.snapshot());
+        DiscoveredRoots.baseOf(spaceId).ifPresent(roots::add);
         return new SafetyPolicy(roots, Runtime.getRuntime().availableProcessors(),
                 1_000_000, Long.MAX_VALUE, DEFAULT_FORMATS, DEFAULT_COMPRESSION);
     }

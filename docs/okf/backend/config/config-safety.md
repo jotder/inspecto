@@ -241,11 +241,33 @@ repeated-Space-path refusal). The five residuals shipped 2026-09-23 (`DATA-PATH-
 PUT round trip), (d) `SpaceConfigRootTest` + `PipelineJobRunnerTest` (a Space job's `data_dir` runs under the
 Space dir), (e) `SchemaExtractorFieldListTest` — `create-schema` emits `data/inbox/<x>` and `data/<x>/<kind>`.
 
-## The allowed roots are a union: declared ∪ discovered (tier 3, shipped 2026-08-14)
+## A Space's allowed roots: declared + its OWN base (tier 3 2026-08-14, narrowed 2026-09-24)
 
-`SafetyPolicy.defaultPolicy()` now returns the **union** of the operator-declared
-`-Dassist.safety.roots` and every hosted space base registered in
-`com.gamma.config.safety.DiscoveredRoots`. This removes the misconfiguration PATH-2 tier 3 named: the
+`SafetyPolicy.defaultPolicy()` returns `SafetyPolicy.forSpace(CurrentSpace.id())`: the operator-declared
+`-Dassist.safety.roots` plus **the bound Space's own base**, as registered (keyed by Space id) in
+`com.gamma.config.safety.DiscoveredRoots`. Another Space's base is never an allowed root.
+
+🔴 **Until 2026-09-24 this was the union of every hosted base** (`CROSS-SPACE-JAIL-1`). Probed and
+confirmed: with two Spaces hosted and operator roots holding neither, `POST /spaces/acme/jobs` with an
+absolute `backup_dir` inside `beta`'s `data/` returned **200** — every Space was an allowed root for every
+other Space, at the 422 gate and in every run-time jail (`PathJail.allowedRoots()` reads the same
+policy). Now it is **422**, and `ControlApiCrossSpaceJailTest` pins that plus the positive controls (a
+Space's own base and an operator root stay allowed). Mutation-checked: restoring the union turns it,
+`DiscoveredRootsTest.anotherSpacesBaseIsNotAnAllowedRoot` and `SpaceManagerTest` red.
+
+- **Which Space is "current"** is the thread's space MDC — `ControlApi.bindSpace` for a `/spaces/{id}`
+  request, `JobService` for a run, `CollectorService.underSpace` for a cycle. **An unbound thread is the
+  `default` Space** and gets only a base registered under `default` — never a named Space's. That is the
+  fail-closed direction: an un-prefixed request on a multi-Space host with no `default` Space dir now
+  gets the operator roots only, where it used to get every Space's base.
+- ⚠ **Boot must run AS the Space.** `SpaceBootstrap.load` is where a Space's `schema_file` refs meet the
+  jail, and the boot thread is unbound — so `SpaceManager.loadAsSpace` binds the MDC to the Space being
+  loaded. Without it a named Space's own pipelines are refused at boot (`SpaceManagerTest.aNamedSpacesOwnSchemaRefLoadsAtBootUnderNarrowedRoots`
+  goes 1 → 0 loaded when the binding is removed).
+- All 15 `ConfigSafetyValidator.check*` callers take `defaultPolicy()` on a bound thread, so none needed
+  an explicit id; `forSpace(id)` is for a caller that already holds one.
+
+The per-Space base (tier 3, 2026-08-14) removes the misconfiguration PATH-2 tier 3 named: the
 write root was per-space and **dynamic** (`writeRoot()` derives from the current space) while the
 policy list was global and **static** — create a space and forget to extend the property, and writes
 into its `config/` passed the 403 gate while every schema/grammar ref inside it was refused at load.
@@ -259,7 +281,7 @@ Now both halves derive, and the declared list goes back to meaning only what it 
   that never joined leaves no root behind. The three runtime create paths share one `bootStarted`
   helper with the same order and the same failure cleanup.
 - **A runtime-created space extends the roots immediately** — `defaultPolicy()` recomputes per call,
-  so the next check sees it, no restart. **A deleted space leaves the union** (in `delete`'s
+  so the next check sees it, no restart. **A deleted space's base leaves with it** (in `delete`'s
   per-space-registry teardown block), so the root set cannot only ever grow within a process lifetime.
 - **The legacy flat / single-tenant space keeps property-only behaviour** — `SpaceManager.single`
   registers nothing, by construction (it never touches `DiscoveredRoots`). Likewise the engine CLI and
@@ -279,7 +301,7 @@ Now both halves derive, and the declared list goes back to meaning only what it 
   a finally — a leaked base flips containment verdicts in unrelated tests. And an assertion about a
   discovered root must inspect `allowedRoots()` **content**, not run a jail check: surefire's
   reactor-wide roots already cover every `@TempDir`, so a verdict-based test passes vacuously.
-- ⚠ `SafetyPolicy.withRoots(...)` (skill workspace, tests) deliberately **bypasses** the union — an
+- ⚠ `SafetyPolicy.withRoots(...)` (skill workspace, tests) deliberately **bypasses** the registry — an
   explicit policy is scoped, not widened.
 
 ⚠ **`PathJail` unified the CONFIG-path implementations, not every containment check in the codebase.**

@@ -193,12 +193,13 @@ public final class SpaceManager implements AutoCloseable {
     private void bootQuietly(Path dir) {
         // Registered BEFORE load: booting the space is exactly when its schema/grammar refs meet the
         // jail, so a root registered after would refuse the very configs it exists to allow.
-        DiscoveredRoots.register(dir);
+        SpaceRoot root = SpaceRoot.under(dir);
+        DiscoveredRoots.register(root.id(), root.base());
         try {
-            SpaceContext ctx = SpaceBootstrap.load(SpaceRoot.under(dir));
+            SpaceContext ctx = loadAsSpace(root);
             spaces.put(ctx.id(), ctx);
         } catch (Exception e) {
-            DiscoveredRoots.unregister(dir);   // a space that never joined must not leave a root behind
+            DiscoveredRoots.unregister(root.id());   // a space that never joined must not leave a root behind
             log.warn("Skipping space dir {} — failed to load: {}", dir, e.getMessage());
         }
     }
@@ -209,9 +210,10 @@ public final class SpaceManager implements AutoCloseable {
      * runtime create paths.
      */
     private static SpaceContext bootStarted(Path base) throws IOException {
-        DiscoveredRoots.register(base);
+        SpaceRoot root = SpaceRoot.under(base);
+        DiscoveredRoots.register(root.id(), root.base());
         try {
-            SpaceContext ctx = SpaceBootstrap.load(SpaceRoot.under(base));
+            SpaceContext ctx = loadAsSpace(root);
             try {
                 ctx.start();
                 return ctx;
@@ -220,8 +222,25 @@ public final class SpaceManager implements AutoCloseable {
                 throw e;
             }
         } catch (IOException | RuntimeException e) {
-            DiscoveredRoots.unregister(base);
+            DiscoveredRoots.unregister(root.id());
             throw e;
+        }
+    }
+
+    /**
+     * {@link SpaceBootstrap#load} with the boot thread bound to the Space being loaded
+     * ({@code CROSS-SPACE-JAIL-1}). Loading is where the Space's schema/grammar refs meet the jail, and the
+     * jail's roots are now the <b>bound</b> Space's base plus the operator roots — unbound, the boot thread
+     * is the {@code default} Space and a named Space's own refs would be judged against someone else's base.
+     */
+    private static SpaceContext loadAsSpace(SpaceRoot root) throws IOException {
+        String prev = MDC.get(EventLog.SPACE_MDC_KEY);
+        MDC.put(EventLog.SPACE_MDC_KEY, root.id());
+        try {
+            return SpaceBootstrap.load(root);
+        } finally {
+            if (prev == null) MDC.remove(EventLog.SPACE_MDC_KEY);
+            else MDC.put(EventLog.SPACE_MDC_KEY, prev);
         }
     }
 
@@ -479,7 +498,7 @@ public final class SpaceManager implements AutoCloseable {
         com.gamma.consignment.FileStages.unregister(id.value());
         com.gamma.consignment.DedupLedgers.unregister(id.value());
         com.gamma.pipeline.exec.ProvenanceStores.unregister(id.value());
-        DiscoveredRoots.unregister(spacesRoot.resolve(id.value()));   // the root set must not only ever grow
+        DiscoveredRoots.unregister(id.value());   // a deleted space's base leaves with it
         if (purge) {
             Path base = spacesRoot.resolve(id.value()).normalize();   // SpaceId is jailed: no separators/.. can escape
             // ⛔ The containment verdict must not be reported as a purge. Both roots are absolute and
