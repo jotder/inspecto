@@ -93,9 +93,11 @@ final class DataSourceRoutes implements RouteModule {
             throw new ApiException(400, bad.getMessage());
         }
 
-        List<String> dataSources = BundleImporter.pipelineIds(bundle);
         Set<String> existing = api.service().pipelines().stream()
                 .map(PipelineView::name).collect(Collectors.toSet());
+        BundleImporter.Narrowed narrowed = BundleImporter.keepExistingReferences(bundle, existing);
+        bundle = narrowed.bundle();
+        List<String> dataSources = BundleImporter.pipelineIds(bundle);
         List<String> conflicts = dataSources.stream().filter(existing::contains).sorted().toList();
 
         // The connection half of the import gate, evaluated from the zip bytes so preview agrees with commit
@@ -129,6 +131,7 @@ final class DataSourceRoutes implements RouteModule {
         r.put("files", new TreeSet<>(bundle.configEntries().keySet()));
         r.put("hasSpaceToon", bundle.spaceToon() != null);
         r.put("conflicts", conflicts);
+        r.put("referencesKept", narrowed.referencesKept());
         r.put("findings", findings);
         r.put("valid", valid);
         return r;
@@ -261,6 +264,13 @@ final class DataSourceRoutes implements RouteModule {
         // Conflict = a bundle pipeline id that already exists in this space's registry.
         Set<String> existing = api.service().pipelines().stream()
                 .map(PipelineView::name).collect(Collectors.toSet());
+        // A carried Reference the target already hosts is the target's to keep, not a clash (W5 forward).
+        List<String> referencesKept = List.of();
+        if (!overwrite) {
+            BundleImporter.Narrowed narrowed = BundleImporter.keepExistingReferences(bundle, existing);
+            bundle = narrowed.bundle();
+            referencesKept = narrowed.referencesKept();
+        }
         List<String> conflicts = BundleImporter.pipelineIds(bundle).stream()
                 .filter(existing::contains).sorted().toList();
         if (!conflicts.isEmpty() && !overwrite)
@@ -309,6 +319,7 @@ final class DataSourceRoutes implements RouteModule {
         body.put("kind", bundle.kind());
         body.put("imported", written);
         body.put("pipelines", pipelines);
+        body.put("referencesKept", referencesKept);
         body.put("overwritten", overwrite && !conflicts.isEmpty());
         return body;
     }

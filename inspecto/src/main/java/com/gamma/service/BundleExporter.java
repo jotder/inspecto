@@ -25,7 +25,8 @@ import java.util.zip.ZipOutputStream;
  * root alongside config-relative file entries:
  * <ul>
  *   <li>{@link #exportDataSource} — one data source's {@link DataSourceBundle} (pipeline + connection +
- *       schemas + jobs + the registry components bound to it).</li>
+ *       schemas + jobs + the registry components bound to it + its enrichment companions + the Reference
+ *       Datasets it reads, indexed under the manifest's {@code references} key).</li>
  *   <li>{@link #exportSpace} — the whole {@code config/} tree plus the space's {@code space.toon}.</li>
  * </ul>
  *
@@ -59,6 +60,8 @@ public final class BundleExporter {
     public static final String MANIFEST = "bundle.toon";
     /** The whole-space manifest entry name for the space's own manifest. */
     public static final String SPACE_TOON = "space.toon";
+    /** The data-source manifest key naming each carried Reference and the entries only it brought. */
+    public static final String REFERENCES = "references";
 
     private BundleExporter() {}
 
@@ -73,7 +76,25 @@ public final class BundleExporter {
         }
         Map<String, Object> manifest = manifest("datasource", spaceId, artifacts);
         manifest.put("data_source", bundle.id());
+        if (!bundle.references().isEmpty()) manifest.put(REFERENCES, referenceIndex(bundle, configDir));
         return zip(entries, manifest);
+    }
+
+    /**
+     * The forward closure as the importer needs it: producer id → the entries that ride only because of that
+     * Reference. A file the rest of the bundle also carries (a shared connection, say) is left out, so an
+     * import that keeps the target's own copy of a Reference never drops a file the data source itself needs.
+     */
+    private static Map<String, Object> referenceIndex(DataSourceBundle bundle, Path configDir) {
+        DataSourceBundle core = new DataSourceBundle(bundle.id(), bundle.pipeline(), bundle.connection(),
+                bundle.schemas(), bundle.jobs(), bundle.components(), bundle.enrichments(), List.of());
+        List<Path> coreFiles = core.files();
+        Map<String, Object> index = new LinkedHashMap<>();
+        for (DataSourceBundle.Reference r : bundle.references()) {
+            index.put(r.id(), r.files().stream().filter(f -> !coreFiles.contains(f))
+                    .map(f -> entryName(configDir, f)).toList());
+        }
+        return index;
     }
 
     /** Zip a whole space: every file under {@code configDir} (relative) + {@code space.toon} + a {@code bundle.toon}. */

@@ -8,9 +8,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.ZipInputStream;
 
 /**
@@ -69,6 +71,41 @@ public final class BundleImporter {
             if (name != null && !name.toString().isBlank()) ids.add(name.toString().toLowerCase());
         }
         return ids;
+    }
+
+    /** A bundle narrowed for one target space, and the carried References it left to the target's own copy. */
+    public record Narrowed(Bundle bundle, List<String> referencesKept) {}
+
+    /**
+     * Drop each carried Reference ({@link BundleExporter#REFERENCES}) the target space already hosts, so the
+     * target's own copy is used as-is rather than the import 409ing on a pipeline the data source merely
+     * reads. Only the entries that Reference alone brought are dropped; one another carried Reference also
+     * needs stays. A bundle with no {@code references} index (every pre-W5-forward bundle) is returned
+     * unchanged. The caller skips this under {@code on_conflict=overwrite}, where replacing is what was asked.
+     *
+     * @param existing the pipeline ids the target space already hosts
+     */
+    public static Narrowed keepExistingReferences(Bundle bundle, Set<String> existing) {
+        if (!(bundle.manifest().get(BundleExporter.REFERENCES) instanceof Map<?, ?> index))
+            return new Narrowed(bundle, List.of());
+        List<String> kept = new ArrayList<>();
+        Set<String> drop = new HashSet<>();
+        Set<String> needed = new HashSet<>();
+        for (Map.Entry<?, ?> e : index.entrySet()) {
+            String id = String.valueOf(e.getKey());
+            List<String> files = e.getValue() instanceof List<?> l ? l.stream().map(String::valueOf).toList() : List.of();
+            if (existing.contains(id)) {
+                kept.add(id);
+                drop.addAll(files);
+            } else {
+                needed.addAll(files);
+            }
+        }
+        if (kept.isEmpty()) return new Narrowed(bundle, List.of());
+        drop.removeAll(needed);
+        LinkedHashMap<String, byte[]> entries = new LinkedHashMap<>(bundle.configEntries());
+        entries.keySet().removeAll(drop);
+        return new Narrowed(new Bundle(bundle.kind(), bundle.manifest(), entries, bundle.spaceToon()), List.copyOf(kept));
     }
 
     /** What an unpack did: the config-relative paths written. */

@@ -13,14 +13,14 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
+> **54<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 26<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 28<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 55<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 54<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -54,7 +54,7 @@ rank.
 |---|---|
 | **Startable now** — no gate, no owed decision | `STREAM-CONSUMER-1` close-out — the `SP-ACQ-09` cell (§3.3) · Onboarding D5-ref — ground the delete-feed first (§3.4) · `RELEASE-PIPELINE-NEVER-EXECUTED-1` — the checksum/signature split (§4) |
 | **Design first** — the trigger fired, the shape is not decided | AI drafting on a non-`schema` kind (§3.1) · Platform Services Stage 2/3 (§3.2) · cross-Space consequence (§3.5) · Bundle "load as draft" (§3.7) · D6 `findings-spec` UI (§3.9) · policy-authoring UX (§3.8) |
-| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · space-to-space comparison (postponed) · W5 forward closure (operator decision) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
+| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · space-to-space comparison (postponed) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
 
 **Standing rules for editing this board** (distilled from the shifts that grew the old page to 644 KB):
 
@@ -95,7 +95,6 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | 3.1 | `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` | (A) keep or retire `GET /pipelines/step-types`; (B) delete the dead client mirrors |
 | 3.2 | EXECUTION-RESIDUALS X4 + X1 | X4's replay default — ⛔ not yet, the evidence it needs does not exist; X1's §5 decisions in `superpower/retry-affordance-design.md` |
 | 3.3 | `LEGACY-ASN-SRC-TREE-UNBUILT-1` | wire, rename or delete the 21 uncompiled test-tree files |
-| 3.4 | Onboarding ↔ Pipeline W5 | carry the reference Datasets a Pipeline reads in its export (forward closure) |
 | 3.6 | D-8 XLSX export | does it work in a shipped / air-gapped bundle? |
 | 3.11 | `API-DEAD-METHODS-1` · `JOB-RUNS-DIALOG-DEAD-1` | wire or delete; retain as a test vehicle or delete |
 | 4 | `REACTOR-VERDICT-CI-1` | wire `check-reactor-verdict.mjs` into `ci.yml` |
@@ -191,7 +190,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 #### Onboarding & bundles
 
 - **P2** · **Onboarding (Stream/Reference)** — **D5-ref is now answerable:** a real delete-feed exists (the gate fired 2026-09-15). Decide how a `delete` tombstone *enters* the reference store (a reserved column? a Decision Rule consequence?) — ⛔ **ground the actual feed first**; the whole point of waiting was to pick the representation from the real shape. **D6-ref:** the within-batch same-key tie-break is arbitrary — add an optional latest-by-`order_by` column only when needed. An optional templates entry (space-template-gallery precedent). ⚠ Enrichment/job configs still derive identity from name. ⛔ Do not implement name-deferral by holding the draft client-side. → `okf/backend/control-plane/onboarding-authoring.md` · `okf/frontend/features/onboarding.md`
-- **P2** · **Onboarding ↔ Pipeline unification — W5 forward reference-Dataset closure** — W0–W5 shipped; W5's reverse closure shipped 2026-09-23 (an export carries the Decision Rules, Datasets, Expectations and Alert Rules that reference its Pipeline; a global Alert Rule stays behind), and import-time referential integrity closed 2026-09-20 (`POST /pipelines/import` reports an unresolved connection as a WARNING — report, not refuse, deliberately, because a pipeline bundle never carries the connection profile). **Open — operator decision:** extend `BundleExporter`/`DataSourceBundleResolver` to carry the reference Datasets a Pipeline reads (the forward closure). ⛔ `PipelineCompiler.toConfigMap` is deliberately not migrated. → `archived-documents/plans-archive/onboarding-pipeline-unification.md` · `okf/backend/pipeline-graph/editable-round-trip.md`
 
 #### Datasets & lineage
 

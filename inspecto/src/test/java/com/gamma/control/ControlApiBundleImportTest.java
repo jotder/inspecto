@@ -36,11 +36,32 @@ class ControlApiBundleImportTest {
     }
 
     private Ctx open(Path root) throws Exception {
+        return open(root, false);
+    }
+
+    /**
+     * @param readsAReference when true, alpha's {@code test_etl} joins {@code reference/region_dim}, alpha also
+     *                        hosts the {@code REGION_DIM} Reference producer, and a second empty target
+     *                        space {@code gamma} exists
+     */
+    private Ctx open(Path root, boolean readsAReference) throws Exception {
         Path config = root.resolve("alpha").resolve("config");
         Files.createDirectories(config);
         Path tmp = TestConfigs.csv(config, PipelineConfigBatchTest.miniSchema()).write();
         Files.move(tmp, config.resolve("etl_pipeline.toon"));
         Files.createDirectories(root.resolve("beta").resolve("config"));   // empty target space
+        if (readsAReference) {
+            // Inactive: a join without output_store cannot arm (PipelineConfig.prepare).
+            Path etl = config.resolve("etl_pipeline.toon");
+            Files.writeString(etl, Files.readString(etl).replace("active: true", "active: false")
+                    .replace("processing:\n", "processing:\n  join:\n    reference: reference/region_dim\n    on: ID\n"));
+            Path region = TestConfigs.csv(config.resolve("region"), PipelineConfigBatchTest.miniSchema())
+                    .name("REGION_DIM").write();
+            Files.writeString(config.resolve("region").resolve("region_pipeline.toon"),
+                    "produces: reference\n" + Files.readString(region).replace("active: true", "active: false"));
+            Files.delete(region);
+            Files.createDirectories(root.resolve("gamma").resolve("config"));
+        }
 
         SpaceManager spaces = SpaceManager.discover(root);
         ControlApi api = new ControlApi(spaces, 0);
@@ -142,6 +163,49 @@ class ControlApiBundleImportTest {
                 assertEquals(e.getValue(), Files.readString(betaReg.resolve(e.getKey())), e.getKey());
             }
             for (String k : theirs.keySet()) assertFalse(Files.exists(betaReg.resolve(k)), k);
+        }
+    }
+
+    /**
+     * W5 forward closure, 2026-09-24 — an export carries the Reference Dataset its pipeline READS (as the
+     * {@code produces: reference} pipeline producing it), and the import round-trips it: into a space without
+     * that Reference both pipelines land; into a space that already hosts it, the target's own copy is kept —
+     * a 200 naming it in {@code referencesKept}, never a 409 on a pipeline the data source merely reads.
+     */
+    @Test
+    void anExportCarriesTheReferenceItReadsAndAnImportRoundTripsOrKeepsTheTargetsOwn(@TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(root, true)) {
+            byte[] bundle = getBytes(c.port, "/spaces/alpha/datasources/test_etl/export").body();
+            java.util.Set<String> names = new java.util.HashSet<>();
+            try (var zis = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(bundle))) {
+                for (var e = zis.getNextEntry(); e != null; e = zis.getNextEntry()) names.add(e.getName());
+            }
+            assertTrue(names.contains("region/region_pipeline.toon"), names.toString());
+
+            // Fresh target: the data source AND the Reference it reads both land and register.
+            HttpResponse<String> fresh = post(c.port, "/spaces/gamma/import", bundle);
+            assertEquals(200, fresh.statusCode(), fresh.body());
+            assertEquals(java.util.List.of(), JSON.convertValue(V1Body.of(fresh.body()).get("referencesKept"),
+                    java.util.List.class));
+            assertTrue(idList(c.port, "/spaces/gamma/datasources").containsAll(java.util.List.of("test_etl", "region_dim")),
+                    "gamma hosts both");
+
+            // A target that already hosts the Reference: import region_dim on its own first...
+            byte[] regionOnly = getBytes(c.port, "/spaces/alpha/datasources/region_dim/export").body();
+            assertEquals(200, post(c.port, "/spaces/beta/import", regionOnly).statusCode());
+            // ...then the consumer: kept, not clashed — and the preview agrees.
+            JsonNode preview = V1Body.of(post(c.port, "/spaces/beta/import/preview", bundle).body());
+            assertEquals("[\"region_dim\"]", preview.get("referencesKept").toString());
+            assertEquals("[]", preview.get("conflicts").toString());
+            HttpResponse<String> kept = post(c.port, "/spaces/beta/import", bundle);
+            assertEquals(200, kept.statusCode(), kept.body());
+            JsonNode body = V1Body.of(kept.body());
+            assertEquals("[\"region_dim\"]", body.get("referencesKept").toString());
+            assertEquals("[\"test_etl\"]", body.get("pipelines").toString());
+            assertFalse(body.get("imported").toString().contains("region_pipeline.toon"),
+                    "the target's own Reference is not rewritten: " + body.get("imported"));
+            assertTrue(body.get("imported").toString().contains("etl_pipeline.toon"));
         }
     }
 
@@ -301,7 +365,7 @@ class ControlApiBundleImportTest {
                 .replaceAll("(?m)^(\\s*schema_file:).*$", "$1 " + java.util.regex.Matcher.quoteReplacement(ref)));
         return BundleExporter.exportDataSource(
                 new DataSourceBundle("test_etl", pipeline, null, java.util.List.of(),
-                        java.util.List.of(), java.util.List.of()), config, "alpha");
+                        java.util.List.of(), java.util.List.of(), java.util.List.of(), java.util.List.of()), config, "alpha");
     }
 
     private static byte[] bundleReferencingConnection(Path root, String connId, boolean carryConnection)
@@ -327,7 +391,7 @@ class ControlApiBundleImportTest {
             s.filter(f -> f.getFileName().toString().startsWith("schema_")).forEach(schemas::add);
         }
         return BundleExporter.exportDataSource(
-                new DataSourceBundle("test_etl", pipeline, conn, schemas, java.util.List.of(), java.util.List.of()), config, "alpha");
+                new DataSourceBundle("test_etl", pipeline, conn, schemas, java.util.List.of(), java.util.List.of(), java.util.List.of(), java.util.List.of()), config, "alpha");
     }
 
     // ── apply order (pipeline spec gap 6c) ───────────────────────────────────────────────────────────
