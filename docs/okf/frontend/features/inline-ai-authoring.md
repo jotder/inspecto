@@ -515,3 +515,10 @@ by design here. Runtime validation is revisitable, but only after all 23 schemas
   ⛔ **Rejected alternative: fold the prose into `args` as an `instruction` key.** That pushes the NL parse
   *into* the tool and breaks the one property all five draft tools rely on — they are deterministic and
   model-free. (The other two rejections are recorded above; this third was only in the plan.)
+
+## Open rows this concept owns
+
+- **`AI-ASSIST-SCHEMA-DIALOG-1`** — re-enable `<inspecto-ai-assist>` for the `schema` kind inside
+  `SchemaEditorDialog` (design S1 / Option C in `superpower/ai-drafting-non-schema-design.md`). Filed
+  2026-09-25 as its own row by operator decision D2: it does not answer the `transform` ask (D1), so
+  closing it must not close that row.
