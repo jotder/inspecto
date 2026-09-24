@@ -371,7 +371,7 @@ public final class JobService implements AutoCloseable {
         // pack type resolves at construction. Startup-scan signals no-op until the event log is wired.
         this.packs = new JobPackManager(System.getProperty("jobs.packs.dir"), registry, expressions,
                 (type, sev, payload) -> emitSignal(type, sev, null, null, Ref.of("job-pack", "job.packs"), payload),
-                this::onPackUnloaded);
+                this::onPackUnloaded, JobPackManager.stagingRootFor(auditDir));   // P0: never the system temp dir
         this.packs.scanAtStartup();
         for (JobConfig c : this.configs) {
             if (!c.enabled()) continue;

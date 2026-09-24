@@ -69,6 +69,57 @@ class JobPackStagingTest {
         }
     }
 
+    /**
+     * P0 (server-owned half): the staged copy the loader reads lives under the SERVER-OWNED staging root the
+     * manager was given, never in the JVM-wide system temp dir (a second, weaker writer path to the bytes that
+     * are actually loaded). Red before the fix: the staging dir's parent was {@code java.io.tmpdir}.
+     */
+    @Test
+    void theStagedCopyLivesUnderTheServerOwnedRootNotTheSystemTempDir(@TempDir Path work) throws Exception {
+        Fixture f = fixture(work);
+        Path root = work.resolve("server-state").resolve("job-packs-staging");
+        JobTypeRegistry registry = new JobTypeRegistry();
+        try (JobPackManager mgr = new JobPackManager(f.packs.toString(), registry,
+                ExpressionRegistry.withBuiltins(), (t, s, p) -> {}, null, root)) {
+            assertEquals(List.of("pack.jar"), mgr.rescan().get("loaded"));
+            Path stagingDir = stagingDir(mgr);
+            assertNotNull(stagingDir);
+            assertEquals(root.toAbsolutePath().normalize(), stagingDir.getParent(),
+                    "staged under the server-owned root: " + stagingDir);
+            try (Stream<Path> staged = Files.list(stagingDir)) {
+                assertEquals(1, staged.count(), "the loaded pack's copy is there");
+            }
+        }
+    }
+
+    /** The staging root must not sit inside the watched packs dir: whoever can drop a jar there could then
+     *  rewrite the staged bytes after they were hashed. Boot refuses, naming the path. */
+    @Test
+    void aStagingRootInsideThePacksDirRefusesBoot(@TempDir Path work) throws Exception {
+        Fixture f = fixture(work);
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> new JobPackManager(
+                f.packs.toString(), new JobTypeRegistry(), ExpressionRegistry.withBuiltins(), (t, s, p) -> {},
+                null, f.packs.resolve("staging")));
+        assertTrue(e.getMessage().contains("inside the packs dir"), e.getMessage());
+    }
+
+    /** JobService's root: {@code -Djobs.packs.stagingDir} wins, else {@code <auditDir>/job-packs-staging}. */
+    @Test
+    void theStagingRootIsTheSpacesAuditDirUnlessOverridden(@TempDir Path work) {
+        String prior = System.getProperty("jobs.packs.stagingDir");
+        try {
+            System.clearProperty("jobs.packs.stagingDir");
+            assertEquals(work.resolve("audit").resolve("job-packs-staging").toAbsolutePath().normalize(),
+                    JobPackManager.stagingRootFor(work.resolve("audit").toString()));
+            System.setProperty("jobs.packs.stagingDir", work.resolve("elsewhere").toString());
+            assertEquals(work.resolve("elsewhere").toAbsolutePath().normalize(),
+                    JobPackManager.stagingRootFor(work.resolve("audit").toString()));
+        } finally {
+            if (prior == null) System.clearProperty("jobs.packs.stagingDir");
+            else System.setProperty("jobs.packs.stagingDir", prior);
+        }
+    }
+
     // ── fixture ──────────────────────────────────────────────────────────────────────────────────────
 
     private record Fixture(Path packs, Path watched, Path unsigned, String signedSha) {}

@@ -133,7 +133,9 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
     private volatile boolean running;
     private WatchService watcher;
     private Thread watchThread;
-    private Path stagingDir;                         // lazily created; holds the locked copies we load from
+    /** Server-owned parent of {@link #stagingDir} (P0); {@code null} only when the feature is off. */
+    private final Path stagingRoot;
+    private Path stagingDir;                         // lazily created under stagingRoot; holds the locked copies we load from
     /** Test seams around {@link #stage}: run just before / just after the watched jar is copied, so a test
      *  can swap the watched file inside the TOCTOU window. No-ops in production. */
     Runnable beforeStage = () -> {};
@@ -144,9 +146,30 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         this(packsDir, registry, expressions, signals, null);
     }
 
+    /** Test convenience: stages under {@code <packs dir>.staging}, a sibling of the packs dir. Production
+     *  ({@code JobService}) always passes the Space's server-owned root, {@link #stagingRootFor}. */
     JobPackManager(String packsDir, JobTypeRegistry registry, ExpressionRegistry expressions,
                    SignalSink signals, UnloadListener unloadListener) {
+        this(packsDir, registry, expressions, signals, unloadListener, null);
+    }
+
+    /**
+     * @param stagingRoot the server-owned directory the staged copies (the bytes the loader reads, and the
+     *                    bytes the allowlist hash is taken of) live under — never the system temp dir, which
+     *                    every local process can write to (parser-plugins-trust-design.md slice P0).
+     *                    {@code null} ⇒ the test-only sibling {@code <packs dir>.staging}. Refused when it lies
+     *                    inside the packs dir: a dir writer could then rewrite staged bytes after hashing.
+     */
+    JobPackManager(String packsDir, JobTypeRegistry registry, ExpressionRegistry expressions,
+                   SignalSink signals, UnloadListener unloadListener, Path stagingRoot) {
         this.dir = (packsDir == null || packsDir.isBlank()) ? null : Path.of(packsDir).toAbsolutePath().normalize();
+        this.stagingRoot = dir == null ? null
+                : stagingRoot != null ? stagingRoot.toAbsolutePath().normalize()
+                : dir.resolveSibling(dir.getFileName() + ".staging");
+        if (this.stagingRoot != null && this.stagingRoot.startsWith(dir))
+            throw new IllegalStateException("jobs.packs staging dir " + this.stagingRoot
+                    + " is inside the packs dir " + dir + " - a packs-dir writer could rewrite staged bytes after "
+                    + "they were hashed; set -Djobs.packs.stagingDir outside it");
         this.registry = registry;
         this.expressions = expressions;
         this.signals = signals;
@@ -156,6 +179,16 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         this.allowlistFile = dir == null ? null : PackAllowlist.configuredFile(dir);   // refuses boot if writable (A3)
         // S2-0: a pipeline run using a pack's node type pins the pack through the same counter as a Job run.
         if (dir != null) PackRunLeases.install(this);
+    }
+
+    /** The staging root {@code JobService} passes: {@code -Djobs.packs.stagingDir} when set, else
+     *  {@code <auditDir>/job-packs-staging} — the Space's own server-written state dir. {@code null} with
+     *  neither (the test-only sibling default then applies). */
+    static Path stagingRootFor(String auditDir) {
+        String override = System.getProperty("jobs.packs.stagingDir");
+        if (override != null && !override.isBlank()) return Path.of(override.trim()).toAbsolutePath().normalize();
+        return auditDir == null || auditDir.isBlank() ? null
+                : Path.of(auditDir).resolve("job-packs-staging").toAbsolutePath().normalize();
     }
 
     boolean enabled() { return dir != null; }
@@ -496,7 +529,12 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
     /** Copy the watched jar into a private staging dir and return the copy the loader will lock. A fresh
      *  uniquely-named file per load, so a reload never overwrites a draining pack's copy. */
     private Path stage(String name, Path jar) throws IOException {
-        if (stagingDir == null) stagingDir = Files.createTempDirectory("job-packs-");
+        if (stagingDir == null) {
+            // One unique dir per manager under the server-owned root: several Spaces may share the root (a
+            // JVM-wide -Djobs.packs.stagingDir), and each manager deletes only its own copies.
+            Files.createDirectories(stagingRoot);
+            stagingDir = Files.createTempDirectory(stagingRoot, "job-packs-");
+        }
         Path dest = Files.createTempFile(stagingDir, "pack-", "-" + name);
         try {
             Files.copy(jar, dest, StandardCopyOption.REPLACE_EXISTING);
