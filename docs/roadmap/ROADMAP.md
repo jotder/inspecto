@@ -38,7 +38,9 @@ These are built and integrated on the development line; the work remaining is ve
 Ordered by recommended sequence (see §6 for the rationale). **§3.1–§3.3 have all shipped since this
 horizon was written** (2026-07-07 → 2026-07-24); their scope prose is kept as the record of intent, each
 now headed by what was actually delivered. **§3.4–§3.5 were re-derived from source 2026-09-10:** of their five scope items, three have shipped, one is filed on
-the board, and one was never filed anywhere — each is marked below. ⛔ The board (`../BACKLOG.md` §0) owns the
+the board, and one was never filed anywhere — each is marked below. ⚠ **Updated 2026-09-25:** the unfiled
+one (the stream consumer) was filed as `STREAM-CONSUMER-1` and closed 2026-09-24, so **four have shipped**
+and only `AUTHORING-REDESIGN-1` remains on the board (§3.4). ⛔ The board (`../BACKLOG.md` §0) owns the
 queue order; this page records direction.
 
 ### 3.1 `inspecto-security` module — Professional edition (T1) · Effort: **L** · ✅ **SHIPPED 2026-07-24**

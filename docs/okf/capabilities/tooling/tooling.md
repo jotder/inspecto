@@ -105,10 +105,21 @@ sentence this whole area turns on: **a clean run says nothing about what it decl
 
 ### 3.2 The guard roster
 
-This is the inventory that existed nowhere. **Fifteen guard scripts, plus two inline pipeline checks** —
-twelve under `tools/` (`check-vocabulary` · `check-secrets` · `check-doc-links` · `check-doc-citations` ·
+This is the inventory that existed nowhere. **Twenty-four guard scripts, plus two inline pipeline checks** —
+twenty-one under `tools/` (`check-vocabulary` · `check-secrets` · `check-doc-links` · `check-doc-citations` ·
 `check-doc-counts` · `check-nul-bytes` · `check-gate-tally` · `check-board-heads` · `check-coverage` ·
-`check-dependencies` · `check-sbom-modules` · `check-launchers`), one under the client tree
+`check-dependencies` · `check-sbom-modules` · `check-launchers`, and nine more listed here but not yet
+given a row in the table below:
+`check-authgate-coverage` — a gated ControlApi route that no armed test exercises;
+`check-backlog-homes` — a `docs/BACKLOG.md` row's `→` owning-doc pointer must name a doc that mentions its subject;
+`check-bundle-doc-links` — every relative link in a shipped doc must resolve inside the customer bundle;
+`check-bundle-platform` — a deployment zip's platform label must come from the runtime it embeds, never a literal;
+`check-family-count` — every stated count of `OperationalDb.Family` must equal the enum;
+`check-reactor-verdict` — a Maven reactor log is a pass only if it proves every module ran;
+`check-safety-roots-declared` — every launcher that starts the engine without space discovery must declare `-Dassist.safety.roots`;
+`check-seed-paths` — every path `tools/seed-samples.mjs` writes must land inside its own Space;
+`check-split-identity-fixture` — the Link Analysis demo corpus must keep at least one split identity),
+one under the client tree
 (`inspecto-ui/tools/check-design-tokens.mjs`), and two `--check` modes of scripts that are not themselves
 guards (`tools/render-processor-board.mjs`, `tools/fetch-duckdb-extensions.mjs`).
 

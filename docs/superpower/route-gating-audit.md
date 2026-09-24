@@ -73,6 +73,13 @@ wrong: it would let an administrator decide whether you may mark *your own* noti
 > `NotificationPreferences` hold ONE state per Space with no recipient, so none of the four is "the calling
 > user's own" — each changes every user's feed or delivery. All four are now gated `canAdminister`; the
 > category is down to `POST /requirements` alone. See `okf/backend/editions/auth-security.md`.
+>
+> 🟢 **Superseded in part 2026-09-25 (per-user read state):** read marks now live in `NotificationReadState`,
+> keyed by the caller, so `POST /notifications/{id}/read`, `POST /notifications/read-all` (and the new
+> `POST /notifications/{id}/unread`) touch only the caller's own marks and are **deliberate self-service
+> exemptions** again (`CapabilityManifest.EXEMPTIONS`, pinned by `ControlApiNotificationsTest.readStateIsPerSubject`).
+> `PUT /notifications/preferences` and `DELETE /notifications/{id}` still write the shared feed / grid and
+> stay `canAdminister`. See `okf/backend/control-plane/events-metrics.md`.
 **No action.** ⚠ The one thing to verify separately is that they are scoped to the caller and cannot
 address another user's notifications — that is an *authorization-by-ownership* question, not a
 capability question, and this audit did not test it. → filed as a follow-up below.
