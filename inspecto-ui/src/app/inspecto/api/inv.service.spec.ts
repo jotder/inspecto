@@ -89,6 +89,24 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
         req.flush({});
     });
 
+    it('LA-13: an expand sends its rung with `budget` (never `limit`), and a window op sends only its window', () => {
+        svc.appendInvestigationOp('inv-1', {
+            op: 'expand',
+            budget: 500,
+            direction: 'out',
+            window: { slot: { start: '22:00', end: '06:00' }, days: ['FRI'], timezone: 'Europe/London' },
+            minDistinctDays: 2,
+        }).subscribe();
+        const expand = httpMock.expectOne(`${base}/inv/investigations/inv-1/ops`);
+        expect(expand.request.body.budget).toBe(500);
+        expect('limit' in expand.request.body).toBe(false);
+        expand.flush({});
+        svc.appendInvestigationOp('inv-1', { op: 'window', window: 'full' }).subscribe();
+        const window = httpMock.expectOne(`${base}/inv/investigations/inv-1/ops`);
+        expect(window.request.body).toEqual({ op: 'window', window: 'full' });
+        window.flush({});
+    });
+
     it('undo, reorder and replay POST to their own sub-routes; the id is path-encoded', () => {
         svc.undoInvestigation('inv/1').subscribe();
         const undo = httpMock.expectOne(`${base}/inv/investigations/inv%2F1/undo`);

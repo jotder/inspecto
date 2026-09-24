@@ -20,8 +20,11 @@ const TEMPLATE: InvestigationTemplate = {
     owner: 'alice',
     createdAt: '',
     derivedFrom: { investigation: 'inv-1', steps: 4, workingSetHash: 'sha256:h' },
-    roles: { dataset: 'calls', sourceCol: 'A', targetCol: 'B', linkKindCol: null },
-    parameters: [{ name: 'seed1', entityType: 'msisdn', step: 1 }],
+    roles: { dataset: 'calls', sourceCol: 'A', targetCol: 'B', linkKindCol: null, timeCol: null, timeColZone: null },
+    parameters: [
+        { name: 'seed1', kind: 'seed', entityType: 'msisdn', step: 1 },
+        { name: 'window1', kind: 'window', default: { from: '2026-01-01T00:00:00Z', to: null }, step: 3 },
+    ],
     ops: [
         { op: 'seed', step: 1, param: 'seed1' },
         { op: 'expand', step: 2 },

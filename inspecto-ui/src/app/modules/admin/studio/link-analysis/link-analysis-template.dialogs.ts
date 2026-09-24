@@ -94,7 +94,7 @@ export interface SaveTemplateData {
                     <ul class="m-0 pl-4 text-xs">
                         @for (p of preview.parameters; track p.step) {
                             <li>
-                                Step {{ p.step }} seed → parameter <code>{{ p.name }}</code>
+                                Step {{ p.step }} {{ p.kind }} → parameter <code>{{ p.name }}</code>
                             </li>
                         }
                         @for (d of preview.dropped; track d.step) {
@@ -113,7 +113,7 @@ export interface SaveTemplateData {
                         Only the loaded steps are previewed; the server extracts from the whole log.
                     </inspecto-alert>
                 }
-                @if (!preview.parameters.length) {
+                @if (!hasSeed) {
                     <inspecto-alert variant="warning" title="Nothing to template">
                         This Investigation has no effective seed step, so there is nothing to parameterise — the server
                         will refuse it.
@@ -159,6 +159,7 @@ export class SaveTemplateDialog {
     private confirm = inject(InspectoConfirmService);
 
     readonly preview = templatePreview(this.data.entries);
+    readonly hasSeed = this.preview.parameters.some((p) => p.kind === 'seed');
     readonly idHint = SAFE_ID_HINT;
     readonly form = new FormGroup({
         title: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] }),
@@ -211,11 +212,16 @@ function datasetColumnLoader(sourceKey: string): AttributeOptionLoader {
     };
 }
 
+/** The seed parameters — the ones instantiation REQUIRES a non-empty id list for. */
+function seedParameters(t: InvestigationTemplate) {
+    return t.parameters.filter((p) => p.kind === 'seed');
+}
+
 /** The instantiate form for one template: a seed list per parameter, then the Dataset + column roles. */
 export function instantiateSpecs(t: InvestigationTemplate): AttributeSpec[] {
     const specs: AttributeSpec[] = [
         { key: 'title', label: 'Title', type: 'string', tier: 'required', required: false },
-        ...t.parameters.map<AttributeSpec>((p) => ({
+        ...seedParameters(t).map<AttributeSpec>((p) => ({
             key: `param:${p.name}`,
             label: `${p.name}${p.entityType ? ' (' + p.entityType + ')' : ''} — seed ids`,
             type: 'list',
@@ -387,7 +393,8 @@ export class InstantiateTemplateDialog {
         const str = (k: string) =>
             typeof v[k] === 'string' && (v[k] as string).trim() ? (v[k] as string).trim() : undefined;
         const params: Record<string, string[]> = {};
-        for (const p of t.parameters)
+        // Window parameters are optional — omitted, the server re-reads the template's authored window.
+        for (const p of seedParameters(t))
             params[p.name] = ((v[`param:${p.name}`] as string[] | null) ?? []).map((s) => s.trim());
         await this.run('Could not create the Investigation.', async () => {
             const res = await firstValueFrom(

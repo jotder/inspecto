@@ -168,9 +168,45 @@ export interface BranchingPatternResult {
 
 // ── LA-10: the Investigation object (`InvestigationRoutes`) ──────────────────────────────────────────────
 
-/** The five ops the backend evaluates. `seedBy`, `excludeBy`, `threshold`, `window`, `annotate` and
- *  `snapshot` are in the closed vocabulary but answer 422 "not implemented yet" — never offer them. */
-export type InvestigationOpName = 'seed' | 'expand' | 'exclude' | 'hide' | 'keep';
+/** The six ops the backend evaluates (`InvestigationRoutes.SHIPPED`). `seedBy`, `excludeBy`, `threshold`,
+ *  `annotate` and `snapshot` are in the closed vocabulary but answer 422 "not implemented yet" — never offer them. */
+export type InvestigationOpName = 'seed' | 'expand' | 'exclude' | 'hide' | 'keep' | 'window';
+
+/** A rung's traversal direction (plan §2.4; `InvestigationRoutes.DIRECTIONS`). */
+export type ExpandDirection = 'either' | 'out' | 'in' | 'reciprocal';
+
+/** A day-of-week in a window's mask (`InvestigationTime.DAYS`). */
+export type WindowDay = 'MON' | 'TUE' | 'WED' | 'THU' | 'FRI' | 'SAT' | 'SUN';
+
+/**
+ * A time window (LA-13, `InvestigationTime.window`): an absolute `[from, to)` range (ISO instants) plus an intraday
+ * `slot` `[start, end)` (`HH:mm`, may cross midnight) and a `days` mask. `timezone` is REQUIRED whenever a slot or
+ * mask is given — they are wall-clock notions.
+ */
+export interface InvestigationWindow {
+    from?: string | null;
+    to?: string | null;
+    slot?: { start: string; end: string } | null;
+    days?: WindowDay[] | null;
+    timezone?: string | null;
+}
+
+/**
+ * One hop-ladder rung (plan §2.4, `InvestigationRoutes` expand params). `budget` caps the rows read (a breach sets
+ * `truncated`) — it was `limit` before LA-13, and `limit` is now REFUSED with 422. `window` defaults to `'inherit'`
+ * (the Investigation's current window); `'full'` reads all time.
+ */
+export interface ExpandRung {
+    budget?: number;
+    direction?: ExpandDirection;
+    linkKinds?: string[] | null;
+    window?: 'inherit' | 'full' | InvestigationWindow;
+    minEvents?: number;
+    minDistinctDays?: number | null;
+    candidateDegreeMin?: number | null;
+    candidateDegreeMax?: number | null;
+    maxFanOut?: number | null;
+}
 
 /** `POST /inv/investigations` — bound to one Dataset + the projection's columns. */
 export interface InvestigationCreateRequest {
@@ -206,7 +242,8 @@ export interface InvestigationHeader {
 /** One op's body. Ids are RAW Dataset values — the server compares `CAST(col AS VARCHAR)` exactly. */
 export type InvestigationOpRequest =
     | { op: 'seed'; ids: string[]; entityType?: string }
-    | { op: 'expand'; ids?: string[]; limit?: number }
+    | ({ op: 'expand'; ids?: string[] } & ExpandRung)
+    | { op: 'window'; window: InvestigationWindow | 'full' }
     | { op: 'exclude'; ids: string[]; reason: string }
     | { op: 'hide' | 'keep'; ids: string[] };
 
@@ -324,7 +361,10 @@ export interface InvestigationLogEntry {
     author: string | null;
     at: string;
     op?: InvestigationOpName;
-    params?: { ids: string[]; entityType?: string | null; limit?: number; reason?: string };
+    /** The op's validated params: an expand's rung arrives resolved (defaults filled); a `window` op has no ids. */
+    params?: { ids?: string[]; entityType?: string | null; reason?: string } & Omit<ExpandRung, 'window'> & {
+            window?: 'inherit' | 'full' | InvestigationWindow | null;
+        };
     undoes?: number;
     undoneBy: number | null;
     read?: { dataset: string; readAt: string; rowCount: number; truncated: boolean; fingerprint: string };
@@ -455,9 +495,16 @@ export interface InvestigationTemplate {
     owner: string | null;
     createdAt: string;
     derivedFrom: { investigation: string; steps: number; workingSetHash: string };
-    roles: { dataset: string; sourceCol: string; targetCol: string; linkKindCol: string | null };
-    /** Each seed step became a parameter (`seed1`, `seed2`, …) — its ids are NOT stored. */
-    parameters: { name: string; entityType: string | null; step: number }[];
+    roles: {
+        dataset: string;
+        sourceCol: string;
+        targetCol: string;
+        linkKindCol: string | null;
+        timeCol: string | null;
+        timeColZone: string | null;
+    };
+    /** Seed steps → `seed1`, `seed2`, … (ids NOT stored); window steps → `window1`, … with the authored default. */
+    parameters: InvestigationTemplateParameter[];
     ops: Record<string, unknown>[];
     /** Exclude/hide/keep steps left out (D-E8) — counts only, never ids or reasons. */
     dropped: { step: number; op: string; count: number }[];
@@ -465,14 +512,22 @@ export interface InvestigationTemplate {
     generalised: { step: number; namedFrontier: number; exact: boolean }[];
 }
 
+/** A template parameter (LA-13): `kind` says which. A window parameter is optional at instantiation. */
+export type InvestigationTemplateParameter =
+    | { name: string; kind: 'seed'; entityType: string | null; step: number }
+    | { name: string; kind: 'window'; default: InvestigationWindow | null; step: number };
+
 export interface InstantiateTemplateRequest {
     id?: string;
     title?: string;
-    params: Record<string, string[]>;
+    /** Seed parameter → non-empty id list; window parameter (optional) → a window or `'full'`. */
+    params: Record<string, string[] | InvestigationWindow | 'full'>;
     dataset?: string;
     sourceCol?: string;
     targetCol?: string;
     linkKindCol?: string;
+    timeCol?: string;
+    timeColZone?: string;
 }
 
 export interface InstantiateTemplateResult {
