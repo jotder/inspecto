@@ -380,9 +380,9 @@ Query Library's execution path** (§2).
   🔴 **Two things this bullet used to describe wrongly, both measured 2026-09-11.** (1) It said
   `INSTALL/LOAD ducklake`, and the code really did open with an unconditional **`INSTALL ducklake FROM
   core`** — a network fetch on every registration, so an air-gapped install egressed the moment a pipeline
-  enabled DuckLake (`AIRGAP-EXTENSIONS-1`). It now goes through `DuckDbExtension`, which tries the cached
-  `LOAD`, then the file `package.ps1` stages under `-Dduckdb.extension.dir`, and reaches `INSTALL` only on a
-  networked host.
+  enabled DuckLake (`AIRGAP-EXTENSIONS-1`). It now goes through `DuckDbExtension`. Since 2026-09-24 (D-8) that has
+  two modes: with `-Dduckdb.extension.dir` set (every bundle launcher) it loads ONLY the staged file by path
+  and a missing file fails loudly; without it, the cached `LOAD` and then `INSTALL` on a networked host.
   🔴 **That ladder covered `ducklake` and NOT the catalog backend's scanner, and the gap survived until
   2026-09-14 (`AIRGAP-PGSCANNER-LOAD-1`).** `ATTACH 'ducklake:postgres:…'` **autoloads** `postgres_scanner`
   from inside DuckLake, so no `LOAD` for it existed anywhere to grep for — and DuckDB's autoload resolves

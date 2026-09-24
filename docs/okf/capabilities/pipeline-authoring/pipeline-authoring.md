@@ -155,6 +155,37 @@ keeps it honest:
 - ⛔ **Never stored as truth.** It is a projection of config, always.
 - ⚠ **Its real risk is being mistaken FOR the truth** — a signed-off document reads like a contract while the
   config keeps moving. The fingerprint is the whole mitigation: it makes staleness cheap to surface.
+- **As a workbook (D-8):** `GET /pipelines/{name}/document?format=xlsx` renders the same model through
+  DuckDB's `excel` extension (`PipelineDocumentXlsx`, `COPY … (FORMAT xlsx)`) — ⛔ no POI. The extension is not
+  linked into duckdb_jdbc, so a bundle must carry it: `package.ps1` step 6d stages
+  `duckdb-extensions/<platform>/excel.duckdb_extension`, matched to the shipped DuckDB's ABI directory
+  (`duckdb.version` 1.5.2.1 → `v1.5.2`; before 2026-09-24 it took the first file of that name in the cache,
+  and this desk's cache holds a v1.5.5 one too), and every launcher points `-Dduckdb.extension.dir` at it.
+  🔴 **In that STAGED mode `DuckDbExtension` loads `LOAD '<dir>/excel.duckdb_extension'` and nothing else** —
+  no bare `LOAD excel` (a warm `~/.duckdb` would make a bundle missing its binary pass on the build box) and
+  no `INSTALL`; a missing file is a 500 naming the exact path.
+  **Proven 2026-09-24, no network:** a Professional-composition bundle (the last `package.ps1` output with
+  `inspecto.jar` rebuilt at this change, `spaces/` re-staged per step 4, the local-only fake authenticator
+  in place of OIDC because no token could be minted), launched with `USERPROFILE` pointed at an empty
+  directory — a probe on that JVM showed a bare `LOAD excel` failing with *not found* under the empty home,
+  so DuckDB's own cache was unreachable — answered `?format=xlsx` with HTTP 200, a
+  `spreadsheetml.sheet` body and a valid zip; the staged binary is byte-identical (SHA-256 `840f6c65…`) to
+  `~/.duckdb/extensions/v1.5.2/windows_amd64/excel.duckdb_extension`; the empty home was still empty
+  afterwards (no INSTALL wrote a cache). With the binary removed the same request returned 500 naming
+  `…\duckdb-extensions\windows_amd64\excel.duckdb_extension`. `PipelineDocumentXlsxTest` runs the real
+  write in staged mode (skips only where no stageable binary exists — CI) plus an ungated missing-binary test.
+  🔴 **One sheet per section, assembled by zip (`XLSX-EXPORT-LAST-SECTION-ONLY-1`, fixed 2026-09-24, operator's choice).** The same run found
+  the workbook held only the LAST section: the 1.5.2 writer accepts `COPY … (APPEND true)` without error
+  but rewrites the file. Each section is now COPYed to its own one-sheet workbook in a temp directory
+  beside the target (removed in `finally`), and `XlsxSheetMerger` stitches them with `java.util.zip` —
+  workbook 1 is the base; every further `xl/worksheets/sheet1.xml` becomes `sheetN.xml` with its
+  `<sheet>`, Relationship and content-type Override. ⚠ It re-maps neither shared strings nor styles, because
+  the writer emits neither: every cell is `t="inlineStr"` (the `sst` is empty) and `styles.xml` is
+  byte-identical across workbooks (inspected on 1.5.2). ⛔ A later sheet with a `t="s"` cell or a differing
+  `styles.xml` makes the merge THROW, so a writer upgrade fails the export instead of mis-rendering it.
+  `PipelineDocumentXlsxTest` opens the zip and asserts the sheet list and each sheet's first cell (red on
+  the old code: `[Guarantees]` alone); `XlsxSheetMergerTest` covers the merger ungated on hand-built parts.
+  ⚠ Linux bundles still ship no `excel` until a `v1.5.2/linux_amd64` binary is fetched.
 
 ⚠ **`parse` and `map` serve `attributes: []` deliberately** — each has a richer editor of its own, so a
 generic attribute spec there would be a worse second way to author the same thing. And the palette publishes

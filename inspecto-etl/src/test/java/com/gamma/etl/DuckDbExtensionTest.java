@@ -108,9 +108,24 @@ class DuckDbExtensionTest {
         assertFalse(rec.issuedInstall(),
                 "an air-gapped install with the extension staged must never reach INSTALL — that is the "
                         + "whole claim. Executed: " + rec.executed);
-        assertTrue(rec.executed.get(rec.executed.size() - 1).startsWith("LOAD '"),
-                "the staged file must be loaded by path: " + rec.executed);
-        assertTrue(rec.executed.get(rec.executed.size() - 1).contains("ducklake.duckdb_extension"));
+        assertEquals(1, rec.executed.size(),
+                "staged = ONE statement, the load by path — no bare LOAD that could pick up ~/.duckdb: "
+                        + rec.executed);
+        assertTrue(rec.executed.get(0).startsWith("LOAD '"), "the staged file must be loaded by path: " + rec.executed);
+        assertTrue(rec.executed.get(0).contains("ducklake.duckdb_extension"));
+    }
+
+    /**
+     * D-8: the staged file wins even when a warm {@code ~/.duckdb} cache WOULD satisfy {@code LOAD <name>} —
+     * otherwise a bundle missing its binary passes on the build box and fails on the customer's.
+     */
+    @Test
+    void aStagedDirectoryIsPreferredOverAWarmCache(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("excel.duckdb_extension"), "stub");
+        Recorder rec = new Recorder(sql -> false);            // a bare LOAD excel would succeed here too
+        withExtensionDir(dir.toString(), () -> assertTrue(ExcelExtension.tryLoad(rec.connection())));
+        assertEquals(1, rec.executed.size(), rec.executed.toString());
+        assertTrue(rec.executed.get(0).startsWith("LOAD '"), rec.executed.toString());
     }
 
     /** ...and the same for excel, so the two callers cannot drift apart again. */
@@ -158,15 +173,22 @@ class DuckDbExtensionTest {
                 "removing the fallback would break every networked deployment — this is not dead code");
     }
 
-    /** A set-but-wrong directory warns and still falls through, rather than failing the batch outright. */
+    /**
+     * D-8 (2026-09-24, reversing the old fall-through): a set directory WITHOUT the file fails loudly, names
+     * the exact path, and issues NO statement at all — in particular no INSTALL. The flag is the bundle's
+     * declaration that it carries its extensions; a missing one is a packaging defect, not a cue to egress.
+     */
     @Test
-    void aMisconfiguredDirectoryFallsThroughRatherThanFailing(@TempDir Path dir) {
+    void aStagedDirectoryWithoutTheFileFailsLoudlyAndNeverInstalls(@TempDir Path dir) {
         Recorder rec = new Recorder(uncachedUntilInstalled("ducklake"));
-        // the directory exists but holds no ducklake.duckdb_extension
-        withExtensionDir(dir.toString(), () ->
-                assertTrue(DuckDbExtension.tryLoad(rec.connection(), "ducklake")));
-        assertTrue(rec.issuedInstall(),
-                "a typo in -Dduckdb.extension.dir must not be a hard failure on a networked host");
+        String[] message = new String[1];
+        withExtensionDir(dir.toString(), () -> message[0] = assertThrows(SQLException.class,
+                () -> DuckDbExtension.ensureLoaded(rec.connection(), "ducklake", "output.ducklake.enabled"))
+                .getMessage());
+        assertEquals(List.of(), rec.executed, "nothing may be executed, least of all INSTALL");
+        assertTrue(message[0].contains(dir.resolve("ducklake.duckdb_extension").toAbsolutePath().toString()),
+                "the failure must name the missing file: " + message[0]);
+        assertTrue(message[0].contains("output.ducklake.enabled"), message[0]);
     }
 
     /** When every layer fails, the caller gets a message naming all three remedies — never a silent skip. */

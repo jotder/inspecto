@@ -47,9 +47,10 @@ DuckLake is a lakehouse format that uses a SQL database (PostgreSQL) as the cata
    ```
 
 3. **Run the ETL.** After each file is written, `DuckLakeRegistrar.register` (called from `ConsignmentIngestor`) will:
-   - load the `ducklake` extension: cached `LOAD` → the file staged by `package.ps1` under
-     `-Dduckdb.extension.dir` → `INSTALL` (the only step that downloads, and the last one tried —
-     `AIRGAP-EXTENSIONS-1`, 2026-09-11; it used to be an unconditional `INSTALL ducklake FROM core`)
+   - load the `ducklake` extension: with `-Dduckdb.extension.dir` set (every bundle launcher), ONLY the
+     file `package.ps1` staged there, and a missing file fails loudly (D-8, 2026-09-24); otherwise cached
+     `LOAD` → `INSTALL` (the only step that downloads — `AIRGAP-EXTENSIONS-1`, 2026-09-11; it used to be
+     an unconditional `INSTALL ducklake FROM core`)
    - `ATTACH` the PostgreSQL catalog
    - Create the schema and table if they do not exist
    - `INSERT INTO` the DuckLake table by reading the just-written Parquet files
