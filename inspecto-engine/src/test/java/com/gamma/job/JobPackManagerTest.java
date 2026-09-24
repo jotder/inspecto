@@ -811,7 +811,7 @@ class JobPackManagerTest {
         return classes;
     }
 
-    private static void writeJar(Path jar, Path classes, String packId, Map<String, String> services)
+    static void writeJar(Path jar, Path classes, String packId, Map<String, String> services)
             throws Exception {
         writeJar(jar, classes, packId, "1.0.0", services);
     }

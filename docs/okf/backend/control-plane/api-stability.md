@@ -98,6 +98,13 @@ above the generated commit list.
 - `GET /jobs/packs` now also lists refused jars as `{file, hash, state: "rejected", cause}` beside the
   `state: "loaded"` rows. A client that treated every row as loaded must filter on `state`.
 
+**Parsers from Job Packs (2026-09-25, parser-plugins trust design slices P2–P4)**
+- A `ParserPlugin` in an allowlisted Job Pack now registers (the fifth pack kind). It appears in
+  `GET /parsers` after every built-in and classpath parser, and leaves it when the pack unloads or its hash
+  is revoked. A pack whose parser id collides with a built-in, classpath or other pack's parser, or names
+  an ingester class another parser names, is refused whole (`job.pack.rejected`).
+- `GET /parsers` rows gain an additive **`source`**: `builtin`, `classpath` or `pack:<jar filename>`.
+
 **Whole-pipeline dry run (2026-09-20, `PIPELINE-DRYRUN-1` step 5)**
 - `POST /runs/{name}/trigger?dryRun=true` runs a pipeline and **lands nothing** — no outputs, no audit or
   commit-log rows, no provenance row, no markers, no backup/quarantine moves — logging each suppressed

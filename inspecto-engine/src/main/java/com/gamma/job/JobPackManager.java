@@ -1,5 +1,7 @@
 package com.gamma.job;
 
+import com.gamma.parse.ParserPlugin;
+import com.gamma.parse.Parsers;
 import com.gamma.signal.Severity;
 import com.gamma.pipeline.PipelineNodeType;
 import com.gamma.pipeline.PipelineNodeTypes;
@@ -46,7 +48,8 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
  * dropped into {@code -Djobs.packs.dir} bundling one or more providers plus their shaded deps —
  * {@link JobTypeProvider}s (SPI + {@link JobTypeMeta}), {@link ExpressionProvider}s, and since
  * 2026-08-31 {@link PipelineNodeType}s and {@link PipelineNodeExecutor}s (pipeline spec gap 7, whose
- * remaining half was exactly that a contributed node type had to sit on the classpath at boot). A pack
+ * remaining half was exactly that a contributed node type had to sit on the classpath at boot), and since
+ * 2026-09-25 {@link ParserPlugin}s (the drop-in parser jar, parser-plugins-trust-design.md slice P2). A pack
  * carrying only ONE of those kinds is valid; the property keeps its {@code jobs.} name so no deployment's
  * configuration changes. Each jar loads in its own parent-first
  * {@link URLClassLoader} — SPI/API types resolve from the engine, pack-private deps stay isolated — and
@@ -255,10 +258,16 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             List<PipelineNodeExecutor> nodeExecutors = new ArrayList<>();
             for (PipelineNodeExecutor e : ServiceLoader.load(PipelineNodeExecutor.class, loader))
                 if (e.getClass().getClassLoader() == loader) nodeExecutors.add(e);
-            if (providers.isEmpty() && exprProviders.isEmpty() && nodeTypes.isEmpty() && nodeExecutors.isEmpty())
+            // The fifth kind (parser-plugins-trust-design.md slice P2, operator D1 2026-09-25): a pack may
+            // contribute ParserPlugins — the drop-in parser jar, through this one loader and trust gate.
+            List<ParserPlugin> parsers = new ArrayList<>();
+            for (ParserPlugin p : ServiceLoader.load(ParserPlugin.class, loader))
+                if (p.getClass().getClassLoader() == loader) parsers.add(p);
+            if (providers.isEmpty() && exprProviders.isEmpty() && nodeTypes.isEmpty() && nodeExecutors.isEmpty()
+                    && parsers.isEmpty())
                 throw new IllegalStateException(
-                        "no JobTypeProvider, ExpressionProvider, PipelineNodeType or PipelineNodeExecutor "
-                                + "in META-INF/services");
+                        "no JobTypeProvider, ExpressionProvider, PipelineNodeType, PipelineNodeExecutor or "
+                                + "ParserPlugin in META-INF/services");
 
             List<String> ids = new ArrayList<>();
             for (JobTypeProvider p : providers) {
@@ -283,6 +292,9 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             // overlays back — so a pack is never half-registered into the pipeline vocabulary.
             for (PipelineNodeType t : nodeTypes) PipelineNodeTypes.register(t, name);
             for (PipelineNodeExecutor e : nodeExecutors) PipelineNodeExecutors.register(e, name);
+            // Parsers.register refuses a built-in/classpath id, another pack's id or ingester; the catch
+            // below deregisters every kind, so a colliding parser rejects the pack whole.
+            for (ParserPlugin p : parsers) Parsers.register(p, name);
 
             String[] mf = manifest(staged);
             LoadedPack pack = new LoadedPack(mf[0] != null ? mf[0] : name, mf[1] != null ? mf[1] : "?",
@@ -292,7 +304,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             log.info("[PACKS] loaded {} v{} ({}): {}", pack.id(), pack.version(), name, ids);
             signals.emit("job.pack.loaded", Severity.INFO, packPayload(pack));
             return true;
-            // 🔴 LinkageError is NOT optional here. The four ServiceLoader loops above run over an
+            // 🔴 LinkageError is NOT optional here. The five ServiceLoader loops above run over an
             // OPERATOR-SUPPLIED pack loader, and a pack that is present but UNLOADABLE — a class compiled
             // for a newer Java, a truncated/corrupt class, a missing shaded dependency — raises a
             // LinkageError that ServiceLoader does NOT wrap in ServiceConfigurationError: it comes straight
@@ -302,9 +314,10 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             // bad jar rejects itself. ⛔ Not a bare Error: OutOfMemoryError/StackOverflowError must escape.
         } catch (Exception | ServiceConfigurationError | LinkageError ex) {
             registry.deregister(name);                                  // roll back any partial registration
-            expressions.deregister(name);                               // all four registries, or the pack
+            expressions.deregister(name);                               // all five registries, or the pack
             PipelineNodeTypes.deregister(name);                         // half-loads — a refused node type
             PipelineNodeExecutors.deregister(name);                     // must not leave an executor behind
+            Parsers.deregister(name);                                   // ... nor a parser (the fifth kind)
             if (loader != null) try { loader.close(); } catch (IOException ignore) { /* best effort */ }
             if (staged != null) try { Files.deleteIfExists(staged); } catch (IOException ignore) { /* best effort */ }
             log.warn("[PACKS] rejected {}: {}", name, ex.toString());
@@ -331,6 +344,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         // on an unloaded pack already has, which is why a pack is normally REPLACED rather than removed.
         PipelineNodeTypes.deregister(name);
         PipelineNodeExecutors.deregister(name);
+        Parsers.deregister(name);   // a Pipeline naming its ingester then fails its next Run with a named error
         log.info("[PACKS] unloaded {} ({}): {}{}", pack.id(), name, removed,
                 removedTokens.isEmpty() ? "" : " + tokens " + removedTokens);
         signals.emit("job.pack.unloaded", Severity.INFO, packPayload(pack));

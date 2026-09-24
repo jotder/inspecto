@@ -51,6 +51,8 @@ final class ParserRoutes implements RouteModule {
             // preview-only plugins. Serving it is what lets the segments editor author the block
             // without the UI hardcoding any parser's implementation class.
             p.ingesterClass().ifPresent(fqcn -> row.put("ingesterClass", fqcn));
+            // Provenance (slice P2): builtin | classpath | pack:<jar filename> — the Job Type vocabulary.
+            row.put("source", Parsers.sourceOf(p.id()));
             row.put("grammarSchema", p.grammarSchema());
             out.add(row);
         }

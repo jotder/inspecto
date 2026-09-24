@@ -9,6 +9,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -114,5 +115,92 @@ class ParsersTest {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
                 () -> p.preview("a,b\n".getBytes(StandardCharsets.UTF_8), Map.of("encoding", "NOPE-8")));
         assertTrue(e.getMessage().contains("unknown encoding"));
+    }
+
+    // ── the pack overlay (parser-plugins-trust-design.md slice P2, operator D1 2026-09-25) ──────────
+
+    /** A minimal parser a Job Pack might contribute, optionally naming an ingester. */
+    private static ParserPlugin stub(String id, String ingester) {
+        return new ParserPlugin() {
+            @Override public String id() { return id; }
+            @Override public String label() { return "Stub " + id; }
+            @Override public boolean hierarchical() { return false; }
+            @Override public List<com.gamma.config.spec.FieldSpec> grammarSchema() { return List.of(); }
+            @Override public ParseResult preview(byte[] sample, Map<String, Object> grammar) {
+                return new ParseResult.Tree(0, List.of());
+            }
+            @Override public java.util.Optional<String> ingesterClass() { return java.util.Optional.ofNullable(ingester); }
+        };
+    }
+
+    private static List<String> ids() {
+        return Parsers.catalog().stream().map(ParserPlugin::id).toList();
+    }
+
+    @Test
+    void aPackParserJoinsTheCatalogAfterTheBuiltinsAndDeregisterRestoresIt() {
+        List<String> before = ids();
+        try {
+            Parsers.register(stub("acme_cdr", "com.acme.AcmeIngester"), "acme-1.jar");
+            List<String> after = ids();
+            assertEquals(before.size() + 1, after.size());
+            assertEquals(before, after.subList(0, before.size()), "catalog order kept: built-ins, classpath, then packs");
+            assertEquals("acme_cdr", after.get(after.size() - 1));
+            assertEquals(java.util.Optional.of("acme-1.jar"), Parsers.ownerOf("acme_cdr"));
+            assertEquals("pack:acme-1.jar", Parsers.sourceOf("acme_cdr"));
+            assertEquals("builtin", Parsers.sourceOf("delimited"));
+            assertEquals("classpath", Parsers.sourceOf("xml"));
+            assertEquals("acme_cdr", Parsers.forIngester("com.acme.AcmeIngester").orElseThrow().id());
+        } finally {
+            Parsers.deregister("acme-1.jar");
+        }
+        assertEquals(before, ids(), "deregister takes the pack's parser back and nothing else");
+        assertTrue(Parsers.get("acme_cdr").isEmpty());
+        assertTrue(Parsers.ownerOf("acme_cdr").isEmpty());
+    }
+
+    @Test
+    void aPackParserCollidingWithABuiltinOrAClasspathParserIsRefused() {
+        List<String> before = ids();
+        ParserPlugin builtinDelimited = Parsers.get("delimited").orElseThrow();
+        IllegalStateException b = assertThrows(IllegalStateException.class,
+                () -> Parsers.register(stub("delimited", null), "evil.jar"));
+        assertTrue(b.getMessage().contains("'delimited'"), b.getMessage());
+        assertThrows(IllegalStateException.class, () -> Parsers.register(stub("asn1", null), "evil.jar"),
+                "a classpath (ServiceLoader) parser is as un-replaceable as a built-in");
+        assertSame(builtinDelimited, Parsers.get("delimited").orElseThrow(), "the built-in still answers");
+        assertEquals(before, ids());
+        assertTrue(Parsers.ownerOf("delimited").isEmpty());
+    }
+
+    @Test
+    void aSecondPackClaimingATakenIdOrIngesterIsRefusedAndTheFirstPackWins() {
+        ParserPlugin first = stub("acme_cdr", "com.acme.AcmeIngester");
+        try {
+            Parsers.register(first, "acme-1.jar");
+            assertThrows(IllegalStateException.class,
+                    () -> Parsers.register(stub("acme_cdr", "com.other.Ingester"), "other.jar"), "same id");
+            assertThrows(IllegalStateException.class,
+                    () -> Parsers.register(stub("other_cdr", "com.acme.AcmeIngester"), "other.jar"),
+                    "same ingester FQCN: which pack's loader resolves it would depend on load order");
+            assertThrows(IllegalStateException.class,
+                    () -> Parsers.register(stub("xml_too", "com.gamma.ingester.XmlRecordIngester"), "other.jar"),
+                    "an ingester a classpath parser already names");
+            assertSame(first, Parsers.get("acme_cdr").orElseThrow());
+            assertTrue(Parsers.get("other_cdr").isEmpty());
+            assertTrue(Parsers.get("xml_too").isEmpty());
+            // The positive probe for the refusals above: the SAME second pack with free names registers.
+            Parsers.register(stub("other_cdr", "com.other.Ingester"), "other.jar");
+            assertEquals(java.util.Optional.of("other.jar"), Parsers.ownerOf("other_cdr"));
+        } finally {
+            Parsers.deregister("acme-1.jar");
+            Parsers.deregister("other.jar");
+        }
+    }
+
+    @Test
+    void aPackParserWithAnInvalidIdIsRefused() {
+        assertThrows(IllegalStateException.class, () -> Parsers.register(stub("Bad-Id", null), "p.jar"));
+        assertTrue(Parsers.ownerOf("Bad-Id").isEmpty());
     }
 }

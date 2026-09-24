@@ -55,6 +55,15 @@ builtin rule: the built-ins' preview IS the engine that ingests, so an override 
 preview diverge from production parsing. ⚠ `Parsers.load` must NOT use `Map.copyOf` — it discards
 iteration order, and catalog order (built-ins first) is part of the contract.
 
+**Plus an owner-keyed pack overlay (2026-09-25, slice P2).** `Parsers.register(plugin, owner)` /
+`deregister(owner)` add and remove the parsers a loaded Job Pack contributes, keyed by the pack's jar
+filename; `ownerOf(id)`, `sourceOf(id)` (`builtin` | `classpath` | `pack:<jar>`) and
+`forIngester(fqcn)` read it. Catalog order is built-ins, then classpath providers, then packs in load
+order. `register` refuses an invalid id, **any id the built-ins or classpath providers hold** (a pack can
+never replace one), an id another pack owns (first pack wins), and **an ingester class name another
+registered parser already names** — otherwise which pack's loader resolved that class would depend on load
+order. Details under *Drop-in parser jars* below.
+
 Reference plugin: `XmlParserPlugin` (engine, registered via the services file) — JDK StAX, DTDs
 and external entities disabled outright (XXE), grammar `ingester_config.record_element` (local name
 or slash path; blank = the root's direct children) / `namespace_aware` / `encoding` / `max_records`;
@@ -152,7 +161,9 @@ them.
 
 ## Control plane (`ParserRoutes`, both compute-only — no write gate, no capability)
 
-- `GET /parsers` → `[{id, label, hierarchical, ingestable, grammarSchema}]`.
+- `GET /parsers` → `[{id, label, hierarchical, ingestable, ingesterClass?, source, grammarSchema}]`.
+  `source` (2026-09-25, additive) is `builtin`, `classpath` or `pack:<jar filename>` for a parser a Job
+  Pack contributed.
 - `POST /parsers/{id}/preview` `{grammar, sample_text | sample_b64}` → the UI's `ParserPreview`
   union `{kind: 'table' | 'tree', …}`. 404 unknown id · 400 missing/oversized sample (text 1MB,
   b64 4MB — binary formats need bytes) · 422 caller errors with the reason. The grammar-shaped
@@ -316,7 +327,7 @@ Still open, tracked in BACKLOG §4 "Parsing (Stage-1)":
   [`parser-plugins-trust-design.md`](../../../superpower/parser-plugins-trust-design.md); what has shipped
   is below.
 
-### Drop-in parser jars — trust gate SHIPPED, parser registration NOT yet (2026-09-25)
+### Drop-in parser jars — trust gate + pack parser registration SHIPPED (2026-09-25)
 
 Operator decisions 2026-09-25: **D1** a parser arrives as a **fifth Job Pack kind** through the existing
 `JobPackManager` loader (`-Djobs.packs.dir`). There is no second `plugins/` directory. **D2** T1 SHA-256
@@ -350,11 +361,30 @@ edition gate. **D8** no out-of-process host.
 - `-Djobs.packs.requireSignature` is unchanged. It is an **integrity** check on top of the allowlist, and
   it still never looks at who signed.
 
-**Not built yet** (design §5): **P2**, the fifth `ServiceLoader` loop plus an owner-keyed `Parsers`
-overlay. Until then a `ParserPlugin` inside a pack is **not registered**, and custom parsers stay
-classpath-only. **P3**, ingester resolution through the owning loader and an ingest-time pack pin.
-**P4**, D4 preview gating. It has no pack parser to gate until P2 lands, so the route and
-`CapabilityManifest` are unchanged. Still open from **P0**: staging under a server-owned dir instead of
+**As built (slice P2, a parser is the fifth pack kind):**
+- `JobPackManager.load` runs a fifth `ServiceLoader` loop for `ParserPlugin` over the pack's loader, keeping
+  only providers that loader defined. A pack carrying **only** a parser is valid. Its parsers register
+  through `Parsers.register(p, <jar filename>)` after the other four kinds.
+- **Atomic refusal.** A parser id that a built-in or classpath parser holds, that another pack owns, or
+  whose ingester class another registered parser already names, throws inside `load`. The catch
+  deregisters **all five** kinds, so the pack is rejected whole: its Job Types, tokens, node types and
+  executors never stay registered. The cause names the id (`job.pack.rejected`, `GET /jobs/packs`).
+- **Unload / revoke** (`unload`: jar removed, hash changed, or hash no longer listed) calls
+  `Parsers.deregister(owner)`. The parser leaves `GET /parsers` and `POST /parsers/{id}/preview` 404s.
+- **Provenance.** `GET /parsers` rows carry `source: "pack:<jar filename>"` (the Job Type vocabulary). The
+  pack's manifest id/version stay in `GET /jobs/packs`.
+- ⚠ **One process-wide registry, one packs dir.** `-Djobs.packs.dir` is JVM-wide and every Space's
+  `JobService` builds a manager over it, so `register` under the **same** owner replaces rather than
+  refuses. Consequence (shared with the node-type overlay): one Space's unload deregisters the parser for
+  all of them. A pack is normally replaced, not removed.
+- Proof: `JobPackParserTest` (real jars compiled at test time, off the classpath: parser-only pack loads
+  with `pack:` provenance; jar removal and hash revocation unregister; a pack whose parser is `delimited`
+  is rejected and its Job Type rolled back, paired with the same mixed pack under a free id loading both
+  kinds; a second pack claiming a taken id is rejected and the first keeps it). `ParsersTest` pins the
+  overlay rules; `ControlApiParsersTest.catalogNamesEachParsersProvenanceIncludingAPacksParser` the wire.
+
+**Not built yet** (design §5): **P3**, ingester resolution through the owning loader and an ingest-time
+pack pin. **P4**, D4 preview gating. Still open from **P0**: staging under a server-owned dir instead of
 the system temp dir. The decode-profile satellite (C1–C4) waits on D5/D6/D9/D10.
 
 ### BER hostile-input handling — fixed 2026-09-17, value cap 2026-09-24

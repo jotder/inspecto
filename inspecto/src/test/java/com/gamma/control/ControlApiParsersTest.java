@@ -265,6 +265,32 @@ class ControlApiParsersTest {
         }
     }
 
+    /** Slice P2 (operator D1 2026-09-25): a parser a Job Pack contributed is listed with its pack as
+     *  {@code source}; built-ins and classpath plugins say so too — the Job Type provenance vocabulary. */
+    @Test
+    void catalogNamesEachParsersProvenanceIncludingAPacksParser(@TempDir Path cfg) throws Exception {
+        com.gamma.parse.Parsers.register(new com.gamma.parse.ParserPlugin() {
+            @Override public String id() { return "acme_cdr"; }
+            @Override public String label() { return "Acme CDR"; }
+            @Override public boolean hierarchical() { return false; }
+            @Override public List<com.gamma.config.spec.FieldSpec> grammarSchema() { return List.of(); }
+            @Override public com.gamma.parse.ParseResult preview(byte[] s, Map<String, Object> g) {
+                return new com.gamma.parse.ParseResult.Tree(0, List.of());
+            }
+        }, "acme-1.jar");
+        try (Ctx c = open(cfg)) {
+            JsonNode list = json(send(c.port, "GET", "/parsers", null));
+            assertEquals(9, list.size(), list.toString());
+            assertEquals("builtin", list.get(0).get("source").asText());
+            assertEquals("classpath", list.get(6).get("source").asText(), "xml is a ServiceLoader plugin");
+            JsonNode pack = list.get(8);
+            assertEquals("acme_cdr", pack.get("id").asText(), "a pack parser lists after every other");
+            assertEquals("pack:acme-1.jar", pack.get("source").asText());
+        } finally {
+            com.gamma.parse.Parsers.deregister("acme-1.jar");
+        }
+    }
+
     // ── plumbing ──────────────────────────────────────────────────────────────────
 
     // ⚠ Every route is served under `/api/v1` — a bare `/api` returns "unknown API version", which
