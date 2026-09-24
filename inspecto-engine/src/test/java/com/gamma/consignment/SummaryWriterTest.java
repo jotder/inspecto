@@ -138,7 +138,7 @@ class SummaryWriterTest {
         emitter.emit(row("cdr", "2026-07-01", Measure.additive("count", 7)));
         List<ConsignmentOutput> registry = new ArrayList<>(written);
         registry.add(new ConsignmentOutput("c1", null, "cdr", "record_day=2026-07-01", "2026-07-01",
-                "/w/detail.parquet", 7L, 100L, "2026-08-04T10:00:00Z", 0, ConsignmentOutput.State.LIVE));
+                "/w/detail.parquet", 7L, 100L, "2026-08-04T10:00:00Z", ConsignmentOutput.State.LIVE));
         assertTrue(emitter.reconcile(registry).isEmpty(),
                 "7 summarised vs 7 detail must reconcile — the summary file must not be counted as detail");
     }

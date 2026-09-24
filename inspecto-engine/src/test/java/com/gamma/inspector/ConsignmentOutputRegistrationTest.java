@@ -97,7 +97,6 @@ class ConsignmentOutputRegistrationTest {
                 assertEquals(2L, o.rows(), "each partition took one row from each of the two members");
                 assertEquals(batch.batchId(), o.consignmentId());
                 assertEquals(ConsignmentOutput.State.LIVE, o.state());
-                assertEquals(0, o.generation());
                 assertTrue(o.bytes() > 0, "bytes come from the revealed file on disk: " + o.path());
                 assertTrue(Files.exists(Path.of(o.path())), "the registered path must be the revealed file");
                 assertNotNull(o.writtenAt());

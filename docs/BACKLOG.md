@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **47<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** —
+> **46<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 25<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 54 on 2026-09-24**: P2 `STREAM-CONSUMER-1` closed — Option A built, the `SP-ACQ-09` note updated, the plan distilled into `okf/capabilities/acquisition/acquisition.md` and archived.
 > ⬇ 55 → 54 on 2026-09-24: P3 `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` closed — its work had shipped in `d5f6353be`
@@ -21,9 +21,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 26<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 25<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 21<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 47<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 46<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -57,7 +57,7 @@ rank.
 |---|---|
 | **Startable now** — no gate, no owed decision | Onboarding D5-ref — ground the delete-feed first (§3.4) · `RELEASE-PIPELINE-NEVER-EXECUTED-1` — the checksum/signature split (§4) |
 | **Design first** — the trigger fired, the shape is not decided | AI drafting on a non-`schema` kind (§3.1) · Platform Services Stage 2/3 (§3.2) · cross-Space consequence (§3.5) · Bundle "load as draft" (§3.7) · D6 `findings-spec` UI (§3.9) · policy-authoring UX (§3.8) |
-| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · space-to-space comparison (postponed) · W5 forward closure (operator decision) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
+| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · space-to-space comparison (postponed) · W5 forward closure (operator decision) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
 
 **Standing rules for editing this board** (distilled from the shifts that grew the old page to 644 KB):
 
@@ -164,8 +164,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Consignments
 
-- **P2** · **Consignment addressing** — the ingest-side Consignment-scoped accessor waits for a consumer. ⚠ `DatasetRelation.temporalColumn` has no caller and cannot safely gain one on a write path. Settled — do not re-open: torn multi-file reads (closed by the pinned `ConsignmentSelector` list); `generation` IS read back (`DbConsignmentOutputStore`); `retire_superseded` is warned about, not silent, and ships as a disabled demo job (`spaces/demo/config/jobs/retire_superseded_job.toon`) — ⛔ its default is **not** flipped, because enabling retirement by default deletes bytes operators may rely on. → `okf/backend/engine/consignment-addressing.md`
-- **P2** · **Consignment ELT** — the surviving item is `generation`, **kept OPEN by operator choice 2026-09-23**: it is always a literal `0` (`ConsignmentOutputs.java:375`), nothing reads it for staging, and revisions use batch-id file names instead. The per-schema outputs decision shipped 2026-09-15 (the existing `consignment_outputs` child table made per-schema accurate; `batches` stays one row per ingest). ⛔ Pointers to `CONSIGNMENT-OUTPUTS-NULLRUN-1` are dead (refuted 2026-09-15). Deliberately unbuilt: the §7.4 rollup cache (until read-time aggregation is measurably slow); the §7.3 unpartitioned fallback stands by operator call. → `okf/backend/engine/db-layer.md` §3.9
+- **P2** · **Consignment addressing** — the ingest-side Consignment-scoped accessor waits for a consumer. ⚠ `DatasetRelation.temporalColumn` has no caller and cannot safely gain one on a write path. Settled — do not re-open: torn multi-file reads (closed by the pinned `ConsignmentSelector` list); `generation` was DELETED 2026-09-24 — nothing read it (`okf/backend/engine/db-layer.md` §3.9); `retire_superseded` is warned about, not silent, and ships as a disabled demo job (`spaces/demo/config/jobs/retire_superseded_job.toon`) — ⛔ its default is **not** flipped, because enabling retirement by default deletes bytes operators may rely on. → `okf/backend/engine/consignment-addressing.md`
 
 #### Admission
 

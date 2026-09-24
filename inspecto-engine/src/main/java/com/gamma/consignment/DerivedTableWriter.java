@@ -165,7 +165,7 @@ public final class DerivedTableWriter {
                                          String partition, Written w,
                                          String writtenAt, String producer, String fingerprint, long rows) {
         return new ConsignmentOutput(consignmentId, runId, table.name() + DERIVED_SUFFIX, partition,
-                null, w.path(), rows, w.bytes(), writtenAt, 0, ConsignmentOutput.State.LIVE,
+                null, w.path(), rows, w.bytes(), writtenAt, ConsignmentOutput.State.LIVE,
                 fingerprint, null, producer);
     }
 

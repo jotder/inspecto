@@ -146,7 +146,7 @@ class StreamWatermarkTest {
     private static ConsignmentOutput row(String consignment, String producer, String path,
                                          String eventTimeMax, Instant writtenAt) {
         return new ConsignmentOutput(consignment, "run-1", "cdr", "dt=2026-08-10", "2026-08-10", path,
-                1, 100, writtenAt.toString(), 0, ConsignmentOutput.State.LIVE, null,
+                1, 100, writtenAt.toString(), ConsignmentOutput.State.LIVE, null,
                 new EventTimeBounds("2026-08-10T00:00:00", eventTimeMax, 0), producer);
     }
 }

@@ -43,7 +43,7 @@ class {{className}}ProcessorTest {
 
     private static ConsignmentOutput output() {
         return new ConsignmentOutput("c-1", "run-1", "events", null, "2026-01-01",
-                "data/events.parquet", 10L, 1024L, "2026-01-01T00:00:00Z", 1,
+                "data/events.parquet", 10L, 1024L, "2026-01-01T00:00:00Z",
                 ConsignmentOutput.State.LIVE, null);
     }
 

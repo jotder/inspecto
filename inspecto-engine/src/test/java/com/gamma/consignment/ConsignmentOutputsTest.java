@@ -143,7 +143,6 @@ class ConsignmentOutputsTest {
 
         ConsignmentOutput o = rows.get(0);
         assertEquals(ConsignmentOutput.State.LIVE, o.state());
-        assertEquals(0, o.generation(), "a fresh write is generation 0; compaction bumps it");
         assertEquals("c1", o.consignmentId());
         assertEquals("r1", o.runId());
         assertEquals("cdr", o.tableName());

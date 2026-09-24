@@ -73,7 +73,7 @@ class DemoRetireSupersededJobShipsDisabledTest {
 
         try (var db = com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
             db.record(List.of(new com.gamma.consignment.ConsignmentOutput("c1", "run-1", "orders", "", null,
-                    old.toString(), 1, 1, "2026-08-01T10:00:00Z", 0,
+                    old.toString(), 1, 1, "2026-08-01T10:00:00Z",
                     com.gamma.consignment.ConsignmentOutput.State.SUPERSEDED)));
             com.gamma.consignment.ConsignmentOutputStores.use(db);
 

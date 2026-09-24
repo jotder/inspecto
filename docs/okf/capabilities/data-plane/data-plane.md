@@ -501,7 +501,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | DuckDB `memory_limit` **default** (GAP-4) | `BACKLOG.md` §3 *Deployment topology gaps* | Only the concurrency half of D11 defaults on; no `scheduler.toon` ships |
 | **Postgres multi-user** — pool, `browseConnection()`, schema-per-Space, `TriageRunStore`, the three uncovered stores, a concurrency test | `BACKLOG.md` §3 *Postgres multi-user* (PARKED by §6); `EDITIONS.md` OPS-03 | |
 | `graph` / `spatial` / `search` / `api` query types; more `$`-resolvers | `BACKLOG.md` §3 *Queries / BI* (P3) | Deliberately not built |
-| §7.4 rollup cache; `generation` staging; `run_id` always null | `BACKLOG.md` §3 *Consignment ELT* | Until read-time aggregation is measurably slow |
+| §7.4 rollup cache (deliberately unbuilt); `generation` deleted 2026-09-24 | `okf/backend/engine/db-layer.md` §3.9 — no board row | Until read-time aggregation is measurably slow |
 | `retire_superseded` must be configured or a recompute keeps an extra copy forever; `DatasetRelation.temporalColumn` has no caller | `BACKLOG.md` §3 *Consignment addressing* | |
 | `DatasetAccess` after the Consignment Selector; a fragment guard for third-party `LOWERED` steps | `BACKLOG.md` §3 *Platform Services Stage 2 / 3* | |
 | Reference-Dataset promotion export; "the engine has no grouping transform" | `BACKLOG.md` §3 *Unification W4 / W5* | |

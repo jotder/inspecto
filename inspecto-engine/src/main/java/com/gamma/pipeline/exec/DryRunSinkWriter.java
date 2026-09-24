@@ -71,7 +71,7 @@ public final class DryRunSinkWriter implements PipelineExecutor.SinkWriter {
         String now = Instant.now().toString();
         ConsignmentOutputStores.record(List.of(new ConsignmentOutput(
                 consignmentId, runId, store, null, null,
-                "(dry run — not written)", Math.max(rows, 0), 0L, now, 0,
+                "(dry run — not written)", Math.max(rows, 0), 0L, now,
                 ConsignmentOutput.State.SIMULATED, null, null, producer)));
     }
 

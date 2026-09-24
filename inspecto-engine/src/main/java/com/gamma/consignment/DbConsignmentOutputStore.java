@@ -77,7 +77,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      *  the spelling in {@code inspecto_pipeline_provenance} and the {@code lineage} CSV. */
     private static final String COLS =
             "consignment_id, run_id, table_name, partition_key, record_day, "
-                    + "path, row_count, bytes, written_at, generation, state, schema_fingerprint, "
+                    + "path, row_count, bytes, written_at, state, schema_fingerprint, "
                     + "event_time_min, event_time_max, event_time_spread_ms, producer";
 
     /** Every column except the three key columns, rewritten from the incoming row — last-writer-wins, because
@@ -88,7 +88,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             "table_name = excluded.table_name, partition_key = excluded.partition_key, "
                     + "record_day = excluded.record_day, row_count = excluded.row_count, "
                     + "bytes = excluded.bytes, written_at = excluded.written_at, "
-                    + "generation = excluded.generation, state = excluded.state, "
+                    + "state = excluded.state, "
                     + "schema_fingerprint = excluded.schema_fingerprint, "
                     + "event_time_min = excluded.event_time_min, event_time_max = excluded.event_time_max, "
                     + "event_time_spread_ms = excluded.event_time_spread_ms, producer = excluded.producer";
@@ -121,7 +121,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             + "consignment_id VARCHAR, run_id VARCHAR, table_name VARCHAR, "
             + "partition_key VARCHAR, record_day VARCHAR, path VARCHAR, "
             + "row_count BIGINT, bytes BIGINT, written_at VARCHAR, "
-            + "generation INTEGER, state VARCHAR, schema_fingerprint VARCHAR, "
+            + "state VARCHAR, schema_fingerprint VARCHAR, "
             + "event_time_min VARCHAR, event_time_max VARCHAR, "
             + "event_time_spread_ms BIGINT, producer VARCHAR, "
             + "UNIQUE (consignment_id, path, run_id))";
@@ -143,6 +143,11 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                     st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_max VARCHAR");
                     st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS event_time_spread_ms BIGINT");
                     st.execute("ALTER TABLE " + T + " ADD COLUMN IF NOT EXISTS producer VARCHAR");
+                    // Subtractive migration (2026-09-24): `generation` was a literal 0 on every write path and
+                    // nothing ever read it — revisions are superseded by `state`, compaction by COMPACTED_AWAY, and
+                    // reads pin file lists (ConsignmentSelector). A registry created before the drop loses the column
+                    // here; every other column and row survives.
+                    st.execute("ALTER TABLE " + T + " DROP COLUMN IF EXISTS generation");
                     // ⚠ The constraint is added LAST, after the widening above: the rebuild copies every column by
                     // name, so it can only run once a pre-constraint registry has them all.
                     if (!hasUniqueConstraint(st)) rebuildWithConstraint(conn, st);
@@ -226,7 +231,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         try {
             src.run(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(
-                        "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
+                        "INSERT INTO " + T + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) "
                                 + "ON CONFLICT (consignment_id, path, run_id) DO UPDATE SET " + UPSERT_SET)) {
                     for (ConsignmentOutput o : outputs) {
                         EventTimeBounds b = o.bounds();
@@ -239,15 +244,14 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                         ps.setLong(7, o.rows());
                         ps.setLong(8, o.bytes());
                         ps.setString(9, o.writtenAt());
-                        ps.setInt(10, o.generation());
-                        ps.setString(11, o.state().name());
-                        ps.setString(12, o.schemaFingerprint());
-                        ps.setString(13, b == null ? null : b.min());
-                        ps.setString(14, b == null ? null : b.max());
+                        ps.setString(10, o.state().name());
+                        ps.setString(11, o.schemaFingerprint());
+                        ps.setString(12, b == null ? null : b.min());
+                        ps.setString(13, b == null ? null : b.max());
                         // null, not 0: a spread of 0 is a real value (one event time in the file), so an absent
                         // bound has to read back as absent rather than as an instantaneous file.
-                        if (b == null) ps.setNull(15, java.sql.Types.BIGINT); else ps.setLong(15, b.spreadMs());
-                        ps.setString(16, o.producer());
+                        if (b == null) ps.setNull(14, java.sql.Types.BIGINT); else ps.setLong(14, b.spreadMs());
+                        ps.setString(15, o.producer());
                         ps.addBatch();
                     }
                     ps.executeBatch();
@@ -720,7 +724,6 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 rs.getLong("row_count"),
                 rs.getLong("bytes"),
                 rs.getString("written_at"),
-                rs.getInt("generation"),
                 state(rs.getString("state")),
                 rs.getString("schema_fingerprint"),
                 bounds(rs),

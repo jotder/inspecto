@@ -42,7 +42,7 @@ class ConsignmentSelectorTest {
 
     private static ConsignmentOutput row(String path, State state) {
         return new ConsignmentOutput("c-" + path.hashCode(), "run-1", "cdr", "", null, path,
-                1, 100, "2026-08-10T10:00:00Z", 0, state);
+                1, 100, "2026-08-10T10:00:00Z", state);
     }
 
     private static String glob(Path dir) {

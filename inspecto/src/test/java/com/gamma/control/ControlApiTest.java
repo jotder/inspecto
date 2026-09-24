@@ -180,7 +180,7 @@ class ControlApiTest {
             try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
                 ConsignmentOutputStores.use(store);
                 store.record(List.of(new ConsignmentOutput("cX", null, "totals__derived", "grp=even", null,
-                        dir.resolve("t.parquet").toString(), 7L, 900L, "2026-08-29T00:00:00Z", 0,
+                        dir.resolve("t.parquet").toString(), 7L, 900L, "2026-08-29T00:00:00Z",
                         ConsignmentOutput.State.LIVE, "id:BIGINT", null, "step_a")));
 
                 JsonNode body = json(send(c.port, "GET",

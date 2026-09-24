@@ -273,7 +273,7 @@ class PostgresStateStoreTest {
         try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open(url)) {
             store.record(List.of(new ConsignmentOutput("cons-1", "run-1", "cdr", "day=2026-08-15",
                     "2026-08-15", "/data/cdr/day=2026-08-15/part-0.parquet", 42L, 4096L,
-                    "2026-08-15T00:00:00Z", 1, ConsignmentOutput.State.LIVE)));
+                    "2026-08-15T00:00:00Z", ConsignmentOutput.State.LIVE)));
 
             List<ConsignmentOutput> got = store.outputs("cons-1");
             assertEquals(1, got.size(),
