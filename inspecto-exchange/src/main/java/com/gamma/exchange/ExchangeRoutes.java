@@ -113,11 +113,11 @@ public final class ExchangeRoutes implements RouteModule {
         String owner = requireSpace(api, ApiContext.str(body, "owner"), "owner");
         String item  = requireItem(body);
         if (ex.offer(owner, "dataset", item).isEmpty())
-            throw new ApiException(404, "no offered dataset " + owner + "/" + item);
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no offered dataset " + owner + "/" + item);
         SpaceContext ctx = api.spaces().space(SpaceId.of(owner))
-                .orElseThrow(() -> new ApiException(404, "no such space '" + owner + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + owner + "'"));
         java.nio.file.Path config = ctx.root().config();
-        if (config == null) throw new ApiException(409, "space '" + owner + "' has no registry");
+        if (config == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + owner + "' has no registry");
         try {
             ExchangeSnapshots.SnapshotMeta meta = ExchangeSnapshotWriter.publish(
                     ex.dir(), owner, config.resolve("registry"),
@@ -130,9 +130,9 @@ public final class ExchangeRoutes implements RouteModule {
             EventLog.current().emit(b);
             return meta.toMap();
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (Exception fail) {
-            throw new ApiException(500, "snapshot failed: " + fail.getMessage());
+            throw new ApiException(500, ErrorCodes.INTERNAL, "snapshot failed: " + fail.getMessage());
         }
     }
 
@@ -153,7 +153,7 @@ public final class ExchangeRoutes implements RouteModule {
         // The offered component must actually exist in the owner Space's registry (cross-Space read is
         // legitimate here — the Exchange is the one surface that spans Spaces).
         ComponentRegistry.Component component = registry.get(kind, item)
-                .orElseThrow(() -> new ApiException(404, "no " + kind + " '" + item + "' in space '" + owner + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no " + kind + " '" + item + "' in space '" + owner + "'"));
 
         // A derived item (a Widget, a saved View) shares render-only, and the grants of every Dataset it
         // reads travel with it (§3.5, generalized by D9): each must already be offered by the same owner.
@@ -161,15 +161,15 @@ public final class ExchangeRoutes implements RouteModule {
         // LA-21 / D-E6: a Working Set Widget never leaves its Space through the Exchange (the reason differs by mode).
         if ("widget".equals(kind)) {
             java.util.Optional<String> refusal = WorkingSetWidgets.exchangeRefusal(item, component.content());
-            if (refusal.isPresent()) throw new ApiException(422, refusal.get());
+            if (refusal.isPresent()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refusal.get());
         }
         if (Exchange.isDerived(kind)) {
             datasets = boundDatasetsOf(kind, component.content());
             if (datasets.isEmpty())
-                throw new ApiException(422, noBindingMessage(kind, item, component.content()));
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, noBindingMessage(kind, item, component.content()));
             for (String ds : datasets)
                 if (ex.offer(owner, "dataset", ds).isEmpty())
-                    throw new ApiException(409, "offer the " + kind + "'s dataset '" + ds
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "offer the " + kind + "'s dataset '" + ds
                             + "' before the " + kind);
         }
 
@@ -194,9 +194,9 @@ public final class ExchangeRoutes implements RouteModule {
         String consumer = requireSpace(api, ApiContext.str(body, "consumer"), "consumer");
         String item     = requireItem(body);
         if (owner.equals(consumer))
-            throw new ApiException(400, "a space cannot request a share from itself");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "a space cannot request a share from itself");
         if (ex.offer(owner, kind, item).isEmpty())
-            throw new ApiException(404, "no offer for " + kind + " " + owner + "/" + item);
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no offer for " + kind + " " + owner + "/" + item);
         try {
             ShareGrant g = ex.request(kind, item, owner, consumer, ApiContext.actor(e),
                     ApiContext.str(body, "purpose"), ApiContext.str(body, "mode"));
@@ -204,10 +204,10 @@ public final class ExchangeRoutes implements RouteModule {
                     owner, consumer, kind, item);
             return g.toMap();
         } catch (IllegalStateException conflict) {
-            throw new ApiException(409, conflict.getMessage());
+            throw new ApiException(409, ErrorCodes.CONFLICT, conflict.getMessage());
         } catch (IllegalArgumentException bad) {
             // e.g. mode 'snapshot' on a saved view — meaningless, so rejected rather than coerced to live.
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
     }
 
@@ -219,7 +219,7 @@ public final class ExchangeRoutes implements RouteModule {
                 case "approve" -> ex.approve(id, actor);
                 case "deny"    -> ex.deny(id, actor);
                 case "revoke"  -> ex.revoke(id, actor);
-                default        -> throw new ApiException(400, "unknown grant action '" + action + "'");
+                default        -> throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "unknown grant action '" + action + "'");
             };
             String type = switch (action) {
                 case "approve" -> EventType.EXCHANGE_GRANTED;
@@ -230,9 +230,9 @@ public final class ExchangeRoutes implements RouteModule {
                     g.owner(), g.consumer(), g.kind(), g.item());
             return g.toMap();
         } catch (NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         } catch (IllegalStateException conflict) {
-            throw new ApiException(409, conflict.getMessage());
+            throw new ApiException(409, ErrorCodes.CONFLICT, conflict.getMessage());
         }
     }
 
@@ -242,7 +242,7 @@ public final class ExchangeRoutes implements RouteModule {
         try {
             return ex.setPin(id, ApiContext.str(api.body(e), "version")).toMap();
         } catch (NoSuchElementException nf) {
-            throw new ApiException(404, nf.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, nf.getMessage());
         }
     }
 
@@ -257,13 +257,13 @@ public final class ExchangeRoutes implements RouteModule {
             try {
                 expiresAt = Long.parseLong(v.toString().trim());
             } catch (NumberFormatException bad) {
-                throw new ApiException(400, "'expiresAt' must be epoch millis");
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'expiresAt' must be epoch millis");
             }
         }
         try {
             return ex.setExpiry(id, expiresAt).toMap();
         } catch (NoSuchElementException nf) {
-            throw new ApiException(404, nf.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, nf.getMessage());
         }
     }
 
@@ -277,7 +277,7 @@ public final class ExchangeRoutes implements RouteModule {
     private Object datasetMeta(ApiContext api, HttpExchange e, String owner, String item) {
         Exchange ex = requireExchange(api);
         Offer offer = ex.offer(owner, "dataset", item)
-                .orElseThrow(() -> new ApiException(404, "no offered dataset " + owner + "/" + item));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no offered dataset " + owner + "/" + item));
         Map<String, Object> out = withFreshness(ex, new LinkedHashMap<>(offer.toMap()), owner, item);
         String consumer = ApiContext.query(e, "consumer");
         if (consumer != null)
@@ -295,11 +295,11 @@ public final class ExchangeRoutes implements RouteModule {
     private Object widgetRender(ApiContext api, HttpExchange e, String owner, String item) {
         Exchange ex = requireExchange(api);
         String consumer = ApiContext.query(e, "consumer");
-        if (consumer == null) throw new ApiException(400, "'consumer' query param is required");
+        if (consumer == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'consumer' query param is required");
         if (!ex.canRenderWidget(consumer, owner, item))
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "no active grant to render widget " + owner + "/" + item);
         ComponentRegistry.Component c = ownerRegistry(api, owner).get("widget", item)
-                .orElseThrow(() -> new ApiException(404, "no widget '" + item + "' in space '" + owner + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no widget '" + item + "' in space '" + owner + "'"));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("owner", owner);
         out.put("item", item);
@@ -320,11 +320,11 @@ public final class ExchangeRoutes implements RouteModule {
     private Object viewRender(ApiContext api, HttpExchange e, String owner, String item) {
         Exchange ex = requireExchange(api);
         String consumer = ApiContext.query(e, "consumer");
-        if (consumer == null) throw new ApiException(400, "'consumer' query param is required");
+        if (consumer == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'consumer' query param is required");
         if (!ex.canRender(consumer, owner, Exchange.VIEW, item))
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "no active grant to render view " + owner + "/" + item);
         ComponentRegistry.Component c = ownerRegistry(api, owner).get(Exchange.VIEW, item)
-                .orElseThrow(() -> new ApiException(404, "no view '" + item + "' in space '" + owner + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no view '" + item + "' in space '" + owner + "'"));
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("owner", owner);
         out.put("item", item);
@@ -445,22 +445,22 @@ public final class ExchangeRoutes implements RouteModule {
     private static Exchange requireExchange(ApiContext api) {
         Exchange ex = Exchange.under(api.spaces().containerRoot());
         if (!ex.enabled())
-            throw new ApiException(409, "cross-space sharing needs the multi-space runtime (-Dspaces.root)");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "cross-space sharing needs the multi-space runtime (-Dspaces.root)");
         return ex;
     }
 
     private static ComponentStore ownerRegistry(ApiContext api, String owner) {
         SpaceContext ctx = api.spaces().space(SpaceId.of(owner))
-                .orElseThrow(() -> new ApiException(404, "no such space '" + owner + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + owner + "'"));
         java.nio.file.Path config = ctx.root().config();
-        if (config == null) throw new ApiException(409, "space '" + owner + "' has no registry");
+        if (config == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + owner + "' has no registry");
         return new ComponentStore(config.resolve("registry"));
     }
 
     private static String requireKind(Map<String, Object> body) {
         String kind = ApiContext.str(body, "kind");
         if (!"dataset".equals(kind) && !"widget".equals(kind) && !Exchange.VIEW.equals(kind))
-            throw new ApiException(400, "'kind' must be 'dataset', 'widget' or '" + Exchange.VIEW + "'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'kind' must be 'dataset', 'widget' or '" + Exchange.VIEW + "'");
         return kind;
     }
 
@@ -468,16 +468,16 @@ public final class ExchangeRoutes implements RouteModule {
     private static String requireItem(Map<String, Object> body) {
         String item = ApiContext.str(body, "item");
         if (item == null || item.contains("..") || !item.matches("[A-Za-z0-9][A-Za-z0-9._-]*"))
-            throw new ApiException(400, "'item' must be a valid component id");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'item' must be a valid component id");
         return item;
     }
 
     /** Validate a space id from the body exists as a hosted Space. */
     private static String requireSpace(ApiContext api, String id, String field) {
         if (id == null || !SpaceId.isValid(id))
-            throw new ApiException(400, "'" + field + "' must be a valid space id");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'" + field + "' must be a valid space id");
         if (api.spaces().space(SpaceId.of(id)).isEmpty())
-            throw new ApiException(404, "no such space '" + id + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
         return id;
     }
 

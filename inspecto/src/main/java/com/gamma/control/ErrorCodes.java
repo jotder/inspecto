@@ -27,6 +27,8 @@ public final class ErrorCodes {
     public static final String PERMISSION_DENIED        = "PERMISSION_DENIED";
     /** 429 — the per-subject token bucket for an expensive route is exhausted ({@code NO-RATE-LIMIT-EXPENSIVE-ROUTES-1}). */
     public static final String RATE_LIMITED             = "RATE_LIMITED";
+    /** 501 — the route exists but does not support this request's shape on this host (e.g. run-to-here on a non-file Collector). */
+    public static final String NOT_SUPPORTED            = "NOT_SUPPORTED";
 
     /** The contract's default code for a status ({@code errorCode} is never absent on a v1 error). */
     static String defaultFor(int status) {
@@ -38,6 +40,7 @@ public final class ErrorCodes {
             case 405 -> METHOD_NOT_ALLOWED;
             case 409 -> CONFLICT;
             case 422 -> CONFIG_VALIDATION_FAILED;
+            case 501 -> NOT_SUPPORTED;
             case 503 -> CAPABILITY_UNAVAILABLE;
             default  -> INTERNAL;
         };

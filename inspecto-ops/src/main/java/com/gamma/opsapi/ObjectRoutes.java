@@ -7,6 +7,7 @@ import com.gamma.control.Subject;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.Cursor;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.Handler;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
@@ -125,11 +126,11 @@ public final class ObjectRoutes implements RouteModule {
      */
     private Object openCaseFromEntities(ApiContext api, HttpExchange ex, Map<String, Object> body) {
         String title = ApiContext.str(body, "title");
-        if (title == null) throw new ApiException(400, "body must include 'title'");
+        if (title == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'title'");
         if (!(body.get("entities") instanceof List<?> raw) || raw.isEmpty())
-            throw new ApiException(400, "body must include at least one entry in 'entities'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include at least one entry in 'entities'");
         if (raw.size() > MAX_CASE_ENTITIES)
-            throw new ApiException(422, "at most " + MAX_CASE_ENTITIES + " entities per Case, got " + raw.size());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_CASE_ENTITIES + " entities per Case, got " + raw.size());
         List<ObjectService.EntityMember> entities = new java.util.ArrayList<>();
         List<String> existing = new java.util.ArrayList<>();
         try {
@@ -152,9 +153,9 @@ public final class ObjectRoutes implements RouteModule {
         } catch (IllegalArgumentException refused) {
             // Only the refusals. A store that FAILS (IllegalStateException) stays a 500 — reporting it as a
             // bad body would send the analyst to fix input that was never wrong.
-            throw new ApiException(422, refused.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refused.getMessage());
         } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
     }
 
@@ -175,7 +176,7 @@ public final class ObjectRoutes implements RouteModule {
         try {
             rule = CaseRule.fromMap(body);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         Path file = caseRuleFile(api, rule.name());
         byte[] bytes = ConfigCodec.toToon(Map.of("case_rule", rule.toMap())).getBytes(StandardCharsets.UTF_8);
@@ -187,7 +188,7 @@ public final class ObjectRoutes implements RouteModule {
     private Object deleteCaseRule(ApiContext api, String name) throws IOException {
         WriteGates.requireWriteRoot(api, "case rule write");
         if (OpsEngine.of(api).caseRule(name).isEmpty())
-            throw new ApiException(404, "no case rule named '" + name + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no case rule named '" + name + "'");
         boolean fileRemoved = Files.deleteIfExists(caseRuleFile(api, name));
         OpsEngine.of(api).removeCaseRule(name);
         return Map.of("deleted", name, "fileRemoved", fileRemoved);
@@ -207,7 +208,7 @@ public final class ObjectRoutes implements RouteModule {
             out.put("opened", r.opened());
             return out;
         } catch (NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
     }
 
@@ -302,7 +303,7 @@ public final class ObjectRoutes implements RouteModule {
      */
     private static void requireVisible(ApiContext api, HttpExchange ex, String id) {
         OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
-        if (o == null || !visibleTo(ex, o)) throw new ApiException(404, "no object with id '" + id + "'");
+        if (o == null || !visibleTo(ex, o)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no object with id '" + id + "'");
     }
 
     /** Wrap a by-id handler: out-of-scope answers the same 404 an absent id does (existence-hiding). */
@@ -311,7 +312,7 @@ public final class ObjectRoutes implements RouteModule {
             String id = ApiContext.name(m);
             OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
             if (o != null && !visibleTo(e, o))
-                throw new ApiException(404, "no object with id '" + id + "'");
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "no object with id '" + id + "'");
             return h.handle(e, m);   // absent ids keep their existing 404/behaviour
         };
     }
@@ -325,7 +326,7 @@ public final class ObjectRoutes implements RouteModule {
     static String visibleObjectCorrelationId(ApiContext api, HttpExchange ex, String id) {
         OperationalObject o = OpsEngine.of(api).get(id).orElse(null);
         if (o == null) return null;
-        if (!visibleTo(ex, o)) throw new ApiException(404, "no object with id '" + id + "'");
+        if (!visibleTo(ex, o)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no object with id '" + id + "'");
         return o.correlationId() == null ? "" : o.correlationId();
     }
 
@@ -404,14 +405,14 @@ public final class ObjectRoutes implements RouteModule {
         try {
             return ObjectType.of(s);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
     }
 
     /** {@code GET /objects/{id}} — the object, or 404. */
     private Object objectById(ApiContext api, String id) {
         return OpsEngine.of(api).get(id).map(OperationalObject::toMap)
-                .orElseThrow(() -> new ApiException(404, "no object with id '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no object with id '" + id + "'"));
     }
 
     /**
@@ -427,19 +428,19 @@ public final class ObjectRoutes implements RouteModule {
      */
     private Object createObject(ApiContext api, HttpExchange ex, Map<String, Object> body) {
         String title = ApiContext.str(body, "title");
-        if (title == null) throw new ApiException(400, "body must include 'title'");
+        if (title == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'title'");
         ObjectType type;
         try {
             type = ObjectType.of(ApiContext.str(body, "type"));
         } catch (IllegalArgumentException badType) {
-            throw new ApiException(400, badType.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, badType.getMessage());
         }
         if (type == null) type = ObjectType.INCIDENT;   // the create path exists for operator-created incidents
 
         // ≥1 linked entity is mandatory. Validate every target exists BEFORE opening, so a dangling link
         // can't leave an orphan object behind (open() then link() is not atomic).
         List<LinkSpec> links = parseLinks(body.get("links"));
-        if (links.isEmpty()) throw new ApiException(400, "body must include at least one entry in 'links'");
+        if (links.isEmpty()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include at least one entry in 'links'");
         for (LinkSpec l : links) requireVisible(api, ex, l.to());
 
         Map<String, String> attrs = new LinkedHashMap<>();
@@ -514,12 +515,12 @@ public final class ObjectRoutes implements RouteModule {
      */
     private Object createLink(ApiContext api, HttpExchange ex, String fromId, Map<String, Object> body) {
         String to = ApiContext.str(body, "to");
-        if (to == null) throw new ApiException(400, "body must include 'to'");
+        if (to == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'to'");
         requireVisible(api, ex, to);
         try {
             return OpsEngine.of(api).link(fromId, to, ApiContext.str(body, "relationship"), ApiContext.str(body, "actor")).toMap();
         } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
     }
 
@@ -535,13 +536,13 @@ public final class ObjectRoutes implements RouteModule {
     private Object deleteLink(ApiContext api, String fromId, HttpExchange ex) {
         String to = ApiContext.query(ex, "to");
         String relationship = ApiContext.query(ex, "relationship");
-        if (to == null || to.isBlank()) throw new ApiException(400, "query must include 'to'");
+        if (to == null || to.isBlank()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "query must include 'to'");
         requireVisible(api, ex, to);
         try {
             if (!OpsEngine.of(api).unlink(fromId, to, relationship, ApiContext.query(ex, "actor")))
-                throw new ApiException(404, "no such link " + fromId + " -> " + to);
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such link " + fromId + " -> " + to);
         } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
         return Map.of("from", fromId, "to", to, "deleted", true);
     }
@@ -554,7 +555,7 @@ public final class ObjectRoutes implements RouteModule {
      */
     private Object mergeCases(ApiContext api, HttpExchange ex, String survivorId, Map<String, Object> body) {
         List<String> sources = stringList(body.get("sources"));
-        if (sources.isEmpty()) throw new ApiException(400, "body must include non-empty 'sources'");
+        if (sources.isEmpty()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include non-empty 'sources'");
         for (String source : sources) requireVisible(api, ex, source);
         return RouteErrors.mapCaseErrors(() -> {
             var result = OpsEngine.of(api).mergeCases(survivorId, sources, ApiContext.str(body, "actor"));
@@ -575,8 +576,8 @@ public final class ObjectRoutes implements RouteModule {
     private Object splitCase(ApiContext api, HttpExchange ex, String caseId, Map<String, Object> body) {
         String title = ApiContext.str(body, "title");
         List<String> members = stringList(body.get("members"));
-        if (title == null || title.isBlank()) throw new ApiException(400, "body must include 'title'");
-        if (members.isEmpty()) throw new ApiException(400, "body must include non-empty 'members'");
+        if (title == null || title.isBlank()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'title'");
+        if (members.isEmpty()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include non-empty 'members'");
         for (String member : members) requireVisible(api, ex, member);
         return RouteErrors.mapCaseErrors(() -> {
             var result = OpsEngine.of(api).splitCase(caseId, title, members,
@@ -613,7 +614,7 @@ public final class ObjectRoutes implements RouteModule {
         try {
             g = OpsEngine.of(api).graph(id, depth);
         } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
         List<Map<String, Object>> nodes = (List<Map<String, Object>>) g.get("nodes");
         java.util.Set<String> visible = new java.util.HashSet<>();
@@ -634,11 +635,11 @@ public final class ObjectRoutes implements RouteModule {
     /** {@code POST /objects/{id}/comments} (Phase 4) — add a comment; body {@code {body, author?}}. */
     private Object addComment(ApiContext api, String id, Map<String, Object> body) {
         String text = ApiContext.str(body, "body");
-        if (text == null) throw new ApiException(400, "body must include 'body'");
+        if (text == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'body'");
         try {
             return OpsEngine.of(api).comment(id, ApiContext.str(body, "author"), text).toMap();
         } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
     }
 
@@ -649,12 +650,12 @@ public final class ObjectRoutes implements RouteModule {
     private Object addAttachment(ApiContext api, String id, Map<String, Object> body) {
         String name = ApiContext.str(body, "name");
         String uri = ApiContext.str(body, "uri");
-        if (name == null || uri == null) throw new ApiException(400, "body must include 'name' and 'uri'");
+        if (name == null || uri == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'name' and 'uri'");
         try {
             return OpsEngine.of(api).attach(id, ApiContext.str(body, "author"), name, ApiContext.str(body, "contentType"),
                     uri, ApiContext.str(body, "caption")).toMap();
         } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
     }
 
@@ -671,7 +672,7 @@ public final class ObjectRoutes implements RouteModule {
         Object t = body.get("template");
         if (t instanceof String named) {       // a *_rca.toon template referenced by name
             template = api.service().rcaTemplate(named).orElseThrow(
-                    () -> new ApiException(404, "no RCA template named '" + named + "'"));
+                    () -> new ApiException(404, ErrorCodes.NOT_FOUND, "no RCA template named '" + named + "'"));
         } else {                                // an inline template ({template:{…}} or the body itself)
             Map<String, Object> tmpl = new LinkedHashMap<>();
             if (t instanceof Map<?, ?> tm) tm.forEach((k, v) -> tmpl.put(String.valueOf(k), v));
@@ -680,13 +681,13 @@ public final class ObjectRoutes implements RouteModule {
             try {
                 template = RcaTemplate.fromMap(tmpl);
             } catch (IllegalArgumentException ex) {
-                throw new ApiException(400, ex.getMessage());
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, ex.getMessage());
             }
         }
         try {
             return toNoteMaps(OpsEngine.of(api).applyRca(id, template, ApiContext.str(body, "actor")));
         } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
     }
 
@@ -701,7 +702,7 @@ public final class ObjectRoutes implements RouteModule {
      */
     private Object assign(ApiContext api, String id, Map<String, Object> body) {
         String assignee = ApiContext.str(body, "assignee");
-        if (assignee == null) throw new ApiException(400, "body must include 'assignee'");
+        if (assignee == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'assignee'");
         return RouteErrors.mapCaseErrors(
                 () -> OpsEngine.of(api).assign(id, assignee, ApiContext.str(body, "actor")).toMap());
     }
@@ -724,12 +725,12 @@ public final class ObjectRoutes implements RouteModule {
         String severity = ApiContext.str(body, "severity");
         String assignee = ApiContext.str(body, "assignee");
         if (priority == null && severity == null && assignee == null && attrs == null)
-            throw new ApiException(400, "body must include at least one of 'priority', 'severity', 'assignee', 'attributes'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include at least one of 'priority', 'severity', 'assignee', 'attributes'");
         if (attrs != null) validateFindings(api, id, attrs);
         try {
             return OpsEngine.of(api).patch(id, priority, severity, assignee, attrs).toMap();
         } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
     }
 
@@ -750,7 +751,7 @@ public final class ObjectRoutes implements RouteModule {
         try {
             effectiveFindingsSpec(api, o.objectType()).validateValues(attrs, merged);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
     }
 
@@ -765,7 +766,7 @@ public final class ObjectRoutes implements RouteModule {
         String target = ApiContext.str(body, "status");
         if (target == null) target = ApiContext.str(body, "to");
         if (action == null && target == null)
-            throw new ApiException(400, "body must include 'action' or 'status'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'action' or 'status'");
         return doTransition(api, id, action, target, ApiContext.str(body, "actor"));
     }
 
@@ -777,9 +778,9 @@ public final class ObjectRoutes implements RouteModule {
                     : OpsEngine.of(api).transitionTo(id, target, actor);
             return updated.toMap();
         } catch (java.util.NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         } catch (IllegalStateException | IllegalArgumentException illegal) {
-            throw new ApiException(422, illegal.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, illegal.getMessage());
         }
     }
 }

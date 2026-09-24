@@ -89,21 +89,21 @@ final class ComponentRoutes implements RouteModule {
      * And no AST→SQL sibling exists or may be added (Q2): the tree is read-only, for good.
      */
     private Object sqlAst(Map<String, Object> body) {
-        if (body == null) throw new ApiException(400, "body must not be empty");
+        if (body == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must not be empty");
         Object rawSql = body.get("sql");
         if (!(rawSql instanceof String sql) || sql.isBlank()) {
-            throw new ApiException(400, "body must include non-blank 'sql'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include non-blank 'sql'");
         }
         Object rawFragment = body.get("fragment");
         SqlAst.Fragment fragment;
         if (rawFragment == null || "statement".equals(rawFragment)) fragment = SqlAst.Fragment.STATEMENT;
         else if ("predicate".equals(rawFragment)) fragment = SqlAst.Fragment.PREDICATE;
-        else throw new ApiException(400, "'fragment' must be 'statement' or 'predicate'");
+        else throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'fragment' must be 'statement' or 'predicate'");
         SqlAst.Result r;
         try {
             r = SqlAst.parse(sql, fragment);
         } catch (java.sql.SQLException | IOException e) {
-            throw new ApiException(500, "the SQL structure could not be read: " + duckDbMessage(e.getMessage()));
+            throw new ApiException(500, ErrorCodes.INTERNAL, "the SQL structure could not be read: " + duckDbMessage(e.getMessage()));
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("ok", r.ok());
@@ -129,10 +129,10 @@ final class ComponentRoutes implements RouteModule {
     private Object validateMapping(Map<String, Object> body) {
         Object rulesObj = body.get("rules");
         if (!(rulesObj instanceof List<?> list))
-            throw new ApiException(400, "body must include 'rules' (a list of mapping rules)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'rules' (a list of mapping rules)");
         for (Object row : list) {
             if (!(row instanceof Map<?, ?>))
-                throw new ApiException(400, "every entry of 'rules' must be an object");
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "every entry of 'rules' must be an object");
         }
         List<Finding> findings = MappingRules.validate((List<Map<String, Object>>) rulesObj);
         Map<String, Object> r = new LinkedHashMap<>();
@@ -161,18 +161,18 @@ final class ComponentRoutes implements RouteModule {
      * <p>400 on a missing/invalid body, 422 with the guard's reason or DuckDB's own binder/syntax error.
      */
     private Object describeTransform(Map<String, Object> body) {
-        if (body == null) throw new ApiException(400, "body must not be empty");
+        if (body == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must not be empty");
         Object rawSql = body.get("sql");
         if (!(rawSql instanceof String sql) || sql.isBlank()) {
-            throw new ApiException(400, "body must include non-blank 'sql'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include non-blank 'sql'");
         }
         Object rawCols = body.get("inputColumns");
         if (!(rawCols instanceof List<?> list) || list.isEmpty()) {
-            throw new ApiException(400, "body must include non-empty 'inputColumns'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include non-empty 'inputColumns'");
         }
         List<Finding> violations = SqlGuard.check(sql);
         if (!violations.isEmpty()) {
-            throw new ApiException(422, violations.get(0).message());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, violations.get(0).message());
         }
         List<TypeFlow.Column> inputColumns = new java.util.ArrayList<>();
         for (Object item : list) {
@@ -189,7 +189,7 @@ final class ComponentRoutes implements RouteModule {
             }
         }
         if (inputColumns.isEmpty()) {
-            throw new ApiException(400, "inputColumns must contain at least one column definition");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "inputColumns must contain at least one column definition");
         }
         try {
             List<Map<String, String>> cols = new java.util.ArrayList<>();
@@ -198,7 +198,7 @@ final class ComponentRoutes implements RouteModule {
             }
             return Map.of("columns", cols);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, duckDbMessage(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, duckDbMessage(e.getMessage()));
         }
     }
 
@@ -261,7 +261,7 @@ final class ComponentRoutes implements RouteModule {
                     .filter(c -> ComponentAccess.canView(ex, c.content()))
                     .map(ComponentRoutes::componentDoc).toList();
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
     }
 
@@ -275,9 +275,9 @@ final class ComponentRoutes implements RouteModule {
         try {
             c = root == null ? null : new ComponentStore(root).get(type, id).orElse(null);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
-        if (c == null) throw new ApiException(404, "no " + type + " component '" + id + "'");
+        if (c == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + type + " component '" + id + "'");
         ComponentAccess.requireView(ex, type, id, c.content());   // R3: shared-away ⇒ indistinguishable 404
         // SEC-7(b): the only verbs on a registry component are the Workbench-authoring family.
         ApiContext.resourcePermissions(ex, java.util.Set.of("canAuthorWorkbench"));
@@ -292,9 +292,9 @@ final class ComponentRoutes implements RouteModule {
         ComponentStore store = componentStore(api);
         String id = ApiContext.str(body, "id");
         if (id == null || id.isBlank()) id = ApiContext.str(body, "name");
-        if (id == null || id.isBlank()) throw new ApiException(400, "body must include 'id' (or 'name')");
+        if (id == null || id.isBlank()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'id' (or 'name')");
         if (componentExists(store, type, id))
-            throw new ApiException(409, type + " component '" + id + "' already exists (use PUT to update)");
+            throw new ApiException(409, ErrorCodes.CONFLICT, type + " component '" + id + "' already exists (use PUT to update)");
         // R3: validate the sharing envelope + stamp owner from the authenticated subject (provenance).
         return writeComponent(api, store, ex, type, id, ComponentAccess.onCreate(ex, body));
     }
@@ -307,7 +307,7 @@ final class ComponentRoutes implements RouteModule {
     private Object updateComponent(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String type, String id, Map<String, Object> body) throws IOException {
         ComponentStore store = componentStore(api);
         ComponentRegistry.Component current = existing(store, type, id);
-        if (current == null) throw new ApiException(404, "no " + type + " component '" + id + "'");
+        if (current == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + type + " component '" + id + "'");
         // R3: edit access against the current envelope, carry owner/shares forward, owner-only envelope changes.
         Map<String, Object> merged = ComponentAccess.onUpdate(ex, type, id, current.content(), body);
         ETags.requireMatch(ex, ETags.of(ContentHash.of(current.content())));
@@ -364,7 +364,7 @@ final class ComponentRoutes implements RouteModule {
         try {
             return store.get(type, id).orElse(null);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
     }
 
@@ -372,23 +372,23 @@ final class ComponentRoutes implements RouteModule {
     private Object deleteComponent(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String type, String id) throws IOException {
         ComponentStore store = componentStore(api);
         ComponentRegistry.Component current = existing(store, type, id);
-        if (current == null) throw new ApiException(404, "no " + type + " component '" + id + "'");
+        if (current == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + type + " component '" + id + "'");
         ComponentAccess.requireDelete(ex, type, id, current.content());   // R3: shared ⇒ owner-only delete
         List<String> refs = PipelineReferences.referencedBy(type + "/" + id, PipelineSupport.liftedPipelines(api.service()));
         if (!refs.isEmpty())
-            throw new ApiException(409, type + " component '" + id + "' is referenced by pipeline(s): "
+            throw new ApiException(409, ErrorCodes.CONFLICT, type + " component '" + id + "' is referenced by pipeline(s): "
                     + String.join(", ", refs));
         // Deletion fence extends to the Exchange: an offered item still shared with other Spaces cannot be
         // deleted out from under its consumers (fail-closed; revoke the grant(s) first).
         List<String> consumers = activeConsumers(api, type, id);
         if (!consumers.isEmpty())
-            throw new ApiException(409, type + " component '" + id + "' is shared with space(s): "
+            throw new ApiException(409, ErrorCodes.CONFLICT, type + " component '" + id + "' is shared with space(s): "
                     + String.join(", ", consumers) + " — revoke the grant(s) first");
         boolean removed;
         try {
             removed = store.delete(type, id);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
         return Map.of("type", type, "id", id, "deleted", true, "fileRemoved", removed);
     }
@@ -399,12 +399,12 @@ final class ComponentRoutes implements RouteModule {
         if (root == null) return List.of();
         ComponentStore store = new ComponentStore(root);
         ComponentRegistry.Component current = existing(store, type, id);
-        if (current == null) throw new ApiException(404, "no " + type + " component '" + id + "'");
+        if (current == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + type + " component '" + id + "'");
         ComponentAccess.requireView(ex, type, id, current.content());   // R3: history is as private as the doc
         try {
             return store.versions(type, id).stream().map(v -> versionDoc(type, id, v)).toList();
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
     }
 
@@ -419,16 +419,16 @@ final class ComponentRoutes implements RouteModule {
         try {
             version = Integer.parseInt(versionStr);
         } catch (NumberFormatException e) {
-            throw new ApiException(400, "version must be an integer, got '" + versionStr + "'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "version must be an integer, got '" + versionStr + "'");
         }
         ComponentRegistry.Component current = existing(store, type, id);
-        if (current == null) throw new ApiException(404, "no " + type + " component '" + id + "'");
+        if (current == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + type + " component '" + id + "'");
         Map<String, Object> content;
         try {
             content = store.versionContent(type, id, version).orElseThrow(
-                    () -> new ApiException(404, "no version " + version + " of " + type + " component '" + id + "'"));
+                    () -> new ApiException(404, ErrorCodes.NOT_FOUND, "no version " + version + " of " + type + " component '" + id + "'"));
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
         // R3: a restore is an update — edit access, envelope carried forward, owner-only envelope changes.
         return writeComponent(api, store, ex, type, id, ComponentAccess.onUpdate(ex, type, id, current.content(), content));
@@ -459,13 +459,13 @@ final class ComponentRoutes implements RouteModule {
         try {
             c = root == null ? null : new ComponentStore(root).get("transform", id).orElse(null);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
-        if (c == null) throw new ApiException(404, "no transform component '" + id + "'");
+        if (c == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no transform component '" + id + "'");
         ComponentAccess.requireView(ex, "transform", id, c.content());   // R3
         String type = ApiContext.str(c.content(), "type");
         if (type == null || !type.startsWith("transform."))
-            throw new ApiException(422, "component '" + id + "' is not a transform ('type: transform.*' required)");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "component '" + id + "' is not a transform ('type: transform.*' required)");
 
         PipelineNode node = new PipelineNode(id, type, c.content(), null);
         return RouteErrors.mapPreviewErrors(() -> ComponentPreview.transform(node, ApiContext.sampleRows(body)));
@@ -491,7 +491,7 @@ final class ComponentRoutes implements RouteModule {
         try {
             return ComponentPreview.sink(c.content(), ApiContext.sampleRows(body));
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
     }
 
@@ -513,7 +513,7 @@ final class ComponentRoutes implements RouteModule {
         Map<String, Object> config = requireInlineConfig(body);
         String type = ApiContext.str(config, "type");
         if (type == null || !type.startsWith("transform."))
-            throw new ApiException(422, "inline config is not a transform ('type: transform.*' required)");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "inline config is not a transform ('type: transform.*' required)");
         return RouteErrors.mapPreviewErrors(() -> ComponentPreview.transform(
                 new PipelineNode(INLINE_ID, type, config, null), ApiContext.sampleRows(body)));
     }
@@ -528,7 +528,7 @@ final class ComponentRoutes implements RouteModule {
         try {
             return ComponentPreview.sink(config, ApiContext.sampleRows(body));
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
     }
 
@@ -539,7 +539,7 @@ final class ComponentRoutes implements RouteModule {
     private static Map<String, Object> requireInlineConfig(Map<String, Object> body) {
         Object cfg = body.get("config");
         if (!(cfg instanceof Map<?, ?>))
-            throw new ApiException(400, "body must include 'config' (the node config object to preview)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'config' (the node config object to preview)");
         return mapAt(body, "config");
     }
 
@@ -550,9 +550,9 @@ final class ComponentRoutes implements RouteModule {
         try {
             c = root == null ? null : new ComponentStore(root).get(type, id).orElse(null);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
-        if (c == null) throw new ApiException(404, "no " + type + " component '" + id + "'");
+        if (c == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + type + " component '" + id + "'");
         ComponentAccess.requireView(ex, type, id, c.content());   // R3
         return c;
     }
@@ -578,7 +578,7 @@ final class ComponentRoutes implements RouteModule {
         try {
             return store.exists(type, id);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
     }
 
@@ -599,7 +599,7 @@ final class ComponentRoutes implements RouteModule {
             ETags.set(ex, ETags.of(ContentHash.of(c.content())));
             return componentDoc(c);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
