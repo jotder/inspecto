@@ -606,7 +606,7 @@ carried `version: 1`, which no component reads — the same dead key `pipeline` 
 `EnrichmentKeyCoverageContractTest.everyCommittedEnrichmentConfigSurvivesTheCensus` pins that nothing
 on disk regresses. 🔴 **The committed `*_pipeline.toon` samples were NOT given the same treatment when
 `pipeline` was censused**: **24** of them still carry `version:`, so re-saving any sample pipeline
-through `/config/write` 422s today. Worth a row.
+through `/config/write` 422'd. ✅ Fixed 2026-09-16 (`45eff375e`) — `PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1` below.
 
 ⚠ The **flat** `alert-rule` component shape (`AlertRoutes`, `ComponentStore`) is a *different config
 type string* and is written through `/alerts/rules*`, not `/config/write` — it never reaches this census.
@@ -619,25 +619,22 @@ Pinned by `AcceptedConfigKeysTest` (the checker), `AlertKeyCoverageContractTest`
 
 ## Open rows this concept owns
 
-- **`COMPONENT-KIND-KEY-CENSUS-1`** — `widget` and `dashboard` can never be censused by
-  `AcceptedConfigKeys`: they never reach `/config/write`, because the UI saves them through
-  `POST|PUT /components/{kind}`. ⚠ Their persisted body also carries `name`, `owner` and `shares`, which
-  no `ConfigSpec` declares, so a naive spec-derived refusal would reject essentially every real save.
-  ✅ The seam already exists — `ComponentRoutes.java:605` calls `ConfigSafetyValidator.check("schema", …)`
-  at `:602-611`, so this extends a live pattern rather than inventing one.
+- ~~**`COMPONENT-KIND-KEY-CENSUS-1`**~~ ✅ **CLOSED 2026-09-16 (`afaa4005c`).** The `widget`/`dashboard`
+  top-level key census lives in `ComponentRoutes.validateKind`, the only place it can work — both kinds are
+  saved through `POST|PUT /components/{kind}` and never reach `/config/write`, so `AcceptedConfigKeys` stays
+  correctly a no-op for them. Accepted = `ConfigSpec` fields ∪ the store envelope (`name`/`owner`/`shares`)
+  ∪ a documented parser-only set (e.g. `dashboard.description`, read by `MetadataGraphBuilder` and declared
+  by no spec) ∪ the `x-` extension marker. ⛔ It had to be written explicitly: `ConfigLoader.validate` walks
+  DECLARED fields only and never emits an unknown-key finding, so copying the `schema` branch's idiom would
+  have shipped a gate that refuses nothing.
 
-- **`COMPONENT-BULK-WRITERS-UNGATED-1`** — `BiTemplates.apply` (`BiTemplates.java:125`) and bundle import
-  (`BundleRoutes.java:425`) call `store.write` directly, so **no** `validateKind` gate runs on that path —
-  not the 2026-09-16 key census and not the pre-existing `schema` validation. ⚠ The same "gate on one
-  route, not its sibling" shape that produced the census in the first place. The authoring route is the
-  UI's only door, so the reachable half is closed; this is the rest.
-- **`PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1`** — 36 committed `*_pipeline.toon` samples (24 under `spaces/`,
-  12 under `inspecto/examples/`) carry a top-level `version:` that `ConfigSpecs.pipeline()` does not
-  declare, so re-saving any shipped sample pipeline through `/config/write` has 422'd since the pipeline
-  census landed. ⛔ **The root cause is a missing guard, not a missing fix:** that census shipped without a
-  *"no committed config regresses"* test. `meta` escaped only because it happens to declare `version`;
-  `enrichment` added the test and cleaned its one sample. ⇒ Owed call: strip the key from 36 files, or
-  declare it and say why.
+- ~~**`COMPONENT-BULK-WRITERS-UNGATED-1`**~~ ✅ **CLOSED 2026-09-17** (bundle half `a0f82161d`, templates
+  half `6708c0baf`) — see the as-built section below.
+- ~~**`PIPELINE-SAMPLES-CARRY-DEAD-VERSION-1`**~~ ✅ **CLOSED 2026-09-16 (`45eff375e`).** The dead top-level
+  `version:` was stripped from all 36 committed `*_pipeline.toon` samples (24 under `spaces/`, 12 under
+  `inspecto/examples/`) — nothing reads a pipeline's `version`. ⛔ The guard was the deliverable:
+  `PipelineKeyCoverageContractTest` now WALKS both trees for *"no committed config regresses"* (rather than
+  hardcoding paths, which would miss a new sample), with a falsification test so an empty sweep fails.
 
 - ~~**`EXPECTATION-SPEC-STALE-VS-CONDITION-1`**~~ ✅ **CLOSED 2026-09-17.** `ConfigSpecs.expectation()` now
   declares `when` as `FieldType.MAP` — the `widget.controls` / `dashboard.filter` precedent, which

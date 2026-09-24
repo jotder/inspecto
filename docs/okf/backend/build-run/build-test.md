@@ -301,18 +301,21 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
   boots by SCAN — and then it presents as a JVM crash, not a missing file. Left as-is deliberately
   (88 files to fix a trap that has sprung once); re-rank on the second scan-booting test.
 
-- **`LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1`** — `CollectorService.fromArgs` → `ServiceBootstrap.buildFrom(…,
-  exitIfEmpty=true)` calls `System.exit(1)` when config discovery finds nothing. Defensible for a CLI
-  `main`; `fromArgs` is a PUBLIC API that tests and embedders call, so the process dies with no exception
-  to catch and no stack trace. ⚠ **Surefire reports it as "The forked VM terminated without properly
-  saying goodbye. VM crash or System.exit called?" — read the second half of that question first.**
-  This exact symptom consumed two sessions and produced a wrong JDK-27 diagnosis before being traced
-  (`WorkflowConfigLoadTest-1`, closed `f1232b03`).
+- ~~**`LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1`**~~ ✅ **CLOSED 2026-09-20 (`cf40aaf3f`).**
+  `ServiceBootstrap.buildFrom(…, exitIfEmpty=true)` — reached from the PUBLIC `CollectorService.fromArgs`
+  — now throws the unchecked `EmptyConfigException` instead of calling `System.exit(1)`; only the CLI mains
+  (`CollectorService.main`, `ControlApi.main`) catch it and exit 1, so CLI behaviour is unchanged. Pinned by
+  `FromArgsEmptyConfigTest`. ⚠ **The trap it caused is still worth knowing: Surefire reports a
+  `System.exit` in a test JVM as "The forked VM terminated without properly saying goodbye. VM crash or
+  System.exit called?" — read the second half of that question first.** It cost two sessions and a wrong
+  JDK-27 diagnosis (`WorkflowConfigLoadTest-1`, closed `f1232b03`). Not done: the `System.exit` sites in
+  `SpaceMigrator`, `EnrichmentProcessor` and `CollectorProcessor` (separate call chains, not reachable
+  from `fromArgs`).
 
-- **`OPENAPI-CONTRACT-RED-ON-MASTER-1`** — `OpenApiPathsContractTest` fails on an undocumented
-  `GET /assist/skills` and halts the reactor at `inspecto-processor`, so any `-pl <module> -am` run
-  currently reports a failure that is NOT the change under test. Regenerate with
-  `-Dopenapi.paths.write=true` or document the route.
+- ~~**`OPENAPI-CONTRACT-RED-ON-MASTER-1`**~~ ✅ **CLOSED 2026-09-19 (`e5c4f17cd`)** — `GET /assist/skills`
+  documented via `-Dopenapi.paths.write=true`. ⛔ It was far worse than filed: one failing module's
+  dependents are BANNED by Maven even under `--fail-at-end`, so a red `OpenApiPathsContractTest` silently
+  left ~850 tests across twelve Professional/Enterprise modules unexercised (20 modules built vs 32).
 
 - **`REACTOR-VERDICT-CI-1`** — wire `check-reactor-verdict.mjs` into `ci.yml`. ⛔ Deliberately NOT
   pre-push: it judges a *build*, not repo state, and producing a log at push time means a ~20-minute
@@ -322,19 +325,22 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
   **56** that survive packaging, every one a source-code or `compliance/` citation. Still owed: decide
   that class (fix the docs, or neutralise at package time), then wire the guard into CI.
 
-- **`README-LINKS-BROKEN-IN-REPO-1`** — 29 links are dead in the repository itself, nearly all in
-  `inspecto/README.md` (still tracked), which step 7 copies to the **bundle root as the customer's first page**. ⛔
-  `check-doc-links.mjs` cannot see them: its `ROOTS` are `docs`, `compliance`, `.claude` and root `*.md`,
-  and `inspecto/` is in none of them. ⚠ Fix the targets and widen the scope — do **not** let the
-  package-time neutralisation swallow these, or repo rot survives behind a bundle rewrite.
+- ~~**`README-LINKS-BROKEN-IN-REPO-1`**~~ ✅ **CLOSED 2026-09-16 (`0e6f9a784`)** — thirteen dead targets in
+  `inspecto/README.md` (the bundle's first page) re-pointed, and `check-doc-links.mjs` widened to the whole
+  repo so the file is visible at all; see `DOC-COUNTS-GUARD-SCOPE-1` below. ⛔ Repo rot must be fixed at
+  the target, never swallowed by the package-time rewrite.
 
-- **`EDITION-GATED-TESTS-IN-WRONG-HOME-1`** — six test classes guard CORE behaviour from inside
+- **`EDITION-GATED-TESTS-IN-WRONG-HOME-1`** — TWO test classes guard CORE behaviour from inside
   `inspecto-ops`, which the default reactor never builds (`mvn -o -pl inspecto-ops -am test` does not even
   resolve without `-Pedition-standard`). ⚠ **Severity is LOW:** `ci.yml:303` runs `-Pedition-enterprise`
   with tests, so they all run on CI — the exposure is the local `mvn -o clean test` loop only.
-  ✅ `RepoSpacesConfigValidationTest` is closed (moved to `inspecto`). Remaining: `ControlApiDbBrowserTest`,
-  `ControlApiDecisionRulesTest`, `ControlApiScopedObjectsTest`, `ControlApiAccessDeciderTest`,
-  `ControlApiReconPromoteTest`, `PostgresStateStoreTest`. ⛔ Not fixable by adding the module to the
+  ✅ Done: `RepoSpacesConfigValidationTest` moved to `inspecto`; `ControlApiDbBrowserTest`,
+  `ControlApiDecisionRulesTest` and `PostgresStateStoreTest` SPLIT (core half in `inspecto`, ops siblings
+  `ControlApiDbBrowserOpsTablesTest`, `ControlApiDecisionRuleApplyTest`, `PostgresOpsStoreTest`);
+  `ControlApiReconPromoteTest` moved to `inspecto` (`2f0b181f9`). Remaining, re-grounded 2026-09-25:
+  `ControlApiScopedObjectsTest` (SEC-7d data-scope guard) and `ControlApiAccessDeciderTest` (the
+  `AccessDecider` seam) — both drive `/objects` with `com.gamma.ops.OperationalObject` fixtures, so moving
+  them needs a non-ops test vehicle, not a file move. ⛔ Not fixable by adding the module to the
   default `<modules>` — that reverses signed decision EDG-01 cell 7.
 
 ### `DOC-COUNTS-GUARD-SCOPE-1` — the allow-list that caused the README row, removed from its sibling too

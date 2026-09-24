@@ -709,13 +709,19 @@ found the change reaches further than the decision that authorised it. ⛔ **`JO
 not the five the decision names** — the extra one is `pipeline_config`, the most common path key in
 committed configs.
 
-- **`JOB-PATH-COMPAT-SURVEY-1`** (P1) — on a deployed tree, **every** relative path value in **every**
-  committed job config now refuses: once the old path exists, no committed value resolves identically, so
-  the deliberate ambiguous-case branch fires for all 28. On a fresh checkout 15 silently re-point instead.
-- **`JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1`** (P1) — `PipelineJobRunner:242` and `:266` pass
-  `pipeline_config` and `data_dir` on with **no `PathJail` call at either site**: 19 of 33 values gated
-  under one rule and run under another, and a containment hole. ⚠ Its javadoc at `:508` claims job configs
-  bypass `ConfigSafetyValidator`, which contradicts that validator having a `checkJob`.
+- ~~**`JOB-PATH-COMPAT-SURVEY-1`**~~ ✅ **CLOSED 2026-09-17 (`1d94876f3`).** Filed as "on a deployed tree
+  every relative path in every committed job config refuses"; re-driven over the real
+  `PathJail.resolveJobPath`, every defect it named had shipped. 🔴 The re-drive found six values the survey
+  never listed — repo-relative `pipeline_config` (`spaces/<x>/config/...`) in five
+  `spaces/default/config/jobs/*_step_rollup_job.toon` and `spaces/demo/config/jobs/orders_rollup_job.toon`,
+  which double the path under the Space-root rule — re-pointed Space-relative in the same commit as the
+  runner split below, because the two only work together.
+- ~~**`JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1`**~~ ✅ **CLOSED 2026-09-17 (`1d94876f3`)**, operator design call
+  option 1 (additive read root). `PipelineJobRunner` read `pipeline_config` and `data_dir` with no
+  `PathJail` call; both now go through `PathJail.requireJobPathUnderAny` against the config READ root
+  (`SpaceConfigRoot.currentConfigReadRoot()`; `data_dir` is CHECKED, not rewritten, because the authored
+  string is baked into durable view SQL). The per-key base is now `SpaceConfigRoot.jobPathBase` — see
+  `JOB-PATH-SINGLE-TENANT-GATE-BASE-1` below. Pinned by `PipelineJobRunnerPathJailTest`.
 - ~~**`JOB-PATH-COMPACTOR-UNJAILED-1`**~~ ✅ **SHIPPED 2026-09-16** — both compactors now use the job rule,
   matching the three `MaintenanceJob` siblings. ⛔ `ReferenceCompactor.compact(Path,long)` stays unjailed
   on purpose: `CollectorService:1276` feeds it a pipeline's own resolved dirs, not an authored value.
@@ -725,11 +731,12 @@ committed configs.
   file's own directory, a job against the Space config root. ⛔ "Make them the same" was the wrong fix.
   The real third base was `/config/write:71`, which passed **no base at all** and judged a job against the
   process working directory. ⚠ Neither route has ever had a `type:"job"` caller — latent, never live.
-- **`JOB-CONFIG-THIRD-PRODUCER-1`** — `BundleRoutes:477` writes a job config on bundle import. The file's
-  location IS contained (`WriteGates.jail`), but the job's own path VALUES never reach
-  `ConfigSafetyValidator` — a third producer of job configs that no gate inspects.
-- **`JOB-PATH-GATE-BLIND-KEYS-1`** — ✅ **one third SHIPPED 2026-09-16, one third REFUTED, one third
-  re-filed.** `archive_dir` is now in `JOB_PATH_KEYS` (seven keys): `CleanupTask:47` already resolved it
+- ~~**`JOB-CONFIG-THIRD-PRODUCER-1`**~~ ✅ **CLOSED 2026-09-16 (`a0f82161d`).** Bundle import's
+  `BundleRoutes.JobBundleSource.write` jailed the FILE (`WriteGates.jail`) but never sent the job's path
+  VALUES to `ConfigSafetyValidator`, unlike its sibling `JobRoutes.parseJob`; it now runs
+  `ConfigSafetyValidator.checkJob` too. ⇒ Every job-config producer runs the same gate.
+- ~~**`JOB-PATH-GATE-BLIND-KEYS-1`**~~ ✅ **CLOSED 2026-09-16 (`8773cc471`) — one third SHIPPED, one third
+  REFUTED, one third re-filed (and since discharged).** `archive_dir` is now in `JOB_PATH_KEYS` (seven keys): `CleanupTask:47` already resolved it
   through `requireJobPathUnderAny` against the Space root, so the gate and the jail agreed on the rule and
   only the gate was not looking — and **no committed job config carries the key**, so listing it refuses
   nothing that exists. 🔴 **The dotted-path half is REFUTED as a reachable defect.** `RawConfig.str` does
@@ -747,15 +754,14 @@ committed configs.
   with no jail at all.** ✅ **Both were discharged the same day by `JOB-PATH-REPORT-ENRICH-SPLIT-1`,
   reader first and only then the list** — see that section below. ⇒ `JOB_PATH_KEYS` is now **nine**:
   the seven after `archive_dir` joined, plus `out_dir` and `config`.
-- **`JOB-PATH-DEMO-CONFIG-REPOINT-1`** — re-point the remaining committed values space-relative.
-  ✅ **CLOSED 2026-09-23 with no code — remainder: 0 real values** *(the "29" this bullet carried was
-  stale, and so is the sequencing ⛔ below: there is nothing left to land).* After the five 2026-09-16
-  re-points, 24 were left: the 19 `PipelineJobRunner` values need none, because
-  `JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` option 1 resolves them against the config READ root (the launch
-  dir, where they always pointed), and since `JOB-PATH-SINGLE-TENANT-GATE-BASE-1` the save gate agrees;
-  4 are `${…}` placeholders, not values; 1 is `store`, which no job-path rule covers.
-  ⛔ Land it with whichever runtime row lands last, or the configs refuse in between. *(33 → 32: the one
-  `out_dir` value moved with its runtime. ⛔ Not licence to re-point the rest early.)*
+- ~~**`JOB-PATH-DEMO-CONFIG-REPOINT-1`**~~ ✅ **CLOSED 2026-09-23 with no code (`21b3803cc`) — remainder:
+  0 real values.** After the five 2026-09-16 re-points (`d433ac0a2`), 24 were left: the 19
+  `PipelineJobRunner` values need none, because `JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1` option 1 resolves
+  them against the config READ root (the launch dir, where they always pointed), and since
+  `JOB-PATH-SINGLE-TENANT-GATE-BASE-1` the save gate agrees; 4 are `${…}` placeholders, not values; 1 is
+  `store`, which no job-path rule covers. ⛔ The durable lesson from its sequencing: a config and its
+  reader's rule move together — configs ahead of their runtime refuse, and a runtime ahead of its configs
+  is the same break (below).
   ~~🔴 **Three of the 32 are now orphaned the OTHER way**~~ ✅ **CLOSED 2026-09-16, same day.**
   `JOB-PATH-BACKUPTASK-SPLIT-1` (`3f384182`) moved `BackupTask` without the three configs it reads, so
   `config_backup` failed at run and `backup_verify` returned a green "no archive to verify" over a
