@@ -6,6 +6,7 @@ import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
 import com.gamma.enrich.EnrichmentConfig;
+import com.gamma.etl.DecodeProfile;
 import com.gamma.etl.PipelineConfig;
 import com.sun.net.httpserver.HttpExchange;
 import com.gamma.util.AtomicFiles;
@@ -287,6 +288,8 @@ final class PipelineBundleRoutes implements RouteModule {
         // Retarget INSIDE the pipeline body, then run the FULL saveGraph gate over the result.
         Map<String, Object> retargeted = retargetPipeline(sourceMap, sourceId, newId, dataPrefix(writeRoot),
                 satelliteNames);
+        // D6: and inside its Decode Profile satellite (verified against the manifest above as shipped).
+        rewriteProfile(retargeted, entries, satelliteNames);
 
         // Satellites land FIRST (the client bundle's ordering rule — the pipeline never names a file
         // that does not exist yet). They must also land BEFORE the safety gate: a config ref resolves
@@ -480,11 +483,41 @@ final class PipelineBundleRoutes implements RouteModule {
                     Map<String, Object> f = new LinkedHashMap<>(mapAt(parsing, frontend));
                     if (f.get("segments") instanceof Map<?, ?> seg) f.put("segments", rewriteRefMap(seg, names));
                     rewriteRef(f, "grammar_file", names);   // a stored .asn module (BUNDLE-ASN1-GRAMMAR-FILE-1)
+                    rewriteRef(f, DecodeProfile.KEY, names);   // a Decode Profile (D6) — its insides: rewriteProfile
                     parsing.put(frontend, f);
                 }
             }
             pipeline.put("parsing", parsing);
         }
+    }
+
+    /**
+     * Operator D6 (2026-09-25): a Decode Profile travels as its OWN satellite — never inlined, which would
+     * import as N un-shared copies — so the refs INSIDE it ({@code asn1.grammar_file}, the {@code segments}
+     * values) are rewritten to the flattened basenames too, exactly like the Pipeline's. The rewritten
+     * profile replaces its entry in {@code entries} (already verified against the manifest as shipped); a
+     * Pipeline naming no bundled profile leaves them untouched.
+     */
+    @SuppressWarnings("unchecked")
+    private static void rewriteProfile(Map<String, Object> retargeted, Map<String, byte[]> entries,
+                                       Set<String> names) {
+        if (!(retargeted.get("parsing") instanceof Map<?, ?> parsing)
+                || !(parsing.get("asn1") instanceof Map<?, ?> asn1)
+                || !(asn1.get(DecodeProfile.KEY) instanceof String ref) || !names.contains(ref)) return;
+        Map<String, Object> doc;
+        try {
+            doc = ConfigCodec.toMap(new String(entries.get(ref), StandardCharsets.UTF_8));
+        } catch (RuntimeException bad) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bundle Decode Profile '" + ref
+                    + "' does not parse: " + bad.getMessage());
+        }
+        if (!(doc.get("asn1") instanceof Map<?, ?> block)) return;   // the registration names what is wrong
+        Map<String, Object> p = new LinkedHashMap<>((Map<String, Object>) block);
+        rewriteRef(p, "grammar_file", names);
+        if (p.get("segments") instanceof Map<?, ?> seg) p.put("segments", rewriteRefMap(seg, names));
+        Map<String, Object> out = new LinkedHashMap<>(doc);
+        out.put("asn1", p);
+        entries.put(ref, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8));
     }
 
     private static List<Object> rewriteSchemaList(List<?> list, Set<String> names) {

@@ -23,6 +23,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import java.util.zip.ZipOutputStream;
@@ -233,6 +234,136 @@ class ControlApiPipelineBundleTest {
             assertEquals(13, V1Body.of(viaText.body()).get("recordCount").asInt());
             assertEquals(V1Body.of(viaText.body()), V1Body.of(viaFile.body()), "the preview tree is identical");
         }
+    }
+
+    // ── Decode Profile (trust design slice C3, operator D6) ─────────────────────
+
+    /**
+     * The msc_cdr demo split into a Decode Profile + a Pipeline, the profile living in
+     * {@code vendors/demo_msc/} with NON-sibling refs of its own ({@code grammars/…}, {@code schemas/…}). D6:
+     * the export carries the profile as its own satellite (never inlined), the import rewrites the refs
+     * INSIDE it to the flattened basenames as well as the Pipeline's {@code profile_file}, and the imported
+     * Pipeline both loads and previews exactly what the inline original does.
+     */
+    @Test
+    void aDecodeProfileTravelsAsItsOwnSatelliteAndItsRefsAreRewritten(@TempDir Path dir) throws Exception {
+        Path repo = Path.of("..").toAbsolutePath().normalize();
+        Path cfg = dir.resolve("cfg");
+        Profiled p = splitMscIntoAProfile(repo, cfg, dir, "grammars/msc_cdr.asn", "schemas/");
+
+        Path wr = dir.resolve("wr");
+        try (Ctx c = open(dir, wr, p.pipeline())) {
+            HttpResponse<byte[]> zip = sendZip(c.port, "GET", "/pipelines/msc_cdr/bundle", null);
+            assertEquals(200, zip.statusCode());
+            Map<String, byte[]> entries = unzip(zip.body());
+            assertArrayEquals(Files.readAllBytes(p.profile()), entries.get("demo_msc.decode.toon"),
+                    "the profile travels byte-verbatim as its own satellite");
+            Map<?, ?> exportedAsn1 = (Map<?, ?>) ((Map<?, ?>) ConfigCodec.toMap(new String(
+                    entries.get("msc_cdr_pipeline.toon"), java.nio.charset.StandardCharsets.UTF_8)).get("parsing")).get("asn1");
+            assertEquals(Set.of("profile_file"), exportedAsn1.keySet().stream().map(String::valueOf)
+                    .collect(java.util.stream.Collectors.toSet()), "never inlined into the exported Pipeline");
+            assertTrue(entries.containsKey("msc_cdr.asn") && entries.containsKey("msc_cdr_mo_call_schema.toon"),
+                    "the profile's own grammar and segment schemas are in the closure: " + entries.keySet());
+
+            HttpResponse<String> imp = send(c.port, "POST", "/pipelines/import?name=msc_copy", zip.body());
+            assertEquals(200, imp.statusCode(), imp.body());
+
+            Path home = wr.resolve("msc_copy");
+            Path written = home.resolve("msc_copy_pipeline.toon");
+            Map<?, ?> importedAsn1 = (Map<?, ?>) ((Map<?, ?>) ConfigCodec.toMap(Files.readString(written))
+                    .get("parsing")).get("asn1");
+            assertEquals("demo_msc.decode.toon", importedAsn1.get("profile_file"), "the Pipeline's ref is rewritten");
+            Map<?, ?> landedProfile = (Map<?, ?>) ConfigCodec.toMap(Files.readString(home.resolve("demo_msc.decode.toon")))
+                    .get("asn1");
+            assertEquals("msc_cdr.asn", landedProfile.get("grammar_file"), "the ref INSIDE the profile is rewritten");
+            assertEquals("msc_cdr_mo_call_schema.toon", ((Map<?, ?>) landedProfile.get("segments")).get("moCallRecord"));
+
+            com.gamma.etl.PipelineConfig loaded = com.gamma.etl.PipelineConfig.load(written.toString());
+            assertEquals(home.resolve("msc_cdr.asn").toAbsolutePath().normalize(), loaded.schemas().ingesterGrammar());
+            assertEquals(Set.of("moCallRecord", "mtCallRecord", "moSMSRecord"), loaded.schemas().segments().keySet());
+
+            String sample = java.util.Base64.getEncoder().encodeToString(Files.readAllBytes(
+                    repo.resolve("spaces/demo/data/samples/msc_cdr/MSC01_20260801_0800.ber")));
+            com.fasterxml.jackson.databind.ObjectMapper m = new com.fasterxml.jackson.databind.ObjectMapper();
+            HttpResponse<String> viaText = send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("grammar", p.grammarText(), "root_type", p.rootType())),
+                    "sample_b64", sample)));
+            HttpResponse<String> viaProfile = send(c.port, "POST", "/parsers/asn1/preview", m.writeValueAsString(Map.of(
+                    "grammar", Map.of("asn1", Map.of("profile_file", "demo_msc.decode.toon")),
+                    "subdir", "msc_copy", "sample_b64", sample)));
+            assertEquals(200, viaProfile.statusCode(), viaProfile.body());
+            assertEquals(13, V1Body.of(viaText.body()).get("recordCount").asInt());
+            assertEquals(V1Body.of(viaText.body()), V1Body.of(viaProfile.body()), "export → import → preview equals inline");
+        }
+    }
+
+    /** Satellites travel flattened under their basenames, so two DIFFERENT files the profile names under one
+     *  basename are refused (409), never silently collapsed into one. The probe — the same profile with
+     *  distinct names — exports (the test above). */
+    @Test
+    void twoProfileSatellitesSharingABasenameAreRefused(@TempDir Path dir) throws Exception {
+        Path repo = Path.of("..").toAbsolutePath().normalize();
+        Path cfg = dir.resolve("cfg");
+        Profiled p = splitMscIntoAProfile(repo, cfg, dir, "msc_cdr.asn", "schemas/");
+        Path vendor = p.profile().getParent();
+        // mtCallRecord's schema moves to other/ UNDER THE SAME NAME as moCallRecord's
+        Files.createDirectories(vendor.resolve("other"));
+        Files.copy(vendor.resolve("schemas/msc_cdr_mt_call_schema.toon"),
+                vendor.resolve("other/msc_cdr_mo_call_schema.toon"));
+        Map<String, Object> doc = ConfigCodec.toMap(Files.readString(p.profile()));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> segs = (Map<String, Object>) ((Map<String, Object>) doc.get("asn1")).get("segments");
+        segs.put("mtCallRecord", "other/msc_cdr_mo_call_schema.toon");
+        Files.writeString(p.profile(), ConfigCodec.toToon(doc));
+
+        try (Ctx c = open(dir, dir.resolve("wr"), p.pipeline())) {
+            HttpResponse<byte[]> zip = sendZip(c.port, "GET", "/pipelines/msc_cdr/bundle", null);
+            assertEquals(409, zip.statusCode(), new String(zip.body(), java.nio.charset.StandardCharsets.UTF_8));
+            assertTrue(new String(zip.body(), java.nio.charset.StandardCharsets.UTF_8).contains("msc_cdr_mo_call_schema.toon"));
+        }
+    }
+
+    private record Profiled(Path pipeline, Path profile, String grammarText, String rootType) {}
+
+    /** Copy the committed msc_cdr demo to {@code cfg/msc/}, then move its grammar, root_type, strictness and
+     *  segments into {@code cfg/vendors/demo_msc/demo_msc.decode.toon} (grammar at {@code grammarRef}, schemas
+     *  under {@code schemaDir}, both relative to the profile). The Pipeline keeps only {@code profile_file}. */
+    @SuppressWarnings("unchecked")
+    private static Profiled splitMscIntoAProfile(Path repo, Path cfg, Path dir, String grammarRef, String schemaDir)
+            throws Exception {
+        Path src = repo.resolve("spaces/demo/config/msc");
+        Path pipeDir = Files.createDirectories(cfg.resolve("msc"));
+        Path vendor = Files.createDirectories(cfg.resolve("vendors/demo_msc"));
+        Files.createDirectories(vendor.resolve(schemaDir));
+        Path toon = pipeDir.resolve("msc_cdr_pipeline.toon");
+        Files.copy(src.resolve("msc_cdr_pipeline.toon"), toon);
+        Map<String, Object> raw = ConfigCodec.toMap(Files.readString(toon));
+        Map<String, Object> parsing = (Map<String, Object>) raw.get("parsing");
+        Map<String, Object> asn1 = (Map<String, Object>) parsing.get("asn1");
+        String grammarText = String.valueOf(asn1.get("grammar"));
+        String rootType = String.valueOf(asn1.get("root_type"));
+        Path asn = vendor.resolve(grammarRef);
+        Files.createDirectories(asn.getParent());
+        Files.writeString(asn, grammarText);
+        Map<String, Object> segs = new LinkedHashMap<>();
+        for (Map.Entry<String, Object> s : ((Map<String, Object>) asn1.get("segments")).entrySet()) {
+            Files.copy(src.resolve(String.valueOf(s.getValue())), vendor.resolve(schemaDir + s.getValue()));
+            segs.put(s.getKey(), schemaDir + s.getValue());
+        }
+        Map<String, Object> profileAsn1 = new LinkedHashMap<>();
+        profileAsn1.put("grammar_file", grammarRef);
+        profileAsn1.put("root_type", rootType);
+        profileAsn1.put("strictness", asn1.get("strictness"));
+        profileAsn1.put("segments", segs);
+        Path profile = vendor.resolve("demo_msc.decode.toon");
+        Files.writeString(profile, ConfigCodec.toToon(Map.of("asn1", profileAsn1)));
+        parsing.put("asn1", new LinkedHashMap<>(Map.of("profile_file", "../vendors/demo_msc/demo_msc.decode.toon")));
+        Map<String, Object> dirs = new LinkedHashMap<>();   // absolute — no Space here, never the CWD
+        ((Map<?, ?>) raw.get("dirs")).forEach((k, v) -> dirs.put(String.valueOf(k),
+                dir.resolve(String.valueOf(v)).toString().replace('\\', '/')));
+        raw.put("dirs", dirs);
+        Files.writeString(toon, ConfigCodec.toToon(raw));
+        return new Profiled(toon, profile, grammarText, rootType);
     }
 
     // ── conflict matrix: refuse / overwrite / rename ─────────────────────────────
