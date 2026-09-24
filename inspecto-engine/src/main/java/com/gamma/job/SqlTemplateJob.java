@@ -4,6 +4,9 @@ import com.gamma.query.DecisionRuleApplier;
 import com.gamma.etl.PartitionOutput;
 import com.gamma.pipeline.exec.SourceStoreReader;
 import com.gamma.signal.Severity;
+import com.gamma.config.spec.Finding;
+import com.gamma.sql.SqlGuard;
+import com.gamma.sql.SqlSandbox;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,6 +80,14 @@ final class SqlTemplateJob implements Job {
 
         String sink = safe(cfg.require("sink_dataset"), "sink_dataset");
         String sql = SqlParamScanner.substitute(cfg.require("sql"), ctx.params());
+        // SQL-TEMPLATE-SANDBOX-1: the SAME allow-list transform.sql applies (RowShaper) — one read-only
+        // SELECT/WITH, no file/extension/system function, no file literal in a FROM. Checked on the
+        // SUBSTITUTED text: a $param lands as a string literal, and in the relation position a literal is a
+        // file read (DuckDB replacement scan), so only the final text can be judged.
+        List<Finding> violations = SqlGuard.check(sql);
+        if (!violations.isEmpty())
+            throw new IllegalArgumentException("sql.template job '" + cfg.name() + "' refused: "
+                    + String.join("; ", violations.stream().map(Finding::message).toList()));
         List<String> sources = splitCsv(cfg.opt("sources", ""));
 
         Path outDir = Path.of(dataDir).resolve(sink);
@@ -89,9 +100,14 @@ final class SqlTemplateJob implements Job {
         ResultSetMeta meta;
         try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
              Statement st = conn.createStatement()) {
+            // The connection half, behind the lexical guard: nothing auto-installs/-loads, and once the
+            // trusted views are registered the connection may reach only the data root — the sources it
+            // reads and the sink/route/quarantine dirs it writes all live there — with the config locked.
+            SqlSandbox.disableExtensionAutoload(conn);
             for (String store : sources)
                 PipelineJobRunner.reportSources(ctx, store,
                         SourceStoreReader.registerView(conn, safe(store, "source store"), dataDir, store, "PARQUET"));
+            SqlSandbox.sealAllowing(conn, List.of(Path.of(dataDir)));
             st.execute("CREATE TABLE " + OUT_TABLE + " AS " + sql);
             // Decision Rules targeting this job check the materialized result before it becomes the
             // snapshot (tag/route/quarantine/drop): route lands as a snapshot Parquet Dataset under

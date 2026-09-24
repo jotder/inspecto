@@ -119,7 +119,10 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   `job.run(ctx)` on the stale instance. A rebuild (`upsertJob`) or `removeJob` clears the flag/owner mapping,
   so a reloaded pack's fresh Job runs normally again.
 * **`sql.template`** — the built-in templated-SQL Job Type and first real artifact producer; its
-  parameters are scanned from the SQL itself.
+  parameters are scanned from the SQL itself. 🔴 Its SQL is sandboxed at run time since 2026-09-24
+  (`SQL-TEMPLATE-SANDBOX-1`): the substituted text must pass `SqlGuard` (one read-only `SELECT`/`WITH`, the
+  `transform.sql` allow-list), and the connection is sealed to the data root — see
+  [Auth & Security](../editions/auth-security.md#the-sqltemplate-job-runs-behind-sqlguard-and-a-sealed-connection-sql-template-sandbox-1-2026-09-24).
 * **`caserule.evaluate`** — schedules the auto-grouping tail of the Alert → Incident → Case chain (C5):
   evaluates a saved Case Rule, grouping matching in-window Incidents under a Case via
   `ObjectService.evaluateCaseRule` — the same step `POST /cases/rules/{name}/evaluate` drives — and emits

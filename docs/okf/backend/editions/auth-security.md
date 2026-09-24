@@ -394,3 +394,43 @@ boundary** at both route and row level, letting a subject bound to one Space add
 which is exactly what PKG-5 chose to make non-fatal. ⛔ The judgement: a tenancy boundary is not a feature,
 so losing it silently is worse than refusing to boot. (`TokenRelays` needs nothing: absence already yields
 a 503 at `AuthRoutes:86`, which is fail-safe.)
+
+## A Space's config cannot name another Space's directory (`CROSS-SPACE-JAIL-1`, 2026-09-24)
+
+The allowed roots every config-path check uses (`SafetyPolicy.defaultPolicy()` → the 422 write gate and
+every run-time `PathJail`) were the **union** of all hosted Space bases, so on a multi-Space host a job in
+Space `acme` could name `beta`'s data directory by absolute path and pass. Probed live (HTTP 200) and fixed:
+a Space's allowed roots are **its own base plus the operator-declared `-Dassist.safety.roots`**, keyed on the
+thread's Space binding. This is the path-level twin of the Enterprise `space-isolation` policy above — and
+unlike it, it holds in **every** edition. Detail, caveats and pinning tests:
+[Config safety](../config/config-safety.md#a-spaces-allowed-roots-declared--its-own-base-tier-3-2026-08-14-narrowed-2026-09-24).
+
+## The `sql.template` job runs behind SqlGuard and a sealed connection (`SQL-TEMPLATE-SANDBOX-1`, 2026-09-24)
+
+`SqlTemplateJob` ran `CREATE TABLE … AS <authored sql>` on a plain `jdbc:duckdb:` connection. Probed and
+confirmed on six vectors, every one of which succeeded: `read_csv` of a file outside the data root, a
+`FROM '<file>'` replacement scan, a `; COPY … TO` writing outside the data root, a `; ATTACH` creating a
+database outside it, `; LOAD httpfs`, and `read_csv('http://127.0.0.1:<port>/x')` — the local test server
+was **hit twice**. The fix reuses both existing layers, it invents neither:
+
+1. **Lexical — `SqlGuard.check`** on the **substituted** text (a `$param` becomes a string literal, and a
+   literal in `FROM` is a file read, so only the final text can be judged). The same allow-list
+   `transform.sql` (`RowShaper`) applies.
+2. **Connection — `SqlSandbox.disableExtensionAutoload`** before the trusted source views are registered,
+   then **`SqlSandbox.sealAllowing(conn, [dataDir])`**: `allowed_directories` = the data root (trailing `/`,
+   so `data-other` is not admitted), `enable_external_access=false`, `lock_configuration=true`. The sink,
+   Decision Rule route and quarantine writes all land under the data root, so they still work.
+
+Both layers are mutation-checked independently in `SqlTemplateJobSandboxTest`: removing the guard turns
+`aFileLiteralInsideTheDataRootIsStillRefusedByTheGuard` red (the seal admits that file), and removing the
+seal turns `aFileFunctionTheGuardMissesIsStoppedByTheConnectionSeal` red.
+
+🔴 **That second probe is also a finding against `SqlGuard` itself:** `parquet_metadata('<any file>')` passes
+the lexical check (it is not `read_*`/`*_scan`, and `FROM parquet_metadata(` is not path-like), and it
+returns the file's schema, row counts and min/max statistics. Any caller that relies on `SqlGuard` **alone**
+on an unsealed connection — `QueryExecutor` documents exactly that posture — is exposed. Not fixed here;
+tracked as `SQLGUARD-PARQUET-METADATA-1` in [BACKLOG](../../../BACKLOG.md) §3.8.
+
+⚠ `SqlSandbox.open` was not reused for the job: its interactive memory/timeout caps (`assist.sql.*`) do not
+fit a batch job. The two static helpers are the same statements `open`/`seal` now call, so there is still
+one definition of the lockdown.

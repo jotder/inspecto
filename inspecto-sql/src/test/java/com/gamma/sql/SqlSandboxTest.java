@@ -245,6 +245,41 @@ class SqlSandboxTest {
         }
     }
 
+    /**
+     * {@code SQL-TEMPLATE-SANDBOX-1}: {@code sealAllowing} is the native half for a caller-owned connection
+     * whose untrusted SQL must still read and write one directory. The allowed dir works both ways, a
+     * sibling whose name merely starts with it does not, and the configuration cannot be re-opened.
+     */
+    @Test
+    void sealAllowingAdmitsOnlyTheNamedDirectory(@TempDir Path dir) throws Exception {
+        Path data = Files.createDirectories(dir.resolve("data"));
+        Path sibling = Files.createDirectories(dir.resolve("data-other"));
+        Files.writeString(data.resolve("in.csv"), "id\n1\n");
+        Files.writeString(sibling.resolve("secret.csv"), "id\n9\n");
+        String in = data.resolve("in.csv").toString().replace('\\', '/');
+        String out = data.resolve("out.csv").toString().replace('\\', '/');
+        String secret = sibling.resolve("secret.csv").toString().replace('\\', '/');
+        String attach = dir.resolve("evil.duckdb").toString().replace('\\', '/');
+
+        com.gamma.util.DuckDbUtil.loadDriver();
+        try (var conn = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+             Statement st = conn.createStatement()) {
+            SqlSandbox.disableExtensionAutoload(conn);
+            SqlSandbox.sealAllowing(conn, java.util.List.of(data));
+
+            assertEquals("1", scalar(st, "SELECT count(*) FROM read_csv('" + in + "')"), "the allowed dir is readable");
+            st.execute("COPY (SELECT 1 AS id) TO '" + out + "' (FORMAT CSV)");
+            assertTrue(Files.exists(data.resolve("out.csv")), "the allowed dir is writable");
+
+            assertThrows(SQLException.class, () -> st.executeQuery("SELECT * FROM read_csv('" + secret + "')"),
+                    "a prefix-sharing sibling is not the allowed dir");
+            assertThrows(SQLException.class, () -> st.execute("ATTACH '" + attach + "' AS evil"));
+            assertFalse(Files.exists(dir.resolve("evil.duckdb")), "ATTACH outside the allowed dir created nothing");
+            assertThrows(SQLException.class, () -> st.execute("SET enable_external_access=true"),
+                    "the configuration is locked");
+        }
+    }
+
     @Test
     void closeClosesTheConnection() throws Exception {
         SqlSandbox sb = SqlSandbox.open(POLICY);
