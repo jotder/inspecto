@@ -101,7 +101,7 @@ final class PipelineGraphRoutes implements RouteModule {
      */
     private Object graphForPipeline(ApiContext api, HttpExchange ex, String name) {
         PipelineConfig c = api.service().configFor(name)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         Map<String, Object> out = new LinkedHashMap<>(PipelineProjection.graph(PipelineLift.lift(c)));
         out.put("readOnlyProjection", true);
         out.put("links", Map.of("roundTrip", ex.getRequestURI().getPath() + "/raw"));
@@ -121,9 +121,9 @@ final class PipelineGraphRoutes implements RouteModule {
      */
     private Object document(ApiContext api, HttpExchange ex, String name) throws IOException {
         PipelineConfig cfg = api.service().configFor(name)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         Path file = api.service().pathFor(name)
-                .orElseThrow(() -> new ApiException(404, "no config file for pipeline '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no config file for pipeline '" + name + "'"));
 
         Map<String, Object> recipe = RecipeConverter.toRecipe(ConfigLoader.filesystem().decode(file.toString()));
         Map<String, Map<String, Object>> components = resolveDocumentRefs(api, cfg, recipe);
@@ -148,7 +148,7 @@ final class PipelineGraphRoutes implements RouteModule {
             } catch (IOException e) {
                 throw e;
             } catch (Exception e) {
-                throw new ApiException(500, "could not render the workbook: " + e.getMessage());
+                throw new ApiException(500, ErrorCodes.INTERNAL, "could not render the workbook: " + e.getMessage());
             } finally {
                 java.nio.file.Files.deleteIfExists(tmp);
             }
@@ -251,9 +251,9 @@ final class PipelineGraphRoutes implements RouteModule {
      */
     private Object editableGraph(ApiContext api, HttpExchange ex, String name) throws IOException {
         PipelineConfig cfg = api.service().configFor(name)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         Path file = api.service().pathFor(name)
-                .orElseThrow(() -> new ApiException(404, "no config file for pipeline '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no config file for pipeline '" + name + "'"));
         Map<String, Object> raw = ConfigLoader.filesystem().decode(file.toString());
         ETags.set(ex, ETags.of(ContentHash.of(raw)));
         Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
@@ -423,7 +423,7 @@ final class PipelineGraphRoutes implements RouteModule {
         try {
             g = PipelineCodec.fromMap(withoutDerivedEdges(body));
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
         validatePipeline(api, g);
         return g;
@@ -442,7 +442,7 @@ final class PipelineGraphRoutes implements RouteModule {
         ComponentRegistry registry = api.writeRoot() == null ? null : componentRegistry(api);
         PipelineValidator.Result r = PipelineValidator.validate(g, registry);
         if (!r.ok())
-            throw new ApiException(422, "pipeline validation failed: " + r.errors().stream()
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline validation failed: " + r.errors().stream()
                     .map(i -> i.code() + " — " + i.message()).toList());
         if (registry != null) checkJoinReferences(api, g);
     }
@@ -467,7 +467,7 @@ final class PipelineGraphRoutes implements RouteModule {
             try {
                 ref = ReferenceReader.parse(raw.toString());
             } catch (IllegalArgumentException e) {
-                throw new ApiException(422, "pipeline validation failed: [" + UNKNOWN_JOIN_REFERENCE
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline validation failed: [" + UNKNOWN_JOIN_REFERENCE
                         + " — Node '" + n.id() + "' (transform.join): " + e.getMessage() + "]");
             }
             if (!ref.byName()) continue;
@@ -475,12 +475,12 @@ final class PipelineGraphRoutes implements RouteModule {
                     .filter(p -> p.identity().pipelineName().equals(ref.ref()))
                     .findFirst().orElse(null);
             if (target == null)
-                throw new ApiException(422, "pipeline validation failed: [" + UNKNOWN_JOIN_REFERENCE
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline validation failed: [" + UNKNOWN_JOIN_REFERENCE
                         + " — Node '" + n.id() + "' (transform.join) joins '" + raw + "' but no pipeline named '"
                         + ref.ref() + "' is loaded; a by-name reference must be a loaded pipeline that declares "
                         + "produces: reference (use a path: for a plain file).]");
             if (!target.producesReference())
-                throw new ApiException(422, "pipeline validation failed: [" + UNKNOWN_JOIN_REFERENCE
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline validation failed: [" + UNKNOWN_JOIN_REFERENCE
                         + " — Node '" + n.id() + "' (transform.join) joins '" + raw + "' but pipeline '"
                         + ref.ref() + "' does not declare produces: reference.]");
         }
@@ -504,11 +504,11 @@ final class PipelineGraphRoutes implements RouteModule {
             try {
                 g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
             } catch (IllegalArgumentException e) {
-                throw new ApiException(400, e.getMessage());
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
             }
             // W5: the editor now edits registered pipelines too — fall back to the lifted config.
             if (g == null) g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
-            if (g == null) throw new ApiException(404, "no authored pipeline '" + id + "'");
+            if (g == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'");
         }
         try {
             return PipelineDryRun.run(componentRegistry(api).effectiveGraph(g), ApiContext.sampleRows(body),
@@ -516,9 +516,9 @@ final class PipelineGraphRoutes implements RouteModule {
         } catch (ApiException e) {
             throw e;
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         } catch (Exception e) {
-            throw new ApiException(422, "dry-run failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dry-run failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
@@ -543,7 +543,7 @@ final class PipelineGraphRoutes implements RouteModule {
      */
     private Object testRun(ApiContext api, String id, String to, Map<String, Object> body) {
         PipelineConfig cfg = api.service().configFor(id)
-                .orElseThrow(() -> new ApiException(404, "no authored pipeline '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'"));
         List<String> files = fileList(body);
         Path jailRoot = testRunRoot(api, cfg);
 
@@ -551,7 +551,7 @@ final class PipelineGraphRoutes implements RouteModule {
         for (String f : files) {
             try {
                 Path p = LocalConnectionWorkbench.jail(jailRoot, f);
-                if (!Files.isRegularFile(p)) throw new ApiException(404, "no such file: " + f);
+                if (!Files.isRegularFile(p)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such file: " + f);
                 picked.add(p);
             } catch (ConnectionWorkbench.PathEscape e) {
                 throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "file '" + f + "' escapes the pipeline's source root");
@@ -565,7 +565,7 @@ final class PipelineGraphRoutes implements RouteModule {
             // past ~260 chars (WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1).
             scratch = Files.createTempDirectory("itr_");
         } catch (IOException e) {
-            throw new ApiException(500, "could not create a scratch root: " + e.getMessage());
+            throw new ApiException(500, ErrorCodes.INTERNAL, "could not create a scratch root: " + e.getMessage());
         }
         try {
             PipelineTestRun.Result parsed = PipelineTestRun.run(cfg, picked, scratch);
@@ -574,7 +574,7 @@ final class PipelineGraphRoutes implements RouteModule {
             // sample existed, to a clean preview of a failure the preview's steps do not reproduce. Either
             // way the batch's own error, the one message that explains it, never reached the author.
             if ("FAILED".equals(parsed.status()))
-                throw new ApiException(422, "test run failed: the batch FAILED after "
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "test run failed: the batch FAILED after "
                         + parsed.totalInputRows() + " row(s) parsed: "
                         + DuckDbUtil.withoutPendingQueryPreamble(parsed.error()));
             // 🔴 Seeded with the PARSER's rows, captured before mapping (TESTRUN-SEED-IS-MAPPED-OUTPUT-1,
@@ -610,9 +610,9 @@ final class PipelineGraphRoutes implements RouteModule {
         } catch (ApiException e) {
             throw e;
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         } catch (Exception e) {
-            throw new ApiException(422, "test run failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "test run failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } finally {
             PipelineTestRun.deleteScratch(scratch);
         }
@@ -632,19 +632,19 @@ final class PipelineGraphRoutes implements RouteModule {
         // (TESTRUN-DATASET-COLLECTOR-SILENT-1). The connection branch below already refuses non-local
         // connectors 501; a Dataset feed is not local either, so it gets the same answer in the same words.
         if (cfg.collector().hasDataset())
-            throw new ApiException(501, "run-to-here supports file-shaped sources only; this pipeline is fed "
+            throw new ApiException(501, ErrorCodes.NOT_SUPPORTED, "run-to-here supports file-shaped sources only; this pipeline is fed "
                     + "by the Dataset '" + cfg.collector().dataset() + "' — there is no inbox file to pick. "
                     + "Preview the Dataset, or dry-run the Steps over sample rows.");
         if (!cfg.collector().hasConnection())
             return Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         String connId = cfg.collector().connection();
         ConnectionProfile p = api.service().connection(connId)
-                .orElseThrow(() -> new ApiException(404, "pipeline's connection '" + connId + "' is not registered"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "pipeline's connection '" + connId + "' is not registered"));
         if (!"local".equalsIgnoreCase(p.connector()))
-            throw new ApiException(501, "run-to-here supports local sources only; connection '" + connId
+            throw new ApiException(501, ErrorCodes.NOT_SUPPORTED, "run-to-here supports local sources only; connection '" + connId
                     + "' is '" + p.connector() + "' — those files reach the inbox via acquisition first");
         if (p.basePath() == null || p.basePath().isBlank())
-            throw new ApiException(422, "connection '" + connId + "' has no base_path configured");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "connection '" + connId + "' has no base_path configured");
         return Paths.get(p.basePath().trim()).toAbsolutePath().normalize();
     }
 
@@ -683,10 +683,10 @@ final class PipelineGraphRoutes implements RouteModule {
         try {
             g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
         if (g == null) g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
-        if (g == null) throw new ApiException(404, "no authored pipeline '" + id + "'");
+        if (g == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'");
         return g;
     }
 
@@ -694,11 +694,11 @@ final class PipelineGraphRoutes implements RouteModule {
     private static List<String> fileList(Map<String, Object> body) {
         Object raw = body == null ? null : body.get("files");
         if (!(raw instanceof List<?> l) || l.isEmpty())
-            throw new ApiException(400, "body must include a non-empty 'files' list");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include a non-empty 'files' list");
         List<String> out = new ArrayList<>();
         for (Object o : l) {
             String s = o == null ? null : String.valueOf(o).trim();
-            if (s == null || s.isEmpty()) throw new ApiException(400, "'files' contains a blank entry");
+            if (s == null || s.isEmpty()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'files' contains a blank entry");
             out.add(s);
         }
         return out;
@@ -759,14 +759,14 @@ final class PipelineGraphRoutes implements RouteModule {
             try {
                 parsed = ReferenceReader.parse(reference);
             } catch (RuntimeException unresolvable) {
-                throw new ApiException(422, "dry-run cannot resolve reference '" + reference + "': "
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dry-run cannot resolve reference '" + reference + "': "
                         + unresolvable.getMessage());
             }
             if (!parsed.byName()) WriteGates.jailToAllowedRoots(parsed.path(), "transform.join.reference");
             try {
                 sql = ReferenceReader.sqlFor(parsed, api.service().loadedPipelines());
             } catch (RuntimeException unresolvable) {
-                throw new ApiException(422, "dry-run cannot resolve reference '" + reference + "': "
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dry-run cannot resolve reference '" + reference + "': "
                         + unresolvable.getMessage());
             }
             String view = DRYRUN_REF_VIEW_PREFIX + "_" + reference.replaceAll("[^A-Za-z0-9._-]", "_");
@@ -818,13 +818,13 @@ final class PipelineGraphRoutes implements RouteModule {
      */
     private Object runPipeline(ApiContext api, HttpExchange e, String id) throws IOException {
         Path root = SpaceRoot.pipelinesSubdir(WriteGates.requireWriteRoot(api, "pipeline run"));
-        if (!new PipelineStore(root).exists(id)) throw new ApiException(404, "no authored pipeline '" + id + "'");
+        if (!new PipelineStore(root).exists(id)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'");
         String runId;
         try {
             runId = api.service().jobServiceOrCreate().triggerPipelineRun(id, ApiContext.query(e, "actor"));
         } catch (IllegalStateException ex) {
             // the service booted without a write root, so its pipeline store never opened — same gate as above
-            throw new ApiException(503, ex.getMessage());
+            throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY, ex.getMessage());
         }
         log.info("[PIPELINE-RUN] ad-hoc run {} of authored pipeline {}", runId, id);
         e.getResponseHeaders().set("Location", (ApiContext.v1(e) ? "/api/v1" : "") + "/jobs/runs/" + runId);

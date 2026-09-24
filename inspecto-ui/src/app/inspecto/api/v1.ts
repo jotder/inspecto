@@ -19,7 +19,8 @@ export type V1ErrorCode =
     | 'CAPABILITY_UNAVAILABLE'
     | 'UNAUTHENTICATED'
     | 'PERMISSION_DENIED'
-    | 'RATE_LIMITED';
+    | 'RATE_LIMITED'
+    | 'NOT_SUPPORTED';
 
 export interface V1EnvelopeMetadata {
     timestamp: string;

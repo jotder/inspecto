@@ -165,11 +165,11 @@ success  {data, metadata:{timestamp, durationMs, apiVersion:"v1", pagination?}, 
 error    {error:{errorCode, message, recoverable, correlationId, details?}}
 ```
 
-`ErrorCodes` (`ErrorCodes.java:11-27`) is the whole catalog — twelve codes, pinned in both directions
+`ErrorCodes` (`ErrorCodes.java:11-31`) is the whole catalog — fourteen codes, pinned in both directions
 against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` · `NOT_FOUND` ·
 `METHOD_NOT_ALLOWED` · `PATH_JAIL_VIOLATION` · `CONFLICT` · `CONFLICT_STALE_VERSION` ·
 `CONFIG_VALIDATION_FAILED` · `INTERNAL` · `CONTROL_PLANE_READ_ONLY` · `CAPABILITY_UNAVAILABLE` ·
-`UNAUTHENTICATED` · `PERMISSION_DENIED`. `defaultFor(status)` maps a bare status to a code (`:30-41`).
+`UNAUTHENTICATED` · `PERMISSION_DENIED` · `RATE_LIMITED` (429) · `NOT_SUPPORTED` (501). `defaultFor(status)` maps a bare status to a code (`:34-47`).
 Bodies ≥ 1024 bytes are gzipped when the client accepts it (`ApiContext.maybeGzip`, `:370-393`).
 `permissions[]` on an authenticated envelope is `subject.capabilities() ∩ applicable` when a route declares
 `resourcePermissions` — an affordance signal, never the security boundary (`SEC` §3.14).
