@@ -104,7 +104,8 @@ class ControlApiAccessIfMatchTest {
             String held = etagOf(c.port, "/access/policies");
 
             assertEquals(200, send(c.port, "PUT", "/access/policies", """
-                    {"policies":[{"name":"deny-all","effect":"deny"}]}""", held).statusCode());
+                    {"policies":[{"name":"freeze-mallory","effect":"deny","when":"subject.id == 'mallory'"}]}""",
+                    held).statusCode());   // an untargeted deny with no `when` is itself a 422 (F9)
 
             HttpResponse<String> stale = send(c.port, "PUT", "/access/policies", """
                     {"policies":[{"name":"allow-all","effect":"allow"}]}""", held);
