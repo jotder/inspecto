@@ -111,6 +111,8 @@ class ControlApiAgentInvokeTest {
 
     @Test
     void createAlertConsequenceAuthorsARealAlertRule(@TempDir Path cfg, @TempDir Path wr) throws Exception {
+        // Alert Rules are Professional+ (G9): this asserts the Professional behaviour.
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
         try (Ctx c = open(cfg, wr)) {
             String rule = "{\"name\":\"breach\",\"targetType\":\"pipeline\",\"target\":\"orders\","
                     + "\"consequences\":[{\"action\":\"create-alert\",\"params\":{"
@@ -128,6 +130,8 @@ class ControlApiAgentInvokeTest {
             boolean found = false;
             for (JsonNode r : rules) if ("real_alert".equals(r.get("name").asText())) found = true;
             assertTrue(found, "the consequence must persist a real alert-rule component, not just a stub signal");
+        } finally {
+            com.gamma.etl.EditionFeatures.overrideForTest(null);
         }
     }
 

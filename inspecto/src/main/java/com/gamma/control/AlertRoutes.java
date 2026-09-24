@@ -2,10 +2,15 @@ package com.gamma.control;
 
 import com.gamma.alert.AlertRule;
 import com.gamma.alert.AlertService;
+import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.FindingCodes;
+import com.gamma.config.spec.Severity;
+import com.gamma.etl.EditionFeatures;
 import com.gamma.pipeline.ComponentStore;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -44,9 +49,10 @@ final class AlertRoutes implements RouteModule {
                 .orElseThrow(() -> new ApiException(503,
                         "alert engine not armed (no alert-rule components loaded)"))));
         api.post("/alerts/rules", ApiContext.withCapability("canAuthorAlertRules",
-                (e, m) -> single(e, create(api, api.body(e)))));
+                (e, m) -> editionRefused(e) ? ApiContext.HANDLED : single(e, create(api, api.body(e)))));
         api.put("/alerts/rules/([^/]+)", ApiContext.withCapability("canAuthorAlertRules",
-                (e, m) -> single(e, update(api, ApiContext.name(m), api.body(e)))));
+                (e, m) -> editionRefused(e) ? ApiContext.HANDLED
+                        : single(e, update(api, ApiContext.name(m), api.body(e)))));
         api.delete("/alerts/rules/([^/]+)", ApiContext.withCapability("canAuthorAlertRules",
                 (e, m) -> delete(api, ApiContext.name(m))));
     }
@@ -120,12 +126,28 @@ final class AlertRoutes implements RouteModule {
         }
     }
 
+    /**
+     * Alert Rules are Professional+ ({@code SP-CTL-07}; `PROCESSOR-RELEASE-READINESS-1` G9): on a Personal build
+     * this answers the request itself - 422, the save gate's body shape, one {@code ERR_EDITION_FEATURE}
+     * finding - and returns {@code true}. Used by create, update and {@code /components/alert-rule}; a Decision
+     * Rule's {@code create-alert} is refused inside {@link #parse}, where the consequence records the message.
+     */
+    static boolean editionRefused(HttpExchange e) throws IOException {
+        if (EditionFeatures.present(EditionFeatures.ALERT_DISPATCH)) return false;
+        Finding f = new Finding(Severity.ERROR, "alert-rule", EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH),
+                FindingCodes.ERR_EDITION_FEATURE, "run the Professional or Enterprise edition");
+        ApiContext.respondJson(e, 422, Map.of("written", false, "error", f.message(), "findings", List.of(f)));
+        return true;
+    }
+
     private static AlertService alerts(ApiContext api) {
         return api.service().alertService()
                 .orElseThrow(() -> new ApiException(503, "alert engine unavailable"));
     }
 
     private static AlertRule parse(Map<String, Object> body) {
+        if (!EditionFeatures.present(EditionFeatures.ALERT_DISPATCH))   // the consequence's door (G9)
+            throw new ApiException(422, EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH));
         AlertRule rule;
         try {
             rule = AlertRule.fromMap(body);

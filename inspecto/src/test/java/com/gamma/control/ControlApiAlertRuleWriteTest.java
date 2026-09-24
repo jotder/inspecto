@@ -7,6 +7,8 @@ import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -31,6 +33,18 @@ import static org.junit.jupiter.api.Assertions.*;
  * reflects create/update/delete.
  */
 class ControlApiAlertRuleWriteTest {
+
+    /** Alert Rules are Professional+ (G9) — this class tests the Professional behaviour; the Personal refusal is
+     *  {@code EditionFeatureGateTest}'s. */
+    @BeforeEach
+    void professionalBuild() {
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
+    }
+
+    @AfterEach
+    void restoreEdition() {
+        com.gamma.etl.EditionFeatures.overrideForTest(null);
+    }
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();

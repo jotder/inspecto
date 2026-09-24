@@ -2,6 +2,7 @@ package com.gamma.etl;
 
 import com.gamma.util.Topology;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -34,9 +35,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class DuckLakeRegistrarPerSinkTest {
 
+    /** DuckLake registration is Professional+ (G9); this class tests the Professional behaviour. */
+    @BeforeEach
+    void professionalBuild() {
+        EditionFeatures.overrideForTest(java.util.Set.of(EditionFeatures.SINK_DUCKLAKE));
+    }
+
     @AfterEach
     void clearTopology() {
         System.clearProperty(Topology.PROPERTY);
+        EditionFeatures.overrideForTest(null);
     }
 
     private static Map<String, Object> lake(Path dir, String name) {

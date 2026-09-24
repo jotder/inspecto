@@ -29,6 +29,11 @@ import static org.junit.jupiter.api.Assertions.*;
  * names a Connection this test Space does not hold, and a missing referent is a warning there, never a
  * refusal. The Connections themselves are loaded through {@link ConnectionProfile#load}, the loader the
  * service uses. And no example may carry keys the save would call inert.
+ *
+ * <p>⚠ This module's tests run as <b>Personal</b> (no Professional module on the classpath), so the two
+ * templates that demonstrate a Professional+ feature — the SFTP Collector's {@code post_action: MOVE}
+ * archive and the DuckLake sink — are refused with {@code ERR_EDITION_FEATURE} (G9) and nothing else. That
+ * exact set is asserted, so a new example leaning on a Professional+ feature is a decision, not an accident.
  */
 class ShippedExamplesPassTheSaveGateTest {
 
@@ -50,10 +55,15 @@ class ShippedExamplesPassTheSaveGateTest {
         assertTrue(pipelines.stream().anyMatch(p -> p.toString().replace('\\', '/').contains("/_reference/")),
                 "the _reference templates are part of the walk");
         List<String> problems = new ArrayList<>();
+        java.util.Set<String> editionRefused = new java.util.TreeSet<>();
         for (Path p : pipelines) {
             Map<String, Object> draft = ConfigLoader.filesystem().decode(p.toString());
             for (Finding f : SaveGate.check(null, "pipeline", draft, null, p.toAbsolutePath().getParent(),
                     SaveGate.Referents.MAY_ARRIVE_LATER)) {
+                if (FindingCodes.ERR_EDITION_FEATURE.equals(f.code())) {
+                    editionRefused.add(EXAMPLES.relativize(p).toString().replace('\\', '/') + " " + f.fieldPath());
+                    continue;
+                }
                 if (f.severity() == Severity.ERROR || FindingCodes.WARN_COLLECTOR_KEY_INERT.equals(f.code()))
                     problems.add(p + ": " + f.code() + " " + f.fieldPath() + " — " + f.message());
             }
@@ -65,6 +75,10 @@ class ShippedExamplesPassTheSaveGateTest {
         }
         assertTrue(problems.isEmpty(), "shipped examples the save gate or the loader refuses:\n  "
                 + String.join("\n  ", problems));
+        assertEquals(java.util.Set.of(
+                        "_reference/ducklake-sink/orders_pipeline.toon output.ducklake",
+                        "_reference/sftp-collector/orders_pipeline.toon collector.post_action.on_success"),
+                editionRefused, "the Professional+ templates a Personal build refuses (G9)");
     }
 
     @Test

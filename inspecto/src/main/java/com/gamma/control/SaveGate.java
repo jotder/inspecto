@@ -9,6 +9,7 @@ import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
+import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfig;
 
 import java.nio.file.Path;
@@ -81,6 +82,7 @@ final class SaveGate {
         f.addAll(ConfigRoutes.stepConfigFindings(type, draft, configDir));   // G4: the run's step refusals
         f.addAll(ConfigRoutes.collectorFindings(type, draft));   // post_action MOVE target; inert remote keys
         f.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, draft));
+        f.addAll(editionFindings(type, draft));   // G9: Professional+ features on a Personal build
         // Referential: a collector bound to a Connection this Space does not have throws once per poll.
         if (referents == Referents.MUST_EXIST) f.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));
         f.addAll(webhookFindings(type, draft, api, referents));
@@ -123,6 +125,24 @@ final class SaveGate {
             return ConfigSafetyValidator.checkJob(draft, SafetyPolicy.defaultPolicy(),
                     k -> com.gamma.pipeline.SpaceConfigRoot.jobPathBase(k, writeRoot));
         return ConfigSafetyValidator.check(type, draft, SafetyPolicy.defaultPolicy(), configDir);
+    }
+
+    /**
+     * The Professional+ features a Personal build refuses ({@link EditionFeatures}, `PROCESSOR-RELEASE-READINESS-1`
+     * G9): a pipeline's {@code post_action: MOVE} archive and its DuckLake registration, and a legacy
+     * {@code alert} config. ERROR regardless of {@code active} — activation does not change the edition.
+     * Alert Rule components are refused on their own routes ({@code AlertRoutes}, {@code ComponentRoutes}).
+     */
+    static List<Finding> editionFindings(String type, Map<String, Object> draft) {
+        List<Finding> out = new ArrayList<>();
+        if ("pipeline".equals(type))
+            for (EditionFeatures.Refusal r : EditionFeatures.pipelineRefusals(draft))
+                out.add(new Finding(Severity.ERROR, r.field(), r.message(), FindingCodes.ERR_EDITION_FEATURE,
+                        "remove it, or run the Professional or Enterprise edition"));
+        if ("alert".equals(type) && !EditionFeatures.present(EditionFeatures.ALERT_DISPATCH))
+            out.add(new Finding(Severity.ERROR, "alert", EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH),
+                    FindingCodes.ERR_EDITION_FEATURE, "run the Professional or Enterprise edition"));
+        return out;
     }
 
     /** Whether {@code findings} carries an ERROR — the one verdict every save path refuses on. */

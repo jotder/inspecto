@@ -173,8 +173,15 @@ public final class ServiceBootstrap {
         Path registryRoot = root.config() != null ? root.config().resolve("registry") : legacyRegistryRoot();
         if (registryRoot == null || !Files.isDirectory(registryRoot)) return List.of();
         List<com.gamma.alert.AlertRule> rules = new ArrayList<>();
+        boolean armable = com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.ALERT_DISPATCH);
         for (com.gamma.pipeline.ComponentRegistry.Component c :
                 new com.gamma.pipeline.ComponentStore(registryRoot).list("alert-rule")) {
+            // G9: a rule copied onto a Personal install's disk is refused here, by name — never armed.
+            if (!armable) {
+                log.warn("Not arming alert rule '{}': {}", c.name(),
+                        com.gamma.etl.EditionFeatures.refusal(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
+                continue;
+            }
             try {
                 com.gamma.alert.AlertRule r = com.gamma.alert.AlertRule.fromMap(c.content());
                 rules.add(r);

@@ -369,6 +369,10 @@ public class CollectorProcessor {
         if (!CollectorConnectors.isRemote(cfg)) return 0;   // local collector: nothing to acquire
 
         PipelineConfig.Collector src = cfg.collector();
+        // G9 backstop for the CLI entry points the pipeline registry does not guard: the MOVE archive is
+        // Professional+, so a Personal build refuses before discovering anything rather than skip the move.
+        if (!skipPostAction && "MOVE".equals(src.postAction().onSuccess()))
+            com.gamma.etl.EditionFeatures.require(com.gamma.etl.EditionFeatures.SINK_ARCHIVE);
         PipelineConfig.Stability st = src.stability();
         DiscoveryContext ctx = discoveryContext(src, st);
         RetryPolicy retry = RetryPolicy.from(src.retry());

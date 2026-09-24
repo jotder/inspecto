@@ -179,3 +179,20 @@ code dependants, several of which **built** the feature. What that changes:
     4, 6). At **seven** (cell 7) one module-local copy in the split package is better: the moved tests stay
     byte-identical and reviewable as *moves*. The drift risk is bounded because core's `ApiContractTest`
     pins the served envelope independently.
+
+## Gating a feature whose code stays in core (`PROCESSOR-RELEASE-READINESS-1` G9, 2026-09-24)
+
+28. **When the executing code cannot leave core, a module DECLARES the feature instead.** Alert Rules
+    (`AlertService`), the Collector's `post_action: MOVE` archive and DuckLake registration (`DuckLakeRegistrar`)
+    are core code with many dependants, so extraction was disproportionate. `com.gamma.etl.EditionFeatureProvider`
+    is a ServiceLoader SPI a Professional-only module registers (`inspecto-ops` → `alert.dispatch`,
+    `inspecto-backup` → `sink.archive` + `sink.ducklake`), and `EditionFeatures.present(id)` is the one question
+    every door asks. Still the house mechanism — the classpath entry is the switch, never a `-D` flag or an
+    `if (edition == …)` — and a provider that fails to load reads as absent, so the gate refuses (safe direction).
+    Refusals carry `ERR_EDITION_FEATURE` (a finding code; the v1 `errorCode` stays `CONFIG_VALIDATION_FAILED`,
+    because the `ErrorCode` enum is a contract catalog). Gate every door, not one: the save gate, the feature's own
+    routes, and the run-time arrivals (registry load, boot load, the lanes the registry does not guard). Full
+    list: [step catalog → Edition notes](../pipeline-graph/step-catalog.md).
+29. ⚠ **Core, engine, etl and connectors test classpaths are Personal.** A test of the Professional behaviour of
+    such a feature pins it with `EditionFeatures.overrideForTest(...)` and restores `null` in teardown; the
+    Professional acceptance proper lives in the declaring module, where the REAL provider is discovered.

@@ -64,6 +64,11 @@ public final class DuckLakeRegistrar {
     public static void register(List<String> outputPaths, String tableName, PipelineConfig cfg) {
         if (outputPaths.isEmpty()) return;
         List<Registration> plan = plan(outputPaths, cfg);
+        // G9 backstop for a lane the pipeline registry does not guard (the job lane, the CLI entry points):
+        // DuckLake registration is Professional+, so a Personal build fails the batch rather than skip it.
+        for (Registration r : plan)
+            if (r.duckLake() != null && Boolean.parseBoolean(String.valueOf(r.duckLake().get("enabled"))))
+                EditionFeatures.require(EditionFeatures.SINK_DUCKLAKE);
         // ⛔ Checked BEFORE the early returns in registerOne, not after: those returns ARE the hole. On one
         // node they are the optional-sidecar contract; when partitioned they are how a pipeline writes
         // Parquet that is registered nowhere and no other node can see.

@@ -585,6 +585,7 @@ final class ComponentRoutes implements RouteModule {
     /** Write a component: the body is the content (the routing-only {@code id} key is stripped); 422 on bad input.
      *  The written resource's new {@code ETag} rides the response so a client can chain a conditional update. */
     private Object writeComponent(ApiContext api, ComponentStore store, com.sun.net.httpserver.HttpExchange ex, String type, String id, Map<String, Object> body) throws IOException {
+        if ("alert-rule".equals(type) && AlertRoutes.editionRefused(ex)) return ApiContext.HANDLED;   // G9
         Map<String, Object> content = new LinkedHashMap<>(body);
         content.remove("id");   // routing key, not content (the store stamps name=id)
         try {

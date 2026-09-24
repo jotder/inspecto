@@ -160,6 +160,9 @@ public final class ConfigRegistry {
     /** Parse a pipeline file fresh and snapshot the mtime fingerprint of it + its referenced files. */
     private Cached parse(Path p) throws IOException {
         PipelineConfig cfg = PipelineConfig.load(p.toString());
+        // G9: a pipeline that arrived on disk using a Professional+ feature this build lacks is a load
+        // failure (listed by the pipeline list), never registered and silently half-run.
+        com.gamma.etl.EditionFeatures.requirePipeline(cfg);
         String id = cfg.identity().pipelineName();
         noteSuffixDivergence(p, id);
         Map<Path, Long> fp = new LinkedHashMap<>();

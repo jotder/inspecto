@@ -298,6 +298,8 @@ class SftpConnectorTest {
                     "ID,AMT,EVENT_DATE\nr" + i + "," + i + ".0,2020-04-0" + i + "\n");
 
         ConnectionRegistry.register(profile());
+        // The MOVE archive is Professional+ (G9); this asserts the Professional behaviour.
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.SINK_ARCHIVE));
         try {
             com.gamma.etl.PipelineConfig cfg = com.gamma.etl.PipelineConfig.load(
                     writeSftpPipeline(dir, "  fetch:\n    parallel_fetch: 2\n  post_action:\n    on_success: MOVE\n    archive_path: archive\n").toString());
@@ -314,6 +316,7 @@ class SftpConnectorTest {
                         "source file " + i + " landed under archive/");
             }
         } finally {
+            com.gamma.etl.EditionFeatures.overrideForTest(null);
             ConnectionRegistry.remove("test-sftp");
         }
     }

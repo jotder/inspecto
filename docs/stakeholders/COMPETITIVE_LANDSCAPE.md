@@ -110,7 +110,7 @@ target hardware with a CI floor is still the single highest-value piece of evide
 
 ### 1.4 The extension surface — what "plugins for the rest" rests on
 
-**20**<!--count:spi-extension-points--> extension-point interfaces, derived by `tools/check-doc-counts.mjs`
+**21**<!--count:spi-extension-points--> extension-point interfaces, derived by `tools/check-doc-counts.mjs`
 from every `ServiceLoader.load(X.class)`, `OptionalSpi.all(X.class)` and `SpiSlot(X.class)` call site in
 `inspecto*/src/main` (re-counted 2026-09-14: the 2026-09-10 grep counted call sites of ONE loader and landed on
 the same number by coincidence — three security seams go through `SpiSlot`, and `TransformFunctionProvider`
@@ -230,7 +230,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 | Native ASN.1 CDR ingestion | 154-file decoder subsystem, vendor corpora |
 | Reconciliation with a Breaks lifecycle, in the free tier | core module |
 | Fault-tolerant DR at Professional; Kubernetes scale-out at Enterprise | signed 2026-09-10; **design, not yet built** — say so. ⚠ The audit trail DR would protect is durable (Parquet) on Professional and Enterprise bundles since `EVENTS-DURABLE-1` closed 2026-09-11, and in memory on Personal *(corrected 2026-09-23 — this said "in memory on every stock bundle")* |
-| **20**<!--count:spi-extension-points--> extension points; the ASN.1 vendor functions ship through one | §1.4; guard-derived |
+| **21**<!--count:spi-extension-points--> extension points; the ASN.1 vendor functions ship through one | §1.4; guard-derived |
 | A distinct Professional bundle exists | `STANDARD-BUNDLE-1`, shipped 2026-09-10 |
 | An Expectation (data-quality) engine with a builder UI — five check kinds, not a GX-sized library | `ING-6` closed 2026-07-07 (`REQUIREMENTS.md` §5); `ExpectationEvaluator`; `inspecto-ui/src/app/modules/admin/expectations/`. A breach raises a deduplicated Incident only where `inspecto-ops` ships (Professional+). *Moved here from §4.2 on 2026-09-23 — its unlock condition, "the UI ships", was met on 2026-07-04* |
 

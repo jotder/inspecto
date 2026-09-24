@@ -649,18 +649,18 @@ DELIVERED with a footnote. Earlier gap groups G1, G3–G8 and G11 closed 2026-09
 dry-run blind spots — [pipeline test run](../engine/pipeline-test-run.md)).
 
 **Verdicts on the seven "questionably delivered" (2026-09-24).** ✓ met · ✗ not met · — no keys to get wrong ·
-G9 = edition gating, still open as its own item (see *Edition notes* below).
+column 5 = edition gating (G9, closed 2026-09-24 — see *Edition notes* below): *all* = every edition, as the board says.
 
 | Processor | 1 doc | 2 test | 3 workbench | 4 palette | 5 edition | 6 save | 7 demo | Verdict |
 |---|---|---|---|---|---|---|---|---|
-| `quality.schema.drift` | ✓ row below | ✓ `SchemaDriftIngestTest`, `SchemaDriftTest` | ✓ rides the parse node; the parse pane's drift check | ✓ inactive, "delivered as parser" (like `quality.schema.validator`) | G9 | — | ✓ `03-schema-transform/schema-drift` | **PASS** — detection only IS the promise (a refusal knob was refused 2026-09-10) |
-| `control.throttle` | ✓ Collect table (`fetch.rate_limit` + `processing.intake`) | ✓ `RateLimiterTest`, `CollectorProcessorRemoteCycleTest`, `CollectorProcessorAdmissionCapTest` | ✓ acquisition form; round trip in `NodeConfigNameContractTest` | ✓ addable | G9 | ✓ rate grammar 422; inert on a local inbox warned | ✓ `05-acquisition/intake-throttle` · `_reference/sftp-collector` | **PASS** — `RATE-LIMIT-OVERSIZE-HANGS-1` fixed 2026-09-24 |
-| `control.circuitbreaker` | ✓ Collect table | ✓ `CollectorProcessorRemoteCycleTest` (trips, skips while OPEN, half-open closes) | ✓ acquisition form; round trip | ✓ addable | G9 | ✓ durations/counts 422; inert on local warned | ✓ `_reference/sftp-collector`, `_reference/db-export` | **PASS** — ⚠ there is no *fallback*: a tripped breaker skips the cycle, it switches to nothing |
-| `sink.archive` | ✓ Collect table (`post_action`) + [backup tasks](../control-plane/jobs.md) | ✓ MOVE in `CollectorProcessorRemoteCycleTest`; `BackupTaskTest` | ✓ acquisition form; a dry run never applies a post-action | ✓ addable | G9 | ✓ unknown `on_success` 422; MOVE with no `archive_path` refused | ✓ `_reference/sftp-collector` | **PASS** — originals are moved (local: `dirs.backup`; remote: `post_action: MOVE`), and the `backup`/`backup_verify` tasks zip them with SHA-256 manifests |
-| `acquisition.db.jdbc` | ✓ Collect table (`db` options) | ✓ exact sink rows (`CollectorProcessorRemoteCycleTest`, `DbExportConnectorTest`) | ✓ acquisition node | ✓ addable | G9 | ✓ connector option checks | ✓ `_reference/db-export` | **PASS** |
-| `quality.constraint.check` | ✓ [section above](#qualityconstraintcheck--expectations) | ✓ `ControlApiExpectationTest` | ✗ authored in the Expectations pane, never on the canvas | ✓ inactive | G9 | ✓ 422 on a bad body | ✓ `spaces/demo` Expectations | **PARTIAL** — not a Step |
-| `control.alert.dispatch` | ✓ [section above](#controlalertdispatch--alert-rules) | ✓ `AlertServiceTest`, `ControlApiAlertRuleWriteTest` | ✗ authored in the Alert Rules pane, never on the canvas | ✓ inactive | G9 | ✓ 422 on a bad body | ✓ `spaces/demo` Alert Rules | **PARTIAL** — not a Step |
-| `sink.quarantine` | ✓ [section above](#sinkquarantine--the-quarantine-directory-and-the-reject-log) | ✓ `ControlApiRejectedRowsTest`, the ingester reject tests | ✗ always on; a node is lifted only for selector / segments pipelines | ✓ inactive | G9 | — | ✓ `03-schema-transform/reject-routing` | **PARTIAL** — not a Step you add |
+| `quality.schema.drift` | ✓ row below | ✓ `SchemaDriftIngestTest`, `SchemaDriftTest` | ✓ rides the parse node; the parse pane's drift check | ✓ inactive, "delivered as parser" (like `quality.schema.validator`) | ✓ all | — | ✓ `03-schema-transform/schema-drift` | **PASS** — detection only IS the promise (a refusal knob was refused 2026-09-10) |
+| `control.throttle` | ✓ Collect table (`fetch.rate_limit` + `processing.intake`) | ✓ `RateLimiterTest`, `CollectorProcessorRemoteCycleTest`, `CollectorProcessorAdmissionCapTest` | ✓ acquisition form; round trip in `NodeConfigNameContractTest` | ✓ addable | ✓ all | ✓ rate grammar 422; inert on a local inbox warned | ✓ `05-acquisition/intake-throttle` · `_reference/sftp-collector` | **PASS** — `RATE-LIMIT-OVERSIZE-HANGS-1` fixed 2026-09-24 |
+| `control.circuitbreaker` | ✓ Collect table | ✓ `CollectorProcessorRemoteCycleTest` (trips, skips while OPEN, half-open closes) | ✓ acquisition form; round trip | ✓ addable | ✓ all | ✓ durations/counts 422; inert on local warned | ✓ `_reference/sftp-collector`, `_reference/db-export` | **PASS** — ⚠ there is no *fallback*: a tripped breaker skips the cycle, it switches to nothing |
+| `sink.archive` | ✓ Collect table (`post_action`) + [backup tasks](../control-plane/jobs.md) | ✓ MOVE in `CollectorProcessorRemoteCycleTest`; `BackupTaskTest` | ✓ acquisition form; a dry run never applies a post-action | ✓ addable | ✓ Professional+, gated | ✓ unknown `on_success` 422; MOVE with no `archive_path` refused | ✓ `_reference/sftp-collector` | **PASS** — originals are moved (local: `dirs.backup`; remote: `post_action: MOVE`), and the `backup`/`backup_verify` tasks zip them with SHA-256 manifests |
+| `acquisition.db.jdbc` | ✓ Collect table (`db` options) | ✓ exact sink rows (`CollectorProcessorRemoteCycleTest`, `DbExportConnectorTest`) | ✓ acquisition node | ✓ addable | ✓ all | ✓ connector option checks | ✓ `_reference/db-export` | **PASS** |
+| `quality.constraint.check` | ✓ [section above](#qualityconstraintcheck--expectations) | ✓ `ControlApiExpectationTest` | ✗ authored in the Expectations pane, never on the canvas | ✓ inactive | ✓ all | ✓ 422 on a bad body | ✓ `spaces/demo` Expectations | **PARTIAL** — not a Step |
+| `control.alert.dispatch` | ✓ [section above](#controlalertdispatch--alert-rules) | ✓ `AlertServiceTest`, `ControlApiAlertRuleWriteTest` | ✗ authored in the Alert Rules pane, never on the canvas | ✓ inactive | ✓ Professional+, gated | ✓ 422 on a bad body | ✓ `spaces/demo` Alert Rules | **PARTIAL** — not a Step |
+| `sink.quarantine` | ✓ [section above](#sinkquarantine--the-quarantine-directory-and-the-reject-log) | ✓ `ControlApiRejectedRowsTest`, the ingester reject tests | ✗ always on; a node is lifted only for selector / segments pipelines | ✓ inactive | ✓ all | — | ✓ `03-schema-transform/reject-routing` | **PARTIAL** — not a Step you add |
 
 The three PARTIALs are a *category* verdict, not a quality one: each is a working capability, and Part B's
 own definition of partial is "something real behind it, but not as a chain Step" — the reason
@@ -675,12 +675,32 @@ were inactive in the palette before. Save-time checks added for the Collector ke
 `orders_by_region_feed` (its unsafe id is `DEMO-DATASET-FEED-UNSAFE-ID-1`); `enrichment.reference` by
 `spaces/demo`'s `orders_daily_enrich`.
 
-**Edition notes (G9, observed, not changed here).** Three cells disagree with the code: `control.alert.dispatch`
-is "not for Personal" on the board, but `AlertService` (inspecto-engine) and `AlertRoutes` (core) ship in
-every flavour; `sink.archive` is "not for Personal", but `post_action` and the `dirs.backup` move are core
-engine code — only the `backup` tasks (`inspecto-backup`) are Professional+; `sink.ducklake` says
-Professional+ in its note while its board cells are ✅ in all three editions and `DuckLakeRegistrar` is in
-inspecto-etl (the PostgreSQL sidecar is the practical gate, not the build).
+**Edition notes (G9) — ✅ GATED 2026-09-24 (operator decision: "gate the code").** Three board cells
+disagreed with the code: `control.alert.dispatch` and `sink.archive` were "not for Personal" while
+`AlertService`/`AlertRoutes` and the Collector's `post_action` shipped in every flavour, and `sink.ducklake`'s
+note said Professional+ while its board cells read ✅ in all three (now `— ✅ ✅`). All three are core code, so
+there is no module to leave out; instead a Professional-only module DECLARES each feature through the
+`com.gamma.etl.EditionFeatureProvider` ServiceLoader seam — `inspecto-ops` declares `alert.dispatch`,
+`inspecto-backup` declares `sink.archive` and `sink.ducklake` — and `EditionFeatures.present(...)` is the
+one question every door asks. The classpath entry is the switch, exactly as for the other EDG-01 modules;
+there is no flag. On Personal, refused with **`ERR_EDITION_FEATURE`** naming the feature and "Professional+":
+* **at save** — `SaveGate.editionFindings` (every config door: `/config/write`, `/config/patch`, graph PUT,
+  bundle import, `/validate`): `collector.post_action.on_success: MOVE`, `output.ducklake` / `sinks[i].ducklake`
+  with `enabled: true`, and the legacy `alert` type; ERROR regardless of `active`. Alert Rule components are
+  refused on their own routes (`POST`/`PUT /alerts/rules`, `/components/alert-rule`) with the same 422 findings
+  body, and a Decision Rule's `create-alert` records the refusal instead of authoring the rule.
+* **at run, for a config that arrived on disk** — `ConfigRegistry` makes such a pipeline a load failure (listed,
+  never registered); the boot load does not arm an Alert Rule and logs why; and two backstops cover lanes the
+  registry does not guard: `DuckLakeRegistrar.register` (the job lane, the CLI) and `CollectorProcessor.acquire`
+  (before any connector opens; a dry run skips the post-action and is not refused).
+What stays in every edition: the other post-actions, the local `dirs.backup` move, a ducklake block that is not
+enabled. The `backup` task itself was already `inspecto-backup`'s (OPS-06, EDG-01 cell 2). Tests:
+`EditionFeatureGateTest` (core = Personal), `EditionFeaturesTest`, `CollectorProcessorArchiveEditionTest`,
+and the Professional acceptance with the REAL providers: `ProfessionalAlertRulesAcceptedTest` (inspecto-ops),
+`ProfessionalSinkFeaturesAcceptedTest` (inspecto-backup). ⚠ Core, engine, etl and connectors test classpaths
+are Personal, so a test of the Professional behaviour pins it with `EditionFeatures.overrideForTest(...)` and
+restores `null` in teardown; `ShippedExamplesPassTheSaveGateTest` asserts the exact two `_reference/` templates
+(`sftp-collector`, `ducklake-sink`) a Personal build refuses.
 
 ✅ **Gap G7 (at-rest real-path tests) closed 2026-09-23.** `PipelineJobRunnerTest` now runs a flat file's
 `profile` step, its `lookup` step and a `webhook:` branch end to end through the job lane and asserts

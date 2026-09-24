@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -27,6 +29,18 @@ import static org.junit.jupiter.api.Assertions.*;
  * because {@code PipelineConfig.prepare()} refuses the shape unconditionally.
  */
 class ControlApiSinkDuckLakeSharedTableTest {
+
+    /** DuckLake registration is Professional+ (G9) — this class tests the Professional behaviour; the Personal refusal is
+     *  {@code EditionFeatureGateTest}'s. */
+    @BeforeEach
+    void professionalBuild() {
+        com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.SINK_DUCKLAKE));
+    }
+
+    @AfterEach
+    void restoreEdition() {
+        com.gamma.etl.EditionFeatures.overrideForTest(null);
+    }
 
     private final HttpClient client = HttpClient.newHttpClient();
 
