@@ -295,6 +295,14 @@ public interface ApiContext {
      */
     byte[] rawBody(HttpExchange ex) throws IOException;
 
+    /**
+     * {@link #rawBody(HttpExchange)} with a hard cap: a body over {@code maxBytes} is
+     * {@code 413 PAYLOAD_TOO_LARGE}, refused on its declared {@code Content-Length} before any byte is read,
+     * or — for an undeclared (chunked) length — after reading at most {@code maxBytes + 1} bytes. For
+     * unauthenticated routes, where nothing else stops a caller buffering an arbitrary body into the heap.
+     */
+    byte[] rawBody(HttpExchange ex, int maxBytes) throws IOException;
+
     /** The running service host the routes act on (the request's bound space, per the {@code /spaces/{id}} seam). */
     CollectorService service();
 

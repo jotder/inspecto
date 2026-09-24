@@ -27,6 +27,8 @@ public final class ErrorCodes {
     public static final String PERMISSION_DENIED        = "PERMISSION_DENIED";
     /** 429 — the per-subject token bucket for an expensive route is exhausted ({@code NO-RATE-LIMIT-EXPENSIVE-ROUTES-1}). */
     public static final String RATE_LIMITED             = "RATE_LIMITED";
+    /** 413 — a request body over a route's hard cap (the public delivery-status callback, SEC review F1). */
+    public static final String PAYLOAD_TOO_LARGE        = "PAYLOAD_TOO_LARGE";
 
     /** The contract's default code for a status ({@code errorCode} is never absent on a v1 error). */
     static String defaultFor(int status) {
@@ -37,6 +39,7 @@ public final class ErrorCodes {
             case 404 -> NOT_FOUND;
             case 405 -> METHOD_NOT_ALLOWED;
             case 409 -> CONFLICT;
+            case 413 -> PAYLOAD_TOO_LARGE;
             case 422 -> CONFIG_VALIDATION_FAILED;
             case 503 -> CAPABILITY_UNAVAILABLE;
             default  -> INTERNAL;

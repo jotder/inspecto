@@ -60,6 +60,11 @@ MAJOR" row, moved here so it accrues in one place; add a line in the same commit
 The GitHub release is cut by `.github/workflows/release.yml` with `--generate-notes`; paste this section
 above the generated commit list.
 
+**Security fixes — behaviour an integrator can see (SEC review, 2026-09-24)**
+- `POST /public/delivery-status/{adapterId}` refuses a body over **256 KiB** with **413
+  `PAYLOAD_TOO_LARGE`** (a new, additive `ErrorCode`) and is throttled per caller IP (burst 60, then 5/s)
+  with **429 `RATE_LIMITED`**. Providers retry a 429; a batch over 256 KiB must be split provider-side.
+
 **Whole-pipeline dry run (2026-09-20, `PIPELINE-DRYRUN-1` step 5)**
 - `POST /runs/{name}/trigger?dryRun=true` runs a pipeline and **lands nothing** — no outputs, no audit or
   commit-log rows, no provenance row, no markers, no backup/quarantine moves — logging each suppressed

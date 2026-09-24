@@ -242,6 +242,52 @@ class ControlApiDeliveryStatusTest {
         }
     }
 
+    // ---- the public-edge bounds (SEC review F1) ---------------------------------------------------
+
+    @Test
+    void anOversizedCallbackBodyIs413AndNeverReachesTheAdapter(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String huge = "[" + " ".repeat(DeliveryStatusRoutes.MAX_CALLBACK_BYTES) + "]";
+
+            // Declared length (Content-Length) — refused before the body is read.
+            HttpResponse<String> declared = callback(c.port, "test", huge, "good");
+            assertEquals(413, declared.statusCode(), declared.body());
+            assertEquals("PAYLOAD_TOO_LARGE", json(declared).at("/error/errorCode").asText(), declared.body());
+
+            // Undeclared length (chunked) — the read itself stops one byte past the cap.
+            byte[] bytes = huge.getBytes(StandardCharsets.UTF_8);
+            HttpResponse<String> chunked = client.send(HttpRequest.newBuilder(URI.create(
+                            "http://localhost:" + c.port + "/api/v1/public/delivery-status/test"))
+                    .header("X-Test-Signature", "good")
+                    .POST(BodyPublishers.ofInputStream(() -> new java.io.ByteArrayInputStream(bytes)))
+                    .build(), BodyHandlers.ofString());
+            assertEquals(413, chunked.statusCode(), chunked.body());
+
+            assertNull(TestDeliveryStatusAdapter.lastRaw, "an oversized body never reaches signature verification");
+            // A body AT the cap is still accepted as input (it is merely unparseable here → 422).
+            String atCap = "[" + " ".repeat(DeliveryStatusRoutes.MAX_CALLBACK_BYTES - 2) + "]";
+            assertEquals(422, callback(c.port, "test", atCap, "good").statusCode());
+        }
+    }
+
+    @Test
+    void thePublicCallbackIsRateLimitedPerCaller(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            int firstThrottled = -1;
+            for (int i = 0; i < 400 && firstThrottled < 0; i++) {
+                HttpResponse<String> r = callback(c.port, "no-such-provider", "[]", "good");
+                if (r.statusCode() == 429) {
+                    firstThrottled = i;
+                    assertEquals("RATE_LIMITED", json(r).at("/error/errorCode").asText(), r.body());
+                } else {
+                    assertEquals(404, r.statusCode(), r.body());
+                }
+            }
+            assertTrue(firstThrottled > 0, "an unauthenticated caller must not be able to hammer the callback "
+                    + "without bound — the throttle runs before any body is read");
+        }
+    }
+
     // ---- the read surface (§4.6) ------------------------------------------------------------------
 
     @Test

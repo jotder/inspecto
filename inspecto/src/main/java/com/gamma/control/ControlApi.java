@@ -223,6 +223,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     private final RateLimiter rateLimiter = RateLimiter.standard();
     /** {@code /bi/query}'s own, larger bucket — one request per dashboard widget (see {@link RateLimiter#dashboard()}). */
     private final RateLimiter dashboardLimiter = RateLimiter.dashboard();
+    /** The unauthenticated D8 delivery-status callback's own bucket, keyed by caller IP (SEC review F1). */
+    private final RateLimiter callbackLimiter = RateLimiter.callback();
 
     /**
      * Control plane over a single running service — wrapped as the {@code default} space. The long-standing
@@ -891,10 +893,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     /** Route prefixes throttled by {@link #rateLimit} ({@code NO-RATE-LIMIT-EXPENSIVE-ROUTES-1}): each can
      *  saturate DuckDB ({@code /db/query}, {@code /bi/query}, {@code /recon/*}) or spend model tokens
-     *  ({@code /agent/*}) without any other bound on request volume. */
+     *  ({@code /agent/*}) without any other bound on request volume — plus the one UNAUTHENTICATED write,
+     *  the D8 {@code /public/delivery-status/*} callback (SEC review F1), on its own per-IP bucket. */
     private static boolean isRateLimited(String path) {
         return path.equals("/db/query") || path.equals("/bi/query")
-                || path.startsWith("/recon/") || path.startsWith("/agent/");
+                || path.startsWith("/recon/") || path.startsWith("/agent/")
+                || path.startsWith("/public/delivery-status/");
     }
 
     /** Per-subject (falling back to the caller's IP when unauthenticated) token-bucket throttle for the
@@ -907,7 +911,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             String ip = ApiContext.ip(ex);
             return ip == null ? "unknown" : ip;
         });
-        RateLimiter bucket = path.equals("/bi/query") ? dashboardLimiter : rateLimiter;
+        RateLimiter bucket = path.equals("/bi/query") ? dashboardLimiter
+                : path.startsWith("/public/delivery-status/") ? callbackLimiter : rateLimiter;
         if (!bucket.tryConsume(key))
             throw new ApiException(429, ErrorCodes.RATE_LIMITED, "rate limit exceeded for " + path + " — retry later");
     }
@@ -1160,6 +1165,32 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         }
         ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY, raw);
         return raw;
+    }
+
+    @Override
+    public byte[] rawBody(HttpExchange ex, int maxBytes) throws IOException {
+        if (ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY) instanceof byte[] cached) {
+            if (cached.length > maxBytes) throw tooLarge(maxBytes);
+            return cached;
+        }
+        String declared = ex.getRequestHeaders().getFirst("Content-Length");
+        if (declared != null) {
+            long length;
+            try { length = Long.parseLong(declared.trim()); } catch (NumberFormatException bad) { length = -1L; }
+            if (length > maxBytes) throw tooLarge(maxBytes);
+        }
+        byte[] raw;
+        try (InputStream in = ex.getRequestBody()) {
+            raw = in.readNBytes(maxBytes + 1);
+        }
+        if (raw.length > maxBytes) throw tooLarge(maxBytes);
+        ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY, raw);
+        return raw;
+    }
+
+    private static ApiException tooLarge(int maxBytes) {
+        return new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE,
+                "request body exceeds the " + maxBytes + "-byte limit for this route");
     }
 
     /**
