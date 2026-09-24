@@ -56,6 +56,10 @@ final class SqlTemplateJob implements Job {
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
     private static final String OUT_TABLE = "__sql_template_out";
 
+    /** The allow-list the authored SQL must pass. ⚠ Test seam only: {@code SqlTemplateJobSandboxTest} swaps it
+     *  for a pass-everything guard to prove the connection seal on its own; production never reassigns it. */
+    static volatile java.util.function.Function<String, List<Finding>> guard = SqlGuard::check;
+
     private final JobConfig cfg;
     private final String dataDir;
 
@@ -84,7 +88,7 @@ final class SqlTemplateJob implements Job {
         // SELECT/WITH, no file/extension/system function, no file literal in a FROM. Checked on the
         // SUBSTITUTED text: a $param lands as a string literal, and in the relation position a literal is a
         // file read (DuckDB replacement scan), so only the final text can be judged.
-        List<Finding> violations = SqlGuard.check(sql);
+        List<Finding> violations = guard.apply(sql);
         if (!violations.isEmpty())
             throw new IllegalArgumentException("sql.template job '" + cfg.name() + "' refused: "
                     + String.join("; ", violations.stream().map(Finding::message).toList()));

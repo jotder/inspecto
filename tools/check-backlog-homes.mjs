@@ -196,7 +196,9 @@ for (const row of rows) {
 // 2026-09-24: 52 → 45. The integration of ~30 lanes closed 13 rows at once (55 → 42 on the board) and
 // 12 owning-doc pointers left with them (57 → 45). Each lane alone stayed above 52, so no lane lowered
 // the floor; the grammar is unchanged — every surviving row's pointer still parses.
-const MIN_DOC_POINTERS = 45;
+// 2026-09-24: 45 → 44. SQLGUARD-COMMA-RELATION-1 closed in the follow-up push and took its one
+// pointer (→ auth-security.md) with it; the grammar is unchanged.
+const MIN_DOC_POINTERS = 44;
 
 const scope =
     `scope: ${rows.length} board row(s), ${identified} with an identifier and ` +
