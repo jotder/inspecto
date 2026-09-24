@@ -1,6 +1,8 @@
 # AI drafting on a non-`schema` component kind: design
 
-**State:** DESIGN (2026-09-24). S1 built 2026-09-25; nothing else is. Seven operator decisions are open (§7).
+**State:** IN FLIGHT (2026-09-25). All seven operator decisions are DECIDED (§7): the named kind is
+`transform`. S1 (the `schema` slice, its own row) built 2026-09-25. Slices built for `transform`: S0 (record corrected + the `ComponentSpecs` spec home), S2+S3 (the
+deterministic, preview-backed `component_draft`), S4 (UI re-adoption in `ComponentFormDialog`). See §8.
 **Board row:** `docs/BACKLOG.md` §3.1, *AI drafting on a non-`schema` kind* (P2, trigger fired 2026-09-15).
 **Owner doc:** [`okf/frontend/features/inline-ai-authoring.md`](../okf/frontend/features/inline-ai-authoring.md).
 **Grounded at:** `7bb36309c` (master). Every claim below cites the tree at that commit.
@@ -198,7 +200,19 @@ Full reactor (GAUNTLET) is not required per slice. It is required before a push 
 - Runtime validation of tool `args` against `jsonSchema`. It stays off on purpose (owner doc, *Why
   the schema is pinned by a TEST*).
 
-## 7. Decisions owed (operator)
+## 7. Decisions (operator, DECIDED 2026-09-25)
+
+| # | Question | Decision |
+|---|---|---|
+| **D1** | Which kind? | **`transform`.** Every slice below builds for it alone; `grammar` and `sink` stay unspecced. |
+| **D2** | Ship S1 (Option C) as well? | **Yes, as a separate row** (`AI-ASSIST-SCHEMA-DIALOG-1`), built by another lane. This lane does not touch `SchemaEditorDialog`. |
+| **D3** | Where does a component-kind spec live? | **`ComponentSpecs.forKind` in `inspecto-engine`** (beside `Parsers`), never `ConfigSpecs.forType`/`TYPES`. |
+| **D4** | Grammar host | **N/A** — grammar was not chosen. |
+| **D5** | Deterministic or NL? | **Both, deterministic first.** The validate-and-repair surface works with no model; S6 (NL) only if it fits after. |
+| **D6** | `clean` semantics | **`clean` requires a passing preview.** With no sample the draft carries a WARNING, so it is never `clean`. |
+| **D7** | transform | **Option B alone** — unanchored preview findings. The `RowShaper` operator vocabulary is NOT re-homed first. |
+
+The original questions, kept for provenance:
 
 1. **D1: Which kind did the author ask for?** Choose `grammar`, `transform` or `sink`. The row records
    only "a non-`schema` kind". Every later slice builds for that one kind. *Recommended:* ask the author,
@@ -221,3 +235,14 @@ Full reactor (GAUNTLET) is not required per slice. It is required before a push 
 7. **D7: transform.** Accept Option B alone (unanchored preview findings), or require the `RowShaper`
    operator vocabulary to get a single declared home first, so that a per-subtype spec can be derived?
    *Recommended:* B alone, and only if transform is the named kind.
+
+## 8. As built (2026-09-25, branch `lane-ai-transform`)
+
+- **S0.** The record is corrected: the owner doc (§2.5-1, -2), the `component-form.dialog.ts` tombstone and
+  `ToolSchemaAdopterContractTest.ADOPTERS` (the phantom `component_draft` row dropped, the
+  `kpi_report_builder` adopter added). The spec home is
+  `inspecto-engine/src/main/java/com/gamma/pipeline/exec/ComponentSpecs.java`: `KINDS = [transform]`,
+  `forKind(kind)`, and `previewFindings(kind, draft, sampleRows)`. It sits in `pipeline.exec` beside
+  `ComponentPreview` rather than in `com.gamma.pipeline`, so `pipeline` does not gain an edge onto `exec`.
+  The `transform` spec is deliberately thin (`type` required, pattern `transform\..+`). Pinned by
+  `ComponentSpecsTest`, including a negative pin that no kind in `KINDS` reaches `ConfigSpecs.forType`/`TYPES`.

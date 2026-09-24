@@ -315,12 +315,14 @@ schema kind** (`component-form.dialog`), and *only* that kind: of the dialog's f
 (grammar/schema/transform/sink) only `schema` had a `ConfigSpec`, so on the rest the tool can only answer
 *"no structural spec for kind"*. ⚠ **Do not "complete" the adoption onto the other three.**
 
-⚠ **RETIRED 2026-07-31 (unification W1).** The `schema` registry component no longer exists — a schema
-lives only in its pipeline's config TOON — so the component-draft affordance was removed from
-`component-form.dialog` **with** the kind rather than left answering *"no structural spec for kind"* on
-every use. The backend repair loop is untouched and still generic: to bring the button back, give another
-dialog kind a structural `ConfigSpec` first. The rest of this section describes the mechanism, which is
-still accurate for the surfaces that do have specs.
+⚠ **Removed 2026-07-31 (unification W1) — on a FALSE premise, corrected 2026-09-25.** W1 removed the
+component-draft affordance from `component-form.dialog`, saying the `schema` registry component no longer
+existed. 🔴 **It still exists**: `schema` is in `ComponentStore.WRITABLE_TYPES`, the Components pane opens
+it in `SchemaEditorDialog` (not `component-form.dialog`), and `ComponentRoutes.validateKind` gates its save
+with `ConfigSpecs.forType("schema")` — the same spec `component_draft(kind="schema")` judges by. Restoring
+the affordance there is its own row (`AI-ASSIST-SCHEMA-DIALOG-1`). What W1 got right is that none of
+`component-form.dialog`'s own kinds had a structural spec. `transform` has had one since 2026-09-25 — see
+[*`transform` drafting*](#transform-drafting-shipped-2026-09-25) below.
 
 ✅ **RE-ADOPTED 2026-09-25 in `SchemaEditorDialog` (`AI-ASSIST-SCHEMA-DIALOG-1`, design S1 / Option C).**
 🔴 The "retired" premise above is **false**: `schema` is still in `ComponentStore.WRITABLE_TYPES`, the
@@ -440,11 +442,11 @@ resolved the latter. The A5.2 adoption therefore always drew *"Missing required 
 real backend, and the repair loop then pushed the model toward a `{raw:{…}}` draft the pane cannot read back,
 so Apply silently no-opped. Both outcomes broken: a spurious ERROR, or a dead button.
 
-**As fixed:** `ConfigSpecs.schemaComponent()` describes the component's column list, and
-`InspectoTools.specFor(kind)` routes `schema` to it. `ConfigSpecs.forType` keeps its meaning for the config
-path — `/validate` still judges real `*_schema.toon` sources by `ConfigSpecs.schema()` — so the two readings
-no longer meet in one method. `config_schema` was fixed at the same seam: it shared the resolution and so
-*advertised* the wrong shape to the model, making this two tools rather than one.
+**As fixed then (2026-07-27), and SUPERSEDED by W1 (2026-07-31):** a `ConfigSpecs.schemaComponent()` spec
+and a `specFor` special case routed `schema` to it. 🔴 **Neither exists any more** (corrected 2026-09-25) —
+W1 removed both once both writers spoke the config TOON shape, so `schema` now resolves through
+`ConfigSpecs.forType("schema")` like every other config type, and `config_schema` shares that resolution.
+Only test names still carry the `schemaComponent` word.
 
 ⚠ **The recorded design call rested on a premise that turned out to be false — do not restore it.** The
 reasoning was that `ConfigSpecs.TYPES` and `ComponentStore.WRITABLE_TYPES` are "disjoint vocabularies that

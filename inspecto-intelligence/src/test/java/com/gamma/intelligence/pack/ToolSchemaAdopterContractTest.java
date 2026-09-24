@@ -42,12 +42,17 @@ class ToolSchemaAdopterContractTest {
 
     /**
      * Every real {@code <inspecto-ai-assist>} adopter in {@code inspecto-ui/}, read from the panes.
-     * {@code kpi_report_builder} is absent on purpose: it is in the {@code AiToolName} union and has
-     * an adapter branch, but no pane calls it, so there is no contract to pin.
+     *
+     * <p>Corrected 2026-09-25 (design {@code ai-drafting-non-schema-design.md} §2.5-3): this table listed
+     * {@code component-form.dialog.ts} as a {@code component_draft} adopter for weeks after W1 removed the
+     * affordance, and said no pane calls {@code kpi_report_builder} while {@code dashboard-editor} did.
      */
     private static final List<Payload> ADOPTERS = List.of(
             new Payload("component_draft", "components/schema-editor.dialog.ts",
                     Map.of("kind", "string")),
+            new Payload("kpi_report_builder", "studio/dashboards/dashboard-editor.component.ts (natural language)",
+                    // identity-only: `title` is sent only when the form has a name
+                    Map.of("dataset", "string", "title", "string")),
             new Payload("query_author", "studio/queries/queries.component.ts (structured)",
                     Map.of("dataset", "string", "when", "object", "name", "string")),
             new Payload("query_author", "studio/queries/queries.component.ts (natural language)",

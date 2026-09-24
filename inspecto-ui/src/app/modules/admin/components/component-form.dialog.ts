@@ -239,11 +239,11 @@ export class ComponentFormDialog {
         }
     }
 
-    // AI drafting (AGT-6a A5.2) lived here for the `schema` kind only — the one kind with a ConfigSpec.
-    // The pane routes `schema` to SchemaEditorDialog, so the affordance now lives THERE
-    // (AI-ASSIST-SCHEMA-DIALOG-1). This dialog's kinds (grammar/transform/sink) have no structural spec,
-    // so component_draft would answer "no structural spec for kind" on every use — give a kind a spec
-    // first (superpower/ai-drafting-non-schema-design.md, S2–S4).
+    // AI drafting (AGT-6a A5.2) was removed from this dialog in W1 (2026-07-31). The reason recorded here
+    // then — "`schema` is no longer a registry component" — was FALSE: `schema` is still in
+    // ComponentStore.WRITABLE_TYPES and opens in SchemaEditorDialog, not here (design
+    // ai-drafting-non-schema-design.md §2.5-1). What is true is that none of THIS dialog's kinds
+    // (grammar/transform/sink) had a structural spec, so the tool could only answer "no structural spec".
 
     addPartition(event: MatChipInputEvent): void {
         const value = event.value.trim();
