@@ -57,30 +57,16 @@
             }
         </mat-form-field>
 
-        <mat-form-field subscriptSizing="dynamic">
-            <mat-label>Kind</mat-label>
-            <mat-select formControlName="kind">
-                @for (k of kinds; track k) {
-                    <mat-option [value]="k">{{ k }}</mat-option>
-                }
-            </mat-select>
-        </mat-form-field>
+        <inspecto-option-picker label="Kind" [options]="kinds" formControlName="kind" />
 
-        <mat-form-field subscriptSizing="dynamic">
-            <mat-label>Source</mat-label>
-            <mat-select formControlName="sourceName">
-                @for (s of sourceNames(); track s) {
-                    <mat-option [value]="s">{{ s }}</mat-option>
-                }
-            </mat-select>
-            @if (storesError(); as e) {
-                <mat-hint>{{ e }}</mat-hint>
-            } @else if (previewProblem(); as why) {
-                <mat-hint>{{ why }}</mat-hint>
-            } @else if (!sourceNames().length) {
-                <mat-hint>This space has no data stores yet.</mat-hint>
-            }
-        </mat-form-field>
+        <inspecto-option-picker
+            label="Source"
+            [options]="sourceOptions()"
+            formControlName="sourceName"
+            [help]="
+                storesError() || previewProblem() || (sourceNames().length ? '' : 'This space has no data stores yet.')
+            "
+        />
 
         @if (!isVirtual()) {
             <mat-form-field class="sm:col-span-3" subscriptSizing="dynamic">

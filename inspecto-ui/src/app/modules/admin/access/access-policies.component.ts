@@ -4,7 +4,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 import { catchError, of } from 'rxjs';
 
@@ -13,6 +12,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
+import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 
 /**
  * Settings ▸ Access ▸ Policies (BACKLOG §5 — the policy-authoring operability slice): a read-only view
@@ -35,12 +35,12 @@ import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.comp
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [
+        InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatSelectModule,
         ChipComponent,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
@@ -53,7 +53,7 @@ export class AccessPoliciesComponent {
     private readonly fb = inject(FormBuilder);
     private readonly toastr = inject(ToastrService);
 
-    readonly methods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+    readonly methods = pickerOptions(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']);
 
     readonly loading = signal(true);
     readonly rows = signal<PolicyDef[]>([]);

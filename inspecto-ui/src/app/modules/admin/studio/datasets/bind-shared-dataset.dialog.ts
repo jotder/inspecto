@@ -1,14 +1,14 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { ExchangeGrant, ExchangeService } from 'app/inspecto/api';
 import { uniqueNameValidator } from 'app/inspecto/investigation';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 
 export interface BindSharedDatasetData {
     /** The active space id — grants where it is the consumer are the bindable ones. */
@@ -36,12 +36,12 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 @Component({
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
         MatFormFieldModule,
         MatInputModule,
-        MatSelectModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -58,17 +58,16 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
                 </div>
             } @else {
                 <form [formGroup]="form" class="flex flex-col gap-2">
-                    <mat-form-field subscriptSizing="dynamic">
-                        <mat-label>Shared dataset</mat-label>
-                        <mat-select formControlName="grantId" cdkFocusInitial>
-                            @for (g of grants(); track g.id) {
-                                <mat-option [value]="g.id">{{ g.owner }} / {{ g.item }}</mat-option>
-                            }
-                        </mat-select>
+                    <div>
+                        <inspecto-option-picker
+                            label="Shared dataset"
+                            [options]="grantOptions()"
+                            formControlName="grantId"
+                        />
                         @if (form.controls.grantId.touched && form.controls.grantId.invalid) {
-                            <mat-error>Choose a shared dataset.</mat-error>
+                            <p class="text-warn m-0 text-xs" role="alert">Choose a shared dataset.</p>
                         }
-                    </mat-form-field>
+                    </div>
                     <mat-form-field subscriptSizing="dynamic">
                         <mat-label>Local dataset name</mat-label>
                         <input matInput formControlName="name" placeholder="e.g. analytics-hub_fx_rates_daily" />
@@ -101,6 +100,9 @@ export class BindSharedDatasetDialog {
 
     /** The active dataset grants this space can bind (fail-closed: active only). */
     readonly grants = signal<ExchangeGrant[]>([]);
+    readonly grantOptions = computed<PickerOption[]>(() =>
+        this.grants().map((g) => ({ value: g.id, label: `${g.owner} / ${g.item}` })),
+    );
 
     readonly form = this.fb.nonNullable.group({
         grantId: ['', Validators.required],

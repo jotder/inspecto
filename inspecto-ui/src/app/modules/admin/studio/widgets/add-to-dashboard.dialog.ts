@@ -4,11 +4,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { Dashboard } from '../dashboards/dashboard-types';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 
 export interface AddToDashboardData {
     widgetId: string;
@@ -36,30 +36,24 @@ const NEW_DASHBOARD = '__new__';
     selector: 'app-add-to-dashboard-dialog',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
         MatFormFieldModule,
         MatInputModule,
-        MatSelectModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Add “{{ data.widgetId }}” to a dashboard</h2>
         <mat-dialog-content>
             <form [formGroup]="form" (ngSubmit)="add()" class="flex flex-col gap-3">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Dashboard</mat-label>
-                    <mat-select formControlName="target" cdkFocusInitial>
-                        <mat-option [value]="NEW">New dashboard…</mat-option>
-                        @for (d of data.dashboards; track d.id) {
-                            <mat-option [value]="d.id"
-                                >{{ d.name }}
-                                <span class="text-secondary">({{ d.tiles.length }} tiles)</span></mat-option
-                            >
-                        }
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-option-picker
+                    class="w-full"
+                    label="Dashboard"
+                    [options]="targetOptions"
+                    formControlName="target"
+                />
                 @if (form.controls.target.value === NEW) {
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
                         <mat-label>New dashboard id</mat-label>
@@ -89,6 +83,10 @@ export class AddToDashboardDialog {
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     readonly data = inject<AddToDashboardData>(MAT_DIALOG_DATA);
     readonly NEW = NEW_DASHBOARD;
+    readonly targetOptions: PickerOption[] = [
+        { value: NEW_DASHBOARD, label: 'New dashboard…' },
+        ...this.data.dashboards.map((d) => ({ value: d.id, label: d.name, hint: `${d.tiles.length} tiles` })),
+    ];
 
     readonly form = this.fb.group({
         target: [NEW_DASHBOARD],

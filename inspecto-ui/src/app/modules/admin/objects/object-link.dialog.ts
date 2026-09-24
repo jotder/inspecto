@@ -1,46 +1,35 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, signal, computed } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ObjectsService, OperationalObject } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import {
+    InspectoOptionPickerComponent,
+    PickerOption,
+    pickerOptions,
+} from 'app/inspecto/components/option-picker.component';
 
 /** Create a correlation link from one object to another — POST /objects/{id}/links. */
 @Component({
     selector: 'app-object-link-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatSelectModule],
+    imports: [InspectoOptionPickerComponent, ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Link this {{ data.fromType }}</h2>
         <mat-dialog-content class="flex flex-col gap-3 pt-2" style="min-width: 26rem">
             <form [formGroup]="form" class="flex flex-col gap-3">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Relationship</mat-label>
-                    <mat-select formControlName="relationship" cdkFocusInitial>
-                        <mat-option value="CONTAINS">CONTAINS</mat-option>
-                        <mat-option value="ESCALATED_FROM">ESCALATED_FROM</mat-option>
-                        <mat-option value="CAUSED_BY">CAUSED_BY</mat-option>
-                        <mat-option value="RELATED_TO">RELATED_TO</mat-option>
-                    </mat-select>
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Target object</mat-label>
-                    <mat-select formControlName="to" required>
-                        @for (o of candidates(); track o.id) {
-                            <mat-option [value]="o.id"
-                                >{{ o.objectType }} · {{ o.title || o.id }} ({{ o.status }})</mat-option
-                            >
-                        }
-                    </mat-select>
+                <inspecto-option-picker label="Relationship" [options]="relationships" formControlName="relationship" />
+                <div>
+                    <inspecto-option-picker label="Target object" [options]="candidateOptions()" formControlName="to" />
                     @if (form.controls.to.hasError('required') && form.controls.to.touched) {
-                        <mat-error>Pick a target object to link to.</mat-error>
+                        <p class="text-warn m-0 text-xs" role="alert">Pick a target object to link to.</p>
                     }
-                </mat-form-field>
+                </div>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -61,6 +50,10 @@ export class ObjectLinkDialog implements OnInit {
     readonly data = inject<{ fromId: string; fromType: string }>(MAT_DIALOG_DATA);
 
     readonly candidates = signal<OperationalObject[]>([]);
+    readonly candidateOptions = computed<PickerOption[]>(() =>
+        this.candidates().map((o) => ({ value: o.id, label: `${o.objectType} · ${o.title || o.id} (${o.status})` })),
+    );
+    readonly relationships = pickerOptions(['CONTAINS', 'ESCALATED_FROM', 'CAUSED_BY', 'RELATED_TO']);
     readonly saving = signal(false);
     readonly form = this.fb.group({
         relationship: ['RELATED_TO', Validators.required],

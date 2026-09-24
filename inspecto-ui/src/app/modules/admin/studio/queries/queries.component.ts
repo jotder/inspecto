@@ -8,7 +8,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { LensService, ParameterContextService, apiErrorMessage } from 'app/inspecto/api';
@@ -42,6 +41,7 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import './query.kind'; // ensure the query kind is registered
 
 /** The default (empty) structured model — a fresh Query Core builder state. */
@@ -100,6 +100,7 @@ function tokenName(raw: string): string {
     selector: 'app-queries',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
         ChipComponent,
         AiExplainComponent,
@@ -110,7 +111,6 @@ function tokenName(raw: string): string {
         MatIconModule,
         MatInputModule,
         MatProgressSpinnerModule,
-        MatSelectModule,
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoEmptyStateComponent,
@@ -139,6 +139,9 @@ export class QueriesComponent implements OnInit {
 
     readonly queries = signal<Query[]>([]);
     readonly datasets = signal<Dataset[]>([]);
+    readonly datasetOptions = computed<PickerOption[]>(() =>
+        this.datasets().map((d) => ({ value: d.id, label: d.id, hint: d.sourceName })),
+    );
     readonly loading = signal(false);
     readonly editing = signal(false);
     readonly editingExisting = signal(false);

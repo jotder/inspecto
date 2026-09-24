@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, signal, computed } from '@angular/core';
 import {
     AbstractControl,
     FormArray,
@@ -27,6 +27,7 @@ import {
     Reconciliation,
     ToleranceType,
 } from 'app/inspecto/reconciliation';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 
 export interface ReconciliationFormResult {
     name: string;
@@ -58,6 +59,7 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
     selector: 'app-reconciliation-form-dialog',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
@@ -82,39 +84,35 @@ const breachNotBelowWarn: ValidatorFn = (c: AbstractControl): ValidationErrors |
                 </mat-form-field>
 
                 <div class="flex gap-3">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>Left dataset (anchor / source of truth)</mat-label>
-                        <mat-select formControlName="leftDataset" (selectionChange)="onLeftChange($event.value)">
-                            @for (d of datasets(); track d.id) {
-                                <mat-option [value]="d.id">{{ d.name }}</mat-option>
-                            }
-                        </mat-select>
-                        @if (form.controls.leftDataset.hasError('required')) {
-                            <mat-error>Choose a left dataset.</mat-error>
+                    <div class="flex-1">
+                        <inspecto-option-picker
+                            label="Left dataset (anchor / source of truth)"
+                            [options]="datasetOptions()"
+                            formControlName="leftDataset"
+                            (ngModelChange)="onLeftChange($event)"
+                        />
+                        @if (form.controls.leftDataset.touched && form.controls.leftDataset.hasError('required')) {
+                            <p class="text-warn m-0 text-xs" role="alert">Choose a left dataset.</p>
                         }
-                    </mat-form-field>
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>Right dataset</mat-label>
-                        <mat-select formControlName="rightDataset">
-                            @for (d of datasets(); track d.id) {
-                                <mat-option [value]="d.id">{{ d.name }}</mat-option>
-                            }
-                        </mat-select>
-                        @if (form.controls.rightDataset.hasError('required')) {
-                            <mat-error>Choose a right dataset.</mat-error>
+                    </div>
+                    <div class="flex-1">
+                        <inspecto-option-picker
+                            label="Right dataset"
+                            [options]="datasetOptions()"
+                            formControlName="rightDataset"
+                        />
+                        @if (form.controls.rightDataset.touched && form.controls.rightDataset.hasError('required')) {
+                            <p class="text-warn m-0 text-xs" role="alert">Choose a right dataset.</p>
                         }
-                    </mat-form-field>
+                    </div>
                 </div>
 
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Third dataset (optional — 3-way vs the anchor)</mat-label>
-                    <mat-select formControlName="thirdDataset">
-                        <mat-option [value]="''">— none (2-way) —</mat-option>
-                        @for (d of datasets(); track d.id) {
-                            <mat-option [value]="d.id">{{ d.name }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-option-picker
+                    class="w-full"
+                    label="Third dataset (optional — 3-way vs the anchor)"
+                    [options]="thirdDatasetOptions()"
+                    formControlName="thirdDataset"
+                />
 
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Key column(s) — selection order is the Board tree</mat-label>
@@ -224,6 +222,13 @@ export class ReconciliationFormDialog {
     readonly duplicating = !!this.data?.recon && !!this.data?.duplicate;
     readonly editing = !!this.data?.recon && !this.data?.duplicate;
     readonly datasets = signal<Dataset[]>([]);
+    readonly datasetOptions = computed<PickerOption[]>(() =>
+        this.datasets().map((d) => ({ value: d.id, label: d.name })),
+    );
+    readonly thirdDatasetOptions = computed<PickerOption[]>(() => [
+        { value: '', label: '— none (2-way) —' },
+        ...this.datasetOptions(),
+    ]);
     readonly leftColumns = signal<string[]>([]);
 
     readonly form: FormGroup = this.fb.group({

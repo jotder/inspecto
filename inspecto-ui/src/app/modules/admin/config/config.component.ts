@@ -15,7 +15,6 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { Subscription } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
@@ -26,6 +25,7 @@ import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 
 const CONFIG_TYPES: ConfigType[] = ['pipeline', 'enrichment', 'job', 'schema', 'meta'];
 
@@ -111,6 +111,7 @@ export function assembleConfig(fields: FieldSpec[], values: Record<string, unkno
     selector: 'app-config',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
         ReactiveFormsModule,
         MatButtonModule,
@@ -118,7 +119,6 @@ export function assembleConfig(fields: FieldSpec[], values: Record<string, unkno
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatSelectModule,
         MatTabsModule,
         InspectoEmptyStateComponent,
         InspectoSchemaFormComponent,
@@ -139,7 +139,7 @@ export class ConfigComponent implements OnInit {
         return this.modeIndex === 0 ? 'draft' : 'file';
     }
 
-    readonly types = CONFIG_TYPES;
+    readonly types = pickerOptions(CONFIG_TYPES);
     readonly typeCtrl = new FormControl<ConfigType>('pipeline', {
         nonNullable: true,
     });

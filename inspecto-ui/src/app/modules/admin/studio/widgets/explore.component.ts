@@ -4,7 +4,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSelectModule } from '@angular/material/select';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { ComponentType, ComponentsService, apiErrorMessage } from 'app/inspecto/api';
@@ -34,6 +33,7 @@ import { WidgetOptionsDialog } from './widget-options.dialog';
 import { WidgetsService } from './widgets.service';
 import { ExploreControlsComponent } from './explore-controls.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import './widget.kind'; // ensure the widget kind + viz plugins are registered
 
 /**
@@ -45,12 +45,12 @@ import './widget.kind'; // ensure the widget kind + viz plugins are registered
     selector: 'app-explore',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
         FormsModule,
         MatButtonModule,
         MatFormFieldModule,
         MatIconModule,
-        MatSelectModule,
         RouterLink,
         InspectoAlertComponent,
         VizRenderComponent,
@@ -79,6 +79,9 @@ export class ExploreComponent implements OnInit {
     }
 
     readonly datasets = signal<Dataset[]>([]);
+    readonly datasetOptions = computed<PickerOption[]>(() =>
+        this.datasets().map((d) => ({ value: d.id, label: d.name })),
+    );
     readonly existingWidgetIds = signal<string[]>([]);
     readonly selectedId = signal<string>('');
     readonly dataset = signal<Dataset | null>(null);
@@ -131,6 +134,9 @@ export class ExploreComponent implements OnInit {
     /** The selected saved view (a view-bound widget's binding) + the picker's choices. */
     readonly viewId = signal<string>('');
     readonly savedViews = signal<{ id: string; name: string }[]>([]);
+    readonly savedViewOptions = computed<PickerOption[]>(() =>
+        this.savedViews().map((v) => ({ value: v.id, label: v.name })),
+    );
     /** A loaded Working Set Widget's binding, carried verbatim through a re-save (never authored here). */
     readonly workingSet = signal<WorkingSetBinding | undefined>(undefined);
 

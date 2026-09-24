@@ -3,10 +3,10 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
 import { INCIDENT_TAXONOMY, joinCategory, splitCategory } from './incident-taxonomy';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 
 /**
  * 3-layer categorization picker (cascading L1 → L2 → L3 selects over {@link INCIDENT_TAXONOMY}).
@@ -16,7 +16,7 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 @Component({
     selector: 'app-categorize-dialog',
     standalone: true,
-    imports: [ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule, MatSelectModule],
+    imports: [InspectoOptionPickerComponent, ReactiveFormsModule, MatButtonModule, MatDialogModule, MatFormFieldModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Categorize incident</h2>
@@ -25,39 +25,34 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
                 <p class="text-secondary text-sm">{{ data.hint }}</p>
             }
             <form [formGroup]="form" class="flex flex-col gap-3">
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Category</mat-label>
-                    <mat-select formControlName="l1" required (selectionChange)="onL1()" cdkFocusInitial>
-                        @for (l1 of l1Options; track l1) {
-                            <mat-option [value]="l1">{{ l1 }}</mat-option>
-                        }
-                    </mat-select>
+                <div>
+                    <inspecto-option-picker
+                        label="Category"
+                        [options]="opts(l1Options)"
+                        formControlName="l1"
+                        (ngModelChange)="onL1()"
+                    />
                     @if (form.controls.l1.hasError('required') && form.controls.l1.touched) {
-                        <mat-error>Category is required.</mat-error>
+                        <p class="text-warn m-0 text-xs" role="alert">Category is required.</p>
                     }
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Subcategory</mat-label>
-                    <mat-select formControlName="l2" required (selectionChange)="onL2()">
-                        @for (l2 of l2Options(); track l2) {
-                            <mat-option [value]="l2">{{ l2 }}</mat-option>
-                        }
-                    </mat-select>
+                </div>
+                <div>
+                    <inspecto-option-picker
+                        label="Subcategory"
+                        [options]="opts(l2Options())"
+                        formControlName="l2"
+                        (ngModelChange)="onL2()"
+                    />
                     @if (form.controls.l2.hasError('required') && form.controls.l2.touched) {
-                        <mat-error>Subcategory is required.</mat-error>
+                        <p class="text-warn m-0 text-xs" role="alert">Subcategory is required.</p>
                     }
-                </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Detail</mat-label>
-                    <mat-select formControlName="l3" required>
-                        @for (l3 of l3Options(); track l3) {
-                            <mat-option [value]="l3">{{ l3 }}</mat-option>
-                        }
-                    </mat-select>
+                </div>
+                <div>
+                    <inspecto-option-picker label="Detail" [options]="opts(l3Options())" formControlName="l3" />
                     @if (form.controls.l3.hasError('required') && form.controls.l3.touched) {
-                        <mat-error>Detail is required.</mat-error>
+                        <p class="text-warn m-0 text-xs" role="alert">Detail is required.</p>
                     }
-                </mat-form-field>
+                </div>
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -76,6 +71,7 @@ export class CategorizeDialog {
     readonly data = inject<{ current?: string; hint?: string }>(MAT_DIALOG_DATA);
 
     readonly l1Options = Object.keys(INCIDENT_TAXONOMY);
+    readonly opts = pickerOptions;
 
     readonly form = this.fb.group({
         l1: ['', Validators.required],

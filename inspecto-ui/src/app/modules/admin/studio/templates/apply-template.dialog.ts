@@ -4,10 +4,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { BiTemplate } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 
 export interface ApplyTemplateData {
     template: BiTemplate;
@@ -30,12 +30,12 @@ export interface ApplyTemplateResult {
     selector: 'app-apply-template-dialog',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
         MatFormFieldModule,
         MatInputModule,
-        MatSelectModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -43,17 +43,16 @@ export interface ApplyTemplateResult {
         <mat-dialog-content>
             <p class="text-secondary mb-3 text-sm">{{ data.template.description }}</p>
             <form [formGroup]="form" (ngSubmit)="apply()" class="flex flex-col gap-3">
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Target dataset</mat-label>
-                    <mat-select formControlName="dataset" cdkFocusInitial>
-                        @for (id of data.datasetIds; track id) {
-                            <mat-option [value]="id">{{ id }}</mat-option>
-                        }
-                    </mat-select>
+                <div class="w-full">
+                    <inspecto-option-picker
+                        label="Target dataset"
+                        [options]="datasetOptions"
+                        formControlName="dataset"
+                    />
                     @if (form.controls.dataset.hasError('required') && form.controls.dataset.touched) {
-                        <mat-error>Choose a dataset to bind the template to.</mat-error>
+                        <p class="text-warn m-0 text-xs" role="alert">Choose a dataset to bind the template to.</p>
                     }
-                </mat-form-field>
+                </div>
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Id prefix (optional)</mat-label>
                     <input matInput formControlName="prefix" placeholder="e.g. q3" />
@@ -77,6 +76,7 @@ export class ApplyTemplateDialog {
     /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     readonly data = inject<ApplyTemplateData>(MAT_DIALOG_DATA);
+    readonly datasetOptions = pickerOptions(this.data.datasetIds);
 
     readonly form = this.fb.group({
         dataset: ['', Validators.required],

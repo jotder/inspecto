@@ -45,14 +45,12 @@
 
         <!-- ── transform ───────────────────────────────────────────────────────── -->
         @if (kind === 'transform') {
-        <mat-form-field class="w-full" subscriptSizing="dynamic">
-            <mat-label>Operator</mat-label>
-            <mat-select formControlName="subtype">
-                @for (t of transformSubtypes; track t) {
-                <mat-option [value]="t">{{ t }}</mat-option>
-                }
-            </mat-select>
-        </mat-form-field>
+        <inspecto-option-picker
+            class="w-full"
+            label="Operator"
+            [options]="transformSubtypes"
+            formControlName="subtype"
+        />
         <mat-form-field class="w-full" subscriptSizing="dynamic">
             <mat-label>Config (JSON)</mat-label>
             <textarea matInput formControlName="config" rows="6" spellcheck="false"></textarea>
@@ -67,26 +65,12 @@
         <!-- ── sink ────────────────────────────────────────────────────────────── -->
         @if (kind === 'sink') {
         <div class="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
-            <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Sink kind</mat-label>
-                <mat-select formControlName="sinkKind">
-                    @for (k of sinkKinds; track k) {
-                    <mat-option [value]="k">{{ k }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
+            <inspecto-option-picker label="Sink kind" [options]="sinkKinds" formControlName="sinkKind" />
             <mat-form-field subscriptSizing="dynamic">
                 <mat-label>Store</mat-label>
                 <input matInput formControlName="store" />
             </mat-form-field>
-            <mat-form-field subscriptSizing="dynamic">
-                <mat-label>Format</mat-label>
-                <mat-select formControlName="format">
-                    @for (f of sinkFormats; track f) {
-                    <mat-option [value]="f">{{ f }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
+            <inspecto-option-picker label="Format" [options]="sinkFormats" formControlName="format" />
             <mat-form-field subscriptSizing="dynamic">
                 <mat-label>Partitions</mat-label>
                 <mat-chip-grid #partitionGrid aria-label="Partition columns">

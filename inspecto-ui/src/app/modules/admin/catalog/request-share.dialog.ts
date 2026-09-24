@@ -4,10 +4,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { ExchangeOffer } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 
 export interface RequestShareData {
     offer: ExchangeOffer;
@@ -28,12 +28,12 @@ export interface RequestShareResult {
 @Component({
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
         MatFormFieldModule,
         MatInputModule,
-        MatSelectModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -54,13 +54,7 @@ export interface RequestShareResult {
                         cdkFocusInitial
                     ></textarea>
                 </mat-form-field>
-                <mat-form-field subscriptSizing="dynamic">
-                    <mat-label>Delivery mode</mat-label>
-                    <mat-select formControlName="mode">
-                        <mat-option value="snapshot">Snapshot — versioned copies the owner refreshes</mat-option>
-                        <mat-option value="live">Live — read the owner's current data</mat-option>
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-option-picker label="Delivery mode" [options]="modeOptions" formControlName="mode" />
             </form>
         </mat-dialog-content>
         <mat-dialog-actions align="end">
@@ -73,6 +67,11 @@ export class RequestShareDialog {
     readonly data = inject<RequestShareData>(MAT_DIALOG_DATA);
     private ref = inject(MatDialogRef<RequestShareDialog>);
     private confirm = inject(InspectoConfirmService);
+
+    readonly modeOptions: PickerOption[] = [
+        { value: 'snapshot', label: 'Snapshot', hint: 'Versioned copies the owner refreshes' },
+        { value: 'live', label: 'Live', hint: "Read the owner's current data" },
+    ];
 
     /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);

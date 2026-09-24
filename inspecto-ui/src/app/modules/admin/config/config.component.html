@@ -18,14 +18,12 @@
             <div class="mt-6 flex flex-col gap-6 lg:flex-row">
                 <div class="min-w-0 flex-auto">
                     <div class="flex items-center gap-4">
-                        <mat-form-field class="gamma-mat-dense w-56" subscriptSizing="dynamic">
-                            <mat-label>Config type</mat-label>
-                            <mat-select [formControl]="typeCtrl">
-                                @for (t of types; track t) {
-                                    <mat-option [value]="t">{{ t }}</mat-option>
-                                }
-                            </mat-select>
-                        </mat-form-field>
+                        <inspecto-option-picker
+                            class="w-56"
+                            label="Config type"
+                            [options]="types"
+                            [formControl]="typeCtrl"
+                        />
                         <mat-checkbox [formControl]="safetyCtrl">safety gate (hard-fail)</mat-checkbox>
                     </div>
 

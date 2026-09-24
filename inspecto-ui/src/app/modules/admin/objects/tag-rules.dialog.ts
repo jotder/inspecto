@@ -5,13 +5,17 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ObjectsService, Tag, TagRule } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { CASE_STATUSES, INCIDENT_PRIORITIES, INCIDENT_STATUSES } from './mail-model';
+import {
+    InspectoOptionPickerComponent,
+    PickerOption,
+    pickerOptions,
+} from 'app/inspecto/components/option-picker.component';
 
 /**
  * Tag Rules manager (GLOSSARY §9) — Gmail-filter semantics: a saved search that applies a tag.
@@ -23,13 +27,13 @@ import { CASE_STATUSES, INCIDENT_PRIORITIES, INCIDENT_STATUSES } from './mail-mo
     selector: 'app-tag-rules-dialog',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatSelectModule,
         MatTooltipModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -114,35 +118,26 @@ import { CASE_STATUSES, INCIDENT_PRIORITIES, INCIDENT_STATUSES } from './mail-mo
                             <mat-label>Search text</mat-label>
                             <input matInput formControlName="q" placeholder="title / description contains…" />
                         </mat-form-field>
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Status</mat-label>
-                            <mat-select formControlName="status">
-                                <mat-option value="">any</mat-option>
-                                @for (s of statuses; track s) {
-                                    <mat-option [value]="s">{{ s }}</mat-option>
-                                }
-                            </mat-select>
-                        </mat-form-field>
+                        <inspecto-option-picker
+                            class="flex-1"
+                            label="Status"
+                            [options]="statuses"
+                            formControlName="status"
+                        />
                     </div>
                     <div class="flex gap-3">
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Priority</mat-label>
-                            <mat-select formControlName="priority">
-                                <mat-option value="">any</mat-option>
-                                @for (p of priorities; track p) {
-                                    <mat-option [value]="p">{{ p }}</mat-option>
-                                }
-                            </mat-select>
-                        </mat-form-field>
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Severity</mat-label>
-                            <mat-select formControlName="severity">
-                                <mat-option value="">any</mat-option>
-                                <mat-option value="INFO">INFO</mat-option>
-                                <mat-option value="WARNING">WARNING</mat-option>
-                                <mat-option value="CRITICAL">CRITICAL</mat-option>
-                            </mat-select>
-                        </mat-form-field>
+                        <inspecto-option-picker
+                            class="flex-1"
+                            label="Priority"
+                            [options]="priorities"
+                            formControlName="priority"
+                        />
+                        <inspecto-option-picker
+                            class="flex-1"
+                            label="Severity"
+                            [options]="severities"
+                            formControlName="severity"
+                        />
                         <mat-form-field class="flex-1" subscriptSizing="dynamic">
                             <mat-label>Category starts with</mat-label>
                             <input matInput formControlName="category" placeholder="e.g. Pipeline / Ingest" />
@@ -196,8 +191,15 @@ export class TagRulesDialog {
     readonly changed = signal(false);
     readonly criteriaMissing = signal(false);
 
-    readonly statuses = this.data.type === 'INCIDENT' ? INCIDENT_STATUSES : CASE_STATUSES;
-    readonly priorities = INCIDENT_PRIORITIES;
+    readonly statuses: PickerOption[] = [
+        { value: '', label: 'any' },
+        ...pickerOptions(this.data.type === 'INCIDENT' ? INCIDENT_STATUSES : CASE_STATUSES),
+    ];
+    readonly priorities: PickerOption[] = [{ value: '', label: 'any' }, ...pickerOptions(INCIDENT_PRIORITIES)];
+    readonly severities: PickerOption[] = [
+        { value: '', label: 'any' },
+        ...pickerOptions(['INFO', 'WARNING', 'CRITICAL']),
+    ];
 
     readonly form = this.fb.group({
         name: ['', Validators.required],

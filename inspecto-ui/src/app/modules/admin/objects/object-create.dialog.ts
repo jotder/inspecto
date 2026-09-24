@@ -15,6 +15,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { INCIDENT_TAXONOMY, joinCategory } from './incident-taxonomy';
 import { currentOperator, INCIDENT_PRIORITIES } from './mail-model';
+import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 
 /**
  * Create dialog for an operator-created object (an INCIDENT or a CASE) — POST /objects.
@@ -27,6 +28,7 @@ import { currentOperator, INCIDENT_PRIORITIES } from './mail-model';
     selector: 'app-object-create-dialog',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatAutocompleteModule,
         MatButtonModule,
@@ -56,63 +58,50 @@ import { currentOperator, INCIDENT_PRIORITIES } from './mail-model';
 
                 @if (isIncident) {
                     <div class="flex gap-3">
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Category</mat-label>
-                            <mat-select
+                        <div class="flex-1">
+                            <inspecto-option-picker
+                                label="Category"
+                                [options]="opts(l1Options)"
                                 formControlName="l1"
-                                required
-                                (selectionChange)="form.patchValue({ l2: '', l3: '' })"
-                            >
-                                @for (l1 of l1Options; track l1) {
-                                    <mat-option [value]="l1">{{ l1 }}</mat-option>
-                                }
-                            </mat-select>
+                                (ngModelChange)="form.patchValue({ l2: '', l3: '' })"
+                            />
                             @if (form.controls.l1.hasError('required') && form.controls.l1.touched) {
-                                <mat-error>Required.</mat-error>
+                                <p class="text-warn m-0 text-xs" role="alert">Required.</p>
                             }
-                        </mat-form-field>
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Subcategory</mat-label>
-                            <mat-select formControlName="l2" required (selectionChange)="form.patchValue({ l3: '' })">
-                                @for (l2 of l2Options(); track l2) {
-                                    <mat-option [value]="l2">{{ l2 }}</mat-option>
-                                }
-                            </mat-select>
+                        </div>
+                        <div class="flex-1">
+                            <inspecto-option-picker
+                                label="Subcategory"
+                                [options]="opts(l2Options())"
+                                formControlName="l2"
+                                (ngModelChange)="form.patchValue({ l3: '' })"
+                            />
                             @if (form.controls.l2.hasError('required') && form.controls.l2.touched) {
-                                <mat-error>Required.</mat-error>
+                                <p class="text-warn m-0 text-xs" role="alert">Required.</p>
                             }
-                        </mat-form-field>
-                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                            <mat-label>Detail</mat-label>
-                            <mat-select formControlName="l3" required>
-                                @for (l3 of l3Options(); track l3) {
-                                    <mat-option [value]="l3">{{ l3 }}</mat-option>
-                                }
-                            </mat-select>
+                        </div>
+                        <div class="flex-1">
+                            <inspecto-option-picker label="Detail" [options]="opts(l3Options())" formControlName="l3" />
                             @if (form.controls.l3.hasError('required') && form.controls.l3.touched) {
-                                <mat-error>Required.</mat-error>
+                                <p class="text-warn m-0 text-xs" role="alert">Required.</p>
                             }
-                        </mat-form-field>
+                        </div>
                     </div>
                 }
 
                 <div class="flex gap-3">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>Severity</mat-label>
-                        <mat-select formControlName="severity">
-                            <mat-option value="INFO">INFO</mat-option>
-                            <mat-option value="WARNING">WARNING</mat-option>
-                            <mat-option value="CRITICAL">CRITICAL</mat-option>
-                        </mat-select>
-                    </mat-form-field>
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>Priority</mat-label>
-                        <mat-select formControlName="priority">
-                            @for (p of priorities; track p) {
-                                <mat-option [value]="p">{{ p }}</mat-option>
-                            }
-                        </mat-select>
-                    </mat-form-field>
+                    <inspecto-option-picker
+                        class="flex-1"
+                        label="Severity"
+                        [options]="severities"
+                        formControlName="severity"
+                    />
+                    <inspecto-option-picker
+                        class="flex-1"
+                        label="Priority"
+                        [options]="priorities"
+                        formControlName="priority"
+                    />
                 </div>
                 <div class="flex gap-3">
                     <mat-form-field class="flex-1" subscriptSizing="dynamic">
@@ -153,15 +142,12 @@ import { currentOperator, INCIDENT_PRIORITIES } from './mail-model';
                     </mat-form-field>
                 </div>
                 <div class="flex gap-3">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>Relationship</mat-label>
-                        <mat-select formControlName="linkRelationship">
-                            <mat-option value="CONTAINS">CONTAINS</mat-option>
-                            <mat-option value="ESCALATED_FROM">ESCALATED_FROM</mat-option>
-                            <mat-option value="CAUSED_BY">CAUSED_BY</mat-option>
-                            <mat-option value="RELATED_TO">RELATED_TO</mat-option>
-                        </mat-select>
-                    </mat-form-field>
+                    <inspecto-option-picker
+                        class="flex-1"
+                        label="Relationship"
+                        [options]="relationships"
+                        formControlName="linkRelationship"
+                    />
                     <mat-form-field class="flex-[2]" subscriptSizing="dynamic">
                         <mat-label>Linked entities</mat-label>
                         <mat-select formControlName="links" multiple required>
@@ -203,8 +189,11 @@ export class ObjectCreateDialog {
     readonly data = inject<{ type: string; label: string; assignees?: string[] }>(MAT_DIALOG_DATA);
 
     readonly isIncident = this.data.type === 'INCIDENT';
-    readonly priorities = INCIDENT_PRIORITIES;
+    readonly priorities = pickerOptions(INCIDENT_PRIORITIES);
+    readonly severities = pickerOptions(['INFO', 'WARNING', 'CRITICAL']);
+    readonly relationships = pickerOptions(['CONTAINS', 'ESCALATED_FROM', 'CAUSED_BY', 'RELATED_TO']);
     readonly l1Options = Object.keys(INCIDENT_TAXONOMY);
+    readonly opts = pickerOptions;
     readonly tagSeparatorKeys = [ENTER, COMMA] as const;
 
     /** Guarded close: Esc / backdrop / Cancel confirm before discarding entered data. */

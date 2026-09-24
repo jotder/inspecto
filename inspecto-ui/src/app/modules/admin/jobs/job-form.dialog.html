@@ -57,12 +57,14 @@
 
         <!-- Cron preset quick-pick (bespoke): visible while the trigger is a cron schedule. -->
         @if (sf.form.get('cron')?.enabled) {
-        <mat-form-field class="w-48" subscriptSizing="dynamic">
-            <mat-label>Preset</mat-label>
-            <mat-select (selectionChange)="applyPreset($event.value)">
-                @for (p of cronPresets; track p.cron) { <mat-option [value]="p.cron">{{ p.label }}</mat-option> }
-            </mat-select>
-        </mat-form-field>
+        <inspecto-option-picker
+            class="w-48"
+            label="Preset"
+            [options]="cronPresets"
+            [ngModel]="null"
+            (ngModelChange)="applyPreset($event)"
+            [ngModelOptions]="{ standalone: true }"
+        />
         }
 
         <!-- Descriptor-driven parameters (P3c): the selected Job Type's declared params as typed fields. -->

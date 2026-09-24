@@ -15,7 +15,6 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { Observable } from 'rxjs';
@@ -40,6 +39,7 @@ import {
 import { isRecord } from 'app/inspecto/a2ui/a2ui-artifact';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 
 /** Dialog data: `def` set ⇒ edit mode (id locked, Test available); absent ⇒ create. */
 interface ComponentFormData {
@@ -88,6 +88,7 @@ const SINK_FORMATS = ['parquet', 'csv', 'json', 'avro'];
     selector: 'app-component-form-dialog',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         ReactiveFormsModule,
         FormsModule,
         MatDialogModule,
@@ -96,7 +97,6 @@ const SINK_FORMATS = ['parquet', 'csv', 'json', 'avro'];
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatSelectModule,
         MatSlideToggleModule,
         StatusBadgeComponent,
         InspectoAlertComponent,
@@ -117,9 +117,9 @@ export class ComponentFormDialog {
 
     readonly kind = this.data.kind;
     readonly isEdit = !!this.data.def;
-    readonly transformSubtypes = TRANSFORM_SUBTYPES;
-    readonly sinkKinds = SINK_KINDS;
-    readonly sinkFormats = SINK_FORMATS;
+    readonly transformSubtypes = pickerOptions(TRANSFORM_SUBTYPES);
+    readonly sinkKinds = pickerOptions(SINK_KINDS);
+    readonly sinkFormats = pickerOptions(SINK_FORMATS);
 
     readonly saving = signal(false);
     readonly testing = signal(false);

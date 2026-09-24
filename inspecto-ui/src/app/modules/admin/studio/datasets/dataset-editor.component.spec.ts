@@ -167,8 +167,8 @@ describe('DatasetEditorComponent', () => {
     });
 
     it('keeps a saved dataset‘s own store in the picker even when the catalog no longer lists it', async () => {
-        // A go-live-registered dataset names its store, which is not a sample source. A mat-select
-        // whose value is missing from its options renders empty — that reads as "no source chosen".
+        // A go-live-registered dataset names its store, which is not a sample source. The store must stay
+        // among the picker's options so re-picking it stays possible after the catalog drops it.
         const live = {
             id: 'orders_feed',
             name: 'orders_feed',

@@ -4,10 +4,10 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { RequirementKind } from 'app/inspecto/requirement';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
+import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
 
 export interface RequirementFormResult {
     title: string;
@@ -29,12 +29,12 @@ const KINDS: { value: RequirementKind; label: string }[] = [
     selector: 'app-requirement-form-dialog',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         ReactiveFormsModule,
         MatDialogModule,
         MatButtonModule,
         MatFormFieldModule,
         MatInputModule,
-        MatSelectModule,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
@@ -53,14 +53,7 @@ const KINDS: { value: RequirementKind; label: string }[] = [
                         <mat-error>Title is required</mat-error>
                     }
                 </mat-form-field>
-                <mat-form-field class="w-full" subscriptSizing="dynamic">
-                    <mat-label>Kind</mat-label>
-                    <mat-select formControlName="kind">
-                        @for (k of kinds; track k.value) {
-                            <mat-option [value]="k.value">{{ k.label }}</mat-option>
-                        }
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-option-picker class="w-full" label="Kind" [options]="kinds" formControlName="kind" />
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Description</mat-label>
                     <textarea

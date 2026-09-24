@@ -14,6 +14,7 @@ import {
     FormArray,
     FormBuilder,
     FormGroup,
+    FormsModule,
     ReactiveFormsModule,
     ValidatorFn,
     Validators,
@@ -23,7 +24,6 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import {
@@ -52,6 +52,7 @@ import {
     paramValueToApi,
     paramValueToForm,
 } from './job-parameter-specs';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 
 /** Dialog input: an existing job ⇒ edit; absent ⇒ create. `focusSchedule` opens with the schedule emphasized
  *  (the "Reschedule" action). */
@@ -124,13 +125,14 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
     selector: 'app-job-form-dialog',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
+        FormsModule,
         ReactiveFormsModule,
         MatButtonModule,
         MatDialogModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
-        MatSelectModule,
         MatTooltipModule,
         InspectoAlertComponent,
         ChipComponent,
@@ -174,7 +176,7 @@ export class JobFormDialog implements AfterViewInit {
     readonly isEdit = !!this.data.job;
     readonly saving = signal(false);
     readonly writesDisabled = signal(false);
-    readonly cronPresets = CRON_PRESETS;
+    readonly cronPresets: PickerOption[] = CRON_PRESETS.map((p) => ({ value: p.cron, label: p.label, hint: p.cron }));
     /** A signal, not the const: the `type` picker's options are replaced by the server's catalog (§8.2). */
     readonly attributes = signal<AttributeSpec[]>(JOB_ATTRIBUTES);
     /**

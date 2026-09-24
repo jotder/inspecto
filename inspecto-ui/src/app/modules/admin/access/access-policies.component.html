@@ -92,14 +92,7 @@
                     <mat-error>A route is required</mat-error>
                 }
             </mat-form-field>
-            <mat-form-field subscriptSizing="dynamic" class="w-32">
-                <mat-label>Method</mat-label>
-                <mat-select formControlName="method">
-                    @for (m of methods; track m) {
-                        <mat-option [value]="m">{{ m }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
+            <inspecto-option-picker class="w-32" label="Method" [options]="methods" formControlName="method" />
             <mat-form-field subscriptSizing="dynamic" class="w-48">
                 <mat-label>Resource kind (optional)</mat-label>
                 <input matInput formControlName="resourceKind" placeholder="incident" />

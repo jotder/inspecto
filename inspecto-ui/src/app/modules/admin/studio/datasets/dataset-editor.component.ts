@@ -7,7 +7,6 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { LensService, apiErrorMessage } from 'app/inspecto/api';
@@ -32,6 +31,7 @@ import { DatasetsService } from './datasets.service';
 import { MaterializeDatasetDialog } from './materialize-dataset.dialog';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { InspectoOptionPickerComponent, pickerOptions } from 'app/inspecto/components/option-picker.component';
 
 const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
 
@@ -45,6 +45,7 @@ const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
     selector: 'app-dataset-editor',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
         ReactiveFormsModule,
         MatButtonModule,
@@ -52,7 +53,6 @@ const KINDS: DatasetKind[] = ['virtual', 'physical', 'materialized'];
         MatIconModule,
         MatInputModule,
         MatProgressSpinnerModule,
-        MatSelectModule,
         RouterLink,
         InspectoAlertComponent,
         QueryPanelComponent,
@@ -83,11 +83,12 @@ export class DatasetEditorComponent implements OnInit {
         return this.id ? [{ kind: 'dataset', id: this.id }] : [];
     }
 
-    readonly kinds = KINDS;
+    readonly kinds = pickerOptions(KINDS);
     /** The stores this space actually has (`/db/catalog`), plus the saved dataset's own source when the
      *  catalog no longer lists it — a `mat-select` whose value is absent from its options renders BLANK,
      *  which reads as "no source chosen" rather than "this store went away". */
     readonly sourceNames = signal<string[]>([]);
+    readonly sourceOptions = computed(() => pickerOptions(this.sourceNames()));
     /** Why the store list is empty, when it is because the catalog could not be read. */
     readonly storesError = signal<string | null>(null);
     /** Why the picked store shows no preview rows (unknown store, unreadable, no offline sample). */

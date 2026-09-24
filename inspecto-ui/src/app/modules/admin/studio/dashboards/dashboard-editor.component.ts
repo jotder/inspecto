@@ -53,6 +53,11 @@ import { DashboardFilterBarComponent } from './dashboard-filter-bar.component';
 import { DashboardDrillDrawerComponent } from './dashboard-drill-drawer.component';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import {
+    InspectoOptionPickerComponent,
+    PickerOption,
+    pickerOptions,
+} from 'app/inspecto/components/option-picker.component';
 import '../widgets/widget.kind'; // register widget kind + viz plugins (tiles call getViz)
 import './dashboard.kind'; // register the dashboard kind
 
@@ -81,6 +86,7 @@ function splitStores(v: string | undefined): string[] | undefined {
     selector: 'app-dashboard-editor',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
         InspectoPageHeaderComponent,
         DragDropModule,
         ReactiveFormsModule,
@@ -145,6 +151,10 @@ export class DashboardEditorComponent implements OnInit {
 
     readonly widgets = signal<Widget[]>([]);
     readonly datasets = signal<Dataset[]>([]);
+    readonly widgetOptions = computed<PickerOption[]>(() =>
+        this.widgets().map((w) => ({ value: w.id, label: w.name, hint: w.vizType })),
+    );
+    readonly datasetOptions = computed<PickerOption[]>(() => pickerOptions(this.datasets().map((d) => d.id)));
     /** Inputs to the stale resolver — see `staleByWidget`. Empty until the three reads land. */
     private readonly disruptions = signal<DisruptionEvent[]>([]);
     private readonly commits = signal<CommitEvent[]>([]);

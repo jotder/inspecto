@@ -44,16 +44,12 @@
                         <mat-error>{{ err }}</mat-error>
                     }
                 </mat-form-field>
-                <mat-form-field class="flex-auto" subscriptSizing="dynamic">
-                    <mat-label>Source dataset</mat-label>
-                    <mat-select formControlName="datasetId">
-                        @for (d of datasets(); track d.id) {
-                            <mat-option [value]="d.id"
-                                >{{ d.id }} <span class="text-secondary">({{ d.sourceName }})</span></mat-option
-                            >
-                        }
-                    </mat-select>
-                </mat-form-field>
+                <inspecto-option-picker
+                    class="flex-auto"
+                    label="Source dataset"
+                    [options]="datasetOptions()"
+                    formControlName="datasetId"
+                />
             </div>
 
             <mat-form-field class="flex-auto" subscriptSizing="dynamic">

@@ -54,21 +54,14 @@
     <!-- Toolbar: add widget + cross-filter -->
     <div class="bg-card mt-6 flex flex-col gap-4 rounded-2xl p-5 shadow">
         <div class="flex flex-wrap items-center gap-4">
-            <mat-form-field subscriptSizing="dynamic" class="w-64">
-                <mat-label>Add widget</mat-label>
-                <mat-select
-                    [ngModel]="null"
-                    (ngModelChange)="addWidget($event)"
-                    [ngModelOptions]="{ standalone: true }"
-                    aria-label="Add widget"
-                >
-                    @for (w of widgets(); track w.id) {
-                        <mat-option [value]="w.id"
-                            >{{ w.name }} <span class="text-secondary">({{ w.vizType }})</span></mat-option
-                        >
-                    }
-                </mat-select>
-            </mat-form-field>
+            <inspecto-option-picker
+                class="w-64"
+                label="Add widget"
+                [options]="widgetOptions()"
+                [ngModel]="null"
+                (ngModelChange)="addWidget($event)"
+                [ngModelOptions]="{ standalone: true }"
+            />
             <span class="text-secondary text-sm">{{ tiles().length }} tile(s)</span>
         </div>
 
@@ -77,19 +70,14 @@
              ⚠ [args] is aiKpiArgs() — identity/context ONLY (dataset + title). Pane args win over the
              model's, so passing measures/groupBy here would overwrite what the sentence just derived. -->
         <div class="flex flex-wrap items-end gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
-            <mat-form-field subscriptSizing="dynamic" class="w-64">
-                <mat-label>Report dataset</mat-label>
-                <mat-select
-                    [ngModel]="kpiDataset()"
-                    (ngModelChange)="kpiDataset.set($event)"
-                    [ngModelOptions]="{ standalone: true }"
-                    aria-label="Report dataset"
-                >
-                    @for (d of datasets(); track d.id) {
-                        <mat-option [value]="d.id">{{ d.id }}</mat-option>
-                    }
-                </mat-select>
-            </mat-form-field>
+            <inspecto-option-picker
+                class="w-64"
+                label="Report dataset"
+                [options]="datasetOptions()"
+                [ngModel]="kpiDataset()"
+                (ngModelChange)="kpiDataset.set($event)"
+                [ngModelOptions]="{ standalone: true }"
+            />
             <inspecto-ai-assist
                 tool="kpi_report_builder"
                 prompting

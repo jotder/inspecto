@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, ViewChild, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
 import { AuthoredNode, ComponentDef, ComponentsService, ParserDef, ParserPreview } from 'app/inspecto/api';
@@ -25,6 +25,11 @@ import {
 } from 'app/inspecto/grammar';
 import { MappingEditorDialog } from 'app/modules/admin/components/mapping-editor.dialog';
 import { SchemaEditorData, SchemaEditorDialog } from 'app/modules/admin/components/schema-editor.dialog';
+import {
+    InspectoOptionPickerComponent,
+    PickerOption,
+    pickerOptions,
+} from 'app/inspecto/components/option-picker.component';
 
 /**
  * Dialog close payload: the edited node (absent ⇒ the user cancelled). Re-homed here from the retired
@@ -78,11 +83,12 @@ export interface GrammarEditorDialogData {
     selector: 'app-grammar-editor-dialog',
     standalone: true,
     imports: [
+        InspectoOptionPickerComponent,
+        FormsModule,
         MatDialogModule,
         MatButtonModule,
         MatFormFieldModule,
         MatIconModule,
-        MatSelectModule,
         MatTooltipModule,
         InspectoAlertComponent,
         InspectoDialogResizeDirective,
@@ -103,6 +109,10 @@ export class GrammarEditorDialog {
 
     /** Existing reusable Grammars (the inline-or-choose options). */
     readonly grammars = signal<ComponentDef[]>([]);
+    readonly grammarOptions = computed<PickerOption[]>(() => [
+        { value: '', label: "This Step's own Grammar" },
+        ...pickerOptions(this.grammars().map((g) => g.name)),
+    ]);
     /** The Grammar component this node is bound to; `null` ⇒ the block lives inline on the node. */
     readonly boundGrammarId = signal<string | null>(null);
 

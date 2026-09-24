@@ -67,11 +67,23 @@ structure and adopts only the compact typography: that row IS a toolbar, not a p
   multi-line statement), and a bounded editor pane (full-bleed header overflows). 34 panes converted by codemod
   with a structural check that no `@if/@for/@switch/@case` block changed count; 14 by hand.
 
+## Single-choice sweep — complete
+
+`MAT-SELECT-SWEEP-1` is **complete** (2026-09-24; the row is off the BACKLOG). Decision D8 scoped the first
+sweep to Geo Map, the Link Analysis dock and toolbox, and Assistant; the follow-up converted 42 more
+single-choice selects across 22 files to `<inspecto-option-picker>` (objects dialogs, reconciliation, Studio
+explore/queries/dashboards/templates/datasets, jobs, config, access, catalog share, components, requirements,
+grammar dialog). Plain string lists go through the `pickerOptions()` helper beside the picker. A picker that
+validates on submit gets a host-rendered `role="alert"` line, and a former `(selectionChange)` side-effect on
+a `formControlName` moved to `(ngModelChange)` (it still fires on user picks only). Kept as `mat-select` by
+rule: genuine multi-selects (7), table/row cells (transfer actions, reconciliation measure rows, decision-rule
+action rows, extra-config new-key type, the Link Analysis pattern-step editors, dataset-columns role, icon
+settings rows whose options carry images), filter/grid toolbars (events cadence, jobs Runs, run-detail file
+status, catalog graph direction, dashboard filter bar) and model settings (optgroups + disabled options the
+picker cannot express).
+
 ## Deliberately open
 
-* `MAT-SELECT-SWEEP-1` (BACKLOG §4): 23 templates still use `mat-select` for a single choice; decision D8 scoped
-  the sweep to Geo Map, the Link Analysis dock and toolbox, and Assistant. Table cells, grid toolbars, the two
-  genuine multi-selects and the two per-row pattern-step editors stay dropdowns by rule.
 * `EMPTY-GRID-HSCROLL-1` (BACKLOG §4): Incidents and Cases draw a horizontal scrollbar on an empty grid because
   their column minimum widths exceed the pane at narrow widths.
 * `JOB-RUNS-DIALOG-DEAD-1` (BACKLOG §4): `jobs/job-runs.dialog.ts` has no opener.

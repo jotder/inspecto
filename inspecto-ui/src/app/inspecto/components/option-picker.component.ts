@@ -12,6 +12,11 @@ export interface PickerOption {
     hint?: string;
 }
 
+/** Plain string choices whose label is the value itself. */
+export function pickerOptions(values: readonly string[]): PickerOption[] {
+    return values.map((v) => ({ value: v, label: v }));
+}
+
 interface PickerData {
     title: string;
     options: PickerOption[];

@@ -11,6 +11,11 @@ import {
     VizField,
     VizPlugin,
 } from 'app/inspecto/viz';
+import {
+    InspectoOptionPickerComponent,
+    PickerOption,
+    pickerOptions,
+} from 'app/inspecto/components/option-picker.component';
 
 const AGGS: Aggregation[] = ['sum', 'avg', 'min', 'max', 'count', 'countDistinct'];
 const GRAINS: TimeGrain[] = ['auto', 'day', 'week', 'month'];
@@ -24,15 +29,15 @@ const GRAINS: TimeGrain[] = ['auto', 'day', 'week', 'month'];
 @Component({
     selector: 'app-explore-controls',
     standalone: true,
-    imports: [FormsModule, MatFormFieldModule, MatSelectModule],
+    imports: [InspectoOptionPickerComponent, FormsModule, MatFormFieldModule, MatSelectModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div class="space-y-3">
             @for (control of plugin().controls; track control.channel) {
                 <div class="flex items-end gap-2">
-                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
-                        <mat-label>{{ control.label }}</mat-label>
-                        @if (control.multiple) {
+                    @if (control.multiple) {
+                        <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                            <mat-label>{{ control.label }}</mat-label>
                             <mat-select
                                 multiple
                                 [ngModel]="selectedFields(control.channel)"
@@ -43,48 +48,35 @@ const GRAINS: TimeGrain[] = ['auto', 'day', 'week', 'month'];
                                     <mat-option [value]="f.name">{{ f.label || f.name }}</mat-option>
                                 }
                             </mat-select>
-                        } @else {
-                            <mat-select
-                                [ngModel]="selectedField(control.channel)"
-                                (ngModelChange)="onField(control, $event)"
-                                [aria-label]="control.label"
-                            >
-                                <mat-option [value]="null">—</mat-option>
-                                @for (f of fieldsFor(control); track f.name) {
-                                    <mat-option [value]="f.name">{{ f.label || f.name }}</mat-option>
-                                }
-                            </mat-select>
-                        }
-                    </mat-form-field>
+                        </mat-form-field>
+                    } @else {
+                        <inspecto-option-picker
+                            class="flex-1"
+                            [label]="control.label"
+                            [options]="fieldOptions(control)"
+                            [ngModel]="selectedField(control.channel)"
+                            (ngModelChange)="onField(control, $event || null)"
+                        />
+                    }
 
                     @if (isTemporalSelected(control)) {
-                        <mat-form-field class="w-32" subscriptSizing="dynamic">
-                            <mat-label>Time grain</mat-label>
-                            <mat-select
-                                [ngModel]="grainFor(control.channel)"
-                                (ngModelChange)="onGrain(control.channel, $event)"
-                                [aria-label]="control.label + ' time grain'"
-                            >
-                                @for (g of grains; track g) {
-                                    <mat-option [value]="g">{{ g }}</mat-option>
-                                }
-                            </mat-select>
-                        </mat-form-field>
+                        <inspecto-option-picker
+                            class="w-32"
+                            label="Time grain"
+                            [options]="grains"
+                            [ngModel]="grainFor(control.channel)"
+                            (ngModelChange)="onGrain(control.channel, $event)"
+                        />
                     }
 
                     @if (control.isMeasure && !control.multiple && !isExpressionSelected(control.channel)) {
-                        <mat-form-field class="w-32" subscriptSizing="dynamic">
-                            <mat-label>Aggregation</mat-label>
-                            <mat-select
-                                [ngModel]="aggFor(control.channel)"
-                                (ngModelChange)="onAgg(control.channel, $event)"
-                                [aria-label]="control.label + ' aggregation'"
-                            >
-                                @for (a of aggs; track a) {
-                                    <mat-option [value]="a">{{ a }}</mat-option>
-                                }
-                            </mat-select>
-                        </mat-form-field>
+                        <inspecto-option-picker
+                            class="w-32"
+                            label="Aggregation"
+                            [options]="aggs"
+                            [ngModel]="aggFor(control.channel)"
+                            (ngModelChange)="onAgg(control.channel, $event)"
+                        />
                     }
                 </div>
             }
@@ -92,8 +84,8 @@ const GRAINS: TimeGrain[] = ['auto', 'day', 'week', 'month'];
     `,
 })
 export class ExploreControlsComponent {
-    readonly aggs = AGGS;
-    readonly grains = GRAINS;
+    readonly aggs = pickerOptions(AGGS);
+    readonly grains = pickerOptions(GRAINS);
 
     readonly plugin = input.required<VizPlugin>();
     readonly fields = input.required<VizField[]>();
@@ -102,6 +94,14 @@ export class ExploreControlsComponent {
 
     fieldsFor(control: ControlSpec): VizField[] {
         return this.fields().filter((f) => control.acceptRoles.includes(f.role));
+    }
+
+    /** The field choices plus a blank "—" that clears the channel (emitted as null). */
+    fieldOptions(control: ControlSpec): PickerOption[] {
+        return [
+            { value: '', label: '—' },
+            ...this.fieldsFor(control).map((f) => ({ value: f.name, label: f.label || f.name })),
+        ];
     }
 
     selectedField(channel: ControlSpec['channel']): string | null {
