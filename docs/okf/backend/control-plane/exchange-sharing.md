@@ -152,7 +152,10 @@ scalar key) · `exchange.handler.spec` +2.
 
 No Schema sharing (a Dataset's own Result Set is self-describing). No sharing of Dashboards, Pipelines,
 Jobs, Queries, Expectations — cross-instance/staging transport for those stays [Metadata Bundles](metadata-bundle.md)
-(copy semantics). No cross-space writes, ever. No per-row/column masking in v1 (an owner shares the
+(copy semantics), or the per-data-source zip bundle, whose closure carries a Pipeline's bound components and
+— since 2026-09-24 — the Reference Datasets it reads, as their producing Pipelines
+([editable round-trip §22](../pipeline-graph/editable-round-trip.md)). Neither is sharing: a Reference that
+travels in a bundle is copied into the target Space, never granted. No cross-space writes, ever. No per-row/column masking in v1 (an owner shares the
 whole Dataset or offers a pre-filtered derived one). No wholesale/public scope.
 
 ## Design-of-record

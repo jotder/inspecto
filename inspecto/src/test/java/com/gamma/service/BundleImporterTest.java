@@ -100,6 +100,44 @@ class BundleImporterTest {
                 out.paths().stream().sorted().toList());
     }
 
+    /**
+     * W5 forward closure: a carried Reference the target already hosts is dropped — only the entries it alone
+     * brought, never one another carried Reference still needs — and named as kept. One the target lacks, and
+     * a bundle with no {@code references} index, pass through untouched.
+     */
+    @Test
+    void keepExistingReferencesDropsOnlyWhatAHostedReferenceAloneBrought() throws Exception {
+        Map<String, Object> manifest = new LinkedHashMap<>();
+        manifest.put("kind", "datasource");
+        manifest.put(BundleExporter.REFERENCES, Map.of(
+                "region_dim", List.of("region_pipeline.toon", "dims_connection.toon"),
+                "country_dim", List.of("country_pipeline.toon", "dims_connection.toon")));
+        Map<String, String> entries = new LinkedHashMap<>();
+        entries.put("bundle.toon", com.gamma.config.io.ConfigCodec.toToon(manifest));
+        entries.put("orders_pipeline.toon", "name: ORDERS_ETL\n");
+        entries.put("region_pipeline.toon", "name: REGION_DIM\n");
+        entries.put("country_pipeline.toon", "name: COUNTRY_DIM\n");
+        entries.put("dims_connection.toon", "connection:\n  id: DIMS\n");
+        BundleImporter.Bundle bundle = BundleImporter.parse(zip(entries));
+
+        BundleImporter.Narrowed n = BundleImporter.keepExistingReferences(bundle, java.util.Set.of("region_dim"));
+        assertEquals(List.of("region_dim"), n.referencesKept());
+        assertEquals(List.of("orders_pipeline.toon", "country_pipeline.toon", "dims_connection.toon"),
+                List.copyOf(n.bundle().configEntries().keySet()),
+                "region_dim's pipeline is dropped; the connection country_dim also needs stays");
+        assertEquals(List.of("orders_etl", "country_dim"), BundleImporter.pipelineIds(n.bundle()),
+                "so the kept Reference is no longer a conflict candidate");
+
+        BundleImporter.Narrowed none = BundleImporter.keepExistingReferences(bundle, java.util.Set.of("orders_etl"));
+        assertTrue(none.referencesKept().isEmpty());
+        assertSame(bundle, none.bundle(), "a target hosting none of the References changes nothing");
+
+        BundleImporter.Bundle legacy = BundleImporter.parse(zip(Map.of(
+                "bundle.toon", "kind: datasource\n", "orders_pipeline.toon", "name: ORDERS_ETL\n")));
+        assertSame(legacy, BundleImporter.keepExistingReferences(legacy, java.util.Set.of("region_dim")).bundle(),
+                "a bundle with no references index is returned unchanged");
+    }
+
     @Test
     void parseRejectsAZipWithoutAManifest() throws Exception {
         byte[] zip = zip(Map.of("a_pipeline.toon", "name: A\n"));

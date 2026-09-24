@@ -537,6 +537,50 @@ UI side: [Grammar configuration](../../frontend/features/grammar-config.md).
   routes is the BACKLOG follow-up; the metadata bundle's `authored-pipeline` kind stays serving
   grandfathered flows only.
 
+## 22. The data-source bundle's forward closure — the Reference Datasets a Pipeline reads (W5, 2026-09-24)
+
+The per-data-source zip (`GET /spaces/{id}/datasources/{ds}/export` → `DataSourceBundleResolver` →
+`BundleExporter`) already carried the **reverse** closure — what names the Pipeline (jobs, Decision Rules,
+Expectations, Datasets over its store, Alert Rules). It now also carries the **forward** closure: what the
+Pipeline itself reads. Operator decision 2026-09-24: build it. ⛔ `PipelineCompiler.toConfigMap` is
+deliberately not migrated.
+
+**Every way a Pipeline declares a Reference read** (grounded against the parser and the two executors):
+
+| Where | Spelling | Carried? |
+|---|---|---|
+| `processing.join.reference` | `reference/<id>` | ✅ — surfaces as a `join` Step through `PipelineConfig.steps()` |
+| top-level `steps[]` → `join.reference` | `reference/<id>` | ✅ — same seam |
+| `route.branches[].steps[]` → `join.reference` | `reference/<id>` | ✅ — walked from the `route` Step config and `routeConfig()` |
+| `*_enrich.toon` companion → `references.<alias>.ref` | `<id>` | ✅ — the companion itself travels too (matched on `triggers.on_pipeline`, the `PipelineBundleRoutes.companionsOf` rule) |
+| any of the above as a **path** (`data/ref/x.csv`, `references.<alias>.path`) | a data path | ❌ — data, and a config bundle carries no data |
+| `transform.lookup` | inline `mappings` | ❌ — reads nothing |
+| recipe `transform: {join: references/<id>}` | `references/<id>` | ✅ — accepted beside `reference/`, as `PipelineConfigParser.referencePath` treats both as ids |
+
+A by-name id resolves the way `ReferenceReader.sqlFor` resolves it at run time — the loaded Pipeline whose
+`identity().pipelineName()` equals the id **and** that declares `produces: reference`; anything else (a
+dangling id, a Pipeline that produces no Reference) is warned and not carried. A carried Reference is its
+producer's `*_pipeline.toon` **plus its connection and schema files**, because the import gate 422s on a
+Pipeline whose connection or schema the target lacks. The closure is **transitive** (a producer that joins
+another Reference brings it) and never revisits the data source itself, so a self-join or a cycle adds
+nothing. `DataSourceBundle.files()` de-duplicates, so a file both closures reach — a connection the producer
+shares, the same schema — rides once.
+
+**Import round trip.** The manifest indexes the forward closure as `references: {<producer id>: [entries]}`,
+listing only the entries that Reference alone brought. On `POST /spaces/{id}/import` (and its preview),
+`BundleImporter.keepExistingReferences` drops every carried Reference the target already hosts — its entries
+are not written and it is not a 409 conflict — and reports it in `referencesKept`; under
+`?on_conflict=overwrite` nothing is narrowed and the carried copy replaces the target's. ⚠ The data-source
+import's connection gate is an **ERROR** (422, nothing registered), unlike `POST /pipelines/import`, where an
+unresolved connection is a WARNING because that bundle never carries a profile; the forward closure carries
+the producer's connection precisely so this gate stays unchanged. An imported companion `*_enrich.toon` is
+written but not hot-registered — it goes live on the Space's next boot, as in a whole-Space import.
+
+Pinned by `DataSourceBundleResolverTest.carriesTheReferenceDatasetsThePipelineReadsAndNothingElse` (all
+three by-name read sites, transitive hop, shared-file de-dup, the manifest index, and the negatives: path,
+dangling id, non-producer, self-join, a Pipeline reading nothing) and, over real HTTP,
+`ControlApiBundleImportTest.anExportCarriesTheReferenceItReadsAndAnImportRoundTripsOrKeepsTheTargetsOwn`.
+
 ## Every fixture survives the round trip — the standing gate (W0, proven 2026-09-06)
 
 `LiftLowerFixtureSweepTest` (inspecto-engine) runs every `spaces/**/*_pipeline.toon` in the repo through the

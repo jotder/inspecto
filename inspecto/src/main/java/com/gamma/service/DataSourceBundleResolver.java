@@ -10,11 +10,16 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 
@@ -23,7 +28,8 @@ import java.util.stream.Stream;
  * everything it references: the connection profile it binds to, the schema / grammar files it read at parse
  * time, any job that targets it, and the registry components bound to it (Decision Rules and Expectations
  * targeting it, Datasets reading its store, Alert Rules watching it or one of those Datasets — see
- * {@link #findComponentsFor}).
+ * {@link #findComponentsFor}), its enrichment companions, and — the forward closure — the Reference Datasets
+ * it reads by name ({@link #findReferencesFor}).
  *
  * <p>Scoped to one space: parsed configs come from that space's {@link ReadModel}; the connection / job
  * files are found by scanning that space's {@code config/} tree, because they are addressed by their in-file
@@ -67,9 +73,136 @@ public final class DataSourceBundleResolver {
                 : null;
 
         List<Path> jobs = findJobsFor(dataSourceId);
+        List<Path> enrichments = findEnrichmentsFor(dataSourceId);
         return new DataSourceBundle(
                 dataSourceId, pipelineFile, connection,
-                cfg.referencedFiles(), jobs, findComponentsFor(dataSourceId, jobs));
+                cfg.referencedFiles(), jobs, findComponentsFor(dataSourceId, jobs),
+                enrichments, findReferencesFor(dataSourceId, cfg, enrichments));
+    }
+
+    /**
+     * Every {@code *_enrich.toon} whose {@code triggers.on_pipeline} names this pipeline (case-insensitively)
+     * — the Stage-2 companion that joins References on the pipeline's behalf. The same match
+     * {@code PipelineBundleRoutes.companionsOf} makes for the single-pipeline bundle. A reverse reference,
+     * like {@link #findJobsFor}; it is carried here because its {@code references} are reads this data
+     * source makes, so the forward closure below must see them.
+     */
+    private List<Path> findEnrichmentsFor(String pipelineName) {
+        List<Path> out = new ArrayList<>();
+        for (Path p : scan("_enrich.toon")) {
+            try {
+                if (ToonHelper.load(p.toString()).get("triggers") instanceof Map<?, ?> t
+                        && pipelineName.equalsIgnoreCase(String.valueOf(t.get("on_pipeline")))) out.add(p);
+            } catch (RuntimeException | IOException bad) {
+                log.warn("skipping unreadable enrichment file {}: {}", p, bad.toString());
+            }
+        }
+        return out;
+    }
+
+    /**
+     * <b>The forward closure</b> (W5, 2026-09-24): the Reference Datasets this data source reads, each carried
+     * as the {@code produces: reference} pipeline that produces it — its pipeline file, connection and schema
+     * files, so the Reference can import and run in the target space. A data source reads a Reference by name
+     * in exactly three places, all collected by {@link #byNameReads}:
+     * <ol>
+     *   <li>a {@code join} step's {@code reference} — {@code processing.join} and a top-level {@code steps[]}
+     *       join both surface through {@link PipelineConfig#steps()};</li>
+     *   <li>a {@code join} step inside a {@code route.branches[].steps[]} list;</li>
+     *   <li>an enrichment companion's {@code references.<alias>.ref}.</li>
+     * </ol>
+     * A reference is by name when it is spelled {@code reference/<id>} (or the recipe's
+     * {@code references/<id>} — the parser keeps both as ids, {@code PipelineConfigParser.referencePath}), and
+     * resolves as {@code ReferenceReader.sqlFor} resolves it: the loaded pipeline whose
+     * {@code identity().pipelineName()} equals the id and which declares {@code produces: reference}.
+     *
+     * <p><b>Deliberately not carried:</b> a <em>path</em> reference ({@code reference: data/regions.csv}, an
+     * enrichment's {@code references.<alias>.path}) is a data file, and a config bundle carries no data; a
+     * by-name id that resolves to no Reference producer here is warned and skipped (the engine refuses it at
+     * run time anyway). A {@code transform.lookup} step reads nothing — its mappings are inline. The closure is
+     * transitive (a producer that itself joins a Reference brings that one too) and never revisits the data
+     * source itself, so a self-join or a cycle adds nothing.
+     */
+    private List<DataSourceBundle.Reference> findReferencesFor(String dataSourceId, PipelineConfig cfg,
+                                                               List<Path> enrichments) {
+        Set<String> seen = new HashSet<>(List.of(cfg.identity().pipelineName()));
+        Set<String> carried = new HashSet<>();
+        Deque<String> todo = new ArrayDeque<>(byNameReads(cfg));
+        for (Path e : enrichments) todo.addAll(enrichmentReads(e));
+        List<DataSourceBundle.Reference> out = new ArrayList<>();
+        while (!todo.isEmpty()) {
+            String ref = todo.poll();
+            if (!seen.add(ref)) continue;
+            PipelineView producer = service.pipelines().stream()
+                    .filter(v -> service.configFor(v.name())
+                            .filter(c -> c.producesReference() && c.identity().pipelineName().equals(ref))
+                            .isPresent())
+                    .findFirst().orElse(null);
+            if (producer == null) {
+                log.warn("reference '{}' is read by '{}' but no produces: reference pipeline of that name is"
+                        + " loaded — not carried", ref, dataSourceId);
+                continue;
+            }
+            if (producer.name().equals(dataSourceId) || !carried.add(producer.name())) continue;
+            PipelineConfig pc = service.configFor(producer.name()).orElseThrow();
+            LinkedHashSet<Path> files = new LinkedHashSet<>();
+            service.pathFor(producer.name()).ifPresent(files::add);
+            if (pc.collector().hasConnection()) {
+                Path conn = findConnectionFile(pc.collector().connection());
+                if (conn != null) files.add(conn);
+            }
+            files.addAll(pc.referencedFiles());
+            out.add(new DataSourceBundle.Reference(producer.name(), List.copyOf(files)));
+            todo.addAll(byNameReads(pc));
+        }
+        return out;
+    }
+
+    /** The by-name Reference ids a pipeline's {@code join} steps read — top-level and inside route branches. */
+    private static Set<String> byNameReads(PipelineConfig cfg) {
+        Set<String> out = new LinkedHashSet<>();
+        for (PipelineConfig.Step s : cfg.steps()) {
+            if (PipelineConfig.Step.JOIN.equals(s.kind())) addByName(s.config().get("reference"), out);
+            if (PipelineConfig.Step.ROUTE.equals(s.kind())) branchJoins(s.config(), out);
+        }
+        branchJoins(cfg.routeConfig(), out);
+        return out;
+    }
+
+    /** Each {@code route.branches[].steps[]} entry spelled {@code {join: {reference: …}}}. */
+    private static void branchJoins(Map<String, Object> route, Set<String> out) {
+        if (route == null || !(route.get("branches") instanceof List<?> branches)) return;
+        for (Object b : branches) {
+            if (!(b instanceof Map<?, ?> branch) || !(branch.get("steps") instanceof List<?> steps)) continue;
+            for (Object step : steps)
+                if (step instanceof Map<?, ?> sm && sm.get("join") instanceof Map<?, ?> join)
+                    addByName(join.get("reference"), out);
+        }
+    }
+
+    /** Add the id of a by-name {@code reference/<id>} / {@code references/<id>}; a path reference adds nothing. */
+    private static void addByName(Object reference, Set<String> out) {
+        if (reference == null) return;
+        String s = reference.toString().trim();
+        for (String prefix : new String[]{"reference/", "references/"}) {
+            if (s.startsWith(prefix) && s.length() > prefix.length()) out.add(s.substring(prefix.length()).trim());
+        }
+    }
+
+    /** An enrichment companion's by-name reads — every {@code references.<alias>.ref}; {@code path:} ones are data. */
+    private static List<String> enrichmentReads(Path enrichment) {
+        List<String> out = new ArrayList<>();
+        try {
+            if (ToonHelper.load(enrichment.toString()).get("references") instanceof Map<?, ?> refs) {
+                for (Object v : refs.values()) {
+                    if (v instanceof Map<?, ?> r && r.get("ref") != null && !r.get("ref").toString().isBlank())
+                        out.add(r.get("ref").toString().trim());
+                }
+            }
+        } catch (RuntimeException | IOException bad) {
+            log.warn("skipping unreadable enrichment file {}: {}", enrichment, bad.toString());
+        }
+        return out;
     }
 
     /** The {@code *_connection.toon} whose in-file {@code id} matches {@code connId}, or {@code null} if none. */
@@ -142,9 +275,10 @@ public final class DataSourceBundleResolver {
      * {@code config/}, so the thing it depends on cannot ride in a config bundle at all); a Dataset over a
      * bundled <em>job's</em> output store ({@code orders_rollup_dataset}'s {@code physicalRef: rollup} —
      * resolving a job's output store means following job → pipeline → sink, which nothing here reads today);
-     * and every <b>forward</b> reference out of a bundled component — an Expectation's {@code refDataset},
-     * a Dataset's reference Datasets — which would pull in components that do not reference this data
-     * source at all (whether an export should chase them is an open operator decision).
+     * and every <b>forward</b> reference out of a bundled <em>component</em> — an Expectation's
+     * {@code refDataset}, say — which would pull in components that do not reference this data source at all.
+     * The forward references out of the <em>pipeline</em> itself are a separate closure,
+     * {@link #findReferencesFor}.
      *
      * <p>A <b>disabled</b> Decision Rule still travels. {@code DecisionRules} filters {@code enabled} at
      * <em>evaluation</em> time; an export is a promotion of the config as authored, and silently dropping

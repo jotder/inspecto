@@ -164,8 +164,12 @@ Pipeline: Decision Rules and Expectations whose `targetType`/`target` name it (o
 whose `physicalRef` reads its store, and Alert Rules whose `onPipeline` names it or whose `dataset` names a
 bundled Dataset (W4/W5, 2026-09-23 — `ControlApiBundleImportTest.anExportCarriesTheAlertRulesAndExpectations…`).
 An Alert Rule with no `onPipeline` watches every Pipeline and stays behind; **forward** references out of a
-bundled component (an Expectation's `refDataset`, reference Datasets) are deliberately not chased — an open
-operator decision. `BundleImporter`
+bundled *component* (an Expectation's `refDataset`) are deliberately not chased. The Pipeline's *own* forward
+reads are (2026-09-24, `DataSourceBundleResolver.findReferencesFor`): its `*_enrich.toon` companions travel,
+and every Reference Dataset it joins by name travels as its `produces: reference` Pipeline + connection +
+schemas, indexed in the manifest's `references` map; an import into a Space that already hosts that Reference
+keeps the target's copy and names it in `referencesKept` rather than 409ing — see
+[editable round-trip §22](../../backend/pipeline-graph/editable-round-trip.md). `BundleImporter`
 **jails every zip entry** — an entry resolving outside `configDir` throws (`:84-104`, the zip-slip pin, tested
 with a re-packed archive) — and **rebases** `spaces/<source>/…` path prefixes to the target Space (W3).
 `POST /spaces/import` reuses the same importer to seed a brand-new Space. ⚠ `multi-space.md` enumerates the
@@ -472,7 +476,7 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 | `SpaceRootTest` (1) | legacy vs directory-rooted paths |
 | `SpaceMigratorTest` (2) | plan / apply / idempotence of the one-time migration |
 | `BundleExporterTest` (8) · `BundleImporterTest` (9) | the zip manifest and contents; **the zip-slip jail** and source-prefix rebasing |
-| `DataSourceBundleResolverTest` (2) | per-data-source bundle resolution |
+| `DataSourceBundleResolverTest` (3) | per-data-source bundle resolution, incl. the forward Reference closure |
 
 ### 8.2 Routes — `inspecto/src/test/java/com/gamma/control/` (real HTTP)
 
@@ -481,7 +485,7 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 | `ControlApiSpacesTest` (4) | `/spaces` CRUD; `authenticatedCreateSucceedsWhenNoSpaceIsHostedYet`; `purgingTheLastSpaceOnDiskIsRefused` |
 | `ControlApiSpaceTemplatesTest` (2) | the gallery and `createFromTemplate` |
 | `ControlApiMultiSpaceTest` (1) | a multi-Space server smoke |
-| `ControlApiBundleTest` (11) · `ControlApiBundleImportTest` (10) · `ControlApiBundleNewKindsTest` (10) · `ControlApiPipelineBundleTest` (7) | export / preview / import contract, ordering, the newer kinds, the `authored-pipeline` round trip |
+| `ControlApiBundleTest` (11) · `ControlApiBundleImportTest` (11) · `ControlApiBundleNewKindsTest` (10) · `ControlApiPipelineBundleTest` (7) | export / preview / import contract, ordering, the newer kinds, the `authored-pipeline` round trip |
 | `ExchangeAttributeScopeTest` · `NoExchangeShipsInThePersonalBuildTest` | exchange attributes private by default; Personal carries no exchange module |
 | `PostgresStateStoreTest` (opt-in, `-Dinspecto.test.pg.url`; 11 skipped otherwise) | the DB-backed stores against a real Postgres |
 
