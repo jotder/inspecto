@@ -1,5 +1,6 @@
 package com.gamma.etl;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
@@ -10,7 +11,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.nio.channels.FileChannel;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -81,9 +81,8 @@ public final class CommitLog {
     public Set<String> committedBatchIds() {
         Set<String> ids = new HashSet<>();
         if (!Files.exists(file)) return ids;
-        try {
-            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-            for (String l : lines) {
+        try (BufferedReader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {   // streamed: the log only grows
+            for (String l; (l = r.readLine()) != null; ) {
                 if (l.isBlank() || l.startsWith("committed_at,")) continue;
                 String[] c = l.split(",", -1);
                 if (c.length >= 4 && "SUCCESS".equals(c[3])) ids.add(c[1]);

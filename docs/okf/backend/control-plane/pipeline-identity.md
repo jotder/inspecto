@@ -159,7 +159,9 @@ config write lands *after* the state moves: a crash before it leaves the old con
 the route's `catch` block can re-register it and keep the pipeline reachable — but ledger/audit state
 already moved under earlier steps stays moved (a documented residual risk, not a bug). Every completed
 step is appended to `<writeRoot>/rename.journal`, and since 2026-08-13 the journal is **read back by
-`POST /pipelines/rename/resume`** (below) — an interrupted migration is finished, not reconciled by hand.
+`POST /pipelines/rename/resume`** (below) — an interrupted migration is finished, not reconciled by hand. The
+read-back streams the journal line by line (it only grows); see [Jobs](jobs.md) § *Journal read-backs
+stream*.
 
 ## `resume` — finishing an interrupted migration (shipped 2026-08-13)
 

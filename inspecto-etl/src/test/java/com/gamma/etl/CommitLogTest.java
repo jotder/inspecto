@@ -74,6 +74,29 @@ class CommitLogTest {
         assertEquals(n + 1, Files.readAllLines(log.path()).size(), "header + n records, no lost/torn writes");
     }
 
+    /** AUDIT-LOG-UNBOUNDED-READ-1: the streamed read folds a large log whole — no cap, no tail shortcut. */
+    @Test
+    void readsALargeLogWhole(@TempDir Path dir) throws Exception {
+        CommitLog log = new CommitLog(dir.resolve("big_commits.log").toString());
+        StringBuilder sb = new StringBuilder();
+        int n = 100_000;
+        for (int i = 0; i < n; i++)
+            sb.append("t,b").append(i).append(",p,").append(i % 2 == 0 ? "SUCCESS" : "EMPTY").append(",1,1,1,1\n");
+        Files.writeString(log.path(), sb.toString(), java.nio.file.StandardOpenOption.APPEND);
+        Set<String> ids = log.committedBatchIds();
+        assertEquals(n / 2, ids.size());
+        assertTrue(ids.contains("b0") && ids.contains("b" + (n - 2)), "first and last SUCCESS both read");
+    }
+
+    /** AUDIT-LOG-UNBOUNDED-READ-1: a torn trailing record (hard kill mid-append) is tolerated exactly as before. */
+    @Test
+    void aTornTrailingRecordIsSkippedUnlessItsStatusLanded(@TempDir Path dir) throws Exception {
+        CommitLog log = new CommitLog(dir.resolve("torn_commits.log").toString());
+        log.record("t", "b1", "p", "SUCCESS", 1, 1, 1, 1);
+        Files.writeString(log.path(), "t,b2,p,SUCC", java.nio.file.StandardOpenOption.APPEND);
+        assertEquals(Set.of("b1"), log.committedBatchIds(), "a status cut short never reads as SUCCESS");
+    }
+
     @Test
     void emptyLogReadsAsEmptySet(@TempDir Path dir) {
         CommitLog log = new CommitLog(dir.resolve("fresh_commits.log").toString());

@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **51<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** —
+> **50<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 26<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 54 on 2026-09-24**: P2 `STREAM-CONSUMER-1` closed — Option A built, the `SP-ACQ-09` note updated, the plan distilled into `okf/capabilities/acquisition/acquisition.md` and archived.
 > ⬇ 55 → 54 on 2026-09-24: P3 `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` closed — its work had shipped in `d5f6353be`
@@ -22,8 +22,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 26<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 25<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 51<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 24<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 50<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -222,7 +222,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 - **P2** · **Bundle / Exchange — "load as draft" import** — a per-editor import that lands as a draft instead of writing straight through (today `BundleRoutes.importBundle` over `BundleImporter`/`BundleExporter` has no draft seam and no staging state). Design first, likely multi-session. ⛔ Do not fake it with a cross-kind `enabled:false` stamp. (`requires` present-but-different classification shipped 2026-07-18.) → `okf/backend/control-plane/exchange-sharing.md` · design: [`superpower/bundle-load-as-draft-design.md`](superpower/bundle-load-as-draft-design.md) (D1–D8 owed)
 - **P2** · **Job framework — space-to-space comparison** — ⛔ **POSTPONED by the operator 2026-09-16: design only, do not start.** The trigger fired 2026-09-15, which removed the gate but did not set a rank; the design is `superpower/space-comparison-design.md`, its four §5 decisions parked, not owed. No code exists. Predictive maintenance stays deferred to AGT-5 regardless. → `okf/backend/control-plane/jobs.md`
-- **P3** · `AUDIT-LOG-UNBOUNDED-READ-1` — `JobRunLedger.java:98,124,149`, `PartitionCompactor.java:163`, `ReferenceCompactor.java:292`, `RunArtifactStore.java:60`, `RunLogStore.java:50` and `CommitLog.java:85` read whole journal files into memory on every read, with no cap. Demand-gated: stream or tail once a file is measured to matter.
 
 #### API contract & vocabulary
 

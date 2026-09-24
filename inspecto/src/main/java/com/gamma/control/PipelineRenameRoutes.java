@@ -217,17 +217,19 @@ final class PipelineRenameRoutes implements RouteModule {
     private List<PendingRename> readPendingRenames(Path journalFile) throws IOException {
         if (!Files.exists(journalFile)) return List.of();
         Map<String, PendingRename> open = new LinkedHashMap<>();
-        for (String line : Files.readAllLines(journalFile, StandardCharsets.UTF_8)) {
-            java.util.regex.Matcher m = JOURNAL_LINE.matcher(line);
-            if (!m.matches()) continue;
-            String key = m.group(1) + " -> " + m.group(2);
-            String step = m.group(3);
-            java.util.regex.Matcher b = BEGIN_STEP.matcher(step);
-            if (b.matches())
-                open.put(key, new PendingRename(m.group(1), m.group(2), b.group(1),
-                        Boolean.parseBoolean(b.group(2)), b.group(3)));
-            else if ("completed".equals(step))
-                open.remove(key);
+        try (java.io.BufferedReader r = Files.newBufferedReader(journalFile, StandardCharsets.UTF_8)) {
+            for (String line; (line = r.readLine()) != null; ) {   // streamed: the journal only grows
+                java.util.regex.Matcher m = JOURNAL_LINE.matcher(line);
+                if (!m.matches()) continue;
+                String key = m.group(1) + " -> " + m.group(2);
+                String step = m.group(3);
+                java.util.regex.Matcher b = BEGIN_STEP.matcher(step);
+                if (b.matches())
+                    open.put(key, new PendingRename(m.group(1), m.group(2), b.group(1),
+                            Boolean.parseBoolean(b.group(2)), b.group(3)));
+                else if ("completed".equals(step))
+                    open.remove(key);
+            }
         }
         return List.copyOf(open.values());
     }

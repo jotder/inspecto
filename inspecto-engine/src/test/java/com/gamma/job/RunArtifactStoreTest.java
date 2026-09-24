@@ -3,6 +3,8 @@ package com.gamma.job;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
@@ -69,5 +71,36 @@ class RunArtifactStoreTest {
     @Test
     void unknownRunReadsEmpty(@TempDir Path dir) {
         assertTrue(new RunArtifactStore(dir.toString()).read("never-ran").isEmpty());
+    }
+
+    /** AUDIT-LOG-UNBOUNDED-READ-1: the streamed read returns a large file whole, in write order, no cap. */
+    @Test
+    void readsALargeArtifactFileWholeInWriteOrder(@TempDir Path dir) throws Exception {
+        Path f = seedFile(dir, "r3");
+        String template = Files.readString(f, StandardCharsets.UTF_8).strip();
+        StringBuilder sb = new StringBuilder();
+        int n = 20_000;
+        for (int i = 1; i <= n; i++) sb.append(template.replace("\"seq\":0", "\"seq\":" + i)).append("\n\n");
+        Files.writeString(f, sb.toString(), StandardCharsets.UTF_8);
+
+        List<RunArtifact> arts = new RunArtifactStore(dir.toString()).read("r3");
+        assertEquals(n, arts.size(), "every artifact comes back, blank lines skipped");
+        assertEquals(1, arts.get(0).seq());
+        assertEquals(n, arts.get(n - 1).seq());
+    }
+
+    /** AUDIT-LOG-UNBOUNDED-READ-1: a torn trailing line still fails the read, exactly as the whole-file read did. */
+    @Test
+    void aTornTrailingLineStillFailsTheRead(@TempDir Path dir) throws Exception {
+        Path f = seedFile(dir, "r4");
+        Files.writeString(f, Files.readString(f) + "{\"runId\":\"r4\",\"job\":\"lo", StandardCharsets.UTF_8);
+        RunArtifactStore store = new RunArtifactStore(dir.toString());
+        assertThrows(java.io.UncheckedIOException.class, () -> store.read("r4"));
+    }
+
+    private static Path seedFile(Path dir, String runId) {
+        new RunArtifactStore(dir.toString()).append(new RunArtifact(runId, "loader", 0, "output", "file",
+                "out.csv", null, 0L, 10L, null, "2026-09-24T00:00:00Z", null));
+        return dir.resolve("artifacts").resolve(runId + ".jsonl");
     }
 }

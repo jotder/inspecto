@@ -390,6 +390,26 @@ taken.
 skip each other while the audit calls them healthy. ⛔ Naming only the first sharer is likewise
 mutation-guarded — it leaves the operator exactly as unable to act as the bare skip message did.
 
+### Journal read-backs stream, they do not load (`AUDIT-LOG-UNBOUNDED-READ-1`, 2026-09-24)
+
+Every read-back of an append-only journal goes line by line through `Files.newBufferedReader`, never
+`Files.readAllLines`: `JobRunLedger.lastStartTimes` / `lastSuccessEnd` / `lastSuccessRunId`
+(`jobs_runs.csv`), `RunLogStore.read`, `RunArtifactStore.read`, `com.gamma.etl.CommitLog.committedBatchIds`,
+`PipelineRenameRoutes.readPendingRenames` (`rename.journal`) and `SnapshotStore.attachmentsOf`
+(`attachments.jsonl`). The answers are unchanged: same UTF-8 decoding, same line splitting, and no new cap.
+A torn trailing line is handled as before. The CSV folds skip it as malformed. The two JSONL stores still
+fail the read loudly.
+
+- ⛔ **Do not "optimise" the `JobRunLedger` reads into a tail read.** They are folds, the *latest by
+  timestamp* and not the last row: runs append at their END, so a long run started earlier lands after a
+  shorter one started later. `JobRunLedgerStreamedReadTest` puts the newest row first to pin this.
+- **Deliberately left whole-file:** `PartitionCompactor.heal` and `ReferenceCompactor.heal` (the journal
+  is one compaction's candidate list, already in memory during `compact()`, and deleted on success), and
+  `BranchCommitLog.forEachRow` (one file per batch, deleted once the batch commits). These are bounded, not
+  growing, so streaming them buys nothing.
+- No shared helper: no caller wants "the last N lines", so the tail-read helper the row suggested has no
+  user.
+
 ## Maintenance jobs (MNT, shipped 2026-07-12)
 
 System maintenance is **tasks on the `maintenance` job type, never shell scripts or OS cron**. Task library:

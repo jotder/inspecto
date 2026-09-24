@@ -5,6 +5,7 @@ import com.gamma.util.CsvLedger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -99,10 +100,10 @@ final class JobRunLedger implements AutoCloseable {
     Map<String, LocalDateTime> lastStartTimes() {
         Map<String, LocalDateTime> out = new LinkedHashMap<>();
         if (auditFile == null || !Files.exists(auditFile)) return out;
-        try {
-            List<String> lines = Files.readAllLines(auditFile);
-            for (int i = 1; i < lines.size(); i++) {                      // row 0 is the header
-                String[] f = lines.get(i).split(",", -1);                 // job + start_time are comma-free fields
+        try (BufferedReader r = Files.newBufferedReader(auditFile)) {     // streamed: the audit only grows
+            r.readLine();                                                 // row 0 is the header
+            for (String line; (line = r.readLine()) != null; ) {
+                String[] f = line.split(",", -1);                         // job + start_time are comma-free fields
                 if (f.length < 5) continue;
                 try {
                     LocalDateTime start = LocalDateTime.parse(f[4], TS);
@@ -125,10 +126,10 @@ final class JobRunLedger implements AutoCloseable {
     Optional<LocalDateTime> lastSuccessEnd(String name) {
         if (auditFile == null || !Files.exists(auditFile)) return Optional.empty();
         LocalDateTime best = null;
-        try {
-            List<String> lines = Files.readAllLines(auditFile);
-            for (int i = 1; i < lines.size(); i++) {                      // row 0 is the header
-                String[] f = lines.get(i).split(",", -1);
+        try (BufferedReader r = Files.newBufferedReader(auditFile)) {     // streamed: the audit only grows
+            r.readLine();                                                 // row 0 is the header
+            for (String line; (line = r.readLine()) != null; ) {
+                String[] f = line.split(",", -1);
                 if (f.length < 7 || !name.equals(f[1]) || !"SUCCESS".equals(f[6])) continue;
                 try {
                     LocalDateTime end = LocalDateTime.parse(f[5], TS);
@@ -150,10 +151,10 @@ final class JobRunLedger implements AutoCloseable {
         if (auditFile == null || !Files.exists(auditFile)) return Optional.empty();
         String bestRunId = null;
         LocalDateTime best = null;
-        try {
-            List<String> lines = Files.readAllLines(auditFile);
-            for (int i = 1; i < lines.size(); i++) {                      // row 0 is the header
-                String[] f = lines.get(i).split(",", -1);
+        try (BufferedReader r = Files.newBufferedReader(auditFile)) {     // streamed: the audit only grows
+            r.readLine();                                                 // row 0 is the header
+            for (String line; (line = r.readLine()) != null; ) {
+                String[] f = line.split(",", -1);
                 if (f.length < 7 || !name.equals(f[1]) || !"SUCCESS".equals(f[6])) continue;
                 try {
                     LocalDateTime end = LocalDateTime.parse(f[5], TS);
