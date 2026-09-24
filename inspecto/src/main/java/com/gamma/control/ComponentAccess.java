@@ -68,7 +68,7 @@ public final class ComponentAccess {
     /** 404 (indistinguishable from absence) unless the request may view the component. */
     static void requireView(HttpExchange ex, String type, String id, Map<String, Object> content) {
         if (!canView(ex, content))
-            throw new ApiException(404, "no " + type + " component '" + id + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + type + " component '" + id + "'");
     }
 
     /** {@link #requireView} then 403 unless the request may edit (owner, edit share, or unrestricted). */
@@ -166,23 +166,23 @@ public final class ComponentAccess {
     /** Validate the sharing envelope inside {@code content}; throws {@link ApiException} 422. */
     static void validate(Map<String, Object> content) {
         if (content.containsKey(OWNER) && trimOrEmpty(content.get(OWNER)).isEmpty())
-            throw new ApiException(422, "'owner' must be a non-blank subject id");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'owner' must be a non-blank subject id");
         if (!content.containsKey(SHARES)) return;
         if (!(content.get(SHARES) instanceof List<?> shares))
-            throw new ApiException(422, "'shares' must be a list of {subjectType, subjectId, access}");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'shares' must be a list of {subjectType, subjectId, access}");
         if (shares.size() > MAX_SHARES)
-            throw new ApiException(422, "too many shares (max " + MAX_SHARES + ")");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "too many shares (max " + MAX_SHARES + ")");
         for (Object o : shares) {
             if (!(o instanceof Map<?, ?> share))
-                throw new ApiException(422, "every share must be an object {subjectType, subjectId, access}");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every share must be an object {subjectType, subjectId, access}");
             String subjectType = trimOrEmpty(share.get("subjectType"));
             if (!"role".equals(subjectType) && !"user".equals(subjectType))
-                throw new ApiException(422, "share 'subjectType' must be 'role' or 'user', got '" + subjectType + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "share 'subjectType' must be 'role' or 'user', got '" + subjectType + "'");
             if (trimOrEmpty(share.get("subjectId")).isEmpty())
-                throw new ApiException(422, "share 'subjectId' is required");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "share 'subjectId' is required");
             String access = trimOrEmpty(share.get("access"));
             if (!"view".equals(access) && !"edit".equals(access))
-                throw new ApiException(422, "share 'access' must be 'view' or 'edit', got '" + access + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "share 'access' must be 'view' or 'edit', got '" + access + "'");
         }
     }
 }

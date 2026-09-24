@@ -4,6 +4,7 @@ import com.gamma.alert.AlertRule;
 import com.gamma.alert.AlertService;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
@@ -78,7 +79,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
             asked.put("value", v.isPresent() ? v.getAsDouble() : null);
             out.put("measure", asked);
         } else if (relation != null && !relation.isBlank()) {
-            throw new ApiException(422, "'relation' names the relation a 'measure' is computed over — give both");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'relation' names the relation a 'measure' is computed over — give both");
         }
         out.put("key", rel.key());
         out.put("cached", cached[0]);
@@ -99,7 +100,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
         for (String k : body.keySet())
             if (!RULE_FIELDS.contains(k))
-                throw new ApiException(422, "'" + k + "' is not a field of an Investigation Alert Rule " + RULE_FIELDS
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + k + "' is not a field of an Investigation Alert Rule " + RULE_FIELDS
                         + " — the Investigation is the path's, and its owner is recorded, not given");
         Map<String, Object> content = new LinkedHashMap<>(body);
         content.put("investigation", id);
@@ -107,23 +108,23 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         try {
             rule = AlertRule.fromMap(content);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
         if (!SnapshotStore.SAFE_ID.matcher(rule.name()).matches())
-            throw new ApiException(422, "alert rule name must match " + SnapshotStore.SAFE_ID.pattern());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "alert rule name must match " + SnapshotStore.SAFE_ID.pattern());
         WorkingSetRoutes.Relation rel = WorkingSetRoutes.relation(inv, new boolean[1]);
         OptionalDouble current = compute(rel, rule.relation(), rule.measure());   // 422 if the relation cannot
 
         AlertService alerts = api.service().alertService()
-                .orElseThrow(() -> new ApiException(503, "alert engine unavailable"));
+                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
         ComponentStore store = new ComponentStore(inv.writeRoot().resolve("registry"));
         if (store.get("alert-rule", rule.name()).isPresent())
-            throw new ApiException(409, "alert rule '" + rule.name() + "' already exists");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists");
         Map<String, Object> written;
         try {
             written = store.write("alert-rule", rule.name(), rule.toMap()).content();
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
         Map<String, Object> binding = new LinkedHashMap<>();
         binding.put("rule", rule.name());
@@ -155,7 +156,7 @@ public final class InvestigationMeasureRoutes implements RouteModule {
                         + ", got '" + relation + "'");
             return WorkingSetMeasures.compute(rel.tables().get(relation), relation, measure);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 

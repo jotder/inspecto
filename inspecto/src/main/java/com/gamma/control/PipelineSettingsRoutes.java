@@ -79,14 +79,14 @@ final class PipelineSettingsRoutes implements RouteModule {
             throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
         Path srcPath = api.service().pathFor(source)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + source + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + source + "'"));
         WriteGates.jail(writeRoot, srcPath, "config path");   // refuse a config outside the write root
         PipelineConfig live = api.service().configFor(source)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + source + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + source + "'"));
 
         String raw = ApiContext.str(body, "name");
         if (raw == null || raw.isBlank())
-            throw new ApiException(400, "body must include 'name' (the new display name)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'name' (the new display name)");
         String label = raw.trim();
 
         Map<String, Object> src = ConfigLoader.filesystem().decode(srcPath.toString());
@@ -144,7 +144,7 @@ final class PipelineSettingsRoutes implements RouteModule {
      */
     private Object pipelineSettings(ApiContext api, String name) throws IOException {
         Path srcPath = api.service().pathFor(name)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         Map<String, Object> raw = ConfigLoader.filesystem().decode(srcPath.toString());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("produces", raw.getOrDefault("produces", "stream"));
@@ -164,7 +164,7 @@ final class PipelineSettingsRoutes implements RouteModule {
             throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
         Path srcPath = api.service().pathFor(name)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         WriteGates.jail(writeRoot, srcPath, "config path");
 
         Map<String, Object> src = ConfigLoader.filesystem().decode(srcPath.toString());
@@ -232,14 +232,14 @@ final class PipelineSettingsRoutes implements RouteModule {
             throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline write");
         Path srcPath = api.service().pathFor(source)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + source + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + source + "'"));
 
         String rawId = ApiContext.str(body, "id");
         if (rawId == null || rawId.isBlank())
-            throw new ApiException(400, "body must include 'id' (the new template's pipeline id)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'id' (the new template's pipeline id)");
         String id = rawId.trim().toLowerCase();
         if (!id.matches("[a-z0-9][a-z0-9_]*"))
-            throw new ApiException(422, "id '" + id
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "id '" + id
                     + "' must match [a-z0-9][a-z0-9_]* (lowercase letters, digits and underscores)");
 
         // The id must be free as a live pipeline AND on disk — either would collide at registration.

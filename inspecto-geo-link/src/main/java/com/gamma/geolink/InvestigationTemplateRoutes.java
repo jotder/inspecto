@@ -2,6 +2,7 @@ package com.gamma.geolink;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
 import com.gamma.control.WriteGates;
@@ -143,7 +144,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
             if (t != null) ops.add(t);
         }
         if (parameters.stream().noneMatch(x -> "seed".equals(x.get("kind"))))
-            throw new ApiException(422, "investigation '" + invId + "' has no effective seed step — nothing to "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "investigation '" + invId + "' has no effective seed step — nothing to "
                     + "parameterise, so nothing to template");
 
         Map<String, Object> h = inv.header();
@@ -162,7 +163,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         doc.put("dropped", dropped);
         doc.put("generalised", generalised);
         if (!inv.store().createTemplate(id, canonical(doc)))
-            throw new ApiException(409, "investigation template '" + id + "' already exists");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "investigation template '" + id + "' already exists");
         emit(ex, EventType.LINK_INVESTIGATION_TEMPLATE_SAVED, "link.investigation.template.saved",
                 "link.investigation.template.saved — " + invId + " → " + id,
                 b -> b.attr("templateId", id).attr("investigationId", invId).attr("parameters", parameters.size())
@@ -191,10 +192,10 @@ public final class InvestigationTemplateRoutes implements RouteModule {
             names.add(name);
             if ("window".equals(p.get("kind"))) continue;   // optional: the authored window is its default
             if (!(given.get(name) instanceof List<?> l) || l.isEmpty())
-                throw new ApiException(422, "parameter '" + name + "' needs a non-empty list of seed ids");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "parameter '" + name + "' needs a non-empty list of seed ids");
         }
         for (String k : given.keySet())
-            if (!names.contains(k)) throw new ApiException(422, "unknown parameter '" + k + "' — this template takes "
+            if (!names.contains(k)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown parameter '" + k + "' — this template takes "
                     + names);
 
         Map<String, Object> roles = (Map<String, Object>) doc.get("roles");
@@ -244,17 +245,17 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         SnapshotStore store = new SnapshotStore(writeRoot);
         jail(store, id);
         String raw = store.readTemplate(id);
-        if (raw == null) throw new ApiException(404, "no investigation template '" + id + "'");
+        if (raw == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation template '" + id + "'");
         Map<String, Object> doc = ApiContext.JSON.readValue(raw, Map.class);
         Optional<Subject> subject = ApiContext.subject(ex);
         if (subject.isPresent() && !subject.get().id().equals(doc.get("owner")))
-            throw new ApiException(404, "no investigation template '" + id + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no investigation template '" + id + "'");
         return new Template(writeRoot, doc);
     }
 
     private static void requireSafeId(String id) {
         if (id == null || !SnapshotStore.SAFE_ID.matcher(id).matches())
-            throw new ApiException(422, "investigation template id must match " + SnapshotStore.SAFE_ID.pattern()
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "investigation template id must match " + SnapshotStore.SAFE_ID.pattern()
                     + ", got '" + id + "'");
     }
 
@@ -262,7 +263,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         Path root = store.templateDirectory().normalize();
         Path target = root.resolve(id + ".json").normalize();
         if (!target.startsWith(root) || target.getParent() == null || !target.getParent().equals(root))
-            throw new ApiException(403, "investigation template id escapes the template store");
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "investigation template id escapes the template store");
     }
 
     /** A small insertion-ordered map that, unlike {@code Map.of}, tolerates null values. */

@@ -171,8 +171,12 @@ against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` �
 `CONFIG_VALIDATION_FAILED` · `INTERNAL` · `CONTROL_PLANE_READ_ONLY` · `CAPABILITY_UNAVAILABLE` ·
 `UNAUTHENTICATED` · `PERMISSION_DENIED` · `RATE_LIMITED` (429) · `NOT_SUPPORTED` (501) ·
 `PAYLOAD_TOO_LARGE` (413). `defaultFor(status)` maps a bare status to a code (`:36-50`).
-**197 of 874** `new ApiException(` sites under `*/src/main` still take that default (2026-09-25, after the
-`QueryRoutes` / `ParserRoutes` / `ConfigReadRoutes` / `RuleRoutes` / `EnrichmentRoutes` / `RouteErrors` slice —
+**141 of 874** `new ApiException(` sites under `*/src/main` still take that default (2026-09-25, after the
+`SettingsRoutes` / `PipelineSettingsRoutes` / `ConfigWriteRoutes` / `ComponentAccess` + `inspecto-geo-link`
+`InvestigationTemplateRoutes` / `InvestigationMeasureRoutes` / `GeoRoutes` slice — 56 sites, every one the status
+default, so no wire change: the one 403 is the template store's path-containment escape (`PATH_JAIL_VIOLATION`),
+the one 503 is an absent alert engine (`CAPABILITY_UNAVAILABLE`), and `ComponentAccess`' shared-helper callers keep
+their codes; the `QueryRoutes` / `ParserRoutes` / `ConfigReadRoutes` / `RuleRoutes` / `EnrichmentRoutes` / `RouteErrors` slice —
 58 sites, all the status default but one: `RuleRoutes`' "no write root configured" 503 is now
 `CONTROL_PLANE_READ_ONLY` (was `CAPABILITY_UNAVAILABLE`), a wire change asserted over HTTP by
 `ControlApiRuleTemplateTest` and noted in [api-stability](../../backend/control-plane/api-stability.md);

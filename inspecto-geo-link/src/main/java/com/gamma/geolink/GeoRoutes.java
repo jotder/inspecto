@@ -2,6 +2,7 @@ package com.gamma.geolink;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 
@@ -233,15 +234,15 @@ public final class GeoRoutes implements RouteModule {
     private Ctx context(ApiContext api, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "geo projection");
         String datasetId = ApiContext.str(body, "dataset");
-        if (datasetId == null) throw new ApiException(422, "body must include 'dataset'");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
         Map<String, Object> dataset = new ComponentStore(writeRoot.resolve("registry")).get("dataset", datasetId)
                 .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, "no dataset '" + datasetId + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'"));
         try {
             return new Ctx(datasetId,
                     DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views"))));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
     }
 
@@ -250,9 +251,9 @@ public final class GeoRoutes implements RouteModule {
             return QueryExecutor.run(new QueryExecutor.Request(
                     c.datasetId, c.relationSql, sql, limit, 0, List.of(), List.of()));
         } catch (SQLException e) {
-            throw new ApiException(422, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
-            throw new ApiException(422, "projection failed: " + e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "projection failed: " + e.getMessage());
         }
     }
 
@@ -291,7 +292,7 @@ public final class GeoRoutes implements RouteModule {
         for (Object o : list) {
             String v = String.valueOf(o);
             if (!SAFE_IDENT.matcher(v).matches())
-                throw new ApiException(422, "unsafe column identifier '" + v + "' for attrCols");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for attrCols");
             out.add(v);
         }
         return out;
@@ -300,11 +301,11 @@ public final class GeoRoutes implements RouteModule {
     private static String ident(Map<String, Object> body, String key, boolean required) {
         String v = ApiContext.str(body, key);
         if (v == null) {
-            if (required) throw new ApiException(422, "body must include '" + key + "'");
+            if (required) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + key + "'");
             return null;
         }
         if (!SAFE_IDENT.matcher(v).matches())
-            throw new ApiException(422, "unsafe column identifier '" + v + "' for " + key);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsafe column identifier '" + v + "' for " + key);
         return v;
     }
 

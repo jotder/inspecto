@@ -50,9 +50,9 @@ final class ConfigWriteRoutes implements RouteModule {
         String type = ApiContext.str(body, "type");
         Object cfgObj = body.get("config");
         if (type == null || !(cfgObj instanceof Map<?, ?>))
-            throw new ApiException(400, "body must include 'type' and 'config' (a draft config map)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'type' and 'config' (a draft config map)");
         ConfigSpec spec = ConfigSpecs.forType(type);
-        if (spec == null) throw new ApiException(404, "unknown config type: " + type);
+        if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
         Map<String, Object> draft = mapAt(body, "config");
 
         // The one content gate every save path runs (SaveGate) — BEFORE any path is resolved, so an
@@ -78,7 +78,7 @@ final class ConfigWriteRoutes implements RouteModule {
         Path dir = writeRoot;
         if (subdir != null && !subdir.isBlank()) {
             Path sub = Path.of(subdir.trim());
-            if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
+            if (sub.isAbsolute()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "subdir must be relative");
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
 
@@ -86,7 +86,7 @@ final class ConfigWriteRoutes implements RouteModule {
         List<String> idFields = identityFields(type);
         String identity = firstPresentValue(draft, idFields);
         if (identity == null)
-            throw new ApiException(422, "config is missing its identity field '" + idFields.getFirst() + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "config is missing its identity field '" + idFields.getFirst() + "'");
         String safeIdentity = WriteGates.safeName(identity, "config name");
         Path target = WriteGates.jail(writeRoot,
                 dir.resolve(ConfigFileSupport.fileBase(type, safeIdentity) + ".toon"), "resolved path");
@@ -304,9 +304,9 @@ final class ConfigWriteRoutes implements RouteModule {
         String name = ApiContext.str(body, "name");
         Object patchObj = body.get("patch");
         if (type == null || name == null || name.isBlank() || !(patchObj instanceof Map<?, ?>))
-            throw new ApiException(400, "body must include 'type', 'name' and 'patch' (a partial config map)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'type', 'name' and 'patch' (a partial config map)");
         ConfigSpec spec = ConfigSpecs.forType(type);
-        if (spec == null) throw new ApiException(404, "unknown config type: " + type);
+        if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
         Map<String, Object> patch = mapAt(body, "patch");
         String fileName = WriteGates.safeName(name, "config name");
 
@@ -314,7 +314,7 @@ final class ConfigWriteRoutes implements RouteModule {
         String subdir = ApiContext.str(body, "subdir");
         if (subdir != null && !subdir.isBlank()) {
             Path sub = Path.of(subdir.trim());
-            if (sub.isAbsolute()) throw new ApiException(400, "subdir must be relative");
+            if (sub.isAbsolute()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "subdir must be relative");
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
         // Pipeline-aware: a patch addresses a registered pipeline by name, and deactivating one is
@@ -323,7 +323,7 @@ final class ConfigWriteRoutes implements RouteModule {
         Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, type, fileName, subdir);
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
         if (!Files.isRegularFile(target))
-            throw new ApiException(404, "no such config: " + rel + " (create it via /config/write first)");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such config: " + rel + " (create it via /config/write first)");
 
         Map<String, Object> existing = ConfigLoader.filesystem().decode(target.toString());
         // Split storage (schema): patch over the CONFLATED view, so a partial draft can address

@@ -72,7 +72,7 @@ final class SettingsRoutes implements RouteModule {
         Path root = WriteGates.requireWriteRoot(api, "branding write");
         String logo = ApiContext.str(body, "logoDataUrl");
         if (logo != null && logo.length() > MAX_LOGO_CHARS)
-            throw new ApiException(422, "logoDataUrl too large (max " + MAX_LOGO_CHARS + " characters)");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "logoDataUrl too large (max " + MAX_LOGO_CHARS + " characters)");
         BrandingSettings b = new BrandingSettings(logo, ApiContext.str(body, "caption"), ApiContext.str(body, "footerText"));
         b.write(root.resolve(BRANDING_FILE));
         return shape(b);
@@ -142,7 +142,7 @@ final class SettingsRoutes implements RouteModule {
         if (raw == null) return null;
         String v = LinkAnalysisSettings.maskingMode(String.valueOf(raw));
         if (v == null)
-            throw new ApiException(422, "maskingMode must be one of "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "maskingMode must be one of "
                     + com.gamma.config.spec.ConfigSpecs.LINK_ANALYSIS_MASKING_MODES + ", got '" + raw + "'");
         return v;
     }
@@ -156,10 +156,10 @@ final class SettingsRoutes implements RouteModule {
         try {
             v = Integer.parseInt(String.valueOf(raw).trim());
         } catch (NumberFormatException e) {
-            throw new ApiException(422, key + " must be an integer, got '" + raw + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, key + " must be an integer, got '" + raw + "'");
         }
         if (v < 1 || v > MAX_NODE_CAP)
-            throw new ApiException(422, key + " must be 1.." + MAX_NODE_CAP + ", got " + v);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, key + " must be 1.." + MAX_NODE_CAP + ", got " + v);
         return v;
     }
 
@@ -176,10 +176,10 @@ final class SettingsRoutes implements RouteModule {
             try {
                 keep = Integer.parseInt(String.valueOf(raw).trim());
             } catch (NumberFormatException e) {
-                throw new ApiException(422, "keep must be an integer, got '" + raw + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "keep must be an integer, got '" + raw + "'");
             }
             if (keep < 1 || keep > PipelineHistorySettings.MAX_KEEP)
-                throw new ApiException(422, "keep must be 1.." + PipelineHistorySettings.MAX_KEEP + ", got " + keep);
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "keep must be 1.." + PipelineHistorySettings.MAX_KEEP + ", got " + keep);
         }
         PipelineHistorySettings s = new PipelineHistorySettings(keep);
         s.write(root.resolve(PipelineHistorySettings.FILE));
@@ -207,11 +207,11 @@ final class SettingsRoutes implements RouteModule {
         Map<String, IconMapSettings.Rule> rules = new LinkedHashMap<>();
         for (Map.Entry<String, Object> entry : body.entrySet()) {
             if (!(entry.getValue() instanceof Map<?, ?> sub))
-                throw new ApiException(422, "icon-map entry '" + entry.getKey() + "' must be an object {glyph, color}");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "icon-map entry '" + entry.getKey() + "' must be an object {glyph, color}");
             String glyph = ApiContext.str((Map<String, Object>) sub, "glyph");
             String color = ApiContext.str((Map<String, Object>) sub, "color");
             if (glyph == null || glyph.isBlank() || color == null || color.isBlank())
-                throw new ApiException(422, "icon-map entry '" + entry.getKey() + "' needs a glyph and a color");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "icon-map entry '" + entry.getKey() + "' needs a glyph and a color");
             rules.put(entry.getKey(), new IconMapSettings.Rule(glyph.trim(), color.trim()));
         }
         IconMapSettings s = new IconMapSettings(rules);
