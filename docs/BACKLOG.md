@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **37<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 15<!--count:backlog-p3--> × P3** —
+> **36<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 15<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -24,9 +24,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 22<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 15<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 37<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 36<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -58,7 +58,7 @@ rank.
 
 | State | P2 rows |
 |---|---|
-| **Startable now** — no gate, no owed decision | Onboarding D5-ref + D6-ref — `reference.delete` on a marker column, with the `order_by` tie-break (§3.4, decided 2026-09-25) · `JOB-RUNS-DIALOG-DEAD-1` + `API-DEAD-METHODS-1` deletes (§3.11, decided 2026-09-25) |
+| **Startable now** — no gate, no owed decision | — none this minute: the 2026-09-25 decisions were built the same day. The next buildable slices come from the design rows below as their calls are answered. |
 | **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | AI drafting on a non-`schema` kind (§3.1) · Platform Services Stage 2/3 (§3.2) · cross-Space consequence (§3.5) · Bundle "load as draft" (§3.7) · D6 `findings-spec` UI (§3.9) · policy-authoring UX (§3.8) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) · `DUCKLE-C1-DATASET-FRESHNESS-1` residual (2) (needs a design pass, §3.5) |
 
@@ -100,22 +100,22 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | 3.2 | EXECUTION-RESIDUALS X1 | X1's §5 decisions in `superpower/retry-affordance-design.md` (X4's default was decided 2026-09-25 — see the row) |
 | 4 | `REACTOR-VERDICT-CI-1` | wire `check-reactor-verdict.mjs` into `ci.yml` |
 | 3.12 | Link Analysis | every open D-U* / LA-* call lives in `superpower/link-analysis-backlog-plan.md` |
-| 3.1 | AI drafting on a non-`schema` kind | 7 calls in `superpower/ai-drafting-non-schema-design.md` (Decisions owed) |
+| 3.1 | AI drafting on a non-`schema` kind | 6 calls in `superpower/ai-drafting-non-schema-design.md` (D1 decided 2026-09-25: **`transform`**) |
 | 3.2 | Platform Services Stage 2 / 3 | 10 calls in `superpower/platform-services-stage2-design.md` (Decisions owed) |
 | 3.3 | Parsing (Stage-1) — parser-plugin trust | 8 calls (D2 + D3 decided 2026-09-25 — see the row) in `superpower/parser-plugins-trust-design.md` (Decisions owed) |
 | 3.5 | cross-Space consequence | 11 calls (D2 decided 2026-09-25; D10, the consequence actually asked for, is the one that unblocks the build) in `superpower/cross-space-consequence-design.md` (Decisions owed) |
 | 3.5 | `D8-SES-SNS-1` | 14 calls in `superpower/ses-sns-adapter-design.md` (Decisions owed) |
-| 3.7 | Bundle "load as draft" | 8 calls in `superpower/bundle-load-as-draft-design.md` (Decisions owed) |
+| 3.7 | Bundle "load as draft" | 7 calls in `superpower/bundle-load-as-draft-design.md` (D1 decided 2026-09-25: the draft is **in-memory**) |
 | 3.8 | policy-authoring UX | 9 calls in `superpower/policy-authoring-ux-design.md` (Decisions owed) |
 | 3.8 | `DUCKLE-C6-POLICY-NARROWING-1` | 16 calls in `superpower/policy-narrowing-design.md` (Decisions owed) |
-| 3.9 | D6 `findings-spec` UI | 10 calls in `superpower/findings-spec-authoring-ui-design.md` (Decisions owed) |
+| 3.9 | D6 `findings-spec` UI | 9 calls in `superpower/findings-spec-authoring-ui-design.md` (D1 decided 2026-09-25: author on **`canManageIncidents`**) |
 
 **Decided 2026-09-25, not tied to a row** (operator; each lands in its owning OKF concept when built):
 
-- **Notifications:** per-user read state — each Subject marks its own read/unread; delete stays admin-only.
-- **Space import (W5) with a missing connection:** warn, and land the affected Pipelines **disabled** with a "connect X" warning — no longer a refusal.
 - **Admission pools:** a "queued run" means **Consignment admission** (what is built) — no new Run records.
 - **`s3://` `dirs.database`:** resolved **deferred, at first write** — no bootstrap split (was an owed input above).
+- **Notifications per-user read state** and **Space import warns on a missing connection** — decided and SHIPPED 2026-09-25 (`okf/backend/control-plane/events-metrics.md` · `okf/backend/pipeline-graph/editable-round-trip.md`).
+- **Processor board drift:** the Java catalog wins for the status rows, except DuckLake stays Professional+ (the G9 gate) — being fixed in the catalog, then re-rendered.
 
 ⛔ **A plan is where a decision is *described*; this section is where it is *queued*.** A decision
 described in `superpower/` and not indexed here is how a three-day stall happened (2026-09-11 → 09-14).
@@ -191,7 +191,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Onboarding & bundles
 
-- **P2** · **Onboarding (Stream/Reference)** — **Decided 2026-09-25 (operator):** the real delete-feed carries a **marker column** (an op/deleted flag); build `reference.delete` keyed on it together with the D6-ref `order_by` tie-break. Previously: **D5-ref is now answerable:** a real delete-feed exists (the gate fired 2026-09-15). Decide how a `delete` tombstone *enters* the reference store (a reserved column? a Decision Rule consequence?) — ⛔ **ground the actual feed first**; the whole point of waiting was to pick the representation from the real shape. **D6-ref:** the within-batch same-key tie-break is arbitrary — add an optional latest-by-`order_by` column only when needed. An optional templates entry (space-template-gallery precedent). ⚠ Enrichment/job configs still derive identity from name. ⛔ Do not implement name-deferral by holding the draft client-side. → `okf/backend/control-plane/onboarding-authoring.md` · `okf/frontend/features/onboarding.md`
+- **P3** · **Onboarding (Stream/Reference) — residuals** — ✅ D5-ref `reference.delete` (a marker column + values; the marker is not persisted, a delete of an unknown key writes nothing) and D6-ref `reference.order_by` (latest wins within a batch; tie → the delete wins) SHIPPED 2026-09-25 on the operator's marker-column call — as-built in `okf/backend/control-plane/onboarding-authoring.md`. Re-ranked P2 → P3: what is left is demand-gated. Left: an optional templates entry (space-template-gallery precedent); both new keys are TOON-only (the Settings dialog now carries them through untouched but does not edit them). ⚠ Enrichment/job configs still derive identity from name. ⛔ Do not implement name-deferral by holding the draft client-side. → `okf/backend/control-plane/onboarding-authoring.md` · `okf/frontend/features/onboarding.md`
 
 #### Datasets & lineage
 
@@ -226,7 +226,7 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 #### API contract & vocabulary
 
-- **P3** · `ERRORCODE-DEFAULTED-1` — **explicit error codes on the remaining bare throw sites.** The 403 slice is done (zero bare 403 sites; `ErrorCodes` and its constants are public; `ApiContractTest` pins the catalog). **675 of 849 `ApiException` sites still take `ErrorCodes.defaultFor(status)`** (2026-09-24, after the first by-file slice; it was 818 of 849 before it — the 2026-09-17 figure of 620/648 had drifted as routes landed) — sweep by file, re-deriving each count first (the row's original figures were wrong by ~3×). Swept 2026-09-24: `ComponentRoutes` 40 · `inspecto-ops/ObjectRoutes` 39 · `PipelineGraphRoutes` 33 · `ExchangeRoutes` 31 — zero bare sites left in each; codes are the status defaults except the ad-hoc-run 503 (now `CONTROL_PLANE_READ_ONLY`, the write-root gate it is) and the two run-to-here 501s (new `NOT_SUPPORTED`, also `defaultFor(501)` — it was `INTERNAL`). Largest remaining: `inspecto-geo-link/InvestigationRoutes` 68 · `inspecto-geo-link/InvRoutes` 39 · `ReconRoutes` 28 · `AgentRoutes` 24 · `JobRoutes` 22 · `RunRoutes` 21 · `ConnectionRoutes` 21 · `ConfigPreviewRoutes` 21. Derive with `git grep -cP 'new ApiException\([^,()]+,(?!\s*(\w+\.)?[A-Z][A-Z_]+\s*,)' -- '*/src/main/**.java' | sort -t: -k2 -nr` (sum the counts; drop `-c` and pipe to `wc -l` for the total; all sites: `git grep -hPo 'new ApiException\(' -- '*/src/main/**.java' | wc -l`). ⚠ One site emits a code **outside the catalog**: `PipelineGraphRoutes` `new ApiException(422, PipelineValidator.JOIN_REFERENCE_MISSING, …)` — not in `ErrorCodes`, so not in the OpenAPI `ErrorCode` enum.
+- **P3** · `ERRORCODE-DEFAULTED-1` — **explicit error codes on the remaining bare throw sites.** The 403 slice is done (zero bare 403 sites; `ErrorCodes` and its constants are public; `ApiContractTest` pins the catalog). **591 of 874 `ApiException` sites still take `ErrorCodes.defaultFor(status)`** (2026-09-25, after the geo-link `InvestigationRoutes`/`InvRoutes` slice — 107 sites; three four-eyes 403s moved `PATH_JAIL_VIOLATION` → `PERMISSION_DENIED`) — sweep by file, re-deriving each count first (the row's original figures were wrong by ~3×). Swept 2026-09-24: `ComponentRoutes` 40 · `inspecto-ops/ObjectRoutes` 39 · `PipelineGraphRoutes` 33 · `ExchangeRoutes` 31 — zero bare sites left in each; codes are the status defaults except the ad-hoc-run 503 (now `CONTROL_PLANE_READ_ONLY`, the write-root gate it is) and the two run-to-here 501s (new `NOT_SUPPORTED`, also `defaultFor(501)` — it was `INTERNAL`). Largest remaining: `ReconRoutes` 28 · `AgentRoutes` 24 · `JobRoutes` 22 · `RunRoutes` 21 · `ConnectionRoutes` 21 · `ConfigPreviewRoutes` 21. Derive with `git grep -cP 'new ApiException\([^,()]+,(?!\s*(\w+\.)?[A-Z][A-Z_]+\s*,)' -- '*/src/main/**.java' | sort -t: -k2 -nr` (sum the counts; drop `-c` and pipe to `wc -l` for the total; all sites: `git grep -hPo 'new ApiException\(' -- '*/src/main/**.java' | wc -l`). ⚠ One site emits a code **outside the catalog**: `PipelineGraphRoutes` `new ApiException(422, PipelineValidator.JOIN_REFERENCE_MISSING, …)` — not in `ErrorCodes`, so not in the OpenAPI `ErrorCode` enum.
 
 ### 3.8 Security, Policy, Editions & Compliance
 
@@ -253,8 +253,7 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.11 Web UI — SPA-wide hygiene
 
-- **P3** · `JOB-RUNS-DIALOG-DEAD-1` — **`modules/admin/jobs/job-runs.dialog.ts` has no opener**; only its own spec references `JobRunsDialog`. **Decided 2026-09-25 (operator):** **delete it** with its spec. → `okf/frontend/conventions/page-chrome.md`
-- **P3** · `API-DEAD-METHODS-1` — five exported service methods have no caller in the SPA: `access.service.ts:128` `deleteProfile`, `collectors.service.ts:41` `notify`, and `config.service.ts:180, 187, 203` `previewParsing`/`previewSchema`/`previewEnrichment`. The three previews look like an intended feature that never got a pane — a product call (wire or delete), not a mechanical delete. **Decided 2026-09-25 (operator):** delete `deleteProfile` and `notify`; KEEP the three previews — they are to get a pane (file that row when built).
+- **P3** · `API-DEAD-METHODS-1` — **the three config previews have no pane.** `config.service.ts` `previewParsing` / `previewSchema` / `previewEnrichment` have no caller in the SPA; the operator decided 2026-09-25 to KEEP them for a pane (and `deleteProfile`, `notify` and `JobRunsDialog` were deleted the same day). Build the pane when someone asks for it by name.
 
 ### 3.12 Link Analysis & Geo
 

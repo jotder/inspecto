@@ -67,7 +67,7 @@
 // armed test, which had taken the count 79 → 80 — was FIXED rather than absorbed into the new number
 // (`ControlApiSettingsTest.settingsWritesRequireCanAuthorWorkbench`). Re-baselining would otherwise have
 // silently forgiven it, which is how a ratchet stops meaning anything.
-const BASELINE_UNCOVERED = 94;
+const BASELINE_UNCOVERED = 79;
 
 // Usage:  node tools/check-authgate-coverage.mjs           # report + exit 1 on a ratchet regression
 //         node tools/check-authgate-coverage.mjs --list    # also print every uncovered route
