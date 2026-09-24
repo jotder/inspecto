@@ -122,7 +122,7 @@ feeds), `JobTypeProvider` and `MaintenanceTaskProvider` (their scheduled work), 
 
 ⚠ **Two honesty notes before any coverage percentage goes on a slide.** `ExpressionProvider` is declared and
 registered by nothing (`SPEC-DEADSEAM-1`). And the processor catalogue is **119**<!--count:processors-->
-entries of which **37**<!--count:processors-delivered--> are delivered, **15**<!--count:processors-partial-->
+entries of which **34**<!--count:processors-delivered--> are delivered, **18**<!--count:processors-partial-->
 partial, and the rest planned — a palette of inactive tiles a buyer will count. Claim coverage **by category
 covered end to end**, never as a percentage of that palette.
 
@@ -241,7 +241,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 | Anything about the AI assistant | *(corrected 2026-09-23 — this row said "ships in no bundle")* staged in every Professional and Enterprise bundle since 2026-09-12 (`CP-14`, `PKG-5`, both closed), but **no release has been tagged since `v3.12.0` (2026-06-05)** and only a `v*` tag publishes (`.github/workflows/release.yml`), so no downloadable artifact carries it | a tagged release publishes a Professional bundle |
 | Anything about the autonomy ladder or the intelligence agent (approvals inbox, `SHADOW`/`AUTO`) | `inspecto-intelligence` and `inspecto-agent-hosted` ship in **no** bundle ([`../EDITIONS.md`](../EDITIONS.md) `CP-14`) | a bundling decision places `inspecto-intelligence` in an edition |
 | "1 trillion rows/day" for Professional | off by 10–250× on one node (§1.3) | never for Professional; an Enterprise cluster-design conversation |
-| "119 processors" | 67 are planned, inactive tiles | say **37**<!--count:processors-delivered--> delivered, or name the families |
+| "119 processors" | 67 are planned, inactive tiles | say **34**<!--count:processors-delivered--> delivered, or name the families |
 | "90–100 % of requirements" | the palette above; one dead SPI | phrase as categories covered + named seams (§1.4) |
 | "Low maintenance" | the install kit (preflight, service wrappers, upgrade/rollback) is unbuilt | deployment Phases 0–1 ship — `DEPLOY-SERVICE-WRAPPER-1` (P1) is the first piece |
 | Air-gap parity claims about Definite | their blog says it; their product page does not | a vendor conversation |

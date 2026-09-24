@@ -375,9 +375,9 @@
     "label" : "Constraint & range checker (Expectations)",
     "emoji" : "⚠️",
     "icon" : "heroicons_outline:exclamation-triangle",
-    "status" : "delivered",
+    "status" : "partial",
     "capability" : "expectation",
-    "note" : "Expectations evaluated per Dataset (`ExpectationEvaluator`); not a mid-chain step",
+    "note" : "Expectations evaluated per Dataset (`ExpectationEvaluator`), authored in the Expectations pane — not a Step: never on the canvas, so no workbench preview / lift / lower",
     "addable" : false
   }, {
     "id" : "quality.dedup.exact",
@@ -940,9 +940,9 @@
     "label" : "Alert rule dispatcher",
     "emoji" : "🚨",
     "icon" : "heroicons_outline:megaphone",
-    "status" : "delivered",
+    "status" : "partial",
     "capability" : "alert-rule",
-    "note" : "Alert Rules over the ledgers → Alerts → channels; board CP-11/CP-15",
+    "note" : "Alert Rules over the ledgers → Alerts → channels (board CP-11/CP-15), authored in the Alert Rules pane — not a Step: never on the canvas, so no workbench preview / lift / lower",
     "addable" : false
   }, {
     "id" : "control.sla.monitor",
@@ -1000,9 +1000,9 @@
     "label" : "Quarantine error-log store",
     "emoji" : "☣️",
     "icon" : "heroicons_outline:shield-exclamation",
-    "status" : "delivered",
+    "status" : "partial",
     "capability" : "sink.quarantine",
-    "note" : "structural rejects + `errors/<base>_errors.csv`",
+    "note" : "structural rejects + `errors/<base>_errors.csv` on every pipeline — not a Step you add: a quarantine node is lifted only for selector / segments pipelines, so there is no workbench preview / lift / lower of its own",
     "addable" : false
   }, {
     "id" : "sink.archive",
