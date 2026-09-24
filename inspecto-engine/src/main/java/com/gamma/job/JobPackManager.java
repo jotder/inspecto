@@ -117,6 +117,10 @@ final class JobPackManager implements AutoCloseable {
     private WatchService watcher;
     private Thread watchThread;
     private Path stagingDir;                         // lazily created; holds the locked copies we load from
+    /** Test seams around {@link #stage}: run just before / just after the watched jar is copied, so a test
+     *  can swap the watched file inside the TOCTOU window. No-ops in production. */
+    Runnable beforeStage = () -> {};
+    Runnable afterStage = () -> {};
 
     JobPackManager(String packsDir, JobTypeRegistry registry, ExpressionRegistry expressions,
                    SignalSink signals) {
@@ -190,13 +194,22 @@ final class JobPackManager implements AutoCloseable {
         return summary(loadedNow, reloaded, unloaded, rejected);
     }
 
-    /** Load one pack atomically: verify → discover → validate → register all, or reject the whole jar. */
+    /** Load one pack atomically: stage → hash + verify the staged bytes → discover → validate → register
+     *  all, or reject the whole jar. {@code hash} is the watched jar's (the change trigger); the recorded
+     *  fingerprint is re-taken from the staged copy. */
     private boolean load(String name, Path jar, String hash) {
         URLClassLoader loader = null;
         Path staged = null;
         try {
-            if (requireSignature) verifySignature(jar);
-            staged = stage(name, hash, jar);          // load from a private copy; keep the watched jar unlocked
+            // 🔴 TOCTOU: stage FIRST, then hash + verify + load exactly the staged bytes. Verifying the watched
+            // jar and copying it afterwards let a jar swapped between the two load unverified. The staging
+            // dir/file are owner-only (createTempDirectory/createTempFile), so the watched-dir writer cannot
+            // touch the copy once it is taken.
+            beforeStage.run();
+            staged = stage(name, jar);                // load from a private copy; keep the watched jar unlocked
+            afterStage.run();
+            hash = hash(staged);                      // fingerprint of the bytes actually verified and loaded
+            if (requireSignature) verifySignature(staged);
             loader = new URLClassLoader(new URL[]{staged.toUri().toURL()}, JobPackManager.class.getClassLoader());
 
             List<JobTypeProvider> providers = new ArrayList<>();
@@ -247,7 +260,7 @@ final class JobPackManager implements AutoCloseable {
             for (PipelineNodeType t : nodeTypes) PipelineNodeTypes.register(t, name);
             for (PipelineNodeExecutor e : nodeExecutors) PipelineNodeExecutors.register(e, name);
 
-            String[] mf = manifest(jar);
+            String[] mf = manifest(staged);
             LoadedPack pack = new LoadedPack(mf[0] != null ? mf[0] : name, mf[1] != null ? mf[1] : "?",
                     jar, hash, List.copyOf(ids), loader, staged);
             loaded.put(name, pack);
@@ -428,11 +441,17 @@ final class JobPackManager implements AutoCloseable {
         return m;
     }
 
-    /** Copy the watched jar into a private staging dir and return the copy the loader will lock. */
-    private Path stage(String name, String hash, Path jar) throws IOException {
+    /** Copy the watched jar into a private staging dir and return the copy the loader will lock. A fresh
+     *  uniquely-named file per load, so a reload never overwrites a draining pack's copy. */
+    private Path stage(String name, Path jar) throws IOException {
         if (stagingDir == null) stagingDir = Files.createTempDirectory("job-packs-");
-        Path dest = stagingDir.resolve(hash.substring(0, Math.min(12, hash.length())) + "-" + name);
-        Files.copy(jar, dest, StandardCopyOption.REPLACE_EXISTING);
+        Path dest = Files.createTempFile(stagingDir, "pack-", "-" + name);
+        try {
+            Files.copy(jar, dest, StandardCopyOption.REPLACE_EXISTING);
+        } catch (IOException e) {
+            Files.deleteIfExists(dest);
+            throw e;
+        }
         return dest;
     }
 

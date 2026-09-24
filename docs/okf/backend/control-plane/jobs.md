@@ -118,6 +118,16 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   fail-closed shape as a missing-required-parameter reject, emitting `job.run.rejected`) instead of calling
   `job.run(ctx)` on the stale instance. A rebuild (`upsertJob`) or `removeJob` clears the flag/owner mapping,
   so a reloaded pack's fresh Job runs normally again.
+  **2026-09-24 FIXED a verify/load TOCTOU (SEC-7 signing gate):** `load()` used to signature-verify the
+  jar in the WATCHED dir and only then copy it to staging, so a jar swapped between verify and copy loaded
+  unverified. It now **stages first** (a fresh `createTempFile` in the owner-only `createTempDirectory`
+  staging dir, out of the watched-dir writer's reach), then hashes **and** `verifySignature`s the staged
+  copy and loads exactly those bytes; the recorded `hash` (inventory, `job.pack.*` payloads) is the staged
+  file's sha256, and a verification failure deletes the staged copy. The watched jar's hash remains only
+  the rescan change trigger — if it differs from the recorded one after a mid-load swap, the next rescan
+  reloads. Pinned by `JobPackStagingTest` (package-private `beforeStage`/`afterStage` seams swap the
+  watched file inside the window; both mutants — the old order, and staging first but verifying the
+  watched jar — go red).
 * **`sql.template`** — the built-in templated-SQL Job Type and first real artifact producer; its
   parameters are scanned from the SQL itself.
 * **`caserule.evaluate`** — schedules the auto-grouping tail of the Alert → Incident → Case chain (C5):
