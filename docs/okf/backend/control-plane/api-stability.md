@@ -153,6 +153,11 @@ above the generated commit list.
   change — a concurrent session committed the staged tree under its own heading, so the commit is typed
   `docs:` and carries **no SemVer signal for a breaking change**. Tests followed in `ba51a27b`. This entry
   is the record; ⛔ do not conclude from `git log` alone that this MAJOR has no route removals.
+- `GET /pipelines/step-types` is **gone** (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`, 2026-09-24, `d5f6353be`),
+  with `PipelineProjection.stepCatalog()` / `RECIPE_VERBS`, its `step-types.contract.json` and the
+  `step-types` count guard. Its last reader was the Recipe view (removed in `6d3c68fa`); the palette's one
+  source is `GET /pipelines/node-types` (+ `/pipelines/processor-catalog`). The recipe grammar itself is
+  unchanged — `RecipeCompiler`'s verb switch is the vocabulary.
 
 **Breaking — Java `@PublicApi` (binds only within a released major; none of this was published in 3.x)**
 - Three store interfaces gained abstract methods for `incident_purge` (MNT-14, 2026-07-27).
