@@ -517,7 +517,23 @@ overlapping slice every cycle instead. **Lag:** `inspecto_stream_lag_records{con
 end offset − *committed* frontier, refreshed on every discovery (a landed-but-uncommitted slice still counts).
 Also exported: `inspecto_stream_slices_drained_total{connection,topic}` and
 `inspecto_slice_frontiers_committed_total{pipeline}` (Kafka and DB export), all three on `GET
-/metrics/acquisition`.
+/metrics/acquisition`. That JSON *is* the Collector's stream status surface: no field was added to `GET
+/collectors`.
+
+**The delivery grain is the slice, not the row.** Slice-name identity plus the fence give slice-level
+at-least-once: after a crash at most one slice per partition is re-delivered. Row-level exactly-once is out
+of scope by design. The default `options.payload: envelope` already carries `topic`, `partition` and
+`offset` on every record, so a Dataset that needs row-level dedup keys on those downstream.
+
+**Why the loop is the Collector scan (STREAM-CONSUMER-1 design pass, 2026-09-24).** Three homes were
+weighed. (A) the scheduler's acquisition tick, hardened — **built**; its latency floor is the acquisition
+cadence, or a `POST /collectors/{id}/notify` wake-up. (B) a continuous `trigger: stream` lane in
+`PipelineScheduler` — a virtual thread per stream Collector holding the consumer open and handing ingest
+runs to the per-pipeline coalescer — **deferred**, not refused: build it only when an operator names a
+latency target the cadence cannot meet (Q2 named none). It is A plus a different trigger, so everything
+above still applies; its cost is new lifecycle wiring (space close, and the run lease under Enterprise
+scale-out). (C) a long-running Job — **refused**, see §6.8. The at-least-once fixes (§3.7 and the fence)
+were needed under every option, so they landed inside the row rather than as a separate P1 (Q1).
 
 ### 3.10 Connection profiles, secrets, and the SEC-07 gate
 
@@ -736,6 +752,8 @@ Only decisions that still bind are listed; where one reversed an earlier one, bo
 |---|---|---|
 | 2026-07-08 | Every remote connector is **SDK-free** — SigV4 for `s3`, SharedKey for `azure`, and (2026-07-22) a native JSON API + RS256 service-account JWT for `gcs` | A small SBOM is a FedRAMP asset; three cloud SDKs would have dwarfed the whole artifact |
 | 2026-07-08 | `kafka` uses `assign()`+`seek()` with **no consumer group** | The consumed frontier rides the acquisition ledger watermark instead, so replay and crash-recovery reuse machinery that already exists and is already tested |
+| 2026-09-24 | The stream consumer loop **stays in the Collector scan**; broker consumer groups stay out (STREAM-CONSUMER-1 Q2, Q4) | No latency target was named, so a continuous lane buys nothing yet; one offset store and fewer ACLs outweigh broker-visible lag (§3.9) |
+| 2026-09-24 | A remote slice's frontier must **survive a restart**, for `kafka` AND `db` (STREAM-CONSUMER-1 Q3) | A restart must never re-ingest; built as a durable per-slice record, not a name-derived frontier (§3.7) |
 | 2026-08-13 | HTTP `CONNECT` proxy dial-through **shipped, reversing an earlier fail-closed rejection** | The rejection assumed a JDK socket could tunnel transparently. It cannot, so the tunnel had to be explicit — the earlier "no" was based on a wrong premise, not a policy |
 | 2026-09-06 | JDBC dial-through is **PostgreSQL only**, fail-closed elsewhere | Each driver's socket-factory hook differs; a generic claim would have been untestable |
 | 2026-07-18 | The connection **probe is graded** (`REACHABILITY` → `AUTHENTICATE` → `READ` → `WRITE` → `LIST`) and WRITE is `skipped` for every remote scheme | A workbench must never write a scratch object into a customer system. Only `local` does write-and-delete. See §6.5 |
@@ -768,7 +786,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 |---|---|---|
 | S3 / GCS object ingest | `SP-ACQ-06`, `SP-ACQ-08` | The connectors ship and are tested; there is **no proven end-to-end acquisition-node run**. ⚠ This is not a contradiction of `ACQ-4` — *a connector is not a Step* (§6.7) |
 | Azure ADLS Gen2 | `SP-ACQ-07` | Blob works; the Gen2 hierarchical namespace is unproven |
-| Kafka consumer-group-as-Collector | `SP-ACQ-09` | The per-scan drain ships; consumer-group semantics do not (by design — see §4) |
+| Kafka consumer as a Collector | `SP-ACQ-09` | The per-scan drain ships, hardened to slice-level at-least-once (§3.7, §3.9). What keeps the cell 🟡: it is proven only against `MockConsumer` and a fake offset-tail connector, never a real broker. Consumer-group semantics stay out by design (§4) |
 | Excel workbook fan-out | `SP-ACQ-05` | One sheet per file today; multi-sheet fan-out unbuilt |
 
 ### Planned — declared, unstarted
@@ -781,7 +799,6 @@ so they are not re-proposed as new ideas; none is scheduled.
 
 | Item | Board id | What remains |
 |---|---|---|
-| Adapter stream-consumer runtime | `STREAM-CONSUMER-1` (P2, filed 2026-09-10 — until then this cell pointed at ROADMAP §3.4, i.e. at no board row) | Option A (the hardened Collector scan) is built as of 2026-09-24: the frontier re-keys on land and survives a restart (§3.7), there is one uncommitted slice per partition, and lag is exported (§3.9). Still open: the `SP-ACQ-09` cell in `EDITIONS.md`. The `trigger: stream` lane is not built, by decision (Q2) |
 | Outbound object-store export | `EXPORT-1` (P3) | The inverse direction of ACQ-4 — recommendation of record only |
 | Vault / KMS secret provider | `GAP-6` | Deferred by the SEC-07 decision, not blocked |
 | "Listed-not-yet-fetched" gauge | branch-aware residual **(e)** | Observability gap: the queue between list and fetch is invisible |
@@ -891,6 +908,7 @@ pair is not "reconciled" by flattening one of them.
 | Refused | Reason |
 |---|---|
 | A second Kafka lane for urgent topics | Urgency is a *parameter* on one node, not a second lane |
+| The stream consumer as a long-running Job (STREAM-CONSUMER-1, 2026-09-24) | `JobService` models finite, non-overlapping Runs: a permanent Run holds one of the global in-flight slots forever, every later fire records `SKIPPED`, and a Job has no path to the pipeline's inbox, run guard or acquisition ledger, so it would duplicate the scheduler's wiring. A Run that never ends also makes Run history and duration meaningless |
 | Nested archives, and partial-archive failure | `depth: 1` is deliberate; a nested archive is an unbounded expansion in a jailed path |
 | Crash-mid-archive exactly-once | Relies on `OVERWRITE_OR_IGNORE`; true exactly-once would need a per-entry ledger, which costs more than the failure |
 | Fetch-lane fairness | Stays FIFO until a real fetch-lane wait is observed |

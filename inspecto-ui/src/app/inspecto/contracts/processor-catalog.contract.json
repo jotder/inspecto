@@ -120,7 +120,7 @@
     "icon" : "heroicons_outline:queue-list",
     "status" : "partial",
     "nodeType" : "acquisition",
-    "note" : "Connection kind exists (kafka); consumer-group ingest as a Collector not proven",
+    "note" : "Per-cycle Collector drain ships: frontier on the ledger watermark, re-keyed on land and durable across a restart, one uncommitted slice per partition, lag exported (STREAM-CONSUMER-1); broker consumer groups out by decision; proven against MockConsumer and a fake connector only, never a real broker",
     "addable" : true
   }, {
     "id" : "acquisition.stream.pulsar",

@@ -3,7 +3,7 @@
 **State: S1–S6 BUILT 2026-09-24** (§7) — operator decisions recorded in §5. BACKLOG row *Branch-aware executor
 residuals*, clause (b): multi-schema + `route:` needs a segment-scoped lift; ⛔ do not just lift the refusal.
 Written 2026-09-24 against `425ee239`. As-built truth:
-[branch-aware-ingest.md](../okf/backend/engine/branch-aware-ingest.md) § *Multi-schema route*.
+[branch-aware-ingest.md](../../okf/backend/engine/branch-aware-ingest.md) § *Multi-schema route*.
 
 ## 1. The problem
 
