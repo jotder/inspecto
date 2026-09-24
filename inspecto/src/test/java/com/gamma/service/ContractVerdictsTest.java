@@ -317,4 +317,55 @@ class ContractVerdictsTest {
                 AffectedPipelines.render(r));
         assertEquals("dataset:prod_ds", of(r, Tier.BREAKING).get(0).subject());
     }
+
+    @Test
+    void anEnrichmentOrJobNamingTheProducerIsRevalidateAndTheColumnStaysOnlyPossiblyBreaking(@TempDir Path root)
+            throws Exception {
+        Path schema = producer(root, "");
+        dataset(root, "prod_ds", "prod/db");
+        Files.writeString(root.resolve("prod_enrich.toon"), "name: prod_enrich\nreferences:\n  base:\n    ref: prod\n");
+        Path jobs = Files.createDirectories(root.resolve("jobs"));
+        Files.writeString(jobs.resolve("after_job.toon"), "type: report\non_pipeline: prod\n");
+
+        Report r = removeAmt(root, schema);
+
+        assertTrue(of(r, Tier.BREAKING).isEmpty(), "their column use is unknown, so never BREAKING: "
+                + AffectedPipelines.render(r));
+        assertEquals(List.of("enrichment:prod_enrich", "job:after_job"),
+                of(r, Tier.REVALIDATE).stream().map(Verdict::reader).toList(), AffectedPipelines.render(r));
+        assertEquals("amt", of(r, Tier.REVALIDATE).get(0).column());
+        assertEquals(1, of(r, Tier.POSSIBLY_BREAKING).size(), "never collapsed to compatible either");
+    }
+
+    @Test
+    void deletingTheProducerIsBreakingForItsEnrichmentAndJobLinks(@TempDir Path root) throws Exception {
+        producer(root, "");
+        Files.writeString(root.resolve("prod_enrich.toon"), "name: prod_enrich\nreferences:\n  base:\n    ref: prod\n");
+        Path jobs = Files.createDirectories(root.resolve("jobs"));
+        Files.writeString(jobs.resolve("after_job.toon"), "type: report\non_pipeline: prod\n");
+        Path prod = root.resolve("prod/prod_pipeline.toon");
+        String before = Files.readString(prod);
+        Files.delete(prod);
+
+        Report r = AffectedPipelines.analyze(root, List.of(new Change(prod, Status.DELETED, before)));
+
+        assertEquals(List.of("enrichment:prod_enrich", "job:after_job"),
+                of(r, Tier.BREAKING).stream().map(Verdict::reader).toList(), AffectedPipelines.render(r));
+    }
+
+    @Test
+    void anEnrichmentBehindABrokenConsumerIsRevalidate(@TempDir Path root) throws Exception {
+        Path schema = producer(root, "");
+        dataset(root, "prod_ds", "prod/db");
+        consumer(root, "cons", "prod_ds", "amt");
+        Files.writeString(root.resolve("cons_enrich.toon"), "name: cons_enrich\nreferences:\n  base:\n    ref: cons\n");
+
+        Report r = removeAmt(root, schema);
+
+        assertEquals(List.of("pipeline:cons"), of(r, Tier.BREAKING).stream().map(Verdict::reader).toList());
+        List<Verdict> revalidate = of(r, Tier.REVALIDATE);
+        assertEquals(List.of("enrichment:cons_enrich"), revalidate.stream().map(Verdict::reader).toList(),
+                AffectedPipelines.render(r));
+        assertTrue(revalidate.get(0).reason().contains("downstream of pipeline:cons"), revalidate.get(0).reason());
+    }
 }

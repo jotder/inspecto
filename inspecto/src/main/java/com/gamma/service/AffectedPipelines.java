@@ -76,6 +76,19 @@ public final class AffectedPipelines {
     public record Hit(String pipeline, List<String> chain) {
     }
 
+    /**
+     * A non-Pipeline dependent of something the change reached — an enrichment ({@code references.<n>.ref} /
+     * {@code triggers.on_pipeline}), a job ({@code on_pipeline}), an Expectation / Decision Rule ({@code target}),
+     * a Dataset, a Widget ({@code datasetId}) or a Dashboard ({@code tiles[].widgetId}) — with the chain to it.
+     * Only listed: what an enrichment or a job then writes is not followed further.
+     *
+     * @param kind  {@link PipelineDependents.Dependent#kind()}
+     * @param via   the key that carries the reference
+     * @param chain the reached Pipeline's (or changed Dataset's) chain, ending in {@code <kind>:<name>}
+     */
+    public record Dependent(String kind, String name, String via, List<String> chain) {
+    }
+
     /** Something the check could not decide — a subject and why. */
     public record Uncertain(String subject, String reason) {
     }
@@ -98,8 +111,8 @@ public final class AffectedPipelines {
     public record Verdict(Tier tier, String subject, String column, String reader, String reason) {
     }
 
-    public record Report(List<Hit> affected, List<Uncertain> uncertain, List<Ignored> ignored,
-                         List<Verdict> verdicts) {
+    public record Report(List<Hit> affected, List<Dependent> dependents, List<Uncertain> uncertain,
+                         List<Ignored> ignored, List<Verdict> verdicts) {
         public boolean breaking() {
             return verdicts.stream().anyMatch(v -> v.tier() == Tier.BREAKING);
         }
@@ -142,6 +155,7 @@ public final class AffectedPipelines {
 
         Map<String, Hit> hits = new LinkedHashMap<>();
         Deque<Hit> queue = new ArrayDeque<>();
+        Map<String, Dependent> dependents = new LinkedHashMap<>();   // kind:name → first (shortest) chain
         List<Ignored> ignored = new ArrayList<>();
         List<Change> real = new ArrayList<>();
 
@@ -182,11 +196,12 @@ public final class AffectedPipelines {
                 String id = c != null ? c.name() : idFromBefore(ch.before());
                 if (id == null) id = stem(ch.file(), ".toon");
                 List<String> chain = append(start, "dataset:" + id);
+                boolean shown = datasetViewers(root, id, chain, dependents);
                 for (String consumer : consumers.getOrDefault(id, List.of())) {
                     reached |= offer(hits, queue, consumer, chain);
                 }
-                if (consumers.getOrDefault(id, List.of()).isEmpty() && !reached) {
-                    ignored.add(new Ignored(rel, "Dataset '" + id + "' has no consuming Pipeline"));
+                if (consumers.getOrDefault(id, List.of()).isEmpty() && !reached && !shown) {
+                    ignored.add(new Ignored(rel, "Dataset '" + id + "' has no consuming Pipeline and no Widget"));
                 }
                 reached = true;
             }
@@ -196,7 +211,14 @@ public final class AffectedPipelines {
         // producer → Dataset → consumer, breadth-first so each Pipeline keeps its shortest chain
         while (!queue.isEmpty()) {
             Hit h = queue.poll();
-            for (PipelineDependents.Dependent d : PipelineDependents.scan(root, h.pipeline()).dependents()) {
+            PipelineDependents.Report scan = PipelineDependents.scan(root, h.pipeline());
+            if (scan.truncated()) {
+                uncertain.add(new Uncertain("pipeline:" + h.pipeline(), "has " + scan.total()
+                        + " dependents; only the first " + scan.dependents().size() + " are listed and followed"));
+            }
+            for (PipelineDependents.Dependent d : scan.dependents()) {
+                dependents.putIfAbsent(d.kind() + ":" + d.name(),
+                        new Dependent(d.kind(), d.name(), d.via(), append(h.chain(), d.kind() + ":" + d.name())));
                 if (!"dataset".equals(d.kind())) continue;
                 List<String> chain = append(h.chain(), "dataset:" + d.name());
                 for (String consumer : consumers.getOrDefault(d.name(), List.of())) {
@@ -210,7 +232,32 @@ public final class AffectedPipelines {
                     "does not load, so what it reads is unknown: " + f.message()));
         }
         List<Verdict> verdicts = ContractVerdicts.judge(root, registry, real, hits, consumers);
-        return new Report(List.copyOf(hits.values()), List.copyOf(uncertain), List.copyOf(ignored), verdicts);
+        return new Report(List.copyOf(hits.values()), List.copyOf(dependents.values()), List.copyOf(uncertain),
+                List.copyOf(ignored), verdicts);
+    }
+
+    /**
+     * The Widgets ({@code datasetId}) and their Dashboards ({@code tiles[].widgetId}) on a directly changed
+     * Dataset — the same two hops {@link PipelineDependents} reports behind a producer. True when any exist.
+     */
+    private static boolean datasetViewers(Path root, String dataset, List<String> chain, Map<String, Dependent> out) {
+        ComponentRegistry reg = ComponentRegistry.scan(root.resolve("registry"));
+        boolean any = false;
+        for (ComponentRegistry.Component w : reg.ofType("widget")) {
+            Object ds = w.content().get("datasetId");
+            if (ds == null || !dataset.equals(String.valueOf(ds).trim())) continue;
+            any = true;
+            List<String> wc = append(chain, "widget:" + w.name());
+            out.putIfAbsent("widget:" + w.name(), new Dependent("widget", w.name(), "datasetId", wc));
+            for (ComponentRegistry.Component d : reg.ofType("dashboard")) {
+                if (!(d.content().get("tiles") instanceof List<?> tiles)) continue;
+                boolean on = tiles.stream().anyMatch(t -> t instanceof Map<?, ?> m && m.get("widgetId") != null
+                        && w.name().equals(String.valueOf(m.get("widgetId")).trim()));
+                if (on) out.putIfAbsent("dashboard:" + d.name(), new Dependent("dashboard", d.name(),
+                        "tiles[].widgetId", append(wc, "dashboard:" + d.name())));
+            }
+        }
+        return any;
     }
 
     private static boolean offer(Map<String, Hit> hits, Deque<Hit> queue, String id, List<String> via) {
@@ -278,6 +325,8 @@ public final class AffectedPipelines {
      * each modified/deleted file's pre-change content with {@code git show}, and prints {@link #render}.
      * Exit 0; 1 when {@code --fail-on-affected} and something is affected or uncertain, or when
      * {@code --fail-on-breaking} and any verdict is {@link Tier#BREAKING}; 2 on a usage or git error.
+     * It hosts no Space, so pass {@code -Dassist.safety.roots=<space base>} — without a jail root every
+     * Pipeline fails to load and the report is all UNCERTAIN (the CI step in {@code ci.yml} does).
      */
     public static void main(String[] args) throws Exception {
         if (args.length < 2) {
@@ -325,6 +374,8 @@ public final class AffectedPipelines {
         StringBuilder sb = new StringBuilder();
         for (Hit h : r.affected()) sb.append("AFFECTED  ").append(h.pipeline()).append("  ")
                 .append(String.join(" -> ", h.chain())).append('\n');
+        for (Dependent d : r.dependents()) sb.append("DEPENDENT ").append(d.kind()).append(':').append(d.name())
+                .append("  via ").append(d.via()).append("  ").append(String.join(" -> ", d.chain())).append('\n');
         for (Uncertain u : r.uncertain()) sb.append("UNCERTAIN ").append(u.subject()).append("  ")
                 .append(u.reason()).append('\n');
         for (Verdict v : r.verdicts()) sb.append(String.format("%-17s", v.tier())).append(' ').append(v.subject())

@@ -62,7 +62,7 @@ final class ContractVerdicts {
         final Map<String, List<String>> consumers;
         final List<ComponentRegistry.Component> datasets;
         final List<ComponentRegistry.Component> widgets;
-        final Map<String, List<String>> datasetsOf = new HashMap<>();
+        final Map<String, List<PipelineDependents.Dependent>> scans = new HashMap<>();
         final List<Verdict> out = new ArrayList<>();
 
         Ctx(Path root, ConfigRegistry registry, List<Change> changes, Map<String, List<String>> consumers) {
@@ -75,11 +75,37 @@ final class ContractVerdicts {
             this.widgets = reg.ofType("widget");
         }
 
+        List<PipelineDependents.Dependent> scan(String pipeline) {
+            return scans.computeIfAbsent(pipeline, p -> PipelineDependents.scan(root, p).dependents());
+        }
+
         List<String> datasetsOf(String pipeline) {
-            return datasetsOf.computeIfAbsent(pipeline, p -> PipelineDependents.scan(root, p).dependents().stream()
-                    .filter(d -> "dataset".equals(d.kind())).map(PipelineDependents.Dependent::name).toList());
+            return scan(pipeline).stream().filter(d -> "dataset".equals(d.kind()))
+                    .map(PipelineDependents.Dependent::name).toList();
+        }
+
+        /**
+         * The readers that name the Pipeline itself rather than one of its Datasets: an enrichment's
+         * {@code references.<n>.ref} or {@code triggers.on_pipeline}, a job's {@code on_pipeline}, an Expectation's
+         * or Decision Rule's {@code target}. None of them states its columns in structured config (enrichment and
+         * rule bodies are free SQL; a job reads whatever its type does), so each is a reader whose column use is
+         * NOT determined — never a reader known not to read a column.
+         */
+        List<Reads> pipelineReaders(String pipeline) {
+            List<Reads> out = new ArrayList<>();
+            for (PipelineDependents.Dependent d : scan(pipeline)) {
+                if (!PIPELINE_READER_KINDS.contains(d.kind())) continue;
+                String who = d.kind() + ":" + d.name();
+                if (out.stream().anyMatch(r -> r.reader().equals(who))) continue;   // one enrichment, two keys
+                out.add(new Reads(who, null, "it names the Pipeline by " + d.via()
+                        + " and its column use is not in structured config"));
+            }
+            return out;
         }
     }
+
+    /** {@link PipelineDependents} kinds that bind to a Pipeline by name (the Dataset / Widget hops are judged apart). */
+    private static final Set<String> PIPELINE_READER_KINDS = Set.of("enrichment", "job", "expectation", "decision-rule");
 
     /**
      * @param changes   the changes that are real (formatting-only edits already dropped)
@@ -106,7 +132,7 @@ final class ContractVerdicts {
                         "producer Pipeline '" + id + "' no longer loads, so its output columns cannot be derived");
             } else {
                 everyReader(ctx, id, Tier.BREAKING, null,
-                        "producer Pipeline '" + id + "' is deleted; nothing writes this Dataset any more");
+                        "producer Pipeline '" + id + "' is deleted; nothing writes its Datasets or raises its completion any more");
             }
             return;
         }
@@ -182,10 +208,15 @@ final class ContractVerdicts {
                     }
                 }
             }
+            for (Reads r : ctx.pipelineReaders(id)) {
+                ctx.out.add(new Verdict(Tier.REVALIDATE, "pipeline:" + id, name, r.reader(),
+                        "column " + change + "; which columns " + r.reader() + " reads is not determined: "
+                                + r.unknown()));
+            }
             if (!read) {
                 ctx.out.add(new Verdict(Tier.POSSIBLY_BREAKING, "pipeline:" + id, name, null, "column " + change
-                        + "; no reader in config reads it, but a reader outside config (a query, a BI tool, "
-                        + "an export) may"));
+                        + "; no reader in config is known to read it, but a reader outside config (a query, a BI "
+                        + "tool, an export) may"));
             }
         }
         for (String name : after.byName().keySet()) {
@@ -211,6 +242,9 @@ final class ContractVerdicts {
                 taint(tainted, r.reader());
             }
         }
+        for (Reads r : ctx.pipelineReaders(id)) {
+            ctx.out.add(new Verdict(tier, "pipeline:" + id, column, r.reader(), reason));
+        }
         downstream(ctx, id, tainted);
     }
 
@@ -233,6 +267,10 @@ final class ContractVerdicts {
                             + "consuming Pipeline is not traced"));
                     if (reader.startsWith("pipeline:")) queue.add(reader.substring("pipeline:".length()));
                 }
+            }
+            for (Reads r : ctx.pipelineReaders(via)) {
+                ctx.out.add(new Verdict(Tier.REVALIDATE, "pipeline:" + producer, null, r.reader(), "downstream of "
+                        + "pipeline:" + via + ", whose contract with '" + producer + "' changed; " + r.unknown()));
             }
         }
     }
