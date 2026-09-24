@@ -93,7 +93,7 @@ class ControlApiInvestigationsTest {
     }
 
     private static final String CREATE =
-            "{\"id\":\"case-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}";
+            "{\"purpose\":\"test\",\"id\":\"case-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}";
 
     private JsonNode op(Ctx c, String id, String body) throws Exception {
         return data(post(c.port, "/inv/investigations/" + id + "/ops", body));
@@ -164,15 +164,15 @@ class ControlApiInvestigationsTest {
         try (Ctx c = open(cfg, root)) {
             assertEquals(422, post(c.port, "/inv/investigations", "{\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}").statusCode());
             assertEquals(422, post(c.port, "/inv/investigations",
-                    "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller;drop\",\"targetCol\":\"callee\"}").statusCode());
+                    "{\"purpose\":\"test\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller;drop\",\"targetCol\":\"callee\"}").statusCode());
             assertEquals(404, post(c.port, "/inv/investigations",
-                    "{\"dataset\":\"nope\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}").statusCode());
+                    "{\"purpose\":\"test\",\"dataset\":\"nope\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}").statusCode());
             HttpResponse<String> col = post(c.port, "/inv/investigations",
-                    "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"ghost\"}");
+                    "{\"purpose\":\"test\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"ghost\"}");
             assertEquals(422, col.statusCode(), col.body());
             assertTrue(col.body().contains("ghost"));
             assertEquals(422, post(c.port, "/inv/investigations",
-                    "{\"id\":\"../escape\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}").statusCode());
+                    "{\"purpose\":\"test\",\"id\":\"../escape\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}").statusCode());
 
             assertEquals(200, post(c.port, "/inv/investigations", CREATE).statusCode());
             assertEquals(409, post(c.port, "/inv/investigations", CREATE).statusCode(),

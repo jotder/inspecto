@@ -100,9 +100,10 @@ describe('InvestigationSessionStore (LA-10)', () => {
     it('start → seed → undo: the op log and the Working Set follow each step', async () => {
         const { store, inv, logs, sets } = setup();
 
-        expect(await store.start(P, 'Burners')).toBe(true);
+        expect(await store.start(P, 'warrant 7', 'Burners')).toBe(true);
         expect(inv.createInvestigation).toHaveBeenCalledWith({
             title: 'Burners',
+            purpose: 'warrant 7',
             dataset: 'calls',
             sourceCol: 'A',
             targetCol: 'B',

@@ -212,6 +212,8 @@ export interface ExpandRung {
 export interface InvestigationCreateRequest {
     id?: string;
     title?: string;
+    /** The stated purpose / legal basis (D-U5) — required; recorded in the sealed header and the Dossier, not enforced. */
+    purpose: string;
     dataset: string;
     sourceCol: string;
     targetCol: string;
@@ -228,6 +230,8 @@ export interface InvestigationLineage {
 export interface InvestigationHeader {
     id: string;
     title: string | null;
+    /** The stated purpose / legal basis (D-U5); absent on an Investigation created before it was required. */
+    purpose?: string | null;
     owner: string | null;
     dataset: string;
     sourceCol: string;
@@ -326,6 +330,8 @@ export interface WorkingSetAnnotation {
     id: string;
     step: number;
     note: string;
+    /** The Admiralty grade (D-U9): source reliability A–F then information credibility 1–6, e.g. `B2`. Absent when ungraded. */
+    confidence?: string;
 }
 
 /** The full Working Set — only `/replay` returns it. */
@@ -555,6 +561,8 @@ export type InvestigationTemplateParameter =
 export interface InstantiateTemplateRequest {
     id?: string;
     title?: string;
+    /** Required as on create (D-U5): instantiating mints an Investigation. */
+    purpose: string;
     /** Seed parameter → non-empty id list; window parameter (optional) → a window or `'full'`. */
     params: Record<string, string[] | InvestigationWindow | 'full'>;
     dataset?: string;

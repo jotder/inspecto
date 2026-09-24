@@ -99,11 +99,12 @@ export class InvestigationSessionStore {
     }
 
     /** Create an Investigation over the projection's Dataset + columns and open it. */
-    async start(p: EntityProjection, title?: string): Promise<boolean> {
+    async start(p: EntityProjection, purpose: string, title?: string): Promise<boolean> {
         return this.run('Could not start the Investigation.', async () => {
             const h = await firstValueFrom(
                 this.inv.createInvestigation({
                     title: title || undefined,
+                    purpose,
                     dataset: p.datasetId,
                     sourceCol: p.sourceCol,
                     targetCol: p.targetCol,

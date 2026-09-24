@@ -45,7 +45,7 @@ class ControlApiInvestigationTemplateTest {
             + "('bob','dave','call'),('bob','erin','sms'),('carol','frank','call')";
     private static final String TEXTS = "('x1','x2','sms'),('x2','x3','call'),('x9','x8','sms')";
     private static final String CREATE =
-            "{\"id\":\"case-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}";
+            "{\"purpose\":\"test\",\"id\":\"case-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}";
     private final HttpClient client = HttpClient.newHttpClient();
 
     private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {
@@ -141,7 +141,7 @@ class ControlApiInvestigationTemplateTest {
             // Re-bound to the same seed over the same Dataset: bob is BACK — the exclusion was a judgement about
             // case-a's graph and stayed there. (A template that carried it would answer alice, carol, frank.)
             JsonNode inst = post(c, "/inv/investigation-templates/tpl-1/instantiate",
-                    "{\"id\":\"case-b\",\"params\":{\"seed1\":[\"alice\"]}}");
+                    "{\"purpose\":\"test\",\"id\":\"case-b\",\"params\":{\"seed1\":[\"alice\"]}}");
             assertEquals(Set.of("alice", "bob", "carol", "dave", "erin", "frank"), entities(c, "case-b"));
             assertEquals(0, inst.at("/workingSet/excluded").asInt(), "no analyst-judgement exclusion set (G-E12)");
             assertEquals(3, inst.get("steps").asInt());
@@ -164,7 +164,7 @@ class ControlApiInvestigationTemplateTest {
             ops(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"]}", "{\"op\":\"expand\"}", "{\"op\":\"expand\"}");
             post(c, "/inv/investigations/case-a/template", "{\"id\":\"tpl-1\"}");
 
-            JsonNode inst = post(c, "/inv/investigation-templates/tpl-1/instantiate", "{\"id\":\"texts-1\","
+            JsonNode inst = post(c, "/inv/investigation-templates/tpl-1/instantiate", "{\"purpose\":\"test\",\"id\":\"texts-1\","
                     + "\"dataset\":\"texts_ds\",\"sourceCol\":\"src\",\"targetCol\":\"dst\",\"linkKindCol\":\"kind\","
                     + "\"params\":{\"seed1\":[\"x1\"]}}");
             assertEquals("texts_ds", inst.at("/header/dataset").asText());
@@ -174,7 +174,7 @@ class ControlApiInvestigationTemplateTest {
             assertEquals("texts_ds", log.at("/entries/1/read/dataset").asText(), "every expand read the NEW binding");
 
             assertEquals(422, status(c, "POST", "/inv/investigation-templates/tpl-1/instantiate",
-                    "{\"id\":\"texts-2\",\"dataset\":\"texts_ds\",\"params\":{\"seed1\":[\"x1\"]}}"),
+                    "{\"purpose\":\"test\",\"id\":\"texts-2\",\"dataset\":\"texts_ds\",\"params\":{\"seed1\":[\"x1\"]}}"),
                     "the template's column NAMES do not exist in texts_ds — the roles must be re-bound");
         }
     }
@@ -220,7 +220,7 @@ class ControlApiInvestigationTemplateTest {
             assertEquals(422, status(c, "POST", inst, "{}"), "the seed parameter is required");
             assertEquals(422, status(c, "POST", inst, "{\"params\":{\"seed1\":[]}}"), "…and non-empty");
             assertEquals(422, status(c, "POST", inst, "{\"params\":{\"seed1\":[\"a\"],\"seed9\":[\"b\"]}}"));
-            assertEquals(404, status(c, "POST", inst, "{\"dataset\":\"ghost_ds\",\"params\":{\"seed1\":[\"alice\"]}}"));
+            assertEquals(404, status(c, "POST", inst, "{\"purpose\":\"test\",\"dataset\":\"ghost_ds\",\"params\":{\"seed1\":[\"alice\"]}}"));
             assertEquals(422, status(c, "POST", inst, "{\"sourceCol\":\"no_such\",\"params\":{\"seed1\":[\"alice\"]}}"));
             assertEquals(422, status(c, "POST", inst, "{\"id\":\"../x\",\"params\":{\"seed1\":[\"alice\"]}}"));
             assertEquals(409, status(c, "POST", inst, "{\"id\":\"case-a\",\"params\":{\"seed1\":[\"alice\"]}}"),
@@ -251,7 +251,7 @@ class ControlApiInvestigationTemplateTest {
             assertEquals(200, send(c.port, "POST", save, "{\"id\":\"t1\"}", "Bearer owner").statusCode());
 
             String get = "/inv/investigation-templates/t1", inst = get + "/instantiate";
-            String body = "{\"id\":\"case-b\",\"params\":{\"seed1\":[\"alice\"]}}";
+            String body = "{\"purpose\":\"test\",\"id\":\"case-b\",\"params\":{\"seed1\":[\"alice\"]}}";
             assertEquals(200, send(c.port, "GET", get, null, "Bearer owner-nocaps").statusCode(), "a read takes no capability");
             assertEquals(404, send(c.port, "GET", get, null, "Bearer other").statusCode(), "…but is owner-only");
             assertEquals(404, send(c.port, "POST", inst, body, "Bearer other").statusCode());

@@ -3,6 +3,7 @@ package com.gamma.geolink;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ComponentAccess;
+import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.RowScope;
 import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
@@ -57,8 +58,19 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  *   <li>{@code POST /inv/investigations/{id}/replay} — full evaluation from the sealed log, with the equivalence
  *       check against the hashes recorded at append time, and — with {@code reread} — a drift check against
  *       current data.</li>
- *   <li>{@code GET /inv/investigations/{id}/log} — the ordered log, each step rendered as a plain-language line.</li>
+ *   <li>{@code GET /inv/investigations/{id}/log} — the ordered log, each step rendered as a plain-language line, and
+ *       the pending sensitive expands (D-U7).</li>
+ *   <li>{@code POST /inv/investigations/{id}/reveal} — reveal masked entity ids, per entity (D-U6).</li>
+ *   <li>{@code POST /inv/investigations/{id}/pending/{rid}/approve} · {@code .../deny} — four-eyes (D-U7).</li>
  * </ul>
+ *
+ * <p><b>LA-19 controls (operator decisions 2026-09-24).</b> <i>Purpose</i> (D-U5): every Investigation states a
+ * {@code purpose} — its legal basis — at create; it is sealed in the write-once header and shown in the Dossier, and
+ * NOT enforced. <i>Masking</i> (D-U6): every response carrying entity ids is masked per the Space's
+ * {@code maskingMode} ({@link EntityMasking}); a holder of {@code canRevealLinkEntities} reveals one entity at a time,
+ * audited. <i>Four-eyes</i> (D-U7): an {@code expand} whose budget or fan-out exceeds the Space's threshold does not
+ * run — it becomes a PENDING request that runs only when a DIFFERENT Subject holding
+ * {@code canApproveLinkExpansions} approves it.
  *
  * <p><b>SEAL NOW, versioned reads deferred (D-E3).</b> There is no version-addressable Dataset read in the
  * backend, so {@code datasetVersion} is always {@code null}. Instead every Dataset-reading step MATERIALISES what
@@ -94,6 +106,8 @@ public final class InvestigationRoutes implements RouteModule {
     private static final int MAX_IDS = 1_000;
     private static final int MAX_ID_LENGTH = 512;
     private static final int MAX_NOTE_LENGTH = 2_000;
+    private static final int MAX_PURPOSE_LENGTH = 1_000;
+    private static final int MAX_REVEAL = 100;
     private static final int MAX_FRONTIER = 1_000;
     private static final int MAX_LINK_KINDS = 100;
     private static final int DEFAULT_EXPAND_BUDGET = 2_000;
@@ -117,6 +131,12 @@ public final class InvestigationRoutes implements RouteModule {
                 (e, m) -> reorder(api, e, m.group(1), api.body(e))));
         api.post("/inv/investigations/([^/]+)/replay", (e, m) -> replay(api, e, m.group(1), api.body(e)));
         api.get("/inv/investigations/([^/]+)/log", (e, m) -> log(api, e, m.group(1)));
+        api.post("/inv/investigations/([^/]+)/reveal", ApiContext.withCapability("canRevealLinkEntities",
+                (e, m) -> reveal(api, e, m.group(1), api.body(e))));
+        api.post("/inv/investigations/([^/]+)/pending/([^/]+)/approve", ApiContext.withCapability("canApproveLinkExpansions",
+                (e, m) -> decide(api, e, m.group(1), m.group(2), true, api.body(e))));
+        api.post("/inv/investigations/([^/]+)/pending/([^/]+)/deny", ApiContext.withCapability("canApproveLinkExpansions",
+                (e, m) -> decide(api, e, m.group(1), m.group(2), false, api.body(e))));
     }
 
     /** One opened Investigation: its store, write root and parsed header. Package-private for {@link WorkingSetRoutes}. */
@@ -128,10 +148,11 @@ public final class InvestigationRoutes implements RouteModule {
     // ── routes ─────────────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * {@code POST /inv/investigations} — body {@code {id?, title?, dataset, sourceCol, targetCol, linkKindCol?,
-     * timeCol?, timeColZone?}}. {@code timeCol} (LA-13) binds the event time every window reads; see
+     * {@code POST /inv/investigations} — body {@code {id?, title?, purpose, dataset, sourceCol, targetCol, linkKindCol?,
+     * timeCol?, timeColZone?}}. {@code purpose} (D-U5) is the stated purpose / legal basis — required, recorded in
+     * the sealed header and shown in the Dossier, not enforced. {@code timeCol} (LA-13) binds the event time every window reads; see
      * {@link InvestigationTime} for the timezone contract {@code timeColZone} is part of.
-     * Gates: write root 503 → a missing/unsafe field 422 → unknown or not-viewable Dataset 404 → a column the
+     * Gates: write root 503 → a missing/unsafe field (incl. {@code purpose}) 422 → unknown or not-viewable Dataset 404 → a column the
      * relation lacks, a time column that is not a timestamp, or a bad zone 422 → id escaping the store 403 → id
      * taken 409 → write the header CREATE_NEW.
      */
@@ -140,6 +161,7 @@ public final class InvestigationRoutes implements RouteModule {
         String given = ApiContext.str(body, "id");
         String id = given != null ? given : "inv-" + UUID.randomUUID();
         requireSafeId(id);
+        String purpose = purpose(body);
         String dataset = ApiContext.str(body, "dataset");
         if (dataset == null) throw new ApiException(422, "body must include 'dataset'");
         String sourceCol = ident(body, "sourceCol", true);
@@ -159,6 +181,7 @@ public final class InvestigationRoutes implements RouteModule {
         Map<String, Object> header = new LinkedHashMap<>();
         header.put("id", id);
         header.put("title", ApiContext.str(body, "title"));
+        header.put("purpose", purpose);
         header.put("owner", ApiContext.actor(ex));
         header.put("dataset", dataset);
         header.put("sourceCol", sourceCol);
@@ -192,7 +215,7 @@ public final class InvestigationRoutes implements RouteModule {
                     + "LA-13 and LA-19 ship seed, expand, exclude, hide, keep, window, annotate)");
         if (!SHIPPED.contains(op))
             throw new ApiException(422, "op '" + op + "' is not in the closed op vocabulary");
-        Map<String, Object> params = params(op, body);
+        Map<String, Object> params = params(op, resolvePseudonyms(inv, body));
         requireBindings(inv.header(), op, params, "");
 
         synchronized (lock(inv.dir())) {
@@ -214,9 +237,11 @@ public final class InvestigationRoutes implements RouteModule {
                 if (frontier.size() > MAX_FRONTIER)
                     throw new ApiException(422, "an expand frontier is capped at " + MAX_FRONTIER
                             + " entities; name them with 'ids'");
+                Map<String, Object> sensitive = sensitivity(inv, params);
+                if (sensitive != null) return masked(inv, requestExpansion(ex, inv, params, sensitive, before));
                 entry.put("read", read(api, ex, inv, rung(params, frontier, before)));
             }
-            return commit(ex, inv, log, entry, before);
+            return masked(inv, commit(ex, inv, log, entry, before));
         }
     }
 
@@ -229,7 +254,7 @@ public final class InvestigationRoutes implements RouteModule {
             if (target < 0) throw new ApiException(409, "nothing to undo");
             Map<String, Object> entry = entry(log.size() + 1, "undo", ex);
             entry.put("undoes", target);
-            return commit(ex, inv, log, entry, evaluate(log, -1, null));
+            return masked(inv, commit(ex, inv, log, entry, evaluate(log, -1, null)));
         }
     }
 
@@ -289,6 +314,7 @@ public final class InvestigationRoutes implements RouteModule {
             e.put("op", orig.get("op"));
             e.put("params", orig.get("params"));
             e.put("derivedFrom", Map.of("investigation", parent.id(), "step", from));
+            if (orig.get("approval") != null) e.put("approval", orig.get("approval"));   // D-U7: approved in the parent
             if ("expand".equals(orig.get("op"))) {
                 @SuppressWarnings("unchecked") Map<String, Object> p = (Map<String, Object>) orig.get("params");
                 List<String> named = strings(p.get("ids"));
@@ -352,6 +378,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (store.readInvestigation(id) != null) throw new ApiException(409, "investigation '" + id + "' already exists");
 
         Map<String, Object> h = new LinkedHashMap<>(header);
+        h.put("purpose", purpose(header));   // D-U5: an instantiated Investigation states its purpose like a created one
         h.remove("timeCol");
         h.remove("timeColZone");
         if (timeCol != null) {
@@ -383,6 +410,14 @@ public final class InvestigationRoutes implements RouteModule {
                 if (frontier.size() > MAX_FRONTIER)
                     throw new ApiException(422, "template step " + step + " would expand " + frontier.size()
                             + " entities; an expand frontier is capped at " + MAX_FRONTIER);
+                // D-U7: a template names no entities, so there is no frontier a second person could approve in
+                // advance — a sensitive step is refused rather than run unapproved.
+                Map<String, Object> sensitive = sensitivity(inv, params);
+                if (sensitive != null)
+                    throw new ApiException(422, "template step " + step + " is a sensitive expand " + sensitive.get("exceeded")
+                            + " — four-eyes applies and a template names no frontier to approve; save the template "
+                            + "with a smaller budget/fan-out and expand further from the Investigation, where the "
+                            + "step can be approved");
                 e.put("read", read(api, ex, inv, rung(params, frontier, state)));
             }
             e = roundTrip(e);
@@ -462,7 +497,7 @@ public final class InvestigationRoutes implements RouteModule {
         out.put("reread", reread);
         out.put("drift", drift);
         out.put("diverged", diverged);
-        return out;
+        return masked(inv, out);
     }
 
     /** {@code GET /inv/investigations/{id}/log?limit=n} — bounded; the TRUE total ships beside it. */
@@ -503,7 +538,10 @@ public final class InvestigationRoutes implements RouteModule {
         out.put("entries", entries);
         out.put("total", log.size());
         out.put("truncated", log.size() > entries.size());
-        return out;
+        List<Map<String, Object>> pending = new ArrayList<>();
+        for (String rec : inv.store().listPending(inv.id())) pending.add(parse(rec));
+        out.put("pending", pending);
+        return masked(inv, out);
     }
 
     // ── steps ──────────────────────────────────────────────────────────────────────────────────────────
@@ -779,15 +817,14 @@ public final class InvestigationRoutes implements RouteModule {
                 p.put("reason", reason);
             }
             case "annotate" -> {
-                // LA-19. 'confidence' is in plan §2.2's parameter list but its scale is undecided — refused, never dropped.
-                if (body.containsKey("confidence"))
-                    throw new ApiException(422, "'confidence' is not accepted yet — its scale is an open operator "
-                            + "decision (LA-19); annotate with 'note' only");
                 String note = ApiContext.str(body, "note");
                 if (note == null || note.isBlank()) throw new ApiException(422, "'annotate' requires a 'note'");
                 if (note.length() > MAX_NOTE_LENGTH)
                     throw new ApiException(422, "'note' is at most " + MAX_NOTE_LENGTH + " chars");
                 p.put("note", note);
+                // D-U9: an Admiralty grade (A-F x 1-6). Absent when not given, so an ungraded annotate is sealed
+                // byte-for-byte as it was before the grade existed.
+                if (body.get("confidence") != null) p.put("confidence", AdmiraltyGrade.validate(body.get("confidence")));
             }
             default -> { }
         }
@@ -890,7 +927,7 @@ public final class InvestigationRoutes implements RouteModule {
                         + (r.get("fanOutCapped") instanceof Number c && c.longValue() > 0
                                 ? ", " + c + " more left out by the fan-out cap" : "")
                         + (Boolean.TRUE.equals(r.get("truncated")) ? ", TRUNCATED at its budget of " + q.get("budget") : "")
-                        + ".";
+                        + "." + approvalClause(e);
             }
             case "window" -> p.get("window") == null
                     ? "Cleared the time window: later expansions read the full time range."
@@ -900,9 +937,21 @@ public final class InvestigationRoutes implements RouteModule {
                     + " (reason: " + p.get("reason") + "): " + list(ids) + ".";
             case "hide" -> "Hid " + list(ids) + " from display (still traversed and counted).";
             case "keep" -> "Kept " + list(ids) + " (protected from later exclusion).";
-            case "annotate" -> "Annotated " + list(ids) + ": \"" + p.get("note") + "\"";
+            case "annotate" -> "Annotated " + list(ids) + gradeClause(p) + ": \"" + p.get("note") + "\"";
             default -> "Applied " + e.get("op") + ".";
         };
+    }
+
+    /** {@code " graded B2 (source usually reliable, information probably true)"} — empty when ungraded (D-U9). */
+    static String gradeClause(Map<String, Object> params) {
+        return params.get("confidence") == null ? ""
+                : " graded " + AdmiraltyGrade.describe(String.valueOf(params.get("confidence")));
+    }
+
+    /** {@code " Four-eyes: requested by a, approved by b."} — empty for an expand that needed no approval (D-U7). */
+    static String approvalClause(Map<String, Object> e) {
+        return e.get("approval") instanceof Map<?, ?> a
+                ? " Four-eyes: requested by " + a.get("requestedBy") + ", approved by " + a.get("approvedBy") + "." : "";
     }
 
     private static String list(List<String> ids) {
@@ -924,6 +973,15 @@ public final class InvestigationRoutes implements RouteModule {
      * {@code /dossier} still served the same content and {@code /ops} still wrote.
      */
     static Inv open(ApiContext api, HttpExchange ex, String id) throws IOException {
+        return open(api, ex, id, true);
+    }
+
+    /**
+     * {@code ownerOnly = false} is the four-eyes APPROVER exception (D-U7), and the only one: someone other than the
+     * owner must be able to reach a pending request to decide it. Everything else still applies — the R3 Dataset gate
+     * and the Enterprise PDP judge the approver exactly as they would the owner.
+     */
+    private static Inv open(ApiContext api, HttpExchange ex, String id, boolean ownerOnly) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "link analysis investigation");
         requireSafeId(id);
         SnapshotStore store = new SnapshotStore(writeRoot);
@@ -932,7 +990,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (raw == null) throw new ApiException(404, "no investigation '" + id + "'");
         @SuppressWarnings("unchecked") Map<String, Object> header = ApiContext.JSON.readValue(raw, Map.class);
         Optional<Subject> subject = ApiContext.subject(ex);
-        if (subject.isPresent() && !subject.get().id().equals(header.get("owner")))
+        if (ownerOnly && subject.isPresent() && !subject.get().id().equals(header.get("owner")))
             throw new ApiException(404, "no investigation '" + id + "'");
         String dataset = String.valueOf(header.get("dataset"));
         Optional<Map<String, Object>> ds = new ComponentStore(writeRoot.resolve("registry")).get("dataset", dataset)
@@ -953,6 +1011,219 @@ public final class InvestigationRoutes implements RouteModule {
         r.put("dataset", inv.dataset());
         if (inv.header().get("parent") instanceof Map<?, ?> p) r.put("parent", p.get("id"));
         return r;
+    }
+
+    // ── LA-19 controls: purpose (D-U5), masking (D-U6), four-eyes (D-U7) ─────────────────────────────────────
+
+    /** The stated purpose / legal basis (D-U5): required, non-blank, bounded. Recorded, not enforced. */
+    private static String purpose(Map<String, Object> body) {
+        String purpose = ApiContext.str(body, "purpose");
+        if (purpose == null || purpose.isBlank())
+            throw new ApiException(422, "body must include 'purpose' — the stated purpose / legal basis of this "
+                    + "Investigation (D-U5); it is recorded in the sealed header and shown in the Dossier, not enforced");
+        if (purpose.length() > MAX_PURPOSE_LENGTH)
+            throw new ApiException(422, "'purpose' is at most " + MAX_PURPOSE_LENGTH + " chars");
+        return purpose.trim();
+    }
+
+    /** The response, masked per the Space's {@code maskingMode}, with a {@code masking} note saying what was (D-U6). */
+    @SuppressWarnings("unchecked")
+    private static Object masked(Inv inv, Object out) throws IOException {
+        EntityMasking mask = EntityMasking.of(inv, List.of());
+        Object masked = mask.apply(out);
+        if (!(masked instanceof Map<?, ?> m)) return masked;
+        Map<String, Object> copy = new LinkedHashMap<>((Map<String, Object>) m);
+        copy.put("masking", mask.describe());
+        return copy;
+    }
+
+    /** An op body whose {@code ids} may carry pseudonyms this Investigation issued, each resolved to its entity. */
+    private static Map<String, Object> resolvePseudonyms(Inv inv, Map<String, Object> body) throws IOException {
+        if (!(body.get("ids") instanceof List<?> l)
+                || l.stream().noneMatch(o -> o instanceof String v && v.startsWith(EntityMasking.TOKEN_PREFIX)))
+            return body;
+        Map<String, Object> out = new LinkedHashMap<>(body);
+        out.put("ids", EntityMasking.of(inv, List.of()).resolve(strings(l)));
+        return out;
+    }
+
+    /**
+     * Whether an expand is SENSITIVE under the Space's four-eyes thresholds (D-U7): its row budget above
+     * {@code fourEyesBudgetAbove}, or its {@code maxFanOut} above {@code fourEyesFanOutAbove} — an unbounded fan-out
+     * exceeds any fan-out threshold. Null when it is not (or no threshold is set, the shipped default).
+     */
+    private static Map<String, Object> sensitivity(Inv inv, Map<String, Object> params) {
+        LinkAnalysisSettings s = LinkAnalysisSettings.forRoot(inv.writeRoot());
+        List<String> exceeded = new ArrayList<>();
+        int budget = ((Number) params.get("budget")).intValue();
+        if (s.fourEyesBudgetAbove() != null && budget > s.fourEyesBudgetAbove())
+            exceeded.add("budget " + budget + " > " + s.fourEyesBudgetAbove());
+        Object fanOut = params.get("maxFanOut");
+        if (s.fourEyesFanOutAbove() != null && (!(fanOut instanceof Number n) || n.intValue() > s.fourEyesFanOutAbove()))
+            exceeded.add(fanOut == null ? "maxFanOut unbounded (threshold " + s.fourEyesFanOutAbove() + ")"
+                    : "maxFanOut " + fanOut + " > " + s.fourEyesFanOutAbove());
+        if (exceeded.isEmpty()) return null;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("exceeded", exceeded);
+        m.put("budget", budget);
+        m.put("maxFanOut", fanOut);
+        m.put("fourEyesBudgetAbove", s.fourEyesBudgetAbove());
+        m.put("fourEyesFanOutAbove", s.fourEyesFanOutAbove());
+        return m;
+    }
+
+    /**
+     * Hold a sensitive expand as a PENDING request instead of running it (D-U7). Nothing is read and nothing enters the
+     * log: the request waits outside it ({@link SnapshotStore#writePending}) until a different Subject decides it. One
+     * pending request per Investigation — a second is a 409, so an approver never decides against a queue whose order
+     * they cannot see. The frontier is resolved when it RUNS, against the Working Set at approval time.
+     */
+    private static Map<String, Object> requestExpansion(HttpExchange ex, Inv inv, Map<String, Object> params,
+                                                        Map<String, Object> sensitive,
+                                                        InvestigationEvaluator.State before) throws IOException {
+        List<String> existing = inv.store().listPending(inv.id());
+        for (String raw : existing)
+            if ("pending".equals(parse(raw).get("status")))
+                throw new ApiException(409, "a sensitive expand is already pending approval (" + parse(raw).get("id")
+                        + ") — it must be approved or denied before another is requested");
+        String rid = "p" + (existing.size() + 1);
+        Map<String, Object> rec = new LinkedHashMap<>();
+        rec.put("id", rid);
+        rec.put("investigationId", inv.id());
+        rec.put("op", "expand");
+        rec.put("params", params);
+        rec.put("sensitivity", sensitive);
+        rec.put("status", "pending");
+        rec.put("requestedBy", ApiContext.actor(ex));
+        rec.put("requestedAt", Instant.now().toString());
+        inv.store().writePending(inv.id(), rid, canonical(rec));
+        emit(ex, EventType.LINK_EXPANSION_REQUESTED, "link.expansion.requested",
+                "link.expansion.requested — " + inv.id() + " " + rid + " " + sensitive.get("exceeded"),
+                b -> b.attr("investigationId", inv.id()).attr("requestId", rid).attr("budget", sensitive.get("budget"))
+                        .attr("maxFanOut", sensitive.get("maxFanOut")).attr("exceeded", sensitive.get("exceeded")));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("status", "pending");
+        out.put("pending", rec);
+        out.put("workingSet", summary(before));
+        return out;
+    }
+
+    /**
+     * {@code POST /inv/investigations/{id}/pending/{rid}/approve | deny} — four-eyes (D-U7). Gates, in order:
+     * {@code canApproveLinkExpansions} (the route) → an authenticated Subject 403 (without one two people cannot be
+     * told apart, and the actor would be spoofable) → the Investigation, WITHOUT the owner check but with R3 and the
+     * PDP ({@link #open(ApiContext, HttpExchange, String, boolean)}) → an unsafe request id 422 → no such request 404
+     * → already decided 409 → the requester deciding their own request 403. Approve then RUNS the expand as the
+     * requester's op, against the Working Set as it is now, and seals it with {@code approval{requestedBy,
+     * approvedBy, ...}} in the log line; deny records who denied it (and an optional {@code reason}) and reads nothing.
+     */
+    @SuppressWarnings("unchecked")
+    private Object decide(ApiContext api, HttpExchange ex, String id, String rid, boolean approve,
+                          Map<String, Object> body) throws IOException {
+        Optional<Subject> subject = ApiContext.subject(ex);
+        if (subject.isEmpty())
+            throw new ApiException(403, "four-eyes needs an authenticated Subject — without one, the requester and "
+                    + "the approver cannot be told apart");
+        Inv inv = open(api, ex, id, false);
+        if (!SnapshotStore.SAFE_ID.matcher(rid).matches())
+            throw new ApiException(422, "request id must match " + SnapshotStore.SAFE_ID.pattern() + ", got '" + rid + "'");
+        String reason = ApiContext.str(body, "reason");
+        if (reason != null && reason.length() > 200) throw new ApiException(422, "'reason' is at most 200 chars");
+        synchronized (lock(inv.dir())) {
+            String raw = inv.store().readPending(inv.id(), rid);
+            if (raw == null) throw new ApiException(404, "no pending request '" + rid + "' on investigation '" + id + "'");
+            Map<String, Object> rec = parse(raw);
+            if (!"pending".equals(rec.get("status")))
+                throw new ApiException(409, "request '" + rid + "' is already " + rec.get("status"));
+            if (subject.get().id().equals(rec.get("requestedBy")))
+                throw new ApiException(403, "four-eyes: '" + rec.get("requestedBy") + "' requested this expand and "
+                        + "cannot " + (approve ? "approve" : "deny") + " it — a different person must");
+            String by = ApiContext.actor(ex);
+            String at = Instant.now().toString();
+            rec.put("decidedBy", by);
+            rec.put("decidedAt", at);
+            if (!approve) {
+                rec.put("status", "denied");
+                if (reason != null) rec.put("reason", reason);
+                inv.store().writePending(inv.id(), rid, canonical(rec));
+                emit(ex, EventType.LINK_EXPANSION_DENIED, "link.expansion.denied",
+                        "link.expansion.denied — " + id + " " + rid + " by " + by,
+                        b -> b.attr("investigationId", id).attr("requestId", rid)
+                                .attr("requestedBy", rec.get("requestedBy")).attr("reason", reason));
+                return masked(inv, Map.of("id", id, "pending", rec));
+            }
+
+            Map<String, Object> params = (Map<String, Object>) rec.get("params");
+            List<Map<String, Object>> log = readLog(inv);
+            InvestigationEvaluator.State before = evaluate(log, -1, null);
+            List<String> named = strings(params.get("ids"));
+            List<String> frontier = new ArrayList<>();
+            for (String n : named.isEmpty() ? before.entities.keySet() : sorted(named))
+                if (before.entities.containsKey(n)) frontier.add(n);
+            if (frontier.isEmpty())
+                throw new ApiException(409, "nothing left to expand — the entities this request names have left the "
+                        + "Working Set since it was made; deny it instead");
+            if (frontier.size() > MAX_FRONTIER)
+                throw new ApiException(422, "an expand frontier is capped at " + MAX_FRONTIER + " entities");
+            Map<String, Object> approval = new LinkedHashMap<>();
+            approval.put("request", rid);
+            approval.put("requestedBy", rec.get("requestedBy"));
+            approval.put("requestedAt", rec.get("requestedAt"));
+            approval.put("approvedBy", by);
+            approval.put("approvedAt", at);
+            Map<String, Object> entry = entry(log.size() + 1, "op", ex);
+            entry.put("author", rec.get("requestedBy"));   // the requester's op; the approver is recorded beside it
+            entry.put("op", "expand");
+            entry.put("params", params);
+            entry.put("approval", approval);
+            entry.put("read", read(api, ex, inv, rung(params, frontier, before)));
+            Map<String, Object> out = (Map<String, Object>) commit(ex, inv, log, entry, before);
+            rec.put("status", "approved");
+            rec.put("step", out.get("step"));
+            inv.store().writePending(inv.id(), rid, canonical(rec));
+            emit(ex, EventType.LINK_EXPANSION_APPROVED, "link.expansion.approved",
+                    "link.expansion.approved — " + id + " " + rid + " by " + by + " → step " + out.get("step"),
+                    b -> b.attr("investigationId", id).attr("requestId", rid)
+                            .attr("requestedBy", rec.get("requestedBy")).attr("step", out.get("step")));
+            out.put("approval", approval);
+            return masked(inv, out);
+        }
+    }
+
+    /**
+     * {@code POST /inv/investigations/{id}/reveal} — body {@code {tokens: ["masked:…", …]}} (D-U6). Per entity: each
+     * pseudonym this Investigation issued is answered with the entity id behind it; anything else is listed under
+     * {@code unknown}, never guessed. Gates: {@code canRevealLinkEntities} (the route) → the Investigation, owner-only /
+     * R3 / PDP ({@link #open}) → a missing, empty or over-long token list 422. Audited as
+     * {@code LINK_ENTITY_REVEALED} with the TOKENS revealed — never the raw ids, so the trail does not re-leak them.
+     */
+    private Object reveal(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+        Inv inv = open(api, ex, id);
+        if (!(body.get("tokens") instanceof List<?> raw) || raw.isEmpty() || raw.size() > MAX_REVEAL)
+            throw new ApiException(422, "body must include 'tokens', a list of 1.." + MAX_REVEAL + " masked ids to reveal");
+        EntityMasking mask = EntityMasking.of(inv, List.of());
+        List<Map<String, Object>> revealed = new ArrayList<>();
+        List<String> unknown = new ArrayList<>();
+        for (String token : new LinkedHashSet<>(strings(raw))) {
+            String value = mask.reveal(token);
+            if (value == null) unknown.add(token);
+            else revealed.add(Map.of("token", token, "id", value));
+        }
+        List<Object> tokens = revealed.stream().map(r -> r.get("token")).toList();
+        emit(ex, EventType.LINK_ENTITY_REVEALED, "link.entity.revealed",
+                "link.entity.revealed — " + id + " " + revealed.size() + " entit" + (revealed.size() == 1 ? "y" : "ies"),
+                b -> b.attr("investigationId", id).attr("tokens", tokens).attr("count", revealed.size()));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        out.put("revealed", revealed);
+        out.put("unknown", unknown);
+        out.put("masking", mask.describe());
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> parse(String raw) throws IOException {
+        return ApiContext.JSON.readValue(raw, LinkedHashMap.class);
     }
 
     private static List<String> relationColumns(String datasetId, String relationSql) {

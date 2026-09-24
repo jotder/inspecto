@@ -112,7 +112,7 @@ class ControlApiInvestigationHopLadderTest {
     }
 
     private void create(Ctx c, String id, String extra) throws Exception {
-        data(post(c, "/inv/investigations", "{\"id\":\"" + id + "\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\","
+        data(post(c, "/inv/investigations", "{\"purpose\":\"test\",\"id\":\"" + id + "\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\","
                 + "\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"" + extra + "}"));
     }
 
@@ -196,7 +196,7 @@ class ControlApiInvestigationHopLadderTest {
     @Test
     void anInstantColumnNeedsNoZoneAndRefusesOne(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            String base = "{\"id\":\"tz\",\"dataset\":\"calls_tz_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\","
+            String base = "{\"purpose\":\"test\",\"id\":\"tz\",\"dataset\":\"calls_tz_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\","
                     + "\"linkKindCol\":\"channel\",\"timeCol\":\"ts\"";
             HttpResponse<String> zoned = post(c, "/inv/investigations", base + ",\"timeColZone\":\"UTC\"}");
             assertEquals(422, zoned.statusCode(), zoned.body());
@@ -227,7 +227,7 @@ class ControlApiInvestigationHopLadderTest {
     @Test
     void theTimeContractRefusesWhatWouldFallBackToTheHost(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            String base = "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",";
+            String base = "{\"purpose\":\"test\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",";
             assertEquals(422, post(c, "/inv/investigations", base + "\"id\":\"x1\",\"timeCol\":\"ts_text\"}").statusCode(),
                     "a text column is not an event time");
             assertEquals(422, post(c, "/inv/investigations", base + "\"id\":\"x2\",\"timeCol\":\"ts\","
@@ -287,7 +287,7 @@ class ControlApiInvestigationHopLadderTest {
             timed(c, "bad", "h");
             assertEquals(422, opStatus(c, "bad", "{\"op\":\"expand\",\"direction\":\"sideways\"}"));
             assertEquals(422, opStatus(c, "bad", "{\"op\":\"expand\",\"linkKinds\":[]}"));
-            data(post(c, "/inv/investigations", "{\"id\":\"nokind\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\","
+            data(post(c, "/inv/investigations", "{\"purpose\":\"test\",\"id\":\"nokind\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\","
                     + "\"targetCol\":\"callee\"}"));
             op(c, "nokind", "{\"op\":\"seed\",\"ids\":[\"h\"]}");
             assertEquals(422, opStatus(c, "nokind", "{\"op\":\"expand\",\"linkKinds\":[\"sms\"]}"),
@@ -440,13 +440,13 @@ class ControlApiInvestigationHopLadderTest {
             assertEquals("ts", tpl.at("/roles/timeCol").asText());
 
             JsonNode byDefault = data(post(c, "/inv/investigation-templates/tpl/instantiate",
-                    "{\"id\":\"i1\",\"params\":{\"seed1\":[\"a\"]}}"));
+                    "{\"purpose\":\"test\",\"id\":\"i1\",\"params\":{\"seed1\":[\"a\"]}}"));
             assertEquals(4, byDefault.at("/workingSet/entities").asInt(), "the authored window by default");
             JsonNode overridden = data(post(c, "/inv/investigation-templates/tpl/instantiate",
-                    "{\"id\":\"i2\",\"params\":{\"seed1\":[\"a\"],\"window1\":\"full\"}}"));
+                    "{\"purpose\":\"test\",\"id\":\"i2\",\"params\":{\"seed1\":[\"a\"],\"window1\":\"full\"}}"));
             assertEquals(7, overridden.at("/workingSet/entities").asInt(), "an override window re-binds the period");
             assertEquals(422, post(c, "/inv/investigation-templates/tpl/instantiate",
-                    "{\"id\":\"i3\",\"params\":{\"seed1\":[\"a\"],\"window1\":{\"slot\":{\"start\":\"22:00\",\"end\":\"04:00\"}}}}")
+                    "{\"purpose\":\"test\",\"id\":\"i3\",\"params\":{\"seed1\":[\"a\"],\"window1\":{\"slot\":{\"start\":\"22:00\",\"end\":\"04:00\"}}}}")
                     .statusCode(), "an override is validated like an authored window");
         }
     }
@@ -460,7 +460,7 @@ class ControlApiInvestigationHopLadderTest {
             default -> Optional.empty();
         });
         try (Ctx c = open(cfg, root)) {
-            assertEquals(200, send(c.port, "POST", "/inv/investigations", "{\"id\":\"g\",\"dataset\":\"calls_ds\","
+            assertEquals(200, send(c.port, "POST", "/inv/investigations", "{\"purpose\":\"test\",\"id\":\"g\",\"dataset\":\"calls_ds\","
                     + "\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"timeCol\":\"ts\"}", "Bearer owner").statusCode());
             String w = "{\"op\":\"window\",\"window\":" + SLOT + "}";
             assertEquals(403, send(c.port, "POST", "/inv/investigations/g/ops", w, "Bearer plain").statusCode());

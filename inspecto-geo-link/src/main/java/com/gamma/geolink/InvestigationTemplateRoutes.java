@@ -172,7 +172,8 @@ public final class InvestigationTemplateRoutes implements RouteModule {
 
     /**
      * {@code POST /inv/investigation-templates/{id}/instantiate} — body
-     * {@code {id?, title?, params: {seed1: [ids…], …}, dataset?, sourceCol?, targetCol?, linkKindCol?}}. The Dataset
+     * {@code {id?, title?, purpose, params: {seed1: [ids…], …}, dataset?, sourceCol?, targetCol?, linkKindCol?}} —
+     * {@code purpose} is required as on create (D-U5), because instantiating MINTS an Investigation. The Dataset
      * and column names default to the template's; the ROLES are the template's and cannot be dropped (a template
      * that bound a link-kind column binds one here too). Gates: the template (503 · 422 · 403 · 404) → a missing,
      * empty or unknown parameter 422 → then {@link InvestigationRoutes#instantiate}'s own (column 422 → Dataset 404
@@ -201,6 +202,7 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         String id = ApiContext.str(body, "id");
         header.put("id", id != null ? id : "inv-" + UUID.randomUUID());
         header.put("title", ApiContext.str(body, "title"));
+        header.put("purpose", ApiContext.str(body, "purpose"));   // D-U5: required — checked by instantiate()
         for (String key : List.of("dataset", "sourceCol", "targetCol", "linkKindCol", "timeCol", "timeColZone")) {
             String override = ApiContext.str(body, key);
             header.put(key, override != null && roles.get(key) != null ? override : roles.get(key));

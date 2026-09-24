@@ -690,6 +690,12 @@ umbrella (that is one specific Note kind), ⛔ never "metadata" (that is Catalog
 writable component type — Dataset, Dashboard, Widget, and the saved `link-analysis-view` /
 `geo-map-view`. Widening the component registry widens Annotation Targets automatically.
 
+**Admiralty grade** — The two-axis grade an analyst puts on an Investigation annotation (Link Analysis `annotate`
+op, LA-19 / D-U9, 2026-09-24): the standard NATO/Admiralty scale, **source reliability A–F** (F = cannot be judged)
+× **information credibility 1–6** (6 = cannot be judged), written as one token such as `B2`. Carried on the wire
+as the op's `confidence` parameter. ⛔ never a 0–1 float, and not the same thing as the schema-overlap
+`high`/`medium` inference or a Tool Evidence confidence.
+
 **Tag** — A **user-created** label attached to any **Annotation Target** for cross-cutting
 grouping/filtering (the mail metaphor's "labels"). Applied **manually** (in bulk over a selection)
 or **by a Tag Rule**. ⛔ never "Label". *(Generalized beyond Incidents/Cases by D7, 2026-07-26/27 — it

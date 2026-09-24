@@ -686,14 +686,24 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   Set ids through the same `store.apply` path as exclude; the notes render from the sealed state's
   `annotations` (ABSENT when empty) as an *Annotations* list and under the selected entity, and the log line is
   the server's own text. Undo needs nothing special: the store re-reads `/replay`, whose state no longer carries
-  the note. A 422 (an id not in the Working Set, an over-long note) is the panel's error alert. ⛔ `confidence`
-  is never asked or sent — its scale is undecided (D-U9) and the server refuses it. *Check coverage* reads
+  the note. A 422 (an id not in the Working Set, an over-long note) is the panel's error alert. `confidence` is
+  never asked or sent by the panel; since D-U9 (2026-09-24) the server accepts an Admiralty grade (`B2`: source
+  reliability A–F × information credibility 1–6), and the *Annotations* list shows one in brackets when present. *Check coverage* reads
   `GET …/coverage` with NO query parameters, i.e. over the Investigation's own window (the service accepts
   `from`/`to`/`timezone`; no picker asks for them yet), and names every day with zero rows in the window's zone,
   or says every day has data; it always states that per-Collector coverage is not assessed
   (`collectors.assessed:false`). A result is shown only while its Investigation is the open one. ⚠ The route
   needs a `timeCol` in the header and a bounded window, and *Start Investigation* sends no `timeCol` — so an
   Investigation started from this panel answers coverage with a 422, shown verbatim.
+* **Purpose, masking, four-eyes** (LA-19 operator decisions 2026-09-24, D-U5/D-U6/D-U7 — decision record in
+  `docs/superpower/link-analysis-backlog-plan.md` §4). *Start Investigation* now REQUIRES a *Purpose / legal
+  basis* field (the server answers 422 without one) and the template *Instantiate* form carries the same required
+  field; the value is sealed in the header and shown in the Dossier, never enforced. Entity ids in every
+  Investigation response may arrive MASKED as `masked:<16 hex>` per the Space's `maskingMode` (default `typed`:
+  ids seeded with `entityType` MSISDN / IMSI / ACCOUNT, or every id when a bound Dataset column is classified as
+  one); the panel shows the pseudonym as given and may send it back in an op's `ids` — the server resolves it.
+  ⚠ The panel has NO UI yet for `POST …/reveal`, for approving/denying a pending expand, or for rendering an expand
+  answered `{status:"pending"}` (only reachable when a Space sets a four-eyes threshold).
 * ✅ **The feed is INGESTED, not merely authored** (verified end to end 2026-09-23): 1 283/1 283 rows land
   across three Hive partitions, `rejected_files=0`, `rejected_rows=0`, `cast_failures=0`, and every row
   reconciles to the source PSV by `REC_SEQ` with zero value mismatches. `IMEI` keeps its leading zeros as

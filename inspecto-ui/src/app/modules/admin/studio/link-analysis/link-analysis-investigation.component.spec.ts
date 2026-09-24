@@ -147,10 +147,16 @@ describe('LinkAnalysisInvestigationComponent (LA-10)', () => {
         expect(el.textContent).toContain('no server-side list');
         await expectNoA11yViolations(el);
 
+        // D-U5: no purpose, no start — the server would answer 422.
+        expect(button('Start Investigation').disabled).toBe(true);
+        const purpose = el.querySelector('input[required]') as HTMLInputElement;
+        purpose.value = 'warrant 7';
+        purpose.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
         button('Start Investigation').click();
         await fixture.whenStable();
         expect(inv.createInvestigation).toHaveBeenCalledWith(
-            expect.objectContaining({ dataset: 'calls', sourceCol: 'A', targetCol: 'B' }),
+            expect.objectContaining({ purpose: 'warrant 7', dataset: 'calls', sourceCol: 'A', targetCol: 'B' }),
         );
     });
 

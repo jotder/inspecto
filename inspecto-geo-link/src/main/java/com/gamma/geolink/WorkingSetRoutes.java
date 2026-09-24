@@ -58,6 +58,9 @@ import java.util.Map;
  * Investigation-scoped route is the ONLY way to read it — exposing it to BI waits for a Widget binding that carries
  * the D-E7 gate with it (LA-21).
  *
+ * <p><b>Masked (LA-19, D-U6).</b> Entity ids in the answer are masked per the Space's {@code maskingMode}
+ * ({@link EntityMasking}); the answer carries a {@code masking} note saying what was masked and why.
+ *
  * <p>A {@code GET}: reads are open by policy (no capability — {@code route-gating.md}), so the gate is the row
  * rule above, not a capability. Audited per the LA-04 query pattern.
  *
@@ -134,7 +137,11 @@ public final class WorkingSetRoutes implements RouteModule {
         out.put("head", head);
         out.put("key", rel.key());
         out.put("cached", cached[0]);
-        return out;
+        // D-U6: masked on the way out, AFTER the cache — the cached relation holds raw ids, the answer never does.
+        EntityMasking mask = EntityMasking.of(inv, List.of());
+        @SuppressWarnings("unchecked") Map<String, Object> masked = (Map<String, Object>) mask.apply(out);
+        masked.put("masking", mask.describe());
+        return masked;
     }
 
     /** The resolved Investigation as the PDP sees it — {@code resource.*} in an Access Policy's {@code when}. */

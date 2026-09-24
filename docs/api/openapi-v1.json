@@ -7404,6 +7404,89 @@
         "x-optional-module" : true
       }
     },
+    "/inv/investigations/{investigationId}/reveal" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/investigations/{investigationId}/reveal (generated skeleton)",
+        "operationId" : "postInvInvestigationsByInvestigationIdReveal",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/inv/investigations/{investigationId}/pending/{pendingId}/approve" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/investigations/{investigationId}/pending/{pendingId}/approve (generated skeleton)",
+        "operationId" : "postInvInvestigationsByInvestigationIdPendingByPendingIdApprove",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "pendingId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/inv/investigations/{investigationId}/pending/{pendingId}/deny" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/investigations/{investigationId}/pending/{pendingId}/deny (generated skeleton)",
+        "operationId" : "postInvInvestigationsByInvestigationIdPendingByPendingIdDeny",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "investigationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "pendingId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
     "/inv/investigations/{investigationId}/dossier" : {
       "get" : {
         "tags" : [ "inv" ],

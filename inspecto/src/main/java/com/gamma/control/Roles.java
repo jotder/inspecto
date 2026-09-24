@@ -105,6 +105,20 @@ public final class Roles {
      */
     public static final String CAN_MANAGE_INCIDENTS    = "canManageIncidents";
 
+    /**
+     * Revealing a MASKED entity id in a Link Analysis Investigation ({@code POST /inv/investigations/{id}/reveal},
+     * LA-19 / D-U6, operator 2026-09-24): per entity, audited. ⛔ Deliberately NOT {@code canManageIncidents} —
+     * every Investigation owner holds that, so it would make masking a formality.
+     */
+    public static final String CAN_REVEAL_LINK_ENTITIES = "canRevealLinkEntities";
+
+    /**
+     * Approving (or denying) a PENDING sensitive expand in someone else's Investigation — four-eyes, LA-19 /
+     * D-U7, operator 2026-09-24. The approver must be a DIFFERENT Subject from the requester; holding this
+     * capability never makes self-approval legal.
+     */
+    public static final String CAN_APPROVE_LINK_EXPANSIONS = "canApproveLinkExpansions";
+
     /** The capability vocabulary = exactly what the route gates demand ({@link CapabilityManifest},
      *  R4) — the 422 validation set for authored roles and Access-Catalog action nodes. */
     static final Set<String> KNOWN_CAPABILITIES = Set.copyOf(CapabilityManifest.capabilities());
@@ -155,9 +169,11 @@ public final class Roles {
         m.put("developer", new Def(builder, null));
         m.put("operations", new Def(ops, null));
         m.put("support", new Def(ops, null));
+        // LA-19: revealing a masked entity and approving a sensitive expand are oversight acts, so they sit with
+        // Admin (and Super, which holds everything) — NOT with the analyst roles that own Investigations.
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
                 CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER,
-                CAN_MANAGE_INCIDENTS), null));
+                CAN_MANAGE_INCIDENTS, CAN_REVEAL_LINK_ENTITIES, CAN_APPROVE_LINK_EXPANSIONS), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,
                 CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_MANAGE_INCIDENTS), null));
         m.put("super", new Def(KNOWN_CAPABILITIES, null));

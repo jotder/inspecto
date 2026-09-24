@@ -67,7 +67,7 @@ class ControlApiInvestigationPolicyTest {
     void anAuthoredPolicyDenyHidesTheWorkingSetEvenFromItsOwner(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             assertEquals(200, send(c.port, "POST", "/inv/investigations",
-                    "{\"id\":\"case-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}",
+                    "{\"purpose\":\"test\",\"id\":\"case-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"}",
                     "owner").statusCode());
             assertEquals(200, send(c.port, "POST", "/inv/investigations/case-a/ops",
                     "{\"op\":\"seed\",\"ids\":[\"alice\"]}", "owner").statusCode());

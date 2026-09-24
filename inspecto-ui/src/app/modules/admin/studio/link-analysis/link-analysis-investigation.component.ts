@@ -76,6 +76,11 @@ export class LinkAnalysisInvestigationComponent {
     readonly projectionIssue = input('');
 
     readonly title = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(200)] });
+    /** D-U5: the stated purpose / legal basis — required by the server, recorded and shown in the Dossier, not enforced. */
+    readonly purpose = new FormControl('', {
+        nonNullable: true,
+        validators: [Validators.required, Validators.pattern(/\S/), Validators.maxLength(1000)],
+    });
     readonly reason = new FormControl('', {
         nonNullable: true,
         validators: [Validators.required, Validators.maxLength(200)],
@@ -156,8 +161,11 @@ export class LinkAnalysisInvestigationComponent {
 
     async start(): Promise<void> {
         const p = this.projection();
-        if (!p || this.title.invalid) return;
-        if (await this.store.start(p, this.title.value.trim())) this.title.reset('');
+        if (!p || this.title.invalid || this.purpose.invalid) return;
+        if (await this.store.start(p, this.purpose.value.trim(), this.title.value.trim())) {
+            this.title.reset('');
+            this.purpose.reset('');
+        }
     }
 
     switchTo(id: string | null): void {

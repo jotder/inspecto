@@ -37,7 +37,7 @@ import java.util.TreeSet;
  *       reports it as {@code protected} rather than silently succeeding.</li>
  *   <li>{@code hide {ids}} — display-only: still traversed and counted (the difference from exclude).</li>
  *   <li>{@code keep {ids}} — pins an entity against later excludes.</li>
- *   <li>{@code annotate {ids, note}} (LA-19) — attaches the note to each named entity in the Working Set. It changes
+ *   <li>{@code annotate {ids, note, confidence?}} (LA-19; {@code confidence} is an Admiralty grade, D-U9) — attaches the note to each named entity in the Working Set. It changes
  *       nothing about traversal, display or counts; a later exclusion keeps the note, because a note is history.</li>
  *   <li>{@code window {window}} (LA-13) — sets the window later {@code expand}s inherit ({@code null} clears it).
  *       It re-filters nothing already admitted: a sealed row is a folded count with no timestamps left in it, and
@@ -69,8 +69,8 @@ final class InvestigationEvaluator {
     /** Why an id is excluded, and by which step. */
     record Exclusion(int step, String reason) {}
 
-    /** One analyst note on one entity (LA-19), and the step that made it. */
-    record Annotation(int step, String note) {}
+    /** One analyst note on one entity (LA-19), the step that made it, and its Admiralty grade (D-U9; null = none). */
+    record Annotation(int step, String note, String confidence) {}
 
     /** The Working Set at one log position. Mutable only inside this class. */
     static final class State {
@@ -131,6 +131,8 @@ final class InvestigationEvaluator {
                         m.put("id", a.getKey());
                         m.put("step", n.step());
                         m.put("note", n.note());
+                        // Only when graded (D-U9): an ungraded note hashes exactly as it did before the grade existed.
+                        if (n.confidence() != null) m.put("confidence", n.confidence());
                         as.add(m);
                     }
                 out.put("annotations", as);
@@ -268,9 +270,11 @@ final class InvestigationEvaluator {
             case "window" -> s.window = p.get("window") instanceof Map<?, ?> w ? (Map<String, Object>) w : null;
             case "annotate" -> {
                 String note = String.valueOf(p.get("note"));
+                String confidence = p.get("confidence") == null ? null : String.valueOf(p.get("confidence"));
                 for (String id : ids)
                     if (s.entities.containsKey(id))
-                        s.annotations.computeIfAbsent(id, k -> new ArrayList<>()).add(new Annotation(step, note));
+                        s.annotations.computeIfAbsent(id, k -> new ArrayList<>())
+                                .add(new Annotation(step, note, confidence));
             }
             default -> throw new IllegalStateException("op '" + entry.get("op") + "' in a sealed log is not evaluable");
         }

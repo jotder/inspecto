@@ -44,6 +44,11 @@ import java.util.function.UnaryOperator;
  * does not depend on when it was built — so neither is capability-gated: the GET is a read, the verify POST takes the
  * read-shaped exemption. Both are audited (LA-04), because issuing and checking evidence are acts the trail must show.
  *
+ * <p><b>Masked (LA-19, D-U6).</b> The dossier's entity ids — in the lists, the ledger, the three renderings and the
+ * embedded snapshots' score tables — are masked per the Space's {@code maskingMode} ({@link EntityMasking}). The
+ * manifest carries only hashes, over the RAW store, so {@code verify} is unaffected; a reader holding a masked dossier
+ * verifies custody through the route, not by re-hashing the masked lists.
+ *
  * <p>⚠ {@code open()} duplicates {@code InvestigationRoutes.open} rather than sharing it, to leave that class
  * untouched under a parallel lane; fold them together later (as {@code relationFor} is already duplicated there).
  */
@@ -58,7 +63,7 @@ public final class DossierRoutes implements RouteModule {
         api.post("/inv/investigations/([^/]+)/dossier/verify", (e, m) -> verify(api, e, m.group(1), api.body(e)));
     }
 
-    private record Opened(SnapshotStore store, Path writeRoot, String id, String headerRaw) {}
+    private record Opened(InvestigationRoutes.Inv inv, SnapshotStore store, Path writeRoot, String id, String headerRaw) {}
 
     /** {@code GET /inv/investigations/{id}/dossier}. Gates: 503 → 422 id → 404 absent/not owner/R3 → 422 params. */
     private Object dossier(ApiContext api, HttpExchange ex, String id) throws IOException {
@@ -86,7 +91,11 @@ public final class DossierRoutes implements RouteModule {
             for (String s : rawSnaps.split(",")) if (!s.isBlank()) snapshotIds.add(s.trim());
 
         GraphDossierBuilder.Input in = input(inv, log, at, snapshots(ex, inv, snapshotIds, true));
-        Map<String, Object> dossier = GraphDossierBuilder.build(in);
+        Map<String, Object> built = GraphDossierBuilder.build(in);
+        // D-U6: the dossier is masked as it leaves — the manifest (hashes only) is unaffected, and custody is
+        // verified against the store by /dossier/verify, which never sees a pseudonym.
+        EntityMasking mask = EntityMasking.of(inv.inv(), snapshotEntityIds(in.snapshots()));
+        @SuppressWarnings("unchecked") Map<String, Object> dossier = (Map<String, Object>) mask.apply(built);
         @SuppressWarnings("unchecked") Map<String, Object> manifest = (Map<String, Object>) dossier.get("manifest");
         @SuppressWarnings("unchecked") Map<String, Object> integrity = (Map<String, Object>) dossier.get("integrity");
         int stepsAt = at;
@@ -101,6 +110,7 @@ public final class DossierRoutes implements RouteModule {
         out.put("id", id);
         out.put("generatedAt", java.time.Instant.now().toString());   // NOT part of the manifest root
         out.putAll(dossier);
+        out.put("masking", mask.describe());
         @SuppressWarnings("unchecked") Map<String, Object> renderings = (Map<String, Object>) dossier.get("renderings");
         return switch (format) {
             case "steps" -> ApiContext.respondText(ex,
@@ -198,7 +208,21 @@ public final class DossierRoutes implements RouteModule {
         InvestigationRoutes.Inv inv = InvestigationRoutes.open(api, ex, id);
         String raw = inv.store().readInvestigation(id);
         if (raw == null) throw new ApiException(404, "no investigation '" + id + "'");
-        return new Opened(inv.store(), inv.writeRoot(), id, raw);
+        return new Opened(inv, inv.store(), inv.writeRoot(), id, raw);
+    }
+
+    /** The node ids an included snapshot carries (its {@code nodes[].id} and score-vector keys) — so that
+     *  {@code maskingMode all} masks them in the score tables too, not only the ids the log names. */
+    private static List<String> snapshotEntityIds(List<GraphDossierBuilder.Snapshot> snaps) throws IOException {
+        List<String> out = new ArrayList<>();
+        for (GraphDossierBuilder.Snapshot s : snaps) {
+            @SuppressWarnings("unchecked") Map<String, Object> snap = ApiContext.JSON.readValue(s.raw(), Map.class);
+            if (snap.get("nodes") instanceof List<?> nodes)
+                for (Object n : nodes) if (n instanceof Map<?, ?> m && m.get("id") != null) out.add(String.valueOf(m.get("id")));
+            if (snap.get("metrics") instanceof Map<?, ?> metrics)
+                for (Object v : metrics.values()) if (v instanceof Map<?, ?> vector) for (Object k : vector.keySet()) out.add(String.valueOf(k));
+        }
+        return out;
     }
 
     private static List<String> castStrings(Object o) {

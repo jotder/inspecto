@@ -42,7 +42,7 @@ class ControlApiDossierTest {
     private static final String ROWS = "('alice','bob','sms'),('alice','bob','sms'),('alice','carol','call'),"
             + "('bob','dave','call'),('bob','erin','sms'),('carol','frank','call')";
     private static final String CREATE =
-            "{\"id\":\"case-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}";
+            "{\"purpose\":\"test\",\"id\":\"case-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}";
     private final HttpClient client = HttpClient.newHttpClient();
 
     private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {

@@ -100,6 +100,7 @@ describe('InstantiateTemplateDialog (LA-23)', () => {
         const specs = instantiateSpecs({ ...TEMPLATE, roles: { ...TEMPLATE.roles, linkKindCol: 'KIND' } });
         expect(specs.map((s) => s.key)).toEqual([
             'title',
+            'purpose',
             'param:seed1',
             'dataset',
             'sourceCol',
@@ -130,11 +131,12 @@ describe('InstantiateTemplateDialog (LA-23)', () => {
         const form = (
             c as unknown as { schemaForm: () => { form: { patchValue: (v: unknown) => void } } }
         ).schemaForm();
-        form.form.patchValue({ 'param:seed1': ['4471', '4480'], dataset: 'calls_2024' });
+        form.form.patchValue({ purpose: 'warrant 7', 'param:seed1': ['4471', '4480'], dataset: 'calls_2024' });
         await c.instantiate();
         expect(instantiateTemplate).toHaveBeenCalledWith('tpl-1', {
             params: { seed1: ['4471', '4480'] },
             title: undefined,
+            purpose: 'warrant 7',
             dataset: 'calls_2024',
             sourceCol: 'A',
             targetCol: 'B',

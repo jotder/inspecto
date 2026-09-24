@@ -30,7 +30,20 @@
                     <mat-error>At most 200 characters.</mat-error>
                 }
             </mat-form-field>
-            <button mat-flat-button color="primary" [disabled]="store.busy() || title.invalid" (click)="start()">
+            <mat-form-field class="w-full" subscriptSizing="dynamic">
+                <mat-label>Purpose / legal basis</mat-label>
+                <input matInput required [formControl]="purpose" />
+                <mat-hint>Recorded with the Investigation and shown in its Dossier.</mat-hint>
+                @if (purpose.hasError('maxlength')) {
+                    <mat-error>At most 1000 characters.</mat-error>
+                }
+            </mat-form-field>
+            <button
+                mat-flat-button
+                color="primary"
+                [disabled]="store.busy() || title.invalid || purpose.invalid"
+                (click)="start()"
+            >
                 Start Investigation
             </button>
         } @else {
@@ -240,7 +253,8 @@
                 <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
                     @for (a of store.workingSet()!.annotations; track a.step + ':' + a.id) {
                         <li>
-                            <strong>{{ a.id }}</strong> — {{ a.note }} (step {{ a.step }})
+                            <strong>{{ a.id }}</strong> — {{ a.note }}{{ a.confidence ? ' [' + a.confidence + ']' : '' }}
+                            (step {{ a.step }})
                         </li>
                     }
                 </ul>

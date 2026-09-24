@@ -203,6 +203,37 @@ class ControlApiSettingsTest {
         }
     }
 
+    /** LA-19 (D-U6, D-U7): the masking mode and the two four-eyes thresholds share the document and its rules. */
+    @Test
+    void linkAnalysisMaskingAndFourEyesRoundTripAndRefuseBadValues(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            JsonNode def = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertTrue(def.get("maskingMode").isNull() && def.get("fourEyesBudgetAbove").isNull()
+                    && def.get("fourEyesFanOutAbove").isNull(), "absent ⇒ inherit: typed masking, no four-eyes");
+
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"maskingMode\":\"ALL\",\"fourEyesBudgetAbove\":5000,\"fourEyesFanOutAbove\":25}");
+            assertEquals(200, put.statusCode(), put.body());
+            assertEquals("all", json(put).get("maskingMode").asText(), "normalised to the declared spelling");
+            String toon = Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"));
+            assertTrue(toon.contains("masking_mode: all") && toon.contains("four_eyes_budget_above: 5000")
+                    && toon.contains("four_eyes_fan_out_above: 25"), toon);
+            JsonNode got = json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null));
+            assertEquals(5000, got.get("fourEyesBudgetAbove").asInt());
+            assertEquals(25, got.get("fourEyesFanOutAbove").asInt());
+
+            HttpResponse<String> bad = send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"maskingMode\":\"some\"}");
+            assertEquals(422, bad.statusCode(), bad.body());
+            assertTrue(bad.body().contains("[typed, all, none]"), "the 422 names the declared modes: " + bad.body());
+            assertEquals(422, send(c.port, "PUT", "/spaces/acme/settings/link-analysis",
+                    "{\"fourEyesBudgetAbove\":0}").statusCode());
+            assertEquals("all", json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null))
+                    .get("maskingMode").asText(), "a refused write left the last good values standing");
+        }
+    }
+
     /**
      * The capability gate on the settings writes, exercised with an ARMED Authenticator.
      *

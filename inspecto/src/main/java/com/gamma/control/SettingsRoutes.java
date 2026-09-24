@@ -12,9 +12,9 @@ import java.util.Map;
  *   PUT /settings/branding   replace the space's branding (write-root gated, capability-gated)         [v4.10.0]
  *   GET /settings/geo        the space's {tileServerUrl} (null = no self-hosted tile server)
  *   PUT /settings/geo        replace the space's geo/tile-server config (same gates as branding)
- *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap}
- *                                 (nulls = shipped defaults)
- *   PUT /settings/link-analysis   replace the space's Link Analysis caps (same gates as branding)
+ *   GET /settings/link-analysis   the space's {projectionNodeCap, analysisNodeCap, suspicionNodeCap,
+ *                                 maskingMode, fourEyesBudgetAbove, fourEyesFanOutAbove} (nulls = shipped defaults)
+ *   PUT /settings/link-analysis   replace the space's Link Analysis settings (same gates as branding)
  *   GET /config/icon-map     the space's processor-icon map { "&lt;type&gt;": {glyph,color}, … } ({} = none) [v5.0.0]
  *   PUT /config/icon-map     replace the space's icon map (same gates as branding)                          [v5.0.0]
  * </pre>
@@ -111,7 +111,8 @@ final class SettingsRoutes implements RouteModule {
     private Object writeLinkAnalysis(ApiContext api, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "link-analysis settings write");
         LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
-                nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"));
+                nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
+                nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -122,7 +123,22 @@ final class SettingsRoutes implements RouteModule {
         m.put("projectionNodeCap", s.projectionNodeCap());
         m.put("analysisNodeCap", s.analysisNodeCap());
         m.put("suspicionNodeCap", s.suspicionNodeCap());
+        m.put("maskingMode", s.maskingMode());
+        m.put("fourEyesBudgetAbove", s.fourEyesBudgetAbove());
+        m.put("fourEyesFanOutAbove", s.fourEyesFanOutAbove());
         return m;
+    }
+
+    /** A stated masking mode (D-U6): {@code null}/absent = inherit the default ({@code typed}); otherwise one of
+     *  {@link com.gamma.config.spec.ConfigSpecs#LINK_ANALYSIS_MASKING_MODES} or the write is refused (422). */
+    private static String maskingMode(Map<String, Object> body) {
+        Object raw = body.get("maskingMode");
+        if (raw == null) return null;
+        String v = LinkAnalysisSettings.maskingMode(String.valueOf(raw));
+        if (v == null)
+            throw new ApiException(422, "maskingMode must be one of "
+                    + com.gamma.config.spec.ConfigSpecs.LINK_ANALYSIS_MASKING_MODES + ", got '" + raw + "'");
+        return v;
     }
 
     /** A stated node cap: {@code null}/absent = inherit the shipped default; otherwise an int in

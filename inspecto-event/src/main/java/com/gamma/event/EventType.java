@@ -220,6 +220,19 @@ public final class EventType {
      *  /inv/investigations/{id}/alert-rules}, LA-23) by the Investigation's owner. {@code rule},
      *  {@code investigationId}, {@code relation}, {@code measure}, {@code threshold}. */
     public static final String LINK_INVESTIGATION_ALERT_RULE_BOUND = "LINK_INVESTIGATION_ALERT_RULE_BOUND";
+    /** Masked entity ids of an Investigation were revealed ({@code POST /inv/investigations/{id}/reveal}, LA-19 /
+     *  D-U6) — per entity, by a holder of {@code canRevealLinkEntities}. {@code investigationId}, {@code tokens}
+     *  (the pseudonyms revealed — never the raw values, so the trail does not re-leak them) and {@code count}. */
+    public static final String LINK_ENTITY_REVEALED = "LINK_ENTITY_REVEALED";
+    /** A sensitive expand was held for four-eyes approval instead of running (LA-19 / D-U7). {@code investigationId},
+     *  {@code requestId}, {@code budget}, {@code maxFanOut} and the thresholds it exceeded. Nothing was read. */
+    public static final String LINK_EXPANSION_REQUESTED = "LINK_EXPANSION_REQUESTED";
+    /** A pending sensitive expand was approved by a DIFFERENT Subject and ran (LA-19 / D-U7). {@code investigationId},
+     *  {@code requestId}, {@code requestedBy}, {@code step} (the log step it sealed). */
+    public static final String LINK_EXPANSION_APPROVED = "LINK_EXPANSION_APPROVED";
+    /** A pending sensitive expand was denied (LA-19 / D-U7); it never ran. {@code investigationId}, {@code requestId},
+     *  {@code requestedBy}, {@code reason}. */
+    public static final String LINK_EXPANSION_DENIED = "LINK_EXPANSION_DENIED";
     /** A Geo point projection was served over a Dataset ({@code POST /geo/projection}); {@code dataset},
      *  {@code points}, {@code truncated} and {@code skipped} carry the served result. */
     public static final String GEO_PROJECTED = "GEO_PROJECTED";

@@ -43,6 +43,11 @@ final class CapabilityManifest {
             // InvestigationMeasureRoutes (LA-23) — binding an Alert Rule arms it, so it is alert authoring, as
             // POST /alerts/rules is; the Investigation's owner-only / PDP gate applies on top.
             new Entry("POST", "/inv/investigations/([^/]+)/alert-rules", Roles.CAN_AUTHOR_ALERT_RULES),
+            // InvestigationRoutes, LA-19 controls (operator 2026-09-24) — revealing a masked entity (D-U6) and
+            // deciding a pending sensitive expand (D-U7, four-eyes) are oversight acts with their own capabilities.
+            new Entry("POST", "/inv/investigations/([^/]+)/reveal", Roles.CAN_REVEAL_LINK_ENTITIES),
+            new Entry("POST", "/inv/investigations/([^/]+)/pending/([^/]+)/approve", Roles.CAN_APPROVE_LINK_EXPANSIONS),
+            new Entry("POST", "/inv/investigations/([^/]+)/pending/([^/]+)/deny", Roles.CAN_APPROVE_LINK_EXPANSIONS),
             // AccessRoutes
             new Entry("PUT", "/access/roles", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/policies", Roles.CAN_CONFIGURE_ACCESS),

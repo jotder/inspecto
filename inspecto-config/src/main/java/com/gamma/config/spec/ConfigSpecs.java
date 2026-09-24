@@ -923,6 +923,39 @@ public final class ConfigSpecs {
                         })));
     }
 
+    // ── link-analysis settings (a per-Space settings document, NOT a component type) ─────────────
+
+    /** Entity masking modes for Link Analysis responses (LA-19, D-U6) — the FIRST is the default. */
+    public static final List<String> LINK_ANALYSIS_MASKING_MODES = List.of("typed", "all", "none");
+
+    /**
+     * The keys of a Space's {@code link-analysis.toon} ({@code GET|PUT /settings/link-analysis}). ⚠ Deliberately
+     * NOT in {@link #TYPES}: this is a per-Space preference document, not a registry component, so
+     * {@code /config/spec/{type}} and the generic config write routes must not accept it. Every key is optional and
+     * an absent key means "the shipped default" — never "unbounded" and never "off by accident".
+     */
+    public static ConfigSpec linkAnalysisSettings() {
+        List<FieldSpec> fields = List.of(
+                FieldSpec.of("projection_node_cap", "Projection node cap", FieldType.INT,
+                        "Nodes admitted to one projection (1..100000); absent = the shipped default."),
+                FieldSpec.of("analysis_node_cap", "Analysis node cap", FieldType.INT,
+                        "Nodes above which the browser-side graph algorithms refuse; absent = the shipped default."),
+                FieldSpec.of("suspicion_node_cap", "Suspicion score node cap", FieldType.INT,
+                        "Nodes above which suspicion score alone refuses (D-S3); absent = the shipped default."),
+                FieldSpec.enumField("masking_mode", "Entity masking", LINK_ANALYSIS_MASKING_MODES,
+                        LINK_ANALYSIS_MASKING_MODES.get(0),
+                        "Which entity ids Investigation responses mask (D-U6): typed = typed identifiers "
+                                + "(MSISDN, IMSI, ACCOUNT), all = every entity id, none = nothing."),
+                FieldSpec.of("four_eyes_budget_above", "Four-eyes budget threshold", FieldType.INT,
+                        "An expand whose row budget exceeds this waits for a second person's approval (D-U7); "
+                                + "absent = no budget threshold."),
+                FieldSpec.of("four_eyes_fan_out_above", "Four-eyes fan-out threshold", FieldType.INT,
+                        "An expand whose maxFanOut exceeds this, or is unbounded, waits for a second person's "
+                                + "approval (D-U7); absent = no fan-out threshold.")
+        );
+        return new ConfigSpec("link-analysis-settings", fields, List.of());
+    }
+
     /**
      * Whether {@code path} holds a block an author actually wrote. ⚠ Stricter than
      * {@link RawConfig#present}: an empty {@code steps: []} or {@code dedup: {}} is not an authored

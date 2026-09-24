@@ -91,7 +91,7 @@ class ControlApiInvestigationEvidentialControlsTest {
     }
 
     private void create(Ctx c, String id, boolean timed) throws Exception {
-        post(c, "/inv/investigations", "{\"id\":\"" + id + "\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\","
+        post(c, "/inv/investigations", "{\"purpose\":\"test\",\"id\":\"" + id + "\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\","
                 + "\"targetCol\":\"callee\",\"linkKindCol\":\"channel\""
                 + (timed ? ",\"timeCol\":\"ts\",\"timeColZone\":\"America/Sao_Paulo\"" : "") + "}");
     }
@@ -111,7 +111,8 @@ class ControlApiInvestigationEvidentialControlsTest {
             assertEquals(expanded.at("/workingSet/entities").asInt(), step.at("/workingSet/entities").asInt());
             assertFalse(before.equals(step.at("/workingSet/hash").asText()), "the note is part of the sealed state");
 
-            // Refusals: not in the Working Set, no note, and the undecided confidence scale — each 422, nothing written.
+            // Refusals: not in the Working Set, no note, and a 0-1 confidence (the scale is the Admiralty grade, D-U9 —
+            // ControlApiInvestigationOversightTest) — each 422, nothing written.
             assertEquals(422, status(c, "POST", ops, "{\"op\":\"annotate\",\"ids\":[\"zz\"],\"note\":\"x\"}"));
             assertEquals(422, status(c, "POST", ops, "{\"op\":\"annotate\",\"ids\":[\"b\"]}"));
             assertEquals(422, status(c, "POST", ops, "{\"op\":\"annotate\",\"ids\":[\"b\"],\"note\":\"x\",\"confidence\":0.9}"));
@@ -208,7 +209,7 @@ class ControlApiInvestigationEvidentialControlsTest {
             default -> Optional.empty();
         });
         try (Ctx c = open(cfg, root)) {
-            assertEquals(200, send(c.port, "POST", "/inv/investigations", "{\"id\":\"case-a\",\"dataset\":\"calls_ds\","
+            assertEquals(200, send(c.port, "POST", "/inv/investigations", "{\"purpose\":\"test\",\"id\":\"case-a\",\"dataset\":\"calls_ds\","
                     + "\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"timeCol\":\"ts\"}", "Bearer owner").statusCode());
             String ops = "/inv/investigations/case-a/ops";
             assertEquals(200, send(c.port, "POST", ops, "{\"op\":\"seed\",\"ids\":[\"a\"]}", "Bearer owner").statusCode());

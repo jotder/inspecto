@@ -235,6 +235,7 @@ final class GraphDossierBuilder {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("investigation", in.id());
         m.put("title", header.get("title"));
+        m.put("purpose", header.get("purpose"));   // D-U5: the stated purpose / legal basis — recorded, not enforced
         m.put("owner", header.get("owner"));
         m.put("createdAt", header.get("createdAt"));
         m.put("dataset", header.get("dataset"));
@@ -437,8 +438,8 @@ final class GraphDossierBuilder {
             entries.add(out);
         }
         Map<String, Object> bindings = new LinkedHashMap<>();
-        for (String k : List.of("id", "dataset", "sourceCol", "targetCol", "linkKindCol", "timeCol", "timeColZone",
-                "datasetVersion", "parent"))
+        for (String k : List.of("id", "purpose", "dataset", "sourceCol", "targetCol", "linkKindCol", "timeCol",
+                "timeColZone", "datasetVersion", "parent"))
             bindings.put(k, header.get(k));
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("investigation", bindings);
@@ -465,7 +466,11 @@ final class GraphDossierBuilder {
         StringBuilder b = new StringBuilder();
         b.append("Method statement — Investigation ").append(in.id());
         if (header.get("title") != null) b.append(" (").append(header.get("title")).append(")");
-        b.append("\n\nScope. Owner ").append(header.get("owner")).append(", created ").append(header.get("createdAt"))
+        b.append("\n\nScope. ");
+        if (header.get("purpose") != null)   // D-U5 — stated at create; an Investigation before D-U5 has none
+            b.append("Stated purpose (legal basis, recorded and not enforced): ").append(header.get("purpose")).append(". ");
+        else b.append("No purpose was recorded (the Investigation predates the purpose requirement). ");
+        b.append("Owner ").append(header.get("owner")).append(", created ").append(header.get("createdAt"))
          .append(". Dataset ").append(header.get("dataset")).append(", links read from ").append(header.get("sourceCol"))
          .append(" to ").append(header.get("targetCol"));
         if (header.get("linkKindCol") != null) b.append(", kind from ").append(header.get("linkKindCol"));
@@ -565,7 +570,7 @@ final class GraphDossierBuilder {
                         + (r.get("fanOutCapped") instanceof Number c && c.longValue() > 0
                                 ? ", " + c + " more left out by the fan-out cap" : "")
                         + (Boolean.TRUE.equals(r.get("truncated")) ? ", TRUNCATED at its budget of " + q.get("budget") : "")
-                        + ".";
+                        + "." + InvestigationRoutes.approvalClause(e);
             }
             case "window" -> p.get("window") == null
                     ? "Cleared the time window: later expansions read the full time range."
@@ -575,7 +580,8 @@ final class GraphDossierBuilder {
                     + " (reason: " + p.get("reason") + "): " + String.join(", ", ids) + ".";
             case "hide" -> "Hid " + head(ids) + " from display (still traversed and counted).";
             case "keep" -> "Kept " + head(ids) + " (protected from later exclusion).";
-            case "annotate" -> "Annotated " + String.join(", ", ids) + ": \"" + p.get("note") + "\"";
+            case "annotate" -> "Annotated " + String.join(", ", ids) + InvestigationRoutes.gradeClause(p)
+                    + ": \"" + p.get("note") + "\"";
             default -> "Applied " + e.get("op") + ".";
         };
     }

@@ -221,6 +221,14 @@ function seedParameters(t: InvestigationTemplate) {
 export function instantiateSpecs(t: InvestigationTemplate): AttributeSpec[] {
     const specs: AttributeSpec[] = [
         { key: 'title', label: 'Title', type: 'string', tier: 'required', required: false },
+        {
+            key: 'purpose',
+            label: 'Purpose / legal basis',
+            type: 'string',
+            tier: 'required',
+            required: true,
+            help: 'Recorded with the new Investigation and shown in its Dossier (D-U5).',
+        },
         ...seedParameters(t).map<AttributeSpec>((p) => ({
             key: `param:${p.name}`,
             label: `${p.name}${p.entityType ? ' (' + p.entityType + ')' : ''} — seed ids`,
@@ -401,6 +409,7 @@ export class InstantiateTemplateDialog {
                 this.inv.instantiateTemplate(t.id, {
                     params,
                     title: str('title'),
+                    purpose: str('purpose') ?? '',
                     dataset: str('dataset'),
                     sourceCol: str('sourceCol'),
                     targetCol: str('targetCol'),

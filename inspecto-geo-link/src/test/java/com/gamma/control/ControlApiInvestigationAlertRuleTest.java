@@ -45,7 +45,7 @@ class ControlApiInvestigationAlertRuleTest {
     private static final String ROWS = "('alice','bob','sms'),('alice','bob','sms'),('alice','carol','call'),"
             + "('bob','dave','call'),('bob','erin','sms'),('carol','frank','call')";
     private static final String CREATE =
-            "{\"id\":\"case-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}";
+            "{\"purpose\":\"test\",\"id\":\"case-a\",\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}";
     private static final String BIG_RING = "{\"name\":\"big-ring\",\"measure\":\"count\",\"comparator\":\"gte\","
             + "\"threshold\":3,\"severity\":\"CRITICAL\"}";
     private final HttpClient client = HttpClient.newHttpClient();

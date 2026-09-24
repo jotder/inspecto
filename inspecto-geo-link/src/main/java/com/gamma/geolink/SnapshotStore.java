@@ -303,6 +303,43 @@ final class SnapshotStore {
         return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
     }
 
+    // ── Pending sensitive expands (LA-19, D-U7 four-eyes) — requests OUTSIDE the sealed log ──────────────
+    //   investigations/<id>/pending/<rid>.json   status pending → approved | denied. A request is a workflow
+    // record, not evidence: nothing was read while it waits, and only an APPROVED expand enters the log (carrying
+    // who requested and who approved it). So it is rewritten in place — atomically — as its status moves, like
+    // the Alert Rule binding above, and the log, its hashes, undo, fork and the Dossier never see a pending step.
+
+    /** Write (or rewrite) one pending-expand record. */
+    void writePending(String investigationId, String requestId, String json) throws IOException {
+        Path d = investigationDir(investigationId).resolve("pending");
+        Files.createDirectories(d);
+        Path tmp = Files.createTempFile(d, ".req-", ".tmp");
+        Files.writeString(tmp, json, StandardCharsets.UTF_8);
+        Files.move(tmp, d.resolve(requestId + ".json"), java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    /** One pending-expand record, raw, or null when it was never written. */
+    String readPending(String investigationId, String requestId) throws IOException {
+        Path f = investigationDir(investigationId).resolve("pending").resolve(requestId + ".json");
+        return Files.isRegularFile(f) ? Files.readString(f, StandardCharsets.UTF_8) : null;
+    }
+
+    /** Every pending-expand record of one Investigation, raw, in request-id order. */
+    List<String> listPending(String investigationId) throws IOException {
+        Path d = investigationDir(investigationId).resolve("pending");
+        if (!Files.isDirectory(d)) return List.of();
+        List<Path> files = new ArrayList<>();
+        try (var s = Files.list(d)) {
+            s.filter(p -> p.getFileName().toString().endsWith(".json")).forEach(files::add);
+        }
+        files.sort(Comparator.comparing((Path p) -> p.getFileName().toString().length())
+                .thenComparing(p -> p.getFileName().toString()));
+        List<String> out = new ArrayList<>();
+        for (Path p : files) out.add(Files.readString(p, StandardCharsets.UTF_8));
+        return out;
+    }
+
     private static void deleteTree(Path p) throws IOException {
         try (var s = Files.walk(p)) {
             for (Path q : s.sorted(Comparator.reverseOrder()).toList()) Files.deleteIfExists(q);
