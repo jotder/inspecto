@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **34<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3** —
+> **35<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 14<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -24,9 +24,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 14<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 34<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 35<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -218,7 +218,8 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 #### Exchange & jobs
 
-- **P2** · **Bundle / Exchange — "load as draft" import** — ✅ **slices 1–2 SHIPPED 2026-09-25** (all eight calls answered that day): `POST /bundle/preview` returns advisory `integrity: [...]` findings (read-only, ungated), and the Dashboard, Widget and Dataset editors carry **Import as draft…** beside **Import…** — missing prerequisites are write-through imported first, the target opens in memory under a shared draft banner, Save goes through the editor's own `/components` route (`If-Match` for an existing id, with a diff). As-built: `okf/backend/control-plane/metadata-bundle.md`. **Still open:** authored Pipeline (design slice 5), then Link Analysis and Geo views; integrity is checked once when the draft opens, not re-checked against the edited draft before Save; a browser pass over the three editors. ⛔ Do not fake it with a cross-kind `enabled:false` stamp. → `okf/backend/control-plane/metadata-bundle.md` · design: [`superpower/bundle-load-as-draft-design.md`](superpower/bundle-load-as-draft-design.md)
+- **P2** · **Bundle / Exchange — "load as draft" import** — ✅ **slices 1–2 SHIPPED 2026-09-25** (all eight calls answered that day): `POST /bundle/preview` returns advisory `integrity: [...]` findings (read-only, ungated), and the Dashboard, Widget and Dataset editors carry **Import as draft…** beside **Import…** — missing prerequisites are write-through imported first, the target opens in memory under a shared draft banner, Save goes through the editor's own `/components` route (`If-Match` for an existing id, with a diff). As-built: `okf/backend/control-plane/metadata-bundle.md`. ✅ Slice 5 (authored Pipeline — draft in its own tab, Save = the editor's `PUT …/graph` with `If-Match` from `GET …/graph/raw`, or the New-pipeline scaffold + register + one PUT for a new id) and the pre-Save integrity re-check (Dashboard/Widget/Dataset) SHIPPED 2026-09-25. **Still open:** Link Analysis and Geo views; a pipeline draft's banner says "not checked" because `/bundle/preview` checks no pipeline references; a browser pass over the four editors. ⛔ Do not fake it with a cross-kind `enabled:false` stamp. → `okf/backend/control-plane/metadata-bundle.md` · design: [`superpower/bundle-load-as-draft-design.md`](superpower/bundle-load-as-draft-design.md)
+- **P2** · `BUNDLE-AUTHORED-PIPELINE-STORE-1` — **the `authored-pipeline` bundle kind reads and writes a different store from the Pipelines the editor edits.** It uses `PipelineStore` (`<root>/pipelines/`), while the editor and the runtime use the registered `*_pipeline.toon` files — so exporting a Pipeline that exists only as a registered file reports it missing, and an ordinary bundle import lands it where nothing runs it. Found 2026-09-25 by the load-as-draft slice 5 lane (its draft Save is unaffected: it goes through the editor's own route). Ground which store is authoritative before choosing a fix. → `okf/backend/control-plane/metadata-bundle.md`
 - **P3** · **Job framework — space-to-space comparison (residuals)** — ✅ the comparison SHIPPED 2026-09-24 (`space.comparison` Job Type + `POST /space-comparisons` on `canAdminister`; all four design decisions taken "go with recommendations", each recorded with how to reverse it in `archived-documents/plans-archive/space-comparison-design.md` §5). Left, each waiting for a real ask: (a) **a scheduled / authored cross-Space comparison** — refused by design today (no Subject ⇒ own-Space-only grant); needs a persisted, attributable, revocable grant, which is a new operator decision, not plumbing · (b) *compare every registered Space* — only with a `SpaceConfigRoot` enumeration decision (design Q1 (b) / Q4) · (c) persisting comparison rows — the data-residency call (Q3) · (d) no UI surface; API only. Predictive maintenance stays deferred to AGT-5 regardless. → `okf/backend/control-plane/jobs.md` § *Space comparison*
 
 #### API contract & vocabulary

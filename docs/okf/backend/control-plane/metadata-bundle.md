@@ -171,3 +171,10 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
 The UI side (one derivation `deriveRefs`, one format, every surface — Settings workbench + editor/library
 transfer menus) lives in the frontend bundle. Design history: `docs/archived-documents/plans-archive/`
 (`metadata-network-design.md`, `transportability-plan.md`, `metadata-bundle.md`).
+
+## Open rows this concept owns
+
+- **`BUNDLE-AUTHORED-PIPELINE-STORE-1`** — the `authored-pipeline` bundle kind reads and writes
+  `PipelineStore` (`<root>/pipelines/`), not the registered `*_pipeline.toon` files the Pipeline editor and
+  the runtime use: exporting a registered-file-only Pipeline reports it missing, and an ordinary import lands
+  it where nothing runs it. Found 2026-09-25 (load-as-draft slice 5); the draft path is unaffected.
