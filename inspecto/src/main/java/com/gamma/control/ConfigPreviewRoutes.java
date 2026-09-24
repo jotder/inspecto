@@ -34,7 +34,7 @@ final class ConfigPreviewRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/config/spec/(.+)", (e, m) -> {
             ConfigSpec spec = ConfigSpecs.forType(ApiContext.name(m));
-            if (spec == null) throw new ApiException(404, "unknown config type: " + ApiContext.name(m));
+            if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + ApiContext.name(m));
             return spec;
         });
         api.post("/validate", (e, m) -> validate(api, api.body(e)));
@@ -68,13 +68,13 @@ final class ConfigPreviewRoutes implements RouteModule {
      */
     private Object derivedSchema(ApiContext api, String pipeline) throws IOException {
         if (pipeline == null || pipeline.isBlank())
-            throw new ApiException(400, "query parameter 'pipeline' is required");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "query parameter 'pipeline' is required");
         // A bare config key, never a path: refuse separators outright rather than jailing a path.
         if (pipeline.contains("/") || pipeline.contains("\\") || pipeline.contains(".."))
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "'pipeline' must be a bare pipeline name, not a path");
 
         PipelineConfig cfg = api.service().configFor(pipeline)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + pipeline + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + pipeline + "'"));
         PipelineConfig.Schemas schemas = cfg.schemas();
 
         // ingesterClass != null is exactly the plugin path: the parser REFUSES a plugin ingester
@@ -90,7 +90,7 @@ final class ConfigPreviewRoutes implements RouteModule {
         else if (schemas.single() != null)
             out.add(derivedEntry("single", null, schemas.single(), cfg, typedSource));
         else
-            throw new ApiException(422, "pipeline '" + pipeline + "' declares no schema "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline '" + pipeline + "' declares no schema "
                     + "(a draft may be saved schema-less, but nothing can be derived from it)");
 
         Map<String, Object> body = new LinkedHashMap<>();
@@ -110,7 +110,7 @@ final class ConfigPreviewRoutes implements RouteModule {
             cols = TypeFlow.sinkColumns(schema, cfg, typedSource);
         } catch (IllegalArgumentException doesNotBind) {
             // Fail closed and name the schema: a partial answer here would read as a complete one.
-            throw new ApiException(422, "schema '" + key + "' does not compile to a valid transform: "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "schema '" + key + "' does not compile to a valid transform: "
                     + doesNotBind.getMessage());
         }
         List<Map<String, Object>> columns = new ArrayList<>();
@@ -141,7 +141,7 @@ final class ConfigPreviewRoutes implements RouteModule {
                 // loader's own message (file + line for a TOON decode refusal), never a bare 500.
                 // IllegalStateException is requireRunnable()'s shape refusal (e.g. two sinks sharing one
                 // DuckLake table, SINK-DUCKLAKE-SHARED-LAKE-DUPLICATES-1) — the author's to fix too.
-                throw new ApiException(422, refused.getMessage());
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refused.getMessage());
             }
             List<String> warnings = ConfigValidator.validate(cfg);
             Map<String, Object> decoded = ConfigLoader.filesystem().decode(configPath);
@@ -161,11 +161,11 @@ final class ConfigPreviewRoutes implements RouteModule {
         String type = ApiContext.str(body, "type");
         Object cfgObj = body.get("config");
         if (type == null || !(cfgObj instanceof Map<?, ?>)) {
-            throw new ApiException(400,
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST,
                     "body must include 'configPath', or 'type' + 'config' (a draft config map)");
         }
         ConfigSpec spec = ConfigSpecs.forType(type);
-        if (spec == null) throw new ApiException(404, "unknown config type: " + type);
+        if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
         Map<String, Object> draft = mapAt(body, "config");
         // The SAME gate every save path runs (SaveGate), so /validate reports exactly what a save would
         // refuse. 🔴 Until G3 (2026-09-23) this branch ran a hand-kept subset — six of the eleven
@@ -196,11 +196,11 @@ final class ConfigPreviewRoutes implements RouteModule {
         Path candidate = Path.of(configPath.trim());
         if (!candidate.isAbsolute()) {
             if (api.writeRoot() == null)
-                throw new ApiException(400, "a relative 'configPath' needs a write root to resolve against; pass an absolute path");
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "a relative 'configPath' needs a write root to resolve against; pass an absolute path");
             candidate = api.writeRoot().resolve(candidate);
         }
         Path resolved = WriteGates.jailToAllowedRoots(candidate.toString(), "configPath");
-        if (!Files.isRegularFile(resolved)) throw new ApiException(404, "no config file at 'configPath'");
+        if (!Files.isRegularFile(resolved)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no config file at 'configPath'");
         return resolved.toString();
     }
 
@@ -221,15 +221,15 @@ final class ConfigPreviewRoutes implements RouteModule {
         Object cfgObj = body.get("config");
         String sample = ApiContext.str(body, "sample_text");
         if (!(cfgObj instanceof Map<?, ?>) || sample == null || sample.isBlank())
-            throw new ApiException(400, "body must include 'config' (a pipeline draft map) and 'sample_text'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'config' (a pipeline draft map) and 'sample_text'");
         if (sample.length() > MAX_SAMPLE_CHARS)
-            throw new ApiException(400, "sample_text too large (max " + MAX_SAMPLE_CHARS + " chars)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "sample_text too large (max " + MAX_SAMPLE_CHARS + " chars)");
         Map<String, Object> draft = mapAt(body, "config");
         PipelineConfig cfg;
         try {
             cfg = PipelineConfig.fromMap(draft);
         } catch (Exception invalid) {
-            throw new ApiException(422, "config is not a valid pipeline draft: " + invalid.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "config is not a valid pipeline draft: " + invalid.getMessage());
         }
         try {
             ComponentPreview.GrammarResult r = ComponentPreview.parsing(cfg, sample);
@@ -245,9 +245,9 @@ final class ConfigPreviewRoutes implements RouteModule {
             if (!r.resolved().isEmpty()) out.put("resolved", r.resolved());
             return out;
         } catch (IllegalArgumentException unsupported) {
-            throw new ApiException(422, unsupported.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, unsupported.getMessage());
         } catch (Exception parseFail) {
-            throw new ApiException(422, "sample does not parse with these settings: " + parseFail.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "sample does not parse with these settings: " + parseFail.getMessage());
         }
     }
 
@@ -270,7 +270,7 @@ final class ConfigPreviewRoutes implements RouteModule {
         Object cfgObj = body.get("config");
         List<Map<String, Object>> sampleRows = ApiContext.sampleRows(body);
         if (!(cfgObj instanceof Map<?, ?>) || sampleRows.isEmpty())
-            throw new ApiException(400, "body must include 'config' (a schema draft map) and non-empty 'sampleRows'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'config' (a schema draft map) and non-empty 'sampleRows'");
         Map<String, Object> content = mapAt(body, "config");
         try {
             ComponentPreview.Result r = ComponentPreview.schema(content, sampleRows);
@@ -298,9 +298,9 @@ final class ConfigPreviewRoutes implements RouteModule {
             }
             return out;
         } catch (IllegalArgumentException badSchema) {
-            throw new ApiException(422, badSchema.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, badSchema.getMessage());
         } catch (Exception castFail) {
-            throw new ApiException(422, "schema preview failed: " + castFail.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "schema preview failed: " + castFail.getMessage());
         }
     }
 
@@ -339,7 +339,7 @@ final class ConfigPreviewRoutes implements RouteModule {
     private Object suggestSchema(Map<String, Object> body) {
         List<Map<String, Object>> sampleRows = ApiContext.sampleRows(body);
         if (sampleRows.isEmpty())
-            throw new ApiException(400, "body must include non-empty 'sampleRows'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include non-empty 'sampleRows'");
         try {
             List<com.gamma.pipeline.exec.SchemaSuggest.Field> inferred =
                     com.gamma.pipeline.exec.SchemaSuggest.infer(sampleRows);
@@ -370,9 +370,9 @@ final class ConfigPreviewRoutes implements RouteModule {
                         mapAt(body, "config"), inferred)));
             return out;
         } catch (IllegalArgumentException badSample) {
-            throw new ApiException(422, badSample.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, badSample.getMessage());
         } catch (Exception inferFail) {
-            throw new ApiException(422, "schema suggestion failed: " + inferFail.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "schema suggestion failed: " + inferFail.getMessage());
         }
     }
 

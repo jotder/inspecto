@@ -108,9 +108,9 @@ final class PipelineBundleRoutes implements RouteModule {
      */
     private Object exportBundle(ApiContext api, HttpExchange e, String name) throws IOException {
         PipelineConfig cfg = api.service().configFor(name)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         Path file = api.service().pathFor(name)
-                .orElseThrow(() -> new ApiException(404, "no config file for pipeline '" + name + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no config file for pipeline '" + name + "'"));
         String id = cfg.identity().pipelineName();
 
         List<String> notes = new ArrayList<>();
@@ -139,7 +139,7 @@ final class PipelineBundleRoutes implements RouteModule {
             Path prior = byBasename.putIfAbsent(base, abs);
             if (prior != null) {
                 if (prior.equals(abs)) continue;   // the same file referenced twice — one entry
-                throw new ApiException(409, "two satellites collide on the portable name '" + base
+                throw new ApiException(409, ErrorCodes.CONFLICT, "two satellites collide on the portable name '" + base
                         + "' (" + prior + " and " + abs + ") — rename one before exporting");
             }
             byte[] bytes = Files.readAllBytes(abs);
@@ -212,22 +212,22 @@ final class PipelineBundleRoutes implements RouteModule {
         String pipelineEntry = ApiContext.str(manifest, "pipeline_file");
         byte[] pipelineBytes = pipelineEntry == null ? null : entries.get(pipelineEntry);
         if (sourceId == null || pipelineBytes == null)
-            throw new ApiException(422, "bundle names no pipeline entry");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bundle names no pipeline entry");
         List<Map<String, Object>> satellites = asMapList(manifest.get("satellites"));
         for (Map<String, Object> s : satellites) {
             String path = ApiContext.str(s, "path");
             byte[] bytes = path == null ? null : entries.get(path);
             if (bytes == null)
-                throw new ApiException(422, "manifest names satellite '" + path + "' but the zip has no such entry");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "manifest names satellite '" + path + "' but the zip has no such entry");
             String expected = ApiContext.str(s, "sha256");
             if (expected != null && !expected.equals(sha256(bytes)))
-                throw new ApiException(422, "satellite '" + path + "' does not match its manifest sha256");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "satellite '" + path + "' does not match its manifest sha256");
         }
         Map<String, Object> sourceMap;
         try {
             sourceMap = ConfigCodec.toMap(new String(pipelineBytes, StandardCharsets.UTF_8));
         } catch (RuntimeException bad) {
-            throw new ApiException(422, "bundle pipeline does not parse: " + bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bundle pipeline does not parse: " + bad.getMessage());
         }
 
         // The target identity: caller's ?name= wins, else the bundle's own id. 422 on an unsafe name.
@@ -238,7 +238,7 @@ final class PipelineBundleRoutes implements RouteModule {
         String conflict = String.valueOf(
                 java.util.Objects.requireNonNullElse(ApiContext.query(e, "conflict"), "refuse")).toLowerCase();
         if (!Set.of("refuse", "overwrite", "rename").contains(conflict))
-            throw new ApiException(422, "conflict must be refuse, overwrite or rename");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "conflict must be refuse, overwrite or rename");
 
         // Gate 3 — zip-slip path jail → 403 (BundleImporter precedent, WriteGates.jail = PathJail):
         // every entry the manifest tells us to write must resolve inside the destination directory.
@@ -262,7 +262,7 @@ final class PipelineBundleRoutes implements RouteModule {
                     newId = freeName(api, writeRoot, base);
                     renamedFrom = base;
                 }
-                default -> throw new ApiException(409, "pipeline '" + newId
+                default -> throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + newId
                         + "' already exists; re-send with ?conflict=overwrite or ?conflict=rename");
             }
         }
@@ -334,13 +334,13 @@ final class PipelineBundleRoutes implements RouteModule {
         Object targetDb = retargeted.get("dirs") instanceof Map<?, ?> d ? d.get("database") : null;
         for (Object en : asStringList(manifest.get("enrichments"))) {
             byte[] bytes = entries.get(String.valueOf(en));
-            if (bytes == null) throw new ApiException(422, "manifest names companion '" + en
+            if (bytes == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "manifest names companion '" + en
                     + "' but the zip has no such entry");
             Map<String, Object> enrich;
             try {
                 enrich = ConfigCodec.toMap(new String(bytes, StandardCharsets.UTF_8));
             } catch (RuntimeException bad) {
-                throw new ApiException(422, "bundle companion '" + en + "' does not parse: " + bad.getMessage());
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bundle companion '" + en + "' does not parse: " + bad.getMessage());
             }
             String newName = retargetEnrichment(enrich, sourceId, newId,
                     sourceDb == null ? null : String.valueOf(sourceDb),
@@ -363,9 +363,9 @@ final class PipelineBundleRoutes implements RouteModule {
         try {
             registeredName = api.service().registerPipeline(target);
         } catch (IllegalArgumentException invalid) {
-            throw new ApiException(422, "imported pipeline did not register: " + invalid.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "imported pipeline did not register: " + invalid.getMessage());
         } catch (IllegalStateException clash) {
-            throw new ApiException(409, clash.getMessage());
+            throw new ApiException(409, ErrorCodes.CONFLICT, clash.getMessage());
         }
         for (Path et : enrichTargets) {
             try {
@@ -594,7 +594,7 @@ final class PipelineBundleRoutes implements RouteModule {
             String candidate = base + "_" + i;
             if (!taken(api, writeRoot, candidate)) return candidate;
         }
-        throw new ApiException(409, "no free name near '" + base + "'");
+        throw new ApiException(409, ErrorCodes.CONFLICT, "no free name near '" + base + "'");
     }
 
     /** The {@code *_enrich.toon} companions of one pipeline at the write root, decoded (read-only). */
@@ -738,27 +738,27 @@ final class PipelineBundleRoutes implements RouteModule {
             for (var en = zis.getNextEntry(); en != null; en = zis.getNextEntry())
                 if (!en.isDirectory()) all.put(en.getName(), zis.readAllBytes());
         } catch (IOException bad) {
-            throw new ApiException(422, "body is not a readable zip: " + bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body is not a readable zip: " + bad.getMessage());
         }
-        if (all.isEmpty()) throw new ApiException(422, "body is not a pipeline bundle (empty zip)");
+        if (all.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body is not a pipeline bundle (empty zip)");
         return all;
     }
 
     /** Validate + decode {@code manifest.toon} → 422 on anything not a v1 pipeline bundle. */
     private static Map<String, Object> manifestOf(LinkedHashMap<String, byte[]> entries) {
         byte[] mf = entries.remove(MANIFEST);
-        if (mf == null) throw new ApiException(422, "not a pipeline bundle: missing " + MANIFEST);
+        if (mf == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "not a pipeline bundle: missing " + MANIFEST);
         Map<String, Object> manifest;
         try {
             manifest = ConfigCodec.toMap(new String(mf, StandardCharsets.UTF_8));
         } catch (RuntimeException bad) {
-            throw new ApiException(422, "invalid " + MANIFEST + ": " + bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "invalid " + MANIFEST + ": " + bad.getMessage());
         }
         if (!FORMAT.equals(ApiContext.str(manifest, "format")))
-            throw new ApiException(422, "not a pipeline bundle (format must be '" + FORMAT + "')");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "not a pipeline bundle (format must be '" + FORMAT + "')");
         Object v = manifest.get("version");
         if (!(v instanceof Number n) || n.intValue() != VERSION)
-            throw new ApiException(422, "unsupported bundle version (expected " + VERSION + ")");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsupported bundle version (expected " + VERSION + ")");
         return manifest;
     }
 

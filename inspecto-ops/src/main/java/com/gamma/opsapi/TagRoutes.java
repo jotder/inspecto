@@ -6,6 +6,7 @@ import com.gamma.control.WidgetTags;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 
@@ -130,11 +131,11 @@ public final class TagRoutes implements RouteModule {
     private Object assign(ApiContext api, com.sun.net.httpserver.HttpExchange ex,
                           String targetKind, String targetId, Map<String, Object> body) {
         String tag = ApiContext.str(body, "tag");
-        if (tag == null) throw new ApiException(400, "body must include 'tag'");
+        if (tag == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'tag'");
         return RouteErrors.mapErrors(() -> {
             requireVisibleTarget(api, ex, targetKind, targetId);
             if (OpsEngine.of(api).tag(tag).isEmpty())
-                throw new ApiException(404, "no tag named '" + tag + "' — create it via POST /tags first");
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "no tag named '" + tag + "' — create it via POST /tags first");
             String actor = ApiContext.str(body, "actor");
             // An object's `tags` attribute is a projection of the assignment store (D7 phase 2), so object
             // targets go through ObjectService — writing the store directly would leave the CSV stale and
@@ -153,7 +154,7 @@ public final class TagRoutes implements RouteModule {
             return OpsEngine.of(api).tagAssignments().forTag(tag).stream()
                     .filter(a -> a.targets(targetKind, targetId))
                     .findFirst()
-                    .orElseThrow(() -> new ApiException(500, "tag assignment did not persist"))
+                    .orElseThrow(() -> new ApiException(500, ErrorCodes.INTERNAL, "tag assignment did not persist"))
                     .toMap();
         });
     }
@@ -179,7 +180,7 @@ public final class TagRoutes implements RouteModule {
     private static void requireVisibleTarget(ApiContext api, com.sun.net.httpserver.HttpExchange ex,
                                              String targetKind, String targetId) {
         if (AnnotationTargets.gate(api, ex, targetKind, targetId) == null)
-            throw new ApiException(404, "no " + targetKind + " '" + targetId + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no " + targetKind + " '" + targetId + "'");
     }
 
     /** {@code POST /tags} — create a tag; body {@code {name}}. Duplicate → 409; persisted as {@code <name>_tag.toon}. */
@@ -189,7 +190,7 @@ public final class TagRoutes implements RouteModule {
         try {
             tag = Tag.fromMap(body);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         Path file = tagFile(api, tag.name(), "_tag.toon", "tag name");
         WriteGates.conflictIf(OpsEngine.of(api).tag(tag.name()).isPresent(),
@@ -209,9 +210,9 @@ public final class TagRoutes implements RouteModule {
     private Object renameTag(ApiContext api, String from, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "tag write");
         String to = ApiContext.str(body, "to");
-        if (to == null) throw new ApiException(400, "body must include 'to'");
+        if (to == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'to'");
         if (OpsEngine.of(api).tag(from).isEmpty())
-            throw new ApiException(404, "no tag named '" + from + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no tag named '" + from + "'");
 
         // Persist the destination first (the createTag order): a failed write must not leave a renamed
         // in-memory vocabulary with nothing on disk to reload at the next boot.
@@ -226,7 +227,7 @@ public final class TagRoutes implements RouteModule {
                     "createdAt", System.currentTimeMillis())), ".tag-");
             changed = OpsEngine.of(api).renameTag(from, to);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         // A rule that followed the rename now disagrees with its own file until rewritten.
         for (String rule : changed.rules())
@@ -235,7 +236,7 @@ public final class TagRoutes implements RouteModule {
                     persist(api, tagFile(api, rule, "_tagrule.toon", "tag rule name"),
                             Map.of("tag_rule", r.toMap()), ".tagrule-");
                 } catch (IOException io) {
-                    throw new ApiException(500, "renamed tag rule '" + rule + "' could not be persisted: " + io);
+                    throw new ApiException(500, ErrorCodes.INTERNAL, "renamed tag rule '" + rule + "' could not be persisted: " + io);
                 }
             });
         int reprojected = WidgetTags.reproject(api, widgets);
@@ -259,9 +260,9 @@ public final class TagRoutes implements RouteModule {
         try {
             changed = OpsEngine.of(api).deleteTag(name);
         } catch (NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         } catch (IllegalStateException conflict) {
-            throw new ApiException(409, conflict.getMessage());
+            throw new ApiException(409, ErrorCodes.CONFLICT, conflict.getMessage());
         }
         int reprojected = WidgetTags.reproject(api, widgets);
         boolean fileRemoved = Files.deleteIfExists(tagFile(api, name, "_tag.toon", "tag name"));
@@ -280,7 +281,7 @@ public final class TagRoutes implements RouteModule {
         try {
             rule = TagRule.fromMap(body);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         Path file = tagFile(api, rule.name(), "_tagrule.toon", "tag rule name");
         persist(api, file, Map.of("tag_rule", rule.toMap()), ".tagrule-");
@@ -291,7 +292,7 @@ public final class TagRoutes implements RouteModule {
     private Object deleteTagRule(ApiContext api, String name) throws IOException {
         WriteGates.requireWriteRoot(api, "tag rule write");
         if (OpsEngine.of(api).tagRule(name).isEmpty())
-            throw new ApiException(404, "no tag rule named '" + name + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no tag rule named '" + name + "'");
         boolean fileRemoved = Files.deleteIfExists(tagFile(api, name, "_tagrule.toon", "tag rule name"));
         OpsEngine.of(api).removeTagRule(name);
         return Map.of("deleted", name, "fileRemoved", fileRemoved);
@@ -306,7 +307,7 @@ public final class TagRoutes implements RouteModule {
             ObjectService.TagRuleApplication result = OpsEngine.of(api).applyTagRule(name);
             return Map.of("matched", result.matched(), "updated", result.updated());
         } catch (NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
     }
 

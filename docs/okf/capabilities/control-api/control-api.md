@@ -171,10 +171,11 @@ against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` �
 `CONFIG_VALIDATION_FAILED` · `INTERNAL` · `CONTROL_PLANE_READ_ONLY` · `CAPABILITY_UNAVAILABLE` ·
 `UNAUTHENTICATED` · `PERMISSION_DENIED` · `RATE_LIMITED` (429) · `NOT_SUPPORTED` (501) ·
 `PAYLOAD_TOO_LARGE` (413). `defaultFor(status)` maps a bare status to a code (`:36-50`).
-**461 of 874** `new ApiException(` sites under `*/src/main` still take that default (2026-09-25, after the
-`ReconRoutes` / `AgentRoutes` / `JobRoutes` / `RunRoutes` + `inspecto-geo-link` `DossierRoutes` /
-`InvestigationTime` / `PatternQueryCompiler` slice of `ERRORCODE-DEFAULTED-1` — 130 sites, every one the
-status default, so no wire change; the earlier `InvestigationRoutes` + `InvRoutes` slice's four-eyes
+**353 of 874** `new ApiException(` sites under `*/src/main` still take that default (2026-09-25, after the
+`ConnectionRoutes` / `ConfigPreviewRoutes` / `PipelineBundleRoutes` / `DbBrowserRoutes` / `AccessRoutes` +
+`inspecto-ops` `TagRoutes` slice of `ERRORCODE-DEFAULTED-1` — 108 sites, every one the status default, so
+no wire change; the `ReconRoutes` / `AgentRoutes` / `JobRoutes` / `RunRoutes` + `inspecto-geo-link` slice
+before it was 130 sites, likewise all defaults; the earlier `InvestigationRoutes` + `InvRoutes` slice's four-eyes
 403s are `PERMISSION_DENIED`, not the defaulted `PATH_JAIL_VIOLATION`). Re-derive with
 `git grep -nP 'new ApiException\([^,()]+,(?!\s*(\w+\.)?[A-Z][A-Z_]+\s*,)' -- '*/src/main/**.java' | wc -l`.
 Bodies ≥ 1024 bytes are gzipped when the client accepts it (`ApiContext.maybeGzip`, `:370-393`).

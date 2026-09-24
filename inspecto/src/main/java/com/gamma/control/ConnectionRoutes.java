@@ -71,13 +71,13 @@ final class ConnectionRoutes implements RouteModule {
     private Object connectionById(ApiContext api, String id) {
         return api.service().connection(id)
                 .map(ConnectionProfile::toMap)
-                .orElseThrow(() -> new ApiException(404, "no connection profile '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'"));
     }
 
     /** {@code POST /connections/{id}/test} — TCP-reachability + secret-resolution test; 404 if unknown. */
     private Object testConnection(ApiContext api, String id) {
         ConnectionProfile p = api.service().connection(id)
-                .orElseThrow(() -> new ApiException(404, "no connection profile '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'"));
         return ConnectionTester.test(p).toMap();
     }
 
@@ -99,17 +99,17 @@ final class ConnectionRoutes implements RouteModule {
                     p.port(), p.database(), p.basePath(), p.username(), p.password(), p.options(), null)).toMap();
             case "tunnel" -> {
                 if (p.tunnel() == null || p.tunnel().host() == null || p.tunnel().host().isBlank())
-                    throw new ApiException(422, "no tunnel configured to test");
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "no tunnel configured to test");
                 yield ConnectionTester.test(p).toMap();
             }
             case "proxy" -> {
                 if (p.proxy() == null || p.proxy().host() == null || p.proxy().host().isBlank())
-                    throw new ApiException(422, "no proxy configured to test");
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "no proxy configured to test");
                 yield ConnectionTester.test(new ConnectionProfile(p.id(), p.connector(), p.proxy().host(),
                         p.proxy().port(), null, null, p.proxy().username(), p.proxy().password(),
                         p.options(), null)).toMap();
             }
-            default -> throw new ApiException(422, "unsupported test target '" + t + "' (connection|tunnel|proxy)");
+            default -> throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsupported test target '" + t + "' (connection|tunnel|proxy)");
         };
     }
 
@@ -120,14 +120,14 @@ final class ConnectionRoutes implements RouteModule {
      */
     private Object probeConnection(ApiContext api, String id, Map<String, Object> body) {
         ConnectionProfile p = api.service().connection(id)
-                .orElseThrow(() -> new ApiException(404, "no connection profile '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'"));
         EnumSet<ProbeCheck> checks = EnumSet.noneOf(ProbeCheck.class);
         if (body != null && body.get("checks") instanceof List<?> names) {
             for (Object n : names) {
                 try {
                     checks.add(ProbeCheck.fromWire(String.valueOf(n)));
                 } catch (IllegalArgumentException ex) {
-                    throw new ApiException(422, "unknown probe check '" + n
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown probe check '" + n
                             + "' (reachability|authenticate|read|write|list)");
                 }
             }
@@ -140,38 +140,38 @@ final class ConnectionRoutes implements RouteModule {
         try (ConnectionWorkbench wb = workbench(api, id)) {
             return ConnectionWorkbench.ResourceNode.toMaps(wb.explore(path));
         } catch (AcquisitionException e) {
-            throw new ApiException(502, "explore failed: " + e.getMessage());
+            throw new ApiException(502, ErrorCodes.INTERNAL, "explore failed: " + e.getMessage());
         } catch (ConnectionWorkbench.PathEscape e) {
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, e.getMessage());
         } catch (ConnectionWorkbench.NoSuchPath e) {
-            throw new ApiException(404, e.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, e.getMessage());
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
     /** {@code GET /connections/{id}/sample?path=&limit=} — bounded preview of the file at {@code path}. */
     private Object sampleConnection(ApiContext api, String id, String path, String limit) {
-        if (path == null || path.isBlank()) throw new ApiException(400, "query param 'path' is required");
+        if (path == null || path.isBlank()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "query param 'path' is required");
         try (ConnectionWorkbench wb = workbench(api, id)) {
             return wb.sample(path, intOf(limit, 50)).toMap();
         } catch (AcquisitionException e) {
-            throw new ApiException(502, "sample failed: " + e.getMessage());
+            throw new ApiException(502, ErrorCodes.INTERNAL, "sample failed: " + e.getMessage());
         } catch (ConnectionWorkbench.PathEscape e) {
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, e.getMessage());
         } catch (ConnectionWorkbench.NoSuchPath e) {
-            throw new ApiException(404, e.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, e.getMessage());
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
     /** Resolve the workbench for a saved profile: 404 unknown id, 501 connector without workbench support. */
     private ConnectionWorkbench workbench(ApiContext api, String id) {
         ConnectionProfile p = api.service().connection(id)
-                .orElseThrow(() -> new ApiException(404, "no connection profile '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'"));
         ConnectionWorkbench wb = ConnectionProber.workbenchFor(p);
-        if (wb == null) throw new ApiException(501,
+        if (wb == null) throw new ApiException(501, ErrorCodes.NOT_SUPPORTED,
                 "explore/sample not supported for connector '" + p.connector() + "' yet");
         return wb;
     }
@@ -191,7 +191,7 @@ final class ConnectionRoutes implements RouteModule {
     private Object createConnection(ApiContext api, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "connection write");
         String id = ApiContext.str(body, "id");
-        if (id == null) throw new ApiException(400, "body must include 'id'");
+        if (id == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'id'");
         WriteGates.conflictIf(api.service().connection(id).isPresent(),
                 "connection '" + id + "' already exists (use PUT to update)");
         ConnectionProfile p = connectionFromBody(id, body, null);
@@ -203,7 +203,7 @@ final class ConnectionRoutes implements RouteModule {
     private Object updateConnection(ApiContext api, String id, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "connection write");
         ConnectionProfile existing = api.service().connection(id)
-                .orElseThrow(() -> new ApiException(404, "no connection profile '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'"));
         ConnectionProfile p = connectionFromBody(id, body, existing);
         persistConnection(api, p);
         return p.toMap();
@@ -213,7 +213,7 @@ final class ConnectionRoutes implements RouteModule {
     private Object deleteConnection(ApiContext api, String id) throws IOException {
         WriteGates.requireWriteRoot(api, "connection write");
         if (api.service().connection(id).isEmpty())
-            throw new ApiException(404, "no connection profile '" + id + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'");
         WriteGates.conflictIf(api.service().connectionInUse(id),
                 "connection '" + id + "' is in use by a pipeline source");
         boolean removed = Files.deleteIfExists(connectionFile(api, id));
@@ -273,7 +273,7 @@ final class ConnectionRoutes implements RouteModule {
         try {
             return ConnectionProfile.fromMap(c);
         } catch (IllegalArgumentException ex) {
-            throw new ApiException(400, ex.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, ex.getMessage());
         }
     }
 
@@ -288,7 +288,7 @@ final class ConnectionRoutes implements RouteModule {
         try {
             com.gamma.acquire.CollectorConnectors.validate(p);   // the connector's own option checks, at the save
         } catch (IllegalArgumentException refused) {
-            throw new ApiException(422, refused.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refused.getMessage());
         }
         Path target = connectionFile(api, p.id());
         byte[] bytes = ConfigCodec.toToon(Map.of("connection", connectionDoc(p))).getBytes(StandardCharsets.UTF_8);

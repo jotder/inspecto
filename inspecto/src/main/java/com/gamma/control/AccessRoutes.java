@@ -162,7 +162,7 @@ final class AccessRoutes implements RouteModule {
             return out;
         }
         String route = ApiContext.query(ex, "route");
-        if (route == null || route.isBlank()) throw new ApiException(422, "explain requires a 'route' to evaluate");
+        if (route == null || route.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "explain requires a 'route' to evaluate");
         String method = ApiContext.query(ex, "method");
         String action = ControlApi.actionFor((method == null ? "GET" : method).toUpperCase(Locale.ROOT), route);
         String resourceKind = ApiContext.query(ex, "resourceKind");
@@ -248,26 +248,26 @@ final class AccessRoutes implements RouteModule {
     /** Validate a node forest: id (safe, unique across the tree), label, kind, action ⇒ capability. */
     private static List<Map<String, Object>> validNodes(Object nodesObj, Set<String> seen) {
         if (!(nodesObj instanceof List<?> raw))
-            throw new ApiException(422, "access catalog requires a 'nodes' list");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "access catalog requires a 'nodes' list");
         return raw.stream().map(n -> validNode(n, seen)).toList();
     }
 
     private static Map<String, Object> validNode(Object nodeObj, Set<String> seen) {
         if (!(nodeObj instanceof Map<?, ?> node))
-            throw new ApiException(422, "every catalog node must be an object");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every catalog node must be an object");
         String id = WriteGates.safeName(trimOrEmpty(node.get("id")), "catalog node id");
-        if (!seen.add(id)) throw new ApiException(422, "duplicate catalog node id '" + id + "'");
+        if (!seen.add(id)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "duplicate catalog node id '" + id + "'");
         String label = trimOrEmpty(node.get("label"));
-        if (label.isBlank()) throw new ApiException(422, "catalog node '" + id + "' requires a 'label'");
+        if (label.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "catalog node '" + id + "' requires a 'label'");
         String kind = trimOrEmpty(node.get("kind"));
         if (!NODE_KINDS.contains(kind))
-            throw new ApiException(422, "catalog node '" + id + "' has unknown kind '" + kind
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "catalog node '" + id + "' has unknown kind '" + kind
                     + "' (expected one of " + NODE_KINDS + ")");
         String capability = trimOrEmpty(node.get("capability"));
         if ("action".equals(kind) && capability.isBlank())
-            throw new ApiException(422, "action node '" + id + "' requires a 'capability'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "action node '" + id + "' requires a 'capability'");
         if (!capability.isBlank() && !Roles.KNOWN_CAPABILITIES.contains(capability))
-            throw new ApiException(422, "catalog node '" + id + "' has unknown capability '" + capability
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "catalog node '" + id + "' has unknown capability '" + capability
                     + "' (expected one of " + Roles.KNOWN_CAPABILITIES + ")");   // R4: manifest vocabulary
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
@@ -304,11 +304,11 @@ final class AccessRoutes implements RouteModule {
                 ETags.requireMatch(ex, ETags.of(ContentHash.of(current.content()))));
         String subjectType = trimOrEmpty(body.get("subjectType"));
         if (!SUBJECT_TYPES.contains(subjectType))
-            throw new ApiException(422, "access profile requires subjectType " + SUBJECT_TYPES);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "access profile requires subjectType " + SUBJECT_TYPES);
         String subjectId = trimOrEmpty(body.get("subjectId"));
-        if (subjectId.isBlank()) throw new ApiException(422, "access profile requires a 'subjectId'");
+        if (subjectId.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "access profile requires a 'subjectId'");
         if (!safeId.equals(subjectType + "-" + subjectId))
-            throw new ApiException(422, "access profile id '" + safeId
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "access profile id '" + safeId
                     + "' must equal '<subjectType>-<subjectId>' ('" + subjectType + "-" + subjectId + "')");
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("subjectType", subjectType);
@@ -324,7 +324,7 @@ final class AccessRoutes implements RouteModule {
         ComponentStore store = writeStore(api);
         String safeId = WriteGates.safeName(id, "access profile id");
         if (!store.exists(PROFILE_TYPE, safeId))
-            throw new ApiException(404, "access profile '" + safeId + "' not found");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "access profile '" + safeId + "' not found");
         store.delete(PROFILE_TYPE, safeId);
         return Map.of("deleted", safeId);
     }
@@ -333,14 +333,14 @@ final class AccessRoutes implements RouteModule {
     private static Map<String, Object> validGrants(Object grantsObj) {
         if (grantsObj == null) return Map.of();
         if (!(grantsObj instanceof Map<?, ?> grants))
-            throw new ApiException(422, "access profile 'grants' must be an object of nodeId -> allow|deny");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "access profile 'grants' must be an object of nodeId -> allow|deny");
         Map<String, Object> out = new LinkedHashMap<>();
         for (Map.Entry<?, ?> g : grants.entrySet()) {
             String nodeId = trimOrEmpty(g.getKey());
             String value = trimOrEmpty(g.getValue());
-            if (nodeId.isBlank()) throw new ApiException(422, "grant with a blank node id");
+            if (nodeId.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "grant with a blank node id");
             if (!GRANT_VALUES.contains(value))
-                throw new ApiException(422, "grant '" + nodeId + "' has value '" + value
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "grant '" + nodeId + "' has value '" + value
                         + "' (expected one of " + GRANT_VALUES + ")");
             out.put(nodeId, value);
         }
@@ -364,7 +364,7 @@ final class AccessRoutes implements RouteModule {
         try {
             return store.write(type, id, content).content();
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 }

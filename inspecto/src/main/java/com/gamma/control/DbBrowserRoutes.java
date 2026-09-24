@@ -79,7 +79,7 @@ final class DbBrowserRoutes implements RouteModule {
                     tables.add(t);
                 }
             } catch (IOException e) {
-                throw new ApiException(503, "could not list data directory: " + e.getMessage());
+                throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "could not list data directory: " + e.getMessage());
             }
         }
 
@@ -130,7 +130,7 @@ final class DbBrowserRoutes implements RouteModule {
         WriteGates.requireWriteRoot(api, "table browser");
         String group = orDefault(ApiContext.query(ex, "group"), STORES_GROUP);
         String name = ApiContext.query(ex, "name");
-        if (name == null || name.isBlank()) throw new ApiException(400, "missing 'name'");
+        if (name == null || name.isBlank()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "missing 'name'");
         int limit = clampLimit(ApiContext.parseIntOr(ApiContext.query(ex, "limit"), DEFAULT_LIMIT));
         int offset = Math.max(0, ApiContext.parseIntOr(ApiContext.query(ex, "offset"), 0));
         List<QueryExecutor.Sort> sort = parseSort(ApiContext.query(ex, "sort"));
@@ -138,7 +138,7 @@ final class DbBrowserRoutes implements RouteModule {
         if (group.startsWith("ops:"))
             return browseOperational(api, group, name, null, limit, offset);
         if (!STORES_GROUP.equals(group))
-            throw new ApiException(404, "unknown group '" + group + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown group '" + group + "'");
         return browseStore(api, name, null, limit, offset, sort);
     }
 
@@ -149,7 +149,7 @@ final class DbBrowserRoutes implements RouteModule {
         String group = orDefault(ApiContext.str(body, "group"), STORES_GROUP);
         String tableName = ApiContext.str(body, "table");
         String sql = ApiContext.str(body, "sql");
-        if (sql == null) throw new ApiException(422, "missing 'sql'");
+        if (sql == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'sql'");
 
         // A store id may itself contain path-like characters (e.g. "mule_transfers/database") without
         // being a smuggled file reference — SqlGuard's PATH_LIKE check can't tell those apart from the
@@ -168,8 +168,8 @@ final class DbBrowserRoutes implements RouteModule {
         if (group.startsWith("ops:"))
             return browseOperational(api, group, tableName, sql, limit, offset);
         if (!STORES_GROUP.equals(group))
-            throw new ApiException(404, "unknown group '" + group + "'");
-        if (tableName == null) throw new ApiException(422, "missing 'table' (the store the SQL reads from)");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown group '" + group + "'");
+        if (tableName == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'table' (the store the SQL reads from)");
         return browseStore(api, tableName, sql, limit, offset, List.of());
     }
 
@@ -196,15 +196,15 @@ final class DbBrowserRoutes implements RouteModule {
     private Object browseStore(ApiContext api, String storeName, String userSql,
                                int limit, int offset, List<QueryExecutor.Sort> sort) {
         Path dataRoot = api.dataRoot();
-        if (dataRoot == null) throw new ApiException(404, "no data directory for this space");
+        if (dataRoot == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no data directory for this space");
         Path root = dataRoot.normalize();
         Path storeDir = root.resolve(storeName).normalize();
         if (!storeDir.startsWith(root)) throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "store path escapes the data root");
         Path browseDir = pipelineDatabaseDir(api, storeName).orElse(storeDir);
-        if (!Files.isDirectory(browseDir)) throw new ApiException(404, "no store '" + storeName + "'");
+        if (!Files.isDirectory(browseDir)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no store '" + storeName + "'");
 
         String format = detectFormat(browseDir);
-        if (format == null) throw new ApiException(404, "store '" + storeName + "' has no parquet/csv data");
+        if (format == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "store '" + storeName + "' has no parquet/csv data");
 
         // QueryExecutor registers this as `CREATE VIEW <store> AS <relationSql>`, so it must be a full
         // SELECT — the same wrap DatasetRelation / SourceStoreReader apply around the reader. The source
@@ -221,11 +221,11 @@ final class DbBrowserRoutes implements RouteModule {
         try {
             return response(QueryExecutor.run(req));
         } catch (IllegalArgumentException bad) {          // unsafe projection/sort identifier
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
-            throw new ApiException(503, "query sandbox unavailable: " + e.getMessage());
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + e.getMessage());
         }
     }
 
@@ -243,9 +243,9 @@ final class DbBrowserRoutes implements RouteModule {
         for (BrowsableStore b : api.service().browsableStores())
             if (b.browseId().equals(id)) { store = b; break; }
         if (store == null)
-            throw new ApiException(404, "no live operational store '" + id + "' (its backend is not DB-backed)");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no live operational store '" + id + "' (its backend is not DB-backed)");
         if (userSql == null && (table == null || table.isBlank()))
-            throw new ApiException(400, "missing 'name'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "missing 'name'");
         long t0 = System.nanoTime();
         try {
             BrowsableStore.Page page = userSql != null
@@ -253,9 +253,9 @@ final class DbBrowserRoutes implements RouteModule {
                     : store.browseTable(table, limit, offset);
             return responseFromPage(page, (System.nanoTime() - t0) / 1_000_000);
         } catch (IllegalArgumentException bad) {          // unknown table for this store
-            throw new ApiException(404, bad.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
