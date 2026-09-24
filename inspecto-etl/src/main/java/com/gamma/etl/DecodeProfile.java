@@ -1,10 +1,9 @@
 package com.gamma.etl;
 
-import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.safety.PathJail;
+import com.gamma.util.ToonHelper;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -77,8 +76,8 @@ public final class DecodeProfile {
         // under the roots is nameable here; only a real profile's own keys are named in an error.
         Map<String, Object> doc;
         try {
-            doc = ConfigCodec.toMap(Files.readString(file, StandardCharsets.UTF_8));
-        } catch (RuntimeException bad) {
+            doc = ToonHelper.load(file.toString());
+        } catch (RuntimeException bad) {   // the codec's detail stays in the cause, never in the message
             throw new IllegalArgumentException("Decode Profile " + file + " is not valid TOON", bad);
         }
         if (!(doc.get("asn1") instanceof Map<?, ?> profileBlock))
