@@ -1833,6 +1833,18 @@ public final class PipelineConfig {
         return out;
     }
 
+    /** Every schema's lift key (selector tables by index, else segment keys) — empty for single-schema. */
+    private List<String> schemaLiftKeys() {
+        List<String> out = new ArrayList<>();
+        if (schemas.selector() != null && schemas.selector().hasSchemas()) {
+            List<SchemaSelector.Selection> entries = schemas.selector().entries();
+            for (int i = 0; i < entries.size(); i++) out.add(StepDisableArming.liftKey(entries.get(i).table(), i));
+        } else if (schemas.segments() != null) {
+            for (String k : schemas.segments().keySet()) out.add(StepDisableArming.liftKey(k, 0));
+        }
+        return out;
+    }
+
     public void prepare() throws IOException {
         requireRunnable();
         createStatusDir();
@@ -1905,7 +1917,7 @@ public final class PipelineConfig {
             java.util.List<String> allSinkDbs = new java.util.ArrayList<>();
             for (Sink d : sinks) allSinkDbs.add(d.database());
             List<String> stepRefusals = StepDisableArming.refusals(disabledSteps,
-                    StepDisableArming.parkableSinkIds(route, allSinkDbs),
+                    StepDisableArming.parkableSinkIds(route, allSinkDbs, schemaLiftKeys()),
                     dirs.backup() != null && !dirs.backup().isBlank());
             if (!stepRefusals.isEmpty()) throw new IllegalStateException(stepRefusals.get(0));
         }

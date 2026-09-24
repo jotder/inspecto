@@ -111,6 +111,21 @@ class StepDisableArmingTest {
     }
 
     @Test
+    @DisplayName("multi-schema: every schema's branch sinks carry its lift-key suffix — sink__d1 is NOT parkable")
+    void multiSchemaParkableIdsCarryTheSchemaSuffix() {
+        List<String> keys = StepDisableArming.draftSchemaKeys(Map.of(),
+                Map.of("plugin", new java.util.LinkedHashMap<>(Map.of("segments",
+                        new java.util.LinkedHashMap<>(Map.of("stock-receipt", "r.toon"))))));
+        assertEquals(List.of("stock_receipt"), keys, "the lift's routeKey sanitisation, mirrored");
+        List<String> parkable = StepDisableArming.parkableSinkIds(ROUTE, List.of("emea_db", "apac_db"), keys);
+        assertEquals(List.of("sink_stock_receipt__d0", "sink_stock_receipt__d1"), parkable);
+        assertFalse(StepDisableArming.refusals(List.of("sink__d1"), parkable, true).isEmpty(),
+                "the single-schema id names no node of a multi-schema lift — refused, never silently enabled");
+        assertEquals(List.of("alpha", "schema_1"), StepDisableArming.draftSchemaKeys(
+                Map.of("schemas", List.of(Map.of("table", "alpha"), Map.of("column_count", 4))), Map.of()));
+    }
+
+    @Test
     @DisplayName("the draft-map reader: list parsed, absent means empty")
     void draftReaderParsesTheList() {
         assertEquals(List.of("dedup", "join"),

@@ -84,13 +84,26 @@ public final class StepDisableArming {
      * {@code sink__d<i>} for each {@code sinks[]} index whose {@code database} matches a branch
      * (single-destination shorthand: {@code sink}). Empty when there is no route block or no branches.
      *
-     * <p>⚠ This mirrors {@code PipelineLift.emitSinks}' id grammar — legitimate only because an armed
-     * {@code route:} pipeline is single-schema (RouteArming rule 4), where the lift's schema suffix is
-     * empty. The mirror is pinned VERBATIM against a real lift by
+     * <p>⚠ This mirrors {@code PipelineLift.emitSinks}' id grammar for a SINGLE-schema pipeline, where the
+     * lift's schema suffix is empty. A multi-schema one needs {@link #parkableSinkIds(Map, List, List)}.
+     * The mirror is pinned VERBATIM against a real lift by
      * {@code PipelineLiftTest.parkableSinkIdsMatchTheLiftedGraph} — extend the grammar there and here
      * together or the gate drifts from the graph.
      */
     public static List<String> parkableSinkIds(Map<?, ?> route, List<String> sinkDatabases) {
+        return parkableSinkIds(route, sinkDatabases, null);
+    }
+
+    /**
+     * As above for a multi-schema pipeline (branch-aware segment lift, 2026-09-24): one armed route: block
+     * is lifted once PER SCHEMA, so each schema's branch sinks are {@code sink_<key>} / {@code sink_<key>__d<i>}
+     * — {@code key} being the lift's route key ({@link #liftKey}). 🔴 Without the suffix a multi-schema
+     * pipeline disabling {@code sink__d1} would pass this gate and match NO lifted node: a silently-enabled
+     * step, the exact hole the "unknown id" refusal exists to close.
+     *
+     * @param schemaKeys the lift keys of every schema, in lift order; {@code null}/empty = single-schema
+     */
+    public static List<String> parkableSinkIds(Map<?, ?> route, List<String> sinkDatabases, List<String> schemaKeys) {
         List<String> out = new ArrayList<>();
         if (route == null || sinkDatabases == null || sinkDatabases.isEmpty()) return out;
         List<?> branches = route.get("branches") instanceof List<?> b ? b : List.of();
@@ -99,10 +112,45 @@ public final class StepDisableArming {
         for (Object b : branches)
             if (b instanceof Map<?, ?> m && m.get("database") != null)
                 branchDbs.add(String.valueOf(m.get("database")));
-        for (int d = 0; d < sinkDatabases.size(); d++) {
-            if (branchDbs.contains(sinkDatabases.get(d)))
-                out.add("sink" + (sinkDatabases.size() == 1 ? "" : "__d" + d));
+        List<String> suffixes = new ArrayList<>();
+        if (schemaKeys == null || schemaKeys.isEmpty()) suffixes.add("");
+        else for (String k : schemaKeys) suffixes.add("_" + k);
+        for (String suffix : suffixes)
+            for (int d = 0; d < sinkDatabases.size(); d++) {
+                if (branchDbs.contains(sinkDatabases.get(d)))
+                    out.add("sink" + suffix + (sinkDatabases.size() == 1 ? "" : "__d" + d));
+            }
+        return out;
+    }
+
+    /**
+     * The lift's route key for a schema named {@code name} at selector index {@code i} — a byte-for-byte
+     * mirror of {@code PipelineLift.routeKey} (this module sits below the lift). Pinned against a real
+     * lift by {@code PipelineLiftTest.parkableSinkIdsMatchTheLiftedGraph}.
+     */
+    public static String liftKey(String name, int i) {
+        if (name == null || name.isBlank()) return "schema_" + i;
+        String k = name.trim().replaceAll("[^A-Za-z0-9]+", "_").replaceAll("^_+|_+$", "");
+        return k.isEmpty() ? "schema_" + i : k;
+    }
+
+    /**
+     * The draft-map form of a multi-schema pipeline's lift keys: each {@code processing.schemas[]} entry's
+     * {@code table} at its index, else the segment keys ({@code parsing.plugin.segments} over
+     * {@code processing.segments}, {@code PipelineConfigParser}'s precedence); empty for single-schema.
+     */
+    public static List<String> draftSchemaKeys(Map<?, ?> processing, Map<?, ?> parsing) {
+        List<String> out = new ArrayList<>();
+        if (processing != null && processing.get("schemas") instanceof List<?> l && !l.isEmpty()) {
+            for (int i = 0; i < l.size(); i++)
+                out.add(liftKey(l.get(i) instanceof Map<?, ?> m && m.get("table") != null
+                        ? String.valueOf(m.get("table")) : null, i));
+            return out;
         }
+        Object plugin = parsing == null ? null : parsing.get("plugin");
+        Object segments = plugin instanceof Map<?, ?> pm && pm.get("segments") != null
+                ? pm.get("segments") : (processing == null ? null : processing.get("segments"));
+        if (segments instanceof Map<?, ?> sm) for (Object k : sm.keySet()) out.add(liftKey(String.valueOf(k), 0));
         return out;
     }
 

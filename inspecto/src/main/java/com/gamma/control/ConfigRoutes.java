@@ -235,8 +235,10 @@ final class ConfigRoutes {
         boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
         Severity severity = active ? Severity.ERROR : Severity.WARNING;
         Map<?, ?> route = draft.get("route") instanceof Map<?, ?> r ? r : null;
+        Map<?, ?> parsing = draft.get("parsing") instanceof Map<?, ?> p ? p : Map.of();
         List<String> parkable = com.gamma.etl.StepDisableArming.parkableSinkIds(
-                route, RouteArming.draftSinkDatabases(draft.get("sinks")));
+                route, RouteArming.draftSinkDatabases(draft.get("sinks")),
+                com.gamma.etl.StepDisableArming.draftSchemaKeys(proc, parsing));
         Map<?, ?> dirs = draft.get("dirs") instanceof Map<?, ?> d ? d : Map.of();
         List<Finding> out = new ArrayList<>();
         for (String refusal : com.gamma.etl.StepDisableArming.refusals(disabled, parkable,

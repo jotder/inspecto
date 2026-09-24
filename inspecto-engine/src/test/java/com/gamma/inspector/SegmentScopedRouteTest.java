@@ -118,6 +118,92 @@ class SegmentScopedRouteTest {
         assertTrue(e.getMessage().contains("binds in [beta]"), e.getMessage());
     }
 
+    /**
+     * S5 / D4: a PARKED segments batch drains. Disabling {@code sink_SMS__d1} (the SMS segment's normal
+     * branch) arms — the parkable ids carry the schema suffix — and parks exactly that branch while CALL's
+     * two branches and SMS's bulk branch commit; the drain then writes the parked rows under SMS's own home
+     * ({@code <normal db>/SMS/…}) and finalises the whole batch once.
+     */
+    @Test
+    void aParkedSegmentsBatchDrainsIntoItsOwnSegmentsHome(@TempDir Path dir) throws Exception {
+        Path toon = segmentRoutePipeline(dir, true);
+        String armed = Files.readString(toon);
+        Files.writeString(toon, withDisabled(armed, "sink_SMS__d1"));
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        Files.writeString(inbox.resolve("feed.bin"),
+                "CALL,B1,2020-04-03\nCALL,C2,2020-04-03\nSMS,B3,2020-04-03\nSMS,S4,2020-04-03\n");
+
+        CollectorProcessor.run(cfg);
+
+        assertEquals(List.of("B1"), ids(dir.resolve("db_bulk/CALL")));
+        assertEquals(List.of("C2"), ids(dir.resolve("db_normal/CALL")));
+        assertEquals(List.of("B3"), ids(dir.resolve("db_bulk/SMS")));
+        assertEquals(List.of(), ids(dir.resolve("db_normal/SMS")), "the disabled branch parked, wrote nothing");
+
+        String batchId = soleManifestId(dir);
+        Files.writeString(toon, armed);   // re-enable
+        DrainCommand.Result r = DrainCommand.run(toon.toString(), batchId);
+
+        assertEquals(List.of("sink_SMS__d1"), r.drainedBranches());
+        assertEquals(List.of("S4"), ids(dir.resolve("db_normal/SMS")), "drained into SMS's own home");
+        assertEquals(List.of("B1"), ids(dir.resolve("db_bulk/CALL")), "nothing already committed is rewritten");
+        String mf;
+        try (java.util.stream.Stream<Path> w = Files.walk(dir.resolve("status"))) {
+            mf = Files.readString(w.filter(p -> p.getFileName().toString().equals(batchId + ".json"))
+                    .findFirst().orElseThrow()).replace("\\\\", "/");
+        }
+        assertTrue(mf.contains("\"SUCCESS\"") && !mf.contains("\"parkedAt\""), mf);
+        assertTrue(mf.contains("db_bulk/CALL") && mf.contains("db_normal/SMS"),
+                "one commit tail lists every segment's outputs: " + mf);
+    }
+
+    /** S5 / D4, selector twin: a parked {@code beta} batch drains under beta's table dir. */
+    @Test
+    void aParkedSelectorBatchDrainsItsOwnSchema(@TempDir Path dir) throws Exception {
+        Path toon = selectorRoutePipeline(dir, true);
+        String armed = Files.readString(toon);
+        Files.writeString(toon, withDisabled(armed, "sink_beta__d1"));
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()));
+        Files.writeString(inbox.resolve("b.csv"), "ID,AMT,EVENT_DATE,NOTE\nB1,1.0,2020-04-03,x\nN2,2.0,2020-04-03,y\n");
+
+        CollectorProcessor.run(cfg);
+        assertEquals(List.of("B1"), ids(dir.resolve("db_bulk/beta")));
+        assertEquals(List.of(), ids(dir.resolve("db_normal/beta")));
+
+        String batchId = soleManifestId(dir);
+        Files.writeString(toon, armed);
+        assertEquals(List.of("sink_beta__d1"), DrainCommand.run(toon.toString(), batchId).drainedBranches());
+        assertEquals(List.of("N2"), ids(dir.resolve("db_normal/beta")));
+        assertFalse(Files.exists(dir.resolve("db_normal/alpha")), "never written as the first schema");
+    }
+
+    private static String withDisabled(String toon, String step) {
+        return toon.replaceFirst("(?m)^(  threads: 1\\n)", "$1  disabled_steps[1]: " + step + "\n");
+    }
+
+    private static String soleManifestId(Path dir) throws Exception {
+        try (java.util.stream.Stream<Path> w = Files.walk(dir.resolve("status"))) {
+            String name = w.filter(p -> p.getFileName().toString().endsWith(".json")).findFirst()
+                    .orElseThrow(() -> new AssertionError("no manifest")).getFileName().toString();
+            return name.substring(0, name.length() - ".json".length());
+        }
+    }
+
+    /** The first CSV column (the record id) of every data row under {@code root}, sorted; empty if absent. */
+    static List<String> ids(Path root) throws Exception {
+        if (!Files.exists(root)) return List.of();
+        try (java.util.stream.Stream<Path> w = Files.walk(root)) {
+            return w.filter(Files::isRegularFile)
+                    .flatMap(p -> {
+                        try { return Files.readAllLines(p).stream().skip(1); }
+                        catch (Exception e) { throw new RuntimeException(e); }
+                    })
+                    .map(l -> l.split(",", 2)[0]).sorted().toList();
+        }
+    }
+
     // ── fixtures (shared with the later slices' tests) ────────────────────────
 
     /** A CSV {@code schemas[2]} selector (alpha: 3 columns, beta: 4) with a two-branch route on {@code ID}. */

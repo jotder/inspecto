@@ -129,7 +129,7 @@ public final class DrainCommand {
                 batchId, parkTables.size(), parkTables.keySet(), m.members.size(), pending.outputs().size());
 
         // ── rebuild the batch's identity from the manifest (the ingest JVM is long gone) ──
-        SchemaSelector.Selection selection = soleSchema(cfg, batchId, m);
+        SchemaSelector.Selection selection = batchSchema(cfg, batchId, m);
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
 
         List<Consignment.Member> survivors = new ArrayList<>();
@@ -141,12 +141,21 @@ public final class DrainCommand {
         }
         Consignment batch = new Consignment(batchId, m.schemaName, m.outputTable, List.copyOf(survivors));
 
-        List<String> partCols = ConsignmentIngestStrategy.partitionColumns(selection.schema());
-        String dbDir    = ConsignmentIngestStrategy.databaseDir(batch, cfg);
         String baseName = ConsignmentIngestStrategy.consolidatedBaseName(survivors, batch);
+        // Each parked sink is written where ITS schema's write put it: a segment's under database/<segKey>
+        // with that segment's partitions (UnionModeIngester's home), a selector/single-schema batch's under
+        // the batch's own table dir. The sink node names its schema (lift config `table` / `schema`).
+        boolean segmented = cfg.schemas().segments() != null && !cfg.schemas().segments().isEmpty();
+        for (String nodeId : m.parkedAt) {
+            Object table = byId.get(nodeId).cfg("table");
+            if (!segmented && table != null && !table.equals(m.outputTable))
+                throw new IllegalStateException("Refusing to drain " + batchId + ": parked step '" + nodeId
+                        + "' belongs to schema '" + table + "', but the batch was written under '"
+                        + m.outputTable + "' — a selector batch is one schema, so this is not its step.");
+        }
 
         LocalDateTime start = LocalDateTime.now();
-        IngestSinkWriter writer;
+        Map<String, IngestSinkWriter> writers = new LinkedHashMap<>();   // per schema home, in first-use order
         BranchCommitCoordinator.Result committed;
         File tempDb = ConsignmentIngestStrategy.openTempDb(cfg, "drain_");
         try (Connection conn = DuckDbUtil.openConnection(tempDb)) {
@@ -162,7 +171,16 @@ public final class DrainCommand {
                 }
             }
 
-            writer = new IngestSinkWriter(conn, cfg, partCols, dbDir, baseName, batchId, srcIdToFile);
+            java.util.function.Function<PipelineNode, IngestSinkWriter> writerFor = node -> {
+                String segKey = segmented ? String.valueOf(node.cfg("table")) : "";
+                return writers.computeIfAbsent(segKey, k -> {
+                    Map<String, Object> schema = segmented ? cfg.schemas().segments().get(k) : selection.schema();
+                    String dbDir = segmented ? Paths.get(cfg.dirs().database(), k).toString()
+                                             : ConsignmentIngestStrategy.databaseDir(batch, cfg);
+                    return new IngestSinkWriter(conn, cfg, ConsignmentIngestStrategy.partitionColumns(schema),
+                            dbDir, baseName, batchId, srcIdToFile);
+                });
+            };
             BranchCommitLog commitLog = new BranchCommitLog(
                     ConsignmentIngestStrategy.branchCommitLogPath(cfg, batchId).toString());
             // Every branch this batch owes: the ones the park run already committed (durable in the log)
@@ -170,7 +188,6 @@ public final class DrainCommand {
             Set<String> expected = new LinkedHashSet<>(commitLog.committedBranches(batchId));
             expected.addAll(m.parkedAt);
 
-            IngestSinkWriter w = writer;
             // ⚠ The coordinator's SOURCE phase is NOT this lane's finalisation signal: on the ingest
             // path ConsignmentGraphRunner's SourceFinalizer is a deliberate no-op (finalisation belongs to
             // ConsignmentIngestor.commit, once the batch outcome exists), so the park run already recorded
@@ -178,7 +195,8 @@ public final class DrainCommand {
             // that IS meaningful — the durable, idempotent per-BRANCH skip — and runs the real commit
             // tail itself right after, exactly as ConsignmentIngestor.commit does when the runner returns.
             committed = new BranchCommitCoordinator(commitLog).commit(batchId, expected,
-                    branch -> w.write(byId.get(branch), seeded.get(branch)), () -> { });
+                    branch -> writerFor.apply(byId.get(branch)).write(byId.get(branch), seeded.get(branch)),
+                    () -> { });
 
             Set<String> nowCommitted = commitLog.committedBranches(batchId);
             if (!nowCommitted.containsAll(expected))
@@ -186,7 +204,7 @@ public final class DrainCommand {
                         + "expected " + expected + ", durable " + nowCommitted
                         + ". Nothing was lost; the park tables are untouched.");
             restoreOriginalsToInbox(m, poll);
-            finalizeWholeBatch(batch, cfg, survivors, pending, w);
+            finalizeWholeBatch(batch, cfg, survivors, pending, writers.values());
         } finally {
             DuckDbUtil.deleteTempDb(tempDb);
         }
@@ -196,32 +214,44 @@ public final class DrainCommand {
         ParkedCommit.delete(parkHome, batchId);
         Files.deleteIfExists(ConsignmentIngestStrategy.branchCommitLogPath(cfg, batchId));
 
-        writeDrainAudit(batch, cfg, m, writer, start);
+        List<PartitionOutput> drainedOutputs = new ArrayList<>();
+        List<LineageRow> drainedLineage = new ArrayList<>();
+        for (IngestSinkWriter w : writers.values()) {
+            drainedOutputs.addAll(w.outputs());
+            drainedLineage.addAll(w.lineage());
+        }
+        writeDrainAudit(batch, cfg, m, drainedOutputs, drainedLineage, start);
         log.info("[DRAIN] {} complete — {} branch(es) drained, {} output file(s)",
-                batchId, committed.committedBranches().size(), writer.outputs().size());
-        return new Result(batchId, committed.committedBranches(), writer.outputs().size(),
-                writer.lineage().stream().mapToLong(LineageRow::rowCount).sum());
+                batchId, committed.committedBranches().size(), drainedOutputs.size());
+        return new Result(batchId, committed.committedBranches(), drainedOutputs.size(),
+                drainedLineage.stream().mapToLong(LineageRow::rowCount).sum());
     }
 
     /**
-     * The one schema this batch was written with. An armed {@code route:} pipeline is single-schema by
-     * construction (multi-schema × route is a standing refusal), so there is exactly one — from the
-     * {@code schemas[]} selector or the legacy {@code schema_file}. A plugin ({@code segments}) path
-     * never reaches the branch-aware lane, so it is refused rather than guessed at.
+     * The schema this batch was written with, by its manifest (branch-aware segment lift S5 — a multi-schema
+     * {@code route:} arms since 2026-09-24):
+     * <ul>
+     *   <li>a {@code schemas[]} selector batch is ONE schema — the entry whose table is the manifest's
+     *       {@code outputTable}; a table no entry declares any more is refused, never guessed at;</li>
+     *   <li>a legacy {@code schema_file} batch — that schema;</li>
+     *   <li>a plugin {@code segments} batch has no single schema (the planner's selection carries none);
+     *       each parked sink names its own segment, resolved per sink in {@link #run}.</li>
+     * </ul>
      */
-    private static SchemaSelector.Selection soleSchema(PipelineConfig cfg, String batchId, ConsignmentManifest m) {
+    private static SchemaSelector.Selection batchSchema(PipelineConfig cfg, String batchId, ConsignmentManifest m) {
         PipelineConfig.Schemas schemas = cfg.schemas();
         if (schemas.selector() != null && schemas.selector().hasSchemas()) {
-            List<SchemaSelector.Selection> entries = schemas.selector().entries();
-            if (entries.size() != 1)
-                throw new IllegalStateException("Refusing to drain " + batchId + ": this pipeline declares "
-                        + entries.size() + " schemas, and an armed route: pipeline is single-schema by"
-                        + " construction — this batch was not parked by a shape this command can complete.");
-            return entries.get(0);
+            for (SchemaSelector.Selection s : schemas.selector().entries())
+                if (s.table() != null && s.table().equals(m.outputTable)) return s;
+            throw new IllegalStateException("Refusing to drain " + batchId + ": it was written under table '"
+                    + m.outputTable + "', which no processing.schemas[] entry declares any more — restore the"
+                    + " schema, or discard the Consignment deliberately.");
         }
         if (schemas.single() != null) return new SchemaSelector.Selection(schemas.single(), m.outputTable);
+        if (schemas.segments() != null && !schemas.segments().isEmpty())
+            return new SchemaSelector.Selection(null, m.outputTable);
         throw new IllegalStateException("Refusing to drain " + batchId
-                + ": this pipeline resolves no CSV schema (plugin or schema-less draft).");
+                + ": this pipeline resolves no schema (a schema-less draft).");
     }
 
     /**
@@ -304,16 +334,18 @@ public final class DrainCommand {
      * drain just wrote — one register, one manifest, one §11.3 registration for the whole Consignment.
      */
     private static void finalizeWholeBatch(Consignment batch, PipelineConfig cfg, List<Consignment.Member> survivors,
-                                           ParkedCommit pending, IngestSinkWriter writer)
+                                           ParkedCommit pending, java.util.Collection<IngestSinkWriter> writers)
             throws java.io.IOException {
         List<PartitionOutput> outputs = new ArrayList<>(pending.outputs());
-        outputs.addAll(writer.outputs());
         List<LineageRow> lineage = new ArrayList<>(pending.lineage());
-        lineage.addAll(writer.lineage());
         Map<String, EventTimeBounds> bounds = new LinkedHashMap<>();
         pending.bounds().forEach((file, b) ->
                 bounds.put(file, new EventTimeBounds(b.min(), b.max(), b.spreadMs())));
-        bounds.putAll(writer.bounds());
+        for (IngestSinkWriter writer : writers) {
+            outputs.addAll(writer.outputs());
+            lineage.addAll(writer.lineage());
+            bounds.putAll(writer.bounds());
+        }
         ConsignmentIngestor.finalizeSource(batch, cfg, survivors, outputs, lineage, bounds);
     }
 
@@ -324,21 +356,22 @@ public final class DrainCommand {
      * Only the lineage this drain produced is appended — the park run already recorded the rest.
      */
     private static void writeDrainAudit(Consignment batch, PipelineConfig cfg, ConsignmentManifest m,
-                                        IngestSinkWriter writer, LocalDateTime start) {
+                                        List<PartitionOutput> outputs, List<LineageRow> lineage,
+                                        LocalDateTime start) {
         ConsignmentAuditWriter audit = new ConsignmentAuditWriter(
                 cfg.dirs().statusFilePath(), cfg.dirs().batchesFilePath(), cfg.dirs().lineageFilePath(),
                 cfg.dirs().commitLogPath());
         audit.setTerminalBatchSink(com.gamma.signal.PipelineConsignmentSignal::emit);
         LocalDateTime end = LocalDateTime.now();
-        long rows  = writer.lineage().stream().mapToLong(LineageRow::rowCount).sum();
-        long bytes = writer.outputs().stream().mapToLong(PartitionOutput::bytes).sum();
+        long rows  = lineage.stream().mapToLong(LineageRow::rowCount).sum();
+        long bytes = outputs.stream().mapToLong(PartitionOutput::bytes).sum();
         audit.flush(new ConsignmentAuditWriter.ConsignmentRow(
                 batch.batchId(), cfg.identity().pipelineName(), m.schemaName, m.outputTable,
                 start.format(DuckDbUtil.DT_FMT), end.format(DuckDbUtil.DT_FMT), "SUCCESS",
                 // rejected_files, rejected_rows, total_input_rows (D2, 2026-09-22): a drain replays
                 // already-parsed rows, so nothing is rejected here and input == output.
-                m.members.size(), 0, 0L, rows, rows, writer.outputs().size(), bytes,
+                m.members.size(), 0, 0L, rows, rows, outputs.size(), bytes,
                 java.time.Duration.between(start, end).toMillis(), null),
-                List.of(), writer.lineage());
+                List.of(), lineage);
     }
 }

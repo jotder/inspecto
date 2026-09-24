@@ -257,6 +257,32 @@ class PipelineLiftTest {
         assertFalse(routeFedSinkIds.isEmpty(), "the fixture actually routes");
     }
 
+    /**
+     * The multi-schema half of the pin above: one route: block lifts once PER SCHEMA, so the parkable ids
+     * carry the schema suffix — and the gate's {@code liftKey} mirror must match {@code routeKey} exactly.
+     */
+    @Test
+    void multiSchemaParkableSinkIdsMatchTheLiftedGraph(@TempDir Path dir) throws Exception {
+        for (boolean segments : List.of(true, false)) {
+            PipelineConfig cfg = multiSchemaRoute(dir.resolve(segments ? "seg" : "sel"), segments, false);
+            PipelineGraph g = PipelineLift.lift(cfg);
+            Set<String> routeFed = new java.util.LinkedHashSet<>();
+            for (PipelineEdge e : g.edges())
+                if (e.rel().startsWith("route:") && "transform.route".equals(g.byId().get(e.from()).type()))
+                    routeFed.add(e.to());
+            List<String> keys = segments
+                    ? cfg.schemas().segments().keySet().stream().map(k -> com.gamma.etl.StepDisableArming.liftKey(k, 0)).toList()
+                    : List.of(com.gamma.etl.StepDisableArming.liftKey("alpha", 0), com.gamma.etl.StepDisableArming.liftKey("beta", 1));
+            List<String> sinkDbs = cfg.sinks().stream().map(PipelineConfig.Sink::database).toList();
+            assertEquals(routeFed, new java.util.LinkedHashSet<>(
+                    com.gamma.etl.StepDisableArming.parkableSinkIds(cfg.routeConfig(), sinkDbs, keys)));
+            assertEquals(4, routeFed.size(), "two schemas × two branches: " + routeFed);
+        }
+        for (String name : List.of("receipt", "stock-receipt", " _x.y_ ", "", "--"))
+            for (int i : new int[]{0, 3})
+                assertEquals(PipelineLift.routeKey(name, i), com.gamma.etl.StepDisableArming.liftKey(name, i), name);
+    }
+
     // ── scope(graph, key): one schema's slice of a multi-schema lift ─────────
 
     @Test
@@ -305,6 +331,7 @@ class PipelineLiftTest {
     /** An inactive route over either multi-schema shape: plugin segments (receipt/dispatch) or a
      *  schemas[] selector (alpha/beta); {@code chain} gives the bulk branch a filter step. */
     private static PipelineConfig multiSchemaRoute(Path dir, boolean segments, boolean chain) throws Exception {
+        Files.createDirectories(dir);
         Path schema = dir.resolve("s.toon");
         Files.writeString(schema, PipelineConfigBatchTest.miniSchema());
         String s = schema.toString().replace("\\", "/");
