@@ -58,6 +58,25 @@ lane-wide since 2026-09-01: the Stage-2 **orphan-`output_store:` check is defaul
 space (transition-debounced signal; `-Djobs.orphan.audit=false` to disable) — see
 [stage1-architecture](../engine/stage1-architecture.md) §Step 3.
 
+**Record-level replay evidence (X4, 2026-09-24/25).** The ingest lane's `?dryRun=true` runs the real
+ingest pass over member copies in a deleted scratch root (`PipelineTestRun.dryIngest`, contained;
+zero side effects pinned by `FlatLaneDryRunParseTest`) and reports per member a `MemberOutcome`:
+the member's **kind** of end (`WOULD_LAND` / `REJECTED` / `SKIPPED` / `FAULT`) and, since 2026-09-25,
+its **rejected records** — `rejects: [RejectedRecord(line, reason)]`, capped at
+`PipelineTestRun.REJECTS_PER_MEMBER` (100) in file order, plus an uncapped `rejectTotal`. They are read
+from the reject sidecar `<errors>/<file>_errors.csv` **before** the scratch root is deleted; the offset
+is the sidecar's own `line_number` column (both CSV ingesters already wrote one — nothing was added to
+the sidecar) and the reason its `reason` column, located by header name because the native ingester
+has a `columns` field between them (`CsvIngester.rejectSidecar` is the one path). ⚠ The sidecar has
+**two homes**: `errors/` for a member accepted while losing rows, and the quarantine tree for a member
+rejected whole as a field mismatch (`QuarantineManager` moves it with the file) — the reader checks
+both, and a mutant reading only `errors/` goes red. The raw line is deliberately **not** carried (reject
+rows hold raw source data). Surface: `DryIngest.members()` and one `dry run: … rejected record(s), first
+N of M: line L (reason); …` log line per member — the trigger's HTTP response (`202 + {runId,…}`) does
+not carry it, so `docs/api/openapi-v1.json` is unchanged. Plugin decoders write no sidecar, so their
+members report `rejectTotal = 0`. **Decided 2026-09-25 (operator):** the replay default is
+**eject-and-continue**; this was its stated precondition, and replay itself is still unbuilt.
+
 ## Identity and status, per lane
 
 (Supersedes the two-lane table that lived in

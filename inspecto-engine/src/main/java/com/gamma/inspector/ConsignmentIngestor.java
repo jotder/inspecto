@@ -99,11 +99,18 @@ public final class ConsignmentIngestor {
                             + "log went to a deleted scratch root)",
                     batch.batchId(), batch.members().size(), strategy.getClass().getSimpleName(),
                     batch.table(), outcome.status(), dry.parsedRows(), dry.wouldLandRows());
-            for (PipelineTestRun.MemberOutcome m : dry.members())
+            for (PipelineTestRun.MemberOutcome m : dry.members()) {
                 log.info("dry run: consignment {} member {} → {} ({}): {} parsed, {} rejected row(s){}",
                         batch.batchId(), m.filename(), m.kind(), m.status() == null ? "not reached" : m.status(),
                         m.parsedRows(), m.errorRows(),
                         m.reason() == null || m.reason().isBlank() ? "" : " — " + m.reason());
+                // X4: per-RECORD offsets + reasons, read from the reject sidecar before the scratch went.
+                if (m.rejectTotal() > 0)
+                    log.info("dry run: consignment {} member {} rejected record(s), first {} of {}: {}",
+                            batch.batchId(), m.filename(), m.rejects().size(), m.rejectTotal(),
+                            m.rejects().stream().map(r -> "line " + r.line() + " (" + r.reason() + ")")
+                                    .collect(java.util.stream.Collectors.joining("; ")));
+            }
         } else {
             try {
                 outcome = strategy.ingest(batch, cfg);

@@ -349,6 +349,16 @@ public final class CsvIngester {
             java.util.regex.Pattern.compile("\\.(gz|bz2|zip|z)$", java.util.regex.Pattern.CASE_INSENSITIVE);
     private static final java.util.regex.Pattern EXT_SUFFIX = java.util.regex.Pattern.compile("\\.[^.]+$");
 
+    /**
+     * The per-file reject sidecar {@code <dirs.errors>/<basename>_errors.csv} both CSV ingesters write —
+     * the one location, exposed for readers outside this package (the dry run reads it back before its
+     * scratch root is deleted). Its header always names {@code line_number} (first) and {@code reason};
+     * the native ingester adds {@code columns} between them, so read it by header name.
+     */
+    public static Path rejectSidecar(File file, PipelineConfig cfg) {
+        return ParserSpec.errorFile(file, cfg);
+    }
+
     /** Strips a compression suffix ({@code .gz}/{@code .bz2}/{@code .zip}/{@code .Z}) then the remaining
      *  extension — {@code .Z} added with the unpack stage so an expanded file's errors CSV pairs with its
      *  original's quarantine move. */

@@ -110,6 +110,72 @@ class FlatLaneDryRunParseTest {
         assertTrue(ParkedBranches.drain(batch.batchId() + PipelineTestRun.DRY_BATCH_SUFFIX).isEmpty());
     }
 
+    /**
+     * X4's precondition: each member's rejected RECORDS — line number + reason, as the reject sidecar
+     * {@code <errors>/<file>_errors.csv} records them — are read out of the scratch root before it is deleted.
+     * Both homes the sidecar can have are covered: {@code errors/} for a member accepted while losing rows, and
+     * the quarantine tree for a wholly-rejected member ({@code QuarantineManager} moves the sidecar with it).
+     */
+    @Test
+    void aDryRunReportsEachMembersRejectedRecordsWithLineAndReason(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, MULTI);
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        Path partial = Files.writeString(inbox.resolve("a_partial.csv"),
+                HEADER + "a1,1.0,2020-04-03\nshort-line\na2,2.0,2020-04-03\nalso-short\n");
+        Path clean = Files.writeString(inbox.resolve("b_clean.csv"), HEADER + "b1,1.0,2020-04-03\n");
+        Path bad = Files.writeString(inbox.resolve("c_bad.csv"), BAD);
+        Consignment batch = onlyBatch(cfg, List.of(partial.toFile(), clean.toFile(), bad.toFile()));
+
+        PipelineTestRun.DryIngest dry = PipelineTestRun.dryIngest(batch, cfg);
+
+        Map<String, MemberOutcome> by = dry.members().stream()
+                .collect(Collectors.toMap(MemberOutcome::filename, Function.identity()));
+
+        MemberOutcome p = by.get("a_partial.csv");
+        assertEquals(MemberKind.WOULD_LAND, p.kind(), p.toString());
+        assertEquals(2, p.rejectTotal(), "two short lines rejected: " + p);
+        assertEquals(p.errorRows(), p.rejectTotal(), "the sidecar agrees with the pass's own count: " + p);
+        assertEquals(2, p.rejects().size(), p.toString());
+        List<Long> lines = p.rejects().stream().map(PipelineTestRun.RejectedRecord::line).toList();
+        assertEquals(lines.stream().sorted().toList(), lines, "in file order: " + p);
+        assertTrue(lines.get(0) > 0 && lines.get(1) > lines.get(0), "real line numbers: " + p);
+        for (PipelineTestRun.RejectedRecord r : p.rejects())
+            assertFalse(r.reason().isBlank(), "every record carries a reason: " + r);
+
+        MemberOutcome c = by.get("b_clean.csv");
+        assertEquals(0, c.rejectTotal(), c.toString());
+        assertTrue(c.rejects().isEmpty(), c.toString());
+
+        MemberOutcome b = by.get("c_bad.csv");
+        assertEquals(MemberKind.REJECTED, b.kind(), b.toString());
+        assertEquals(2, b.rejectTotal(), "the sidecar followed the member into the scratch quarantine: " + b);
+
+        // Still zero side effects: the sidecars were read, then deleted with the scratch root.
+        for (Path f : List.of(partial, clean, bad)) assertTrue(Files.exists(f), "inbox member moved: " + f);
+        assertEquals(0, filesUnder(cfg.dirs().errors()), "no sidecar outside the scratch root");
+        assertEquals(0, filesUnder(cfg.dirs().quarantine()));
+        assertEquals(0, filesUnder(cfg.dirs().temp()), "the scratch root is deleted before returning");
+    }
+
+    /** The per-member list is CAPPED; the total is not. */
+    @Test
+    void theRejectedRecordListIsCappedButTheTotalIsExact(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = load(dir, MULTI);
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        int bad = PipelineTestRun.REJECTS_PER_MEMBER + 25;
+        StringBuilder sb = new StringBuilder(HEADER).append("a1,1.0,2020-04-03\n");
+        for (int i = 0; i < bad; i++) sb.append("short-").append(i).append('\n');
+        Path many = Files.writeString(inbox.resolve("many.csv"), sb.toString());
+        Consignment batch = onlyBatch(cfg, List.of(many.toFile()));
+
+        MemberOutcome m = PipelineTestRun.dryIngest(batch, cfg).members().getFirst();
+
+        assertEquals(bad, m.rejectTotal(), m.kind() + " " + m.status());
+        assertEquals(PipelineTestRun.REJECTS_PER_MEMBER, m.rejects().size());
+    }
+
     /** Control for the quarantine probe: the same members ingested for real DO leave the inbox. */
     @Test
     void theRealPassQuarantinesTheSameMembers(@TempDir Path dir) throws Exception {

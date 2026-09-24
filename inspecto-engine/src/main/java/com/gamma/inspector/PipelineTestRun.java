@@ -254,9 +254,30 @@ public final class PipelineTestRun {
      * One member's dry-run result. {@code status} is the {@link MemberStatus} wire form the ingest pass
      * assigned, or {@code null} when the batch threw before reaching this member; {@code reason} is the
      * pass's own message (the rejection reason, or the batch's fault).
+     *
+     * @param rejects     the member's first {@value #REJECTS_PER_MEMBER} rejected records, in sidecar (file)
+     *                    order — read from the scratch root before it is deleted (EXECUTION-RESIDUALS X4)
+     * @param rejectTotal every record the sidecar holds; {@code 0} when the member wrote no sidecar
      */
     public record MemberOutcome(int srcId, String filename, MemberKind kind, String status,
-                                long parsedRows, long errorRows, String reason) {}
+                                long parsedRows, long errorRows, String reason,
+                                List<RejectedRecord> rejects, long rejectTotal) {}
+
+    /**
+     * One rejected RECORD of a member, as its reject sidecar ({@code <errors>/<file>_errors.csv}) records it:
+     * {@code line} is the sidecar's {@code line_number} — the ingester's own line number in the member file —
+     * and {@code reason} its {@code reason} column. The raw line is deliberately NOT carried: reject rows hold
+     * raw source data, and the offset is what a replay keys on.
+     */
+    public record RejectedRecord(long line, String reason) {}
+
+    /** How many {@link RejectedRecord}s one member reports — the list is capped, {@code rejectTotal} is not. */
+    public static final int REJECTS_PER_MEMBER = 100;
+
+    /** A member's reject sidecar, read back: the capped records plus the uncapped count. */
+    private record Rejects(List<RejectedRecord> records, long total) {
+        static final Rejects NONE = new Rejects(List.of(), 0);
+    }
 
     /**
      * What a dry run of ONE Consignment observed. {@code outcome} is the real ingest pass's, with each
@@ -300,13 +321,15 @@ public final class PipelineTestRun {
         java.time.LocalDateTime start = java.time.LocalDateTime.now();
         Path scratchRoot = null;
         PipelineConfig scratch = null;
+        List<File> staged = null;
+        Map<Integer, Rejects> rejects = Map.of();
         IngestOutcome raw;
         try {
             scratchRoot = newDryScratchRoot(cfg);
             PipelineConfig s = cfg.forScratchRun(scratchRoot);
             scratch = s;
             Files.createDirectories(Path.of(s.dirs().database()));
-            List<File> staged = stage(batch.members().stream().map(m -> m.file().toPath()).toList(),
+            staged = stage(batch.members().stream().map(m -> m.file().toPath()).toList(),
                     Path.of(s.dirs().poll()));
             List<Consignment.Member> copies = new ArrayList<>();
             for (int i = 0; i < staged.size(); i++) {
@@ -335,13 +358,15 @@ public final class PipelineTestRun {
                             dryId, e.toString());
                 }
             }
+            // X4: the reject sidecars live under the scratch root — read them before it goes.
+            if (scratch != null && staged != null) rejects = readRejects(batch, staged, scratch);
             deleteScratch(scratchRoot);
         }
-        return report(batch, raw);
+        return report(batch, raw, rejects);
     }
 
     /** Rename each audit back to its inbox member (by {@code srcId}) and classify every member. */
-    private static DryIngest report(Consignment batch, IngestOutcome raw) {
+    private static DryIngest report(Consignment batch, IngestOutcome raw, Map<Integer, Rejects> rejects) {
         boolean failed = "FAILED".equals(raw.status());
         Map<Integer, MemberAudit> bySrc = new LinkedHashMap<>();
         for (MemberAudit ma : raw.memberAudits()) bySrc.put(ma.srcId(), ma);
@@ -350,8 +375,10 @@ public final class PipelineTestRun {
         for (Consignment.Member m : batch.members()) {
             String name = m.file().getName();
             MemberAudit ma = bySrc.get(m.srcId());
+            Rejects rj = rejects.getOrDefault(m.srcId(), Rejects.NONE);
             if (ma == null) {
-                members.add(new MemberOutcome(m.srcId(), name, MemberKind.FAULT, null, 0, 0, raw.error()));
+                members.add(new MemberOutcome(m.srcId(), name, MemberKind.FAULT, null, 0, 0, raw.error(),
+                        rj.records(), rj.total()));
                 continue;
             }
             renamed.add(new MemberAudit(ma.srcId(), name, ma.status(), ma.parsedRows(), ma.errorRows(),
@@ -359,12 +386,82 @@ public final class PipelineTestRun {
             MemberKind kind = MemberKind.of(ma.status(), failed);
             String reason = kind == MemberKind.FAULT ? raw.error() : ma.error();
             members.add(new MemberOutcome(m.srcId(), name, kind, ma.status().name(),
-                    ma.parsedRows(), ma.errorRows(), reason));
+                    ma.parsedRows(), ma.errorRows(), reason, rj.records(), rj.total()));
         }
         IngestOutcome outcome = new IngestOutcome(raw.batchStart(), raw.status(), raw.error(), List.of(),
                 List.copyOf(renamed), List.of(), raw.lineage(), raw.totalInputRows(), raw.schemaLabel(),
                 Map.of(), Map.of(), raw.castFailures());
         return new DryIngest(outcome, List.copyOf(members));
+    }
+
+    /**
+     * Read each staged member's reject sidecar, keyed by {@code srcId}. The sidecar has two possible homes:
+     * {@code dirs.errors} for a member accepted while losing rows, and — for a member quarantined as a field
+     * mismatch — beside it in the quarantine tree, where {@code QuarantineManager} moves it. Both are under the
+     * scratch root here. Never throws: an unreadable sidecar is logged and reported as none.
+     */
+    private static Map<Integer, Rejects> readRejects(Consignment batch, List<File> staged, PipelineConfig scratch) {
+        Map<Integer, Rejects> out = new LinkedHashMap<>();
+        for (int i = 0; i < staged.size(); i++) {
+            Path sidecar = com.gamma.etl.CsvIngester.rejectSidecar(staged.get(i), scratch);
+            try {
+                if (!Files.isRegularFile(sidecar)) sidecar = findUnder(scratch.dirs().quarantine(), sidecar);
+                if (sidecar != null) out.put(batch.members().get(i).srcId(), readSidecar(sidecar));
+            } catch (IOException | RuntimeException e) {
+                log.warn("dry run: could not read the reject sidecar of {}: {}", staged.get(i).getName(), e.toString());
+            }
+        }
+        return out;
+    }
+
+    private static Path findUnder(String root, Path sidecar) throws IOException {
+        if (root == null || !Files.isDirectory(Path.of(root))) return null;
+        String name = sidecar.getFileName().toString();
+        try (Stream<Path> walk = Files.walk(Path.of(root))) {
+            return walk.filter(p -> Files.isRegularFile(p) && p.getFileName().toString().equals(name))
+                    .findFirst().orElse(null);
+        }
+    }
+
+    /** Stream one sidecar: the first {@value #REJECTS_PER_MEMBER} records, and a count of all of them. */
+    private static Rejects readSidecar(Path sidecar) throws IOException {
+        List<RejectedRecord> records = new ArrayList<>();
+        long total = 0;
+        try (java.io.BufferedReader r = Files.newBufferedReader(sidecar, java.nio.charset.StandardCharsets.UTF_8)) {
+            String header = r.readLine();
+            if (header == null) return Rejects.NONE;
+            List<String> cols = splitSidecarLine(header);
+            int lineIdx = cols.indexOf("line_number"), reasonIdx = cols.indexOf("reason");
+            if (lineIdx < 0 || reasonIdx < 0)
+                throw new IOException("unrecognised reject sidecar header: " + header);
+            for (String row; (row = r.readLine()) != null; ) {
+                if (row.isEmpty()) continue;
+                total++;
+                if (records.size() >= REJECTS_PER_MEMBER) continue;
+                List<String> f = splitSidecarLine(row);
+                records.add(new RejectedRecord(Long.parseLong(f.get(lineIdx).trim()),
+                        reasonIdx < f.size() ? f.get(reasonIdx) : ""));
+            }
+        }
+        return new Rejects(List.copyOf(records), total);
+    }
+
+    /**
+     * Split one sidecar line. Both writers emit an unquoted number, then {@code "..."} fields with every inner
+     * {@code "} already replaced by {@code '} — so a quote always opens or closes a field, never escapes one.
+     */
+    private static List<String> splitSidecarLine(String line) {
+        List<String> out = new ArrayList<>();
+        StringBuilder cur = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') quoted = !quoted;
+            else if (c == ',' && !quoted) { out.add(cur.toString()); cur.setLength(0); }
+            else cur.append(c);
+        }
+        out.add(cur.toString());
+        return out;
     }
 
     /**
