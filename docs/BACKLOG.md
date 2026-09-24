@@ -15,12 +15,12 @@ number** — rows moved between sections in this consolidation, and older docs c
 
 > **42<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 24<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
-> ⬇ **55 → 54 on 2026-09-24**: P2 `STREAM-CONSUMER-1` closed — Option A built, the `SP-ACQ-09` note updated, the plan distilled into `okf/capabilities/acquisition/acquisition.md` and archived.
-> ⬇ 55 → 54 on 2026-09-24: P3 `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` closed — its work had shipped in `d5f6353be`
-> (route + contract + dead client mirrors retired) and the consolidation re-listed it.
-> ⬇ 55 → 54 on 2026-09-24: P3 `FLAT-DRYRUN-COUNTS-ZERO-1` shipped — a flat-lane dry run parses inside a
-> contained pass, so its provenance counts are real and each member is reported by kind (X4's evidence
-> precondition, now met; the row's gate text says what is still open).
+> ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
+> P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
+> `PIPELINE-CONFIG-HISTORY-1`, `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` (had shipped in `d5f6353be`), `NODETYPE-SCAFFOLD-EMITS-A-COPY-1`,
+> `FLAT-DRYRUN-COUNTS-ZERO-1`, `DUCKLE-C10-ADMISSION-POOLS-1`, `DUCKLE-C8-BASELINE-EXPECTATION-1`, **EXPORT-1**,
+> `AUDIT-LOG-UNBOUNDED-READ-1`, **Vocabulary rollout, Tier 3**, `QUEUES-USER-FACING-COPY-1` (already fixed in `ec49b7bda`) and
+> `GLOSSARY-CASE-1`. Filed: P2 `SQLGUARD-PARQUET-METADATA-1`. Re-ranked: **Job framework** P2 → P3.
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.

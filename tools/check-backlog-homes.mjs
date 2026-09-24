@@ -193,7 +193,10 @@ for (const row of rows) {
 // `DRYRUN-INVISIBLE-ON-FLAT-LANE-1`, which points at the same OKF concept. The grammar is
 // unchanged and every previously-parsed pointer still parses; this is one more row, not one
 // fewer break.
-const MIN_DOC_POINTERS = 52;
+// 2026-09-24: 52 → 45. The integration of ~30 lanes closed 13 rows at once (55 → 42 on the board) and
+// 12 owning-doc pointers left with them (57 → 45). Each lane alone stayed above 52, so no lane lowered
+// the floor; the grammar is unchanged — every surviving row's pointer still parses.
+const MIN_DOC_POINTERS = 45;
 
 const scope =
     `scope: ${rows.length} board row(s), ${identified} with an identifier and ` +
