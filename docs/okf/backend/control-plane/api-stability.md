@@ -64,10 +64,17 @@ above the generated commit list.
 - `POST /public/delivery-status/{adapterId}` refuses a body over **256 KiB** with **413
   `PAYLOAD_TOO_LARGE`** (a new, additive `ErrorCode`) and is throttled per caller IP (burst 60, then 5/s)
   with **429 `RATE_LIMITED`**. Providers retry a 429; a batch over 256 KiB must be split provider-side.
-- **Breaking (Professional/Enterprise):** `POST /notifications/read-all`, `POST /notifications/{id}/read`,
-  `DELETE /notifications/{id}` and `PUT /notifications/preferences` now require **`canAdminister`** (403
-  `PERMISSION_DENIED` otherwise). They were exempt as per-caller, but the feed state and the preference grid
-  are one shared state per Space. Personal (no authenticator) is unchanged.
+- **Breaking (Professional/Enterprise):** `DELETE /notifications/{id}` and `PUT /notifications/preferences`
+  now require **`canAdminister`** (403 `PERMISSION_DENIED` otherwise). They were exempt as per-caller, but
+  the feed archive and the preference grid are one shared state per Space. Personal (no authenticator) is
+  unchanged.
+- **Behaviour change (every edition, 2026-09-25):** notification **read state is per caller**. `POST
+  /notifications/{id}/read` and `POST /notifications/read-all` stay open to any authenticated caller (no
+  capability) and mark only the caller's own state; `GET /notifications`, the `/notifications/stream` frames
+  and `/notifications/unread-count` report `state` / `readAt` as the caller sees them, plus a new additive
+  boolean **`read`**. New route **`POST /notifications/{id}/unread`** (404 unknown id). A client that read
+  another user's mark through the shared `state` no longer can. On Personal the caller is `appUser` (or the
+  honour-system `X-Actor`).
 - **Breaking (every edition):** `X-Forwarded-For` is **ignored by default** — the client IP recorded in the
   audit trail and used as the unauthenticated rate-limit key is the socket peer unless the peer is listed
   in the new `-Dcontrol.trustedProxies` (IPs/CIDRs), and then the right-most untrusted hop wins, not the

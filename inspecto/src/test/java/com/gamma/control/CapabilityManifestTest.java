@@ -156,22 +156,30 @@ class CapabilityManifestTest {
     }
 
     /**
-     * SEC review F2 (2026-09-24): the notification feed's read/archive state and the preference grid are one
-     * shared state per Space — neither store is keyed by a recipient — so these four writes were never "the
-     * caller's own", which is what their old {@code self-service} exemption claimed. Pinned so a re-exemption
-     * has to delete this test, not just move a line between tables.
+     * SEC review F2 (2026-09-24): the notification feed's archive state and the preference grid are one
+     * shared state per Space — neither store is keyed by a recipient — so those writes were never "the
+     * caller's own", which is what their old {@code self-service} exemption claimed. The READ state is keyed
+     * by the calling Subject since 2026-09-25 (operator decision; {@code NotificationReadState}), so exactly
+     * the three read-state writes are self-service and nothing else under {@code /notifications} may be.
+     * Pinned so a re-exemption has to edit this test, not just move a line between tables.
      */
     @Test
     void sharedNotificationStateWritesStayAdminGated() {
         Set<String> adminGated = new LinkedHashSet<>();
         for (CapabilityManifest.Entry e : CapabilityManifest.ENTRIES)
             if (Roles.CAN_ADMINISTER.equals(e.capability())) adminGated.add(route(e.method(), e.pattern()));
-        for (String r : new String[] {"POST /notifications/read-all", "POST /notifications/([^/]+)/read",
-                "PUT /notifications/preferences", "DELETE /notifications/(?!suppressions$)([^/]+)"})
+        for (String r : new String[] {"PUT /notifications/preferences", "DELETE /notifications/(?!suppressions$)([^/]+)"})
             assertTrue(adminGated.contains(r), () -> r + " writes one global per-Space state and must stay canAdminister");
-        for (CapabilityManifest.Exemption x : CapabilityManifest.EXEMPTIONS)
-            assertFalse(x.pattern().startsWith("/notifications"),
-                    () -> "no /notifications write is caller-scoped, so none may be exempt: " + x);
+        Set<String> selfService = Set.of("POST /notifications/read-all", "POST /notifications/([^/]+)/read",
+                "POST /notifications/([^/]+)/unread");
+        Set<String> exemptNotificationWrites = new LinkedHashSet<>();
+        for (CapabilityManifest.Exemption x : CapabilityManifest.EXEMPTIONS) {
+            if (!x.pattern().startsWith("/notifications")) continue;
+            exemptNotificationWrites.add(route(x.method(), x.pattern()));
+            assertEquals("self-service", x.category(), () -> "a per-Subject read-state write is self-service: " + x);
+        }
+        assertEquals(selfService, exemptNotificationWrites,
+                "only the per-Subject read-state writes are caller-scoped, so only they may be exempt");
     }
 
     private static String route(String method, String pattern) {

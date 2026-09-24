@@ -335,8 +335,14 @@ new capability, or they silently start asserting the gate instead.
 authenticated user could silence a category's email/webhook delivery, or mark read and archive the feed,
 for everyone. All four are now `canAdminister` (fail closed; reads stay open), pinned by
 `CapabilityManifestTest.sharedNotificationStateWritesStayAdminGated` and exercised WITH a Subject in
-`ControlApiNotificationsTest`. ⚠ Consequence: a non-admin's bell can no longer mark read or dismiss; per-user
-read state (a recipient-keyed store) is what would let those four become self-service again.
+`ControlApiNotificationsTest`. ⚠ Consequence: a non-admin's bell could no longer mark read or dismiss.
+**Resolved for READ state, 2026-09-25 (operator):** read state is now per reader — `NotificationReadState`,
+keyed by `ApiContext.actor` (the Subject id; on Personal the `appUser` / `X-Actor` fallback) — so `POST
+/notifications/read-all`, `POST /notifications/{id}/read` and the new `POST /notifications/{id}/unread` are
+`self-service` exemptions again, this time scoped in the store. Delete (archive) and the preference PUT stay
+`canAdminister`: those still write the one shared feed and grid. The pin became "exactly these three may be
+exempt". See [events-metrics](../control-plane/events-metrics.md) §Notifications for the one shared side
+effect a read keeps (the dedupe acknowledgement).
 
 🔴 **The client IP is the socket peer unless a trusted proxy vouches otherwise** (SEC review F3,
 2026-09-24). `ApiContext.ip` — the audit trail's `ip` and the throttle key for callers with no Subject —

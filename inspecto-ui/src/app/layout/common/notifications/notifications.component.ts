@@ -20,6 +20,7 @@ import { Subscription } from 'rxjs';
 import {
     apiUrl,
     DEFAULT_REFRESH_MS,
+    LensService,
     NotificationsService,
     spaceScopedUrl,
     SpacesService,
@@ -99,18 +100,16 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                     } @else {
                         <ul class="divide-y">
                             @for (n of svc.items(); track n.id) {
-                                <li class="flex gap-3 px-4 py-3" [class.opacity-60]="n.state === 'READ'">
+                                <li class="flex gap-3 px-4 py-3" [class.opacity-60]="n.read">
                                     <span
                                         class="mt-1.5 h-2 w-2 shrink-0 rounded-full"
-                                        [class.bg-primary]="n.state === 'UNREAD'"
+                                        [class.bg-primary]="!n.read"
                                         aria-hidden="true"
                                     ></span>
                                     <div class="min-w-0 flex-auto">
-                                        <span
-                                            class="block truncate text-sm"
-                                            [class.font-semibold]="n.state === 'UNREAD'"
-                                            >{{ n.title }}</span
-                                        >
+                                        <span class="block truncate text-sm" [class.font-semibold]="!n.read">{{
+                                            n.title
+                                        }}</span>
                                         @if (n.body) {
                                             <div class="text-secondary mt-0.5 truncate text-sm">{{ n.body }}</div>
                                         }
@@ -120,7 +119,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                                         </div>
                                     </div>
                                     <div class="flex shrink-0 flex-col gap-1">
-                                        @if (n.state === 'UNREAD') {
+                                        @if (!n.read) {
                                             <button
                                                 mat-icon-button
                                                 type="button"
@@ -133,16 +132,34 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                                                     svgIcon="heroicons_outline:check"
                                                 ></mat-icon>
                                             </button>
+                                        } @else {
+                                            <button
+                                                mat-icon-button
+                                                type="button"
+                                                matTooltip="Mark as unread"
+                                                aria-label="Mark as unread"
+                                                (click)="svc.markUnread(n.id)"
+                                            >
+                                                <mat-icon
+                                                    class="icon-size-4"
+                                                    svgIcon="heroicons_outline:envelope"
+                                                ></mat-icon>
+                                            </button>
                                         }
-                                        <button
-                                            mat-icon-button
-                                            type="button"
-                                            matTooltip="Delete"
-                                            aria-label="Delete notification"
-                                            (click)="svc.remove(n.id)"
-                                        >
-                                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:trash"></mat-icon>
-                                        </button>
+                                        @if (canDelete()) {
+                                            <button
+                                                mat-icon-button
+                                                type="button"
+                                                matTooltip="Delete for everyone"
+                                                aria-label="Delete notification for everyone"
+                                                (click)="svc.remove(n.id)"
+                                            >
+                                                <mat-icon
+                                                    class="icon-size-4"
+                                                    svgIcon="heroicons_outline:trash"
+                                                ></mat-icon>
+                                            </button>
+                                        }
                                     </div>
                                 </li>
                             }
@@ -156,6 +173,11 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 export class NotificationBellComponent implements OnInit, OnDestroy {
     readonly svc = inject(NotificationsService);
     private spaces = inject(SpacesService);
+    private lens = inject(LensService);
+
+    /** Read/unread is each user's own, so every user gets those buttons; delete archives the ONE shared
+     *  feed for everyone and the server requires `canAdminister` for it, so only an administrator sees it. */
+    readonly canDelete = this.lens.canAdminister;
     private destroyRef = inject(DestroyRef);
 
     readonly open = signal(false);

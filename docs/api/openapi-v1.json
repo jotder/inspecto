@@ -4652,6 +4652,28 @@
         "x-generated" : true
       }
     },
+    "/notifications/{notificationId}/unread" : {
+      "post" : {
+        "tags" : [ "notifications" ],
+        "summary" : "POST /notifications/{notificationId}/unread (generated skeleton)",
+        "operationId" : "postNotificationsByNotificationIdUnread",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "notificationId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/notifications/preferences" : {
       "get" : {
         "tags" : [ "notifications" ],

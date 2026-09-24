@@ -32,11 +32,25 @@ timestamp: 2026-07-16T00:00:00Z
 
 * **`NotificationService`** — an `EventLog` subscriber that **hands off to a virtual-thread
   executor** (never runs inline — the sync-bus/run-claim hand-off seam above). Feed routes under
-  `/notifications/*` (list / unread-count / read / read-all / delete), real-time via **SSE**
+  `/notifications/*` (list / unread-count / read / unread / read-all / delete), real-time via **SSE**
   `GET /notifications/stream` (blocking handler on a virtual thread, heartbeat, close-hook registry),
   and `NotificationRateLimiter` (rolling per-hour cap on identical notifications — the anti-loop
   safeguard). `NotificationTemplate` uses `{{var}}` interpolation; delivery is gated by
   `NotificationPreferences` (category × channel; critical categories locked on).
+* **Read state is per reader** (operator, 2026-09-25) — the feed (`NotificationStore`) is one shared
+  state per Space, but each reader's read marks live in **`NotificationReadState`**, keyed by
+  `(ApiContext.actor, notification id)`: the Subject id, or on Personal the `appUser` / `X-Actor`
+  fallback. `POST /notifications/{id}/read`, `POST /notifications/{id}/unread` (new) and
+  `POST /notifications/read-all` touch only the caller's marks and are **self-service** (open to any
+  authenticated caller — `CapabilityManifest.EXEMPTIONS`); `GET /notifications`, the SSE frames and
+  `/notifications/unread-count` report `read` / `state` / `readAt` **as the caller sees them**. Delete
+  (archive) and `PUT /notifications/preferences` stay `canAdminister` — those write the shared feed / grid.
+  In memory, like the feed it overlays (a restart forgets both); ≤1000 marks per reader, oldest evicted.
+  ⚠ **One shared side effect, on purpose:** a read also acknowledges the notification in the shared store
+  (`NotificationStore.markRead`), because that is what re-opens the dispatcher's dedupe collapse
+  (`hasActiveDuplicate` matches only store-UNREAD rows) so the next identical alert is delivered again, as
+  before. It can only let a repeat alert through, never hide one, and no reader's view reports it. Tests:
+  `ControlApiNotificationsTest.readStateIsPerSubject` (real HTTP, with Subjects), `NotificationReadStateTest`.
 * **`NotificationChannel`** is a ServiceLoader SPI — in-app is intrinsic; **email is an edition
   seam**, deliberately not in core. A message broker is deliberately not used: in-process
   virtual-thread executor + append-only `EventStore` is the idiom.

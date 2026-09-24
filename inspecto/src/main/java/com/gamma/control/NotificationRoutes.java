@@ -2,8 +2,10 @@ package com.gamma.control;
 
 import com.gamma.notify.ChannelConfig;
 import com.gamma.notify.Notification;
+import com.gamma.notify.NotificationReadState;
 import com.gamma.notify.NotificationRule;
 import com.gamma.notify.NotificationService;
+import com.gamma.notify.NotificationState;
 import com.gamma.notify.NotificationStore;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -36,16 +38,16 @@ final class NotificationRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/notifications", (e, m) -> feed(api, e));
         api.get("/notifications/stream", (e, m) -> stream(api, e));
-        api.get("/notifications/unread-count", (e, m) -> Map.of("count", store(api).unreadCount()));
-        // ⚠ The feed's read/archive state and the preference grid are ONE shared state per Space (neither
-        // store has a recipient), so each write below changes every user's feed or delivery — admin-gated,
-        // not "self-service" (SEC review F2). Reads stay open.
-        api.post("/notifications/read-all", ApiContext.withCapability("canAdminister",
-                (e, m) -> Map.of("updated", store(api).markAllRead())));
-        api.post("/notifications/([^/]+)/read", ApiContext.withCapability("canAdminister",
-                (e, m) -> store(api).markRead(ApiContext.name(m))
-                        .map(Notification::toMap)
-                        .orElseThrow(() -> new ApiException(404, "no notification '" + ApiContext.name(m) + "'"))));
+        api.get("/notifications/unread-count", (e, m) -> Map.of("count", unreadCount(api, ApiContext.actor(e))));
+        // Read state is PER READER (operator, 2026-09-25): each caller marks its own notifications read /
+        // unread, so these three are self-service — open to any authenticated caller, and they touch only
+        // the caller's NotificationReadState marks. See read() for the one shared side effect.
+        api.post("/notifications/read-all", (e, m) -> Map.of("updated", readAll(api, ApiContext.actor(e))));
+        api.post("/notifications/([^/]+)/read", (e, m) -> read(api, ApiContext.actor(e), ApiContext.name(m)));
+        api.post("/notifications/([^/]+)/unread", (e, m) -> unread(api, ApiContext.actor(e), ApiContext.name(m)));
+        // ⚠ The archive ("delete") and the preference grid are ONE shared state per Space (neither store
+        // has a recipient), so each write below changes every user's feed or delivery — admin-gated, not
+        // "self-service" (SEC review F2). Reads stay open.
         api.get("/notifications/preferences", (e, m) -> api.service().notificationPreferences().grid());
         api.put("/notifications/preferences", ApiContext.withCapability("canAdminister",
                 (e, m) -> savePreferences(api, api.body(e))));
@@ -105,6 +107,67 @@ final class NotificationRoutes implements RouteModule {
 
     private static NotificationStore store(ApiContext api) {
         return api.service().notifications();
+    }
+
+    private static NotificationReadState readState(ApiContext api) {
+        return api.service().notificationReadState();
+    }
+
+    /** Every active notification — the feed is bounded by the store itself, so this is never unbounded. */
+    private static List<Notification> active(ApiContext api) {
+        return store(api).recent(Integer.MAX_VALUE);
+    }
+
+    /**
+     * One notification as {@code reader} sees it: {@link Notification#toMap()} with {@code state} /
+     * {@code readAt} taken from the reader's own marks, plus a {@code read} flag. The store's own READ
+     * state is never reported — it is not any one reader's (see {@link #read}).
+     */
+    private static Map<String, Object> view(ApiContext api, String reader, Notification n) {
+        Map<String, Object> m = n.toMap();
+        Long readAt = readState(api).readAt(reader, n.id());
+        if (n.state() != NotificationState.ARCHIVED)
+            m.put("state", (readAt == null ? NotificationState.UNREAD : NotificationState.READ).name());
+        m.put("readAt", readAt);
+        m.put("read", readAt != null);
+        return m;
+    }
+
+    private static long unreadCount(ApiContext api, String reader) {
+        return active(api).stream().filter(n -> readState(api).readAt(reader, n.id()) == null).count();
+    }
+
+    /**
+     * {@code POST /notifications/{id}/read} — mark it read FOR THE CALLER. 404 unknown id.
+     * ⚠ It also acknowledges the notification in the shared store, which is what re-opens the dispatcher's
+     * dedupe collapse ({@link NotificationStore#hasActiveDuplicate}) so the next identical alert is delivered
+     * again, as it was before read state went per-reader. That effect can only let a repeat alert THROUGH,
+     * never hide one, and no reader's feed reports it.
+     */
+    private static Map<String, Object> read(ApiContext api, String reader, String id) {
+        Notification n = existing(api, id);
+        readState(api).markRead(reader, id, System.currentTimeMillis());
+        store(api).markRead(id);
+        return view(api, reader, n);
+    }
+
+    /** {@code POST /notifications/{id}/unread} — mark it unread FOR THE CALLER. 404 unknown id. */
+    private static Map<String, Object> unread(ApiContext api, String reader, String id) {
+        Notification n = existing(api, id);
+        readState(api).markUnread(reader, id);
+        return view(api, reader, n);
+    }
+
+    /** {@code POST /notifications/read-all} — every active notification read FOR THE CALLER; returns how many changed. */
+    private static int readAll(ApiContext api, String reader) {
+        List<String> ids = active(api).stream().map(Notification::id).toList();
+        int changed = readState(api).markAllRead(reader, ids, System.currentTimeMillis());
+        store(api).markAllRead();   // the shared dedupe acknowledgement — see read()
+        return changed;
+    }
+
+    private static Notification existing(ApiContext api, String id) {
+        return store(api).get(id).orElseThrow(() -> new ApiException(404, "no notification '" + id + "'"));
     }
 
     // ── channel destinations (admin CRUD; C4 — persisted as `channel` components per space) ─────────
@@ -248,7 +311,8 @@ final class NotificationRoutes implements RouteModule {
     /** {@code GET /notifications?limit=} — the active feed, newest-first. */
     private static List<Map<String, Object>> feed(ApiContext api, HttpExchange ex) {
         int limit = ApiContext.parseIntOr(ApiContext.query(ex, "limit"), 50);
-        return store(api).recent(limit).stream().map(Notification::toMap).toList();
+        String reader = ApiContext.actor(ex);
+        return store(api).recent(limit).stream().map(n -> view(api, reader, n)).toList();
     }
 
     /**
@@ -261,6 +325,7 @@ final class NotificationRoutes implements RouteModule {
      */
     private static Object stream(ApiContext api, HttpExchange ex) throws IOException {
         NotificationService svc = api.service().notificationService();
+        String reader = ApiContext.actor(ex);
         BlockingQueue<Notification> queue = new LinkedBlockingQueue<>();
         Consumer<Notification> listener = queue::offer;
         Thread me = Thread.currentThread();
@@ -278,7 +343,7 @@ final class NotificationRoutes implements RouteModule {
             while (true) {
                 Notification n = queue.poll(HEARTBEAT_SECONDS, TimeUnit.SECONDS);
                 writeFrame(os, n != null
-                        ? "data: " + ApiContext.JSON.writeValueAsString(n.toMap()) + "\n\n"
+                        ? "data: " + ApiContext.JSON.writeValueAsString(view(api, reader, n)) + "\n\n"
                         : ": ping\n\n");        // heartbeat keeps the connection warm + surfaces a disconnect
             }
         } catch (InterruptedException ie) {

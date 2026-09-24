@@ -3,7 +3,11 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 
-/** One in-app notification (GET /notifications). Mirrors `com.gamma.notify.Notification#toMap()`. */
+/**
+ * One in-app notification (GET /notifications). Mirrors `com.gamma.notify.Notification#toMap()` with the
+ * read state AS THE CALLER SEES IT: read state is per user (2026-09-25), so `read`, `state` and `readAt`
+ * are the signed-in user's own — another user's read never shows here.
+ */
 export interface NotificationRow {
     id: string;
     ts: number;
@@ -15,6 +19,8 @@ export interface NotificationRow {
     body: string;
     state: 'UNREAD' | 'READ' | 'ARCHIVED';
     readAt: number | null;
+    /** Whether the calling user has read it. */
+    read: boolean;
 }
 
 /** Per-channel toggles for one preference-grid category (in-app / email / future SPI channels). */
@@ -108,38 +114,52 @@ export class NotificationsService {
     applyIncoming(n: NotificationRow): void {
         if (this.items().some((x) => x.id === n.id)) return;
         this.items.update((rows) => [n, ...rows]);
-        if (n.state === 'UNREAD') this.unreadCount.update((c) => c + 1);
+        if (!n.read) this.unreadCount.update((c) => c + 1);
     }
 
-    /** Mark one notification read (POST /notifications/{id}/read), updating local state on success. */
+    /** Mark one notification read FOR THIS USER (POST /notifications/{id}/read) — any signed-in user may. */
     markRead(id: string): void {
-        this.http.post(apiUrl(`/notifications/${encodeURIComponent(id)}/read`), {}).subscribe({
-            next: () => {
-                this.items.update((rows) => rows.map((n) => (n.id === id ? { ...n, state: 'READ' as const } : n)));
-                this.unreadCount.update((c) => Math.max(0, c - 1));
-            },
+        this.http.post<NotificationRow>(apiUrl(`/notifications/${encodeURIComponent(id)}/read`), {}).subscribe({
+            next: (row) => this.replace(row),
         });
     }
 
-    /** Mark every notification read (POST /notifications/read-all). */
+    /** Mark one notification unread again FOR THIS USER (POST /notifications/{id}/unread). */
+    markUnread(id: string): void {
+        this.http.post<NotificationRow>(apiUrl(`/notifications/${encodeURIComponent(id)}/unread`), {}).subscribe({
+            next: (row) => this.replace(row),
+        });
+    }
+
+    /** Mark every notification read FOR THIS USER (POST /notifications/read-all). */
     markAllRead(): void {
         this.http.post(apiUrl('/notifications/read-all'), {}).subscribe({
             next: () => {
-                this.items.update((rows) => rows.map((n) => ({ ...n, state: 'READ' as const })));
+                this.items.update((rows) => rows.map((n) => ({ ...n, state: 'READ' as const, read: true })));
                 this.unreadCount.set(0);
             },
         });
     }
 
-    /** Delete (archive) one notification (DELETE /notifications/{id}), removing it from the feed. */
+    /**
+     * Delete (archive) one notification (DELETE /notifications/{id}), removing it from the feed. ⚠ Unlike
+     * read state this is ONE shared feed per Space, so it removes it for everyone and needs `canAdminister`.
+     */
     remove(id: string): void {
         this.http.delete(apiUrl(`/notifications/${encodeURIComponent(id)}`)).subscribe({
             next: () => {
                 const was = this.items().find((n) => n.id === id);
                 this.items.update((rows) => rows.filter((n) => n.id !== id));
-                if (was?.state === 'UNREAD') this.unreadCount.update((c) => Math.max(0, c - 1));
+                if (was && !was.read) this.unreadCount.update((c) => Math.max(0, c - 1));
             },
         });
+    }
+
+    /** Swap in the server's view of one row, moving the badge by the change in its read flag. */
+    private replace(row: NotificationRow): void {
+        const was = this.items().find((n) => n.id === row.id);
+        this.items.update((rows) => rows.map((n) => (n.id === row.id ? row : n)));
+        if (was && was.read !== row.read) this.unreadCount.update((c) => Math.max(0, c + (row.read ? -1 : 1)));
     }
 
     /** The preference grid (GET /notifications/preferences). */

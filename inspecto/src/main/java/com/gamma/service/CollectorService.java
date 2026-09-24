@@ -752,6 +752,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     /** In-app notification feed (Phase B2) and its event→feed engine; the subscriber is held so
      *  {@link #close()} can de-register it (mirrors {@link #eventObjectBridge}). */
     private final com.gamma.notify.NotificationStore notifications;
+    /** Per-reader read marks over {@link #notifications} (operator 2026-09-25) — in memory, like the feed. */
+    private final com.gamma.notify.NotificationReadState notificationReadState = new com.gamma.notify.NotificationReadState();
     private final com.gamma.notify.NotificationPreferences notificationPreferences;
     private final com.gamma.notify.NotificationService notificationService;
     private final com.gamma.notify.DeliveryReceiptStore deliveryReceipts;
@@ -813,6 +815,12 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     /** The in-app notification feed (Phase B2) backing the {@code /notifications*} API. */
     public com.gamma.notify.NotificationStore notifications() {
         return notifications;
+    }
+
+    /** Each reader's own read/unread marks over the shared feed — backs {@code /notifications/{id}/read|unread}
+     *  and {@code /notifications/read-all}, and the {@code read} flag every feed read reports. */
+    public com.gamma.notify.NotificationReadState notificationReadState() {
+        return notificationReadState;
     }
 
     /** The notification engine (event→feed); exposed so the SSE endpoint can attach a live listener. */
