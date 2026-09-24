@@ -463,12 +463,28 @@ macro and is refused too, as is a CTE with a column list named like a blocked fu
 `read_parquet('<registered path>')` masking in `GuardedDerivedTableEmitter` is unaffected — it masks the
 call to an identifier before the guard runs.
 
-🔴 **Found while closing it, NOT fixed here — `SQLGUARD-COMMA-RELATION-1`** ([BACKLOG](../../../BACKLOG.md)
-§3.8): the replacement-scan check (`RELATION_REF`) judges only the token after `FROM`/`JOIN`, so
-`SELECT b.secret FROM (SELECT 1) a, '<any file>' b` passes the guard and returns the file's **rows** on an
-unsealed connection. It is now the seal-only probe in `SqlTemplateJobSandboxTest`
-(`aFileLiteralTheGuardMissesIsStoppedByTheConnectionSeal`, mutation-checked: removing the seal turns it
-red); that test's premise assert goes red when the comma gap is fixed.
+**Layer two — DuckDB's own parse tree (`SQLGUARD-COMMA-RELATION-1`, closed 2026-09-24).** The
+replacement-scan check (`RELATION_REF`) judged only the token after `FROM`/`JOIN`, so
+`SELECT b.secret FROM (SELECT 1) a, '<any file>' b` passed the guard and returned the file's rows on an
+unsealed connection. Not patched with another regex: text the lexical checks pass is now parsed by DuckDB
+itself — `SELECT json_serialize_sql(?::VARCHAR)` on one lazily-opened, in-memory, extension-autoload-off,
+sealed connection (`SqlGuard.parseTreeViolations`) — and the tree is walked. Refused: an error from the
+parser (it serializes **SELECT only**, so DML, `PIVOT` statements, `EXPLAIN` and syntax errors all refuse),
+more than one statement, a relation kind outside `JOIN`/`SUBQUERY`/`BASE_TABLE`/`TABLE_FUNCTION`/`EMPTY`/
+`EXPRESSION_LIST`/`PIVOT` (so `SHOW_REF` — `DESCRIBE`/`SUMMARIZE`/`SHOW` — refuses), a `BASE_TABLE` whose
+catalog, schema or name contains `/ \ . : * ? [` (a string literal and a quoted identifier are the same
+node; the caller's `trustedRelation` is exempt only as an exact unqualified name), a `BASE_TABLE` named
+`duckdb_*`/`pragma_*` (the catalog **views** — `FROM duckdb_databases` with no parens listed every attached
+database's file path, and the lexical scan only sees a name followed by `(`), a `TABLE_FUNCTION` not in
+`SAFE_TABLE_FUNCTIONS`, and any function call `BLOCKED_FUNCTION` names. Because every relation node is
+judged where it sits, FROM-list commas, subqueries, CTE bodies, set-op branches, `LATERAL`, scalar and
+lambda subqueries and the `FROM 'file'` shorthand are all covered. The lexical layer stays first (defence
+in depth, and it keeps its messages for what it already caught). **Cost: ~0.2 ms/call warm** (DuckDB
+1.5.2.1; 0.6 ms in the surefire JVM including JIT) — no cache. `SqlGuardParseTreeTest` (mutation-checked:
+skipping layer two turns the comma probe, the `"x.csv"` identifier and the trusted-relation cases red).
+`SqlTemplateJobSandboxTest.aFileLiteralTheGuardMissesIsStoppedByTheConnectionSeal` now isolates the seal
+by swapping the job's guard for a pass-everything one (`SqlTemplateJob.guard`, a test seam) — mutation-checked:
+removing `sealAllowing` turns it red.
 
 ⚠ `SqlSandbox.open` was not reused for the job: its interactive memory/timeout caps (`assist.sql.*`) do not
 fit a batch job. The two static helpers are the same statements `open`/`seal` now call, so there is still

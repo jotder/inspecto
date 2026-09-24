@@ -105,11 +105,11 @@ class SqlTemplateJobSandboxTest {
         assertTrue(r.message().contains("refused"), "refused by the guard, not by DuckDB: " + r.message());
     }
 
-    /** The connection layer on its own: a replacement-scan literal after a FROM-list COMMA is not judged by
-     *  {@code SqlGuard} ({@code SQLGUARD-COMMA-RELATION-1}), so the lexical check passes it and only the sealed
-     *  connection keeps a file outside the data root out of the snapshot. (Until 2026-09-24 this probe used
-     *  {@code parquet_metadata(...)}; {@code SQLGUARD-PARQUET-METADATA-1} closed that gap.) When the comma gap
-     *  is fixed the premise assert goes red — find another vector the guard passes, or retire the probe. */
+    /** The connection layer on its own: the guard is swapped for one that passes everything (the job's test
+     *  seam), so only the sealed connection keeps a file outside the data root out of the snapshot. (Until
+     *  2026-09-24 this probe used a SQL shape the guard missed — first {@code parquet_metadata(...)}, then a
+     *  file literal after a FROM-list comma; {@code SQLGUARD-PARQUET-METADATA-1} and
+     *  {@code SQLGUARD-COMMA-RELATION-1} closed both, so the seal is now isolated by disabling the guard.) */
     @Test
     void aFileLiteralTheGuardMissesIsStoppedByTheConnectionSeal(@TempDir Path dir) throws Exception {
         Path outside = Files.createDirectories(dir.resolve("outside")).resolve("other.parquet");
@@ -118,10 +118,17 @@ class SqlTemplateJobSandboxTest {
             st.execute("COPY (SELECT 42 AS secret) TO " + lit(outside) + " (FORMAT PARQUET)");
         }
         String sql = "SELECT b.secret FROM (SELECT 1 AS x) a, " + lit(outside) + " b";
-        assertTrue(com.gamma.sql.SqlGuard.check(sql).isEmpty(),
-                "premise: the lexical guard passes this query, so the seal is what is under test");
-        JobRun r = run(dir, sql);
-        assertNotEquals("SUCCESS", r.status(), "a file outside the data root was read: " + r.message());
+        assertFalse(com.gamma.sql.SqlGuard.check(sql).isEmpty(),
+                "the real guard refuses this query (SQLGUARD-COMMA-RELATION-1)");
+        var real = SqlTemplateJob.guard;
+        SqlTemplateJob.guard = s -> List.of();
+        try {
+            JobRun r = run(dir, sql);
+            assertNotEquals("SUCCESS", r.status(), "a file outside the data root was read: " + r.message());
+            assertFalse(r.message().contains("refused:"), "stopped by DuckDB's seal, not a guard: " + r.message());
+        } finally {
+            SqlTemplateJob.guard = real;
+        }
     }
 
     @Test

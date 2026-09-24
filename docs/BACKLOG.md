@@ -13,14 +13,14 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **56<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 28<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
+> **55<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 27<!--count:backlog-p2--> × P2 · 28<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 28<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 27<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 28<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 56<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 55<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -237,7 +237,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 - **P2** · **Security: policy-authoring UX** — trigger FIRED 2026-09-15: an install had hand-edited policy TOON go wrong. A matrix/create editor beyond hand-authored TOON. The read-only Policies tab and the "why denied?" endpoint already make the mistake diagnosable, so the build is about **preventing** the error — extend those surfaces rather than duplicate them. → `okf/backend/editions/auth-security.md`
 - **P3** · `DUCKLE-C6-POLICY-NARROWING-1` — **a workspace policy that can only NARROW.** Denies union, allowlists intersect, permissions AND; `mode` comes from the server file only; enforced **at plan time AND at the point of the act** (network: every hop plus DuckDB itself; state mutation: every watermark/offset advance); prefixes match at a path boundary, not as strings; a named policy file that cannot be read refuses the run. Parts exist (`PathJail`, `ConfigSafetyValidator`, `DataRef`); the structural narrowing and the unreadable-policy refusal do not. The prefix-boundary rule is the exact defect corrected in scale-out phase C §5.4.
-- **P2** · `SQLGUARD-COMMA-RELATION-1` — **`SqlGuard` passes a replacement-scan literal after a FROM-list comma:** `SELECT b.secret FROM (SELECT 1) a, '<any file>' b` returns the file's **rows** on an unsealed connection (probed 2026-09-24: guard findings `[]`, value `42`). `RELATION_REF` inspects only the token after `FROM`/`JOIN`. Found while closing `SQLGUARD-PARQUET-METADATA-1`; it is now the seal-only probe (`SqlTemplateJobSandboxTest.aFileLiteralTheGuardMissesIsStoppedByTheConnectionSeal`), whose premise assert goes red when this is fixed. Remedy: judge every top-level FROM-list item, not only the first; a select-list literal (`SELECT a, 'x.csv' b`) has the same shape, so the scan must know where FROM starts and ends (subqueries included). Then sweep the unsealed callers (`QueryExecutor`). → `okf/backend/editions/auth-security.md`
 - **P3** · `QUEUES-USER-FACING-COPY-1` — **three shipped strings still promise a capability deleted in 2026-09:** `AbsentObjectRoutes.java:27` (the Personal-edition **503 body**), `inspecto-ui/…/admin/objects/object-mail.component.html:4` and `…/admin/tags/tags.component.html:4` all read "notes, links, tags **and queues** are provided by the…". Product copy, not comments, and none is test-asserted; the two templates need the `angular-ui` skill. → `okf/capabilities/editions/editions.md`
 
 Ongoing, not a row: the **compliance repo-side artifacts** — the customer verification runbook (G2 half), the
