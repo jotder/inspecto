@@ -81,6 +81,7 @@ class ControlApiPolicyEnforcementTest {
     @Test
     void routeLevelDenyBitesBeforeTheCapabilityGate(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
+            allowClaims(c);
             // authored over HTTP — the A2 route is itself the arrangement
             assertEquals(200, send(c.port, "PUT", "/access/policies", """
                     {"policies":[{"name":"contractor-write-freeze","effect":"deny",
@@ -94,7 +95,8 @@ class ControlApiPolicyEnforcementTest {
 
             assertEquals(200, send(c.port, "GET", "/objects", null, "carl:contractor").statusCode(),
                     "the target keeps the contractor's reads open");
-            assertEquals(200, send(c.port, "PUT", "/access/roles", "{\"roles\":[]}", "root").statusCode(),
+            assertEquals(200, send(c.port, "PUT", "/access/roles",
+                    "{\"roles\":[],\"identity\":{\"attributeClaims\":[\"employment\"]}}", "root").statusCode(),
                     "unmatched subjects write as before");
         }
     }
@@ -143,6 +145,7 @@ class ControlApiPolicyEnforcementTest {
     @Test
     void decisionsAreAuditedWithTheMatchedPolicy(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
+            allowClaims(c);
             writePolicies(c, List.of(
                     Map.of("name", "freeze-contractor", "effect", "deny",
                             "target", Map.of("actions", List.of("write", "operate")),
@@ -220,6 +223,7 @@ class ControlApiPolicyEnforcementTest {
     @Test
     void explainTellsTheSubjectWhyTheyAreDenied(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
+            allowClaims(c);
             writePolicies(c, List.of(Map.of("name", "contractor-write-freeze", "effect", "deny",
                     "target", Map.of("actions", List.of("write", "operate")),
                     "when", "subject.employment == 'contractor'")));
@@ -250,6 +254,66 @@ class ControlApiPolicyEnforcementTest {
 
     private static com.fasterxml.jackson.databind.JsonNode byName2(com.fasterxml.jackson.databind.JsonNode trace, String name) {
         for (var e : trace) if (name.equals(e.get("name").asText())) return e;
+        return null;
+    }
+
+    // ── save-time guards that need the engine (policy-authoring-ux-design.md F6, F7, F9, D4) ──
+
+    @Test
+    void f6_authoringASeedNameIsAWarningNamingTheLostExemption(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            allowClaims(c);
+            HttpResponse<String> r = send(c.port, "PUT", "/access/policies", """
+                    {"policies":[{"name":"space-isolation","effect":"deny","target":{"actions":["write"]},
+                      "when":"subject.space != null and subject.space != env.space"}]}""", "root");
+            assertEquals(200, r.statusCode(), r.body());
+            var warnings = json(r.body()).get("warnings");
+            var seed = warnings == null ? null : byPolicyAndCode(warnings, "space-isolation", "seed-override");
+            assertNotNull(seed, "authoring a seed's name replaces the built-in deny — warned: " + warnings);
+            assertTrue(seed.get("message").asText().contains("canConfigureAccess"),
+                    "the warning names what the replacement loses (the operator exemption): " + seed);
+        }
+    }
+
+    @Test
+    void f9_anUntargetedUnconditionalDenyNeverTakesEffect(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> r = send(c.port, "PUT", "/access/policies",
+                    "{\"policies\":[{\"name\":\"deny-all\",\"effect\":\"deny\"}]}", "root");
+            assertEquals(422, r.statusCode(), r.body());
+            assertFalse(Files.exists(c.writeRoot().resolve("access-policies.toon")));
+            assertEquals(200, send(c.port, "GET", "/objects", null, "ana").statusCode(), "nobody is denied");
+        }
+    }
+
+    @Test
+    void d4_upgradePath_aStrayKeyOnDiskDeniesEveryRequestUntilFixed(@TempDir Path dir) throws Exception {
+        // Before the guard this doc loaded as a write-freeze with NO condition (the misspelt `wen` was
+        // ignored), silently denying every write. After it, the doc is unreadable: every authenticated
+        // request is denied, loudly, until the key is fixed on disk (the in-product save is itself denied).
+        try (Ctx c = open(dir)) {
+            writePolicies(c, List.of(Map.of("name", "contractor-freeze", "effect", "deny",
+                    "target", Map.of("actions", List.of("write")), "wen", "subject.id == 'carl'")));
+            assertEquals(403, send(c.port, "GET", "/objects", null, "ana").statusCode(),
+                    "a stray key fails closed — no silent unconditional write-freeze");
+            writePolicies(c, List.of(Map.of("name", "contractor-freeze", "effect", "deny",
+                    "target", Map.of("actions", List.of("write")), "when", "subject.id == 'carl'")));
+            assertEquals(200, send(c.port, "GET", "/objects", null, "ana").statusCode(), "fixed on disk → restored");
+            assertEquals(200, send(c.port, "PUT", "/access/roles", "{\"roles\":[]}", "ana").statusCode());
+        }
+    }
+
+    /** Allowlist the A1 claims these tests' policies reference ({@code subject.employment},
+     *  {@code subject.space}) — an un-allowlisted claim is a 422 (F2), since it can never be present. */
+    private static void allowClaims(Ctx c) throws Exception {
+        Files.writeString(c.writeRoot().resolve("roles.toon"), JToon.encode(Map.of("roles", List.of(),
+                "identity", Map.of("attribute_claims", List.of("employment", "space")))));
+    }
+
+    private static com.fasterxml.jackson.databind.JsonNode byPolicyAndCode(
+            com.fasterxml.jackson.databind.JsonNode warnings, String policy, String code) {
+        for (var w : warnings)
+            if (policy.equals(w.get("policy").asText()) && code.equals(w.get("code").asText())) return w;
         return null;
     }
 

@@ -51,6 +51,21 @@ public final class AccessPolicies {
     /** The environment action verbs a policy target may name (plan §4 A1). */
     public static final Set<String> ACTIONS = Set.of("read", "write", "operate");
 
+    /**
+     * The resource kinds the row-level PEPs pass ({@code RowScope.visible} callers): the operational
+     * object types lower-cased ({@code ObjectRoutes}, {@code AnnotationTargets}) and
+     * {@code investigation} ({@code InvestigationRoutes}). There is no registry, so this list is it —
+     * a {@code resourceKinds} value outside it can never match (F4, a save-time warning).
+     */
+    public static final Set<String> RESOURCE_KINDS = Set.of("alert", "incident", "case", "task", "investigation");
+
+    /** The {@code subject.*} keys {@code PolicyEngine} binds besides the allowlisted A1 claims. */
+    static final Set<String> SUBJECT_KEYS = Set.of("id", "capabilities", "dataScopes", "roles");
+    /** The {@code env.*} keys {@code PolicyEngine} binds. */
+    static final Set<String> ENV_KEYS = Set.of("action", "route", "space");
+
+    private static final Set<String> POLICY_KEYS = Set.of("name", "effect", "target", "when");
+    private static final Set<String> TARGET_KEYS = Set.of("actions", "resourceKinds", "resource_kinds");
     private static final Set<String> EFFECTS = Set.of("allow", "deny");
     private static final int MAX_POLICIES = 200;
     private static final int MAX_TARGET_VALUES = 64;
@@ -74,16 +89,23 @@ public final class AccessPolicies {
         }
     }
 
-    /** The authored doc + its readability (unreadable ⇒ the engine denies loudly, never skips). */
-    public record Doc(List<Policy> policies, boolean unreadable) {
-        static final Doc ABSENT = new Doc(List.of(), false);
+    /** The authored doc + its readability (unreadable ⇒ the engine denies loudly, never skips).
+     *  {@code error} names what made it unreadable — the policy and the failed check (null when readable). */
+    public record Doc(List<Policy> policies, boolean unreadable, String error) {
+        static final Doc ABSENT = new Doc(List.of(), false, null);
 
         public Doc {
             policies = List.copyOf(policies);
         }
     }
 
-    private record Cached(long mtime, long size, Doc doc) {}
+    /** A save-time finding that does not refuse the doc (policy-authoring-ux-design.md §4): the policy,
+     *  a stable {@code code}, and a human message. */
+    public record Warning(String policy, String code, String message) {}
+
+    /** The parse is keyed on the attribute-claim allowlist too: whether {@code subject.<claim>} is a
+     *  known reference depends on {@code roles.toon}, so a roles edit re-validates this doc. */
+    private record Cached(long mtime, long size, Set<String> claims, Doc doc) {}
 
     private static final ConcurrentHashMap<Path, Cached> CACHE = new ConcurrentHashMap<>();
 
@@ -104,34 +126,45 @@ public final class AccessPolicies {
         try {
             long mtime = Files.getLastModifiedTime(file).toMillis();
             long size = Files.size(file);
+            Set<String> claims = Set.copyOf(Roles.load(configRoot).attributeClaims());
             Cached hit = CACHE.get(file);
-            if (hit != null && hit.mtime() == mtime && hit.size() == size) return hit.doc();
-            Doc parsed = parseFile(file);
-            CACHE.put(file, new Cached(mtime, size, parsed));
+            if (hit != null && hit.mtime() == mtime && hit.size() == size && hit.claims().equals(claims))
+                return hit.doc();
+            Doc parsed = parseFile(file, claims);
+            CACHE.put(file, new Cached(mtime, size, claims, parsed));
             return parsed;
         } catch (IOException e) {
             LOG.warn("access-policies: cannot stat {} — marking unreadable (deny loudly): {}", file, e.toString());
-            return new Doc(List.of(), true);
+            return new Doc(List.of(), true, "cannot read the file: " + e.getMessage());
         }
     }
 
-    private static Doc parseFile(Path file) {
+    /** F1: a hand edit is held to the PUT's own 422 checks — failing one marks the doc unreadable
+     *  (fail-closed, as before), and the reason names the policy and the check (D5). */
+    private static Doc parseFile(Path file, Set<String> claims) {
+        String reason;
         try {
             Map<String, Object> m = ToonHelper.load(file.toString());
-            return new Doc(validate(m.get("policies")), false);
+            return new Doc(validate(m.get("policies"), claims), false, null);
+        } catch (ApiException e) {
+            reason = e.getMessage();
         } catch (Exception e) {
-            LOG.warn("access-policies: {} is unreadable — the policy engine must DENY (fail-closed) until fixed: {}",
-                    file, e.toString());
-            return new Doc(List.of(), true);
+            reason = "not valid TOON: " + e.getMessage();
         }
+        LOG.warn("access-policies: {} is unreadable — the policy engine must DENY (fail-closed) until fixed: {}",
+                file, reason);
+        return new Doc(List.of(), true, reason);
     }
 
     // ── validation (shared by the PUT route and the file parser — one grammar) ──────
 
     /** Parse+validate a {@code policies} list (wire {@code resourceKinds} and on-disk
      *  {@code resource_kinds} both accepted). Throws {@link ApiException} 422 on any violation —
-     *  including a {@code when} that does not parse ({@link Conditions} is the authoring gate). */
-    static List<Policy> validate(Object policiesObj) {
+     *  including a {@code when} that does not parse ({@link Conditions} is the authoring gate), and the
+     *  save-time guards of policy-authoring-ux-design.md §4: an unknown key (F8), a reference outside
+     *  the bound vocabulary (F2 — {@code attributeClaims} is the {@code roles.toon} allowlist, the only
+     *  claims a Subject can carry), and an untargeted deny with no condition (F9). */
+    static List<Policy> validate(Object policiesObj, java.util.Collection<String> attributeClaims) {
         if (!(policiesObj instanceof List<?> raw))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "access policies require a 'policies' list");
         if (raw.size() > MAX_POLICIES)
@@ -143,6 +176,7 @@ public final class AccessPolicies {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every policy must be an object {name, effect, target?, when?}");
             String name = WriteGates.safeName(trimOrEmpty(policy.get("name")).toLowerCase(Locale.ROOT), "policy name");
             if (!seen.add(name)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "duplicate policy '" + name + "'");
+            requireKnownKeys(name, "", policy, POLICY_KEYS);
             String effect = trimOrEmpty(policy.get("effect"));
             if (!EFFECTS.contains(effect))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + name + "': effect must be one of " + EFFECTS);
@@ -152,6 +186,10 @@ public final class AccessPolicies {
             if (targetObj != null) {
                 if (!(targetObj instanceof Map<?, ?> target))
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + name + "': 'target' must be an object {actions?, resourceKinds?}");
+                requireKnownKeys(name, "target.", target, TARGET_KEYS);
+                if (target.containsKey("resourceKinds") && target.containsKey("resource_kinds"))
+                    throw refusal(name, "ambiguous-key", "'target' names both 'resourceKinds' and 'resource_kinds'"
+                            + " — they are one key (wire and on-disk spelling); give it once");
                 actions = targetValues(name, "actions", target.get("actions"));
                 for (String a : actions)
                     if (!ACTIONS.contains(a))
@@ -166,6 +204,9 @@ public final class AccessPolicies {
                         + MAX_CONDITION_LENGTH + " chars)");
             Conditions.Condition condition;
             if (when.isBlank()) {
+                if ("deny".equals(effect) && actions.isEmpty() && resourceKinds.isEmpty())
+                    throw refusal(name, "deny-everything", "an untargeted deny with no 'when' denies every"
+                            + " request by every subject, the saver's own next save included — add a target or a condition");
                 condition = ctx -> true;   // no condition — applies whenever the target matches
             } else {
                 try {
@@ -173,8 +214,98 @@ public final class AccessPolicies {
                 } catch (IllegalArgumentException e) {
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + name + "': " + e.getMessage());
                 }
+                requireKnownRefs(name, when, attributeClaims);
             }
             out.add(new Policy(name, effect, actions, resourceKinds, when, condition));
+        }
+        return List.copyOf(out);
+    }
+
+    /** A 422 naming the policy and the failed check's stable code. */
+    private static ApiException refusal(String policy, String code, String message) {
+        return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "policy '" + policy + "' [" + code + "]: " + message);
+    }
+
+    /** F8: a key the grammar does not read is refused — never silently a policy with no condition or
+     *  an unconstrained target. */
+    private static void requireKnownKeys(String policy, String prefix, Map<?, ?> m, Set<String> known) {
+        for (Object k : m.keySet())
+            if (!known.contains(String.valueOf(k)))
+                throw refusal(policy, "unknown-key", "unknown key '" + prefix + k + "' (expected one of "
+                        + known.stream().sorted().toList() + ")");
+    }
+
+    /** F2: every reference must name an attribute the engine binds — {@code subject.{id, capabilities,
+     *  dataScopes, roles}} ∪ the allowlisted claims, {@code env.{action, route, space}}, or any
+     *  {@code resource.*} (row attributes have no registry). Anything else resolves to null forever. */
+    private static void requireKnownRefs(String policy, String when, java.util.Collection<String> attributeClaims) {
+        for (String ref : Conditions.refs(when).keySet()) {
+            int dot = ref.indexOf('.');
+            String root = dot < 0 ? ref : ref.substring(0, dot);
+            String key = dot < 0 ? "" : ref.substring(dot + 1).split("\\.", 2)[0];
+            String problem = switch (root) {
+                case "subject" -> key.isEmpty() || SUBJECT_KEYS.contains(key) || attributeClaims.contains(key) ? null
+                        : "'subject." + key + "' is not bound — expected one of " + SUBJECT_KEYS.stream().sorted().toList()
+                          + " or an attribute claim allowlisted in roles.toon identity.attributeClaims "
+                          + attributeClaims.stream().sorted().toList();
+                case "env" -> ENV_KEYS.contains(key) ? null
+                        : "'" + ref + "' is not bound — expected env." + ENV_KEYS.stream().sorted().toList();
+                case "resource" -> null;
+                default -> "'" + ref + "' has an unknown root — references start subject., env. or resource.";
+            };
+            if (problem == null && key.isEmpty()) problem = "'" + ref + "' names no attribute";
+            if (problem != null) throw refusal(policy, "unknown-ref", problem);
+        }
+    }
+
+    /** F1 (the roles side): would the on-disk policies doc still load if the claim allowlist became
+     *  {@code attributeClaims}? A roles save that drops a claim a policy references would otherwise
+     *  turn the policies doc unreadable — deny-all — as a side effect; it is refused (422) instead. */
+    static void requireLoadableUnder(Path configRoot, java.util.Collection<String> attributeClaims) {
+        Doc now = load(configRoot);
+        if (now.unreadable()) return;   // already failing closed — the roles save does not change that
+        for (Policy p : now.policies()) {
+            if (p.when().isBlank()) continue;
+            try {
+                requireKnownRefs(p.name(), p.when(), attributeClaims);
+            } catch (ApiException e) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "this change would make "
+                        + FILE + " unreadable (every request denied): " + e.getMessage());
+            }
+        }
+    }
+
+    /**
+     * The save-time warnings (policy-authoring-ux-design.md §4, the judgement calls): a capability
+     * literal outside the vocabulary or a role literal outside the effective role table (F3), a
+     * {@code resourceKinds} value no PEP passes (F4), a {@code resource.*} reference on a policy that
+     * only ever evaluates at route level where no resource exists (F5), and an authored policy that
+     * replaces a built-in one of the same name (F6). Returned by the GET and the PUT alike, so a
+     * hand-edited doc shows them too.
+     */
+    static List<Warning> lint(List<Policy> policies, Set<String> roleNames, List<Policy> seeds) {
+        List<Warning> out = new java.util.ArrayList<>();
+        for (Policy p : policies) {
+            Map<String, Set<String>> refs = Conditions.refs(p.when());
+            for (String cap : refs.getOrDefault("subject.capabilities", Set.of()))
+                if (!Roles.KNOWN_CAPABILITIES.contains(cap))
+                    out.add(new Warning(p.name(), "unknown-capability", "'" + cap + "' is not a capability, so this"
+                            + " comparison never matches (known: " + Roles.KNOWN_CAPABILITIES.stream().sorted().toList() + ")"));
+            for (String role : refs.getOrDefault("subject.roles", Set.of()))
+                if (!roleNames.contains(role))
+                    out.add(new Warning(p.name(), "unknown-role", "'" + role + "' is not a role in this Space's role"
+                            + " table — it matches only if the identity provider sends it"));
+            for (String kind : p.resourceKinds())
+                if (!RESOURCE_KINDS.contains(kind))
+                    out.add(new Warning(p.name(), "unknown-resource-kind", "no row-level check passes resource kind '"
+                            + kind + "', so this target never matches (known: " + RESOURCE_KINDS.stream().sorted().toList() + ")"));
+            if (p.resourceKinds().isEmpty() && refs.keySet().stream().anyMatch(r -> r.startsWith("resource.")))
+                out.add(new Warning(p.name(), "resource-ref-at-route-level", "a policy with no resourceKinds target is"
+                        + " evaluated at route level too, where there is no resource — every resource.* reference is null there"));
+            for (Policy seed : seeds)
+                if (seed.name().equals(p.name()))
+                    out.add(new Warning(p.name(), "seed-override", "this replaces the built-in '" + seed.name()
+                            + "' policy wholesale; the built-in " + seed.effect() + " was: " + seed.when()));
         }
         return List.copyOf(out);
     }

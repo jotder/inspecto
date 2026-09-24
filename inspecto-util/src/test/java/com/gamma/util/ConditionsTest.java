@@ -94,4 +94,20 @@ class ConditionsTest {
         assertTrue(c.test(ctx()));
         assertFalse(c.test(Map.of("subject", Map.of("space", "fraud"), "resource", Map.of("space", "fraud"))));
     }
+
+    @Test
+    void refsListsEveryReferenceWithTheStringLiteralsComparedToIt() {
+        // the lint seam (policy-authoring-ux-design.md S1): nested not/parens, both operand orders,
+        // a ref compared only with another ref or a non-string keeps an empty literal set
+        var refs = Conditions.refs("not (subject.capabilities contains 'canX') and ('ops' in subject.roles"
+                + " or (subject.roles contains 'dev' and resource.space != subject.space)) and subject.n == 3");
+        assertEquals(List.of("subject.capabilities", "subject.roles", "resource.space", "subject.space", "subject.n"),
+                List.copyOf(refs.keySet()));
+        assertEquals(java.util.Set.of("canX"), refs.get("subject.capabilities"));
+        assertEquals(java.util.Set.of("ops", "dev"), refs.get("subject.roles"));
+        assertTrue(refs.get("resource.space").isEmpty());
+        assertTrue(refs.get("subject.n").isEmpty(), "only string literals are collected");
+        assertTrue(Conditions.refs(" ").isEmpty());
+        assertThrows(IllegalArgumentException.class, () -> Conditions.refs("subject.id =="));
+    }
 }

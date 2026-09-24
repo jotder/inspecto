@@ -2,9 +2,12 @@ package com.gamma.util;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * The shared condition language (RBAC/ABAC plan §4 A2 — the "one policy engine, many policy kinds"
@@ -58,6 +61,39 @@ public final class Conditions {
         Expr root = p.expr();
         p.expect(Tok.EOF);
         return ctx -> Boolean.TRUE.equals(root.eval(ctx == null ? Map.of() : ctx));
+    }
+
+    /**
+     * The dotted references {@code source} names, in first-seen order, each mapped to the string
+     * literals it is directly compared with by {@code == != in contains} (either operand order) — the
+     * static facts an authoring surface lints against its own vocabulary (a mistyped attribute or
+     * literal is otherwise silent: a missing attribute is {@code null} and a mismatch is {@code false}).
+     * Empty for a blank condition.
+     * @throws IllegalArgumentException on a syntax error, exactly as {@link #parse}.
+     */
+    public static Map<String, Set<String>> refs(String source) {
+        Map<String, Set<String>> out = new LinkedHashMap<>();
+        if (source == null || source.isBlank()) return out;
+        Parser p = new Parser(source);
+        Expr root = p.expr();
+        p.expect(Tok.EOF);
+        collect(root, out);
+        return out;
+    }
+
+    private static void collect(Expr e, Map<String, Set<String>> out) {
+        switch (e) {
+            case Ref r -> out.computeIfAbsent(r.path(), k -> new LinkedHashSet<>());
+            case Not n -> collect(n.inner(), out);
+            case AndOr a -> { collect(a.left(), out); collect(a.right(), out); }
+            case Compare c -> {
+                collect(c.left(), out);
+                collect(c.right(), out);
+                if (c.left() instanceof Ref r && c.right() instanceof Literal(String s)) out.get(r.path()).add(s);
+                if (c.right() instanceof Ref r && c.left() instanceof Literal(String s)) out.get(r.path()).add(s);
+            }
+            default -> { }   // a literal names nothing
+        }
     }
 
     // ── expression tree ─────────────────────────────────────────────────────────────

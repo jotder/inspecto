@@ -208,6 +208,8 @@ class PolicyEngineTest {
     void spaceScopingBindsResourceSpaceToTheBoundSpace(@TempDir Path root) throws Exception {
         // The A4/SPC-5 shape: rows serve from the bound space; the subject's home space is an A1
         // allowlisted claim. A visitor from another space sees nothing.
+        Files.writeString(root.resolve("roles.toon"), JToon.encode(Map.of("roles", List.of(),
+                "identity", Map.of("attribute_claims", List.of("space")))));   // else subject.space is a 422 (F2)
         writePolicies(root, List.of(Map.of("name", "space-isolation", "effect", "deny",
                 "when", "not (resource.space == subject.space)")));
         Subject local = new Subject("ana", Set.of(), null, Map.of("space", "alpha"));

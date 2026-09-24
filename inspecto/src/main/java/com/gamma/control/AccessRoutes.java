@@ -46,7 +46,7 @@ final class AccessRoutes implements RouteModule {
         api.get("/access/roles", (e, m) -> ETags.respond(e, roles(api)));
         api.put("/access/roles", ApiContext.withCapability("canConfigureAccess",
                 (e, m) -> saveRoles(api, e, api.body(e))));
-        api.get("/access/policies", (e, m) -> ETags.respond(e, policies(api)));
+        api.get("/access/policies", (e, m) -> ETags.respond(e, policies(api, e)));
         api.put("/access/policies", ApiContext.withCapability("canConfigureAccess",
                 (e, m) -> savePolicies(api, e, api.body(e))));
         // "Why denied?" dry-run for the caller's own session (BACKLOG §5). A GET (read action) on
@@ -98,6 +98,7 @@ final class AccessRoutes implements RouteModule {
         ETags.requireMatch(ex, ETags.of(ContentHash.of(roles(api))));
         Map<String, Roles.Def> authored = Roles.validate(body.get("roles"));
         List<String> attributeClaims = Roles.attributeClaims(body.get("identity"));
+        AccessPolicies.requireLoadableUnder(root, attributeClaims);   // F1: never deny-all as a side effect
         Roles.write(root, authored, attributeClaims);
         return ETags.respond(ex, roles(api));
     }
@@ -119,12 +120,18 @@ final class AccessRoutes implements RouteModule {
      *  denies), so an operator sees the built-in denies too (BACKLOG §5). A seed whose name an authored
      *  policy overrides is shadowed (shown once, as authored). An unreadable doc is surfaced — the engine
      *  denies, fail-closed. Seeds appear only on the Enterprise edition (the engine supplies them). */
-    private Object policies(ApiContext api) {
+    private Object policies(ApiContext api, HttpExchange ex) {
         AccessPolicies.Doc doc = AccessPolicies.load(api.writeRoot());
         Map<String, Object> out = new LinkedHashMap<>();
         if (doc.unreadable()) {
             out.put("policies", List.of());
-            out.put("error", "access-policies.toon is unreadable — the policy engine denies (fail-closed) until it is fixed or re-saved");
+            String error = "access-policies.toon is unreadable — the policy engine denies (fail-closed) until it is fixed or re-saved";
+            // D5 (taken on recommendation, most fail-closed): this read is ungated, so the reason — which
+            // names a policy and its condition — is shown only to those who may fix it.
+            boolean mayConfigure = ApiContext.subject(ex)
+                    .map(s -> s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS)).orElse(true);
+            out.put("error", mayConfigure && doc.error() != null ? error + ": " + doc.error() : error);
+            out.put("warnings", List.of());
             return out;
         }
         List<Map<String, Object>> rows = new java.util.ArrayList<>();
@@ -133,11 +140,21 @@ final class AccessRoutes implements RouteModule {
             authored.add(p.name());
             rows.add(policyShape(p, "authored"));
         }
-        AccessDeciders.active().ifPresent(d -> d.seededPolicies().stream()
-                .filter(p -> !authored.contains(p.name()))
-                .forEach(p -> rows.add(policyShape(p, "seed"))));
+        List<AccessPolicies.Policy> seeds = AccessDeciders.active()
+                .map(AccessDecider::seededPolicies).orElse(List.of());
+        seeds.stream().filter(p -> !authored.contains(p.name())).forEach(p -> rows.add(policyShape(p, "seed")));
         out.put("policies", rows);
+        out.put("warnings", AccessPolicies.lint(doc.policies(), Roles.effective(api.writeRoot()).keySet(), seeds)
+                .stream().map(AccessRoutes::warningShape).toList());
         return out;
+    }
+
+    private static Map<String, Object> warningShape(AccessPolicies.Warning w) {
+        Map<String, Object> r = new LinkedHashMap<>();
+        r.put("policy", w.policy());
+        r.put("code", w.code());
+        r.put("message", w.message());
+        return r;
     }
 
     /** "Why denied?" dry-run for the current session's own subject (BACKLOG §5). Query:
@@ -194,10 +211,11 @@ final class AccessRoutes implements RouteModule {
     /** IFMATCH-COVERAGE-GAP-1: same full-replace settings-doc exposure as {@link #saveRoles}. */
     private Object savePolicies(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "access policy write");
-        ETags.requireMatch(ex, ETags.of(ContentHash.of(policies(api))));
-        List<AccessPolicies.Policy> policies = AccessPolicies.validate(body.get("policies"));
+        ETags.requireMatch(ex, ETags.of(ContentHash.of(policies(api, ex))));
+        List<AccessPolicies.Policy> policies =
+                AccessPolicies.validate(body.get("policies"), Roles.load(root).attributeClaims());
         AccessPolicies.write(root, policies);
-        return ETags.respond(ex, policies(api));
+        return ETags.respond(ex, policies(api, ex));
     }
 
     private static Map<String, Object> policyShape(AccessPolicies.Policy p, String source) {

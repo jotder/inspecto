@@ -101,6 +101,8 @@ class ControlApiAccessPoliciesTest {
     void roundTripPersistsAndEchoesTheAuthoredPolicies(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("cfg");
         try (Ctx c = open(dir, writeRoot)) {
+            // subject.space is an A1 claim — it must be allowlisted, else the ref is a 422 (F2)
+            json(send(c.port, "PUT", "/access/roles", "{\"roles\":[],\"identity\":{\"attributeClaims\":[\"space\"]}}"));
             JsonNode saved = json(send(c.port, "PUT", "/access/policies", """
                     {"policies":[
                       {"name":"Cross-Space-Deny","effect":"deny",
