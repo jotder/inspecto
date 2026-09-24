@@ -60,7 +60,7 @@ space (transition-debounced signal; `-Djobs.orphan.audit=false` to disable) — 
 [stage1-architecture](../engine/stage1-architecture.md) §Step 3.
 
 **The COMMIT retry affordance (X1 deferrals, 2026-09-25; decisions Q1–Q4 in
-[retry-affordance-design](../../../superpower/retry-affordance-design.md)).** Three routes over
+[retry-affordance-design](../../../archived-documents/plans-archive/retry-affordance-design.md)).** Three routes over
 `CommitRetry`, **per pipeline** (Q4) and addressed by the **poll-relative FILE path, never `batchId`**
 (minted per cycle, so a batch-keyed route would be dead by the second cycle):
 `GET /runs/{name}/retries` (open read; bounded at 500 with `truncated` + the true `total`),

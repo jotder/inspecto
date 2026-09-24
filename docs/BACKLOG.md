@@ -33,7 +33,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 | § | Product area | Active plans (`docs/superpower/`) | §2 gates in this area |
 |---|---|---|---|
 | [3.1](#31-pipelines--authoring-editor--step-catalog) | Pipelines — authoring, editor & Step catalog | [record-transformer-replaces-map-plan.md](superpower/record-transformer-replaces-map-plan.md) · [dead-property-validation-plan.md](superpower/dead-property-validation-plan.md) · [ai-drafting-non-schema-design.md](superpower/ai-drafting-non-schema-design.md) | — |
-| [3.2](#32-pipelines--execution-lanes--consignments) | Pipelines — execution, lanes & Consignments | [retry-affordance-design.md](superpower/retry-affordance-design.md) · [platform-services-stage2-design.md](superpower/platform-services-stage2-design.md) | Row 15 · X5 |
+| [3.2](#32-pipelines--execution-lanes--consignments) | Pipelines — execution, lanes & Consignments | [platform-services-stage2-design.md](superpower/platform-services-stage2-design.md) | Row 15 · X5 |
 | [3.3](#33-acquisition-collectors--parsing) | Acquisition, Collectors & Parsing | [parser-field-tiers-interview-plan.md](superpower/parser-field-tiers-interview-plan.md) · [parser-plugins-trust-design.md](superpower/parser-plugins-trust-design.md) | D13 |
 | [3.4](#34-catalog-onboarding-datasets--lineage) | Catalog, Onboarding, Datasets & Lineage | — | — |
 | [3.5](#35-data-quality-observability-signals--alerting) | Data quality, Observability, Signals & Alerting | [completeness-kpi-k4-design.md](superpower/completeness-kpi-k4-design.md) · [cross-space-consequence-design.md](superpower/cross-space-consequence-design.md) · [ses-sns-adapter-design.md](superpower/ses-sns-adapter-design.md) | OPS-5 · Completeness KPI hold |
