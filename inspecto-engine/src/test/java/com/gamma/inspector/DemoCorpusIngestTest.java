@@ -124,6 +124,66 @@ class DemoCorpusIngestTest {
     }
 
     /**
+     * Decode Profile (trust design slice C4): the committed msc_cdr demo split into a per-vendor profile
+     * ({@code config/vendors/demo_msc/demo_msc.decode.toon} holding the grammar file, root_type, strictness
+     * and all three segments, their files beside the profile) and a Pipeline that keeps only
+     * {@code profile_file}. It must preview and ingest exactly as the inline original — same tree, the same
+     * rows in every segment.
+     */
+    @Test
+    @SuppressWarnings("unchecked")
+    void mscCdrSplitIntoADecodeProfilePreviewsAndIngestsIdenticallyToInline(@TempDir Path dir) throws Exception {
+        Path inlineDir = Files.createDirectories(dir.resolve("inline"));
+        Path profiledDir = Files.createDirectories(dir.resolve("profiled"));
+        PipelineConfig inline = stage(inlineDir, "config/msc/msc_cdr_pipeline.toon");
+
+        stage(profiledDir, "config/msc/msc_cdr_pipeline.toon");
+        Path toon = profiledDir.resolve("config/msc/msc_cdr_pipeline.toon");
+        Path vendor = Files.createDirectories(profiledDir.resolve("config/vendors/demo_msc"));
+        Map<String, Object> raw = com.gamma.config.io.ConfigCodec.toMap(Files.readString(toon));
+        Map<String, Object> parsing = (Map<String, Object>) raw.get("parsing");
+        Map<String, Object> asn1 = (Map<String, Object>) parsing.get("asn1");
+        Files.writeString(vendor.resolve("demo_msc.asn"), String.valueOf(asn1.get("grammar")));
+        for (Object schema : ((Map<String, Object>) asn1.get("segments")).values())
+            Files.move(toon.resolveSibling(String.valueOf(schema)), vendor.resolve(String.valueOf(schema)));
+        Map<String, Object> profile = new java.util.LinkedHashMap<>();
+        profile.put("grammar_file", "demo_msc.asn");
+        profile.put("root_type", asn1.get("root_type"));
+        profile.put("strictness", asn1.get("strictness"));
+        profile.put("segments", asn1.get("segments"));
+        Files.writeString(vendor.resolve("demo_msc.decode.toon"),
+                com.gamma.config.io.ConfigCodec.toToon(Map.of("asn1", profile)));
+        parsing.put("asn1", Map.of("profile_file", "../vendors/demo_msc/demo_msc.decode.toon"));
+        Files.writeString(toon, com.gamma.config.io.ConfigCodec.toToon(raw));
+        PipelineConfig profiled = PipelineConfig.load(toon.toString());
+        assertEquals(vendor.resolve("demo_msc.asn").toAbsolutePath().normalize(), profiled.schemas().ingesterGrammar(),
+                "the profile's grammar resolves beside the profile");
+
+        byte[] sample = Files.readAllBytes(REPO.resolve("spaces/demo/data/samples/msc_cdr/MSC01_20260801_0800.ber"));
+        Asn1ParserPlugin plugin = new Asn1ParserPlugin();
+        ParseResult viaText = plugin.preview(sample, Map.of("asn1", Map.of(
+                "grammar", inline.schemas().ingesterConfig().get("grammar_text"),
+                "root_type", inline.schemas().ingesterConfig().get("root_type"))));
+        ParseResult viaProfile = plugin.preview(sample,
+                Map.of("asn1", Map.of("profile_file", "../vendors/demo_msc/demo_msc.decode.toon")), toon.getParent());
+        assertEquals(13, ((ParseResult.Tree) viaText).recordCount());
+        assertEquals(viaText, viaProfile, "the preview tree is identical");
+
+        seed(inline, "msc_cdr/MSC01_20260801_0800.ber");
+        seed(profiled, "msc_cdr/MSC01_20260801_0800.ber");
+        CollectorProcessor.run(inline);
+        CollectorProcessor.run(profiled);
+        Path inlineDb = Path.of(inline.dirs().database());
+        Path profiledDb = Path.of(profiled.dirs().database());
+        assertEquals(subdirs(inlineDb), subdirs(profiledDb));
+        for (String seg : List.of("moCallRecord", "mtCallRecord", "moSMSRecord")) {
+            List<String> a = rows(inlineDb.resolve(seg));
+            assertFalse(a.isEmpty(), seg);
+            assertEquals(a, rows(profiledDb.resolve(seg)), seg + " rows are identical");
+        }
+    }
+
+    /**
      * {@link #stage}, then move the inline {@code asn1.grammar} text into {@code msc_cdr.asn} BESIDE the
      * pipeline, referenced by its bare sibling name — the spelling a satellite ref resolves from
      * ({@code SCHEMA-FILE-RESOLVES-AGAINST-CWD-1}).
