@@ -478,4 +478,12 @@ describe('DataTableComponent', () => {
         f.detectChanges();
         expect(region!.textContent?.trim()).toBe('No rows');
     });
+
+    it('suppresses the horizontal scrollbar only while the grid is empty (EMPTY-GRID-HSCROLL-1)', async () => {
+        const f = await create('standard');
+        expect(f.componentInstance.suppressHScroll()).toBe(false);
+        f.componentRef.setInput('rows', []);
+        f.detectChanges();
+        expect(f.componentInstance.suppressHScroll()).toBe(true);
+    });
 });

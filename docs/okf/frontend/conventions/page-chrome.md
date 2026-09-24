@@ -43,6 +43,9 @@ structure and adopts only the compact typography: that row IS a toolbar, not a p
   canonical glossary entries — `'Batch'` was being handed to the explain dialog, which has no such entry.
 * **Titles follow their nav label** — Jobs (not "Scheduler"), Overview (not "Dashboard", a colliding glossary
   concept). Changing the nav instead is three edits, because the Access Catalog is derived from the nav tree.
+* **An empty grid never scrolls sideways** — `<inspecto-data-table>` binds ag-Grid's
+  `suppressHorizontalScroll` while it displays zero rows, so a pane whose column min widths exceed its
+  width (Incidents, Cases) shows no stray scrollbar under the empty state (`EMPTY-GRID-HSCROLL-1`).
 
 ## Traps measured on the way (each cost a cycle)
 

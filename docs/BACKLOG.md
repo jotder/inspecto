@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **40<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
+> **39<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -25,8 +25,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 22<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 18<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 40<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 17<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 39<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -251,7 +251,6 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.11 Web UI — SPA-wide hygiene
 
-- **P3** · `EMPTY-GRID-HSCROLL-1` — **Incidents and Cases draw a horizontal scrollbar on an EMPTY grid**: their column minimum widths exceed the pane at narrower widths. Give the grid `suppressHorizontalScroll` while `rows.length === 0`, or flex-size the columns. → `okf/frontend/conventions/page-chrome.md`
 - **P3** · `JOB-RUNS-DIALOG-DEAD-1` — **`modules/admin/jobs/job-runs.dialog.ts` has no opener**; only its own spec references `JobRunsDialog`. Decide retain-as-test-vehicle (the `MOCK-DEAD-COMPUTE-1` precedent) or delete; do not leave it looking like a live surface. → `okf/frontend/conventions/page-chrome.md`
 - **P3** · `API-DEAD-METHODS-1` — five exported service methods have no caller in the SPA: `access.service.ts:128` `deleteProfile`, `collectors.service.ts:41` `notify`, and `config.service.ts:180, 187, 203` `previewParsing`/`previewSchema`/`previewEnrichment`. The three previews look like an intended feature that never got a pane — a product call (wire or delete), not a mechanical delete.
 

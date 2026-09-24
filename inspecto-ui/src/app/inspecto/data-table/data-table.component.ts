@@ -334,6 +334,9 @@ export class DataTableComponent {
     /** Rows shown in the grid: the last Run result in pro, else the source rows. */
     readonly displayRows = computed<unknown[]>(() => this.proResult() ?? this.rows());
 
+    /** EMPTY-GRID-HSCROLL-1: an empty grid never draws a horizontal scrollbar, even when column min widths exceed the pane. */
+    readonly suppressHScroll = computed(() => this.displayRows().length === 0);
+
     /** Rows ag-Grid is actually displaying (post-filter), fed by the grid's own events. */
     private readonly displayedCount = signal<number | null>(null);
 

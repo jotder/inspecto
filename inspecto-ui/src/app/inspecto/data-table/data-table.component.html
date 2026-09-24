@@ -159,6 +159,7 @@
     class="w-full"
     [style.height]="autoHeight() ? null : height()"
     [domLayout]="autoHeight() ? 'autoHeight' : 'normal'"
+    [suppressHorizontalScroll]="suppressHScroll()"
     [theme]="gridTheme.theme()"
     [rowData]="displayRows()"
     [columnDefs]="gridColumns()"
