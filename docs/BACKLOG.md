@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **44<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 24<!--count:backlog-p2--> × P2 · 20<!--count:backlog-p3--> × P3** —
+> **44<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 21<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 54 on 2026-09-24**: P2 `STREAM-CONSUMER-1` closed — Option A built, the `SP-ACQ-09` note updated, the plan distilled into `okf/capabilities/acquisition/acquisition.md` and archived.
 > ⬇ 55 → 54 on 2026-09-24: P3 `STEP-TYPES-DEAD-CLIENT-MIRRORS-1` closed — its work had shipped in `d5f6353be`
@@ -21,8 +21,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 24<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 20<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 23<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 21<!--count:backlog-p3--> P3 rows are mostly a list of things
 > deliberately NOT being built, and reading all 44<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
@@ -35,7 +35,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 | [3.4](#34-catalog-onboarding-datasets--lineage) | Catalog, Onboarding, Datasets & Lineage | — | — |
 | [3.5](#35-data-quality-observability-signals--alerting) | Data quality, Observability, Signals & Alerting | [completeness-kpi-k4-design.md](superpower/completeness-kpi-k4-design.md) | OPS-5 · Completeness KPI hold |
 | [3.6](#36-analytics--queries-bi-studio--export) | Analytics — Queries, BI, Studio & Export | — | — |
-| [3.7](#37-control-plane-api--jobs) | Control plane, API & Jobs | [job-path-compat-survey.md](superpower/job-path-compat-survey.md) · [space-comparison-design.md](superpower/space-comparison-design.md) (postponed) | Release notes for the next MAJOR |
+| [3.7](#37-control-plane-api--jobs) | Control plane, API & Jobs | [job-path-compat-survey.md](superpower/job-path-compat-survey.md) | Release notes for the next MAJOR |
 | [3.8](#38-security-policy-editions--compliance) | Security, Policy, Editions & Compliance | [route-gating-audit.md](superpower/route-gating-audit.md) | X-Actor · NFR-7 · SOC 2 · SEC-INCIDENT-1 · DATA-GOV-1 |
 | [3.9](#39-cases-incidents--assistant) | Cases, Incidents & Assistant | — | AGT-6b |
 | [3.10](#310-deployment-packaging--scale-out) | Deployment, Packaging & Scale-out | [enterprise-scale-out-plan.md](superpower/enterprise-scale-out-plan.md) | Deployment topology live validation · E1 |
@@ -60,6 +60,7 @@ rank.
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · space-to-space comparison (postponed) · W5 forward closure (operator decision) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · space-to-space comparison (postponed) · W5 forward closure (operator decision) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · space-to-space comparison (postponed) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
+| **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · X4 replay (evidence that does not exist yet) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX bundle proof (operator) · W5 forward closure (operator decision) · Consignment ELT `generation` (kept open by operator choice) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Parsing Stage-1 (trust decision) · Deployment topology GAP-4 · `D8-SES-SNS-1` (security review first) |
 
 **Standing rules for editing this board** (distilled from the shifts that grew the old page to 644 KB):
 
@@ -214,7 +215,7 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 #### Exchange & jobs
 
 - **P2** · **Bundle / Exchange — "load as draft" import** — a per-editor import that lands as a draft instead of writing straight through (today `BundleRoutes.importBundle` over `BundleImporter`/`BundleExporter` has no draft seam and no staging state). Design first, likely multi-session. ⛔ Do not fake it with a cross-kind `enabled:false` stamp. (`requires` present-but-different classification shipped 2026-07-18.) → `okf/backend/control-plane/exchange-sharing.md` · design: [`superpower/bundle-load-as-draft-design.md`](superpower/bundle-load-as-draft-design.md) (D1–D8 owed)
-- **P2** · **Job framework — space-to-space comparison** — ⛔ **POSTPONED by the operator 2026-09-16: design only, do not start.** The trigger fired 2026-09-15, which removed the gate but did not set a rank; the design is `superpower/space-comparison-design.md`, its four §5 decisions parked, not owed. No code exists. Predictive maintenance stays deferred to AGT-5 regardless. → `okf/backend/control-plane/jobs.md`
+- **P3** · **Job framework — space-to-space comparison (residuals)** — ✅ the comparison SHIPPED 2026-09-24 (`space.comparison` Job Type + `POST /space-comparisons` on `canAdminister`; all four design decisions taken "go with recommendations", each recorded with how to reverse it in `archived-documents/plans-archive/space-comparison-design.md` §5). Left, each waiting for a real ask: (a) **a scheduled / authored cross-Space comparison** — refused by design today (no Subject ⇒ own-Space-only grant); needs a persisted, attributable, revocable grant, which is a new operator decision, not plumbing · (b) *compare every registered Space* — only with a `SpaceConfigRoot` enumeration decision (design Q1 (b) / Q4) · (c) persisting comparison rows — the data-residency call (Q3) · (d) no UI surface; API only. Predictive maintenance stays deferred to AGT-5 regardless. → `okf/backend/control-plane/jobs.md` § *Space comparison*
 
 #### API contract & vocabulary
 

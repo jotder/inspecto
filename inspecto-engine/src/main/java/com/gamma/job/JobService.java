@@ -587,6 +587,27 @@ public final class JobService implements AutoCloseable {
                                 .build()),
                 List.of("alert.evaluate.completed"), List.of(), List.of("alerts")),
                 c -> new AlertEvaluateJob(c)));
+        // space.comparison (space-comparison design, decided 2026-09-24): compare the storage growth of two or
+        // more Spaces. ⛔ Registered with the OWN-SPACE-ONLY grant, so an authored or scheduled job of this type
+        // can read nothing outside this Space — and since a comparison needs >= 2 Spaces, it is refused. The
+        // only cross-Space path is triggerSpaceComparisonRun, whose grant a canAdminister-gated route built.
+        // The grant reads spaceId lazily: it is set AFTER construction (spaceId(...)), when build() has run.
+        registry.register(JobTypeProvider.of(new JobTypeDescriptor(SpaceComparisonJob.TYPE, "Space Comparison",
+                "Compares the storage growth (the maintenance_storage series storage_report records) of two or "
+                        + "more Spaces per axis: latest bytes, bytes/day, spread and fastest grower. Read-only. "
+                        + "⚠ Reading another Space needs canAdminister, so it runs through POST /space-comparisons "
+                        + "only; an authored or scheduled job of this type may read just its own Space and is "
+                        + "refused.",
+                List.of(ParameterDecl.of("spaces", ParamType.STRING).required().multi().label("Spaces")
+                                .description("The Space ids to compare (at least two, comma-separated)").build(),
+                        ParameterDecl.of("window_days", ParamType.INTEGER).min(1).defaultValue("30")
+                                .description("Trend window, as storage_trend").build(),
+                        ParameterDecl.of("axes", ParamType.STRING).multi()
+                                .description("Only these storage axes (comma-separated); every axis when unset").build(),
+                        ParameterDecl.of("top", ParamType.INTEGER).min(1).defaultValue("5")
+                                .description("Report the N axes with the widest spread").build()),
+                List.of(SpaceComparisonJob.SIGNAL), List.of()),
+                c -> new SpaceComparisonJob(c, id -> SpaceStorageAccess.ownSpaceOnly(spaceId, dataDir).dataRoot(id))));
         // Classpath providers (optional Maven modules — the "classpath way", §12.4). ServiceLoader finds
         // none in the base build; a provider whose id collides with a built-in (registered first) is
         // rejected, fail-closed. Hot-deployable Job Packs (isolated classloaders) arrive in P2c.
@@ -1048,6 +1069,32 @@ public final class JobService implements AutoCloseable {
         JobConfig cfg = new JobConfig(name, "maintenance", null, null, true, false, Map.copyOf(p), null, null);
         Job job = new MaintenanceJob(cfg, dataDir, auditDir, ledger.runStore().orElse(null), this);
         String runId = newRunId(name);
+        String trigger = actor == null || actor.isBlank() ? "manual" : "manual:" + actor.trim();
+        submitAdhocRun(job, cfg, runId, trigger);
+        return runId;
+    }
+
+    /** The ad-hoc run name {@link #triggerSpaceComparisonRun} uses — one comparison at a time per Space. */
+    public static final String SPACE_COMPARISON_RUN = "space.comparison";
+
+    /**
+     * Fire one ad-hoc {@code space.comparison} run with an explicit cross-Space read {@code grant} — the
+     * {@link #triggerMaterializeRun} idiom (lifecycle, non-overlap, poll by {@code runId}), registering nothing.
+     *
+     * <p>⛔ The grant is the authorization. This seam trusts its caller to have checked the capability
+     * ({@code canAdminister}) BEFORE resolving the Spaces it grants, which is why it takes a grant rather than
+     * Space ids: the engine cannot resolve another Space, and must not learn how.
+     *
+     * @param params {@code spaces} (CSV, required by the Job) + optional {@code window_days} / {@code axes} / {@code top}
+     * @param grant  the data roots this run may read
+     * @param actor  attribution, as {@link #triggerMaterializeRun}
+     * @return the {@code runId} to poll
+     */
+    public String triggerSpaceComparisonRun(Map<String, String> params, SpaceStorageAccess grant, String actor) {
+        JobConfig cfg = new JobConfig(SPACE_COMPARISON_RUN, SpaceComparisonJob.TYPE, null, null, true, false,
+                Map.copyOf(params == null ? Map.of() : params), null, null);
+        Job job = new SpaceComparisonJob(cfg, grant);
+        String runId = newRunId(SPACE_COMPARISON_RUN);
         String trigger = actor == null || actor.isBlank() ? "manual" : "manual:" + actor.trim();
         submitAdhocRun(job, cfg, runId, trigger);
         return runId;

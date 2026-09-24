@@ -1,15 +1,9 @@
 package com.gamma.job;
 
+import com.gamma.job.StorageSeries.AxisTrend;
 import com.gamma.signal.Severity;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.ResultSet;
-import java.sql.Statement;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -33,13 +27,7 @@ import java.util.Map;
  */
 final class StorageTrendTask {
 
-    private static final String STORAGE_CATALOG = "maintenance_storage";
-    private static final long DAY_MS = 86_400_000L;
-
     private StorageTrendTask() {}
-
-    /** One axis's growth over the window: its latest observed size and its bytes/day slope. */
-    private record AxisTrend(String axis, long currentBytes, double bytesPerDay) {}
 
     static JobResult run(JobConfig cfg, String dataDir, JobContext ctx) throws Exception {
         long t0 = System.nanoTime();
@@ -50,40 +38,21 @@ final class StorageTrendTask {
 
         if (dataDir == null || dataDir.isBlank())
             return JobResult.ok("storage_trend: no data root configured — no sample history to analyse", 0L);
-        Path storeDir = Path.of(dataDir).resolve(STORAGE_CATALOG);
-        if (!Files.isDirectory(storeDir) || !hasParquet(storeDir))
+        Path storeDir = StorageSeries.storeDir(Path.of(dataDir));
+        if (!StorageSeries.hasHistory(storeDir))
             return JobResult.ok("storage_trend: no storage_report history yet (" + storeDir
                     + ") — run storage_report first", (System.nanoTime() - t0) / 1_000_000L);
 
-        long cutoffMs = Instant.now().minus(Duration.ofDays(windowDays)).toEpochMilli();
-        String glob = "'" + storeDir.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
-                + "/*.parquet'";
+        // The series reader is shared with space.comparison — one slope calculation, never two.
+        StorageSeries.Window w = StorageSeries.read(storeDir, windowDays);
+        List<long[]> totals = w.totals();
+        if (totals.size() < 2)
+            return JobResult.ok("storage_trend: insufficient history (" + totals.size()
+                    + " sample(s) in the last " + windowDays + "d); need >= 2 to project a trend",
+                    (System.nanoTime() - t0) / 1_000_000L);
+        List<AxisTrend> axisTrends = new ArrayList<>(w.axes());
 
-        List<long[]> totals = new ArrayList<>();   // {createdMs, totalBytes} per sample, ascending
-        List<AxisTrend> axisTrends = new ArrayList<>();
-        com.gamma.util.DuckDbUtil.loadDriver();
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
-             Statement st = conn.createStatement()) {
-            try (ResultSet rs = st.executeQuery("SELECT created_ms, CAST(sum(bytes) AS BIGINT) FROM read_parquet("
-                    + glob + ") WHERE created_ms >= " + cutoffMs + " GROUP BY created_ms ORDER BY created_ms")) {
-                while (rs.next()) totals.add(new long[]{rs.getLong(1), rs.getLong(2)});
-            }
-            if (totals.size() < 2)
-                return JobResult.ok("storage_trend: insufficient history (" + totals.size()
-                        + " sample(s) in the last " + windowDays + "d); need >= 2 to project a trend",
-                        (System.nanoTime() - t0) / 1_000_000L);
-            double spanDays = spanDays(totals);
-            try (ResultSet rs = st.executeQuery("SELECT axis, arg_min(bytes, created_ms), "
-                    + "arg_max(bytes, created_ms) FROM read_parquet(" + glob + ") WHERE created_ms >= "
-                    + cutoffMs + " GROUP BY axis")) {
-                while (rs.next()) {
-                    long first = rs.getLong(2), last = rs.getLong(3);
-                    axisTrends.add(new AxisTrend(rs.getString(1), last, (last - first) / spanDays));
-                }
-            }
-        }
-
-        double spanDays = spanDays(totals);
+        double spanDays = w.spanDays();
         long earliestTotal = totals.get(0)[1];
         long latestTotal = totals.get(totals.size() - 1)[1];
         double totalPerDay = (latestTotal - earliestTotal) / spanDays;
@@ -128,18 +97,5 @@ final class StorageTrendTask {
                 + String.format(Locale.ROOT, "%.1f", spanDays) + "d window (" + totals.size()
                 + " samples); archive candidates: " + recommend + "; " + projection;
         return JobResult.ok(msg, (System.nanoTime() - t0) / 1_000_000L);
-    }
-
-    /** Window span in days between the earliest and latest sample (floored just above zero). */
-    private static double spanDays(List<long[]> totals) {
-        long span = totals.get(totals.size() - 1)[0] - totals.get(0)[0];
-        return Math.max(span, 1L) / (double) DAY_MS;
-    }
-
-    /** True when the catalog dir holds at least one Parquet sample (a glob over an empty dir throws). */
-    private static boolean hasParquet(Path storeDir) throws java.io.IOException {
-        try (var s = Files.list(storeDir)) {
-            return s.anyMatch(p -> p.getFileName().toString().endsWith(".parquet"));
-        }
     }
 }

@@ -340,7 +340,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | **Postgres multi-user** — pool behind `JdbcDrivers`, replace `browseConnection()`, **schema-per-Space** URL wiring, `TriageRunStore` PG impl, concurrency test | `BACKLOG.md` §3 *Postgres multi-user* — ⛔ **PARKED by §6**; `EDITIONS.md` OPS-03 | Isolation on Postgres is a **schema**, not a database (a connection binds one database) |
 | Canonical-pipeline selective bundle export / import; retire the `authored-pipeline` kind that still targets the retired `PipelineStore` | `BACKLOG.md` §3 *Canonical-pipeline selective bundle export/import* | |
 | Bundle residuals — `requires` present-but-different classification; per-editor "load as draft" import | `BACKLOG.md` §3 *Bundle / Exchange* | ⛔ do not fake a draft with a cross-kind `enabled: false` |
-| Space-to-space comparison (Maintenance COULD tier) | `BACKLOG.md` §3 *Job framework* | Builds on the preview's drift classification |
+| Space-to-space comparison — residuals only; the storage-growth comparison SHIPPED 2026-09-24 (`space.comparison`, `canAdminister`-gated) | `BACKLOG.md` §3.7 *Job framework — space-to-space comparison (residuals)* | Scheduled cross-Space runs need a persisted grant decision |
 | Cross-Space controller / connector-direct emission (S8) | `BACKLOG.md` §3 | Optional Signal-network slice |
 | Enterprise distributed tier — shared-state backends, distributed scheduler | `BACKLOG.md` §2 *E1*; `REQUIREMENTS.md` NFR-8 | Design only |
 | Row / column-level sharing policy | design §6 of the archived sharing plan | Not filed as a row; listed in `exchange-sharing.md` as future |

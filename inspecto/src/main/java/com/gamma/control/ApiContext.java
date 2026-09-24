@@ -352,7 +352,8 @@ public interface ApiContext {
     /** The running service host the routes act on (the request's bound space, per the {@code /spaces/{id}} seam). */
     CollectorService service();
 
-    /** The container of all hosted spaces — for the server-global {@code SpaceRoutes} CRUD group only. */
+    /** The container of all hosted spaces — for the server-global {@code SpaceRoutes} CRUD group, and the
+     *  {@code canAdminister}-gated {@code SpaceComparisonRoutes} (which resolves Spaces only past that gate). */
     SpaceManager spaces();
 
     /** The configured write root, or {@code null} when filesystem writes are disabled. */
