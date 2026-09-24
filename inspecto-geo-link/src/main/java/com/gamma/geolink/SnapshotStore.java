@@ -121,13 +121,15 @@ final class SnapshotStore {
         if (!Files.isRegularFile(f)) return List.of();
         List<String> out = new ArrayList<>();
         String needle = "\"snapshotId\":" + quote(snapshotId) + ",";
-        for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
-            if (line.contains(needle)) {
-                int i = line.indexOf("\"caseId\":\"");
-                if (i >= 0) {
-                    int start = i + "\"caseId\":\"".length();
-                    int end = line.indexOf('"', start);
-                    if (end > start) out.add(line.substring(start, end));
+        try (java.io.BufferedReader r = Files.newBufferedReader(f, StandardCharsets.UTF_8)) {
+            for (String line; (line = r.readLine()) != null; ) {   // streamed: every snapshot shares this file
+                if (line.contains(needle)) {
+                    int i = line.indexOf("\"caseId\":\"");
+                    if (i >= 0) {
+                        int start = i + "\"caseId\":\"".length();
+                        int end = line.indexOf('"', start);
+                        if (end > start) out.add(line.substring(start, end));
+                    }
                 }
             }
         }

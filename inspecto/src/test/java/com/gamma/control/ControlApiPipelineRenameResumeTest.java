@@ -151,6 +151,33 @@ class ControlApiPipelineRenameResumeTest {
         }
     }
 
+    /** AUDIT-LOG-UNBOUNDED-READ-1: the journal read is streamed, not loaded whole. A long history of closed
+     *  brackets plus a torn trailing line (a hard kill mid-append) still yields exactly the one open rename. */
+    @Test
+    void resumeFindsTheOpenBracketInALargeJournalWithATornTail() throws Exception {
+        Path root = Files.createTempDirectory("resume-large");
+        try (Ctx c = open(root, false)) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < 20_000; i++) {
+                sb.append("2026-08-01T00:00:00Z old_").append(i).append(" -> new_").append(i)
+                  .append(" : begin src=old_").append(i).append("_pipeline.toon rewriteDependents=true\n");
+                sb.append("2026-08-01T00:00:00Z old_").append(i).append(" -> new_").append(i).append(" : completed\n");
+            }
+            sb.append("2026-08-13T00:00:00Z mini_etl -> mini_v2 : begin src=mini_pipeline.toon"
+                    + " rewriteDependents=true newName=Mini V2\n");
+            sb.append("2026-08-13T00:00:00Z mini_etl -> mini_v2 : unregist");   // torn: no newline
+            Files.writeString(root.resolve("rename.journal"), sb.toString());
+
+            HttpResponse<String> r = post(c.port, "/pipelines/rename/resume", "{}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+            assertEquals("mini_etl", out.get("oldId").asText(), "the only open bracket, found past 40k closed lines");
+            assertEquals("Mini V2", out.get("name").asText());
+        } finally {
+            deleteRecursive(root);
+        }
+    }
+
     /** Failure after the config write + source delete (a plain retry 404s — the pipeline is registered
      *  under neither id): resume registers the new config, finishes the dependents and closes the bracket.
      *  The audit rename must work with only the NEW config to read dirs from. */

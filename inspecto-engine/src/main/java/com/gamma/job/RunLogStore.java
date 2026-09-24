@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
@@ -46,8 +47,8 @@ final class RunLogStore {
         Path f = dir.resolve(fileSafe(runId) + ".jsonl");
         if (!Files.isRegularFile(f)) return List.of();
         List<RunLogEntry> out = new ArrayList<>();
-        try {
-            for (String line : Files.readAllLines(f)) {
+        try (BufferedReader r = Files.newBufferedReader(f)) {       // streamed: no second whole-file copy
+            for (String line; (line = r.readLine()) != null; ) {
                 if (!line.isBlank()) out.add(JSON.readValue(line, RunLogEntry.class));
             }
         } catch (IOException e) {

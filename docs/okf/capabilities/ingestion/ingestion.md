@@ -140,7 +140,7 @@ so peak heap stays one generation regardless of file size (`<stem>_gNNNNN_out.*`
 **The write is staged and revealed.** `PartitionWriter` (`inspecto-etl/src/main/java/com/gamma/etl/PartitionWriter.java:158-208`)
 `COPY`s into a staging directory, then reveals by atomic rename — `COPY … PARTITION_BY` for a keyed schema,
 a single-file `COPY` for an **unkeyed** one (E1: the `year=1900/month=01/day=01` sentinel bucket is retired; an
-unkeyed segment writes a **flat** store). `CommitLog` records committed ids; `MarkerManager` writes the
+unkeyed segment writes a **flat** store). `CommitLog` records committed ids (read back by streaming, since the log only grows); `MarkerManager` writes the
 per-file marker only after commit and cleans stale ones; `OVERWRITE_OR_IGNORE` makes a crash mid-archive
 idempotent for already-committed Entries. Since 2026-08-11 **record dedup is not a Stage-1 concern** —
 `processing.dedup` is refused at `prepare()`; the Step runs at rest. Since 2026-08-26 a `route:` pipeline
