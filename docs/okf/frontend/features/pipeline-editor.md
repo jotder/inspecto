@@ -133,7 +133,7 @@ open, and widening reopens only a palette the FLOOR closed, not one the author c
 viewport-based on purpose, not a container measure: the preview browser delivers no `ResizeObserver`
 callbacks, and the shell's nav drawer already leaves the page below `md` (960px).
 
-**Remembered Step positions** (the layout half of the row once filed as `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`, 2026-09-23; the open history half is now `PIPELINE-CONFIG-HISTORY-1`):
+**Remembered Step positions** (the layout half of the row once filed as `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`, 2026-09-23; the history half, `PIPELINE-CONFIG-HISTORY-1`, shipped 2026-09-24 — see *Save*):
 dragging a Step persists every node's position (`node:dragend` → `persistLayout()`), and the next open
 restores them instead of re-running the automatic `antv-dagre` layout. **Home = browser
 `localStorage`, `inspecto.pipelines.layout.<space>.<pipelineId>`** (`pipelines/pipeline-layout.ts`) —
@@ -693,6 +693,16 @@ the dock 1.5s after every edit is intrusive. ⚠ The debounce timer goes through
 effect re-enters `ApplicationRef.tick` (NG0101), and neither fakeAsync nor `vi.useFakeTimers()`
 survives it in this runner — specs capture the armed callback and fire it deterministically.
 
+**Config history survives a reload** (`PIPELINE-CONFIG-HISTORY-1`, 2026-09-24): every successful save
+of a Pipeline config — from any door, not only this editor — leaves a server-side version (the newest 50
+kept, the same cap as undo/redo). The ⋮ menu's **History…** opens `PipelineHistoryDialog`
+(`pipeline-history.dialog.ts`): the versions newest first, and a READ-ONLY line diff of the selected one
+against the version before it (the default) or against the current config — the oldest kept version has no
+previous one, so it falls back to current. Removed lines are `<del>`, added lines `<ins>` (text tone only, no
+tinted fills). It writes nothing: restoring a version is not offered. ⚠ The entry sits in the author-gated
+⋮ menu with the other pipeline verbs, so the Business lens does not see it although the routes are reads.
+Storage, routes and rename/delete behaviour: [Pipeline identity § Config history](../../backend/control-plane/pipeline-identity.md).
+
 Known save-path defects are tracked in [BACKLOG](../../../BACKLOG.md) — see *Known gaps* below
 before trusting a described save.
 
@@ -859,9 +869,9 @@ each fix live). Genuinely open:
   row export onto the bundle routes (both still ride the client stream-bundle).
 - **Carried from the archived workbench MoSCoW (2026-09-23), demand-gated P3s:** ~~the canvas overlays
   the LAST run only (`PIPELINE-RUN-HISTORY-OVERLAY-1`)~~ **SHIPPED 2026-09-23** as the run picker
-  above; and a Pipeline has no persisted config history (undo/redo above is 50 per tab, lost on reload —
-  `PIPELINE-CONFIG-HISTORY-1`, renamed 2026-09-23 from `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1` once its
-  layout half shipped). The responsive floor and remembered Step
+  above; and ~~a Pipeline has no persisted config history~~ **SHIPPED 2026-09-24** as the server-side
+  version history above (`PIPELINE-CONFIG-HISTORY-1`, renamed 2026-09-23 from
+  `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1` once its layout half shipped). The responsive floor and remembered Step
   positions shipped 2026-09-23 (see *Shell* above).
 
 ## Verification culture (why this file reads the way it does)

@@ -205,6 +205,7 @@ final class ConfigWriteRoutes implements RouteModule {
         }
         byte[] bytes = ConfigCodec.toToon(toWrite).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
+        if ("pipeline".equals(type)) PipelineHistory.record(writeRoot, target);   // PIPELINE-CONFIG-HISTORY-1
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
         log.info("[CONFIG-WRITE] type={} wrote {} ({} bytes, overwrote={})", type, rel, bytes.length, exists);
 
@@ -379,6 +380,7 @@ final class ConfigWriteRoutes implements RouteModule {
         }
         byte[] bytes = ConfigCodec.toToon(toWrite).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
+        if ("pipeline".equals(type)) PipelineHistory.record(writeRoot, target);   // PIPELINE-CONFIG-HISTORY-1
         log.info("[CONFIG-PATCH] type={} patched {} ({} bytes)", type, rel, bytes.length);
 
         Map<String, Object> r = new LinkedHashMap<>();

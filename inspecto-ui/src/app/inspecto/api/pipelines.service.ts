@@ -441,6 +441,40 @@ export interface PipelineBundleImportResult {
     findings: { severity: string; fieldPath?: string; message: string; code?: string; guidance?: string }[];
 }
 
+/** One kept config version (`PIPELINE-CONFIG-HISTORY-1`): a snapshot taken after a successful save. */
+export interface PipelineHistoryVersion {
+    version: number;
+    /** ISO instant the version was saved. */
+    savedAt: string;
+    bytes: number;
+}
+
+/** `GET /pipelines/{name}/history` — the kept versions, newest first; the server keeps the newest `keep`. */
+export interface PipelineHistory {
+    pipeline: string;
+    keep: number;
+    total: number;
+    versions: PipelineHistoryVersion[];
+}
+
+/** One line of a config diff, in order: unchanged context, a removed line, or an added line. */
+export interface PipelineHistoryDiffLine {
+    op: 'context' | 'remove' | 'add';
+    text: string;
+}
+
+/** `GET /pipelines/{name}/history/diff` — a line diff of two versions' TOON, or of one against the current file. */
+export interface PipelineHistoryDiff {
+    pipeline: string;
+    from: number;
+    to: number | 'current';
+    added: number;
+    removed: number;
+    /** The change was too large to align line by line and is shown as a whole replacement. */
+    coarse: boolean;
+    lines: PipelineHistoryDiffLine[];
+}
+
 /** Read-only pipeline-graph projection + authored-pipeline CRUD/dry-run for the editor (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
 export class PipelinesService {
@@ -592,6 +626,22 @@ export class PipelinesService {
             apiUrl(`/pipelines/${encodeURIComponent(name)}/settings`),
             settings,
         );
+    }
+
+    // ── config history (PIPELINE-CONFIG-HISTORY-1): a server-side version per successful save ──
+
+    /** The kept config versions, newest first. */
+    history(name: string): Observable<PipelineHistory> {
+        return this.http.get<PipelineHistory>(apiUrl(`/pipelines/${encodeURIComponent(name)}/history`));
+    }
+
+    /** A line diff of version `from` against version `to`, or against the current config when `to` is omitted. */
+    historyDiff(name: string, from: number, to?: number): Observable<PipelineHistoryDiff> {
+        const params: Record<string, string> = { from: String(from) };
+        if (to != null) params['to'] = String(to);
+        return this.http.get<PipelineHistoryDiff>(apiUrl(`/pipelines/${encodeURIComponent(name)}/history/diff`), {
+            params,
+        });
     }
 
     // ── the server bundle (R2): one pipeline + its file closure as a portable zip ──

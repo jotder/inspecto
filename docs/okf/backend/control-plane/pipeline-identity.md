@@ -224,6 +224,49 @@ As-built notes worth keeping:
   ledger/audit/dependent counts; that mock was deleted 2026-08-31. The rule it embodied is worth keeping:
   a stand-in must never claim work it did not do.)*
 
+## Config history (`PIPELINE-CONFIG-HISTORY-1`, shipped 2026-09-24)
+
+Operator decision 2026-09-24: a server-side snapshot of a Pipeline's config on every successful save,
+the newest **50** kept per Pipeline (the editor's undo cap), oldest pruned. `PipelineHistory` (storage +
+diff) and `PipelineHistoryRoutes` (reads), both in `com.gamma.control`.
+
+- **Layout** — `<write-root>/.history/pipelines/<pipelineId>/v<N>.toon`: `N` is monotonic per Pipeline and
+  never reused after a prune, `savedAt` is the snapshot file's mtime. It follows `ComponentStore`'s MET-5
+  `.history/` + `v<N>` convention, one directory per Pipeline so a rename moves it in one step. Written
+  through `AtomicFiles`, numbering + pruning under one lock. ⚠ No walker mistakes a snapshot for a live
+  config: every Pipeline discovery keys on `_pipeline.toon`, and the satellite scan stops at depth 3 while a
+  snapshot sits at depth 4. A whole-Space export (`BundleExporter.exportSpace`) walks the config dir, so it
+  carries `.history/` along, as it already did for component history.
+- **What is snapshotted** — the bytes on disk AFTER the write, read back, filed under the id the parser
+  derives from them (`ConfigReadRoutes.pipelineIdOf`: explicit `id`, else `name` lower-cased with spaces
+  underscored). Called after the write on `/config/write` + `/config/patch` (type `pipeline`), `PUT
+  /pipelines/{name}/graph`, `POST /pipelines/import` (after registration succeeds — a 422/409 there is a
+  refused save), `label`, `settings`, `save-as-template` (the template's first version) and `rename`. A
+  refused save never reaches it. A snapshot failure is logged and swallowed — the save already landed.
+- **Routes** (reads — no capability gate, like `GET /pipelines/{name}/graph/raw`, which already serves the
+  current config to any authenticated caller; unauthenticated → 401 at the edge):
+  `GET /pipelines/{name}/history` → `{pipeline, keep, total, versions:[{version, savedAt, bytes}]}` newest
+  first; `GET /pipelines/{name}/history/{version}` → the version's metadata + its TOON `text`;
+  `GET /pipelines/{name}/history/diff?from={v}&to={v|current}` → `{from, to, added, removed, coarse,
+  lines:[{op: context|remove|add, text}]}`, `to` defaulting to the current file. Gates: unknown Pipeline 404
+  → non-numeric version 400 → version not kept 404. A Pipeline `/config/write` created but the registry has
+  not picked up yet is addressable by its id, so its first versions are not invisible until the next poll.
+  `/history/diff` is registered before `/history/{version}` — first match wins. The diff is an LCS over the
+  lines between the common head and tail; a middle over 4M cells is reported as a whole replacement with
+  `coarse: true` (correct, not minimal).
+- **Rename moves the history** — `PipelineHistory.rename` runs inside `writeRenamedConfig`, AFTER the
+  renamed config landed (a refused rename leaves the history under the id the Pipeline still has), then the
+  rename itself is recorded as a version under the new id. Resume's "config already written" branch runs the
+  same idempotent move. ⛔ It never merges: an existing `.history/pipelines/<newId>` is left alone and the
+  journal says `config history NOT moved`.
+- **Delete purges the history** — `DELETE /config/pipeline/{name}` removes the `v<N>.toon` files and then the
+  directory if that emptied it (never a recursive delete). Decided to match `ComponentStore.delete` (*delete
+  means gone, history included*): the history is config-plane state and goes with the config, whereas a
+  Pipeline delete keeps its data (unless `?data=true`) and its audit trail, which are what record what
+  happened. It also keeps a re-created Pipeline of the same id from inheriting a stranger's versions.
+- **Not snapshotted (deliberately):** the whole-Space `POST /import` and the registry `POST /bundle/import`,
+  which unpack or restore rather than author.
+
 ## Backlog (not built)
 
 - Nothing open. ~~Automated resumability from `rename.journal`~~ shipped 2026-08-13 (§ above).

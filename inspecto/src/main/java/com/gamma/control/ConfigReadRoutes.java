@@ -128,6 +128,9 @@ final class ConfigReadRoutes implements RouteModule {
             dataRemoval = PipelineDataDirs.removeFor(writeRoot, raw, target);
         }
 
+        // Read BEFORE the delete: the id the config history is filed under is in the file itself.
+        Map<String, Object> deletedRaw = "pipeline".equals(type)
+                ? ConfigLoader.filesystem().decode(target.toString()) : Map.of();
         Files.delete(target);
         // Split storage (schema): the sibling _structure.csv / _mapping.csv are part of the component — discard them too.
         if ("schema".equals(type)) {
@@ -136,6 +139,9 @@ final class ConfigReadRoutes implements RouteModule {
         }
         if ("pipeline".equals(type)) {
             api.service().unregisterPipeline(target);   // drop the ghost row instead of waiting for the next poll cycle
+            // PIPELINE-CONFIG-HISTORY-1: the config history goes with the config, as ComponentStore.delete
+            // purges a component's — the data and audit trail kept above are what record what happened.
+            PipelineHistory.purge(writeRoot, pipelineIdOf(deletedRaw, fileName));
         } else if ("enrichment".equals(type)) {
             api.service().unregisterEnrichment(fileName);   // stop its schedule timer immediately, not at restart
         }
@@ -199,7 +205,7 @@ final class ConfigReadRoutes implements RouteModule {
      * {@code PipelineConfigParser}'s derivation, which is what every by-name binding keys on; falls
      * back to the file name only when the config carries neither.
      */
-    private static String pipelineIdOf(Map<String, Object> raw, String fileName) {
+    static String pipelineIdOf(Map<String, Object> raw, String fileName) {
         Object explicit = raw.get("id");
         String id = explicit == null ? "" : String.valueOf(explicit).trim();
         if (!id.isEmpty()) return id;

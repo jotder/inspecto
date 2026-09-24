@@ -122,6 +122,7 @@ final class PipelineSettingsRoutes implements RouteModule {
 
         byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(srcPath, bytes, ".cfg-");
+        PipelineHistory.record(writeRoot, srcPath);   // PIPELINE-CONFIG-HISTORY-1
         log.info("[PIPELINE-LABEL] pipeline '{}' relabelled to '{}'{}",
                 id, label, stampedId ? " (identity stamped as id: " + id + ")" : "");
 
@@ -195,6 +196,7 @@ final class PipelineSettingsRoutes implements RouteModule {
 
         byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(srcPath, bytes, ".cfg-");
+        PipelineHistory.record(writeRoot, srcPath);   // PIPELINE-CONFIG-HISTORY-1
         log.info("[PIPELINE-SETTINGS] pipeline '{}' produces/reference block updated", name);
 
         Map<String, Object> r = new LinkedHashMap<>();
@@ -266,6 +268,7 @@ final class PipelineSettingsRoutes implements RouteModule {
 
         byte[] bytes = ConfigCodec.toToon(tpl).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".tpl-");
+        PipelineHistory.record(writeRoot, target);   // PIPELINE-CONFIG-HISTORY-1: the template's first version
         log.info("[PIPELINE-TEMPLATE] copied '{}' to template '{}' at {} ({} bytes)",
                 source, id, fileName, bytes.length);
 

@@ -2503,6 +2503,91 @@
         "x-generated" : true
       }
     },
+    "/pipelines/{pipelineId}/history" : {
+      "get" : {
+        "tags" : [ "pipelines" ],
+        "summary" : "List a Pipeline's kept config versions, newest first",
+        "operationId" : "getPipelinesByPipelineIdHistory",
+        "description" : "PIPELINE-CONFIG-HISTORY-1: every successful save of a Pipeline config snapshots it; the newest 50 are kept. Returns {pipeline, keep, total, versions:[{version, savedAt, bytes}]}. A read: no capability gate, like GET /pipelines/{pipelineId}/graph/raw. 404 for an unknown Pipeline.",
+        "parameters" : [ {
+          "name" : "pipelineId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/pipelines/{pipelineId}/history/diff" : {
+      "get" : {
+        "tags" : [ "pipelines" ],
+        "summary" : "Line diff of two kept versions, or of one against the current config",
+        "operationId" : "getPipelinesByPipelineIdHistoryDiff",
+        "description" : "Returns {pipeline, from, to, added, removed, coarse, lines:[{op: context|remove|add, text}]}. 400 when 'from' is missing or not a number, 404 for a version that is not kept.",
+        "parameters" : [ {
+          "name" : "pipelineId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "from",
+          "in" : "query",
+          "required" : true,
+          "schema" : {
+            "type" : "integer"
+          }
+        }, {
+          "name" : "to",
+          "in" : "query",
+          "required" : false,
+          "description" : "A version number, or 'current' (the default) for the config file as it is on disk now.",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/pipelines/{pipelineId}/history/{historyId}" : {
+      "get" : {
+        "tags" : [ "pipelines" ],
+        "summary" : "Read one kept config version",
+        "operationId" : "getPipelinesByPipelineIdHistoryByHistoryId",
+        "description" : "Returns {version, savedAt, bytes, pipeline, text} where text is the version's TOON. 400 for a non-numeric version, 404 for one that is not kept.",
+        "parameters" : [ {
+          "name" : "pipelineId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "historyId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
     "/pipelines/{pipelineId}/related" : {
       "get" : {
         "tags" : [ "pipelines" ],

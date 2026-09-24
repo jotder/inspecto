@@ -333,6 +333,7 @@ final class PipelineGraphRoutes implements RouteModule {
 
         byte[] bytes = ConfigCodec.toToon(lowered).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
+        PipelineHistory.record(writeRoot, target);   // PIPELINE-CONFIG-HISTORY-1
         log.info("[PIPELINE-WRITE] lowered graph '{}' to {} ({} bytes)", name, target.getFileName(), bytes.length);
         // The etag a next save (or a re-read) must accept — the same bytes just written, not the pre-save hash.
         ETags.set(e, ETags.of(ContentHash.of(lowered)));

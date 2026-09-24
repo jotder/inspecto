@@ -84,6 +84,7 @@ import { PipelineOpenDialog } from './pipeline-open.dialog';
 import { PipelineChangeIdDialog, PipelineChangeIdResultData } from './pipeline-change-id.dialog';
 import { PipelineRenameDialog, PipelineRenameResultData } from './pipeline-rename.dialog';
 import { PipelineSettingsDialog } from './pipeline-settings.dialog';
+import { PipelineHistoryDialog } from './pipeline-history.dialog';
 import type { PipelineSettings } from 'app/inspecto/api/pipelines.service';
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
@@ -1791,6 +1792,17 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
             },
             error: (err) => this.toast.error(apiErrorMessage(err, 'Could not load pipeline settings')),
         });
+    }
+
+    /**
+     * `PIPELINE-CONFIG-HISTORY-1`: the server-side versions of this Pipeline's config (one per successful
+     * save, newest 50 kept) with a read-only diff. Unlike undo/redo it survives a reload — and it is a
+     * read, so it opens nothing that can change the tab.
+     */
+    pipelineHistory(): void {
+        const id = this.selectedId();
+        if (!id) return;
+        this.dialog.open(PipelineHistoryDialog, { width: '56rem', maxWidth: '95vw', data: { id } });
     }
 
     /**

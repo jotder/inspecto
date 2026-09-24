@@ -376,6 +376,9 @@ final class PipelineBundleRoutes implements RouteModule {
             }
         }
 
+        // PIPELINE-CONFIG-HISTORY-1: only once the import has REGISTERED - a registration refusal above
+        // answers 422/409, and a refused save never gets a version.
+        PipelineHistory.record(writeRoot, target);
         log.info("[PIPELINE-BUNDLE] imported '{}' as '{}' ({} file(s))", sourceId, newId, written.size());
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("written", true);

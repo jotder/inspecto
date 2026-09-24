@@ -340,6 +340,9 @@ final class PipelineRenameRoutes implements RouteModule {
                     journalStep(journalFile, oldId, newId,
                             "removed source config (new config already written)", journal);
                 }
+                // The history moves with the write (writeRenamedConfig); here the write already happened,
+                // so it may still be owed. Idempotent: "none to move" once it has.
+                journalStep(journalFile, oldId, newId, PipelineHistory.rename(writeRoot, oldId, newId), journal);
                 Map<String, Object> written = ConfigLoader.filesystem().decode(newPath.toString());
                 label = String.valueOf(written.getOrDefault("name", newId));
             }
@@ -427,6 +430,11 @@ final class PipelineRenameRoutes implements RouteModule {
         }
         byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(newPath, bytes, ".cfg-");
+        // PIPELINE-CONFIG-HISTORY-1: the history follows the identity — moved only AFTER the renamed config
+        // landed, so a refused rename (above) leaves it under the id the pipeline still has — and the rename
+        // is itself a version, filed under newId.
+        journalStep(journalFile, oldId, newId, PipelineHistory.rename(api.writeRoot(), oldId, newId), journal);
+        PipelineHistory.record(api.writeRoot(), newPath);
         Files.deleteIfExists(srcPath);
         journalStep(journalFile, oldId, newId, "wrote " + newFileName + "; removed source config", journal);
         return new ConfigWrite(label, findings, null);
