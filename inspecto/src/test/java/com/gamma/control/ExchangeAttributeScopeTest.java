@@ -145,13 +145,13 @@ class ExchangeAttributeScopeTest {
      * this build) — same harness as {@code ApiContextV1DerivationTest}. Pre-populating the map models
      * what a shared {@code HttpContext} map holds when the next request arrives.
      */
-    private static final class FakeExchange extends HttpExchange {
+    static final class FakeExchange extends HttpExchange {
         private final URI uri;
         private final Map<String, Object> attributes;
         private final Headers requestHeaders = new Headers();
         private final Headers responseHeaders = new Headers();
 
-        private FakeExchange(String path) { this(path, new HashMap<>()); }
+        FakeExchange(String path) { this(path, new HashMap<>()); }
 
         /** A pre-JDK-26 exchange: its JDK attribute map is the CONTEXT's, shared with its siblings. */
         private FakeExchange(String path, Map<String, Object> sharedJdkMap) {

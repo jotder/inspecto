@@ -14,9 +14,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Core-test-scope fake {@link ObjectEngineProvider} — {@code EDITION-GATED-TESTS-IN-WRONG-HOME-1}'s
- * prerequisite for the three remaining moved tests (`ControlApiReconPromoteTest` here; see that class'
- * own note for why `ControlApiScopedObjectsTest` and `ControlApiAccessDeciderTest`'s row-scope case stay
- * in {@code inspecto-ops} instead).
+ * prerequisite for the remaining moved tests ({@code ControlApiReconPromoteTest}, and
+ * {@code AnnotationTargetsScopeTest} — the core half of the data-scope guard; see its own note for why
+ * {@code ControlApiScopedObjectsTest} and {@code ControlApiAccessDeciderObjectsTest} stay in
+ * {@code inspecto-ops}).
  *
  * <p>⚠ NOT registered module-wide: a global {@code META-INF/services/com.gamma.service.ObjectEngineProvider}
  * in this module's test resources made {@code ControlApiReconTest}'s "no operational-objects module" 503

@@ -96,7 +96,7 @@ class ControlApiReconPromoteTest {
      * {@link FakeObjectEngineProvider} — so {@code ServiceLoader.load(ObjectEngineProvider.class)}
      * discovers it while this classloader is current, and discovers nothing once it is not.
      */
-    private static ClassLoader fakeObjectEngineClassLoader(ClassLoader parent) throws Exception {
+    static ClassLoader fakeObjectEngineClassLoader(ClassLoader parent) throws Exception {
         Path dir = Files.createTempDirectory("recon-fake-engine-spi")
                 .resolve("META-INF").resolve("services");
         Files.createDirectories(dir);

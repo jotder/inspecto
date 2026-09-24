@@ -330,18 +330,15 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
   repo so the file is visible at all; see `DOC-COUNTS-GUARD-SCOPE-1` below. ⛔ Repo rot must be fixed at
   the target, never swallowed by the package-time rewrite.
 
-- **`EDITION-GATED-TESTS-IN-WRONG-HOME-1`** — TWO test classes guard CORE behaviour from inside
-  `inspecto-ops`, which the default reactor never builds (`mvn -o -pl inspecto-ops -am test` does not even
-  resolve without `-Pedition-standard`). ⚠ **Severity is LOW:** `ci.yml:303` runs `-Pedition-enterprise`
-  with tests, so they all run on CI — the exposure is the local `mvn -o clean test` loop only.
-  ✅ Done: `RepoSpacesConfigValidationTest` moved to `inspecto`; `ControlApiDbBrowserTest`,
-  `ControlApiDecisionRulesTest` and `PostgresStateStoreTest` SPLIT (core half in `inspecto`, ops siblings
-  `ControlApiDbBrowserOpsTablesTest`, `ControlApiDecisionRuleApplyTest`, `PostgresOpsStoreTest`);
-  `ControlApiReconPromoteTest` moved to `inspecto` (`2f0b181f9`). Remaining, re-grounded 2026-09-25:
-  `ControlApiScopedObjectsTest` (SEC-7d data-scope guard) and `ControlApiAccessDeciderTest` (the
-  `AccessDecider` seam) — both drive `/objects` with `com.gamma.ops.OperationalObject` fixtures, so moving
-  them needs a non-ops test vehicle, not a file move. ⛔ Not fixable by adding the module to the
-  default `<modules>` — that reverses signed decision EDG-01 cell 7.
+- ~~**`EDITION-GATED-TESTS-IN-WRONG-HOME-1`**~~ ✅ **CLOSED 2026-09-25 (this commit)** — test classes that
+  guarded CORE behaviour from inside `inspecto-ops`, which the default reactor never builds
+  (`mvn -o -pl inspecto-ops -am test` does not even resolve without `-Pedition-standard`). Severity was LOW:
+  `ci.yml:303` runs `-Pedition-enterprise` with tests, so CI always ran them — the exposure was the local
+  `mvn -o clean test` loop only. `RepoSpacesConfigValidationTest` moved to `inspecto`; `ControlApiDbBrowserTest`,
+  `ControlApiDecisionRulesTest` and `PostgresStateStoreTest` SPLIT (ops siblings `ControlApiDbBrowserOpsTablesTest`,
+  `ControlApiDecisionRuleApplyTest`, `PostgresOpsStoreTest`); `ControlApiReconPromoteTest` moved (`2f0b181f9`);
+  the last two closed by the split below. ⛔ Never "fixed" by adding the module to the default `<modules>` —
+  that reverses signed decision EDG-01 cell 7.
 
 ### `DOC-COUNTS-GUARD-SCOPE-1` — the allow-list that caused the README row, removed from its sibling too
 
@@ -429,7 +426,7 @@ running the *previous* guard against the same planted input: red-then-green only
 old-green/new-red shows the widening does something. Two of the three were invisible on today's corpus
 otherwise.
 
-### `EDITION-GATED-TESTS-IN-WRONG-HOME-1` — three closed by SPLITTING, and the trap in the other three
+### `EDITION-GATED-TESTS-IN-WRONG-HOME-1` — closed by SPLITTING, and the trap that made moving whole unsafe
 
 `ControlApiDecisionRulesTest` (5 core / 3 ops), `ControlApiDbBrowserTest` (7 / 1) and `PostgresStateStoreTest`
 (11 / 5) were **split, not moved**: the core half runs in the default reactor, an ops sibling keeps every case
@@ -439,3 +436,23 @@ needing operational objects. 32 tests before, 32 after; no package churn; no new
 `com.gamma.ops`, yet three of its tests drive `GET /objects`. In a default build one **failed** and another
 **passed vacuously** — with ops absent, the `/objects` envelope happens to satisfy its `== 1`. Moving the class
 whole would have landed a vacuously-green test. The positive control caught it; the triage did not.
+
+**The last two (2026-09-25, this commit)** — `ControlApiAccessDeciderTest` and `ControlApiScopedObjectsTest`
+needed a non-ops vehicle, not a file move:
+
+- `ControlApiAccessDeciderTest` **split 3 / 1.** Its three route-level cases (DENY → 403, ABSTAIN falls
+  through, action classification, never consulted without a Subject) used `GET /objects` only as "some
+  authenticated read route"; they now drive core `GET /pipelines` in `inspecto`. The row-level case needs real
+  objects behind `ObjectRoutes` and stays in ops as `ControlApiAccessDeciderObjectsTest`.
+- `ControlApiScopedObjectsTest` **stays whole in ops — every one of its assertions guards ops code.** The
+  `/objects` filter, 404 and graph pruning are `ObjectRoutes.visibleTo` in `inspecto-ops`. What core owns is
+  the other copy of the SEC-7d rule, `AnnotationTargets`' `object` arm (`caseType` vs `Subject.dataScopes`,
+  then `RowScope`) — which had **no test anywhere**. New `AnnotationTargetsScopeTest` (4 tests) pins it in the
+  default reactor against `FakeObjectEngineProvider` (same thread-scoped classloader swap as
+  `ControlApiReconPromoteTest`, never registered module-wide) and a `FakeExchange` carrying the Subject.
+- Counted by `assert*(` calls: **35 before** (15 + 20, all edition-gated) → **50 after** (10 core AccessDecider
+  + 15 `AnnotationTargetsScopeTest` in the default build; 5 + 20 still in ops). Nothing retracted.
+- Mutation-checked: dropping the `dataScopes` check in `AnnotationTargets`, forcing `RowScope.visible` true,
+  and removing the DENY throw in `ControlApi.authorize` each turned the matching core test red with the right
+  values (`expected: <403> but was: <404>` — the handler ran; "Expected ApiException … nothing was thrown" on
+  the out-of-scope and row-denied objects).
