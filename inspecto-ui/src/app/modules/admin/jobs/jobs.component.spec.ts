@@ -118,6 +118,26 @@ describe('JobsComponent', () => {
         expect(hints).toEqual(['Run now', 'Disable']);
     });
 
+    it('badges a system job "System" in the name cell and offers it only Run now (backend 409s the rest)', () => {
+        const c = create('ok').componentInstance;
+        const nameCol = c.columnDefs.find((d) => d.field === 'name')!;
+        const render = (data: JobView) =>
+            (nameCol.cellRenderer as (p: { data: JobView }) => HTMLElement)({ data }).textContent;
+        const sys = { name: 'system.freshness-sweep', type: 'maintenance', enabled: true, system: true } as JobView;
+        const authored = { name: 'rollup', type: 'enrich', enabled: true } as JobView;
+        expect(render(sys)).toBe('system.freshness-sweepSystem');
+        expect(render(authored)).toBe('rollup');
+        // A name is text, never markup.
+        expect(render({ ...authored, name: '<b>x</b>' })).toBe('<b>x</b>');
+
+        const shown = (j: JobView) =>
+            c.scheduleActions
+                .filter((a) => !a.visible || a.visible(j))
+                .map((a) => (typeof a.hint === 'function' ? a.hint(j) : a.hint));
+        expect(shown(sys)).toEqual(['Run now']);
+        expect(shown(authored)).toEqual(['Run now', 'Disable', 'Reschedule', 'Edit', 'Delete']);
+    });
+
     it('opens the detail side panel on a name route param and closes it when the param clears (R5)', () => {
         const params = new BehaviorSubject<ParamMap>(convertToParamMap({}));
         const fixture = create('ok', of([]), params);

@@ -55,6 +55,16 @@ export type JobsViewMode = 'schedules' | 'reporting';
 /** Live-tail poll cadence (ms) for the reporting view — pauses while the tab is hidden. */
 const LIVE_TAIL_MS = 5000;
 
+/** Job-name cell: the name as text (never HTML — names are authored) plus a neutral "System" pill on a
+ *  platform-armed system job (DUCKLE-C1), via the shared status-badge renderer. */
+function jobNameCell(job: JobView | undefined): HTMLElement {
+    const cell = document.createElement('span');
+    cell.className = 'inline-flex items-center gap-2';
+    cell.append(job?.name ?? '');
+    if (job?.system) cell.insertAdjacentHTML('beforeend', statusBadgeHtml('system', 'System'));
+    return cell;
+}
+
 // fmtDuration moved to job-display (shared with the detail view); re-exported for existing importers.
 export { fmtDuration };
 
@@ -150,7 +160,13 @@ export class JobsComponent implements OnInit, OnDestroy {
     }
 
     readonly columnDefs: ColDef<JobView>[] = [
-        { field: 'name', headerName: 'Job', flex: 1, minWidth: 160 },
+        {
+            field: 'name',
+            headerName: 'Job',
+            flex: 1,
+            minWidth: 160,
+            cellRenderer: (p: ICellRendererParams<JobView>) => jobNameCell(p.data),
+        },
         {
             headerName: "What's scheduled",
             flex: 1,
@@ -190,7 +206,8 @@ export class JobsComponent implements OnInit, OnDestroy {
     ];
 
     /** Run/toggle are operational, not authoring — available in every lens. Reschedule/edit/delete open
-     *  the config-authoring dialog or destroy the job, so they're hidden in the Business (read-only) lens. */
+     *  the config-authoring dialog or destroy the job, so they're hidden in the Business (read-only) lens.
+     *  A system job shows only Run now: the backend 409s every other verb on one (DUCKLE-C1). */
     get scheduleActions(): InspectoRowAction<JobView>[] {
         const ops: InspectoRowAction<JobView>[] = [
             {
@@ -201,6 +218,7 @@ export class JobsComponent implements OnInit, OnDestroy {
             {
                 icon: (j) => (j.enabled ? 'heroicons_outline:pause-circle' : 'heroicons_outline:play-circle'),
                 hint: (j) => (j.enabled ? 'Disable' : 'Enable'),
+                visible: (j) => !j.system,
                 onClick: (j) => this.toggleEnabled(j),
             },
         ];
@@ -210,16 +228,19 @@ export class JobsComponent implements OnInit, OnDestroy {
             {
                 icon: 'heroicons_outline:calendar-days',
                 hint: 'Reschedule',
+                visible: (j) => !j.system,
                 onClick: (j) => this.edit(j, true),
             },
             {
                 icon: 'heroicons_outline:pencil-square',
                 hint: 'Edit',
+                visible: (j) => !j.system,
                 onClick: (j) => this.edit(j, false),
             },
             {
                 icon: 'heroicons_outline:trash',
                 hint: 'Delete',
+                visible: (j) => !j.system,
                 onClick: (j) => this.remove(j),
             },
         ];

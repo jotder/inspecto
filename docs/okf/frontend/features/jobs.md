@@ -12,6 +12,17 @@ timestamp: 2026-06-28T00:00:00Z
 Route `/jobs` (Operations nav group). Scheduled jobs in **standard** [data-tables](../design-system/data-table.md)
 (`autoHeight`); a **job-runs dialog** shows run history. Backed by `JobsService`.
 
+## System jobs are badged and read-only (DUCKLE-C1, 2026-09-25)
+
+`GET /jobs` carries `system: true` on a platform-armed job (today only `system.freshness-sweep`, derived
+from the Alert Rules that declare `maximumAge`). `JobView.system` mirrors it; the list's Job cell shows a
+neutral **System** pill (`statusBadgeHtml('system', 'System')`, the name itself set as text, never HTML), and
+the row offers **Run now only**. That reflects the backend, not a UI policy: `JobRoutes.refuseSystemJob` 409s
+`PUT`/`DELETE /jobs/{name}` and `POST …/enable|disable|reschedule` on a system job, while `…/trigger` stays
+open. ⚠ **`GET /jobs/{name}` does not carry the flag**, so the detail panel cannot tell on its own; it is
+safe today only because the panel is always mounted `embedded`, and its write buttons render only in the
+full-page header, which no route reaches. A future full-page detail needs the flag served there first.
+
 ## The authoring form is descriptor-driven (job-parameter-contract steps 10–16, 2026-08-10)
 
 `job-form.dialog` is the `<inspecto-schema-form>` pilot (the renderer's own conventions and traps are the

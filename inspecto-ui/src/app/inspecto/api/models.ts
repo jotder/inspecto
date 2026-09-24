@@ -194,6 +194,10 @@ export interface JobView {
     lastStatus?: string;
     lastRunTime?: string;
     nextFire?: string;
+    /** Platform-armed system job (e.g. `system.freshness-sweep`, DUCKLE-C1) — derived, never persisted. The
+     *  backend 409s edit / reschedule / enable / disable / delete on one; it stays triggerable. List-only:
+     *  `GET /jobs/{name}` does not carry it. */
+    system?: boolean;
 }
 
 export interface JobRun {
