@@ -50,7 +50,12 @@ class CommitRetryTest {
     }
 
     private static PipelineConfig brokenBackup(Path dir) throws Exception {
-        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, "");
+        return brokenBackup(dir, "");
+    }
+
+    private static PipelineConfig brokenBackup(Path dir, String processingSection) throws Exception {
+        Files.createDirectories(dir);
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, processingSection);
         PipelineConfig cfg = PipelineConfig.load(toon.toString());
         Files.createDirectories(Path.of(cfg.dirs().poll()));
         Files.writeString(Path.of(cfg.dirs().poll()).resolve("feed.csv"), "ID,AMT,EVENT_DATE\nr1,1.0,2020-04-03\n");
@@ -132,6 +137,60 @@ class CommitRetryTest {
         assertNull(CommitRetry.recordFor(feed, cfg), "a commit spends the attempt record");
         assertTrue(Signals.query(log.store(), CommitRetry.SIGNAL_TYPE, null, null, null, null, 10).isEmpty(),
                 "no exhaustion Signal for a Consignment that recovered");
+    }
+
+    // ── the per-pipeline processing.retry block (X1 deferral, 2026-09-25) ──────────────────────────
+
+    @Test
+    void aPipelinesRetryBlockOverridesTheGlobalCapAndBackoff(@TempDir Path dir) throws Exception {
+        System.setProperty("ingest.retry.max", "5");                              // global: 5, an hour apart
+        System.setProperty("ingest.retry.backoff.initialMs", "3600000");
+        PipelineConfig cfg = brokenBackup(dir, """
+              retry:
+                max_attempts: 2
+                initial_backoff: 0s
+                max_backoff: 1m
+            """);
+        File feed = Path.of(cfg.dirs().poll()).resolve("feed.csv").toFile();
+        assertEquals(new CommitRetry.Policy(2, 0L, 60_000L), CommitRetry.policy(cfg));
+
+        CollectorProcessor.run(cfg);                                   // attempt 1 — due at once (0s)
+        assertEquals(1, CommitRetry.recordFor(feed, cfg).attempts);
+        CollectorProcessor.run(cfg);                                   // attempt 2 — the PIPELINE's cap
+        assertFalse(feed.exists(), "the pipeline's cap of 2 bit, not the global 5");
+        assertEquals(1, Signals.query(log.store(), CommitRetry.SIGNAL_TYPE, null, null, null, null, 10).size());
+    }
+
+    @Test
+    void anUnsetKeyInheritsItsGlobalAndAnAbsentBlockIsTodaysBehaviour(@TempDir Path dir) throws Exception {
+        System.setProperty("ingest.retry.max", "7");
+        System.setProperty("ingest.retry.backoff.initialMs", "1234");
+        System.setProperty("ingest.retry.backoff.maxMs", "5678");
+        assertEquals(new CommitRetry.Policy(7, 1234L, 5678L), CommitRetry.policy(brokenBackup(dir.resolve("a"))),
+                "no block ⇒ the -D globals whole");
+        assertEquals(new CommitRetry.Policy(3, 1234L, 5678L), CommitRetry.policy(brokenBackup(dir.resolve("b"), """
+              retry:
+                max_attempts: 3
+            """)), "each key independently optional");
+        System.clearProperty("ingest.retry.max");
+        System.clearProperty("ingest.retry.backoff.initialMs");
+        System.clearProperty("ingest.retry.backoff.maxMs");
+        assertEquals(new CommitRetry.Policy(5, 60_000L, 3_600_000L), CommitRetry.policy(brokenBackup(dir.resolve("c"))),
+                "the defaults are today's global behaviour");
+    }
+
+    @Test
+    void aPipelineMayTurnBoundingOffWithMaxAttemptsZero(@TempDir Path dir) throws Exception {
+        System.setProperty("ingest.retry.max", "2");
+        System.setProperty("ingest.retry.backoff.initialMs", "0");
+        PipelineConfig cfg = brokenBackup(dir, """
+              retry:
+                max_attempts: 0
+            """);
+        File feed = Path.of(cfg.dirs().poll()).resolve("feed.csv").toFile();
+        for (int i = 0; i < 3; i++) CollectorProcessor.run(cfg);
+        assertTrue(feed.exists(), "0 = unbounded for this pipeline, whatever the global says");
+        assertNull(CommitRetry.recordFor(feed, cfg));
     }
 
     @Test

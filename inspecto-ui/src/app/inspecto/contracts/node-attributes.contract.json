@@ -587,6 +587,27 @@
     "tier" : "advanced",
     "help" : "Whether cycle overrun adjusts this pipeline's cap; off pins it at the stated cap. Blank = inherit -Dingest.backpressure.adaptive."
   }, {
+    "key" : "retry__max_attempts",
+    "label" : "COMMIT retry attempts",
+    "type" : "number",
+    "tier" : "advanced",
+    "min" : 0.0,
+    "help" : "Failed COMMIT attempts before the Consignment's files are quarantined under retry_exhausted; 0 = unbounded (retried every cycle). Blank = inherit -Dingest.retry.max (default 5)."
+  }, {
+    "key" : "retry__initial_backoff",
+    "label" : "First COMMIT retry delay",
+    "type" : "string",
+    "tier" : "advanced",
+    "help" : "Delay before the first retry, doubling per attempt: a bare number of seconds or N s|m|h|d. Blank = inherit -Dingest.retry.backoff.initialMs (default 60s).",
+    "placeholder" : "60s"
+  }, {
+    "key" : "retry__max_backoff",
+    "label" : "Longest COMMIT retry delay",
+    "type" : "string",
+    "tier" : "advanced",
+    "help" : "Cap on any one retry delay: a bare number of seconds or N s|m|h|d. Blank = inherit -Dingest.retry.backoff.maxMs (default 1h).",
+    "placeholder" : "1h"
+  }, {
     "key" : "ducklake__enabled",
     "label" : "Register in DuckLake",
     "type" : "boolean",

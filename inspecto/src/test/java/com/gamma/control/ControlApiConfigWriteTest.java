@@ -159,6 +159,30 @@ class ControlApiConfigWriteTest {
         }
     }
 
+    /** X1 deferral (2026-09-25): a {@code processing.retry} block is accepted when sane and 422s when not. */
+    @Test
+    void theRetryBlockIsAcceptedWhenSaneAnd422WhenNot(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String ok = """
+                    {"type":"pipeline","config":{
+                       "name":"retry_ok","dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1,"retry":{"max_attempts":3,"initial_backoff":"30s","max_backoff":"2h"}}}}""";
+            HttpResponse<String> accepted = post(c.port, "/config/write", ok);
+            assertEquals(200, accepted.statusCode(), "a declared block is not refused as an unknown key: " + accepted.body());
+
+            for (String retry : List.of("{\"max_attempts\":-1}", "{\"initial_backoff\":\"-5s\"}", "{\"max_backoff\":\"soon\"}")) {
+                String bad = """
+                        {"type":"pipeline","config":{
+                           "name":"retry_bad","dirs":{"poll":"in","database":"out"},
+                           "processing":{"threads":1,"retry":%s}}}""".formatted(retry);
+                HttpResponse<String> r = post(c.port, "/config/write", bad);
+                assertEquals(422, r.statusCode(), retry + " → " + r.body());
+                assertTrue(r.body().contains("processing.retry."), r.body());
+            }
+            assertFalse(Files.exists(root.resolve("retry_bad_pipeline.toon")), "nothing written on a rejected config");
+        }
+    }
+
     /**
      * G4: {@code active: true} with no schema source loads nowhere, so accepting the write means the
      * pipeline is dropped from the index and skipped by the scheduler forever, silently.

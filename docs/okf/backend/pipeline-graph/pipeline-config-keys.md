@@ -277,6 +277,7 @@ against, round-tripped untouched.
 | `processing.pool` | spec |
 | `processing.priority` | spec |
 | `processing.profile` | spec |
+| `processing.retry` | spec |
 | `processing.schema_file` | spec |
 | `processing.schemas` | parser-only |
 | `processing.segments` | parser-only |

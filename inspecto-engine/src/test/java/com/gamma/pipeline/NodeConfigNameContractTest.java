@@ -189,7 +189,16 @@ class NodeConfigNameContractTest {
                 new Contract("sink.persistent", "intake__max_files_per_cycle", "intake.max_files_per_cycle", 250,
                         c -> c.intake().maxFilesPerCycle(), 250),
                 new Contract("sink.persistent", "intake__min_files_per_cycle", "intake.min_files_per_cycle", 7,
-                        c -> c.intake().minFilesPerCycle(), 7));
+                        c -> c.intake().minFilesPerCycle(), 7),
+
+                // ── Bounded COMMIT retry (X1 deferral, 2026-09-25): the retry__* keys nest to
+                // processing.retry:, read by CommitRetry.policy via PipelineConfig.commitRetry().
+                new Contract("sink.persistent", "retry__max_attempts", "retry.max_attempts", 4,
+                        c -> c.commitRetry().maxAttempts(), 4),
+                new Contract("sink.persistent", "retry__initial_backoff", "retry.initial_backoff", "90s",
+                        c -> c.commitRetry().initialBackoffMs(), 90_000L),
+                new Contract("sink.persistent", "retry__max_backoff", "retry.max_backoff", "2h",
+                        c -> c.commitRetry().maxBackoffMs(), 7_200_000L));
     }
 
     /**

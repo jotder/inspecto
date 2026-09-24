@@ -336,6 +336,22 @@ public final class ConfigSpecs {
                         "Floor the adaptive controller may halve this pipeline's cap down to (>= 1). Unset = inherit -Dingest.minFilesPerCycle."),
                 FieldSpec.of("processing.intake.adaptive", "Adaptive intake control", FieldType.BOOL,
                         "Whether cycle overrun adjusts this pipeline's cap; false pins it at the stated cap. Unset = inherit -Dingest.backpressure.adaptive."),
+                // Per-pipeline bounded COMMIT retry (X1 deferral, 2026-09-25) — CommitRetry's cap + backoff.
+                // Same posture as processing.intake: NO spec defaults (the config pane seeds spec defaults
+                // into the saved file, and a seeded value would pin the pipeline off the live -D global).
+                // Durations use the Collector grammar (bare seconds or N s|m|h|d); negatives are refused
+                // by ConfigSafetyValidator.
+                FieldSpec.of("processing.retry.max_attempts", "COMMIT retry attempts", FieldType.INT,
+                        "Failed COMMIT attempts before the files are quarantined under retry_exhausted; 0 = "
+                                + "unbounded (retried every cycle). Unset = inherit -Dingest.retry.max (default 5)."),
+                new FieldSpec("processing.retry.initial_backoff", "First COMMIT retry delay",
+                        "Delay before the first retry, doubling per attempt (±10% jitter): a bare number of "
+                                + "seconds or N s|m|h|d. Unset = inherit -Dingest.retry.backoff.initialMs (default 60s).",
+                        FieldType.STRING, false, null, List.of(), DURATION, null, null),
+                new FieldSpec("processing.retry.max_backoff", "Longest COMMIT retry delay",
+                        "Cap on any one retry delay: a bare number of seconds or N s|m|h|d. Unset = inherit "
+                                + "-Dingest.retry.backoff.maxMs (default 1h).",
+                        FieldType.STRING, false, null, List.of(), DURATION, null, null),
                 FieldSpec.withDefault("processing.streaming.large_file_bytes", "Streaming generation-mode threshold (bytes)",
                         FieldType.LONG, 268_435_456L,
                         "Plugin-ingester batches whose largest member is >= this run in bounded generation mode (huge files); smaller batches use union mode (many small files packed → one transform/write). 0 = always union."),

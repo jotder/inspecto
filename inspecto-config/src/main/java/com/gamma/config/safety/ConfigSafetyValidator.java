@@ -60,6 +60,9 @@ public final class ConfigSafetyValidator {
      *  definitions and a Pipeline's {@code processing.pool} choice are both held to it. */
     public static final Pattern POOL_NAME = Pattern.compile("[a-z][a-z0-9_]{0,63}");
 
+    /** A Collector-grammar duration ({@code PipelineConfigParser.toMillis}) that cannot be negative. */
+    private static final Pattern NON_NEGATIVE_DURATION = Pattern.compile("\\s*\\+?\\d+\\s*[smhdSMHD]?\\s*");
+
     private static final String[] PIPELINE_DIRS = {
             "dirs.poll", "dirs.database", "dirs.backup", "dirs.temp", "dirs.errors",
             "dirs.quarantine", "dirs.markers", "dirs.status_dir", "dirs.log_dir"
@@ -240,6 +243,15 @@ public final class ConfigSafetyValidator {
             }
         }
         checkIntBound(raw, "processing.priority", 1, 3, out);
+        // Bounded COMMIT retry (X1 deferral): 0 = unbounded is a statement; the upper cap only refuses a
+        // number that is plainly a typo. A negative backoff would silently mean "no delay" in the engine.
+        checkIntBound(raw, "processing.retry.max_attempts", 0, 1000, out);
+        for (String f : List.of("processing.retry.initial_backoff", "processing.retry.max_backoff")) {
+            String d = RawConfig.str(raw, f);
+            if (d != null && !d.isBlank() && !NON_NEGATIVE_DURATION.matcher(d).matches())
+                out.add(Finding.error(f, f + " must be a non-negative duration — a bare number of seconds or "
+                        + "N s|m|h|d (got '" + d + "')"));
+        }
         // A pool is CHOSEN here, never defined: only the shape is checked. A well-formed name the server
         // does not define is admitted in `default` — not a refusal (scale-out plan §4.1 rule 2).
         String pool = RawConfig.str(raw, "processing.pool");

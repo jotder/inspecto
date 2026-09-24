@@ -4,7 +4,7 @@
 ⛔ **X4 is NOT in scope and must not be started**: the row records that the operator refused its question —
 the replay default is to be *scoped against a sandbox*, i.e. `PIPELINE-DRYRUN-1`, and both options are risky
 to default to until a dry-run makes the choice observable.
-**Status:** written 2026-09-16 as design only. **All four §5 decisions answered by the operator 2026-09-25** (each as recommended) and the affordance **BUILT** the same day — as-built facts in [execution-lanes](../okf/backend/pipeline-graph/execution-lanes.md) § *The COMMIT retry affordance*.
+**Status:** written 2026-09-16 as design only. **All four §5 decisions answered by the operator 2026-09-25** (each as recommended) and the affordance **BUILT** the same day — as-built facts in [execution-lanes](../okf/backend/pipeline-graph/execution-lanes.md) § *The COMMIT retry affordance*. The §2 `processing.retry` block was **also built** the same day (the `AcceptedConfigKeys` work §2 waited on had landed): see execution-lanes § *Per-pipeline `processing.retry`*. ⚠ Of the "two committed contracts" §2 names, only `node-attributes.contract.json` still exists — the step-types contract was deleted 2026-09-24 (`STEP-TYPES-DEAD-CLIENT-MIRRORS-1`). Open: the UI (Q3).
 
 ## 1. What exists today (grounded, not assumed)
 

@@ -680,6 +680,8 @@ public final class PipelineEditable {
                 // Intake admission control: the nested processing.intake map, owned wholesale like
                 // batch (its keys surface as the intake__* specs). No legacy flat spellings to heal.
                 if (processing.get("intake") instanceof Map<?, ?> in) c.put("intake", in);
+                // Bounded COMMIT retry: the nested processing.retry map, owned wholesale like intake.
+                if (processing.get("retry") instanceof Map<?, ?> rt) c.put("retry", rt);
             }
         } else {
             // filter / map: the lifted config is already plain (derived views; lower ignores map,
@@ -1142,6 +1144,8 @@ public final class PipelineEditable {
             for (String k : SINK_PROC_OWNED) replaceOrRemove(processing, k, primarySink.cfg(k));
             // Intake admission control lowers as the nested processing.intake: map the parser reads.
             replaceOrRemove(processing, "intake", primarySink.cfg("intake"));
+            // Bounded COMMIT retry lowers as the nested processing.retry: map the parser reads.
+            replaceOrRemove(processing, "retry", primarySink.cfg("retry"));
         }
         // Multi-destination: emit a plural sinks: list of the distinct destinations (the single output:/
         // dirs.database above stays the shorthand + parser fallback, consistent with the first destination).

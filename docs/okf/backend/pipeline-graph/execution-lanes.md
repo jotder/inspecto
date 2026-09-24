@@ -87,6 +87,29 @@ space (transition-debounced signal; `-Djobs.orphan.audit=false` to disable) — 
   `CommitRetry.inboxFile(cfg, rel)` is the path jail (blank, absolute or escaping ⇒ `null` ⇒ 403).
 * ⛔ **No UI yet** (Q3: routes first). The Run Detail pane is the natural home; it needs its own design.
 
+**Per-pipeline `processing.retry` (X1 deferral, 2026-09-25).** The cap and backoff are now per pipeline:
+
+```
+processing:
+  retry:
+    max_attempts: 3        # 0 = unbounded for THIS pipeline
+    initial_backoff: 30s   # Collector duration grammar: bare seconds or N s|m|h|d
+    max_backoff: 2h
+```
+
+Every key is independently optional and **inherits its `-Dingest.retry.*` global when unset**
+(`max` 5, `backoff.initialMs` 60000, `backoff.maxMs` 3600000) — so an absent block is today's behaviour byte
+for byte. The `processing.intake` posture exactly: `PipelineConfig.commitRetry()` carries only what the
+author STATED (`CommitRetryPolicy`, nullable fields, `null` when the block is absent), and the merge happens
+in `CommitRetry.policy(cfg)`, which `recordFailure`, `due`, the list route and retry-now's `note` all read.
+⚠ **No spec defaults, deliberately** — the config pane seeds spec defaults into the saved file, which would
+pin a pipeline off the live global. Gates: declared in `ConfigSpecs.pipeline()` (so `AcceptedConfigKeys`
+accepts the block as `spec`-declared — `PARSER_ONLY` may only shrink, so it is not listed there);
+`ConfigSafetyValidator` refuses `max_attempts` outside `[0, 1000]` and a negative or non-duration backoff
+(**422** on `/config/write`); the parser refuses the same at load, naming the key. Editor: `retry__*`
+attributes on `sink.persistent` nest to the node's `retry` map and lower to `processing.retry:`
+(`PipelineEditable`, beside `intake`), pinned end-to-end by `NodeConfigNameContractTest`.
+
 **Record-level replay evidence (X4, 2026-09-24/25).** The ingest lane's `?dryRun=true` runs the real
 ingest pass over member copies in a deleted scratch root (`PipelineTestRun.dryIngest`, contained;
 zero side effects pinned by `FlatLaneDryRunParseTest`) and reports per member a `MemberOutcome`:

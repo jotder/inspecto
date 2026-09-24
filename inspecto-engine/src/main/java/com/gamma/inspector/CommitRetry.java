@@ -47,11 +47,12 @@ import java.util.concurrent.ThreadLocalRandom;
  * semantics stay consignment-grain. Members the strategy already quarantined (moved out of the inbox)
  * are skipped — their fate is decided.
  *
- * <p><b>Policy.</b> Runtime {@code -D} defaults, not a per-pipeline key: {@code -Dingest.retry.max}
+ * <p><b>Policy.</b> Runtime {@code -D} defaults: {@code -Dingest.retry.max}
  * (default 5; {@code 0} disables bounding and keeps the pre-X1 behaviour), {@code -Dingest.retry.backoff.initialMs}
  * (60000), {@code -Dingest.retry.backoff.maxMs} (3600000); the delay is
- * {@code min(initial × 2^(n−1), max) ± 10%}. A per-pipeline {@code processing.retry} block is a filed
- * follow-up — a config key rides two committed contracts, which is its own change.
+ * {@code min(initial × 2^(n−1), max) ± 10%}. Since 2026-09-25 a pipeline's own {@code processing.retry}
+ * block ({@code max_attempts}, {@code initial_backoff}, {@code max_backoff}) overrides each global it states
+ * — see {@link #policy}.
  *
  * <p>Every method here is best-effort and never throws: recovery bookkeeping must not mask the failure it
  * is recording, and a read-only pending count must not be broken by an unreadable sidecar.
@@ -99,7 +100,7 @@ public final class CommitRetry {
      * {@link #REASON_RETRY_EXHAUSTED}, and one CRITICAL Signal names the Consignment and its files.
      */
     public static void recordFailure(Consignment batch, PipelineConfig cfg, String error) {
-        Policy policy = Policy.current();
+        Policy policy = policy(cfg);
         if (!policy.bounded()) return;
         Path root = root(cfg);
         if (root == null) return;
@@ -162,7 +163,7 @@ public final class CommitRetry {
      * early retry, never a silently withheld file).
      */
     public static List<File> due(PipelineConfig cfg, List<File> candidates) {
-        if (candidates.isEmpty() || !Policy.current().bounded()) return candidates;
+        if (candidates.isEmpty() || !policy(cfg).bounded()) return candidates;
         Path root = root(cfg);
         if (root == null) return candidates;
         Instant now = Instant.now();
@@ -220,9 +221,19 @@ public final class CommitRetry {
         public boolean acted() { return result == Result.RESCHEDULED || result == Result.CANCELLED; }
     }
 
-    /** The retry policy in force for {@code cfg}. */
+    /**
+     * The retry policy in force for {@code cfg}: its {@code processing.retry} block, each key stated there
+     * overriding its {@code -Dingest.retry.*} global, every unstated key inheriting it. No block ⇒ the globals
+     * whole — the pre-block behaviour.
+     */
     public static Policy policy(PipelineConfig cfg) {
-        return Policy.current();
+        Policy global = Policy.current();
+        PipelineConfig.CommitRetryPolicy own = cfg.commitRetry();
+        if (own == null) return global;
+        return new Policy(
+                own.maxAttempts() != null ? own.maxAttempts() : global.maxAttempts(),
+                own.initialBackoffMs() != null ? own.initialBackoffMs() : global.initialMs(),
+                own.maxBackoffMs() != null ? own.maxBackoffMs() : global.maxMs());
     }
 
     /**

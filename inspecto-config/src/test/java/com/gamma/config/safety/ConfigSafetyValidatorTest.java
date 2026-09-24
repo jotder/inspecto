@@ -419,6 +419,27 @@ class ConfigSafetyValidatorTest {
         assertTrue(hasError(f, "retention_days"));
     }
 
+    /** X1 deferral (2026-09-25): the per-pipeline {@code processing.retry} block is bounded at save. */
+    @Test
+    void theRetryBlockIsBoundedAtSave(@TempDir Path root) {
+        Map<String, Object> ok = pipeline(safeDirs(root));
+        ok.put("processing", Map.of("retry", Map.of("max_attempts", 0, "initial_backoff", "30s", "max_backoff", "2h")));
+        assertFalse(hasError(ConfigSafetyValidator.check("pipeline", ok, SafetyPolicy.withRoots(root)), "processing.retry"),
+                "0 = unbounded is a legitimate statement");
+
+        Map<String, Object> bad = pipeline(safeDirs(root));
+        bad.put("processing", Map.of("retry", Map.of("max_attempts", -1, "initial_backoff", "-5s", "max_backoff", "soon")));
+        List<Finding> f = ConfigSafetyValidator.check("pipeline", bad, SafetyPolicy.withRoots(root));
+        assertTrue(hasError(f, "processing.retry.max_attempts"), f.toString());
+        assertTrue(hasError(f, "processing.retry.initial_backoff"), "a negative backoff is refused: " + f);
+        assertTrue(hasError(f, "processing.retry.max_backoff"), "a non-duration is refused: " + f);
+
+        Map<String, Object> huge = pipeline(safeDirs(root));
+        huge.put("processing", Map.of("retry", Map.of("max_attempts", 1_000_001)));
+        assertTrue(hasError(ConfigSafetyValidator.check("pipeline", huge, SafetyPolicy.withRoots(root)),
+                "processing.retry.max_attempts"));
+    }
+
     /** DUCKLE-C10-ADMISSION-POOLS-1: a Pipeline CHOOSES a pool, so only its shape is gated — a
      *  well-formed name the server does not define is accepted (it is admitted in `default`). */
     @Test

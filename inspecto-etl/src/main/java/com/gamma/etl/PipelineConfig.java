@@ -438,6 +438,25 @@ public final class PipelineConfig {
     }
 
     /**
+     * Optional per-pipeline bounded-COMMIT-retry override (X1 deferral, 2026-09-25). Parsed from
+     * {@code processing.retry}; {@code null} (block absent) means the process-wide {@code -Dingest.retry.*}
+     * policy applies whole — today's behaviour. Like {@link Intake}, each field is independently optional and
+     * carries only what the author STATED; the merge with the globals happens in {@code CommitRetry.policy}.
+     * {@code maxAttempts == 0} is a statement: unbounded for this pipeline.
+     */
+    @PublicApi(since = "4.0.0")
+    public record CommitRetryPolicy(Integer maxAttempts, Long initialBackoffMs, Long maxBackoffMs) {
+        public CommitRetryPolicy {
+            if (maxAttempts != null && maxAttempts < 0)
+                throw new IllegalArgumentException("processing.retry.max_attempts must be >= 0 (0 = unbounded)");
+            if (initialBackoffMs != null && initialBackoffMs < 0)
+                throw new IllegalArgumentException("processing.retry.initial_backoff must not be negative");
+            if (maxBackoffMs != null && maxBackoffMs < 0)
+                throw new IllegalArgumentException("processing.retry.max_backoff must not be negative");
+        }
+    }
+
+    /**
      * The Collector's unpack stage ({@code processing.unpack}) — pluggable decompression of inbox
      * files before the Consignment is planned. Null when the block is absent, which means
      * {@link #defaults()}: the stage is ON (it only acts on files a plugin claims AND the chosen
@@ -1179,6 +1198,7 @@ public final class PipelineConfig {
     private final DuckDbSettings duckdb;
     private final Chunking       chunking;
     private final Intake         intake;
+    private final CommitRetryPolicy commitRetry;
     private final Unpack         unpack;
     private final FixedWidth     fixedWidth;
     private final Json           json;
@@ -1346,6 +1366,8 @@ public final class PipelineConfig {
     public Chunking       chunking() { return chunking; }
     /** Per-pipeline intake admission-control override, or {@code null} = inherit the {@code -D} globals. */
     public Intake         intake()   { return intake; }
+    /** Per-pipeline bounded-COMMIT-retry override, or {@code null} = inherit the {@code -Dingest.retry.*} globals. */
+    public CommitRetryPolicy commitRetry() { return commitRetry; }
     /** Never null — an absent {@code processing.unpack} block reads as {@link Unpack#defaults()}. */
     public Unpack         unpack()   { return unpack == null ? Unpack.defaults() : unpack; }
     /** Fixed-width frontend config, or {@code null} for the default delimited frontend. */
@@ -1463,6 +1485,7 @@ public final class PipelineConfig {
         this.duckdb   = new DuckDbSettings(b.duckMemoryLimit, b.duckTempDirectory, b.duckMaxTempSize);
         this.chunking = new Chunking(b.chunkMaxFileBytes, b.chunkTargetBytes);
         this.intake = b.intake;
+        this.commitRetry = b.commitRetry;
         this.unpack = b.unpack;
         this.fixedWidth = b.fixedWidth;
         this.json = b.json;
@@ -1553,6 +1576,7 @@ public final class PipelineConfig {
         this.duckdb = src.duckdb;
         this.chunking = src.chunking;
         this.intake = src.intake;
+        this.commitRetry = src.commitRetry;
         this.unpack = src.unpack;
         this.fixedWidth = src.fixedWidth;
         this.json = src.json;
@@ -2108,6 +2132,7 @@ public final class PipelineConfig {
         long   chunkMaxFileBytes = 8_589_934_592L;
         long   chunkTargetBytes  = 0;
         Intake intake            = null;   // absent block = inherit the -Dingest.* globals whole
+        CommitRetryPolicy commitRetry = null;   // absent block = inherit the -Dingest.retry.* globals whole
         Unpack unpack            = null;   // absent block = Unpack.defaults() (stage on, shipped caps)
         String batchesFilePath;
         String lineageFilePath;

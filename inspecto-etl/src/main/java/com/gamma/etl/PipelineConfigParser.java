@@ -297,6 +297,17 @@ final class PipelineConfigParser {
                     boolOrNull(intake.get("adaptive"), "processing.intake.adaptive"));
         }
 
+        // ── per-pipeline bounded COMMIT retry (X1 deferral, 2026-09-25, additive, optional) ──
+        // The intake posture exactly: an absent key inherits its -Dingest.retry.* global at the CommitRetry
+        // call site, which is why these stay nullable rather than defaulted here.
+        Map<String, Object> retry = castMapAt(proc, "retry");
+        if (retry != null) {
+            b.commitRetry = new PipelineConfig.CommitRetryPolicy(
+                    intOrNull(retry.get("max_attempts"), "processing.retry.max_attempts"),
+                    millisOrNull(retry.get("initial_backoff"), "processing.retry.initial_backoff"),
+                    millisOrNull(retry.get("max_backoff"), "processing.retry.max_backoff"));
+        }
+
         // ── unpack stage (Collector-level decompression, additive, optional) ──
         // Unlike `intake` above, an absent KEY here takes the shipped default rather than a global:
         // these are safety caps, so every one always has a concrete value (Unpack.defaults()).
@@ -1564,6 +1575,18 @@ final class PipelineConfigParser {
     }
 
     /** Parse an optional boolean; {@code null}/blank ⇒ {@code null} (unset); only true/false accepted. */
+    /** A {@link #toMillis} duration, {@code null} when absent/blank; garbage fails naming {@code where}. */
+    private static Long millisOrNull(Object v, String where) {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        if (s.isEmpty()) return null;
+        try {
+            return toMillis(s);
+        } catch (IllegalArgumentException e) {   // NumberFormatException included
+            throw new IllegalArgumentException(where + " must be a duration (bare seconds or N s|m|h|d), got: " + s);
+        }
+    }
+
     private static Boolean boolOrNull(Object v, String where) {
         if (v == null) return null;
         String s = String.valueOf(v).trim();

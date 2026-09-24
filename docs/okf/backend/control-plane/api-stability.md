@@ -248,6 +248,13 @@ above the generated commit list.
   new reason `retry_cancelled`**. A file already quarantined, a pipeline with no retry state, or a pipeline
   mid-cycle is a **409** that says so; no record / not in the inbox is **404**.
   [execution-lanes](../pipeline-graph/execution-lanes.md)
+- **New config block (additive, 2026-09-25, X1 deferral):** a Pipeline's `processing.retry:
+  {max_attempts, initial_backoff, max_backoff}` overrides the `-Dingest.retry.*` COMMIT-retry globals per
+  key; unset keys (and an absent block) inherit them, so existing configs behave exactly as before.
+  `max_attempts` outside `[0, 1000]` or a negative/non-duration backoff is a **422** at `/config/write`.
+  The `sink.persistent` node advertises `retry__max_attempts` / `retry__initial_backoff` /
+  `retry__max_backoff` in `node-attributes.contract.json`.
+  [execution-lanes](../pipeline-graph/execution-lanes.md)
 - **Behaviour change — the reject sidecar's `raw_line` is now byte-exact** (2026-09-25): both CSV ingesters
   escape an embedded `"` RFC-4180-style (`""`) in `<errors>/<file>_errors.csv` instead of rewriting it to
   `'`, so `GET /runs/{name}/errors?file=` now shows the line's real quotes. A reader that split the column

@@ -301,6 +301,17 @@ public final class NodeAttributes {
                 .help("Floor the adaptive controller may halve this pipeline's cap down to. Blank = inherit -Dingest.minFilesPerCycle."));
         attrs.add(NodeAttribute.of("intake__adaptive", "Adaptive intake control", "boolean", "advanced")
                 .help("Whether cycle overrun adjusts this pipeline's cap; off pins it at the stated cap. Blank = inherit -Dingest.backpressure.adaptive."));
+        // Bounded COMMIT retry (X1 deferral, 2026-09-25): the retry__* keys nest to the node's `retry` map,
+        // which lowers to the processing.retry: block CommitRetry.policy reads — the intake__* shape.
+        attrs.add(NodeAttribute.of("retry__max_attempts", "COMMIT retry attempts", "number", "advanced")
+                .min(0)
+                .help("Failed COMMIT attempts before the Consignment's files are quarantined under retry_exhausted; 0 = unbounded (retried every cycle). Blank = inherit -Dingest.retry.max (default 5)."));
+        attrs.add(NodeAttribute.of("retry__initial_backoff", "First COMMIT retry delay", "string", "advanced")
+                .placeholder("60s")
+                .help("Delay before the first retry, doubling per attempt: a bare number of seconds or N s|m|h|d. Blank = inherit -Dingest.retry.backoff.initialMs (default 60s)."));
+        attrs.add(NodeAttribute.of("retry__max_backoff", "Longest COMMIT retry delay", "string", "advanced")
+                .placeholder("1h")
+                .help("Cap on any one retry delay: a bare number of seconds or N s|m|h|d. Blank = inherit -Dingest.retry.backoff.maxMs (default 1h)."));
         // DuckLake registration (DuckLakeRegistrar): ducklake__* nests to the node's `ducklake` map, which
         // lowers to output.ducklake: (or the node's sinks[] entry). Kept off OUTPUT on purpose — that table is
         // also the materialized/view sinks' and Onboarding's, and only a persistent sink registers files.
