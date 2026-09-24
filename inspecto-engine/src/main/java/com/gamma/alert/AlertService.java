@@ -88,6 +88,8 @@ public final class AlertService {
      * edge detector with the same lifetime as {@link #lastFired}, not a record of anything.
      */
     private final Map<String, Long> staleSince = new ConcurrentHashMap<>();
+    /** See {@link #onRulesChanged}. */
+    private volatile Runnable rulesChanged = () -> {};
 
     public AlertService(List<AlertRule> rules, ConfigSource configs, StatusStore status) {
         this(rules, configs, status, (ObjectAccess) null);
@@ -151,19 +153,40 @@ public final class AlertService {
      * rule of the same name. The name is the identity, so an upsert is add-or-replace. The next batch
      * event (or {@code POST /alerts/evaluate}) evaluates it. Serialised against {@link #evaluate}.
      */
-    public synchronized void upsert(AlertRule rule) {
-        List<AlertRule> next = new ArrayList<>(rules.size() + 1);
-        for (AlertRule r : rules) if (!r.name().equals(rule.name())) next.add(r);
-        next.add(rule);
-        this.rules = List.copyOf(next);
+    public void upsert(AlertRule rule) {
+        synchronized (this) {
+            List<AlertRule> next = new ArrayList<>(rules.size() + 1);
+            for (AlertRule r : rules) if (!r.name().equals(rule.name())) next.add(r);
+            next.add(rule);
+            this.rules = List.copyOf(next);
+        }
+        rulesChanged.run();
     }
 
     /** Disarm a rule by name ({@code DELETE /alerts/rules/{name}}); {@code true} if one was armed. */
-    public synchronized boolean remove(String name) {
-        List<AlertRule> next = rules.stream().filter(r -> !r.name().equals(name)).toList();
-        boolean removed = next.size() != rules.size();
-        this.rules = List.copyOf(next);
+    public boolean remove(String name) {
+        boolean removed;
+        synchronized (this) {
+            List<AlertRule> next = rules.stream().filter(r -> !r.name().equals(name)).toList();
+            removed = next.size() != rules.size();
+            this.rules = List.copyOf(next);
+        }
+        if (removed) rulesChanged.run();
         return removed;
+    }
+
+    /**
+     * Called after every {@link #upsert}/{@link #remove} — the host re-derives the DUCKLE-C1 freshness
+     * sweep from it. ⚠ Run OUTSIDE this engine's monitor, so a listener that takes the job scheduler's
+     * lock can never order itself against an evaluation holding this one.
+     */
+    public void onRulesChanged(Runnable listener) {
+        this.rulesChanged = listener == null ? () -> {} : listener;
+    }
+
+    /** True while at least one armed rule checks Dataset freshness ({@code maximumAge}). */
+    public boolean hasFreshnessRule() {
+        return rules.stream().anyMatch(AlertRule::isFreshnessRule);
     }
 
     /** Recent fired alerts, newest first, JSON-ready — backs {@code GET /alerts}. */

@@ -249,6 +249,7 @@ final class JobRoutes implements RouteModule {
     /** {@code POST /jobs/{name}/enable|disable} — flip the persisted {@code enabled} flag; 404 if unknown. */
     private Object setEnabled(ApiContext api, String name, boolean enabled) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
+        refuseSystemJob(api, name);
         Map<String, Object> m = new LinkedHashMap<>(existingJob(api, name).toMap());
         m.put("enabled", enabled);
         JobConfig c = parseJob(m);
@@ -259,6 +260,7 @@ final class JobRoutes implements RouteModule {
     /** {@code POST /jobs/{name}/reschedule} — replace the persisted {@code cron}; 422 without one, 404 if unknown. */
     private Object reschedule(ApiContext api, String name, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
+        refuseSystemJob(api, name);
         String cron = ApiContext.str(body, "cron");
         if (cron == null || cron.isBlank()) throw new ApiException(422, "'cron' is required");
         Map<String, Object> m = new LinkedHashMap<>(existingJob(api, name).toMap());
@@ -266,6 +268,17 @@ final class JobRoutes implements RouteModule {
         JobConfig c = parseJob(m);
         persistJob(api, c);
         return c.toMap();
+    }
+
+    /**
+     * 409 for a platform-armed system job (DUCKLE-C1's freshness sweep): it is derived from other state
+     * and re-derived on every boot and rule change, so an edit here would either be silently undone or —
+     * a delete or a disable — silently switch off the check it exists for. It stays triggerable.
+     */
+    private static void refuseSystemJob(ApiContext api, String name) {
+        boolean system = api.service().jobService().map(js -> js.isSystemJob(name)).orElse(false);
+        WriteGates.conflictIf(system, "job '" + name + "' is a system job armed by the platform; it is "
+                + "derived from the Alert Rules and cannot be edited, disabled or deleted here");
     }
 
     /** The registered job named {@code name}, or a 404. */
@@ -350,6 +363,7 @@ final class JobRoutes implements RouteModule {
     private Object updateJob(ApiContext api, HttpExchange ex, String name, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
         JobService svc = jobs(api);
+        refuseSystemJob(api, name);
         JobConfig existing = svc.jobConfig(name)
                 .orElseThrow(() -> new ApiException(404, "no job named '" + name + "'"));
         ETags.requireMatch(ex, ETags.of(ContentHash.of(existing.toMap())));
@@ -364,6 +378,7 @@ final class JobRoutes implements RouteModule {
     private Object deleteJob(ApiContext api, String name) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
         JobService svc = jobs(api);
+        refuseSystemJob(api, name);
         if (svc.jobs().stream().noneMatch(v -> v.name().equals(name)))
             throw new ApiException(404, "no job named '" + name + "'");
         boolean removed = Files.deleteIfExists(jobFile(api, name));

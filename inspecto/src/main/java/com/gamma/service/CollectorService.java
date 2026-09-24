@@ -530,6 +530,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     return wr == null ? java.util.OptionalDouble.empty() : probe.value(wr, rule);
                 }));
         bus.subscribe(alerting::onEvent);
+        alerting.onRulesChanged(this::syncFreshnessSweep);   // DUCKLE-C1 (1): re-derive the freshness sweep
         if (!alertRules.isEmpty()) log.info("Alert engine armed with {} rule(s)", alertRules.size());
         // Event engine (Phase 1, v4.2.0): the append-only record of "what happened". Built from
         // -Devents.backend (memory|parquet), installed into the process-wide EventLog so the SLF4J
@@ -541,7 +542,13 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // above, because it reads the event store — which only exists from the line above. The probe
         // keeps itself current from the bus; the store is its cold-start recovery for publications that
         // happened before this process started.
-        com.gamma.query.DatasetFreshnessProbe freshness = new com.gamma.query.DatasetFreshnessProbe(events);
+        // The durable last-publication floor (duckle S2) is kept beside the run journal, and ONLY over a
+        // durable event store: an in-memory ring forgets every publication on restart anyway, and a floor
+        // there would write a file into the working directory of every legacy/test boot.
+        com.gamma.query.DatasetFreshnessProbe freshness = new com.gamma.query.DatasetFreshnessProbe(events,
+                events instanceof com.gamma.event.InMemoryEventStore ? null
+                        : java.nio.file.Path.of(System.getProperty("jobs.audit.dir", root.auditDir()))
+                                .resolve(com.gamma.query.DatasetFreshnessProbe.FLOOR_FILE));
         this.eventLog.addSubscriber(freshness.subscriber());
         alerting.freshnessProbe(freshness);
         bus.subscribe(this::onConsignmentEvent);
@@ -753,6 +760,21 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     /** The alert engine (always present; empty until a rule is armed) — backs {@code /alerts}. */
     public java.util.Optional<com.gamma.alert.AlertService> alertService() {
         return java.util.Optional.ofNullable(alerting);
+    }
+
+    /** Set by {@link #start()}: a rule change before it must not start the job scheduler early. */
+    private volatile boolean freshnessSweepLive;
+
+    /**
+     * DUCKLE-C1 residual (1): arm the minute-cadence freshness sweep while any Alert Rule with
+     * {@code maximumAge} is armed, disarm it when none is. Runs at {@link #start()} and after every rule
+     * change; {@link com.gamma.job.FreshnessSweep#reconcile} is idempotent, so either may run any number
+     * of times. A space with no job yet gets its {@link JobService} created only when a sweep is WANTED.
+     */
+    private void syncFreshnessSweep() {
+        if (!freshnessSweepLive) return;
+        boolean wanted = alerting.hasFreshnessRule();
+        com.gamma.job.FreshnessSweep.reconcile(wanted ? jobServiceOrCreate() : jobs, wanted);
     }
 
     /** The bus carrying committed-batch events; subscribe before {@link #start()}. */
@@ -1042,6 +1064,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         metrics.start();
         enrichment.start();
         if (jobs != null) jobs.start();
+        freshnessSweepLive = true;
+        syncFreshnessSweep();   // DUCKLE-C1 (1): boot re-derives the sweep from the rules loaded above
         assistSlot.start(AssistAgent::start);   // intelligence agent is intentionally not start()ed here
         // T13 / §3.8 — drive event-triggered flows: an upstream batch-commit signals the downstream
         // pipeline's coalescer (off the publishing thread, see triggerWorkers). Subscribed before the first
