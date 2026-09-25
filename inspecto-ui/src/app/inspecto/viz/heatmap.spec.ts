@@ -9,7 +9,7 @@ import {
     sequentialLevel,
     statusCellTone,
 } from './heatmap';
-import { HEATMAP_PLUGIN } from './plugins';
+import { HEATMAP_MAX_CELLS, HEATMAP_PLUGIN } from './plugins';
 import { allViz } from './viz-registry';
 
 describe('heatmap — pivot', () => {
@@ -152,6 +152,16 @@ describe('HEATMAP_PLUGIN', () => {
         expect(q.groupBy).toEqual(['control', 'event_date']);
         expect(q.grains).toEqual({ event_date: 'day' });
         expect(q.measures.map((m) => m.id)).toEqual(['sum_breaks']);
+    });
+
+    it('asks for every cell in a stable order, never the server 500-row default (R2-01)', () => {
+        const q = HEATMAP_PLUGIN.buildQuery(values, { datasetId: 'control_runs', sourceName: 'control_runs' });
+        expect(q.limit).toBe(HEATMAP_MAX_CELLS);
+        expect(HEATMAP_MAX_CELLS).toBeGreaterThan(500);
+        expect(q.orderBy).toEqual([
+            { field: 'control', dir: 'asc' },
+            { field: 'event_date', dir: 'asc' },
+        ]);
     });
 
     it('transforms result rows into the matrix with readable channel names', () => {

@@ -65,7 +65,7 @@ export { PROGRESS_LIST_PLUGIN } from './progress-list.plugin';
 export { TREEMAP_PLUGIN } from './treemap.plugin';
 export { WATERFALL_PLUGIN } from './waterfall.plugin';
 export { COMBO_PLUGIN } from './combo.plugin';
-export { HEATMAP_PLUGIN } from './heatmap.plugin';
+export { HEATMAP_MAX_CELLS, HEATMAP_PLUGIN } from './heatmap.plugin';
 export {
     GEO_MAP_PLUGIN,
     LINK_ANALYSIS_PLUGIN,

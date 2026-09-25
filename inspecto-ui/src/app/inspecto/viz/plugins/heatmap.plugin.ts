@@ -13,6 +13,13 @@ import { channelGrains } from './plugin-helpers';
  * The `value` channel also accepts a dimension so a STATUS column can fill the cells (`max(status)` — pick max or min;
  * the server refuses sum/avg on text), which the `status` scale colours by tone: the RAG matrix.
  */
+/**
+ * A heatmap needs EVERY cell, so it asks for the server's ceiling (`BiRoutes.MAX_LIMIT`) instead of taking the
+ * 500-row default — 24 controls × 30 days is 720 cells. Without it the server returned an arbitrary 500 of an
+ * unordered GROUP BY and a different 500 on each reload: scattered holes that read as missed runs (R2-01).
+ */
+export const HEATMAP_MAX_CELLS = 10_000;
+
 export const HEATMAP_PLUGIN: VizPlugin = {
     meta: {
         type: 'heatmap',
@@ -28,13 +35,17 @@ export const HEATMAP_PLUGIN: VizPlugin = {
     buildQuery: (values, ctx) => {
         const dims = [values.rows?.[0], values.columns?.[0]].filter((cv): cv is ChannelValue => !!cv?.field);
         const value = values.value?.[0];
+        const groupBy = dims.map((cv) => cv.field);
         return {
             datasetId: ctx.datasetId,
             sourceName: ctx.sourceName,
-            groupBy: dims.map((cv) => cv.field),
+            groupBy,
             ...(channelGrains(dims) ?? {}),
             measures: value ? [channelMeasure(value)] : [],
             filters: ctx.filters ?? null,
+            // Ordered, so a matrix past the ceiling loses its LAST rows rather than random cells.
+            ...(groupBy.length ? { orderBy: groupBy.map((f) => ({ field: f, dir: 'asc' as const })) } : {}),
+            limit: HEATMAP_MAX_CELLS,
         };
     },
     transformProps: (rows, values) => {
