@@ -40,7 +40,7 @@ type Tone = 'good' | 'bad' | 'flat';
                 <div class="text-secondary mb-1 text-xs font-medium">{{ l }}</div>
             }
             <div
-                class="font-extrabold tabular-nums leading-none"
+                class="whitespace-nowrap font-extrabold tabular-nums leading-none"
                 [class.text-2xl]="mode() === 'mini'"
                 [class.text-4xl]="mode() === 'standard'"
                 [class.text-6xl]="mode() === 'max'"
@@ -75,17 +75,24 @@ export class KpiComponent {
 
     readonly display = computed(() => formatNumber(this.value(), this.format()));
 
-    /** "▲ 12.4 % vs prior period (SAR 0.9M)" — change and direction in words, toned by whether it is good. */
+    /** "▲ Up 12.4 % (+SAR 0.9M) vs prior period" — change and direction in words, toned by whether it is good.
+     *  The amount is SIGNED and sits before "vs", so it cannot be read as the prior-period value itself. */
     readonly delta = computed<{ text: string; tone: Tone } | null>(() => {
         const prev = this.compare();
         if (prev == null || !Number.isFinite(prev)) return null;
         const diff = this.value() - prev;
         if (diff === 0) return { text: 'No change vs prior period', tone: 'flat' };
         const up = diff > 0;
+        const good = up === (this.better() === 'higher');
+        const tone: Tone = good ? 'good' : 'bad';
+        // A percent KPI changes in POINTS — a relative % beside it would be a second, different percentage.
+        if (this.format()?.style === 'percent') {
+            const pts = formatNumber(Math.abs(diff), { decimals: 1 });
+            return { text: `${up ? '▲ Up' : '▼ Down'} ${pts} pts vs prior period`, tone };
+        }
         const pct = prev !== 0 ? ` ${formatNumber(Math.abs((diff / prev) * 100), { decimals: 1 })} %` : '';
         const amount = formatNumber(Math.abs(diff), { ...this.format(), compact: true });
-        const good = up === (this.better() === 'higher');
-        return { text: `${up ? '▲ Up' : '▼ Down'}${pct} vs prior period (${amount})`, tone: good ? 'good' : 'bad' };
+        return { text: `${up ? '▲ Up' : '▼ Down'}${pct} (${up ? '+' : '−'}${amount}) vs prior period`, tone };
     });
 
     /** "Target 99 — below target" — the target in the widget's format and whether the value meets it. */

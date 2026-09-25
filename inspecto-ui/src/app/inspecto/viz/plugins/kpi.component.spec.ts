@@ -36,8 +36,15 @@ describe('KpiComponent (UIE-1)', () => {
 
     it('states the delta vs the prior period in words, toned by the good direction', () => {
         const up = create({ value: 110, compare: 100 });
-        expect(up.text('kpi-delta')).toContain('▲ Up 10.0 % vs prior period');
+        expect(up.text('kpi-delta')).toBe('▲ Up 10.0 % (+10) vs prior period');
         expect(up.el.querySelector('[data-testid="kpi-delta"] span')?.className).toContain('green');
+
+        TestBed.resetTestingModule();
+        expect(create({ value: 148, compare: 163 }).text('kpi-delta')).toBe('▼ Down 9.2 % (−15) vs prior period');
+
+        TestBed.resetTestingModule();
+        const sla = create({ value: 88.9, compare: 91.5, format: { style: 'percent' } });
+        expect(sla.text('kpi-delta')).toBe('▼ Down 2.6 pts vs prior period');
 
         TestBed.resetTestingModule();
         const exposureUp = create({ value: 110, compare: 100, better: 'lower' });
