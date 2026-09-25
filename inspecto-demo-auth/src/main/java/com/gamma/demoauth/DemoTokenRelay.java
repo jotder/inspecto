@@ -37,12 +37,16 @@ public final class DemoTokenRelay implements TokenRelay {
         return DemoTokens.verify('r', refreshToken, now).filter(known()::containsKey).map(this::tokens);
     }
 
-    /** The picker: every Demo User's id, name and title — never roles or capabilities (pre-sign-in). */
+    /** The picker: every Demo User's id, name, title and optional landing menu item (UIE-7) — never roles or
+     *  capabilities (pre-sign-in). */
     @Override
     public Map<String, Object> bootstrapAuth() {
         List<Map<String, Object>> users = new ArrayList<>();
-        for (DemoUsers.User u : known().values())
-            users.add(Map.of("id", u.id(), "displayName", u.displayName(), "title", u.title()));
+        for (DemoUsers.User u : known().values()) {
+            Map<String, Object> entry = new LinkedHashMap<>(Map.of("id", u.id(), "displayName", u.displayName(), "title", u.title()));
+            if (u.landing() != null) entry.put("landing", u.landing());
+            users.add(entry);
+        }
         Map<String, Object> auth = new LinkedHashMap<>();
         auth.put("mock", true);
         auth.put("demoUsers", users);

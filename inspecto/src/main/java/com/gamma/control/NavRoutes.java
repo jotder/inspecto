@@ -47,7 +47,7 @@ final class NavRoutes implements RouteModule {
             throw new ApiException(422, "version must be " + NavMenus.VERSION);
         NavMenus menus;
         try {
-            menus = new NavMenus(NavMenus.sanitize(body.get("nodes")));
+            menus = NavMenus.of(body.get("nodes"), body.get("landing"));
         } catch (IllegalArgumentException ex) {
             throw new ApiException(422, ex.getMessage());
         }
@@ -60,6 +60,7 @@ final class NavRoutes implements RouteModule {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("space", EventLog.currentSpaceId());
         m.put("version", NavMenus.VERSION);
+        if (menus.landing() != null) m.put("landing", menus.landing());
         m.put("nodes", menus.nodes());
         return m;
     }

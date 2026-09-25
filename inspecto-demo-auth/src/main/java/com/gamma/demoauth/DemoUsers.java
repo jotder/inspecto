@@ -15,13 +15,15 @@ import java.util.Set;
  * The Demo Users of a Space: {@code <space>/config/demo-users.toon}.
  *
  * <pre>
- * users[2]{id,displayName,title,roles}:
- *   ra.analyst,Demo RA Analyst,Revenue Assurance analyst,operations
- *   admin,Demo Admin,Platform administrator,admin;super
+ * users[2]{id,displayName,title,roles,landing}:
+ *   ra.analyst,Demo RA Analyst,Revenue Assurance analyst,operations,2da48ada-fbb5-57cb-af5b-acebda2f6135
+ *   admin,Demo Admin,Platform administrator,admin;super,
  * </pre>
  *
  * {@code roles} is {@code ;}-separated and names roles of the Space's own role table ({@code roles.toon} over
- * the seed). A missing file means the Space has no Demo Users. Re-read on every call: the file is tiny and a
+ * the seed). {@code landing} (optional, UIE-7) is the id of a menu item in the Space's {@code nav-menus.toon} the
+ * SPA opens after this Demo User signs in, ahead of the Space's own landing; blank means "the Space's landing".
+ * The SPA resolves it and falls back silently when it names no menu item. A missing file means the Space has no Demo Users. Re-read on every call: the file is tiny and a
  * demo operator may edit it while the server runs.
  */
 final class DemoUsers {
@@ -29,7 +31,7 @@ final class DemoUsers {
     static final String FILE = "demo-users.toon";
 
     /** One Demo User. {@code roles} are lower-cased, like the role table's keys. */
-    record User(String id, String displayName, String title, Set<String> roles) {}
+    record User(String id, String displayName, String title, Set<String> roles, String landing) {}
 
     private DemoUsers() {}
 
@@ -50,7 +52,8 @@ final class DemoUsers {
                 String r = str(m.get("roles"));
                 if (r != null)
                     for (String part : r.split(";")) if (!part.isBlank()) roles.add(part.trim().toLowerCase(java.util.Locale.ROOT));
-                out.add(new User(id, orElse(str(m.get("displayName")), id), orElse(str(m.get("title")), ""), Set.copyOf(roles)));
+                out.add(new User(id, orElse(str(m.get("displayName")), id), orElse(str(m.get("title")), ""), Set.copyOf(roles),
+                        str(m.get("landing"))));
             }
             return List.copyOf(out);
         } catch (Exception e) {

@@ -151,4 +151,63 @@ describe('MenuBuilderComponent', () => {
         f.detectChanges();
         expect(f.componentInstance.nodes().length).toBe(0);
     });
+
+    // UIE-7: a route leaf previews as the screen it opens (no artifact render), the Space landing is badged,
+    // and moving the landing to another leaf PUTs the new landing.
+    it('badges the Space landing, previews a screen link, and moves the landing (a11y-clean)', async () => {
+        const tree = {
+            space: 'default',
+            version: 1 as const,
+            landing: 'cases',
+            nodes: [
+                {
+                    id: 'fm',
+                    title: 'Fraud',
+                    children: [
+                        { id: 'cases', title: 'Cases', binding: { kind: 'route' as const, route: '/cases' } },
+                        { id: 'ops', title: 'Ops', binding: { kind: 'dashboard' as const, componentId: 'fm_ops' } },
+                    ],
+                },
+            ],
+        };
+        const puts: { landing?: string }[] = [];
+        TestBed.configureTestingModule({
+            imports: [MenuBuilderComponent],
+            providers: [
+                provideNoopAnimations(),
+                { provide: SpacesService, useValue: { currentSpaceId: signal<string | null>(null) } },
+                { provide: NavigationService, useValue: { get: () => of(null) } },
+                {
+                    provide: NavMenusService,
+                    useValue: {
+                        get: () => of(tree),
+                        put: (t: { landing?: string }) => {
+                            puts.push(t);
+                            return of(t);
+                        },
+                    },
+                },
+                { provide: ToastrService, useValue: { error: () => {} } },
+                { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(undefined) }) } },
+                { provide: LensService, useValue: { canCurateMenus: () => true } },
+            ],
+        });
+        const f = TestBed.createComponent(MenuBuilderComponent);
+        f.componentInstance.selectedId.set('cases');
+        f.detectChanges();
+
+        const chips = f.nativeElement.querySelectorAll('[data-testid="landing-chip"]');
+        expect(chips.length).toBe(1);
+        expect(chips[0].closest('app-menu-tree-node')?.textContent).toContain('Cases');
+        expect(f.nativeElement.querySelector('[data-testid="route-preview"]')?.textContent).toContain('/cases');
+        expect(f.nativeElement.querySelector('app-menu-artifact')).toBeNull();
+        await expectNoA11yViolations(f.nativeElement);
+
+        const nodes = f.debugElement.queryAll((d) => d.name === 'app-menu-tree-node');
+        const ops = nodes.find((d) => d.componentInstance.node().id === 'ops')!;
+        ops.componentInstance.toggleLanding();
+        f.detectChanges();
+        expect(puts.at(-1)?.landing).toBe('ops');
+        expect(f.nativeElement.querySelectorAll('[data-testid="landing-chip"]').length).toBe(1);
+    });
 });

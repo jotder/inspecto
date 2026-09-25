@@ -5,3 +5,4 @@ export * from './menu-favorites';
 export * from './menu-nav';
 export * from './menu-api';
 export * from './menu.service';
+export * from './menu-landing';

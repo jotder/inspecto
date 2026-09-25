@@ -235,6 +235,18 @@ and survives a reload; it is gated on its own capability, **split out of the aut
 deliberately the other way round**: a per-space browser-local overlay that is **never written to the
 shared tree**, because a favourite is personal while the tree is shared.
 
+**Screen links and landing pages (UIE-7, 2026-09-25).** A Menu item binds either a library Component
+(Dashboard, Widget, saved view) or, with `kind: route`, an **in-app route** such as `/cases`, so a
+business user reaches platform screens from the Space menu. The server accepts only an absolute in-app
+path — no scheme, no `//` or backslash, no `.`/`..` segment, no whitespace, at most 512 characters — and the
+Menu Builder's *Add screen link* dialog mirrors that check. The tree also carries an optional `landing`
+(a leaf id, refused on write when it names no leaf, dropped on read when stale). Opening the app at `/`
+resolves **per-Demo-User landing → Space landing → platform Home**: the Demo User's `landing` column in
+`demo-users.toon` rides on the sign-in picker entry (a menu item id, never a role), and the first
+candidate still naming a leaf wins. A landing naming nothing, or a Menu tree that cannot be read, opens
+Home with one console warning — never a blank screen. Switching Space now reloads at `/`, so it lands on
+the new Space's landing instead of the Lens home.
+
 ### 3.5 The design system
 
 The shared family lives in one directory — **22 non-spec units**, including the alert, breadcrumb,

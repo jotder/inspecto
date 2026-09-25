@@ -21,6 +21,11 @@ export class NavMenusService {
     }
 
     put(tree: MenuTree): Observable<MenuTree> {
-        return this.http.put<MenuTree>(apiUrl('/nav/menus'), { version: MENU_TREE_VERSION, nodes: tree.nodes });
+        // `landing` must ride on every PUT: the document is replaced whole, so omitting it clears the landing.
+        return this.http.put<MenuTree>(apiUrl('/nav/menus'), {
+            version: MENU_TREE_VERSION,
+            ...(tree.landing ? { landing: tree.landing } : {}),
+            nodes: tree.nodes,
+        });
     }
 }

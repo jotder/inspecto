@@ -276,6 +276,38 @@ describe('SessionService (W6d edition switch)', () => {
         navigate.mockRestore();
     });
 
+    // UIE-7: the per-Demo-User landing is keyed on the actor, which lands only with the post-sign-in bootstrap
+    // re-read — so `sessionSettled()` must not resolve before it.
+    it('resolves the signed-in Demo User landing once the post-sign-in session has settled', async () => {
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({
+            features: { authMode: 'demo' },
+            auth: {
+                mock: true,
+                demoUsers: [
+                    { id: 'fm.analyst', displayName: 'Demo FM Analyst', title: 'Fraud analyst', landing: 'cases' },
+                    { id: 'admin', displayName: 'Demo Admin', title: 'Admin' },
+                ],
+            },
+        });
+        await tick();
+        httpMock.expectOne(`${base}/auth/refresh`).flush({ error: 'no session' }, { status: 401, statusText: 'x' });
+        await done;
+        expect(svc.demoUserLanding()).toBeUndefined();
+
+        sessionStorage.setItem('inspecto.pkce.state', 's1');
+        sessionStorage.setItem('inspecto.pkce.verifier', 'v1');
+        svc.completeLogin('demo:fm.analyst', 's1').subscribe();
+        httpMock.expectOne(`${base}/auth/exchange`).flush({ accessToken: 'at' });
+        let settled = false;
+        const settling = svc.sessionSettled().then(() => (settled = true));
+        await tick();
+        expect(settled).toBe(false);
+        httpMock.expectOne(`${base}/bootstrap`).flush({ session: { authenticated: true, actor: 'fm.analyst' } });
+        await settling;
+        expect(svc.demoUserLanding()).toBe('cases');
+    });
+
     // RP-Initiated Logout 1.0. Without this the Inspecto session ends but the IdP's SSO session does
     // not, so the next sign-in completes with no credential prompt (BACKLOG §5).
     it('logout redirects to the provider end_session_endpoint when one is configured', async () => {

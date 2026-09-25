@@ -35,6 +35,8 @@ export interface DemoUser {
     id: string;
     displayName: string;
     title: string;
+    /** UIE-7: the menu item this Demo User lands on after sign-in, ahead of the Space landing (optional). */
+    landing?: string;
 }
 
 /** The deployment's own branding, as `GET /bootstrap` serves it. Nulls mean "use the shipped defaults". */
@@ -146,6 +148,23 @@ export class SessionService {
 
     private readonly accessToken = signal<string | null>(null);
     private oidc: OidcConfig | null = null;
+    /** The in-flight post-sign-in bootstrap re-read ({@link completeLogin} does not wait for it). */
+    private sessionLoad: Promise<void> = Promise.resolve();
+
+    /**
+     * Resolves once {@link actor} and {@link capabilities} reflect the signed-in subject. The landing redirect
+     * (UIE-7) awaits it: right after sign-in the callback navigates to `/` before the re-read has landed, and a
+     * per-Demo-User landing keyed on a still-null actor would silently fall through to the Space landing.
+     */
+    sessionSettled(): Promise<void> {
+        return this.sessionLoad;
+    }
+
+    /** UIE-7: the signed-in Demo User's own landing menu item, if the picker entry names one. */
+    demoUserLanding(): string | undefined {
+        const actor = this.actor();
+        return actor ? this.demoUsers().find((u) => u.id === actor)?.landing : undefined;
+    }
 
     /** True only on Standard when there is no live session yet — the sole condition that shows sign-in. */
     readonly loginRequired = computed(() => this.authMode() === 'oidc' && !this.authenticated());
@@ -258,7 +277,7 @@ export class SessionService {
                 map(() => true),
                 // Enrich capabilities from the Subject the backend resolves off the new bearer (non-blocking).
                 tap((ok) => {
-                    if (ok) void this.loadSessionFromBootstrap();
+                    if (ok) this.sessionLoad = this.loadSessionFromBootstrap();
                 }),
                 catchError(() => of(false)),
             );

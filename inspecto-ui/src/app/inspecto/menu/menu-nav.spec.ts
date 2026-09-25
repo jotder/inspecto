@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { favoritesNavGroup, MENU_FAVORITES_NAV_ID, menuTreeToNav } from './menu-nav';
-import { MenuNode } from './menu-types';
+import { favoritesNavGroup, landingUrl, MENU_FAVORITES_NAV_ID, menuLeafUrl, menuTreeToNav } from './menu-nav';
+import { MenuNode, routeError } from './menu-types';
 
 describe('menuTreeToNav', () => {
     it('maps groups to collapsable, leaves to basic /w/ links, and namespaces ids', () => {
@@ -69,5 +69,69 @@ describe('favoritesNavGroup', () => {
     it('returns null when nothing resolves', () => {
         expect(favoritesNavGroup(tree, [])).toBeNull();
         expect(favoritesNavGroup(tree, ['grp', 'nope'])).toBeNull();
+    });
+});
+
+describe('UIE-7 route leaves and the landing', () => {
+    const tree: MenuNode[] = [
+        {
+            id: 'fm',
+            title: 'Fraud',
+            children: [
+                { id: 'cases', title: 'Cases', binding: { kind: 'route', route: '/cases?status=open#top' } },
+                { id: 'ops', title: 'Fraud operations', binding: { kind: 'dashboard', componentId: 'fm_ops' } },
+            ],
+        },
+    ];
+
+    it('links a route leaf straight to its route, with query and fragment in their own fields', () => {
+        const leaf = menuTreeToNav(tree)[0].children![0];
+        expect(leaf).toMatchObject({
+            id: 'menu-cases',
+            type: 'basic',
+            link: '/cases',
+            queryParams: { status: 'open' },
+            fragment: 'top',
+        });
+        expect(menuTreeToNav(tree)[0].children![1].link).toBe('/w/ops');
+    });
+
+    it('resolves the URL a leaf opens, and nothing for a group', () => {
+        expect(menuLeafUrl(tree[0].children![0])).toBe('/cases?status=open#top');
+        expect(menuLeafUrl(tree[0].children![1])).toBe('/w/ops');
+        expect(menuLeafUrl(tree[0])).toBeUndefined();
+    });
+
+    it('lands per-user ahead of the Space, and skips candidates naming no leaf', () => {
+        expect(landingUrl(tree, ['cases', 'ops'])).toBe('/cases?status=open#top');
+        expect(landingUrl(tree, [undefined, 'ops'])).toBe('/w/ops');
+        expect(landingUrl(tree, ['gone', 'ops'])).toBe('/w/ops');
+        expect(landingUrl(tree, ['fm', 'ops'])).toBe('/w/ops'); // a group is not a landing
+        expect(landingUrl(tree, ['gone', null])).toBeNull();
+        expect(landingUrl([], ['cases'])).toBeNull();
+    });
+});
+
+describe('routeError (client mirror of NavMenus.checkRoute)', () => {
+    it('accepts absolute in-app paths, with query and fragment', () => {
+        for (const ok of ['/cases', '/alerts?status=open', '/link-analysis/ring#n1', '/'])
+            expect(routeError(ok), ok).toBeNull();
+    });
+
+    it('refuses anything that could leave the app or escape a segment', () => {
+        for (const bad of [
+            '',
+            'cases',
+            'https://evil.example',
+            'javascript:alert(1)',
+            '//evil.example',
+            '/\\evil.example',
+            '/cases/../settings',
+            '/./cases',
+            '/ca ses',
+            '/x:y',
+            '/' + 'a'.repeat(512),
+        ])
+            expect(routeError(bad), bad).not.toBeNull();
     });
 });

@@ -123,6 +123,89 @@ class ControlApiNavMenusTest {
         }
     }
 
+    // ── UIE-7: the `route` binding kind and the Space landing ──────────────────────
+
+    private static final String ROUTED = """
+            {"version":1,"landing":"cases","nodes":[
+              {"id":"g1","title":"Fraud","children":[
+                {"id":"cases","title":"Cases","binding":{"kind":"route","route":"/cases?status=open#top","componentId":"ignored"}}
+              ]},
+              {"id":"d1","title":"Cockpit","binding":{"kind":"dashboard","componentId":"cockpit","route":"/ignored"}}
+            ]}""";
+
+    @Test
+    void routeBindingAndLandingRoundTrip(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            HttpResponse<String> put = send(c.port, "PUT", "/spaces/acme/nav/menus", ROUTED);
+            assertEquals(200, put.statusCode(), put.body());
+
+            JsonNode got = json(send(c.port, "GET", "/spaces/acme/nav/menus", null));
+            assertEquals("cases", got.get("landing").asText());
+            JsonNode route = got.get("nodes").get(0).get("children").get(0).get("binding");
+            assertEquals("route", route.get("kind").asText());
+            assertEquals("/cases?status=open#top", route.get("route").asText());
+            assertNull(route.get("componentId"), "a route binding keeps only its route");
+            JsonNode dash = got.get("nodes").get(1).get("binding");
+            assertEquals("cockpit", dash.get("componentId").asText());
+            assertNull(dash.get("route"), "an artifact binding keeps only its componentId");
+
+            // a PUT without landing clears it
+            assertEquals(200, send(c.port, "PUT", "/spaces/acme/nav/menus", TREE).statusCode());
+            assertNull(json(send(c.port, "GET", "/spaces/acme/nav/menus", null)).get("landing"));
+        }
+    }
+
+    @Test
+    void unsafeRoutesAndBadLandingsAre422(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String base = "/spaces/acme/nav/menus";
+            for (String route : List.of("cases", "https://evil.example/x", "javascript:alert(1)", "//evil.example",
+                    "/\\\\evil.example", "/cases/../settings", "/./cases", "/ca ses", "/cases\t", "/x:y", "/" + "a".repeat(512))) {
+                String body = JSON.writeValueAsString(java.util.Map.of("version", 1, "nodes", List.of(java.util.Map.of(
+                        "id", "a", "title", "A", "binding", java.util.Map.of("kind", "route", "route", route)))));
+                HttpResponse<String> r = send(c.port, "PUT", base, body);
+                assertEquals(422, r.statusCode(), "route " + route + " must be refused: " + r.body());
+            }
+            // route kind without a route
+            assertEquals(422, send(c.port, "PUT", base,
+                    "{\"version\":1,\"nodes\":[{\"id\":\"a\",\"title\":\"A\",\"binding\":{\"kind\":\"route\",\"componentId\":\"x\"}}]}")
+                    .statusCode());
+            // landing naming an unknown node, a group, or not a string
+            String tree = "\"nodes\":[{\"id\":\"g\",\"title\":\"G\",\"children\":[{\"id\":\"l\",\"title\":\"L\"," +
+                    "\"binding\":{\"kind\":\"route\",\"route\":\"/cases\"}}]}]";
+            assertEquals(422, send(c.port, "PUT", base, "{\"version\":1,\"landing\":\"nope\"," + tree + "}").statusCode());
+            assertEquals(422, send(c.port, "PUT", base, "{\"version\":1,\"landing\":\"g\"," + tree + "}").statusCode());
+            assertEquals(422, send(c.port, "PUT", base, "{\"version\":1,\"landing\":7," + tree + "}").statusCode());
+            assertFalse(Files.exists(root.resolve("acme").resolve("config").resolve("nav-menus.toon")));
+            // …and the valid one is accepted
+            assertEquals(200, send(c.port, "PUT", base, "{\"version\":1,\"landing\":\"l\"," + tree + "}").statusCode());
+        }
+    }
+
+    @Test
+    void danglingLandingOnDiskIsDroppedNotFatal(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            Path file = root.resolve("acme").resolve("config").resolve("nav-menus.toon");
+            Files.writeString(file, """
+                    version: 1
+                    landing: gone
+                    nodes[1]:
+                      - id: l1
+                        title: Cases
+                        binding:
+                          kind: route
+                          route: /cases
+                    """);
+            JsonNode got = json(send(c.port, "GET", "/spaces/acme/nav/menus", null));
+            assertNull(got.get("landing"), "a landing naming no leaf is dropped");
+            assertEquals("/cases", got.get("nodes").get(0).get("binding").get("route").asText(),
+                    "the rest of the tree still loads");
+        }
+    }
+
     @Test
     void disabledWhenNoWriteRootConfigured(@TempDir Path cfg) throws Exception {
         Path pipe = PipelineConfigBatchTest.writePipeline(cfg, "");

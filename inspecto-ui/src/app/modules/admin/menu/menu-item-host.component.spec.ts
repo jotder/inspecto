@@ -1,8 +1,8 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { MenuNode, MenuService } from 'app/inspecto/menu';
 import { DashboardsService } from 'app/modules/admin/studio/dashboards/dashboards.service';
@@ -16,6 +16,7 @@ function configure(node: MenuNode | undefined, nodeId = 'n1'): ComponentFixture<
         imports: [MenuItemHostComponent],
         providers: [
             provideNoopAnimations(),
+            provideRouter([]),
             { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ nodeId })) } },
             { provide: MenuService, useValue: { find: (id: string) => (id === nodeId ? node : undefined) } },
             { provide: DashboardsService, useValue: { get: () => of(null) } },
@@ -42,5 +43,13 @@ describe('MenuItemHostComponent', () => {
     it('resolves the node from the route param (no render — child hosts are live-only)', () => {
         const f = configure({ id: 'n1', title: 'Cost', binding: { kind: 'widget', componentId: 'cost_by_tariff' } });
         expect(f.componentInstance.node()?.binding).toEqual({ kind: 'widget', componentId: 'cost_by_tariff' });
+    });
+
+    it('forwards a route leaf to its in-app route, replacing the /w/ URL (UIE-7)', () => {
+        const f = configure({ id: 'n1', title: 'Cases', binding: { kind: 'route', route: '/cases?status=open' } });
+        const nav = vi.spyOn(TestBed.inject(Router), 'navigateByUrl').mockResolvedValue(true);
+        f.detectChanges();
+        expect(nav).toHaveBeenCalledWith('/cases?status=open', { replaceUrl: true });
+        expect(f.nativeElement.querySelector('app-menu-artifact')).toBeNull();
     });
 });

@@ -72,9 +72,9 @@ class DemoAuthHttpTest {
     void demoUsersSignInWithTheirSpacesRolesAndAGateSeparatesThem(@TempDir Path root) throws Exception {
         Path config = Files.createDirectories(root.resolve("acme").resolve("config"));
         Files.writeString(config.resolve("demo-users.toon"), """
-                users[2]{id,displayName,title,roles}:
-                  ra.analyst,Demo RA Analyst,Revenue Assurance analyst,business
-                  builder,Demo Builder,Rule author,developer
+                users[2]{id,displayName,title,roles,landing}:
+                  ra.analyst,Demo RA Analyst,Revenue Assurance analyst,business,recon-node
+                  builder,Demo Builder,Rule author,developer,
                 """);
         System.setProperty("control.bind", "127.0.0.1");
         System.setProperty("spaces.root", root.toString());
@@ -88,6 +88,9 @@ class DemoAuthHttpTest {
             assertTrue(boot.body().contains("\"mock\":true") && boot.body().contains("\"ra.analyst\"") && boot.body().contains("Demo Builder"),
                     "the anonymous bootstrap lists the Demo Users for the picker: " + boot.body());
             assertFalse(boot.body().contains("\"roles\""), "the pre-sign-in picker never carries roles");
+            // UIE-7: the per-Demo-User landing rides on the picker entry; a blank one is omitted, not sent empty
+            assertTrue(boot.body().contains("\"landing\":\"recon-node\""), boot.body());
+            assertEquals(1, boot.body().split("\"landing\"", -1).length - 1, "only the user with a landing carries one: " + boot.body());
 
             assertEquals(401, send(port, "POST", "/auth/exchange", null,
                     "{\"code\":\"demo:nobody\",\"codeVerifier\":\"x\",\"redirectUri\":\"x\"}").statusCode(),

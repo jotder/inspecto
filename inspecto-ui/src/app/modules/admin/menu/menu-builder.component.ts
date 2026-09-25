@@ -5,7 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { NavigationService } from 'app/core/navigation/navigation.service';
 import { LensService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { MenuService } from 'app/inspecto/menu';
+import { artifactBinding, isRouteBinding, MenuService } from 'app/inspecto/menu';
 import { MenuArtifactComponent } from './menu-artifact.component';
 import { MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult } from './menu-node.dialog';
 import { MenuTreeNodeComponent } from './menu-tree-node.component';
@@ -96,10 +96,17 @@ import { MenuTreeNodeComponent } from './menu-tree-node.component';
                     <h2 class="mb-2 text-sm font-semibold uppercase tracking-wider opacity-60">Preview</h2>
                     @if (selectedNode(); as n) {
                         <div class="mb-3 text-lg font-bold">{{ n.title }}</div>
-                        <app-menu-artifact
-                            [binding]="n.binding"
-                            emptyMessage="This is a group — select one of its reports to preview it."
-                        />
+                        @if (selectedRoute(); as route) {
+                            <p class="text-secondary" data-testid="route-preview">
+                                Opens the in-app screen <code class="font-mono">{{ route }}</code
+                                >.
+                            </p>
+                        } @else {
+                            <app-menu-artifact
+                                [binding]="selectedArtifact()"
+                                emptyMessage="This is a group — select one of its reports to preview it."
+                            />
+                        }
                     } @else {
                         <inspecto-empty-state
                             icon="heroicons_outline:eye"
@@ -132,7 +139,11 @@ export class MenuBuilderComponent {
         const id = this.selectedId();
         return id ? this.menuApi.find(id) : undefined;
     });
-
+    readonly selectedArtifact = computed(() => artifactBinding(this.selectedNode()?.binding));
+    readonly selectedRoute = computed(() => {
+        const b = this.selectedNode()?.binding;
+        return isRouteBinding(b) ? b.route : null;
+    });
     addMenu(): void {
         if (!this.canCurate()) return;
         const data: MenuNodeDialogData = { heading: 'Add menu', takenTitles: this.nodes().map((n) => n.title) };

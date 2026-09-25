@@ -7,7 +7,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LensService, Space, SpacesService } from 'app/inspecto/api';
-import { LENS_HOME } from 'app/app.routes';
 import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
 
 /**
@@ -15,8 +14,8 @@ import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
  * multi-space (discover) server with spaces to switch between ({@link SpacesService.showSwitcher}).
  *
  * Switching persists the new space ({@link SpacesService.selectSpace}) and then hard-reloads at the
- * current lens's home route ({@link LENS_HOME}): every feature component fetches on init and holds
- * its own state, so a reload is the simplest correct way to re-scope the whole app to the new space
+ * app root, which lands on the new Space's landing page (UIE-7 `landingGuard`; Home when it names none):
+ * every feature component fetches on init and holds its own state, so a reload is the simplest correct way to re-scope the whole app to the new space
  * (and a deep link valid in the old space may not exist in the new one).
  *
  * "New space…" at the bottom of the menu opens the same {@link SpaceFormDialog} as Settings → Spaces and,
@@ -91,8 +90,7 @@ export class SpaceSwitcherComponent implements OnInit {
     switch(s: Space): void {
         if (s.id === this.spaces.currentSpaceId()) return;
         this.spaces.selectSpace(s.id);
-        const home = LENS_HOME[this.lens.currentLens()];
-        this.router.navigateByUrl('/' + home).then(() => window.location.reload());
+        this.router.navigateByUrl('/').then(() => window.location.reload());
     }
 
     /** Create a Space through the shared form, then make it the active one. */

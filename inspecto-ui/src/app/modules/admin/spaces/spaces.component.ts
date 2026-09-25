@@ -110,7 +110,7 @@ export class SpacesComponent implements OnInit {
         );
         if (!go) return;
         this.spaces.selectSpace(s.id);
-        window.location.assign('/dashboard');
+        window.location.assign('/'); // UIE-7: `/` lands on the Space landing
     }
 
     /** W5: pick a Space Template from the gallery, name the space, and offer to switch into it. */
@@ -141,7 +141,7 @@ export class SpacesComponent implements OnInit {
         );
         if (!go) return;
         this.spaces.selectSpace(s.id);
-        window.location.assign('/dashboard');
+        window.location.assign('/'); // UIE-7: `/` lands on the Space landing
     }
 
     createFromBundle(): void {

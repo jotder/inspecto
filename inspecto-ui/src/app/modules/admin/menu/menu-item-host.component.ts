@@ -1,9 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { map } from 'rxjs';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { MenuService } from 'app/inspecto/menu';
+import { artifactBinding, isRouteBinding, MenuService } from 'app/inspecto/menu';
 import { MenuArtifactComponent } from './menu-artifact.component';
 
 /**
@@ -11,6 +11,10 @@ import { MenuArtifactComponent } from './menu-artifact.component';
  * links to. Resolves the node from {@link MenuService} and renders its binding via the shared
  * {@link MenuArtifactComponent}. An unknown node falls back to a not-found empty state. See
  * docs/superpower/menu-builder-plan.md (M3).
+ *
+ * UIE-7: a `route` leaf is an in-app screen, not a Component — the sidebar links straight to its route, and a
+ * `/w/<nodeId>` URL that reaches here anyway (a bookmark, a landing, a favourite) is forwarded to it with
+ * `replaceUrl`, so Back does not bounce the user through this host again.
  */
 @Component({
     selector: 'app-menu-item-host',
@@ -21,10 +25,12 @@ import { MenuArtifactComponent } from './menu-artifact.component';
         <div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
             @if (node(); as n) {
                 <h1 class="mb-4 text-2xl font-extrabold leading-tight tracking-tight">{{ n.title }}</h1>
-                <app-menu-artifact
-                    [binding]="n.binding"
-                    emptyMessage="This menu is a group — pick one of its items, or link a report to it in the Menu Builder."
-                />
+                @if (!route()) {
+                    <app-menu-artifact
+                        [binding]="artifact()"
+                        emptyMessage="This menu is a group — pick one of its items, or link a report to it in the Menu Builder."
+                    />
+                }
             } @else {
                 <inspecto-empty-state
                     icon="heroicons_outline:question-mark-circle"
@@ -36,12 +42,26 @@ import { MenuArtifactComponent } from './menu-artifact.component';
     `,
 })
 export class MenuItemHostComponent {
-    private readonly route = inject(ActivatedRoute);
+    private readonly activatedRoute = inject(ActivatedRoute);
+    private readonly router = inject(Router);
     private readonly menu = inject(MenuService);
 
-    private readonly nodeId = toSignal(this.route.paramMap.pipe(map((p) => p.get('nodeId') ?? '')), {
+    private readonly nodeId = toSignal(this.activatedRoute.paramMap.pipe(map((p) => p.get('nodeId') ?? '')), {
         initialValue: '',
     });
 
     readonly node = computed(() => this.menu.find(this.nodeId()));
+    readonly artifact = computed(() => artifactBinding(this.node()?.binding));
+    /** The in-app route a `route` leaf forwards to, or null for any other node. */
+    readonly route = computed(() => {
+        const b = this.node()?.binding;
+        return isRouteBinding(b) ? b.route : null;
+    });
+
+    constructor() {
+        effect(() => {
+            const route = this.route();
+            if (route) void this.router.navigateByUrl(route, { replaceUrl: true });
+        });
+    }
 }

@@ -1,4 +1,4 @@
-import { emptyTree, MenuBinding, MenuNode, MenuTree } from './menu-types';
+import { emptyTree, MenuBinding, MenuNode, MenuTree, RouteBinding } from './menu-types';
 
 /** Id generator seam — tests inject a deterministic counter. */
 export type IdGen = () => string;
@@ -32,7 +32,7 @@ function removeNode(nodes: MenuNode[], id: string): MenuNode[] {
         .map((n) => (n.children ? { ...n, children: removeNode(n.children, id) } : n));
 }
 
-function findNode(nodes: MenuNode[], id: string): MenuNode | undefined {
+export function findNode(nodes: MenuNode[], id: string): MenuNode | undefined {
     for (const n of nodes) {
         if (n.id === id) return n;
         if (n.children) {
@@ -109,7 +109,7 @@ export class MenuStore {
         return this.addChild(parentId, { title, icon, children: [] });
     }
     /** Add a leaf bound to a library component under `parentId` (or top-level when null). Returns its id. */
-    attach(parentId: string | null, title: string, binding: MenuBinding, icon?: string): string {
+    attach(parentId: string | null, title: string, binding: MenuBinding | RouteBinding, icon?: string): string {
         return this.addChild(parentId, { title, icon, binding });
     }
 
@@ -171,7 +171,29 @@ export class MenuStore {
         return this;
     }
     remove(id: string): this {
+        const removed = findNode(this.tree.nodes, id);
+        const landing = this.tree.landing;
         this.tree = { ...this.tree, nodes: removeNode(this.tree.nodes, id) };
+        // Removing the landing item (or a group holding it) clears the landing — the server refuses a dangling one.
+        if (landing && removed && findNode([removed], landing)) this.setLanding(undefined);
+        return this;
+    }
+
+    /** UIE-7: point an in-app route leaf at a new route (the leaf keeps its id, title, icon and place). */
+    setRoute(id: string, route: string): this {
+        this.tree = {
+            ...this.tree,
+            nodes: patchNode(this.tree.nodes, id, (n) => ({ ...n, binding: { kind: 'route', route } })),
+        };
+        return this;
+    }
+
+    /** UIE-7: make a leaf the Space landing (opened instead of the platform Home), or clear it with `undefined`. */
+    setLanding(id: string | undefined): this {
+        const next: MenuTree = { ...this.tree };
+        delete next.landing;
+        if (id) next.landing = id;
+        this.tree = next;
         return this;
     }
 

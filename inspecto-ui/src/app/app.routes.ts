@@ -2,6 +2,7 @@ import { inject } from '@angular/core';
 import { Route } from '@angular/router';
 import { initialDataResolver } from 'app/app.resolvers';
 import { authGuard, Lens, LensService, SessionService } from 'app/inspecto/api';
+import { landingGuard } from 'app/inspecto/menu/menu-landing';
 import { LayoutComponent } from 'app/layout/layout.component';
 
 /** The default landing route per persona lens (W4 — plan §1's per-lens home page). Each target is the
@@ -42,7 +43,8 @@ export const appRoutes: Route[] = [
     // `lensHomeRedirect`, which dropped the three Lenses onto three unrelated screens and gave a fresh
     // install no front door. Home is now that one door in every edition, and the Lens landing route is its
     // primary action — `lensHomeRedirect` stays exported because the Home card reproduces its Ops fallback.
-    { path: '', pathMatch: 'full', redirectTo: 'home' },
+    // UIE-7: `landingGuard` resolves per-Demo-User landing > Space landing > Home and always redirects.
+    { path: '', pathMatch: 'full', canActivate: [landingGuard], children: [] },
 
     // Professional-edition OIDC guest routes (W6d) — shown only when authMode==='oidc' and there's no live
     // session (authGuard bounces here). No app shell, no guard. On Personal/offline these are simply

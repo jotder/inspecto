@@ -4,10 +4,12 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import { MenuNode, MenuService } from 'app/inspecto/menu';
+import { isRouteBinding, MenuNode, MenuService } from 'app/inspecto/menu';
 import { MenuAttachDialog, MenuAttachResult } from './menu-attach.dialog';
 import { MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult } from './menu-node.dialog';
+import { MenuRouteDialog, MenuRouteDialogData, MenuRouteDialogResult } from './menu-route.dialog';
 
 /**
  * One node in the Menu Builder tree — its row (icon + title + an actions menu) and, recursively, its
@@ -18,7 +20,7 @@ import { MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult } from './menu
 @Component({
     selector: 'app-menu-tree-node',
     standalone: true,
-    imports: [MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule, MenuTreeNodeComponent],
+    imports: [ChipComponent, MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule, MenuTreeNodeComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: {
         role: 'treeitem',
@@ -39,7 +41,10 @@ import { MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult } from './menu
                 <mat-icon class="icon-size-5 text-secondary shrink-0" [svgIcon]="icon()"></mat-icon>
                 <span class="truncate text-sm" [class.font-semibold]="!isLeaf()">{{ node().title }}</span>
                 @if (isLeaf()) {
-                    <span class="text-secondary text-xs">· {{ node().binding?.kind }}</span>
+                    <span class="text-secondary text-xs">· {{ isRoute() ? 'screen' : node().binding?.kind }}</span>
+                }
+                @if (isLanding()) {
+                    <inspecto-chip tone="primary" data-testid="landing-chip">Landing page</inspecto-chip>
                 }
             </button>
 
@@ -81,6 +86,20 @@ import { MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult } from './menu
                     </button>
                     <button mat-menu-item (click)="addReport()">
                         <mat-icon svgIcon="heroicons_outline:document-plus"></mat-icon><span>Add report</span>
+                    </button>
+                    <button mat-menu-item (click)="addScreenLink()">
+                        <mat-icon svgIcon="heroicons_outline:link"></mat-icon><span>Add screen link</span>
+                    </button>
+                }
+                @if (isRoute()) {
+                    <button mat-menu-item (click)="editScreenLink()">
+                        <mat-icon svgIcon="heroicons_outline:link"></mat-icon><span>Edit screen link</span>
+                    </button>
+                }
+                @if (isLeaf()) {
+                    <button mat-menu-item (click)="toggleLanding()">
+                        <mat-icon svgIcon="heroicons_outline:home"></mat-icon>
+                        <span>{{ isLanding() ? 'Clear landing page' : 'Set as landing page' }}</span>
                     </button>
                 }
                 <button mat-menu-item [disabled]="!canMoveUp()" (click)="move(-1)">
@@ -136,6 +155,10 @@ export class MenuTreeNodeComponent {
     readonly changed = output<void>();
 
     readonly isLeaf = computed(() => this.node().binding != null);
+    /** UIE-7: the leaf opens an in-app screen rather than a library Component. */
+    readonly isRoute = computed(() => isRouteBinding(this.node().binding));
+    /** UIE-7: this leaf is the Space landing (opened instead of the platform Home). */
+    readonly isLanding = computed(() => this.isLeaf() && this.menu.tree().landing === this.node().id);
     readonly icon = computed(
         () => this.node().icon ?? (this.isLeaf() ? 'heroicons_outline:document-chart-bar' : 'heroicons_outline:folder'),
     );
@@ -189,6 +212,41 @@ export class MenuTreeNodeComponent {
             });
     }
 
+    /** UIE-7: place a Menu item that opens an in-app screen (Cases, Alerts, …) under this group. */
+    addScreenLink(): void {
+        if (!this.canCurate()) return;
+        const takenTitles = (this.node().children ?? []).map((c) => c.title);
+        this.openRoute({ heading: 'Add screen link', takenTitles }).subscribe((r) => {
+            if (!r) return;
+            this.menu.mutate((s) => s.attach(this.node().id, r.title, { kind: 'route', route: r.route }));
+            this.changed.emit();
+        });
+    }
+
+    editScreenLink(): void {
+        const b = this.node().binding;
+        if (!this.canCurate() || !isRouteBinding(b)) return;
+        const takenTitles = this.siblings()
+            .filter((s) => s.id !== this.node().id)
+            .map((s) => s.title);
+        this.openRoute({
+            heading: 'Edit screen link',
+            title: this.node().title,
+            route: b.route,
+            takenTitles,
+        }).subscribe((r) => {
+            if (!r) return;
+            this.menu.mutate((s) => s.rename(this.node().id, r.title).setRoute(this.node().id, r.route));
+            this.changed.emit();
+        });
+    }
+
+    toggleLanding(): void {
+        if (!this.canCurate() || !this.isLeaf()) return;
+        this.menu.mutate((s) => s.setLanding(this.isLanding() ? undefined : this.node().id));
+        this.changed.emit();
+    }
+
     move(delta: -1 | 1): void {
         if (!this.canCurate()) return;
         const ids = this.siblings().map((s) => s.id);
@@ -215,6 +273,16 @@ export class MenuTreeNodeComponent {
         return this.dialog
             .open<MenuNodeDialog, MenuNodeDialogData, MenuNodeDialogResult>(MenuNodeDialog, {
                 width: '420px',
+                autoFocus: false,
+                data,
+            })
+            .afterClosed();
+    }
+
+    private openRoute(data: MenuRouteDialogData) {
+        return this.dialog
+            .open<MenuRouteDialog, MenuRouteDialogData, MenuRouteDialogResult>(MenuRouteDialog, {
+                width: '460px',
                 autoFocus: false,
                 data,
             })

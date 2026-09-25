@@ -102,3 +102,36 @@ describe('MenuStore', () => {
         expect(s.hasSiblingTitle(null, 'TopX')).toBe(false); // TopX is under Revenue, not top-level
     });
 });
+
+describe('MenuStore — UIE-7 landing and route leaves', () => {
+    it('sets, replaces and clears the Space landing', () => {
+        const s = store();
+        const g = s.addMenu('Fraud');
+        const cases = s.attach(g, 'Cases', { kind: 'route', route: '/cases' });
+        expect(s.setLanding(cases).snapshot().landing).toBe(cases);
+        expect('landing' in s.setLanding(undefined).snapshot()).toBe(false);
+    });
+
+    it('clears the landing when its item, or a group holding it, is removed — and only then', () => {
+        const s = store();
+        const g = s.addMenu('Fraud');
+        const cases = s.attach(g, 'Cases', { kind: 'route', route: '/cases' });
+        const other = s.attach(g, 'Ops', { kind: 'dashboard', componentId: 'fm_ops' });
+        s.setLanding(cases);
+        s.remove(other);
+        expect(s.snapshot().landing).toBe(cases);
+        s.remove(g);
+        expect(s.snapshot().landing).toBeUndefined();
+    });
+
+    it('re-points a route leaf, keeping its id and title', () => {
+        const s = store();
+        const cases = s.attach(null, 'Cases', { kind: 'route', route: '/cases' });
+        s.setRoute(cases, '/incidents');
+        expect(s.find(cases)).toMatchObject({
+            id: cases,
+            title: 'Cases',
+            binding: { kind: 'route', route: '/incidents' },
+        });
+    });
+});

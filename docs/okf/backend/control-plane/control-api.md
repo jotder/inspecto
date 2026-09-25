@@ -57,7 +57,9 @@ write-root 503 + `canAuthorWorkbench`, no jail/conflict gates since nothing call
 **`/nav/menus` is gated by `canCurateMenus`** — split out of `canAuthorWorkbench` on 2026-07-25 (D4,
 shipped end-to-end `fc637b1b`/`0c375ff5`; `okf/backend/editions/auth-security.md`). ⚠ This paragraph said
 until 2026-09-08 that curation reused `canAuthorWorkbench` and that the split "stays an open product
-question" — both were superseded the same day they were written)
+question" — both were superseded the same day they were written. Since UIE-7 (2026-09-25) the PUT also 422s
+an unsafe `kind: route` binding target and a `landing` that names no leaf — see
+[`surfaces.md` §3.4](../../capabilities/surfaces/surfaces.md))
 — plus the v1-era additions: `GET /bootstrap`
 (server capabilities incl. `features.authMode`), `/auth/*` (the Standard-edition BFF session routes),
 `POST /queries/{id}/run` (the `com.gamma.query` catalog, W4), and async run polling
