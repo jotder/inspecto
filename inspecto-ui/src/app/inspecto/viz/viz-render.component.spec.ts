@@ -10,6 +10,7 @@ import { BAR_PLUGIN, BUBBLE_PLUGIN, GAUGE_PLUGIN, KPI_PLUGIN, PIE_PLUGIN, TABLE_
 import { getVizComponentLoader, registerVizComponent } from './viz-components';
 import { VizPlugin, VizProps } from './viz-types';
 import { VizRenderComponent } from './viz-render.component';
+import { CHART_TONE } from 'app/inspecto/theme/chart-tokens';
 
 /** Stub outlet for the loader-registry test — stands in for the lazily-loaded geo/link view hosts. */
 @Component({
@@ -230,5 +231,62 @@ describe('VizRenderComponent', () => {
         c.categoryClick.subscribe((v) => (emitted = v));
         c.onElementClick(0);
         expect(emitted).toBeUndefined();
+    });
+
+    it('UIE-8: prints the gauge value in the widget format and states the target in words, with no a11y violations', async () => {
+        const fixture = create(GAUGE_PLUGIN, { labels: [], series: [], value: 96.94 });
+        fixture.componentRef.setInput('renderOptions', {
+            format: { style: 'percent', decimals: 1 },
+            kpi: { target: 99 },
+        });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="gauge-value"]')?.textContent?.trim()).toBe('96.9 %');
+        expect(el.querySelector('[data-testid="gauge-target"]')?.textContent).toContain('Target 99.0 % — below target');
+        await expectNoA11yViolations(el);
+    });
+
+    it('UIE-8: a gauge without a target shows its value but no target line or zone ring', () => {
+        const fixture = create(GAUGE_PLUGIN, { labels: [], series: [], value: 42 });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="gauge-value"]')?.textContent?.trim()).toBe('42');
+        expect(el.querySelector('[data-testid="gauge-target"]')).toBeNull();
+        expect(fixture.componentInstance.chartData()?.datasets).toHaveLength(1);
+    });
+
+    it('UIE-8: the target splits an inner ring into bad/good zones by the better direction, in status tones', () => {
+        const fixture = create(GAUGE_PLUGIN, { labels: [], series: [], value: 30 });
+        fixture.componentRef.setInput('renderOptions', { kpi: { target: 20, better: 'lower' } });
+        const c = fixture.componentInstance;
+        const ring = c.chartData()?.datasets[1];
+        expect(ring?.data).toEqual([20, 80]);
+        expect(ring?.backgroundColor).toEqual([CHART_TONE.success, CHART_TONE.error]); // lower is better: below = good
+        expect(c.gaugeTarget()).toEqual({ text: 'Target 20 — above target', met: false });
+        fixture.componentRef.setInput('renderOptions', { kpi: { target: 20 } });
+        expect(c.chartData()?.datasets[1]?.backgroundColor).toEqual([CHART_TONE.error, CHART_TONE.success]);
+        expect(c.gaugeTarget()?.met).toBe(true);
+    });
+
+    it('reads ISO-date categories as calendar labels and keeps the full date for the tooltip title', () => {
+        const props: VizProps = { labels: ['2025-10-01', '2025-11-01'], series: [{ label: 'm', data: [1, 2] }] };
+        const fixture = create(BAR_PLUGIN, props);
+        const c = fixture.componentInstance;
+        expect(c.chartData()?.labels).toEqual(['Oct 2025', 'Nov 2025']);
+        const title = (
+            c.chartJsOptions().plugins?.tooltip?.callbacks as unknown as {
+                title: (items: { dataIndex: number; label?: string }[]) => string;
+            }
+        ).title;
+        expect(title([{ dataIndex: 1, label: 'Nov 2025' }])).toBe('1 Nov 2025');
+        let clicked: string | undefined;
+        c.categoryClick.subscribe((v) => (clicked = v));
+        c.onElementClick(0);
+        expect(clicked).toBe('2025-10-01'); // drill-down still filters on the raw value
+    });
+
+    it('leaves non-date categories unchanged', () => {
+        const props: VizProps = { labels: ['North', '2025-10-01'], series: [{ label: 'm', data: [1, 2] }] };
+        expect(create(BAR_PLUGIN, props).componentInstance.chartData()?.labels).toEqual(['North', '2025-10-01']);
     });
 });

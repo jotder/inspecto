@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { formatNumber, NumberFormat } from '../number-format';
+import { targetStatus } from '../target-status';
 
 type KpiMode = 'mini' | 'standard' | 'max';
 type Tone = 'good' | 'bad' | 'flat';
@@ -97,12 +98,8 @@ export class KpiComponent {
 
     /** "Target 99 — below target" — the target in the widget's format and whether the value meets it. */
     readonly targetLine = computed<{ text: string; tone: Tone } | null>(() => {
-        const t = this.target();
-        if (t == null || !Number.isFinite(t)) return null;
-        const v = this.value();
-        const met = this.better() === 'higher' ? v >= t : v <= t;
-        const where = met ? 'on target' : this.better() === 'higher' ? 'below target' : 'above target';
-        return { text: `Target ${formatNumber(t, this.format())} — ${where}`, tone: met ? 'good' : 'bad' };
+        const s = targetStatus(this.value(), this.target(), this.better(), this.format());
+        return s ? { text: s.text, tone: s.met ? 'good' : 'bad' } : null;
     });
 
     /** The status-badge value for a tone: the shared badge owns status colour (PASS → success, FAIL → error). */

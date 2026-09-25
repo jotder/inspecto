@@ -8,7 +8,10 @@ import { tableColDefs } from './table-columns';
 import { words } from './column-label';
 import { formatAxisTick, formatNumber } from './number-format';
 import { seriesColors } from './series-colors';
-import { CHART_CATEGORICAL, CHART_PALETTES, GAUGE_TRACK } from 'app/inspecto/theme/chart-tokens';
+import { dateAxisLabels, fullDateLabel } from './date-labels';
+import { targetStatus } from './target-status';
+import { CHART_CATEGORICAL, CHART_PALETTES, CHART_TONE, GAUGE_TRACK } from 'app/inspecto/theme/chart-tokens';
+import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { KpiComponent } from './plugins/kpi.component';
 import { getVizComponentLoader } from './viz-components';
 import { VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
@@ -27,12 +30,35 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = { kpi: KpiComponent };
 @Component({
     selector: 'inspecto-viz-render',
     standalone: true,
-    imports: [NgComponentOutlet, InspectoChartComponent, DataTableComponent],
+    imports: [NgComponentOutlet, InspectoChartComponent, DataTableComponent, StatusBadgeComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         @switch (renderKind()) {
             @case ('chartjs') {
-                @if (chartData(); as data) {
+                @if (isGauge()) {
+                    <!-- UIE-8: the gauge states its value (and its target, in words) under the arc, not just a fill. -->
+                    @if (chartData(); as data) {
+                        <div class="relative">
+                            <inspecto-chart
+                                class="!h-40"
+                                [type]="chartType()"
+                                [data]="data"
+                                [options]="chartJsOptions()"
+                            />
+                            <div
+                                class="pointer-events-none absolute inset-x-0 bottom-0 text-center text-3xl font-extrabold tabular-nums leading-none"
+                                data-testid="gauge-value"
+                            >
+                                {{ gaugeDisplay() }}
+                            </div>
+                        </div>
+                    }
+                    @if (gaugeTarget(); as t) {
+                        <div class="mt-2 flex justify-center" data-testid="gauge-target">
+                            <inspecto-status-badge [value]="t.met ? 'PASS' : 'FAIL'" [label]="t.text" />
+                        </div>
+                    }
+                } @else if (chartData(); as data) {
                     <inspecto-chart
                         [type]="chartType()"
                         [data]="data"
@@ -80,6 +106,17 @@ export class VizRenderComponent {
     readonly categoryClick = output<string>();
 
     readonly renderKind = computed(() => this.plugin().render.kind);
+
+    readonly isGauge = computed(() => this.plugin().meta.type === 'gauge');
+
+    /** UIE-8: the gauge's value as a reader sees it — the widget's format, not the clamped 0–100 fill. */
+    readonly gaugeDisplay = computed(() => formatNumber(this.props().value as number, this.renderOptions()?.format));
+
+    /** UIE-8: the gauge's target (`options.kpi`, the same option the KPI tile reads), stated in words. */
+    readonly gaugeTarget = computed(() => {
+        const o = this.renderOptions();
+        return targetStatus(this.props().value ?? 0, o?.kpi?.target, o?.kpi?.better ?? 'higher', o?.format);
+    });
 
     readonly isKpi = computed(() => {
         const r = this.plugin().render;
@@ -153,12 +190,26 @@ export class VizRenderComponent {
         // Display only: a NULL/empty category drew as an unlabelled bar. Clicks still emit the raw label
         // (onElementClick reads sortedProps), so drill-down keeps filtering on the real value.
         const shown = p.labels.map(categoryLabel);
+        // A category axis over ISO dates reads like a calendar ("Oct 2025", "21 Sep"); the tooltip keeps the full date.
+        const axisLabels = (dateAxisLabels(p.labels) ?? p.labels).map(categoryLabel);
 
         if (plugin.meta.type === 'gauge') {
-            const value = Math.max(0, Math.min(100, this.props().value ?? 0));
+            const clamp = (n: number): number => Math.max(0, Math.min(100, n));
+            const value = clamp(this.props().value ?? 0);
+            const valueRing = { data: [value, 100 - value], backgroundColor: [color(0), GAUGE_TRACK], weight: 3 };
+            // UIE-8: with a target, a thin inner ring splits the scale into its bad and good zones at the target —
+            // below it is bad when higher is better, good when lower is better. Status tones, never literals.
+            const kpi = this.renderOptions()?.kpi;
+            if (kpi?.target == null || !Number.isFinite(kpi.target))
+                return { labels: ['Value', 'Remaining'], datasets: [valueRing] };
+            const target = clamp(kpi.target);
+            const [below, above] =
+                (kpi.better ?? 'higher') === 'higher'
+                    ? [CHART_TONE.error, CHART_TONE.success]
+                    : [CHART_TONE.success, CHART_TONE.error];
             return {
                 labels: ['Value', 'Remaining'],
-                datasets: [{ data: [value, 100 - value], backgroundColor: [color(0), GAUGE_TRACK] }],
+                datasets: [valueRing, { data: [target, 100 - target], backgroundColor: [below, above], weight: 1 }],
             };
         }
         if (plugin.meta.type === 'scatter') {
@@ -193,7 +244,7 @@ export class VizRenderComponent {
         }
         const colors = colorsFor(p.series.map((s) => s.label));
         return {
-            labels: shown,
+            labels: axisLabels,
             datasets: p.series.map((s, i) => ({
                 label: categoryLabel(seriesLabel(s.label)),
                 data: s.data,
@@ -232,6 +283,17 @@ export class VizRenderComponent {
             ? undefined
             : {
                   callbacks: {
+                      // A date category's full date ("1 Oct 2025") — the axis shows the short form.
+                      ...(cartesian
+                          ? {
+                                title: (items: { dataIndex: number; label?: string }[]) => {
+                                    const item = items[0];
+                                    if (!item) return '';
+                                    const raw = this.sortedProps().labels[item.dataIndex];
+                                    return (raw != null ? fullDateLabel(raw) : null) ?? item.label ?? '';
+                                },
+                            }
+                          : {}),
                       label: (ctx: { dataset: { label?: string }; parsed: unknown; label?: string }) => {
                           const parsed = ctx.parsed as number | { x?: number; y?: number } | null;
                           const n = typeof parsed === 'number' ? parsed : isFunnel ? parsed?.x : parsed?.y;

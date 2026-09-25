@@ -6,6 +6,8 @@ import { buildValueQuery, transformValue } from './plugin-helpers';
  * the `gauge`-typed plugin's Chart.js config: 180° circumference, a wide cutout, value-vs-remainder slices).
  * Shares its query/transform with {@link KPI_PLUGIN} — same shape (one ungrouped measure), different render.
  * The value is assumed to already be a 0–100 ratio/percentage; there's no separate "max" control in this pass.
+ * UIE-8: the host also prints the value under the arc in the widget's `options.format`, and with `options.kpi.target`
+ * draws a thin inner ring split into bad / good zones at the target plus an on / off target line in words.
  */
 export const GAUGE_PLUGIN: VizPlugin = {
     meta: { type: 'gauge', label: 'Gauge', icon: 'heroicons_outline:chart-pie', fit: { minMeasure: 1, maxDim: 0 } },

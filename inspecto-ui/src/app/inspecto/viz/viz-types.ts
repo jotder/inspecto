@@ -152,8 +152,8 @@ export interface VizRenderOptions {
     columnLabels?: Record<string, string>;
     /** Table only: columns rendered as status badges. Default: columns named status / severity / rag. */
     badgeColumns?: string[];
-    /** UIE-1, KPI only: the target, and which direction is good. The tile states on / off target in words and tone,
-     *  and colours the delta the same way. `better` defaults to `higher`. */
+    /** UIE-1, KPI and (UIE-8) Gauge: the target, and which direction is good. Both state on / off target in words and tone;
+     *  the KPI colours its delta the same way, the Gauge draws good / bad zones. `better` defaults to `higher`. */
     kpi?: { target?: number; better?: 'higher' | 'lower' };
     /** UIE-4: how this widget's numbers read — KPI value, chart axes and tooltips, and every table column not named in
      *  {@link columnFormats}. Absent: grouped, up to two decimals (axes compact). */
