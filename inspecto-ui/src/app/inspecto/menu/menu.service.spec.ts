@@ -44,6 +44,20 @@ describe('MenuService', () => {
         configure();
     });
 
+    it('hydrates the Space that becomes known AFTER construction (fresh browser, first sign-in)', () => {
+        // A fresh browser: no Space remembered yet, so the service starts on the default key.
+        spaceId.set(null);
+        backend.set('telco', { space: 'telco', version: 1, nodes: [{ id: 'n-cockpit', title: 'Assurance cockpit' }] });
+        const svc = TestBed.inject(MenuService);
+        TestBed.tick();
+        expect(svc.find('n-cockpit')).toBeUndefined();
+
+        // `/spaces` lands and resolves the current Space — the landing's node must now be found.
+        spaceId.set('telco');
+        TestBed.tick();
+        expect(svc.find('n-cockpit')?.title).toBe('Assurance cockpit');
+    });
+
     it('starts empty and persists a mutation to the server across service instances', () => {
         const svc = TestBed.inject(MenuService);
         expect(svc.nodes()).toEqual([]);

@@ -1,4 +1,4 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { ToastrService } from 'ngx-toastr';
 import { NavigationService } from 'app/core/navigation/navigation.service';
 import { apiErrorMessage, SpacesService } from 'app/inspecto/api';
@@ -14,8 +14,10 @@ const DEFAULT_SPACE = 'default';
  * Holds the per-Space Menu tree as a signal. The server (`GET/PUT /nav/menus`, {@link NavMenusService})
  * is the source of truth; the `localStorage` mirror ({@link loadMenuTrees}) gives an instant first
  * paint, feeds the synchronous sidebar merge (the gamma nav mock reads it directly), and keeps the
- * builder working offline. On construction the active Space is hydrated from the server (switching
- * Space reloads the app, so once is enough) and mutations write through — optimistic locally + a PUT.
+ * builder working offline. The active Space is hydrated from the server whenever it becomes known or
+ * changes, and mutations write through — optimistic locally + a PUT. ⚠ Not just once at construction: on a
+ * fresh browser the Space is unknown until `/spaces` lands, so a one-shot fetch filed the tree under
+ * `default` and the first `/w/:nodeId` after sign-in (a Demo User's landing) read "Menu item not found".
  */
 @Injectable({ providedIn: 'root' })
 export class MenuService {
@@ -28,7 +30,14 @@ export class MenuService {
     private readonly favorites = signal<Record<string, string[]>>(loadMenuFavorites());
 
     constructor() {
-        const space = this.spaceKey();
+        effect(() => {
+            const space = this.spaceKey();
+            untracked(() => this.hydrate(space));
+        });
+    }
+
+    /** Fetch `space`'s tree from the server and file it under that key. */
+    private hydrate(space: string): void {
         this.api.get().subscribe({
             next: (tree) => {
                 const changed = JSON.stringify(this.store()[space]?.nodes ?? []) !== JSON.stringify(tree.nodes);
