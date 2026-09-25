@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -40,7 +40,7 @@ const GRAINS: TimeGrain[] = ['auto', 'day', 'week', 'month'];
                             <mat-label>{{ control.label }}</mat-label>
                             <mat-select
                                 multiple
-                                [ngModel]="selectedFields(control.channel)"
+                                [ngModel]="selectedFieldsByChannel()[control.channel] ?? noFields"
                                 (ngModelChange)="onFields(control, $event)"
                                 [aria-label]="control.label"
                             >
@@ -110,6 +110,15 @@ export class ExploreControlsComponent {
     selectedFields(channel: ControlSpec['channel']): string[] {
         return (this.values()[channel] ?? []).map((v) => v.field);
     }
+    /** The multi-select's bound arrays, memoised per `values`: a fresh array per change detection makes NgModel
+     *  see a change every pass, and its async setValue re-dirties the mat-select — a microtask loop that froze
+     *  the page as soon as a plugin with a `multiple` channel (the Table) was picked. */
+    readonly noFields: string[] = [];
+    readonly selectedFieldsByChannel = computed<Record<string, string[]>>(() => {
+        const out: Record<string, string[]> = {};
+        for (const channel of Object.keys(this.values())) out[channel] = this.selectedFields(channel as ControlSpec['channel']);
+        return out;
+    });
     aggFor(channel: ControlSpec['channel']): Aggregation {
         return this.values()[channel]?.[0]?.agg ?? 'sum';
     }

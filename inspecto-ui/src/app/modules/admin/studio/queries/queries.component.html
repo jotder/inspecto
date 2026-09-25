@@ -69,7 +69,7 @@
                         formControlName="text"
                         rows="5"
                         class="bg-default w-full rounded border border-gray-300 p-2 font-mono text-sm dark:border-gray-600"
-                        placeholder="SELECT * FROM data WHERE start_time >= $day(-7)"
+                        [placeholder]="'SELECT * FROM ' + (form.controls.datasetId.value || 'my_dataset') + ' WHERE start_time >= $day(-7)'"
                         aria-label="Query SQL"
                     ></textarea>
                 </label>

@@ -30,13 +30,13 @@ const DS: Dataset = {
     calculated: [],
 };
 
-function create() {
+function create(ds: Dataset = DS) {
     TestBed.configureTestingModule({
         imports: [ExploreComponent],
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
-            { provide: DatasetsService, useValue: { list: () => of([DS]), get: () => of(DS) } },
+            { provide: DatasetsService, useValue: { list: () => of([ds]), get: () => of(ds) } },
             { provide: WidgetsService, useValue: { list: () => of([]), get: () => of(null), save: () => of(null) } },
             {
                 provide: ComponentsService,
@@ -100,6 +100,20 @@ describe('ExploreComponent', () => {
         expect(mapped).toBe(true);
         // A dimension's cardinality comes from the seam (the store derives it), not from counting the page.
         expect(c.fields().find((f) => f.name === 'tariff')?.cardinality).toBe(3);
+    });
+
+    it('a Dataset declaring no columns maps the columns the store served, role-seeded', async () => {
+        // A Stream's Dataset registered at go-live carries no column list; the builder must not go empty.
+        const fixture = create({ ...DS, columns: [] });
+        const c = fixture.componentInstance;
+        c.onSelectDataset('cdr_sample');
+        await fixture.whenStable();
+        expect(c.fields().map((f) => [f.name, f.role])).toEqual([
+            ['tariff', 'dimension'],
+            ['duration_s', 'measure'],
+        ]);
+        const mapped = Object.values(c.controls()).some((vals) => vals?.some((v) => v.field === 'duration_s'));
+        expect(mapped).toBe(true);
     });
 
     it('selecting a view-bound plugin swaps the field mapper for the saved-view picker', () => {

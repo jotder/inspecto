@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
-import { BAR_PLUGIN } from 'app/inspecto/viz/plugins';
+import { BAR_PLUGIN, TABLE_PLUGIN } from 'app/inspecto/viz/plugins';
 import { ControlValues, VizField } from 'app/inspecto/viz';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ExploreControlsComponent } from './explore-controls.component';
@@ -45,6 +45,19 @@ describe('ExploreControlsComponent', () => {
         c.valuesChange.subscribe((v) => (emitted = v));
         c.onAgg('y', 'avg');
         expect(emitted?.y).toEqual([{ field: 'duration_s', agg: 'avg' }]);
+    });
+
+    it('binds a multi-select to the SAME array across change detections', () => {
+        // A fresh array per pass made NgModel re-set the mat-select every pass — a microtask loop that froze
+        // the Widget Builder the moment the Table (multiple channels) was picked.
+        const fixture = create({ x: [{ field: 'tariff' }] });
+        fixture.componentRef.setInput('plugin', TABLE_PLUGIN);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        const first = c.selectedFieldsByChannel()['x'];
+        fixture.detectChanges();
+        expect(first).toEqual(['tariff']);
+        expect(c.selectedFieldsByChannel()['x']).toBe(first);
     });
 
     it('renders with no a11y violations', async () => {

@@ -34,7 +34,7 @@ import {
     draftPlacement,
     draftSaveWarning,
 } from 'app/inspecto/transfer';
-import { Dataset } from '../datasets/dataset-types';
+import { Dataset, DatasetColumn, inferRoles } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { Widget, WidgetOptions, WorkingSetBinding, buildWidget } from './widget-types';
 import { WidgetSaveDialog, WidgetSaveResult } from './widget-save.dialog';
@@ -123,7 +123,7 @@ export class ExploreComponent implements OnInit {
         // Cardinality drives Show-Me, so prefer the count the store itself derived; only fall back to
         // counting the loaded page, which is a page and can undercount.
         const served = new Map((this.page()?.columns ?? []).map((c) => [c.name, c.cardinality]));
-        const columns: VizField[] = (ds?.columns ?? []).map((c) => ({
+        const columns: VizField[] = this.columns().map((c) => ({
             name: c.name,
             type: c.type,
             role: c.role,
@@ -162,9 +162,13 @@ export class ExploreComponent implements OnInit {
     /** The picked Dataset's rows — one page from the rows seam (the real store live, samples offline). */
     private readonly page = signal<DatasetRows | null>(null);
     private readonly rows = computed(() => this.page()?.rows ?? []);
-    private readonly colMetas = computed<ColumnMeta[]>(() =>
-        (this.dataset()?.columns ?? []).map((c) => ({ name: c.name, type: c.type })),
-    );
+    /** The Dataset's declared columns — or, when it declares none (a Stream's Dataset registered at go-live),
+     *  the columns the store served for the page, role-seeded, so the field mapper is never empty. */
+    private readonly columns = computed<DatasetColumn[]>(() => {
+        const declared = this.dataset()?.columns ?? [];
+        return declared.length ? declared : inferRoles(this.page()?.columns ?? []);
+    });
+    private readonly colMetas = computed<ColumnMeta[]>(() => this.columns().map((c) => ({ name: c.name, type: c.type })));
 
     ngOnInit(): void {
         this.datasetsApi.list().subscribe({
