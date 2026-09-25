@@ -1,5 +1,7 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { describe, expect, it, vi } from 'vitest';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
@@ -499,5 +501,91 @@ describe('DataTableComponent', () => {
         f.componentRef.setInput('rows', []);
         f.detectChanges();
         expect(f.componentInstance.suppressHScroll()).toBe(true);
+    });
+
+    describe('sizing + pagination', () => {
+        const grid = (f: { debugElement: import('@angular/core').DebugElement }) =>
+            f.debugElement.query(By.directive(AgGridAngular));
+        const many = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i, name: 'r' + i }));
+
+        it('pages 10 rows by default, and the selector offers that size (no ag-Grid #94/#95 warning)', async () => {
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+            try {
+                const f = await create('mini');
+                f.componentRef.setInput('rows', many(30));
+                f.detectChanges();
+                const g = grid(f).componentInstance as AgGridAngular;
+                expect(g.paginationPageSize).toBe(10);
+                expect(g.paginationPageSizeSelector).toEqual([10, 25, 50, 100]);
+                const pageSizeWarnings = warn.mock.calls
+                    .flat()
+                    .filter((m) => /#9[45]\b|paginationPageSize/.test(String(m)));
+                expect(pageSizeWarnings).toEqual([]);
+            } finally {
+                warn.mockRestore();
+            }
+        });
+
+        it("merges a host's page size that the default list lacks into the selector, in order", async () => {
+            const f = await create('mini');
+            f.componentRef.setInput('pageSize', 20);
+            f.detectChanges();
+            expect(f.componentInstance.pageSizeOptions()).toEqual([10, 20, 25, 50, 100]);
+            expect((grid(f).componentInstance as AgGridAngular).paginationPageSizeSelector).toEqual([
+                10, 20, 25, 50, 100,
+            ]);
+            f.componentRef.setInput('pageSize', 50); // already listed ⇒ not duplicated
+            f.detectChanges();
+            expect(f.componentInstance.pageSizeOptions()).toEqual([10, 25, 50, 100]);
+        });
+
+        it('fits its rows by default (autoHeight, no inline height)', async () => {
+            const f = await create('mini');
+            const el = grid(f);
+            expect((el.componentInstance as AgGridAngular).domLayout).toBe('autoHeight');
+            expect((el.nativeElement as HTMLElement).style.height).toBe('');
+        });
+
+        it('keeps a fixed box only when the host asks for a height', async () => {
+            const f = await create('mini');
+            f.componentRef.setInput('height', '15rem');
+            f.detectChanges();
+            const el = grid(f);
+            expect((el.componentInstance as AgGridAngular).domLayout).toBe('normal');
+            expect((el.nativeElement as HTMLElement).style.height).toBe('15rem');
+        });
+
+        it('hides the pager while every row fits on one page, shows it once rows overflow', async () => {
+            const f = await create('mini'); // 2 rows
+            expect((grid(f).componentInstance as AgGridAngular).suppressPaginationPanel).toBe(true);
+            f.componentRef.setInput('rows', many(11));
+            f.detectChanges();
+            expect((grid(f).componentInstance as AgGridAngular).suppressPaginationPanel).toBe(false);
+        });
+
+        it('an empty table is a compact empty state, not a grid; loading keeps the grid (overlay)', async () => {
+            const f = await create('mini');
+            f.componentRef.setInput('rows', []);
+            f.componentRef.setInput('noRowsTitle', 'No calls yet');
+            f.componentRef.setInput('noRowsHint', 'Rows appear once the Collector delivers.');
+            f.detectChanges();
+            const host = f.nativeElement as HTMLElement;
+            expect(grid(f)).toBeNull();
+            const empty = host.querySelector('inspecto-empty-state');
+            expect(empty?.textContent).toContain('No calls yet');
+            expect(empty?.textContent).toContain('Rows appear once the Collector delivers.');
+            expect(f.componentInstance.countAnnouncement()).toBe('No rows');
+            await expectNoA11yViolations(host);
+
+            f.componentRef.setInput('loading', true); // a fetch in flight: the grid's loading overlay, not "empty"
+            f.detectChanges();
+            expect(grid(f)).not.toBeNull();
+            expect(host.querySelector('inspecto-empty-state')).toBeNull();
+        });
+
+        it('has no a11y violations (short table, fits its rows)', async () => {
+            const f = await create('mini');
+            await expectNoA11yViolations(f.nativeElement);
+        });
     });
 });

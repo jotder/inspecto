@@ -19,22 +19,31 @@
     </button>
 </div>
 
-<ag-grid-angular
-    class="w-full"
-    [style.height]="autoHeight() ? null : height()"
-    [domLayout]="autoHeight() ? 'autoHeight' : 'normal'"
-    [theme]="gridTheme.theme()"
-    [rowData]="flatRows()"
-    [columnDefs]="gridColumns()"
-    [defaultColDef]="defaultColDef()"
-    [getRowId]="getRowId"
-    [rowSelection]="rowSelectionValue()"
-    [loading]="loading()"
-    [overlayNoRowsTemplate]="noRows()"
-    (rowClicked)="onRowClicked($event)"
-    (selectionChanged)="onSelectionChanged($event)"
-    (firstDataRendered)="refresh($event)"
-    (rowDataUpdated)="refresh($event)"
-    (gridReady)="onGridReady($event)"
-    (columnResized)="onColumnStateChanged($event)"
-></ag-grid-angular>
+@if (showEmpty()) {
+    <!-- A compact empty state, not a header over a tall blank body (and axe-clean: no empty role="grid"). -->
+    <inspecto-empty-state
+        icon="heroicons_outline:table-cells"
+        [title]="noRowsHint() ? noRowsTitle() : ''"
+        [message]="noRowsHint() ?? noRowsTitle()"
+    />
+} @else {
+    <ag-grid-angular
+        class="w-full"
+        [style.height]="height() ?? null"
+        [domLayout]="height() ? 'normal' : 'autoHeight'"
+        [theme]="gridTheme.theme()"
+        [rowData]="flatRows()"
+        [columnDefs]="gridColumns()"
+        [defaultColDef]="defaultColDef()"
+        [getRowId]="getRowId"
+        [rowSelection]="rowSelectionValue()"
+        [loading]="loading()"
+        [overlayNoRowsTemplate]="noRows()"
+        (rowClicked)="onRowClicked($event)"
+        (selectionChanged)="onSelectionChanged($event)"
+        (firstDataRendered)="refresh($event)"
+        (rowDataUpdated)="refresh($event)"
+        (gridReady)="onGridReady($event)"
+        (columnResized)="onColumnStateChanged($event)"
+    ></ag-grid-angular>
+}

@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
+import { AgGridAngular } from 'ag-grid-angular';
 
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -97,6 +99,29 @@ describe('TreeTableComponent', () => {
         expect(ids[0]).toBe('__tree');
         expect(ids).toContain('e1');
         expect(ids).toContain('delta');
+    });
+
+    it('fits its rows by default; a host height makes it a fixed box', async () => {
+        const f = await create(1);
+        const el = f.debugElement.query(By.directive(AgGridAngular));
+        expect((el.componentInstance as AgGridAngular).domLayout).toBe('autoHeight');
+        expect((el.nativeElement as HTMLElement).style.height).toBe('');
+        f.componentRef.setInput('height', '100%');
+        f.detectChanges();
+        expect((el.componentInstance as AgGridAngular).domLayout).toBe('normal');
+        expect((el.nativeElement as HTMLElement).style.height).toBe('100%');
+    });
+
+    it('an empty tree is a compact empty state, not an empty grid', async () => {
+        const f = await create(1);
+        f.componentRef.setInput('nodes', []);
+        f.componentRef.setInput('noRowsTitle', 'Nothing to compare');
+        f.detectChanges();
+        expect(f.debugElement.query(By.directive(AgGridAngular))).toBeNull();
+        expect((f.nativeElement as HTMLElement).querySelector('inspecto-empty-state')?.textContent).toContain(
+            'Nothing to compare',
+        );
+        await expectNoA11yViolations(f.nativeElement);
     });
 
     it('has no a11y violations', async () => {

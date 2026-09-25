@@ -169,7 +169,6 @@
                             [rows]="missingA()"
                             [columns]="missingColumns()"
                             [rowActions]="rowActions"
-                            [autoHeight]="true"
                             (rowClick)="select($event)"
                         />
                     </section>
@@ -187,7 +186,6 @@
                             [rows]="missingB()"
                             [columns]="missingColumns()"
                             [rowActions]="rowActions"
-                            [autoHeight]="true"
                             (rowClick)="select($event)"
                         />
                     </section>
@@ -205,7 +203,6 @@
                             [rows]="valueBreaks()"
                             [columns]="valueColumns()"
                             [rowActions]="rowActions"
-                            [autoHeight]="true"
                             (rowClick)="select($event)"
                         />
                     </section>
@@ -222,7 +219,6 @@
                     [columns]="treeColumns()"
                     [rowActions]="treeActions"
                     [groupDefaultExpanded]="1"
-                    [autoHeight]="true"
                     noRowsTitle="No breaks"
                 />
             </div>
@@ -328,7 +324,6 @@
                         exportName="recon-break-rows-a"
                         [rows]="shown.result.a.rows"
                         [columns]="rawColumns(shown.result.a.rows)"
-                        [autoHeight]="true"
                     />
                     <inspecto-data-table
                         tier="standard"
@@ -336,7 +331,6 @@
                         exportName="recon-break-rows-b"
                         [rows]="shown.result.b.rows"
                         [columns]="rawColumns(shown.result.b.rows)"
-                        [autoHeight]="true"
                     />
                 </div>
             </section>

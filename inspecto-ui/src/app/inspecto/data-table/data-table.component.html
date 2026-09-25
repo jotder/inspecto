@@ -155,33 +155,45 @@
     </div>
 }
 
-<ag-grid-angular
-    class="w-full"
-    [style.height]="autoHeight() ? null : height()"
-    [domLayout]="autoHeight() ? 'autoHeight' : 'normal'"
-    [suppressHorizontalScroll]="suppressHScroll()"
-    [theme]="gridTheme.theme()"
-    [rowData]="displayRows()"
-    [columnDefs]="gridColumns()"
-    [defaultColDef]="defaultColDef()"
-    [quickFilterText]="search()"
-    [pagination]="true"
-    [paginationPageSize]="pageSize()"
-    [rowSelection]="rowSelectionValue()"
-    [loading]="loading()"
-    [overlayNoRowsTemplate]="noRows()"
-    (rowClicked)="onRowClicked($event)"
-    (selectionChanged)="onSelectionChanged($event)"
-    (firstDataRendered)="refresh($event)"
-    (rowDataUpdated)="refresh($event)"
-    (filterChanged)="onFilterChanged($event)"
-    (gridReady)="onGridReady($event)"
-    (sortChanged)="onColumnStateChanged($event)"
-    (columnResized)="onColumnStateChanged($event)"
-    (columnMoved)="onColumnStateChanged($event)"
-    (columnPinned)="onColumnStateChanged($event)"
-    (columnVisible)="onColumnStateChanged($event)"
-></ag-grid-angular>
+@if (showEmpty()) {
+    <!-- A compact empty state, not a header over a tall blank body (and axe-clean: no empty role="grid"). -->
+    <inspecto-empty-state
+        icon="heroicons_outline:table-cells"
+        [title]="noRowsHint() ? noRowsTitle() : ''"
+        [message]="noRowsHint() ?? noRowsTitle()"
+    />
+} @else {
+    <ag-grid-angular
+        class="w-full"
+        [style.height]="height() ?? null"
+        [domLayout]="height() ? 'normal' : 'autoHeight'"
+        [suppressHorizontalScroll]="suppressHScroll()"
+        [theme]="gridTheme.theme()"
+        [rowData]="displayRows()"
+        [columnDefs]="gridColumns()"
+        [defaultColDef]="defaultColDef()"
+        [quickFilterText]="search()"
+        [pagination]="true"
+        [paginationPageSize]="pageSize()"
+        [paginationPageSizeSelector]="pageSizeOptions()"
+        [suppressPaginationPanel]="hidePager()"
+        [rowSelection]="rowSelectionValue()"
+        [loading]="loading()"
+        [overlayNoRowsTemplate]="noRows()"
+        (rowClicked)="onRowClicked($event)"
+        (selectionChanged)="onSelectionChanged($event)"
+        (firstDataRendered)="refresh($event)"
+        (rowDataUpdated)="refresh($event)"
+        (filterChanged)="onFilterChanged($event)"
+        (gridReady)="onGridReady($event)"
+        (gridPreDestroyed)="onGridDestroyed()"
+        (sortChanged)="onColumnStateChanged($event)"
+        (columnResized)="onColumnStateChanged($event)"
+        (columnMoved)="onColumnStateChanged($event)"
+        (columnPinned)="onColumnStateChanged($event)"
+        (columnVisible)="onColumnStateChanged($event)"
+    ></ag-grid-angular>
+}
 
 <!-- Audit F2 (WCAG 4.1.3): the grid's row count changes on async loads, live-tail ticks and quick-filter
      keystrokes with nothing announced. Visually hidden — the count is already on screen for sighted users. -->

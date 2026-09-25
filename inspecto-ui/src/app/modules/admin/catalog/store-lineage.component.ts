@@ -35,7 +35,6 @@ import { InspectoRowAction } from 'app/inspecto/grid';
                 [rows]="d.upstream"
                 [columns]="upstreamColumns"
                 [rowActions]="upstreamActions"
-                height="10rem"
                 noRowsTitle="No ingest lineage recorded"
             />
 

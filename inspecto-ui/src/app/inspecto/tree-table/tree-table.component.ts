@@ -15,6 +15,7 @@ import {
     noRowsOverlay,
     refreshAllCells,
 } from 'app/inspecto/grid';
+import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { TreeGroupCell } from './tree-group-cell.component';
 import { allParentIds, flattenTree, FlatTreeRow, seedExpanded, TreeNode } from './tree-types';
 
@@ -28,7 +29,7 @@ import { allParentIds, flattenTree, FlatTreeRow, seedExpanded, TreeNode } from '
 @Component({
     selector: 'inspecto-tree-table',
     standalone: true,
-    imports: [AgGridAngular, MatButtonModule, MatIconModule, MatTooltipModule],
+    imports: [AgGridAngular, InspectoEmptyStateComponent, MatButtonModule, MatIconModule, MatTooltipModule],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './tree-table.component.html',
 })
@@ -48,8 +49,9 @@ export class TreeTableComponent {
     readonly multiSelect = input(false);
     readonly singleSelect = input(false);
     readonly loading = input(false);
-    readonly height = input('42rem');
-    readonly autoHeight = input(false);
+    /** A FIXED grid height (e.g. `'100%'` inside a Dashboard tile). Omitted ⇒ the tree sizes to its visible
+     *  rows (`domLayout: 'autoHeight'`) — same contract as `<inspecto-data-table>`. */
+    readonly height = input<string | undefined>(undefined);
     readonly exportName = input('tree-export');
     readonly noRowsTitle = input('No data to display');
     readonly noRowsHint = input<string | undefined>(undefined);
@@ -113,6 +115,9 @@ export class TreeTableComponent {
               ? 'single'
               : undefined,
     );
+
+    /** No rows (and not loading) ⇒ a compact `<inspecto-empty-state>` instead of an empty grid (as the data-table). */
+    readonly showEmpty = computed(() => !this.loading() && this.flatRows().length === 0);
 
     readonly noRows = computed(() => noRowsOverlay(this.noRowsTitle(), this.noRowsHint()));
 

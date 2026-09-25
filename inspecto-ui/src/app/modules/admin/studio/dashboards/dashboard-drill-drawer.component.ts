@@ -41,7 +41,6 @@ import { DataTableComponent } from 'app/inspecto/data-table';
                 [rows]="rows()"
                 [sourceName]="sourceName()"
                 [exportName]="sourceName() + '-rows'"
-                [autoHeight]="true"
                 noRowsTitle="No rows match the current filter"
             />
         </div>

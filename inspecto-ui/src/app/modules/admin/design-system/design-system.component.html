@@ -519,6 +519,32 @@
                     exportName="cdr_sample"
                 />
             </div>
+            <!-- Sizing: the grid fits its rows (no [height] ⇒ autoHeight), pages 10 rows by default, and hides
+                 the pager when everything fits on one page. Above: 40 rows, paginated. Below: short + empty. -->
+            <p class="text-secondary mb-3 mt-4 text-sm">
+                <b>Sizing.</b> The grid sizes to its rows and pages <b>10</b> by default (the pager offers 10 · 25 · 50
+                · 100 and always includes a host's own <code>[pageSize]</code>); the pager hides while every row fits on
+                one page (the tier demo above is the paginated case: 40 rows, 10 per page). An empty table renders the
+                compact <code>&lt;inspecto-empty-state&gt;</code> (<code>noRowsTitle</code> / <code>noRowsHint</code>)
+                instead of a header over a blank body. Pass <code>height="15rem"</code> only where the layout needs a
+                stable box (a docked bottom panel under a map or graph).
+            </p>
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div class="bg-card rounded-2xl p-6 shadow">
+                    <div class="mb-2 text-sm font-semibold">Short (3 rows) — no empty space</div>
+                    <inspecto-data-table tier="mini" [rows]="dtShortRows" [columns]="cdrColumns" />
+                </div>
+                <div class="bg-card rounded-2xl p-6 shadow">
+                    <div class="mb-2 text-sm font-semibold">Empty — compact empty state</div>
+                    <inspecto-data-table
+                        tier="mini"
+                        [rows]="dtNoRows"
+                        [columns]="cdrColumns"
+                        noRowsTitle="No calls yet"
+                        noRowsHint="Rows appear here once the Collector delivers its first file."
+                    />
+                </div>
+            </div>
             <pre
                 class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
             ><code>{{ snippets.dataTable }}</code></pre>
@@ -540,7 +566,6 @@
                     [nodes]="treeNodes"
                     [columns]="treeColumns"
                     treeHeader="Region / Product"
-                    [autoHeight]="true"
                     [groupDefaultExpanded]="1"
                 />
             </div>

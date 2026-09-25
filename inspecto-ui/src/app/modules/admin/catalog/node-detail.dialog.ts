@@ -75,7 +75,6 @@ import { nodeKindLabel } from './catalog-graph';
                     sourceName="neighbours"
                     [rows]="detail().neighbors.nodes"
                     [columns]="neighbourColumns"
-                    height="12rem"
                     noRowsTitle="No neighbours"
                     (rowClick)="onNeighbourClicked($any($event))"
                 />

@@ -93,12 +93,7 @@ interface InvokeState {
                     }
                 }
                 @case ('data-table') {
-                    <inspecto-data-table
-                        tier="mini"
-                        [rows]="tableRows()"
-                        [columns]="tableColumns()"
-                        [autoHeight]="true"
-                    />
+                    <inspecto-data-table tier="mini" [rows]="tableRows()" [columns]="tableColumns()" />
                 }
                 @case ('draft') {
                     <!-- AGT-ARTIFACT-1: a draft skill's output, READ-ONLY. Plain text only (JSON via

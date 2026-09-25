@@ -103,7 +103,6 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                     tier="mini"
                     sourceName="files"
                     [rows]="batchFiles()"
-                    height="14rem"
                     noRowsTitle="No member files"
                 />
 
@@ -112,7 +111,6 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                     tier="mini"
                     sourceName="lineage"
                     [rows]="batchLineage()"
-                    height="14rem"
                     noRowsTitle="No lineage"
                 />
 
@@ -128,7 +126,6 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
                         tier="mini"
                         sourceName="outputs"
                         [rows]="batchOutputs()"
-                        height="14rem"
                         noRowsTitle="No registered outputs"
                     />
                 }

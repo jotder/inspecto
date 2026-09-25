@@ -48,7 +48,6 @@
             [rows]="maintenanceJobs()"
             [columns]="jobColumns"
             [loading]="loading()"
-            [autoHeight]="true"
             noRowsTitle="No maintenance jobs"
             noRowsHint="Author maintenance jobs (cleanup, backup, audits) in Workbench → Jobs."
         />
@@ -65,7 +64,6 @@
                 sourceName="maintenance-failed-runs"
                 [rows]="failedRuns()"
                 [columns]="failedRunColumns"
-                [autoHeight]="true"
                 noRowsTitle="No failed maintenance runs"
                 noRowsHint="Failures and rejections of maintenance jobs land here (and fire alertable signals)."
             />

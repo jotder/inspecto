@@ -40,6 +40,7 @@ import { inferColumns } from '../query/query-columns';
 import { compileSql, compileSqlWithParams } from '../query/query-sql';
 import { QueryConditionGroupComponent } from '../query/query-condition-group.component';
 import { RuleSaveDialog, RuleTemplate } from 'app/inspecto/rule';
+import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { ColumnChooserComponent } from './column-chooser.component';
 import { fieldNames } from './core/column-resolve';
 import { downloadCsv, toCsv } from './core/csv';
@@ -72,6 +73,9 @@ function capsFor(tier: DataTableTier): Caps {
             return { search: true, export: true, columns: true, query: true, save: true };
     }
 }
+
+/** The page sizes offered by the pager (a host's own {@link DataTableComponent.pageSize} is merged in). */
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 /** Every mounted data-table — the document-level shortcuts pick one instance to act (R3). */
 const TABLES = new Set<DataTableComponent>();
@@ -111,6 +115,7 @@ function isShortcutExempt(target: EventTarget | null): boolean {
         MatTooltipModule,
         AgGridAngular,
         ColumnChooserComponent,
+        InspectoEmptyStateComponent,
         QueryConditionGroupComponent,
         SqlEditorComponent,
     ],
@@ -161,9 +166,15 @@ export class DataTableComponent {
     /** Pin the row-actions column to the right so it stays visible when wide data columns overflow. */
     readonly pinActions = input(false);
     readonly loading = input(false);
-    readonly pageSize = input(25);
-    readonly height = input('42rem');
-    readonly autoHeight = input(false);
+    /** Rows per page. Always offered in the page-size selector (see {@link pageSizeOptions}). */
+    readonly pageSize = input(10);
+    /**
+     * A FIXED grid height (e.g. `'15rem'`) — only for hosts whose layout needs a stable box (a docked
+     * bottom panel under a map/graph). Omitted ⇒ the grid sizes to its rows (`domLayout: 'autoHeight'`):
+     * a 3-row table is 3 rows tall, never a tall empty box. Safe because every data-table paginates, so
+     * at most one page (≤ 100 rows) is ever rendered without row virtualisation.
+     */
+    readonly height = input<string | undefined>(undefined);
     readonly singleSelect = input(false);
     /** Checkbox multi-select (mail-list style): header + row checkboxes; row *click* still only emits `rowClick`. */
     readonly multiSelect = input(false);
@@ -335,6 +346,22 @@ export class DataTableComponent {
     /** Rows shown in the grid: the last Run result in pro, else the source rows. */
     readonly displayRows = computed<unknown[]>(() => this.proResult() ?? this.rows());
 
+    /** The pager's page-size choices — always contains {@link pageSize}, so ag-Grid never warns (#94/#95)
+     *  that a host's size is missing from its default `[20, 50, 100]` selector. */
+    readonly pageSizeOptions = computed<number[]>(() => {
+        const size = this.pageSize();
+        return PAGE_SIZE_OPTIONS.includes(size)
+            ? PAGE_SIZE_OPTIONS
+            : [...PAGE_SIZE_OPTIONS, size].sort((a, b) => a - b);
+    });
+
+    /** Hide the pager while every row fits on the smallest page — a one-page table needs no paging chrome. */
+    readonly hidePager = computed(() => this.displayRows().length <= this.pageSizeOptions()[0]);
+
+    /** No rows (and not loading) ⇒ a compact `<inspecto-empty-state>` instead of the grid: an empty ag-Grid is a
+     *  header over a blank body, and axe flags it (`aria-required-children` — a grid with no data rows). */
+    readonly showEmpty = computed(() => !this.loading() && this.displayRows().length === 0);
+
     /** EMPTY-GRID-HSCROLL-1: an empty grid never draws a horizontal scrollbar, even when column min widths exceed the pane. */
     readonly suppressHScroll = computed(() => this.displayRows().length === 0);
 
@@ -349,6 +376,7 @@ export class DataTableComponent {
      */
     readonly countAnnouncement = computed<string>(() => {
         if (this.loading()) return '';
+        if (this.showEmpty()) return 'No rows'; // no grid is mounted, so displayedCount would be stale
         const n = this.displayedCount();
         if (n == null) return '';
         const filtered = !!this.search();
@@ -482,6 +510,11 @@ export class DataTableComponent {
     }
 
     // ── layout persistence (`stateKey`) ──────────────────────────────────────────
+    /** The grid unmounts while the table is empty ({@link showEmpty}) — drop the dead API with it. */
+    onGridDestroyed(): void {
+        this.gridApi = null;
+    }
+
     onGridReady(e: { api: GridApi }): void {
         this.gridApi = e.api;
         const cols = this.stored()?.columns;

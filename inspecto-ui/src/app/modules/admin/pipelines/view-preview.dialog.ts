@@ -71,7 +71,6 @@ export interface ViewPreviewData {
                     tier="mini"
                     [rows]="r.rows"
                     [columns]="columnsFor(r)"
-                    [autoHeight]="true"
                     noRowsTitle="No rows"
                     noRowsHint="This view's derived_sql returned nothing."
                 />

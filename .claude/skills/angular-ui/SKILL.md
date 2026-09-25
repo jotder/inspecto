@@ -483,6 +483,16 @@ src/app/
   `@lezer/highlight`. Don't re-roll a bare `<ag-grid-angular>` host or a second SQL engine. `[rowActions]`
   appends an actions column; add `[pinActions]="true"` to keep it visible when many data columns overflow
   into a horizontal scroll (pins the `actionsColumn` right — default off so narrow grids are unaffected).
+  **Sizing (2026-09-25; data-table AND tree-table):** no `height` ⇒ the grid **fits its rows**
+  (`domLayout: 'autoHeight'`; the shared theme drops ag-Grid's 150 px body floor once a row renders, so a
+  3-row grid is 3 rows tall). No rows and not `loading` ⇒ the grid is NOT mounted: a compact
+  `<inspecto-empty-state>` built from `noRowsTitle`/`noRowsHint` renders instead (an empty ag-Grid fails axe
+  `aria-required-children`). Pages **10** rows by default; the pager
+  offers `[10, 25, 50, 100]` plus any host `[pageSize]` (never re-trigger ag-Grid warnings #94/#95) and
+  hides while every row fits on one page. Pass `height="15rem"` ONLY where the layout needs a stable box
+  (the docked bottom panels under the Geo map and the Link Analysis graph, a tree filling a Dashboard tile
+  with `height="100%"`); there is no `autoHeight` input any more. A tree-table does not paginate, so give a
+  potentially large tree a fixed `height` to keep row virtualisation.
   ⚠ **`<inspecto-query-panel>` is NOT the row-preview table** (2026-07-30) — it is the query *builder*, and
   it belongs only on the two hosts that consume its `(queryChange)` output (Studio ▸ Queries, Dataset
   editor). Five panes were mounting it `[source]`-only as a dumb preview grid, which is exactly why those

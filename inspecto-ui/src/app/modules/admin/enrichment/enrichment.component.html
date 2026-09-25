@@ -26,7 +26,6 @@
                 [loading]="loading()"
                 [singleSelect]="true"
                 [pageSize]="10"
-                height="20rem"
                 (rowClick)="onRowClick($any($event))"
             />
         }
@@ -116,7 +115,6 @@
                             exportName="enrichment"
                             stateKey="enrichment-rows"
                             [rows]="rows()"
-                            height="24rem"
                         />
                     </div>
                 }

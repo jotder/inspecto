@@ -12,6 +12,7 @@ import {
     ColDef,
     ColumnApiModule,
     colorSchemeDark,
+    createPart,
     GridApi,
     ICellRendererParams,
     ModuleRegistry,
@@ -90,8 +91,22 @@ const GAMMA_GRID_PARAMS = {
     borderRadius: '6px',
 } as const;
 
-export const INSPECTO_GRID_LIGHT: Theme = themeQuartz.withParams(GAMMA_GRID_PARAMS);
-export const INSPECTO_GRID_DARK: Theme = themeQuartz.withPart(colorSchemeDark).withParams(GAMMA_GRID_PARAMS);
+/**
+ * Auto-height grids fit their rows. ag-Grid pins a 150 px floor on an `autoHeight` grid's body so an EMPTY
+ * grid still has room for its no-rows overlay — but it keeps that floor with rows too, so a 2-row table
+ * carried ~80 px of blank space. Drop the floor only once a row is rendered; a rowless body (loading, or a
+ * quick filter matching nothing) keeps it, so its overlay still fits.
+ */
+const AUTO_HEIGHT_FIT = createPart({
+    feature: 'inspectoAutoHeightFit',
+    css: '.ag-layout-auto-height .ag-center-cols-viewport:has(.ag-row){min-height:0}',
+});
+
+export const INSPECTO_GRID_LIGHT: Theme = themeQuartz.withPart(AUTO_HEIGHT_FIT).withParams(GAMMA_GRID_PARAMS);
+export const INSPECTO_GRID_DARK: Theme = themeQuartz
+    .withPart(colorSchemeDark)
+    .withPart(AUTO_HEIGHT_FIT)
+    .withParams(GAMMA_GRID_PARAMS);
 
 /**
  * Shared column defaults for Inspecto grids.

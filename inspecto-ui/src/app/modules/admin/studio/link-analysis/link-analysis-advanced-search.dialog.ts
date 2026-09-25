@@ -81,7 +81,6 @@ export interface LinkAnalysisAdvancedSearchData {
                 [serverRun]="true"
                 (runOnServer)="runOnServer($event)"
                 (queryStarted)="error.set('')"
-                height="22rem"
                 [pageSize]="10"
                 exportName="link-analysis-advanced-search"
                 noRowsTitle="No rows — run a query"

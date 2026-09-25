@@ -59,7 +59,6 @@ export const WORKING_SET_PAGE = 200;
                 @if (rows().length) {
                     <inspecto-data-table
                         tier="standard"
-                        height="20rem"
                         [rows]="rows()"
                         [loading]="loading()"
                         [serverPage]="true"
