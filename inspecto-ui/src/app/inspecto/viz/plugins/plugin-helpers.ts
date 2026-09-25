@@ -1,4 +1,5 @@
 import { ConditionGroup } from 'app/inspecto/query';
+import { humanizeColumn } from '../column-label';
 import { channelMeasure, channelMeasureId } from '../query-spec';
 import { ChannelValue, ControlValues, QuerySpec, TimeGrain, VizProps } from '../viz-types';
 
@@ -89,7 +90,9 @@ export function transformXy(rows: Record<string, unknown>[], values: ControlValu
         const r = rows.find((row) => str(row[xField]) === l);
         return num(r?.[mId]);
     });
-    return { labels, series: [{ label: ycv.agg ? `${ycv.agg}(${ycv.field})` : ycv.field, data }] };
+    // The legend/tooltip text: a reader's wording ("First ings score (total)", "Count"), not the SQL-ish
+    // `sum(FIRST_INGS_SCORE)` — the same default the table plugin gives the column's header.
+    return { labels, series: [{ label: humanizeColumn(mId), data }] };
 }
 
 /** Single headline measure over the (single-row, ungrouped) result — the KPI value. */

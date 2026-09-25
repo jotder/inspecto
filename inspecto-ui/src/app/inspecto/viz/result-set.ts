@@ -25,7 +25,7 @@ export interface ResultSet {
 }
 
 /** Identifier-ish columns (`id`, `*_id`) are dimensions, never measures (you don't aggregate an id). */
-function isIdColumn(name: string): boolean {
+export function isIdColumn(name: string): boolean {
     return /(^|_)id$/i.test(name);
 }
 

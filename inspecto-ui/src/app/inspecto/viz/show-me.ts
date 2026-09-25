@@ -1,4 +1,4 @@
-import { ResultColumn, ResultSet } from './result-set';
+import { isIdColumn, ResultColumn, ResultSet } from './result-set';
 import { allViz } from './viz-registry';
 import { ChannelValue, ControlValues, FieldRole, VizField, VizFit, VizPlugin } from './viz-types';
 
@@ -11,17 +11,20 @@ interface FieldCounts {
     dim: number;
     measure: number;
     temporal: number;
-    /** The highest cardinality among the dimension fields (0 when unknown/no dimensions). */
-    maxDimCardinality: number;
+    /** The LOWEST known cardinality among the dimension fields — the best category a chart could be drawn
+     *  over, which is the one {@link autoAssignChannels} reaches for (0 when unknown/no dimensions). One
+     *  per-row identifier or near-unique date must not make every category chart look unfit. */
+    minDimCardinality: number;
 }
 
 function counts(columns: ResultColumn[]): FieldCounts {
     const dims = columns.filter((f) => f.role === 'dimension');
+    const known = dims.map((f) => f.cardinality).filter((n): n is number => n != null);
     return {
         dim: dims.length,
         measure: columns.filter((f) => f.role === 'measure').length,
         temporal: columns.filter((f) => f.role === 'temporal').length,
-        maxDimCardinality: Math.max(0, ...dims.map((f) => f.cardinality ?? 0)),
+        minDimCardinality: known.length ? Math.min(...known) : 0,
     };
 }
 
@@ -39,7 +42,7 @@ function fitScore(fit: VizFit, c: FieldCounts): number {
     // A declared ceiling is a real preference signal either way: reward staying comfortably under it (the
     // classic "pie shines with a few slices" case) so it's genuinely preferred, not just tied, over a plugin
     // with no ceiling at all — and only mildly penalise (never enough to disqualify) crossing it.
-    if (fit.maxCardinality != null) score += c.maxDimCardinality > fit.maxCardinality ? -1 : 1;
+    if (fit.maxCardinality != null) score += c.minDimCardinality > fit.maxCardinality ? -1 : 1;
     // Reward plugins whose measure appetite matches what's available.
     if (fit.minMeasure != null) score += Math.min(c.measure, fit.maxMeasure ?? c.measure);
     return score;
@@ -59,21 +62,53 @@ export function recommend(input: ResultSet | ResultColumn[] | VizField[]): VizPl
         .map((x) => x.p);
 }
 
+/** Category ceiling for a plugin that declares none — past ~30 bars/points a category axis stops reading. */
+const DEFAULT_MAX_CATEGORIES = 30;
+
+/**
+ * A dimension that identifies rows rather than grouping them: named like one (`id`, `*_id`), or near-unique
+ * per row (a `MATCH_ID`, a free-text `DATE`) with more values than the plugin can draw as categories.
+ * Charting by it gives one bar/slice/point per row.
+ */
+function isIdentifierLike(f: VizField, ceiling: number, rowCount?: number): boolean {
+    if (isIdColumn(f.name)) return true;
+    return (
+        rowCount != null &&
+        rowCount > 0 &&
+        f.cardinality != null &&
+        f.cardinality > ceiling &&
+        f.cardinality >= 0.9 * rowCount
+    );
+}
+
 /**
  * Greedily map fields onto a plugin's channels: each control takes the next unused field whose role it accepts
  * (acceptRoles are tried in declared order, so an `x` that accepts `['temporal','dimension']` prefers time).
  * Measure channels default to `sum`.
+ *
+ * Category (dimension) channels skip identifier-like columns and prefer a dimension within the plugin's
+ * `maxCardinality` (else {@link DEFAULT_MAX_CATEGORIES}) — declared order first, then the lowest-cardinality
+ * rest. An optional break-down channel (the non-required `series` of bar/line/area) is left EMPTY: filling it with a
+ * leftover dimension is how a 70-entry legend happens. `rowCount` (the loaded rows) enables the
+ * near-unique check; without it only the name rule applies.
  */
-export function autoAssignChannels(plugin: VizPlugin, fields: VizField[]): ControlValues {
+export function autoAssignChannels(plugin: VizPlugin, fields: VizField[], rowCount?: number): ControlValues {
+    const ceiling = plugin.meta.fit.maxCardinality ?? DEFAULT_MAX_CATEGORIES;
+    const categories = fields.filter((f) => f.role === 'dimension' && !isIdentifierLike(f, ceiling, rowCount));
+    const fitting = categories.filter((f) => f.cardinality == null || f.cardinality <= ceiling);
+    const overflow = categories
+        .filter((f) => !fitting.includes(f))
+        .sort((a, b) => (a.cardinality ?? 0) - (b.cardinality ?? 0));
     const pools: Record<FieldRole, VizField[]> = {
         temporal: fields.filter((f) => f.role === 'temporal'),
         measure: fields.filter((f) => f.role === 'measure'),
-        dimension: fields.filter((f) => f.role === 'dimension'),
+        dimension: [...fitting, ...overflow],
     };
     const used = new Set<string>();
     const values: ControlValues = {};
 
     for (const control of plugin.controls) {
+        if (control.channel === 'series' && !control.required) continue; // optional break-down stays empty
         const pick = takeNext(control.acceptRoles, pools, used);
         if (!pick) continue;
         const cv: ChannelValue = control.isMeasure ? { field: pick.name, agg: 'sum' } : { field: pick.name };

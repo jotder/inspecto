@@ -19,6 +19,12 @@ describe('table columns — readable headers', () => {
         expect(humanizeColumn('chain_stage')).toBe('Chain stage');
     });
 
+    it('sentence-cases an all-caps column instead of shouting it', () => {
+        expect(humanizeColumn('sum_FIRST_INGS_SCORE')).toBe('First ings score (total)');
+        expect(humanizeColumn('MATCH_ID')).toBe('Match ID');
+        expect(humanizeColumn('PLAYER_OF_THE_MATCH')).toBe('Player of the match');
+    });
+
     it('a widget columnLabels entry wins over the default', () => {
         const [a, b] = tableColDefs(['max_value', 'kpi'], { columnLabels: { max_value: 'Actual' } });
         expect(a.headerName).toBe('Actual');

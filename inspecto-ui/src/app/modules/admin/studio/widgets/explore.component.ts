@@ -274,7 +274,7 @@ export class ExploreComponent implements OnInit {
             this.loadSavedViews(p.meta.viewKind);
             return;
         }
-        this.controls.set(p ? autoAssignChannels(p, this.fields()) : {});
+        this.controls.set(p ? autoAssignChannels(p, this.fields(), this.rows().length) : {});
         this.run();
     }
 
