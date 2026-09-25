@@ -410,9 +410,22 @@ checks a config save runs, and every Pipeline-config door calls it: `POST /confi
 `POST /config/patch`, `PUT /pipelines/{name}/graph`, `POST /pipelines/import`, and `POST /validate`
 (both branches — it reports what a save would refuse; it never refuses). A caller refuses on any ERROR
 (`SaveGate.refuses`). The list, in order: spec validate · `ConfigSafetyValidator` (a job judged from the
-Space config root, everything else from its own directory) · schema-file resolution (WARNING) · the five
-arming checks · unknown collector Connection · the `webhook:` block · `AcceptedConfigKeys` census ·
-route-predicate columns · summarize measure types · step configs (lookup, filter, dedup, profile — G4).
+Space config root, everything else from its own directory) · schema-file resolution (arming split — see
+below) · the five arming checks · unknown collector Connection · the `webhook:` block · `AcceptedConfigKeys`
+census · route-predicate columns · summarize measure types · step configs (lookup, filter, dedup, profile — G4).
+
+🔴 **An ACTIVE pipeline whose `schema_file` resolves nowhere is REFUSED** (`ERR_SCHEMA_FILE_UNRESOLVED`,
+`ConfigRoutes.schemaArmingFindings`, 2026-09-25); an inactive draft keeps the WARNING
+(`WARN_SCHEMA_FILE_UNRESOLVED`), so a scaffold may name its `<id>_schema.toon` before the Parse Apply
+writes it. It used to be a WARNING at every severity, reasoning the file "may be created after the save,
+or belong to another host" — but an active config in this Space's tree is loaded by THIS server, and a
+missing schema turns it into a "Does not load" row with no run. Driven 2026-09-25: a pipeline whose Parse
+Apply had written its schema under the wrong name (`SCHEMA-FILE-NAME-1`) saved, validated and **activated**
+clean, then never ran. Activate is `PUT …/graph` with `active: true`, so it is refused with the reason;
+`/validate` reports the ERROR. The file-for-another-host case is exactly the inactive draft (and bundle
+import, which always lands inactive). Pinned by `ControlApiSchemaFileRefTest`. ⚠ Only the save doors
+changed: `RunRoutes`/`DataSourceRoutes` already used ERROR, the template copy keeps WARNING (templates
+never run).
 
 🔴 **Why one function.** Before G3 (`PROCESSOR-RELEASE-READINESS-1`) each route carried its own hand-kept
 copy of that list, and the copies had drifted — reproduced over real HTTP before the fix:

@@ -284,11 +284,14 @@ class ControlApiConfigWriteTest {
     }
 
     /**
-     * An armed pipeline whose schema reference does not resolve on <em>this</em> host stays a
-     * WARNING and is written — the new gate must not swallow that deliberate distinction.
+     * An armed pipeline whose schema reference does not resolve on <em>this</em> host is REFUSED
+     * (SCHEMA-FILE-NAME-1, 2026-09-25). ⚠ This used to pin the opposite — "stays a WARNING and is
+     * written" — and that is how a pipeline saved, validated and activated clean, then never loaded.
+     * An active config written into this Space's tree is loaded by THIS server; the WARNING now belongs
+     * to the inactive draft alone ({@code ControlApiSchemaFileRefTest}).
      */
     @Test
-    void armedPipelineWithAnUnresolvableSchemaIsStillOnlyAWarning(@TempDir Path cfg, @TempDir Path root)
+    void armedPipelineWithAnUnresolvableSchemaIsRefused(@TempDir Path cfg, @TempDir Path root)
             throws Exception {
         try (Ctx c = open(cfg, root)) {
             String armed = """
@@ -297,10 +300,8 @@ class ControlApiConfigWriteTest {
                        "dirs":{"poll":"in","database":"out"},
                        "processing":{"schema_file":"nowhere/orders_schema.toon","threads":1}}}""";
             HttpResponse<String> r = post(c.port, "/config/write", armed);
-            assertEquals(200, r.statusCode(), r.body());
-            JsonNode out = V1Body.of(r.body());
-            assertTrue(out.get("written").asBoolean());
-            assertTrue(out.get("findings").size() > 0, "the unresolvable reference is still reported");
+            assertEquals(422, r.statusCode(), r.body());
+            assertFalse(Files.exists(root.resolve("armed_elsewhere_pipeline.toon")), "a refused save writes nothing");
         }
     }
 

@@ -147,8 +147,9 @@ Only a genuine unknown-column binder error refuses — `RouteArming.isUnknownCol
 that line is drawn (`ConfigRoutes.isUnknownColumn` delegates to it).
 
 ⛔ Do not run the draft through `PipelineConfig.fromMap` to reuse the parsed form: `fromMap`
-hard-fails on an unresolvable schema reference, which the save path deliberately keeps a WARNING
-(the file may be created after the save, or belong to another host). `armedWithoutSchemaFindings`
+hard-fails on an unresolvable schema reference, which the save path keeps a WARNING on an inactive
+draft (the file may be created after the save) and refuses only when active (`ERR_SCHEMA_FILE_UNRESOLVED`,
+`config-safety.md`) — the draft still has to be judgeable without it. `armedWithoutSchemaFindings`
 makes the same call, for the same reason, and says so in its javadoc. The rules take plain data so
 both callers can supply it from what they have — restating them over raw maps in the control plane
 would be the hand-mirrored-map drift this repo has already paid for three times.

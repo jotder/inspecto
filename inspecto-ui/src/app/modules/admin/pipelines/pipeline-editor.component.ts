@@ -2531,10 +2531,17 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      * downstream Steps kept the pre-Apply empty read (every field VARCHAR) until the tab was reopened.
      */
     private readonly parserSchemaRevision = signal(0);
+    /**
+     * The parse node's `schema_file` when the server answered 404 for it — the reference resolves
+     * nowhere, so the pipeline would register and never load. Surfaced as an activation-blocking
+     * finding by {@link refreshFindings} (SCHEMA-FILE-NAME-1); null while unknown or when it resolves.
+     */
+    private readonly parserSchemaMissing = signal<string | null>(null);
 
     private readonly loadParserSchemaColumns = effect(() => {
         this.parserSchemaRevision();
         const path = this.parserSchemaFile();
+        this.parserSchemaMissing.set(null);
         if (!path) {
             this.parserSchemaFields.set([]);
             return;
@@ -2558,7 +2565,11 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                         .filter((f) => f.name !== ''),
                 );
             },
-            error: () => this.parserSchemaFields.set([]),
+            error: (e: unknown) => {
+                this.parserSchemaFields.set([]);
+                // Only a 404 is "does not exist"; offline or a 5xx says nothing about the reference.
+                if ((e as { status?: number } | null)?.status === 404) this.parserSchemaMissing.set(path);
+            },
         });
     });
 
@@ -3105,6 +3116,20 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private refreshFindings(): PipelineFinding[] {
         const m = this.model();
         const f = m ? validatePipeline(m, this.typeCat(), this.validRefs(), this.testedStatus()) : [];
+        // SCHEMA-FILE-NAME-1: a schema reference the server does not hold is the one fault the pure
+        // validator cannot see, and it is fatal — the pipeline registers, then never loads. The save gate
+        // refuses it when active; saying so HERE is what keeps Validate from reading "ready to activate".
+        const missing = this.parserSchemaMissing();
+        const parse = missing ? m?.nodes.find((n) => isParseNodeType(n.type)) : undefined;
+        if (missing && parse) {
+            f.push({
+                severity: 'error',
+                nodeId: parse.id,
+                code: 'ERR_SCHEMA_FILE_UNRESOLVED',
+                message: `The Parse step's schema file '${missing}' does not exist, so this pipeline would not load.`,
+                guidance: 'Open the Parse step, run a test parse and Apply it — that writes the schema it names.',
+            });
+        }
         this.findings.set(f);
         return f;
     }

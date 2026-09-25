@@ -71,8 +71,9 @@ final class SaveGate {
                                Path configDir, Referents referents) {
         List<Finding> f = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.forType(type), draft));
         f.addAll(safety(type, draft, writeRoot, configDir));   // the hard-fail safety check (R6)
-        // WARNING only: the schema file may be created after the save, or belong to another host.
-        f.addAll(ConfigRoutes.schemaFileFindings(type, draft, Severity.WARNING, configDir));
+        // Arming split (SCHEMA-FILE-NAME-1): an ACTIVE pipeline whose schema_file resolves nowhere is
+        // refused — it would register and then never load; an inactive draft is warned.
+        f.addAll(ConfigRoutes.schemaArmingFindings(type, draft, configDir));
         // Arming (ERROR when active, WARNING on an inactive draft): an active config that cannot arm
         // registers and is then silently skipped every cycle.
         f.addAll(ConfigRoutes.armedWithoutSchemaFindings(type, draft));

@@ -118,6 +118,13 @@ public final class FindingCodes {
     // ── Schema ───────────────────────────────────────────────────────────────────────────────
     // (schema-resolution / compatibility findings register here as they are wired)
 
+    /** An ACTIVE pipeline whose {@code schema_file} resolves nowhere beside its config — it registers,
+     *  then never loads ("Schema file not found"), so the save refuses it (SCHEMA-FILE-NAME-1). */
+    public static final String ERR_SCHEMA_FILE_UNRESOLVED = "ERR_SCHEMA_FILE_UNRESOLVED";
+
+    /** The same unresolved {@code schema_file} on an INACTIVE draft — it bites only at activation. */
+    public static final String WARN_SCHEMA_FILE_UNRESOLVED = "WARN_SCHEMA_FILE_UNRESOLVED";
+
     // ── Safety ───────────────────────────────────────────────────────────────────────────────
     // (ConfigSafetyValidator issues register here as they migrate to the catalog)
 

@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
@@ -37,6 +38,18 @@ class ControlApiRouteArmingTest {
 
     private Ctx open(Path configDir, Path writeRoot) throws Exception {
         Path pipe = PipelineConfigBatchTest.writePipeline(configDir, "");
+        // The `cdr.toon` every fixture here names: an ACTIVE pipeline whose schema_file resolves nowhere
+        // is refused at the save (SCHEMA-FILE-NAME-1), which would mask the route verdict under test.
+        if (writeRoot != null) Files.writeString(writeRoot.resolve("cdr.toon"), """
+                raw:
+                  name: cdr
+                  fields[5]{name,selector,type}:
+                    ID,"0",VARCHAR
+                    AMT,"1",DOUBLE
+                    EVENT_DATE,"2",DATE
+                    TS,"3",TIMESTAMP
+                    DAY,"4",DATE
+                """);
         if (writeRoot != null) System.setProperty("assist.write.root", writeRoot.toString());
         try {
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);

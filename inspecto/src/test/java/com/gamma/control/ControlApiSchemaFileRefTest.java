@@ -153,4 +153,57 @@ class ControlApiSchemaFileRefTest {
             assertFalse(Files.exists(root.getParent().resolve("escape.toon")));
         }
     }
+    // ── (c) fail closed: an armed pipeline whose schema resolves nowhere is refused, not "live" ───────
+
+    /** The shape the editor's Activate PUTs: the parse node names a schema file that does not exist. */
+    private static String armedGraph(String schemaFile) {
+        return """
+                {"active":true,
+                 "nodes":[{"id":"acq","type":"acquisition","config":{"poll":"in"}},
+                          {"id":"parse","type":"parser.delimited","config":{"schema_file":"%s"}},
+                          {"id":"sink","type":"sink.persistent","config":{"database":"db"}}],
+                 "edges":[{"from":"acq","rel":"data","to":"parse"},{"from":"parse","rel":"data","to":"sink"}]}"""
+                .formatted(schemaFile);
+    }
+
+    @Test
+    void anArmedPipelineWhoseSchemaFileDoesNotResolveIsRefused(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c.port, "POST", "/config/write", armedPipeline("shop_orders_schema.toon"));
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("ERR_SCHEMA_FILE_UNRESOLVED"), r.body());
+            assertTrue(r.body().contains("shop_orders_schema.toon"), "the reason names the missing file: " + r.body());
+            assertFalse(Files.exists(root.resolve("shop_orders_pipeline.toon")), "a refused save writes nothing");
+        }
+    }
+
+    /** The draft half of the split: inactive, the same reference saves with a WARNING (the scaffold's case). */
+    @Test
+    void anInactiveDraftNamingAMissingSchemaStillSavesWithAWarning(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String draft = armedPipeline("shop_orders_schema.toon").replace("\"active\":true", "\"active\":false");
+            HttpResponse<String> r = send(c.port, "POST", "/config/write", draft);
+            assertEquals(200, r.statusCode(), r.body());
+            assertTrue(V1Body.of(r.body()).get("findings").toString().contains("WARN_SCHEMA_FILE_UNRESOLVED"), r.body());
+        }
+    }
+
+    /** Activate = PUT /graph with active:true. It must refuse with the reason, not report "Activated". */
+    @Test
+    void activatingThroughTheGraphIsRefusedWhileTheSchemaIsMissing(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> r = send(c.port, "PUT", "/pipelines/shop_orders/graph", armedGraph("shop_orders_schema.toon"));
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("ERR_SCHEMA_FILE_UNRESOLVED"), r.body());
+            assertFalse(Files.exists(root.resolve("shop_orders_pipeline.toon")));
+
+            // ...and once the Parse Apply has written the referenced file, the same Activate goes through.
+            assertEquals(200, send(c.port, "POST", "/config/write", parseSchemaDraft("shop_orders_schema")).statusCode());
+            HttpResponse<String> ok = send(c.port, "PUT", "/pipelines/shop_orders/graph", armedGraph("shop_orders_schema.toon"));
+            assertEquals(200, ok.statusCode(), ok.body());
+        }
+    }
 }

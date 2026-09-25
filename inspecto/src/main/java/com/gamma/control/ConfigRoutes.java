@@ -79,6 +79,30 @@ final class ConfigRoutes {
     }
 
     /**
+     * {@link #schemaFileFindings} with the arming severity split every save path applies
+     * (SCHEMA-FILE-NAME-1, 2026-09-25): an ACTIVE pipeline whose schema reference resolves nowhere is an
+     * ERROR — the save refuses it — and an inactive draft keeps the WARNING, so a scaffold may name its
+     * {@code <id>_schema.toon} before the Parse step writes it.
+     *
+     * <p>🔴 <b>Why the old blanket WARNING was wrong.</b> It reasoned that the file "may be created after
+     * the save, or belong to another host". But an ACTIVE config written into THIS Space's tree is loaded
+     * by THIS server on its next cycle — and when the file is missing that load fails into a
+     * "Does not load" row: no run, no ingest, while the save, Validate and Activate had all reported
+     * success. Found by driving the UI: a Pipeline whose Parse Apply wrote its schema under the wrong
+     * file name activated cleanly and never ran. A file destined for another host is exactly the
+     * inactive draft (or bundle import, which always lands inactive) the WARNING still serves.
+     */
+    static List<Finding> schemaArmingFindings(String type, Map<String, Object> draft, Path configDir) {
+        boolean active = Boolean.parseBoolean(String.valueOf(draft.getOrDefault("active", "false")));
+        List<Finding> out = new ArrayList<>();
+        for (Finding f : schemaFileFindings(type, draft, active ? Severity.ERROR : Severity.WARNING, configDir))
+            out.add(new Finding(f.severity(), f.fieldPath(), f.message(),
+                    active ? FindingCodes.ERR_SCHEMA_FILE_UNRESOLVED : FindingCodes.WARN_SCHEMA_FILE_UNRESOLVED,
+                    active ? GUIDANCE_ACTIVE : GUIDANCE_INACTIVE));
+        return out;
+    }
+
+    /**
      * {@code active: true} with no schema source at all — the one draft shape that {@link
      * PipelineConfig#load} hard-throws on but spec validation accepts. Left unchecked, the write
      * succeeds, {@code ConfigRegistry.rebuild} logs a single WARN and omits the pipeline, and the

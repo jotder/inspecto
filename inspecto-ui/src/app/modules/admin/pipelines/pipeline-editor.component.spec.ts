@@ -1887,6 +1887,44 @@ describe('PipelineEditorComponent', () => {
                 TestBed.tick();
                 expect(c.upstreamColumnTypes()).toEqual({ ORDER_ID: 'BIGINT', AMOUNT: 'DOUBLE' });
             });
+
+            /**
+             * 🔴 SCHEMA-FILE-NAME-1: Validate read "No issues — ready to activate" and Activate reported
+             * success for a pipeline whose schema file did not exist — it then never loaded.
+             */
+            it('flags a schema file the server does not hold, and Activate refuses with the reason', async () => {
+                config.read.mockImplementation((type: string) =>
+                    type === 'schema'
+                        ? throwError(() => ({ status: 404 }))
+                        : of({ config: { name: 'demo' }, path: 'demo_pipeline.toon' }),
+                );
+                const c = make();
+                c.select('demo');
+                withParse(c);
+                TestBed.tick();
+
+                const finding = c.validate().find((f) => f.code === 'ERR_SCHEMA_FILE_UNRESOLVED');
+                expect(finding?.severity).toBe('error');
+                expect(finding?.nodeId).toBe('parse');
+                expect(finding?.message).toContain('demo_schema.toon');
+
+                await c.activate();
+                expect(api.savePipelineGraph).not.toHaveBeenCalled();
+                expect(toast.error).toHaveBeenCalledWith('Fix the errors below before activating.');
+            });
+
+            it('says nothing about a schema read that failed for another reason (offline, 5xx)', () => {
+                config.read.mockImplementation((type: string) =>
+                    type === 'schema'
+                        ? throwError(() => ({ status: 503 }))
+                        : of({ config: { name: 'demo' }, path: 'demo_pipeline.toon' }),
+                );
+                const c = make();
+                c.select('demo');
+                withParse(c);
+                TestBed.tick();
+                expect(c.validate().some((f) => f.code === 'ERR_SCHEMA_FILE_UNRESOLVED')).toBe(false);
+            });
         });
 
         describe('sample thread', () => {

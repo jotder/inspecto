@@ -431,6 +431,8 @@ class ControlApiPipelineCrudTest {
     void anEnrichmentNodesCompanionBindingSavesOverHttp(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
             String b = dir.toString().replace('\\', '/');
+            // An ACTIVE save must name a schema that exists (SCHEMA-FILE-NAME-1) — the binding is the subject.
+            Files.writeString(dir.resolve("s.toon"), "raw:\n  name: s\n  fields[1]{name,selector,type}:\n    ID,\"0\",VARCHAR\n");
             // The shape graph/raw synthesizes: the companion hangs off the sink by the derived companion
             // edge. (It used to sit mid-walk, p → enrich → out, which is ENRICHMENT_NOT_TERMINAL since 2026-09-24.)
             String pipeline = """
