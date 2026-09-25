@@ -49,7 +49,7 @@ main context.
 
 ```powershell
 mvn -o clean test -Pedition-enterprise -B > build.log 2>&1     # -B, NEVER -q
-node tools/check-reactor-verdict.mjs build.log --expect-modules 32
+node tools/check-reactor-verdict.mjs build.log --expect-modules 33
 ```
 
 `tools/check-reactor-verdict.mjs` is the only thing in this file that can actually *refuse* a verdict.

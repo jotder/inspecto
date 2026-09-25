@@ -139,7 +139,7 @@ doc since 2026-09-08 and **did not prevent either occurrence** — which is why 
 
 ```
 mvn -o clean test -Pedition-enterprise -B > build.log 2>&1     # -B, NEVER -q
-node tools/check-reactor-verdict.mjs build.log --expect-modules 32
+node tools/check-reactor-verdict.mjs build.log --expect-modules 33
 ```
 
 Reproduced deliberately on 2026-09-16 with the real toolchain (Maven 3.9.16 / surefire 3.2.5). Three

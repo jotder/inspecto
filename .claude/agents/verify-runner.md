@@ -21,7 +21,7 @@ relies on you so it never has to read a full build log.
   🔴 **Capture the log with `-B`, never `-q`, and get the verdict from the guard — not by reading:**
   ```
   mvn -o clean test -Pedition-enterprise -B > build.log 2>&1
-  node tools/check-reactor-verdict.mjs build.log --expect-modules 32
+  node tools/check-reactor-verdict.mjs build.log --expect-modules 33
   ```
   Report the guard's exit code (0 = PASS · 1 = NON-VERDICT or failure · 2 = could not run).
 - **Package JAR:** `mvn -o clean package -q`.
