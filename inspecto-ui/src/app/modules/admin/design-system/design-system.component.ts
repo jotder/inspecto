@@ -47,6 +47,7 @@ import { ChartData, ChartOptions } from 'chart.js';
 import { InspectoChartComponent } from 'app/inspecto/components/chart.component';
 import { seriesColors } from 'app/inspecto/viz/series-colors';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { DesignSystemFoundationsComponent } from './foundations.component';
 
 interface DemoRow {
     pipeline: string;
@@ -94,6 +95,7 @@ interface DemoRow {
         InspectoChartComponent,
         InspectoSchemaFieldsEditorComponent,
         InspectoSchemaMetadataGridComponent,
+        DesignSystemFoundationsComponent,
     ],
     templateUrl: './design-system.component.html',
 })
@@ -436,7 +438,7 @@ export class DesignSystemComponent {
 <inspecto-filter-bar [fields]="fields" [value]="filters()" (valueChange)="filters.set($event)" (apply)="load()">
   <button end mat-stroked-button (click)="exportCsv()">Export CSV</button>
 </inspecto-filter-bar>`,
-        badge: `<inspecto-status-badge [value]="event.level" />\n// in an ag-Grid cellRenderer:\ncellRenderer: (p) => statusBadgeHtml(p.value)`,
+        badge: `<inspecto-status-badge [value]="event.level" />\n// in an ag-Grid cellRenderer:\ncellRenderer: (p) => statusBadgeHtml(p.value)\n// dense table column — dot + row ink:\n<inspecto-status-badge [value]="row.result" variant="dot" />\ncellRenderer: (p) => statusBadgeHtml(p.value, undefined, 'dot')`,
         chip: `<!-- tag / token / filter pill — variant: outline | soft, tone: neutral | primary -->\n<inspecto-chip variant="soft">{{ tag }}</inspecto-chip>\n<!-- selectable filter toggle: -->\n<button (click)="toggle(t)" [attr.aria-pressed]="active(t)">\n  <inspecto-chip [tone]="active(t) ? 'primary' : 'neutral'">{{ t }}</inspecto-chip>\n</button>\n<!-- removable active filter: -->\n<inspecto-chip variant="soft" tone="primary" removable (removed)="clear()">correlation: {{ id }}</inspecto-chip>`,
         alert: `<inspecto-alert variant="warning" title="Read-only">\n  Editing is disabled (no write root configured).\n</inspecto-alert>`,
         empty: `<inspecto-empty-state\n  icon="heroicons_outline:queue-list"\n  title="Nothing yet"\n  message="No events match the current filters."\n  actionLabel="Clear filters"\n  (action)="reset()" />`,

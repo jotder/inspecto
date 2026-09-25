@@ -64,6 +64,16 @@ describe('ChipComponent', () => {
         expect(fixture.componentInstance.onRemoved).toHaveBeenCalled();
     });
 
+    it('pins a 20 px height (explicit line-height) and steps outline primary up in dark mode for AA', () => {
+        const fixture = create();
+        fixture.componentInstance.tone.set('primary');
+        fixture.detectChanges();
+        const pill = fixture.nativeElement.querySelector('inspecto-chip > span') as HTMLElement;
+        expect(pill.className).toContain('leading-4');
+        // primary-600 text on the dark card measures 2.3:1; primary-400 measures 4.9:1
+        expect(pill.className).toContain('dark:text-primary-400');
+    });
+
     it('has no a11y violations (removable)', async () => {
         const fixture = create();
         fixture.componentInstance.removable.set(true);

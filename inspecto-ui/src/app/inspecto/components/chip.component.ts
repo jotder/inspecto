@@ -6,12 +6,18 @@ export type ChipVariant = 'outline' | 'soft';
 /** Chip emphasis: `neutral` grey, or `primary` for a selected/active token. */
 export type ChipTone = 'neutral' | 'primary';
 
-const BASE = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs';
+/**
+ * 20 px tall like `<inspecto-status-badge>`: `leading-4` because the app's `text-xs` (10 px) has no
+ * line-height of its own and would otherwise inherit its container's. Case is left alone — a chip holds
+ * user text (tags, glob patterns, ids), unlike a badge's status vocabulary.
+ */
+const BASE = 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium leading-4';
 
 const TONE_CLASSES: Record<ChipVariant, Record<ChipTone, string>> = {
     outline: {
         neutral: 'border border-gray-300 dark:border-gray-600',
-        primary: 'border border-primary text-primary',
+        // primary-600 on the dark card is 2.3:1 — dark mode steps up to primary-400 (4.9:1 on bg-card).
+        primary: 'border border-primary text-primary dark:border-primary-400 dark:text-primary-400',
     },
     soft: {
         neutral: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200',

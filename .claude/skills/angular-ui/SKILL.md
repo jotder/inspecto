@@ -122,14 +122,20 @@ src/app/
 - **Standalone** + `ChangeDetectionStrategy.OnPush` (default for new components).
 - Separate **container** components (inject services, hold state) from **presentational** shared
   components (`@Input`/`@Output`, no HTTP, in `inspecto/components`).
-- **Always reuse:** `<inspecto-status-badge [value]>` (or `statusBadgeHtml()` in cell renderers),
+- **Always reuse:** `<inspecto-status-badge [value] [label] [variant=pill|dot]>` (or
+  `statusBadgeHtml(value, label?, 'dot'?)` in cell renderers — both paths render identical classes). A badge
+  is 20 px tall (`leading-4` pinned — the app's `text-xs` has NO line-height, so an unpinned badge in an
+  ag-Grid cell grew to the row height), always `uppercase` semibold, never wraps; `variant="dot"` is a tone
+  dot + text in the row's own ink, for dense table columns,
   `<inspecto-alert variant=info|warning|error|success [title]>` (inline per-screen notices — writes-disabled,
   feature-unavailable, test-result banners; message is content-projected, announces `status`/`alert` by
   variant), `<inspecto-empty-state>`, `<inspecto-skeleton>`,
   `InspectoConfirmService.confirm()/confirmDestructive()`, the grid helpers, `<inspecto-connectivity-banner>`
   (the app-wide offline/backend-down strip, already mounted in the layout — distinct from `<inspecto-alert>`),
   `<inspecto-chip variant=outline|soft tone=neutral|primary [removable]>` (the shared tag/token/filter
-  pill — never hand-roll a `rounded-full … text-xs` span; content is projected, `(removed)` emits on
+  pill — never hand-roll a `rounded-full … text-xs` span; 20 px tall like the badge, `font-medium`, case
+  left as authored (it holds user text); outline-primary steps to `primary-400` in dark mode for AA;
+  content is projected, `(removed)` emits on
   the optional ✕; a clickable filter toggle keeps its own `<button>` around the chip for
   `aria-pressed`/keyboard).
 - **Page chrome — the five pieces every routed pane is built from** (UI consolidation plan, 2026-09-22;
@@ -608,6 +614,24 @@ src/app/
   `md:`/`lg:` for routed full-width panes. Caught in-preview on the mapping editor's side-by-side row
   diff; confirm a responsive class actually fired with
   `getComputedStyle(el).gridTemplateColumns` rather than by eyeballing a screenshot.
+
+### 5.1 Foundations — the token reference is `/design` → *Foundations*
+
+The first gallery section (`modules/admin/design-system/foundations.component.*`) shows every token the app
+uses **resolved live** (`getComputedStyle`) in a forced `.light` and `.dark` island side by side: the
+`--gamma-*` surfaces / text / lines, the primary·accent·warn palettes, the five status tones with their
+measured WCAG ratio and `CHART_TONE` canvas twin, the type roles, and the spacing / radius / elevation steps
+in use. Look there before picking a class — do not invent a token.
+- **Type roles:** page title `text-title` (22 px, owned by `<inspecto-page-header>`) · section `text-lg
+  font-semibold` · card title `text-sm font-semibold` · body `text-base` (14 px) · dense `text-sm` ·
+  caption `text-secondary text-xs` · eyebrow `text-xs font-semibold uppercase tracking-wider` · numbers
+  `tabular-nums`. ⚠ gamma's scale: `text-xs` is **10 px** and carries no line-height.
+- **Cards** `bg-card rounded-2xl p-6 shadow`; popovers `shadow-lg`; chips/dots `rounded-full`.
+- ⚠ **`text-primary` (indigo-600) is 2.3:1 on the dark card** — below AA. For text in dark mode step to
+  `dark:text-primary-400` (4.9:1). `text-secondary` on `bg-default` in LIGHT mode is 4.34:1 (the gallery
+  lists it); prefer it on `bg-card`.
+- A scheme-side-by-side specimen needs classes WITHOUT `dark:` (a `dark:` class cannot be switched off
+  inside a `.light` island on a dark page) — `statusToneSchemeClasses(tone, scheme)` exists for that.
 
 ## 6. Accessibility — WCAG 2.2 AA
 

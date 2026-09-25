@@ -1,0 +1,277 @@
+<p class="text-secondary mb-4 text-sm">
+    The tokens the app actually paints with, read back live from the running stylesheet — every swatch is the real
+    <code>--gamma-*</code> variable or Tailwind class, never a copy. Colour comes from the gamma theming plugin (<code
+        >src/&#64;gamma/tailwind/plugins/theming.js</code
+    >
+    + <code>tailwind.config.js</code>); status tones from <code>status-badge.component.ts</code>; canvas colours from
+    <code>theme/chart-tokens.ts</code>. <code>npm run lint:tokens</code> bans hex / <code>rgb()</code> literals and
+    status-tinted <code>bg-*</code> fills everywhere else.
+</p>
+
+<!-- Scheme-dependent tokens: one forced island per scheme -->
+<div class="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    @for (s of schemes; track s) {
+        <div [class]="s + ' flex flex-col gap-5 rounded-2xl border p-5'">
+            <h3 class="text-lg font-semibold">{{ s === 'light' ? 'Light scheme' : 'Dark scheme' }}</h3>
+
+            @for (group of tokenGroups; track group.title) {
+                <div>
+                    <h4 class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider">
+                        {{ group.title }}
+                    </h4>
+                    <ul class="flex flex-col gap-2">
+                        @for (row of group.rows; track row.token) {
+                            <li class="flex items-center gap-3 text-sm">
+                                @if (group.kind === 'fg') {
+                                    <span
+                                        class="bg-card flex h-8 w-8 shrink-0 items-center justify-center rounded-md border text-base font-semibold"
+                                        aria-hidden="true"
+                                        [style.color]="cssVar(row.token)"
+                                        [attr.data-probe]="s + ':' + row.token"
+                                        data-measure="fg"
+                                        >Aa</span
+                                    >
+                                } @else if (row.token === 'icon' || row.token === 'mat-icon') {
+                                    <span
+                                        class="bg-card flex h-8 w-8 shrink-0 items-center justify-center rounded-md border"
+                                        aria-hidden="true"
+                                        [style.color]="cssVar(row.token)"
+                                        [attr.data-probe]="s + ':' + row.token"
+                                        data-measure="fg"
+                                        >&#9679;</span
+                                    >
+                                } @else {
+                                    <span
+                                        class="h-8 w-8 shrink-0 rounded-md border"
+                                        aria-hidden="true"
+                                        [style.background-color]="cssVar(row.token)"
+                                        [attr.data-probe]="s + ':' + row.token"
+                                        data-measure="bg"
+                                    ></span>
+                                }
+                                <span class="min-w-0 flex-auto">
+                                    <code class="font-mono text-xs">--gamma-{{ row.token }}</code>
+                                    <span class="text-secondary block truncate text-xs">{{ row.role }}</span>
+                                </span>
+                                <code class="text-secondary shrink-0 font-mono text-xs">{{
+                                    value(s + ':' + row.token)
+                                }}</code>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+
+            <!-- Status tones: the badge's own per-scheme pairs, contrast measured from the rendered specimen -->
+            <div>
+                <h4 class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider">
+                    Status tones — contrast (AA needs 4.5:1)
+                </h4>
+                <table class="w-full text-sm" [attr.aria-label]="s + ' scheme status tone contrast'">
+                    <thead>
+                        <tr class="text-secondary text-left text-xs">
+                            <th scope="col" class="py-1 font-medium">Tone</th>
+                            <th scope="col" class="py-1 font-medium">Pill</th>
+                            <th scope="col" class="py-1 font-medium">Canvas</th>
+                            <th scope="col" class="py-1 text-right font-medium">Ratio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (t of tones; track t) {
+                            <tr class="border-t">
+                                <td class="py-1.5 font-mono text-xs">{{ t }}</td>
+                                <td class="py-1.5">
+                                    <span
+                                        [class]="toneClasses(t, s)"
+                                        [attr.data-probe]="s + ':tone:' + t"
+                                        data-measure="pair"
+                                        >{{ t }}</span
+                                    >
+                                </td>
+                                <td class="py-1.5">
+                                    @if (chartColor(t); as c) {
+                                        <span
+                                            class="inline-block h-3 w-6 rounded-full align-middle"
+                                            aria-hidden="true"
+                                            [style.background-color]="c"
+                                        ></span>
+                                        <code class="text-secondary ml-1 font-mono text-xs">{{ c }}</code>
+                                    } @else {
+                                        <span class="text-secondary text-xs">categorical</span>
+                                    }
+                                </td>
+                                <td class="py-1.5 text-right font-mono text-xs">
+                                    @if (ratio(s + ':tone:' + t); as r) {
+                                        {{ r }}:1 <span class="font-semibold">{{ r >= 4.5 ? 'AA' : 'FAIL' }}</span>
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Text on surfaces -->
+            <div>
+                <h4 class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider">
+                    Text on surfaces — contrast
+                </h4>
+                <table class="w-full text-sm" [attr.aria-label]="s + ' scheme text-on-surface contrast'">
+                    <thead>
+                        <tr class="text-secondary text-left text-xs">
+                            <th scope="col" class="py-1 font-medium">Pair</th>
+                            <th scope="col" class="py-1 font-medium">Specimen</th>
+                            <th scope="col" class="py-1 text-right font-medium">Ratio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (p of textPairs; track p.fg + p.bg) {
+                            <tr class="border-t">
+                                <td class="py-1.5 font-mono text-xs">{{ p.fg }} / {{ p.bg }}</td>
+                                <td class="py-1.5">
+                                    <span
+                                        class="rounded px-2 py-0.5 text-sm"
+                                        [style.color]="cssVar(p.fg)"
+                                        [style.background-color]="cssVar(p.bg)"
+                                        [attr.data-probe]="s + ':pair:' + p.fg + '/' + p.bg"
+                                        data-measure="pair"
+                                        >Sample text</span
+                                    >
+                                </td>
+                                <td class="py-1.5 text-right font-mono text-xs">
+                                    @if (ratio(s + ':pair:' + p.fg + '/' + p.bg); as r) {
+                                        {{ r }}:1 <span class="font-semibold">{{ r >= 4.5 ? 'AA' : 'FAIL' }}</span>
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Scheme-independent palettes -->
+<div class="bg-card mt-4 flex flex-col gap-4 rounded-2xl p-6 shadow">
+    <h3 class="text-sm font-semibold">Theme palettes (same in both schemes)</h3>
+    @for (p of palettes; track p.name) {
+        <div>
+            <div class="mb-1 text-sm">
+                <code class="font-mono text-xs">--gamma-{{ p.name }}-50…900</code>
+                <span class="text-secondary text-xs"> · {{ p.source }}</span>
+            </div>
+            <div class="grid grid-cols-5 gap-1 sm:grid-cols-10">
+                @for (h of hues; track h) {
+                    <div class="flex flex-col items-center gap-0.5">
+                        <span
+                            class="h-8 w-full rounded-md border"
+                            aria-hidden="true"
+                            [style.background-color]="cssVar(p.name + '-' + h)"
+                        ></span>
+                        <span class="text-secondary font-mono text-xs">{{ h }}</span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Type scale -->
+<div class="bg-card mt-4 rounded-2xl p-6 shadow">
+    <h3 class="mb-3 text-sm font-semibold">Type scale (gamma's: <code>text-xs</code> is 10 px, body is 14 px)</h3>
+    <table class="w-full text-sm" aria-label="Type roles">
+        <thead>
+            <tr class="text-secondary text-left text-xs">
+                <th scope="col" class="py-1 font-medium">Role</th>
+                <th scope="col" class="py-1 font-medium">Specimen</th>
+                <th scope="col" class="hidden py-1 font-medium md:table-cell">Classes</th>
+                <th scope="col" class="py-1 text-right font-medium">Size / line · weight</th>
+            </tr>
+        </thead>
+        <tbody>
+            @for (r of typeRoles; track r.role; let i = $index) {
+                <tr class="border-t align-middle">
+                    <td class="py-2 pr-3 text-xs">
+                        {{ r.role }}<span class="text-secondary block">{{ r.usedBy }}</span>
+                    </td>
+                    <td class="py-2 pr-3">
+                        <span [class]="r.classes" [attr.data-probe]="'type:' + i" data-measure="type">{{
+                            r.role === 'Tabular number' ? '1,284.50' : 'Pipeline run 42'
+                        }}</span>
+                    </td>
+                    <td class="hidden py-2 pr-3 md:table-cell">
+                        <code class="font-mono text-xs">{{ r.classes }}</code>
+                    </td>
+                    <td class="text-secondary py-2 text-right font-mono text-xs">{{ value('type:' + i) }}</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+<!-- Spacing / radius / elevation -->
+<div class="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+    <div class="bg-card rounded-2xl p-6 shadow">
+        <h3 class="mb-3 text-sm font-semibold">Spacing steps in use</h3>
+        <ul class="flex flex-col gap-2">
+            @for (st of spacing; track st.classes) {
+                <li class="flex items-center gap-3 text-xs">
+                    <span class="flex w-12 shrink-0 justify-start">
+                        <span [class]="st.classes + ' bg-primary h-3 rounded-sm'" aria-hidden="true"></span>
+                    </span>
+                    <span>{{ st.usedBy }}</span>
+                </li>
+            }
+        </ul>
+    </div>
+    <div class="bg-card rounded-2xl p-6 shadow">
+        <h3 class="mb-3 text-sm font-semibold">Radius</h3>
+        <ul class="flex flex-col gap-2">
+            @for (st of radii; track st.classes) {
+                <li class="flex items-center gap-3 text-xs">
+                    <span [class]="st.classes + ' bg-default h-6 w-10 shrink-0 border'" aria-hidden="true"></span>
+                    <span
+                        ><code class="font-mono">{{ st.classes }}</code> — {{ st.usedBy }}</span
+                    >
+                </li>
+            }
+        </ul>
+    </div>
+    <div class="bg-card rounded-2xl p-6 shadow">
+        <h3 class="mb-3 text-sm font-semibold">Elevation</h3>
+        <ul class="flex flex-col gap-4">
+            @for (st of elevations; track st.classes) {
+                <li class="flex items-center gap-3 text-xs">
+                    <span [class]="st.classes + ' bg-card h-8 w-12 shrink-0 rounded-lg'" aria-hidden="true"></span>
+                    <span
+                        ><code class="font-mono">{{ st.classes }}</code> — {{ st.usedBy }}</span
+                    >
+                </li>
+            }
+        </ul>
+    </div>
+</div>
+
+<!-- Known duplicates -->
+<div class="bg-card mt-4 rounded-2xl p-6 shadow">
+    <h3 class="mb-2 text-sm font-semibold">Known duplicates (two names, one value)</h3>
+    <ul class="text-secondary list-disc pl-5 text-sm">
+        <li><code>--gamma-text-hint</code> = <code>--gamma-text-secondary</code> in both schemes (raised for AA).</li>
+        <li>
+            <code>--gamma-divider</code> = <code>--gamma-border</code>; <code>--gamma-mat-icon</code> =
+            <code>--gamma-icon</code>.
+        </li>
+        <li><code>--gamma-bg-dialog</code> = <code>--gamma-bg-card</code> in both schemes.</li>
+        <li>
+            Section titles (<code>h2</code>) use both <code>text-lg</code> and <code>text-xl</code>, in about equal
+            numbers.
+        </li>
+        <li>Cards are <code>rounded-2xl shadow</code>; the stat tile is <code>rounded-xl shadow-sm</code>.</li>
+        <li>Canvas <code>CHART_TONE.info</code> is the categorical blue, not the badge's Tailwind blue.</li>
+    </ul>
+</div>

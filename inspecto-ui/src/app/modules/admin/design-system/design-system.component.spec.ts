@@ -41,6 +41,7 @@ describe('DesignSystemComponent', () => {
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelector('h1')?.textContent).toContain('Design System');
         const sections = Array.from(el.querySelectorAll('section h2')).map((h) => h.textContent?.trim());
+        expect(sections[0]).toBe('Foundations');
         expect(sections).toContain('Status badge');
         expect(sections).toContain('Data grid');
         expect(sections).toContain('Data table');
