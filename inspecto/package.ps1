@@ -1030,6 +1030,11 @@ if [ -f inspecto-security.jar ]; then
         EDITION="Enterprise"
     fi
 fi
+# OBJECTS-BACKEND-DEFAULT-MEMORY-1 (operator decision 2026-09-25): Incidents, Cases, notes, links and tags
+# survive a restart on every edition. Personal/Professional/Preview keep them in each Space's duckdb/ (the
+# engine default, -Dobjects.backend=db). Enterprise REQUIRES PostgreSQL: -Dobjects.backend=postgres refuses
+# to boot until INSPECTO_DB_URL (below) points them at one -- there is no fallback to DuckDB or memory.
+[ "${EDITION}" = "Enterprise" ] && JAVA_OPTS+=("-Dobjects.backend=postgres")
 # PostgreSQL JDBC driver sidecar (PG-1): present in Professional/Enterprise bundles, and honored on ANY
 # bundle so a drop-in works — the classpath entry is inert until -Dinspecto.db=postgres selects it.
 # Remote connector sidecar (CONNECTORS-BUNDLE-1): present in every edition, and honoured on ANY
@@ -1082,6 +1087,10 @@ JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
 echo "[serve.sh] ControlApi on :${PORT}  (spaces: ./${SPACES_ROOT}, UI: $([ -d ui ] && echo ./ui || echo none), edition: ${EDITION})${EXTRA_OPTS:+  extra JVM opts: ${EXTRA_OPTS}}"
 exec "$JAVA" "${JAVA_OPTS[@]}" -cp "$CP" com.gamma.control.ControlApi
 '@
+# OBJECTS-BACKEND-DEFAULT-MEMORY-1: a Preview bundle carries Enterprise's exact jars, so the launcher's jar
+# sniffing would call it Enterprise and demand PostgreSQL. Preview keeps the objects on DuckDB (operator
+# decision 2026-09-25), so the package step - the one place that knows - names the edition in the text.
+if ($Edition -eq 'Preview') { $serveShContent = $serveShContent.Replace('EDITION="Enterprise"', 'EDITION="Preview"') }
 Write-LfScript -Path "$bundleDir\serve.sh" -Content $serveShContent
 
 $serveBatContent = @'
@@ -1140,6 +1149,10 @@ rem inspecto-policy.jar present => Enterprise (Professional + ABAC). No flag nee
 rem is found via META-INF/services/com.gamma.control.AccessDecider, so the classpath IS the switch.
 if exist inspecto-security.jar if exist inspecto-policy.jar set "CP=inspecto.jar;inspecto-security.jar;inspecto-policy.jar"
 if exist inspecto-security.jar if exist inspecto-policy.jar set "EDITION=Enterprise"
+rem OBJECTS-BACKEND-DEFAULT-MEMORY-1 (2026-09-25): Enterprise REQUIRES PostgreSQL for Incidents, Cases,
+rem notes, links and tags - it refuses to boot until INSPECTO_DB_URL is set; see serve.sh. Every other
+rem edition keeps them in each Space's duckdb/ (the engine default, -Dobjects.backend=db).
+if "%EDITION%"=="Enterprise" set "OPTS=%OPTS% -Dobjects.backend=postgres"
 rem PostgreSQL JDBC driver sidecar (PG-1): present in Professional/Enterprise bundles, and honored on ANY
 rem bundle so a drop-in works - the classpath entry is inert until -Dinspecto.db=postgres selects it.
 rem Remote connector sidecar (CONNECTORS-BUNDLE-1) - see serve.sh for why it is unconditional.
@@ -1179,6 +1192,7 @@ if exist "runtime\bin\java.exe" set "JAVA=runtime\bin\java.exe"
 echo [serve.bat] ControlApi on :%PORT%  (spaces: .\%SPACES_ROOT%, edition: %EDITION%)
 "%JAVA%" %OPTS% -cp %CP% com.gamma.control.ControlApi
 '@
+if ($Edition -eq 'Preview') { $serveBatContent = $serveBatContent.Replace('set "EDITION=Enterprise"', 'set "EDITION=Preview"') }
 Write-CrlfScript -Path "$bundleDir\serve.bat" -Content $serveBatContent
 
 # ── step 6b-2: Dockerfile wrapping serve.sh (PKG-3, backend-hardening plan item 6) ──────
@@ -1543,7 +1557,9 @@ if (-not $NoRuntime) {
 # control plane on every interface. serve-demo.* adds the demo module and pins the flags the demo needs:
 #   -Dcontrol.bind=127.0.0.1  demo sign-in is unauthenticated; the module refuses to load otherwise
 #   -Dauth.mode=demo          the SPA's sign-in page shows the Demo User picker
-#   -Dobjects.backend=db      Incidents/Cases/notes persist in the Space's duckdb/ (default is memory)
+#   -Dobjects.backend=db      Incidents/Cases/notes persist in the Space's duckdb/ -- stated explicitly: this is an
+#                             Enterprise-capability build, and Enterprise's serve.* would demand PostgreSQL
+#                             (OBJECTS-BACKEND-DEFAULT-MEMORY-1); a one-folder hand-over has none
 #   -Devents.backend=parquet  the audit trail survives a restart, as on Professional+
 if ($DemoAuth) {
     foreach ($f in 'serve.sh', 'serve.bat', 'Dockerfile', '.dockerignore', 'inspecto.service', 'install-service.sh', 'install-service.ps1') {

@@ -51,6 +51,12 @@ public final class OperationalDb {
     /** The PostgreSQL JDBC driver class, probed by name — never linked against. */
     private static final String PG_DRIVER = "org.postgresql.Driver";
 
+    /** The one toggle the four operational-object families share: {@code db} | {@code postgres} | {@code memory}. */
+    public static final String OBJECTS_BACKEND = "objects.backend";
+
+    /** The object families' {@code postgres} value: durable, and PostgreSQL is mandatory (the Enterprise launcher). */
+    public static final String OBJECTS_POSTGRES = "postgres";
+
     private OperationalDb() {}
 
     /**
@@ -112,13 +118,19 @@ public final class OperationalDb {
         // is declared ⇒ nothing ever claims a key ⇒ the table stays empty.
         DEDUP_LEDGER("Record dedup ledger", "dedup.ledger.backend", "duckdb", Mode.URL_OR_ENGINE,
                 "dedup.ledger.db.url", null, null, SpaceRoot::dedupLedgerDbUrl),
-        OBJECTS("Objects", "objects.backend", "memory", Mode.DB_FLAG,
+        // OBJECTS-BACKEND-DEFAULT-MEMORY-1 (operator decision 2026-09-25): default "db", never "memory" -
+        // Incidents, Cases, notes, links and tags vanishing on restart is not a default any edition keeps.
+        // "db" is the Space's own duckdb/ files (Personal/Professional/Preview, and the -DemoAuth build);
+        // "postgres" is what the Enterprise launcher sets - db, PostgreSQL MANDATORY, refused at boot by
+        // verifyObjectsBackend() when it cannot be honoured; "memory" survives only as an explicit opt-in
+        // (the test reactor pins it in the root pom's surefire config).
+        OBJECTS("Objects", OBJECTS_BACKEND, "db", Mode.DB_FLAG,
                 "objects.db.url", "objects.db.user", "objects.db.password", SpaceRoot::objectsDbUrl),
-        LINKS("Links", "objects.backend", "memory", Mode.DB_FLAG,
+        LINKS("Links", OBJECTS_BACKEND, "db", Mode.DB_FLAG,
                 "objects.links.db.url", "objects.db.user", "objects.db.password", SpaceRoot::linksDbUrl),
-        NOTES("Notes", "objects.backend", "memory", Mode.DB_FLAG,
+        NOTES("Notes", OBJECTS_BACKEND, "db", Mode.DB_FLAG,
                 "objects.notes.db.url", "objects.db.user", "objects.db.password", SpaceRoot::notesDbUrl),
-        TAGS("Tag assignments", "objects.backend", "memory", Mode.DB_FLAG,
+        TAGS("Tag assignments", OBJECTS_BACKEND, "db", Mode.DB_FLAG,
                 "objects.tags.db.url", "objects.db.user", "objects.db.password", SpaceRoot::tagAssignmentsDbUrl),
         // ⚠ Flipping this to "db" — serving the three ledgers from a database rather than off CSV — was
         // attempted 2026-08-31 and REVERTED for a FRESHNESS blocker. **That blocker is now FIXED**
@@ -227,7 +239,8 @@ public final class OperationalDb {
                 return new Resolved(f, Source.BACKEND_PROPERTY, backend, reportedUser(f));
             if (!"duckdb".equals(lower) && !"postgres".equals(lower) && !"postgresql".equals(lower))
                 return new Resolved(f, Source.DISABLED, null, null);
-        } else if (!"db".equalsIgnoreCase(backend)) {
+        } else if (!"db".equalsIgnoreCase(backend)
+                && !(OBJECTS_BACKEND.equals(f.backendProperty) && OBJECTS_POSTGRES.equalsIgnoreCase(backend))) {
             return new Resolved(f, Source.DISABLED, null, null);
         }
         String explicit = System.getProperty(f.urlProperty);
@@ -294,6 +307,7 @@ public final class OperationalDb {
     }
 
     public static void verifySelectable() {
+        verifyObjectsBackend();
         if (!postgres()) return;
         if (url() == null)
             throw new IllegalStateException(
@@ -307,6 +321,51 @@ public final class OperationalDb {
                             + " postgresql.jar sidecar (auto-detected by serve.sh/serve.bat); the Personal"
                             + " bundle ships DuckDB only — drop postgresql.jar beside inspecto.jar.", missing);
         }
+    }
+
+    /** The object families' effective {@code -Dobjects.backend}, trimmed and lower-cased ({@code db} when unset). */
+    public static String objectsBackend() {
+        return System.getProperty(OBJECTS_BACKEND, Family.OBJECTS.backendDefault).trim().toLowerCase();
+    }
+
+    /** True when {@code -Dobjects.backend=postgres} — the Enterprise launcher's setting. */
+    public static boolean objectsPostgresRequired() {
+        return OBJECTS_POSTGRES.equals(objectsBackend());
+    }
+
+    /**
+     * {@code OBJECTS-BACKEND-DEFAULT-MEMORY-1}: fail closed at boot when the object families' backend cannot be
+     * honoured — an unknown value (a typo used to mean "memory", silently), or {@code postgres} (Enterprise)
+     * without a PostgreSQL URL for every one of the four families, or without the driver. ⛔ Never a fallback
+     * to DuckDB or memory: an Enterprise deployment that quietly kept its Cases in a local file, or in the
+     * heap, would look healthy until the first restart or the second node.
+     *
+     * <p>⚠ The {@code -DemoAuth} demo build is not an exception carved in here: its {@code serve-demo.*}
+     * launcher passes {@code -Dobjects.backend=db} explicitly, so this check never asks it for PostgreSQL.
+     *
+     * @throws IllegalStateException naming the property at fault and what to set
+     */
+    public static void verifyObjectsBackend() {
+        String backend = objectsBackend();
+        if ("db".equals(backend) || "memory".equals(backend)) return;
+        if (!OBJECTS_POSTGRES.equals(backend))
+            throw new IllegalStateException("-D" + OBJECTS_BACKEND + "=" + backend
+                    + " is not a backend: use db (the Space's duckdb/ files), postgres (PostgreSQL, mandatory"
+                    + " on Enterprise) or memory (explicit, lost on restart)");
+        for (Family f : List.of(Family.OBJECTS, Family.LINKS, Family.NOTES, Family.TAGS)) {
+            String url = urlFor(f, null);
+            if (url == null || !url.toLowerCase().startsWith("jdbc:postgresql:"))
+                throw new IllegalStateException("-D" + OBJECTS_BACKEND + "=postgres (Enterprise: Incidents, Cases,"
+                        + " notes, links and tags live in PostgreSQL) but " + f.label + " has no PostgreSQL URL"
+                        + (url == null ? "" : " (got " + url + ")")
+                        + ": set -Dinspecto.db=postgres -Dinspecto.db.url=jdbc:postgresql://host:5432/db"
+                        + " (serve.sh/serve.bat: the INSPECTO_DB_URL environment variable) or -D" + f.urlProperty
+                        + ". There is no fallback to DuckDB or memory.");
+        }
+        if (!driverAvailable())
+            throw new IllegalStateException("-D" + OBJECTS_BACKEND + "=postgres but the PostgreSQL JDBC driver ("
+                    + PG_DRIVER + ") is not on the classpath — the Enterprise bundle ships it as postgresql.jar"
+                    + " beside inspecto.jar.");
     }
 
     /**

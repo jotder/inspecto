@@ -95,9 +95,9 @@ unaffected because the database, not the monitor, decides them.
 
 | Domain | Interface | DB impl | Backend toggle (`-D…`) | Default |
 |---|---|---|---|---|
-| Operational objects (ALERT / INCIDENT / CASE / TASK) | `ops/ObjectStore` | [`DbObjectStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/DbObjectStore.java) | `objects.backend=memory\|db` | `memory` |
-| Correlation links | `ops/link/LinkStore` | [`DbLinkStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/link/DbLinkStore.java) | `objects.backend` (shared) | `memory` |
-| Notes / evidence | `ops/note/NoteStore` | [`DbNoteStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/note/DbNoteStore.java) | `objects.backend` (shared) | `memory` |
+| Operational objects (ALERT / INCIDENT / CASE / TASK) | `ops/ObjectStore` | [`DbObjectStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/DbObjectStore.java) | `objects.backend=db\|postgres\|memory` | **`db`** (was `memory` until 2026-09-25 — `OBJECTS-BACKEND-DEFAULT-MEMORY-1`; `postgres` = Enterprise, mandatory, fail-closed; `memory` = explicit opt-in) |
+| Correlation links | `ops/link/LinkStore` | [`DbLinkStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/link/DbLinkStore.java) | `objects.backend` (shared) | **`db`** |
+| Notes / evidence | `ops/note/NoteStore` | [`DbNoteStore`](../../../../inspecto-ops/src/main/java/com/gamma/ops/note/DbNoteStore.java) | `objects.backend` (shared) | **`db`** |
 | Events (append-only facts) | `event/EventStore` | [`ParquetEventStore`](../../../../inspecto-event/src/main/java/com/gamma/event/ParquetEventStore.java) *(Parquet, not JDBC)* · [`DbEventStore`](../../../../inspecto-event/src/main/java/com/gamma/event/DbEventStore.java) *(JDBC, since 2026-09-12)* | `events.backend=memory\|parquet\|db\|postgres\|jdbc:…` | `memory` |
 | Ingest status / audit projection | `etl/StatusStore` | [`DbStatusStore`](../../../../inspecto/src/main/java/com/gamma/service/DbStatusStore.java) | `status.backend=file\|db` | **`db`** (flipped 2026-08-31; this row said `file` until 2026-09-08) |
 | Job-run reporting | *(class is the API)* | [`DbJobRunStore`](../../../../inspecto-engine/src/main/java/com/gamma/job/DbJobRunStore.java) | `jobs.backend=none\|duckdb\|postgres` | `none` |

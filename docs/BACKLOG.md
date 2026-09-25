@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **37<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** —
+> **36<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -25,8 +25,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 17<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 37<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 16<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 36<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -240,8 +240,6 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 - **P2** · **D6 spec-authoring UI (`findings-spec`)** — ✅ **BUILT 2026-09-25, acceptance owed.** All ten calls answered that day. The Cases toolbar opens a **Findings fields** dialog (plain answer kinds, Always / Under More, *Must be filled in*, *Show only when* limited to fields above, a live preview of the real Case form, technical properties under a collapsed section, view-only without `canManageIncidents`); the server now validates the `attributes.findings` blob it stores (S0 — before this, a Case with a required field filled in was refused). As-built: `okf/frontend/features/objects.md`. **Still open:** ⚠ D10 acceptance — one think-aloud session with a real Case-desk lead, recorded in `objects.md` (the row closes on that, not on the build); a browser pass over the dialog; ✅ Findings values now save through `PUT /objects/{id}/findings` (2026-09-25, operator: open to anyone who can see the Case, like comments; only `findings` accepted, spec-validated, audited) — disposition edits stay on the `canAdminister` PATCH. → `okf/frontend/features/objects.md` · design: [`superpower/findings-spec-authoring-ui-design.md`](superpower/findings-spec-authoring-ui-design.md)
 - **P2** · **AGT-5 per-tool dry-run seam — BLOCKED-EXTERNAL** (re-gated 2026-09-16). The upstream `DryRunProvider` type ships, but the seam does not: `javap` on the pinned `eoiagent-platform` jar shows `PlatformBuilder` with `approvalHandler(...)` and `approvalDecisionStore(...)` and **no `dryRunProvider(...)`**. **Upstream ask (to `jotder/inspect-agent`): expose `PlatformBuilder.dryRunProvider(DryRunProvider)` and thread it to the gate builder.** Until then `AgentApprovals` stays as the previewer. ⛔ Do not re-discharge on the presence of the type — check the builder. `incident_explain` waits separately on the eoiagent host seam. → `archived-documents/plans-archive/agt-6-plan.md` §4.2 G2
 - **P3** · `AGT-SEGMENT-1` — **the assistant's commercial framing is an unvalidated product read.** The tier packaging (A Explain / B Author-with-approval / C Bounded autonomy), the "Tier A is the wedge" argument and the SHADOW-first on-ramp were never validated against a client segment. ⛔ Decided 2026-09-10: keep the caveat and reopen on the first customer conversation — needs product input, not engineering; the framing is quoted in a stakeholder-facing doc, so it carries its caveat until this closes. → `stakeholders/PRODUCT_CAPABILITIES.md` §"How the ladder is packaged" · `archived-documents/plans-archive/agt-6-plan.md` §2
-
-- **P3** · `OBJECTS-BACKEND-DEFAULT-MEMORY-1` — **operator decision owed: Incidents, Cases, notes, links and tags default to memory.** `OperationalDb` gives the objects / links / notes / tags families `objects.backend=memory` (`inspecto/src/main/java/com/gamma/service/OperationalDb.java:115`), so every Case vanishes on restart unless `-Dobjects.backend=db` is set (the value is `db`, not `duckdb`). Found 2026-09-25 while seeding a demo Space. Decide whether Professional+ bundles should default to `db` (e.g. via `serve.*`), or whether the in-memory default stays and is documented in the launcher. Do not change it without the decision.
 
 ### 3.10 Deployment, Packaging & Scale-out
 

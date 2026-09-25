@@ -398,7 +398,7 @@ per-route latency/count). Add metrics here when you instrument these — and upd
 | `events.backend` | `memory` | `parquet` → durable rolling Parquet |
 | `events.dir` | `inspecto-events` | Parquet event root |
 | `events.views.file` | (unset) | persisted saved-views JSON; null = in-memory |
-| `objects.backend` | `memory` | `db` enables object/link/note DuckDB stores |
+| `objects.backend` | `db` | object/link/note/tag stores in the Space's DuckDB files; `postgres` (Enterprise launcher) requires PostgreSQL and fails the boot without it; `memory` is an explicit, non-durable opt-in |
 | `objects.db.url` | `inspecto-ops.db` | object store URL |
 | `objects.links.db.url` / `objects.notes.db.url` | `…-ops-links.db` / `…-ops-notes.db` | separate (single-writer) |
 | `objects.db.user` / `objects.db.password` | (unset) | object-tier creds |

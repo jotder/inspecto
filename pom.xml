@@ -538,6 +538,12 @@
                                  reason: the `db` default (an operator decision) minted
                                  inspecto/inspecto-status.db at the module root on every test boot. -->
                             <status.backend>jdbc:duckdb:</status.backend>
+                            <!-- OBJECTS-BACKEND-DEFAULT-MEMORY-1: the object/link/note/tag families default
+                                 to `db` now, and under SpaceRoot.legacy() that is four DuckDB files in the
+                                 module root which every later test in the JVM (and the next run) would
+                                 share. `memory` is kept as an EXPLICIT opt-in precisely for this; tests that
+                                 need the durable default set or clear the property themselves. -->
+                            <objects.backend>memory</objects.backend>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>

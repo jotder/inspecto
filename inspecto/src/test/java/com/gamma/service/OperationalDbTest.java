@@ -141,6 +141,70 @@ class OperationalDbTest {
                 OperationalDb::verifySelectable);
     }
 
+    // ── OBJECTS-BACKEND-DEFAULT-MEMORY-1 (operator decision 2026-09-25) ────────────────────────────────
+    // ⚠ The root pom pins objects.backend=memory for the test reactor; the default case CLEARS it.
+
+    @Test
+    void theObjectFamiliesDefaultToTheSpaceDuckdb_neverMemory(@org.junit.jupiter.api.io.TempDir java.nio.file.Path base) {
+        String prior = System.getProperty(OperationalDb.OBJECTS_BACKEND);
+        System.clearProperty(OperationalDb.OBJECTS_BACKEND);
+        try {
+            assertEquals("db", OperationalDb.objectsBackend());
+            SpaceRoot root = SpaceRoot.under(base);
+            for (OperationalDb.Family f : List.of(OperationalDb.Family.OBJECTS, OperationalDb.Family.LINKS,
+                    OperationalDb.Family.NOTES, OperationalDb.Family.TAGS)) {
+                OperationalDb.Resolved r = OperationalDb.resolve(f, root);
+                assertEquals(OperationalDb.Source.SPACE_DEFAULT, r.source(), f.name());
+                assertTrue(r.url().startsWith("jdbc:duckdb:"), r.url());
+            }
+            OperationalDb.verifySelectable();
+        } finally {
+            if (prior != null) System.setProperty(OperationalDb.OBJECTS_BACKEND, prior);
+        }
+    }
+
+    @Test
+    void enterprisePostgresWithoutAUrl_failsAtBoot_namingTheSettingToFix() {
+        withProps(Map.of(OperationalDb.OBJECTS_BACKEND, "postgres"), () -> {
+            IllegalStateException boom = assertThrows(IllegalStateException.class, OperationalDb::verifySelectable);
+            assertTrue(boom.getMessage().contains("-Dinspecto.db.url"), boom.getMessage());
+            assertTrue(boom.getMessage().contains("INSPECTO_DB_URL"), boom.getMessage());
+        });
+    }
+
+    @Test
+    void enterprisePostgres_refusesOneFamilyLeftOnDuckdb() {
+        withProps(Map.of(OperationalDb.OBJECTS_BACKEND, "postgres",
+                        "inspecto.db", "postgres",
+                        "inspecto.db.url", "jdbc:postgresql://db:5432/inspecto",
+                        "objects.notes.db.url", "jdbc:duckdb:/local/notes.db"),
+                () -> {
+                    IllegalStateException boom = assertThrows(IllegalStateException.class, OperationalDb::verifySelectable);
+                    assertTrue(boom.getMessage().contains("objects.notes.db.url"), boom.getMessage());
+                });
+    }
+
+    @Test
+    void enterprisePostgresWithASharedUrl_passes_andEveryObjectFamilyResolvesToIt() {
+        assumeDriverPresent();
+        withProps(Map.of(OperationalDb.OBJECTS_BACKEND, "postgres",
+                        "inspecto.db", "postgres",
+                        "inspecto.db.url", "jdbc:postgresql://db:5432/inspecto"),
+                () -> {
+                    OperationalDb.verifySelectable();
+                    assertEquals("jdbc:postgresql://db:5432/inspecto",
+                            OperationalDb.resolve(OperationalDb.Family.TAGS, SpaceRoot.legacy()).url());
+                });
+    }
+
+    @Test
+    void anUnknownObjectsBackendFailsAtBoot_ratherThanSilentlyMeaningMemory() {
+        withProps(Map.of(OperationalDb.OBJECTS_BACKEND, "duckdb"), () -> {
+            IllegalStateException boom = assertThrows(IllegalStateException.class, OperationalDb::verifySelectable);
+            assertTrue(boom.getMessage().contains("-Dobjects.backend=duckdb"), boom.getMessage());
+        });
+    }
+
     private static void assumeDriverPresent() {
         try {
             Class.forName("org.postgresql.Driver");

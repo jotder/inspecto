@@ -14,7 +14,7 @@ import java.util.List;
  * events emitted by {@link com.gamma.ops.ObjectService}), not in this store.
  *
  * <p>Two implementations sit behind it, exactly mirroring the object store: {@link InMemoryLinkStore}
- * (the lean default) and {@link DbLinkStore} (durable JDBC over the bundled DuckDB, or a Postgres URL).
+ * (the explicit memory opt-in) and {@link DbLinkStore} (durable JDBC over the bundled DuckDB, or a Postgres URL).
  * The backend follows the same deployment toggle as the object store ({@code -Dobjects.backend});
  * {@link com.gamma.ops.ObjectService} and the Control API depend only on this interface.
  *

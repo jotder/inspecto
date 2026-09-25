@@ -6,7 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * In-memory {@link NoteStore} — the lean default (mirrors {@link com.gamma.ops.link.InMemoryLinkStore}).
+ * In-memory {@link NoteStore} — the explicit memory opt-in (mirrors {@link com.gamma.ops.link.InMemoryLinkStore}).
  * Append-only; reads return newest-first, filtered by object (and optionally kind). Guarded on the
  * instance monitor, so it is safe to share across threads.
  *

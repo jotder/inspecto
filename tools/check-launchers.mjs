@@ -150,14 +150,15 @@ const SCENARIOS = [
     jars: PERSONAL, env: {}, edition: 'Personal',
     expect: ALWAYS,
     // The whole point of the edition seam: Personal is byte-for-byte the historic auth-free bundle.
-    rejectPrefix: ['-Dauth.mode', '-Devents.backend', '-Dauth.oidc.'],
+    rejectPrefix: ['-Dauth.mode', '-Devents.backend', '-Dauth.oidc.', '-Dobjects.backend'],
     jarsOnCp: ['inspecto.jar'],
   },
   {
     name: 'Professional — security jar, no OIDC env',
     jars: PROFESSIONAL, env: {}, edition: 'Professional',
     expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet'],
-    rejectPrefix: ['-Dauth.oidc.'],
+    // OBJECTS-BACKEND-DEFAULT-MEMORY-1: Professional runs the engine default (`db`); only Enterprise pins one.
+    rejectPrefix: ['-Dauth.oidc.', '-Dobjects.backend'],
     jarsOnCp: ['inspecto.jar', 'inspecto-security.jar'],
   },
   {
@@ -179,7 +180,8 @@ const SCENARIOS = [
   {
     name: 'Enterprise — security + policy jar',
     jars: ENTERPRISE, env: OIDC_ENV, edition: 'Enterprise',
-    expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet'],
+    // OBJECTS-BACKEND-DEFAULT-MEMORY-1 (2026-09-25): PostgreSQL is MANDATORY for the operational objects.
+    expect: [...ALWAYS, '-Dauth.mode=oidc', '-Devents.backend=parquet', '-Dobjects.backend=postgres'],
     jarsOnCp: ['inspecto.jar', 'inspecto-security.jar', 'inspecto-policy.jar'],
   },
   {

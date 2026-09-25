@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * In-memory {@link LinkStore} — the lean default (mirrors {@link com.gamma.ops.InMemoryObjectStore} and
+ * In-memory {@link LinkStore} — the explicit memory opt-in (mirrors {@link com.gamma.ops.InMemoryObjectStore} and
  * {@link com.gamma.event.InMemoryEventStore}). Append-only; reads return newest-first. All access is
  * guarded on the instance monitor (low-volume traffic), so it is safe to share across threads.
  *

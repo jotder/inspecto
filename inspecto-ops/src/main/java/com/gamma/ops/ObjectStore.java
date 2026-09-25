@@ -9,7 +9,7 @@ import java.util.Optional;
  * contract: events are append-only facts, objects are <b>mutable</b> records whose status changes over
  * their lifecycle, so this interface has a real {@link #update}.
  *
- * <p>Two implementations sit behind it: {@link InMemoryObjectStore} (the lean default, like the
+ * <p>Two implementations sit behind it: {@link InMemoryObjectStore} (the explicit memory opt-in, like the
  * in-memory event store) and {@code DbObjectStore} (durable, JDBC over the bundled DuckDB — or a
  * Postgres URL for a distributed deployment, exactly like {@link com.gamma.service.DbStatusStore}).
  * The backend is a deployment choice ({@code -Dobjects.backend=memory|db}); {@link ObjectService} and

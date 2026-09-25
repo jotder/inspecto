@@ -570,7 +570,7 @@ anywhere for a knob whose absent 2 GB "default" has been asserted in seven docum
 |---|---|
 | Process crash | Service wrapper auto-restart; `/ready` gates traffic; the in-flight run resumes or re-runs idempotently |
 | Disk loss | Restore the last verified backup; Datasets rebuild from re-ingest where retained |
-| Postgres down | 🔴 Stores **degrade to memory (alert!)**; reconnect means a restart after DB recovery |
+| Postgres down | 🔴 Stores **degrade to memory (alert!)**; reconnect means a restart after DB recovery. ⛔ **Except the operational objects on Enterprise** (Incidents, Cases, notes, links, tags — `OBJECTS-BACKEND-DEFAULT-MEMORY-1`, 2026-09-25): `-Dobjects.backend=postgres` (set by the Enterprise `serve.*`) never degrades — boot refuses without a PostgreSQL URL, and a store that will not open stops its Space |
 | Node loss | T2/T3: rebuild from bundle + restore, within the RTO below. T4: promote the standby |
 | Site loss | T4 only: DNS/LB failover to site B |
 

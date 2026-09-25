@@ -737,14 +737,17 @@ full-module runs red at an unchanged tree, green 8/8 alone. Reproduced determini
 > single-process file lock is fine for the current single-JVM service, and Postgres is what
 > you switch to when you split into separate processes/nodes.
 
-### Object backend (Alert Center) — in-memory (default) or database (`DbObjectStore`)
+### Object backend (Alert Center) — database (default), PostgreSQL (Enterprise) or in-memory (`DbObjectStore`)
 
 The Alert Center (Phase 2) records **operational objects** — managed, *mutable* things with a
 lifecycle (an `ALERT` walks `OPEN → ACKNOWLEDGED → RESOLVED`), the counterpart to the immutable
-event log. Because they mutate they live in a table store, not Parquet. By default they are held
-in memory (`-Dobjects.backend=memory`); set `-Dobjects.backend=db` for a durable store — the same
-engine-neutral JDBC-over-DuckDB pattern as the status backend (no extra dependency), default file
-`inspecto-ops.db`:
+event log. Because they mutate they live in a table store, not Parquet. Since 2026-09-25
+(`OBJECTS-BACKEND-DEFAULT-MEMORY-1`) the default is durable, `-Dobjects.backend=db` — the same
+engine-neutral JDBC-over-DuckDB pattern as the status backend (no extra dependency), in the Space's
+`duckdb/` (legacy single-tenant file `inspecto-ops.db`). The Enterprise `serve.*` passes
+`-Dobjects.backend=postgres`, which **refuses the boot** unless every object family resolves to a
+`jdbc:postgresql:` URL (`INSPECTO_DB_URL`, or `-Dobjects*.db.url`) and never degrades to memory.
+`-Dobjects.backend=memory` survives only as an explicit, non-durable opt-in; any other value fails the boot:
 
 ```bash
 java -cp inspecto.jar com.gamma.control.ControlApi \

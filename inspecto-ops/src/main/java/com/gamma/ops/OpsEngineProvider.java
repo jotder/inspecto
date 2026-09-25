@@ -67,6 +67,9 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
 
     @Override
     public ObjectEngine open(SpaceRoot root, String dataDir) {
+        // Boot already ran this (SpaceManager.discover → verifySelectable); repeated here for the single-tenant
+        // and runtime-create paths, which never pass through discover. Cheap: property reads only.
+        OperationalDb.verifyObjectsBackend();
         ObjectStore objectStore = openObjectStore(root);
         LinkStore linkStore = openLinkStore(root);
         NoteStore noteStore = openNoteStore(root);
@@ -85,15 +88,28 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
 
     // ── the four stores (was ServiceStores) ──────────────────────────────────────────────────────
 
-    /** {@code -Dobjects.backend=db} opts into durable JDBC; anything else is in-memory. */
+    /**
+     * Durable JDBC unless {@code -Dobjects.backend=memory} was asked for explicitly
+     * ({@code OBJECTS-BACKEND-DEFAULT-MEMORY-1}: {@code db} is the default, {@code postgres} the Enterprise one).
+     */
     private static boolean durable() {
-        return "db".equalsIgnoreCase(System.getProperty("objects.backend", "memory"));
+        return !"memory".equals(OperationalDb.objectsBackend());
+    }
+
+    /**
+     * {@code -Dobjects.backend=postgres} (Enterprise) never degrades to in-memory: a store that will not open
+     * stops this Space booting instead. The {@code db} default keeps its degrade — the Alert Center must not
+     * block a Personal/Professional boot — but Enterprise asked for PostgreSQL, and serving the heap would hide it.
+     */
+    private static IllegalStateException refuseFallback(String what, String url, Exception cause) {
+        return new IllegalStateException("-Dobjects.backend=postgres: could not open the " + what + " store at " + url
+                + " — Enterprise keeps it in PostgreSQL and never falls back to memory: " + cause.getMessage(), cause);
     }
 
     private static ObjectStore openObjectStore(SpaceRoot root) {
         if (!durable()) {
             StoreHealth.record(root.id(), "objects", StoreHealth.Status.NOT_CONFIGURED, "memory",
-                    "-Dobjects.backend is not 'db' — Incidents and Alerts are lost on restart");
+                    "-Dobjects.backend=memory — Incidents and Alerts are lost on restart");
             return new InMemoryObjectStore();
         }
         String url = OperationalDb.urlFor(OperationalDb.Family.OBJECTS, root.objectsDbUrl());
@@ -105,6 +121,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
             StoreHealth.record(root.id(), "objects", StoreHealth.Status.UP, url, "open");
             return db;
         } catch (Exception e) {
+            if (OperationalDb.objectsPostgresRequired()) throw refuseFallback("object", url, e);
             log.warn("Could not open object DB at {} — falling back to in-memory: {}", url, e.getMessage());
             StoreHealth.degraded(root.id(), "objects", url,
                     "Incidents and Alerts fell back to in-memory and are lost on restart: " + e.getMessage());
@@ -115,7 +132,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
     private static LinkStore openLinkStore(SpaceRoot root) {
         if (!durable()) {
             StoreHealth.record(root.id(), "links", StoreHealth.Status.NOT_CONFIGURED, "memory",
-                    "-Dobjects.backend is not 'db'");
+                    "-Dobjects.backend=memory");
             return new InMemoryLinkStore();
         }
         String url = OperationalDb.urlFor(OperationalDb.Family.LINKS, root.linksDbUrl());
@@ -127,6 +144,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
             StoreHealth.record(root.id(), "links", StoreHealth.Status.UP, url, "open");
             return db;
         } catch (Exception e) {
+            if (OperationalDb.objectsPostgresRequired()) throw refuseFallback("link", url, e);
             log.warn("Could not open link DB at {} — falling back to in-memory: {}", url, e.getMessage());
             StoreHealth.degraded(root.id(), "links", url, "object links fell back to in-memory: " + e.getMessage());
             return new InMemoryLinkStore();
@@ -136,7 +154,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
     private static NoteStore openNoteStore(SpaceRoot root) {
         if (!durable()) {
             StoreHealth.record(root.id(), "notes", StoreHealth.Status.NOT_CONFIGURED, "memory",
-                    "-Dobjects.backend is not 'db'");
+                    "-Dobjects.backend=memory");
             return new InMemoryNoteStore();
         }
         String url = OperationalDb.urlFor(OperationalDb.Family.NOTES, root.notesDbUrl());
@@ -148,6 +166,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
             StoreHealth.record(root.id(), "notes", StoreHealth.Status.UP, url, "open");
             return db;
         } catch (Exception e) {
+            if (OperationalDb.objectsPostgresRequired()) throw refuseFallback("note", url, e);
             log.warn("Could not open note DB at {} — falling back to in-memory: {}", url, e.getMessage());
             StoreHealth.degraded(root.id(), "notes", url, "operator notes fell back to in-memory: " + e.getMessage());
             return new InMemoryNoteStore();
@@ -157,7 +176,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
     private static TagAssignmentStore openTagAssignmentStore(SpaceRoot root) {
         if (!durable()) {
             StoreHealth.record(root.id(), "tags", StoreHealth.Status.NOT_CONFIGURED, "memory",
-                    "-Dobjects.backend is not 'db'");
+                    "-Dobjects.backend=memory");
             return new InMemoryTagAssignmentStore();
         }
         String url = OperationalDb.urlFor(OperationalDb.Family.TAGS, root.tagAssignmentsDbUrl());
@@ -169,6 +188,7 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
             StoreHealth.record(root.id(), "tags", StoreHealth.Status.UP, url, "open");
             return db;
         } catch (Exception e) {
+            if (OperationalDb.objectsPostgresRequired()) throw refuseFallback("tag", url, e);
             log.warn("Could not open tag DB at {} — falling back to in-memory: {}", url, e.getMessage());
             StoreHealth.degraded(root.id(), "tags", url, "tag assignments fell back to in-memory: " + e.getMessage());
             return new InMemoryTagAssignmentStore();

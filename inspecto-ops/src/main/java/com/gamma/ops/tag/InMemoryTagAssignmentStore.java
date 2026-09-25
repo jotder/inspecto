@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.TreeSet;
 
 /**
- * In-memory {@link TagAssignmentStore} — the lean default, mirroring {@code InMemoryNoteStore}. Guarded
+ * In-memory {@link TagAssignmentStore} — the explicit memory opt-in, mirroring {@code InMemoryNoteStore}. Guarded
  * on the instance monitor, so it is safe to share across threads.
  *
  * <p>A flat list is the right shape here despite the obvious "index it by tag" temptation: assignment
