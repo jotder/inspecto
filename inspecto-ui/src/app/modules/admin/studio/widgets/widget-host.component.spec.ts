@@ -312,6 +312,48 @@ describe('WidgetHostComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('a result the server cut at its row limit says so under the render, naming the row count', async () => {
+        const rows = Array.from({ length: 1200 }, (_, i) => ({ x: `c${i}`, y: i }));
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: { run: () => Promise.resolve({ ok: true, rows, truncated: true }) },
+            },
+        ]);
+        fixture.componentRef.setInput('widget', { ...WIDGET, vizType: 'bar' });
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="tile-truncated"]')?.textContent?.trim()).toBe(
+            'Showing the first 1,200 rows — the result was cut',
+        );
+        await expectNoA11yViolations(el);
+    });
+
+    it('a complete (untruncated) result shows no truncation note', async () => {
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: { run: () => Promise.resolve({ ok: true, rows: [{ x: 'a', y: 1 }], truncated: false }) },
+            },
+        ]);
+        fixture.componentRef.setInput('widget', { ...WIDGET, vizType: 'bar' });
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('inspecto-viz-render')).toBeTruthy();
+        expect(el.querySelector('[data-testid="tile-truncated"]')).toBeNull();
+        expect(el.textContent).not.toContain('the result was cut');
+    });
+
     it('a chart tile offers Export as PNG in its action set once rendered', async () => {
         const fixture = create([
             { provide: WidgetsService, useValue: {} },

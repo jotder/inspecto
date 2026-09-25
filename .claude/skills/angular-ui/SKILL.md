@@ -187,7 +187,10 @@ src/app/
     unconditionally — the HOST renders it only when `ready`. The KPI size cycle is a tile action: pass
     `[kpiSize]` to `<inspecto-viz-render>` and the KPI drops its own card and button. A host adds its own
     controls with `<app-dashboard-tile><ng-container tileActions [ngTemplateOutlet]="controls" /></app-dashboard-tile>`.
-    The card fills its flex cell, so tiles in one row share a height.
+    The card fills its flex cell, so tiles in one row share a height. **A result `/bi/query` cut at its row
+    limit** (`statistics.truncated` → `DatasetRunResult.truncated`) gets a quiet `text-secondary text-xs` caption
+    under the render — "Showing the first 1,200 rows — the result was cut" (`widget-host` `truncatedNote`, count
+    via `formatNumber`) — 🔴 never draw a page as if it were the whole dataset (R2-01).
   - **Table Widget row link → `options.rowLink: {kind, idField, labelField?}`** (UIE-6,
     `inspecto/viz/row-link-cell.component.ts` + `tableColDefs`). `kind` = `case | incident | reconciliation`
     (each opens its detail route with the row's id). Prefer **`labelField`**: that readable cell becomes the link

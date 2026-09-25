@@ -86,6 +86,12 @@ describe('DatasetResultService', () => {
         });
     });
 
+    it.each([true, false])('carries the server statistics.truncated flag (%s) onto the result', async (truncated) => {
+        const stats = { rowCount: 1, elapsedMs: 1, truncated };
+        const { svc } = setup(vi.fn(() => of({ rows: [{ a: 1 }], statistics: stats })));
+        expect((await svc.run(spec(), COLS)).truncated).toBe(truncated);
+    });
+
     it('maps a server error to an ok:false result (never throws)', async () => {
         const biRun = vi.fn(() => throwError(() => ({ status: 422, error: { error: 'bad spec' } })));
         const { svc } = setup(biRun);

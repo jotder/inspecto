@@ -25,6 +25,7 @@ import { ColumnMeta, ConditionGroup } from 'app/inspecto/query';
 import { ChannelId, VizPlugin, VizProps, getViz } from 'app/inspecto/viz';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
+import { formatNumber } from 'app/inspecto/viz/number-format';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
 import { Widget } from './widget-types';
 import { WidgetsService } from './widgets.service';
@@ -149,6 +150,11 @@ export interface DrillEvent extends DrillPair {
                                     (channelClick)="onChannelClick($event)"
                                     (cellClick)="onCellClick($event)"
                                 />
+                                @if (truncatedNote(); as note) {
+                                    <!-- R2-01: /bi/query cut the result at its row limit. Say so, or a partial
+                                         dataset reads as missing data. A quiet caption, not an alert. -->
+                                    <p class="text-secondary mt-2 text-xs" data-testid="tile-truncated">{{ note }}</p>
+                                }
                             }
                         } @else if (datasetFailed()) {
                             <!-- The dataset fetch FAILED (deleted dataset, backend down). Without this the
@@ -231,6 +237,12 @@ export class WidgetHostComponent {
     private readonly resultArrived = signal(false);
     /** Rows in the last successful result; 0 ⇒ the compact empty state, not an empty chart. */
     private readonly rowCount = signal(0);
+    /** The last successful result was cut at the server's row limit (`statistics.truncated`). */
+    private readonly truncated = signal(false);
+    /** The caption under a truncated render — names the number of rows actually drawn. */
+    readonly truncatedNote = computed(() =>
+        this.truncated() ? `Showing the first ${formatNumber(this.rowCount())} rows — the result was cut` : null,
+    );
     /** The KPI tile's in-place size, cycled from the tile's action set. */
     readonly kpiSize = signal<KpiMode>('standard');
 
@@ -297,11 +309,13 @@ export class WidgetHostComponent {
                     this.runOk.set(res.ok);
                     this.throttled.set(!!res.throttled);
                     this.rowCount.set(res.ok ? res.rows.length : 0);
+                    this.truncated.set(res.ok && !!res.truncated);
                     this.props.set(plugin.transformProps(res.ok ? res.rows : [], widget.controls));
                     this.resultArrived.set(true);
                 })
                 .catch(() => {
                     this.runOk.set(false);
+                    this.truncated.set(false);
                     this.props.set({ labels: [], series: [] });
                     this.resultArrived.set(true);
                 });

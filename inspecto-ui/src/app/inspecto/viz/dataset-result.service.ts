@@ -19,6 +19,9 @@ import { QuerySpec } from './viz-types';
  *  retries — distinct from a failed query, so a tile can say "rate limited" instead of "No data". */
 export interface DatasetRunResult extends SqlRunResult {
     throttled?: boolean;
+    /** The server cut the result at its row limit (`statistics.truncated`) — `rows` is only the first page, so a
+     *  tile must say so rather than draw a partial dataset as if it were whole. */
+    truncated?: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -67,7 +70,7 @@ export class DatasetResultService {
         for (let attempt = 0; ; attempt++) {
             try {
                 const r = await firstValueFrom(this.bi.run(body));
-                return { ok: true, rows: r.rows };
+                return { ok: true, rows: r.rows, truncated: r.statistics?.truncated };
             } catch (e) {
                 const throttled = e instanceof HttpErrorResponse && e.status === 429;
                 if (throttled && attempt < delays.length) {
