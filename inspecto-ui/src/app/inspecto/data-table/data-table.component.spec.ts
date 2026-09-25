@@ -583,6 +583,69 @@ describe('DataTableComponent', () => {
             expect(host.querySelector('inspecto-empty-state')).toBeNull();
         });
 
+        describe('row-count caption (one-page grid, no pager)', () => {
+            const captionEl = (f: { nativeElement: HTMLElement }) =>
+                f.nativeElement.querySelector('ag-grid-angular + div.text-xs') as HTMLElement | null;
+
+            it('says "N rows" / "1 row" under a one-page grid', async () => {
+                const f = await create('mini');
+                f.componentRef.setInput('rows', many(3));
+                f.detectChanges();
+                expect(captionEl(f)?.textContent?.trim()).toBe('3 rows');
+                f.componentRef.setInput('rows', many(1));
+                f.detectChanges();
+                expect(captionEl(f)?.textContent?.trim()).toBe('1 row');
+            });
+
+            it('states the DISPLAYED count once a quick filter narrows the rows ("2 of 9 rows")', async () => {
+                const f = await create('mini');
+                const c = f.componentInstance;
+                f.componentRef.setInput('rows', many(9));
+                c.search.set('r1');
+                c.onFilterChanged({ api: apiWith(2) });
+                f.detectChanges();
+                expect(captionEl(f)?.textContent?.trim()).toBe('2 of 9 rows');
+            });
+
+            it('is absent when the pager shows, when empty, while loading, and under "Load more"', async () => {
+                const f = await create('mini');
+                f.componentRef.setInput('rows', many(11)); // pager visible — its own summary counts
+                f.detectChanges();
+                expect(captionEl(f)).toBeNull();
+
+                f.componentRef.setInput('rows', []); // the empty state speaks instead
+                f.detectChanges();
+                expect(captionEl(f)).toBeNull();
+
+                f.componentRef.setInput('loading', true); // grid mounted with its overlay, no count yet
+                f.detectChanges();
+                expect(captionEl(f)).toBeNull();
+
+                f.componentRef.setInput('loading', false);
+                f.componentRef.setInput('rows', many(3));
+                f.componentRef.setInput('serverPage', true);
+                f.componentRef.setInput('hasMore', true); // the strip already says "Showing 3 …"
+                f.detectChanges();
+                expect(captionEl(f)).toBeNull();
+            });
+
+            it('is plain text, not a second live region, and axe-clean', async () => {
+                const f = await create('mini');
+                const el = captionEl(f)!;
+                expect(el.textContent?.trim()).toBe('2 rows');
+                expect(el.getAttribute('aria-live')).toBeNull();
+                expect(el.getAttribute('role')).toBeNull();
+                // outside ag-Grid's own internals, exactly one polite region (the sr-only status) — the
+                // caption does not double-announce
+                const ours = Array.from(
+                    (f.nativeElement as HTMLElement).querySelectorAll('[aria-live="polite"]'),
+                ).filter((n) => !n.closest('ag-grid-angular'));
+                expect(ours.length).toBe(1);
+                expect(ours[0].classList.contains('sr-only')).toBe(true);
+                await expectNoA11yViolations(f.nativeElement);
+            });
+        });
+
         it('has no a11y violations (short table, fits its rows)', async () => {
             const f = await create('mini');
             await expectNoA11yViolations(f.nativeElement);

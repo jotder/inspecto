@@ -504,7 +504,11 @@ src/app/
   `<inspecto-empty-state>` built from `noRowsTitle`/`noRowsHint` renders instead (an empty ag-Grid fails axe
   `aria-required-children`). Pages **10** rows by default; the pager
   offers `[10, 25, 50, 100]` plus any host `[pageSize]` (never re-trigger ag-Grid warnings #94/#95) and
-  hides while every row fits on one page. Pass `height="15rem"` ONLY where the layout needs a stable box
+  hides while every row fits on one page — a quiet right-aligned `text-secondary text-xs` caption then
+  stands in for its row summary (`rowCountCaption`: "3 rows" / "1 row", "2 of 9 rows" when a quick or column
+  filter narrows the DISPLAYED rows; counts via `formatNumber`; none while loading, when empty, or under the
+  `serverPage && hasMore` "Load more" strip). It is plain text — the sr-only `countAnnouncement` live region
+  already announces count changes, so never make the caption a second live region. Pass `height="15rem"` ONLY where the layout needs a stable box
   (the docked bottom panels under the Geo map and the Link Analysis graph, a tree filling a Dashboard tile
   with `height="100%"`); there is no `autoHeight` input any more. A tree-table does not paginate, so give a
   potentially large tree a fixed `height` to keep row virtualisation.

@@ -193,6 +193,11 @@
         (columnPinned)="onColumnStateChanged($event)"
         (columnVisible)="onColumnStateChanged($event)"
     ></ag-grid-angular>
+    @if (rowCountCaption(); as caption) {
+        <!-- One-page grid, no pager: a quiet count sits where the pager's row summary would (right-aligned).
+             Plain text, not a live region — the sr-only status below already announces count changes, once. -->
+        <div class="text-secondary mt-1 text-right text-xs">{{ caption }}</div>
+    }
 }
 
 <!-- Audit F2 (WCAG 4.1.3): the grid's row count changes on async loads, live-tail ticks and quick-filter

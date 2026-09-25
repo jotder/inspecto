@@ -48,6 +48,7 @@ import { quickFilterRows } from './core/quick-filter';
 import { SqlEditorComponent } from './sql/sql-editor.component';
 import { runSql } from './sql/sql-run';
 import { SqlHistoryService } from './sql/sql-history.service';
+import { formatNumber } from '../viz/number-format';
 
 /** The four product tiers (the "mobile version" analogy). */
 export type DataTableTier = 'mini' | 'standard' | 'pro' | 'proMax';
@@ -383,6 +384,23 @@ export class DataTableComponent {
         if (n === 0) return filtered ? 'No matching rows' : 'No rows';
         const noun = n === 1 ? 'row' : 'rows';
         return filtered ? `${n} matching ${noun}` : `${n} ${noun}`;
+    });
+
+    /**
+     * The quiet row count under a one-page grid ({@link hidePager}), so a reader still knows how many rows
+     * there are without paging chrome: "3 rows", or "2 of 9 rows" once a quick/column filter narrows the
+     * DISPLAYED rows. Blank while loading, when empty (the empty state speaks), when the pager shows (its own
+     * summary does), and under the server "Load more" strip (it already states the count).
+     */
+    readonly rowCountCaption = computed<string>(() => {
+        if (!this.hidePager() || this.loading() || this.showEmpty()) return '';
+        if (this.serverPage() && this.hasMore()) return '';
+        const total = this.displayRows().length;
+        const shown = Math.min(this.displayedCount() ?? total, total);
+        const noun = total === 1 ? 'row' : 'rows';
+        return shown < total
+            ? `${formatNumber(shown)} of ${formatNumber(total)} ${noun}`
+            : `${formatNumber(total)} ${noun}`;
     });
 
     readonly gridColumns = computed<ColDef[]>(() => {

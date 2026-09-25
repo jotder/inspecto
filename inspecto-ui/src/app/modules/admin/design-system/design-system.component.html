@@ -524,7 +524,9 @@
             <p class="text-secondary mb-3 mt-4 text-sm">
                 <b>Sizing.</b> The grid sizes to its rows and pages <b>10</b> by default (the pager offers 10 · 25 · 50
                 · 100 and always includes a host's own <code>[pageSize]</code>); the pager hides while every row fits on
-                one page (the tier demo above is the paginated case: 40 rows, 10 per page). An empty table renders the
+                one page (the tier demo above is the paginated case: 40 rows, 10 per page) and a quiet right-aligned
+                caption takes the place of its row summary — "3 rows", or "2 of 9 rows" while a search narrows them
+                (none while loading, when empty, or under a server "Load more" strip). An empty table renders the
                 compact <code>&lt;inspecto-empty-state&gt;</code> (<code>noRowsTitle</code> / <code>noRowsHint</code>)
                 instead of a header over a blank body. Pass <code>height="15rem"</code> only where the layout needs a
                 stable box (a docked bottom panel under a map or graph).
