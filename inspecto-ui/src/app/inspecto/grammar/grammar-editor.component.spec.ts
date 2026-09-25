@@ -388,6 +388,27 @@ describe('GrammarEditorComponent', () => {
         expect(button()).toBeUndefined();
     });
 
+    /**
+     * A first-time builder could not find Test parse: in `own` mode it rendered BELOW every Grammar
+     * section (~40 settings). It now sits beside the Sample | Parsed tabs, ahead of the settings.
+     */
+    it('renders its own Test parse beside the sample tabs, ahead of the Grammar settings', () => {
+        const fixture = create({ frontend: 'delimited' });
+        const el = fixture.nativeElement as HTMLElement;
+        const buttons = Array.from(el.querySelectorAll('button')).filter((b) => b.textContent?.trim() === 'Test parse');
+        expect(buttons).toHaveLength(1); // exactly one — the old bottom copy is gone
+        const tabs = el.querySelector('mat-tab-group.inspecto-sample-tabs')!;
+        expect(buttons[0].closest('div.relative')).toBe(tabs.parentElement); // same block as the tabs
+        const accordion = el.querySelector('mat-accordion')!;
+        // DOCUMENT_POSITION_FOLLOWING: the settings come AFTER the button.
+        expect(buttons[0].compareDocumentPosition(accordion) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        // Still wired: with a sample it parses.
+        fixture.componentInstance.onSampleText('id,msisdn\n1,x');
+        fixture.detectChanges();
+        buttons[0].click();
+        expect(fixture.componentInstance.preview()).toEqual(TABLE);
+    });
+
     it('renders an unsectioned spec set (text_regex) flat, exactly as before', () => {
         const flat = create({ frontend: 'text_regex' });
         expect(flat.nativeElement.querySelector('mat-accordion')).toBeNull();

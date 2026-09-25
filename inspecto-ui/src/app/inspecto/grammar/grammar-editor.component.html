@@ -46,8 +46,23 @@
      [hidden]-tab trap because NEITHER tab hosts a form — only the Dialect/Types/Robustness
      sections below (S2's expansion panels) do. -->
 @if (sampleMode === 'own') {
-    <div class="mt-4">
-        <mat-tab-group class="inspecto-sample-tabs" animationDuration="0ms">
+    <div class="relative mt-4">
+        <!-- Test parse sits BESIDE the Sample | Parsed tabs (on the tab-header row, visible from either
+             tab), not below the ~40 Grammar settings where a first-time builder never found it. It is
+             the verb that turns the sample into the Parsed tab's result, so it lives with them. -->
+        <div class="absolute right-0 top-1 z-10 flex items-center gap-2">
+            @if (!sampleText()) {
+                <span class="text-secondary text-xs">Add a sample to test these settings.</span>
+            }
+            <button mat-stroked-button type="button" [disabled]="testing() || !sampleText()" (click)="test()">
+                @if (testing()) {
+                    <mat-spinner diameter="16" class="mr-2" />
+                }
+                Test parse
+            </button>
+        </div>
+        <!-- Unstretched, so the tab labels stay left and the Test parse cluster on the right never covers them. -->
+        <mat-tab-group class="inspecto-sample-tabs" animationDuration="0ms" mat-stretch-tabs="false">
             <mat-tab label="Sample">
                 <div class="mt-3">
                     <div class="mb-1 flex items-center gap-1">
@@ -256,22 +271,7 @@
 <!-- ── test ─────────────────────────────────────────────────────────────────
      S4: with `sampleMode: 'host'` the HOST owns this verb and renders it beside the sample chips its
      result changes — the primary action belongs where its feedback lands, not below the option tabs.
-     A host-owned sample without a host-owned button would leave no way to parse at all, so the
-     spinner/hint arm stays for `own`. -->
-@if (sampleMode === 'own') {
-    <div class="mt-4 flex items-center gap-2">
-        <button mat-stroked-button type="button" [disabled]="testing() || !sampleText()" (click)="test()">
-            @if (testing()) {
-                <mat-spinner diameter="16" class="mr-2" />
-            }
-            Test parse
-        </button>
-        @if (!sampleText()) {
-            <span class="text-secondary text-xs">Add a sample to test these settings.</span>
-        }
-    </div>
-}
-
+     With `own` the editor renders it beside its own Sample | Parsed tabs (above), for the same reason. -->
 @if (error()) {
     <div class="mt-3">
         <inspecto-alert variant="error">{{ error() }}</inspecto-alert>
