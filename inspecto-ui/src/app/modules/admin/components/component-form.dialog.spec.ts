@@ -45,6 +45,11 @@ function create(kind: ComponentDef['type'] = 'grammar', def?: ComponentDef) {
     return { fixture, c: fixture.componentInstance, ref, api, runTool, deriveTool, toastr };
 }
 
+/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
+function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
+    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
+}
+
 describe('ComponentFormDialog', () => {
     it('blocks submit until the id is valid, then creates and closes with the saved component', () => {
         const { c, ref, api } = create();
@@ -344,5 +349,35 @@ describe('ComponentFormDialog', () => {
             expect(grammarDialog({ delimiter: ',', has_header: true }).c.grammarUnauthorable).toBeNull();
             expect(create('grammar').c.grammarUnauthorable).toBeNull();
         });
+    });
+
+    it('shows "Id is required." only after submit — never on open (the error lands in the subscript)', () => {
+        const { fixture, c } = create();
+        const field = fieldOf(fixture.nativeElement, 'form', 'id');
+        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
+        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
+        expect(field.querySelector('mat-error')).toBeNull();
+        expect(field.textContent).not.toContain('Id is required.');
+        c.submit();
+        fixture.detectChanges();
+        const err = field.querySelector('mat-error');
+        expect(err?.textContent).toContain('Id is required.');
+        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+    });
+
+    it('shows "Config must be valid JSON." only after submit, in the subscript (the hint shows until then)', () => {
+        const { fixture, c } = create('transform');
+        c.form.controls['config'].setValue('{ not json');
+        fixture.detectChanges();
+        const field = fieldOf(fixture.nativeElement, 'form', 'config');
+        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
+        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
+        expect(field.querySelector('mat-error')).toBeNull();
+        expect(field.textContent).not.toContain('Config must be valid JSON.');
+        c.submit();
+        fixture.detectChanges();
+        const err = field.querySelector('mat-error');
+        expect(err?.textContent).toContain('Config must be valid JSON.');
+        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
     });
 });

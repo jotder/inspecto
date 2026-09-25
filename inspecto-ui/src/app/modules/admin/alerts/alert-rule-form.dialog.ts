@@ -126,14 +126,12 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
                         <mat-label>Rule id</mat-label>
                         <input matInput formControlName="name" required cdkFocusInitial />
-                        @if (saveForm.controls.name; as c) {
-                            @if (c.hasError('required')) {
-                                <mat-error>A rule id is required.</mat-error>
-                            } @else if (c.hasError('pattern')) {
-                                <mat-error>Start with a letter; then letters, digits, dash, underscore only.</mat-error>
-                            } @else if (c.hasError('duplicate')) {
-                                <mat-error>An alert rule with this id already exists.</mat-error>
-                            }
+                        @if (saveForm.controls.name.hasError('required')) {
+                            <mat-error>A rule id is required.</mat-error>
+                        } @else if (saveForm.controls.name.hasError('pattern')) {
+                            <mat-error>Start with a letter; then letters, digits, dash, underscore only.</mat-error>
+                        } @else if (saveForm.controls.name.hasError('duplicate')) {
+                            <mat-error>An alert rule with this id already exists.</mat-error>
                         }
                     </mat-form-field>
                 </form>

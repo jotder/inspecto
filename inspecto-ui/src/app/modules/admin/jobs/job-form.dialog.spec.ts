@@ -57,6 +57,11 @@ function create(
     return { fixture, c: fixture.componentInstance, ref, save };
 }
 
+/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
+function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
+    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
+}
+
 describe('JobFormDialog', () => {
     it('seeds the form from an existing job (edit) and stays on the config step (id is immutable)', () => {
         const { c } = create({
@@ -565,6 +570,25 @@ describe('JobFormDialog', () => {
             expect(c.paramTokenMap()).toEqual({});
             expect(c.paramSpecs().map((s) => s.key)).toEqual(['day']);
         });
+    });
+
+    it('shows "A job id is required." only after save — never when the save step first renders (the error lands in the subscript)', () => {
+        const { fixture, c } = create({});
+        c.schemaForm.form.patchValue({ scheduleMode: 'manual' });
+        c.save();
+        expect(c.step()).toBe('save');
+        c.saveForm.controls.name.setValue('');
+        fixture.detectChanges();
+        const field = fieldOf(fixture.nativeElement, 'form[aria-label="Name this job"]', 'name');
+        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
+        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
+        expect(field.querySelector('mat-error')).toBeNull();
+        expect(field.textContent).not.toContain('A job id is required.');
+        c.save();
+        fixture.detectChanges();
+        const err = field.querySelector('mat-error');
+        expect(err?.textContent).toContain('A job id is required.');
+        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
     });
 });
 

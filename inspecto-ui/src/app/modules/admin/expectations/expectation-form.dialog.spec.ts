@@ -25,6 +25,11 @@ function create(data: ExpectationFormData) {
     return fixture;
 }
 
+/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
+function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
+    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
+}
+
 describe('ExpectationFormDialog', () => {
     it('create mode blocks a duplicate id inline (asked at the save step) and has no a11y violations', async () => {
         const fixture = create({ existingNames: ['cdr_msisdn_not_null'] });
@@ -295,5 +300,25 @@ describe('ExpectationFormDialog', () => {
         // Still on the config step, nothing saved — ExpectationsService was stubbed with NO methods, so
         // any write attempt would have thrown.
         expect(c.step()).toBe('config');
+    });
+
+    it('shows "An id is required." only after save — never when the save step first renders (the error lands in the subscript)', () => {
+        const fixture = create({});
+        const c = fixture.componentInstance;
+        c.schemaForm.form.patchValue({ target: 'cdr_ingest', column: 'msisdn', kind: 'non_null' });
+        c.save();
+        expect(c.step()).toBe('save');
+        c.saveForm.controls.name.setValue('');
+        fixture.detectChanges();
+        const field = fieldOf(fixture.nativeElement, 'form[aria-label="Name this expectation"]', 'name');
+        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
+        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
+        expect(field.querySelector('mat-error')).toBeNull();
+        expect(field.textContent).not.toContain('An id is required.');
+        c.save();
+        fixture.detectChanges();
+        const err = field.querySelector('mat-error');
+        expect(err?.textContent).toContain('An id is required.');
+        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
     });
 });

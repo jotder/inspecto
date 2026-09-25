@@ -40,6 +40,11 @@ function create(data: AlertRuleFormData, save = vi.fn(() => of(RULE))) {
     return { fixture, c: fixture.componentInstance, ref, save };
 }
 
+/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
+function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
+    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
+}
+
 describe('AlertRuleFormDialog', () => {
     it('seeds the form from an existing rule (edit) and stays on the config step (id is immutable)', () => {
         const { c } = create({ rule: RULE });
@@ -156,5 +161,24 @@ describe('AlertRuleFormDialog', () => {
     it('renders with no a11y violations', async () => {
         const { fixture } = create({});
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('shows "A rule id is required." only after save — never when the save step first renders (the error lands in the subscript)', () => {
+        const { fixture, c } = create({});
+        c.schemaForm.form.patchValue({ metric: 'duration_ms', threshold: 30000 });
+        c.save();
+        expect(c.step()).toBe('save');
+        c.saveForm.controls.name.setValue('');
+        fixture.detectChanges();
+        const field = fieldOf(fixture.nativeElement, 'form[aria-label="Name this alert rule"]', 'name');
+        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
+        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
+        expect(field.querySelector('mat-error')).toBeNull();
+        expect(field.textContent).not.toContain('A rule id is required.');
+        c.save();
+        fixture.detectChanges();
+        const err = field.querySelector('mat-error');
+        expect(err?.textContent).toContain('A rule id is required.');
+        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
     });
 });

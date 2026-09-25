@@ -161,17 +161,14 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     <mat-form-field class="w-full" subscriptSizing="dynamic">
                         <mat-label>Expectation id</mat-label>
                         <input matInput formControlName="name" required cdkFocusInitial />
-                        @if (saveForm.controls.name; as c) {
-                            @if (c.hasError('required')) {
-                                <mat-error>An id is required.</mat-error>
-                            } @else if (c.hasError('pattern')) {
-                                <mat-error
-                                    >Start with a letter or digit; then letters, digits,
-                                    <code>. _ -</code> only.</mat-error
-                                >
-                            } @else if (c.hasError('duplicate')) {
-                                <mat-error>An expectation with this id already exists.</mat-error>
-                            }
+                        @if (saveForm.controls.name.hasError('required')) {
+                            <mat-error>An id is required.</mat-error>
+                        } @else if (saveForm.controls.name.hasError('pattern')) {
+                            <mat-error
+                                >Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error
+                            >
+                        } @else if (saveForm.controls.name.hasError('duplicate')) {
+                            <mat-error>An expectation with this id already exists.</mat-error>
                         }
                     </mat-form-field>
                     <mat-form-field class="w-full" subscriptSizing="dynamic">

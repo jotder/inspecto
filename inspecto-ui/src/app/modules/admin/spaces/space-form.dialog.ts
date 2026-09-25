@@ -84,14 +84,12 @@ export interface SpaceFormData {
                         <mat-label>Id</mat-label>
                         <input matInput formControlName="id" autocomplete="off" (input)="idManual = true" />
                         <mat-hint>lowercase letters, digits and hyphens — becomes the space folder</mat-hint>
-                        @if (form.get('id'); as c) {
-                            @if (c.hasError('required')) {
-                                <mat-error>Id is required.</mat-error>
-                            } @else if (c.hasError('pattern')) {
-                                <mat-error>Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.</mat-error>
-                            } @else if (c.hasError('duplicate')) {
-                                <mat-error>A space with this id already exists.</mat-error>
-                            }
+                        @if (form.get('id')?.hasError('required')) {
+                            <mat-error>Id is required.</mat-error>
+                        } @else if (form.get('id')?.hasError('pattern')) {
+                            <mat-error>Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.</mat-error>
+                        } @else if (form.get('id')?.hasError('duplicate')) {
+                            <mat-error>A space with this id already exists.</mat-error>
                         }
                     </mat-form-field>
                 }

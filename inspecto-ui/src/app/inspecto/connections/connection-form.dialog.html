@@ -214,13 +214,13 @@
             <mat-form-field class="w-full" subscriptSizing="dynamic">
                 <mat-label>Name</mat-label>
                 <input matInput formControlName="name" required cdkFocusInitial />
-                @if (saveForm.controls.name; as c) { @if (c.hasError('required')) {
+                @if (saveForm.controls.name.hasError('required')) {
                 <mat-error>Name is required.</mat-error>
-                } @else if (c.hasError('pattern')) {
+                } @else if (saveForm.controls.name.hasError('pattern')) {
                 <mat-error>Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error>
-                } @else if (c.hasError('duplicate')) {
+                } @else if (saveForm.controls.name.hasError('duplicate')) {
                 <mat-error>A connection with this name already exists.</mat-error>
-                } }
+                }
                 <mat-hint>Unique — this is the profile id pipelines reference.</mat-hint>
             </mat-form-field>
             <mat-form-field class="w-full" subscriptSizing="dynamic">

@@ -156,13 +156,13 @@
         <mat-form-field class="w-full" subscriptSizing="dynamic">
             <mat-label>Job id</mat-label>
             <input matInput formControlName="name" required cdkFocusInitial />
-            @if (saveForm.controls.name; as c) { @if (c.hasError('required')) {
+            @if (saveForm.controls.name.hasError('required')) {
             <mat-error>A job id is required.</mat-error>
-            } @else if (c.hasError('pattern')) {
+            } @else if (saveForm.controls.name.hasError('pattern')) {
             <mat-error>Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error>
-            } @else if (c.hasError('duplicate')) {
+            } @else if (saveForm.controls.name.hasError('duplicate')) {
             <mat-error>A job with this id already exists.</mat-error>
-            } }
+            }
         </mat-form-field>
     </form>
     }

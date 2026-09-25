@@ -52,6 +52,11 @@ function create(existingIds: string[] = ['default']) {
     return { fixture, created, closed };
 }
 
+/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
+function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
+    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
+}
+
 describe('SpaceTemplateGalleryDialog', () => {
     it('renders the template cards, then pre-fills the naming step from the chosen template', () => {
         const { fixture } = create();
@@ -96,5 +101,24 @@ describe('SpaceTemplateGalleryDialog', () => {
     it('has no a11y violations (gallery step)', async () => {
         const { fixture } = create();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('shows the id pattern error only after submit — never before (the error lands in the subscript)', () => {
+        const { fixture, created } = create();
+        const c = fixture.componentInstance;
+        c.choose(TEMPLATES[0]);
+        c.form.patchValue({ id: 'Bad Id' });
+        fixture.detectChanges();
+        const field = fieldOf(fixture.nativeElement, 'form', 'id');
+        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
+        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
+        expect(field.querySelector('mat-error')).toBeNull();
+        expect(field.textContent).not.toContain('Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
+        c.submit();
+        fixture.detectChanges();
+        const err = field.querySelector('mat-error');
+        expect(err?.textContent).toContain('Use a–z, 0–9, hyphen; start with a letter or digit; max 63 chars.');
+        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        expect(created).not.toHaveBeenCalled();
     });
 });

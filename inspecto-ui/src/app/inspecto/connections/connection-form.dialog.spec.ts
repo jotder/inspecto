@@ -39,6 +39,11 @@ function create(profile?: ConnectionProfile, existingIds?: string[]) {
     return { fixture, c: fixture.componentInstance, close, api };
 }
 
+/** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
+function fieldOf(el: HTMLElement, scope: string, control: string): HTMLElement {
+    return el.querySelector(`${scope} [formControlName="${control}"]`)!.closest('mat-form-field') as HTMLElement;
+}
+
 describe('ConnectionFormDialog', () => {
     it('defaults to SFTP on the config step with routing collapsed and both hops unselected', () => {
         const { c } = create();
@@ -208,5 +213,24 @@ describe('ConnectionFormDialog', () => {
         c.submit();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('shows "Name is required." only after save — never when the save step first renders (the error lands in the subscript)', () => {
+        const { fixture, c } = create();
+        c.attrsForm().patchValue({ host: 'h', username: 'u' });
+        c.submit();
+        expect(c.step()).toBe('save');
+        c.saveForm.controls.name.setValue('');
+        fixture.detectChanges();
+        const field = fieldOf(fixture.nativeElement, 'section[aria-label="Name this connection"]', 'name');
+        // Untouched: no error. The old outer "@if (…; as c)" wrapper mis-projected the <mat-error> into
+        // the form field's DEFAULT slot, so it rendered beside the input before any touch/submit.
+        expect(field.querySelector('mat-error')).toBeNull();
+        expect(field.textContent).not.toContain('Name is required.');
+        c.submit();
+        fixture.detectChanges();
+        const err = field.querySelector('mat-error');
+        expect(err?.textContent).toContain('Name is required.');
+        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
     });
 });
