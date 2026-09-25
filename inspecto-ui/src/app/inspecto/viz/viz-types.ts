@@ -160,6 +160,17 @@ export interface VizRenderOptions {
     format?: NumberFormat;
     /** UIE-4, table only: a per-column format, keyed by result column id (`sum_exposure_sar`). */
     columnFormats?: Record<string, NumberFormat>;
+    /** UIE-6, table only: the operational object each row describes. The `idField` cell becomes a link to it; a row
+     *  with no id stays plain text. `idField` must be a result column (a chosen dimension). */
+    rowLink?: RowLink;
+}
+
+/** UIE-6: the operational objects a table row can open — each has a detail route taking its id. */
+export type RowLinkKind = 'case' | 'incident' | 'reconciliation';
+
+export interface RowLink {
+    kind: RowLinkKind;
+    idField: string;
 }
 
 /** The render-ready props a plugin produces from result rows (labels + series, or raw rows for the table). */

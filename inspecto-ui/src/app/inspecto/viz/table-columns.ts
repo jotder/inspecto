@@ -2,6 +2,7 @@ import { ColDef } from 'ag-grid-community';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { humanizeColumn } from './column-label';
 import { formatNumber, isRawNumberColumn } from './number-format';
+import { followRowLinkOnEnter, RowLinkCell } from './row-link-cell.component';
 import { VizRenderOptions } from './viz-types';
 
 export { humanizeColumn } from './column-label';
@@ -33,6 +34,12 @@ export function tableColDefs(columns: string[], opts?: VizRenderOptions): ColDef
                 const text = escapeHtml(String(p.value));
                 return statusBadgeHtml(text, text);
             };
+        }
+        // UIE-6: the row's id cell links to the object it describes (wins over a badge on the same column).
+        if (opts?.rowLink?.idField === field) {
+            def.cellRenderer = RowLinkCell;
+            def.cellRendererParams = { kind: opts.rowLink.kind };
+            def.suppressKeyboardEvent = followRowLinkOnEnter;
         }
         return def;
     });

@@ -91,4 +91,27 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
             { value: 'lower', label: 'Lower' },
         ],
     },
+    // UIE-6, table only: each row opens the operational object it describes. Both are needed for a link.
+    {
+        key: 'rowLinkKind',
+        label: 'Table: rows open',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: '',
+        options: [
+            { value: '', label: 'Nothing' },
+            { value: 'case', label: 'Case' },
+            { value: 'incident', label: 'Incident' },
+            { value: 'reconciliation', label: 'Reconciliation' },
+        ],
+    },
+    {
+        key: 'rowLinkIdField',
+        label: 'Table: column holding the id',
+        type: 'string',
+        tier: 'required',
+        required: false,
+        placeholder: 'A dimension of this table, e.g. reconciliation_id',
+    },
 ];

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { statusBadgeClasses, statusTone } from 'app/inspecto/components/status-badge.component';
 import { humanizeColumn, isBadgeColumn, tableColDefs } from './table-columns';
+import { followRowLinkOnEnter, RowLinkCell } from './row-link-cell.component';
 
 describe('table columns — readable headers', () => {
     it('turns measure ids into "<Field> (<agg>)"', () => {
@@ -71,5 +72,27 @@ describe('table columns — status badges', () => {
         expect(statusTone('Confirmed')).toBe('error');
         expect(statusTone('Recovered')).toBe('success');
         expect(statusTone('Closed - no loss')).toBe('success');
+    });
+});
+
+describe('table columns — UIE-6 row link', () => {
+    it('only the rowLink idField cell becomes a link, and Enter follows it', () => {
+        const opts = { rowLink: { kind: 'reconciliation' as const, idField: 'recon_id' } };
+        const [control, recon] = tableColDefs(['control', 'recon_id'], opts);
+        expect(control.cellRenderer).toBeUndefined();
+        expect(recon.cellRenderer).toBe(RowLinkCell);
+        expect(recon.cellRendererParams).toEqual({ kind: 'reconciliation' });
+        expect(recon.suppressKeyboardEvent).toBe(followRowLinkOnEnter);
+    });
+
+    it('a link wins over a status badge on the same column', () => {
+        const [status] = tableColDefs(['status'], { rowLink: { kind: 'incident', idField: 'status' } });
+        expect(status.cellRenderer).toBe(RowLinkCell);
+    });
+
+    it('no rowLink, no link', () => {
+        const [id] = tableColDefs(['recon_id']);
+        expect(id.cellRenderer).toBeUndefined();
+        expect(id.suppressKeyboardEvent).toBeUndefined();
     });
 });

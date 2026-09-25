@@ -1,6 +1,7 @@
 import { Component, input, ChangeDetectionStrategy } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { provideRouter } from '@angular/router';
 import { describe, expect, it } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { of } from 'rxjs';
@@ -26,6 +27,7 @@ function create(plugin: VizPlugin, props: VizProps) {
         imports: [VizRenderComponent],
         providers: [
             provideNoopAnimations(),
+            provideRouter([]),
             {
                 provide: GammaConfigService,
                 useValue: { config$: of({ scheme: 'dark' }) },
@@ -94,6 +96,25 @@ describe('VizRenderComponent', () => {
             expect.objectContaining({ field: 'a', headerName: 'A', valueFormatter: expect.any(Function) }),
             expect.objectContaining({ field: 'b', headerName: 'B', valueFormatter: expect.any(Function) }),
         ]);
+    });
+
+    it('UIE-6: a table with a rowLink renders each id as a link to its object; a row without one stays text', async () => {
+        const props: VizProps = {
+            labels: [],
+            series: [],
+            rows: [
+                { control: 'RA-C02 Offer fee', recon_id: 'ra_c02_offer_fee' },
+                { control: 'RA-C07 Roaming', recon_id: null },
+            ],
+            columns: ['control', 'recon_id'],
+        };
+        const fixture = create(TABLE_PLUGIN, props);
+        fixture.componentRef.setInput('renderOptions', { rowLink: { kind: 'reconciliation', idField: 'recon_id' } });
+        fixture.detectChanges();
+        await new Promise((r) => setTimeout(r, 50));
+        fixture.detectChanges();
+        const links = Array.from(fixture.nativeElement.querySelectorAll('.ag-cell a')) as HTMLAnchorElement[];
+        expect(links.map((a) => a.getAttribute('href'))).toEqual(['/reconciliation/ra_c02_offer_fee']);
     });
 
     it('resolves the KPI component for a component-render plugin and passes inputs', () => {

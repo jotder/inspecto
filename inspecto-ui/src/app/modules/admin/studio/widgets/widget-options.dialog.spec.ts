@@ -80,6 +80,30 @@ describe('WidgetOptionsDialog', () => {
         expect(saved.kpi).toEqual({ target: 0.3, better: 'lower' });
     });
 
+    it('keeps a table row link through a save (UIE-6)', () => {
+        const { c, ref } = create({ rowLink: { kind: 'reconciliation', idField: 'recon_id' } });
+        c.save();
+        const saved = ref.close.mock.calls[0][0] as WidgetOptions;
+        expect(saved.rowLink).toEqual({ kind: 'reconciliation', idField: 'recon_id' });
+    });
+
+    it('authors a row link, and "Nothing" or a blank column removes it (UIE-6)', () => {
+        const { c, ref } = create({ rowLink: { kind: 'case', idField: 'case_id' } });
+        const form = c.schemaForm.form;
+        form.patchValue({ rowLinkKind: 'incident', rowLinkIdField: ' incident_id ' });
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).rowLink).toEqual({
+            kind: 'incident',
+            idField: 'incident_id',
+        });
+        form.patchValue({ rowLinkKind: '' });
+        c.save();
+        expect((ref.close.mock.calls[1][0] as WidgetOptions).rowLink).toBeUndefined();
+        form.patchValue({ rowLinkKind: 'case', rowLinkIdField: '' });
+        c.save();
+        expect((ref.close.mock.calls[2][0] as WidgetOptions).rowLink).toBeUndefined();
+    });
+
     it('renders with no a11y violations', async () => {
         const { fixture } = create({});
         await expectNoA11yViolations(fixture.nativeElement);

@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, ViewChild, inject } from '@angular/
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
+import { RowLinkKind } from 'app/inspecto/viz/viz-types';
 import { WidgetOptions } from './widget-types';
 import { WIDGET_OPTION_ATTRIBUTES } from './widget-option-attributes';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -62,6 +63,8 @@ export class WidgetOptionsDialog {
         decimals: this.data.format?.decimals ?? null,
         kpiTarget: this.data.kpi?.target ?? null,
         kpiBetter: this.data.kpi?.better ?? 'higher',
+        rowLinkKind: this.data.rowLink?.kind ?? '',
+        rowLinkIdField: this.data.rowLink?.idField ?? '',
     };
 
     save(): void {
@@ -79,6 +82,8 @@ export class WidgetOptionsDialog {
                 : undefined;
         const target = typeof v['kpiTarget'] === 'number' ? (v['kpiTarget'] as number) : undefined;
         const better = (str(v['kpiBetter']) || 'higher') as 'higher' | 'lower';
+        const linkKind = str(v['rowLinkKind']) as '' | RowLinkKind;
+        const linkField = str(v['rowLinkIdField']);
         const options: WidgetOptions = {
             // Keep what this dialog does not model (columnLabels, badgeColumns, columnFormats…): rebuilding the
             // object from the form alone silently wiped them on every save.
@@ -97,6 +102,7 @@ export class WidgetOptionsDialog {
             hideBlank: (v['hideBlank'] as boolean) || undefined,
             format,
             kpi: target != null || better === 'lower' ? { target, better } : undefined,
+            rowLink: linkKind && linkField ? { kind: linkKind, idField: linkField } : undefined,
         };
         this.ref.close(options);
     }
