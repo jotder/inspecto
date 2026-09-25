@@ -4,7 +4,7 @@ import { Observable, map } from 'rxjs';
 import { ComponentsService } from 'app/inspecto/api';
 import { apiUrl } from 'app/inspecto/api/api-base';
 import { ConditionGroup, emptyGroup } from 'app/inspecto/query';
-import { Dashboard, DashboardTile } from './dashboard-types';
+import { Dashboard, DashboardHeader, DashboardTile, compactHeader } from './dashboard-types';
 
 /** `POST /dashboards/{id}/share` — the minted public link (BI-6). `url` is the API resolve path;
  *  the shareable link the user copies is the app viewer route `/share/{token}`. */
@@ -74,7 +74,13 @@ export class DashboardsService {
 // therefore never render. Keep the two functions in step; a key added to one belongs in the other.
 
 function toContent(d: Dashboard): Record<string, unknown> {
-    return { name: d.name, tiles: d.tiles, filter: d.filter ?? null, exposedFields: d.exposedFields ?? [] };
+    return {
+        name: d.name,
+        tiles: d.tiles,
+        filter: d.filter ?? null,
+        exposedFields: d.exposedFields ?? [],
+        ...compactHeader(d),
+    };
 }
 
 function fromContent(name: string, content: Record<string, unknown>): Dashboard {
@@ -84,5 +90,6 @@ function fromContent(name: string, content: Record<string, unknown>): Dashboard 
         tiles: (content['tiles'] as DashboardTile[]) ?? [],
         filter: (content['filter'] as ConditionGroup) ?? emptyGroup('AND'),
         exposedFields: (content['exposedFields'] as string[]) ?? [],
+        ...compactHeader(content as DashboardHeader),
     };
 }

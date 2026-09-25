@@ -42,4 +42,27 @@ describe('DashboardsService', () => {
         expect(dashboards[0].name).toBe('d1');
         expect(dashboards[0].tiles).toHaveLength(1);
     });
+
+    it('UIE-5: the header keys survive the persistence pair; blank or mistyped ones are not carried', () => {
+        const { svc } = setup();
+        const d = buildDashboard('d1', [{ widgetId: 'c1', span: 1 }], null, [], {
+            description: 'Which question?',
+            asOf: '2026-09-23',
+            illustrative: true,
+        });
+        const content = svc.toContent(d);
+        expect(content).toMatchObject({ description: 'Which question?', asOf: '2026-09-23', illustrative: true });
+        expect(svc.fromContent('d1', content)).toMatchObject({
+            description: 'Which question?',
+            asOf: '2026-09-23',
+            illustrative: true,
+        });
+
+        const plain = svc.toContent(buildDashboard('d2', [], null, [], { description: '  ', illustrative: false }));
+        expect(Object.keys(plain)).not.toContain('description');
+        expect(Object.keys(plain)).not.toContain('illustrative');
+        const odd = svc.fromContent('d3', { tiles: [], description: 7, illustrative: 'yes' });
+        expect(odd.description).toBeUndefined();
+        expect(odd.illustrative).toBeUndefined();
+    });
 });

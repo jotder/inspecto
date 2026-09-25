@@ -9,6 +9,7 @@ import { MenuBinding } from 'app/inspecto/menu';
 import { Dashboard } from 'app/modules/admin/studio/dashboards/dashboard-types';
 import { DashboardsService } from 'app/modules/admin/studio/dashboards/dashboards.service';
 import { DashboardFilterBarComponent } from 'app/modules/admin/studio/dashboards/dashboard-filter-bar.component';
+import { DashboardHeaderComponent } from 'app/modules/admin/studio/dashboards/dashboard-header.component';
 import { DashboardTileComponent } from 'app/modules/admin/studio/dashboards/dashboard-tile.component';
 import { DashboardViewStore } from 'app/modules/admin/studio/dashboards/dashboard-view.store';
 import { GeoViewWidgetComponent } from 'app/modules/admin/studio/geo-map/geo-view-widget.component';
@@ -33,6 +34,7 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
         GeoViewWidgetComponent,
         LinkViewWidgetComponent,
         DashboardFilterBarComponent,
+        DashboardHeaderComponent,
         DashboardTileComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -50,7 +52,8 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
                     <div class="h-[70vh] min-h-0"><app-link-view-widget [viewId]="b.componentId" /></div>
                 }
                 @case ('dashboard') {
-                    @if (dashboard()) {
+                    @if (dashboard(); as d) {
+                        <app-dashboard-header class="mb-4 block empty:hidden" [header]="d" />
                         @if (view.exposedFields().length) {
                             <div class="bg-card mb-4 rounded-2xl p-4 shadow">
                                 <app-dashboard-filter-bar

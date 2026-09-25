@@ -1020,7 +1020,15 @@ public final class ConfigSpecs {
                 FieldSpec.of("filter", "Cross-filter", FieldType.MAP,
                         "A Query Core condition group injected into every tile's query."),
                 FieldSpec.of("exposedFields", "Exposed filter fields", FieldType.LIST,
-                        "Columns offered to viewers as quick filters (the dashboard filter bar).")
+                        "Columns offered to viewers as quick filters (the dashboard filter bar)."),
+                // UIE-5: the viewer header under the title. `description` was already read by
+                // MetadataGraphBuilder (the catalog node's description) before it was declared here.
+                FieldSpec.of("description", "Description", FieldType.STRING,
+                        "One line naming the question the dashboard answers, shown under its title."),
+                FieldSpec.of("asOf", "As of", FieldType.STRING,
+                        "The calendar day the figures describe (YYYY-MM-DD), shown as \"As of <date>\"."),
+                FieldSpec.of("illustrative", "Illustrative data", FieldType.BOOL,
+                        "The figures are synthetic, shown to illustrate the view — viewers see an Illustrative data chip.")
         );
         List<CrossFieldRule> rules = List.of(
                 new CrossFieldRule(
@@ -1031,9 +1039,26 @@ public final class ConfigSpecs {
                         raw -> {
                             Object tiles = at(raw, "tiles");
                             return !(tiles instanceof List<?> l) || !l.isEmpty();
-                        })
+                        }),
+                new CrossFieldRule(
+                        "as-of-is-a-date",
+                        "asOf is a calendar date, YYYY-MM-DD.",
+                        Severity.ERROR,
+                        List.of("asOf"),
+                        raw -> !present(raw, "asOf") || isIsoDate(str(raw, "asOf")))
         );
         return new ConfigSpec("dashboard", fields, rules);
+    }
+
+    /** A real calendar date in exactly {@code YYYY-MM-DD} form ({@code 2026-02-30} is not one). */
+    private static boolean isIsoDate(String s) {
+        if (s == null || !s.matches("\\d{4}-\\d{2}-\\d{2}")) return false;
+        try {
+            java.time.LocalDate.parse(s);
+            return true;
+        } catch (java.time.format.DateTimeParseException e) {
+            return false;
+        }
     }
 
     // ── schema ──────────────────────────────────────────────────────────────────

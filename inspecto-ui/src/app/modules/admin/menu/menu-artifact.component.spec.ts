@@ -150,4 +150,29 @@ describe('MenuArtifactComponent', () => {
         f.detectChanges();
         expect(tile(f).filter()!.items).toEqual(SAVED_FILTER.items);
     });
+
+    it('UIE-5: shows the Dashboard header — description, as-of date, Illustrative data chip — without a heading', async () => {
+        const f = create({
+            ...dashboard([]),
+            description: 'Which stages decide the season?',
+            asOf: '2026-09-23',
+            illustrative: true,
+        });
+        await settle(f);
+        const header: HTMLElement = f.nativeElement.querySelector('[data-testid="dashboard-header"]');
+        expect(header).not.toBeNull();
+        expect(header.textContent).toContain('Which stages decide the season?');
+        expect(header.textContent).toContain('As of 23 Sep 2026');
+        expect(header.querySelector('inspecto-chip')!.textContent).toContain('Illustrative data');
+        // The host (menu item) owns the page's <h1>; the header adds no heading of its own.
+        expect(header.querySelector('h1, h2, h3')).toBeNull();
+        await expectNoA11yViolations(f.nativeElement);
+    });
+
+    it('UIE-5: renders no header for a Dashboard that declares none of it', async () => {
+        const f = create(dashboard([]));
+        await settle(f);
+        expect(f.nativeElement.querySelector('[data-testid="dashboard-header"]')).toBeNull();
+        expect(f.nativeElement.textContent).not.toContain('Illustrative data');
+    });
 });

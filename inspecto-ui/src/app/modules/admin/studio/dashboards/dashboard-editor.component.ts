@@ -13,6 +13,7 @@ import { nextSpan, spanLabel, tileBasis } from 'app/inspecto/viz/dashboard-grid'
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -53,7 +54,7 @@ import { concatMap, from, map, of, tap } from 'rxjs';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetRowsService, RowSourceRef } from 'app/inspecto/viz/dataset-rows.service';
 import { DashboardViewStore } from './dashboard-view.store';
-import { Dashboard, DashboardTile, buildDashboard } from './dashboard-types';
+import { AS_OF_PATTERN, Dashboard, DashboardTile, buildDashboard } from './dashboard-types';
 import { DashboardsService } from './dashboards.service';
 import { ShareDashboardDialog } from './share-dashboard.dialog';
 import { DashboardTileComponent } from './dashboard-tile.component';
@@ -100,6 +101,7 @@ function splitStores(v: string | undefined): string[] | undefined {
         ReactiveFormsModule,
         FormsModule,
         MatButtonModule,
+        MatCheckboxModule,
         MatFormFieldModule,
         MatIconModule,
         MatInputModule,
@@ -195,6 +197,10 @@ export class DashboardEditorComponent implements OnInit {
 
     readonly form = this.fb.group({
         name: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)]],
+        // UIE-5: the viewer header — all optional.
+        description: [''],
+        asOf: ['', Validators.pattern(AS_OF_PATTERN)],
+        illustrative: [false],
     });
 
     /**
@@ -335,6 +341,11 @@ export class DashboardEditorComponent implements OnInit {
 
     private seed(d: Dashboard): void {
         this.view.seed(d);
+        this.form.patchValue({
+            description: d.description ?? '',
+            asOf: d.asOf ?? '',
+            illustrative: d.illustrative ?? false,
+        });
     }
 
     // ── Import as draft (operator decisions 2026-09-25) ──────────────────────────────────────────
@@ -521,7 +532,8 @@ export class DashboardEditorComponent implements OnInit {
     save(): void {
         const ctrl = this.form.controls.name;
         const name = String(ctrl.value ?? '').trim() || (this.id ?? '');
-        if (!name || (ctrl.enabled && ctrl.invalid)) {
+        const header = this.form.controls;
+        if (!name || (ctrl.enabled && ctrl.invalid) || header.asOf.invalid) {
             this.form.markAllAsTouched();
             return;
         }
@@ -529,7 +541,11 @@ export class DashboardEditorComponent implements OnInit {
             this.toastr.warning('Add at least one widget.');
             return;
         }
-        const dashboard = buildDashboard(name, this.tiles(), this.filter(), this.exposedFields());
+        const dashboard = buildDashboard(name, this.tiles(), this.filter(), this.exposedFields(), {
+            description: header.description.value ?? '',
+            asOf: header.asOf.value ?? '',
+            illustrative: !!header.illustrative.value,
+        });
         this.saving.set(true);
         const draft = this.importDraft();
         const ifMatch = draft ? this.draftIfMatch : undefined;

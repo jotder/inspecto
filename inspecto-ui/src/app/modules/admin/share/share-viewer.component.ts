@@ -11,6 +11,8 @@ import 'app/inspecto/viz/plugins';
 import { getViz } from 'app/inspecto/viz/viz-registry';
 import { channelMeasureId } from 'app/inspecto/viz/query-spec';
 import { ChannelValue, ControlValues, VizPlugin, VizProps } from 'app/inspecto/viz/viz-types';
+import { DashboardHeaderComponent } from 'app/modules/admin/studio/dashboards/dashboard-header.component';
+import { DashboardHeader, compactHeader } from 'app/modules/admin/studio/dashboards/dashboard-types';
 
 /** The subset of a widget component's content the embed needs (structurally a Studio `WidgetConfig`). */
 interface EmbedWidget {
@@ -76,7 +78,7 @@ export function embedQueryBody(widget: EmbedWidget): PublicQueryBody | null {
     selector: 'app-share-viewer',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [InspectoAlertComponent, InspectoSkeletonComponent, VizRenderComponent],
+    imports: [InspectoAlertComponent, InspectoSkeletonComponent, VizRenderComponent, DashboardHeaderComponent],
     templateUrl: './share-viewer.component.html',
 })
 export class ShareViewerComponent implements OnInit {
@@ -92,6 +94,8 @@ export class ShareViewerComponent implements OnInit {
     readonly errorMessage = signal('');
     readonly name = signal('');
     readonly expiresAt = signal('');
+    /** UIE-5: the Dashboard's description / as-of / illustrative flag, shown under its title. */
+    readonly header = signal<DashboardHeader>({});
     readonly tiles = signal<TileVm[]>([]);
 
     ngOnInit(): void {
@@ -105,8 +109,12 @@ export class ShareViewerComponent implements OnInit {
     }
 
     private render(shared: SharedDashboard): void {
-        const content = shared.dashboard.content as { name?: string; tiles?: { widgetId: string; span?: number }[] };
+        const content = shared.dashboard.content as {
+            name?: string;
+            tiles?: { widgetId: string; span?: number }[];
+        } & DashboardHeader;
         this.name.set(content.name || shared.dashboard.id);
+        this.header.set(compactHeader(content));
         this.expiresAt.set(fmtWhen(shared.expiresAt));
         const widgets = new Map(shared.widgets.map((w) => [w.id, w.content as unknown as EmbedWidget]));
 

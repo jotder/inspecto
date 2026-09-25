@@ -97,6 +97,33 @@ describe('ShareViewerComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('UIE-5: shows the Dashboard header under the title (and passes axe)', async () => {
+        const fixture = await create({
+            resolve: () =>
+                of({
+                    dashboard: {
+                        id: 'ra',
+                        content: {
+                            name: 'Leakage & recovery',
+                            tiles: [],
+                            description: 'How much leaked, and how much came back?',
+                            asOf: '2026-09-23',
+                            illustrative: true,
+                        },
+                    },
+                    widgets: [],
+                    expiresAt: '2026-12-31T00:00:00Z',
+                }),
+        } as Partial<ShareService>);
+        const el: HTMLElement = fixture.nativeElement;
+        const header = el.querySelector('header [data-testid="dashboard-header"]')!;
+        expect(header.textContent).toContain('How much leaked, and how much came back?');
+        expect(header.textContent).toContain('As of 23 Sep 2026');
+        expect(header.textContent).toContain('Illustrative data');
+        expect(el.querySelectorAll('h1')).toHaveLength(1);
+        await expectNoA11yViolations(el);
+    });
+
     it('fetches tile data through the token-fenced public query', async () => {
         const bodies: unknown[] = [];
         const fixture = await create({

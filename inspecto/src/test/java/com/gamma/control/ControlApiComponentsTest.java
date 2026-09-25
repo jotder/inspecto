@@ -666,9 +666,9 @@ class ControlApiComponentsTest {
      *
      * <p>⚠ The negative half matters more than the positive one: the accepted set is NOT just the
      * {@code ConfigSpec}'s fields. It also carries the store envelope ({@code name}/{@code owner}/
-     * {@code shares}) and the parser-only keys no spec declares — {@code dashboard.description} is read
-     * by {@code MetadataGraphBuilder} and declared nowhere, so a naive spec-derived refusal would have
-     * rejected it.
+     * {@code shares}) and the parser-only keys no spec declares — {@code dashboard.widgets} is read by
+     * {@code ShareRoutes.walk} and declared nowhere, so a naive spec-derived refusal would reject it.
+     * ({@code dashboard.description} was the original example; UIE-5 declared it in the spec.)
      */
     @Test
     void widgetAndDashboardRefuseATopLevelKeyNothingReads(@TempDir Path dir) throws Exception {
@@ -698,10 +698,12 @@ class ControlApiComponentsTest {
                     "{\"vizType\":\"kpi\",\"datasetId\":\"orders\",\"refreshInterval\":30}");
             assertEquals(422, badUpdate.statusCode(), badUpdate.body());
 
-            // dashboard: `description` is spec-UNDECLARED but MetadataGraphBuilder-read ⇒ must pass
+            // dashboard: the UIE-5 header keys are spec-declared ⇒ pass; `widgets` is spec-UNDECLARED but
+            // ShareRoutes-read (parser-only) ⇒ must pass too
             assertEquals(200, send(c.port, "POST", "/components/dashboard",
                     "{\"id\":\"d1\",\"name\":\"D1\",\"tiles\":[{\"widgetId\":\"w1\",\"span\":1}],"
-                            + "\"description\":\"board\"}").statusCode());
+                            + "\"description\":\"board\",\"asOf\":\"2026-09-23\",\"illustrative\":true,"
+                            + "\"widgets\":[\"w1\"]}").statusCode());
             HttpResponse<String> badBoard = send(c.port, "POST", "/components/dashboard",
                     "{\"id\":\"d2\",\"tiles\":[{\"widgetId\":\"w1\",\"span\":1}],\"autoRefresh\":true}");
             assertEquals(422, badBoard.statusCode(), badBoard.body());

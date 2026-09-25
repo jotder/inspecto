@@ -54,6 +54,7 @@ function create(
     existing: Dashboard[] = [],
     widgets: Partial<WidgetsService> = {},
     rowsProvider: unknown = rowsStub(),
+    get: (id: string) => unknown = () => of(null),
 ) {
     TestBed.configureTestingModule({
         imports: [DashboardEditorComponent],
@@ -63,7 +64,7 @@ function create(
             rowsProvider as never,
             { provide: WidgetsService, useValue: { list: () => of([WIDGET]), ...widgets } },
             { provide: DatasetsService, useValue: { list: () => of([DS]) } },
-            { provide: DashboardsService, useValue: { get: () => of(null), list: () => of(existing), save } },
+            { provide: DashboardsService, useValue: { get, list: () => of(existing), save } },
             {
                 provide: ToastrService,
                 useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
@@ -190,6 +191,62 @@ describe('DashboardEditorComponent', () => {
             { update: false }, // create mode — edits go through PUT (the backend 409s a re-create)
         );
         expect(nav).toHaveBeenCalledWith(['/studio/dashboards']);
+    });
+
+    it('UIE-5: round-trips the header — a loaded description / as-of / illustrative flag survives an edit + save', () => {
+        const save = vi.fn((d: Dashboard) => of(d));
+        const stored: Dashboard = {
+            id: 'ra_board',
+            name: 'ra_board',
+            tiles: [{ widgetId: 'bar1', span: 2 }],
+            filter: null,
+            description: 'How much leaked?',
+            asOf: '2026-09-23',
+            illustrative: true,
+        };
+        const fixture = create(save, [], {}, rowsStub(), () => of(stored));
+        fixture.componentInstance.id = 'ra_board';
+        vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        fixture.detectChanges();
+        const header = fixture.componentInstance.form.controls;
+        expect(header.description.value).toBe('How much leaked?');
+        expect(header.asOf.value).toBe('2026-09-23');
+        expect(header.illustrative.value).toBe(true);
+        // The authoring fields are on screen.
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.textContent).toContain('Description');
+        expect(el.textContent).toContain('Illustrative data');
+
+        header.description.setValue('  How much leaked, and how much came back?  ');
+        fixture.componentInstance.save();
+        expect(save).toHaveBeenCalledWith(
+            expect.objectContaining({
+                id: 'ra_board',
+                description: 'How much leaked, and how much came back?',
+                asOf: '2026-09-23',
+                illustrative: true,
+            }),
+            { update: true },
+        );
+    });
+
+    it('UIE-5: blank header fields are not written, and a malformed as-of blocks save', () => {
+        const save = vi.fn((d: Dashboard) => of(d));
+        const fixture = create(save);
+        fixture.detectChanges();
+        vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        const c = fixture.componentInstance;
+        c.form.controls.name.setValue('plain');
+        c.addWidget('bar1');
+        c.form.controls.asOf.setValue('23 Sep');
+        c.save();
+        expect(save).not.toHaveBeenCalled();
+        expect(c.form.controls.asOf.hasError('pattern')).toBe(true);
+
+        c.form.controls.asOf.setValue('');
+        c.save();
+        const saved = save.mock.calls[0][0] as Dashboard;
+        expect('description' in saved || 'asOf' in saved || 'illustrative' in saved).toBe(false);
     });
 
     it('blocks save on a duplicate id (case-insensitive) per the product-wide rule', () => {

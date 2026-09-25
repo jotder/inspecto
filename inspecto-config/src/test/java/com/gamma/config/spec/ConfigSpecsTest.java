@@ -439,6 +439,20 @@ class ConfigSpecsTest {
                 "an empty tiles list → ERROR (required alone would accept [])");
     }
 
+    /** UIE-5: the viewer header keys are declared (so the component-route key census accepts them), and
+     *  {@code asOf} must be a real calendar date. */
+    @Test
+    void dashboardDeclaresTheHeaderAndAsOfIsARealDate() {
+        ConfigSpec d = ConfigSpecs.dashboard();
+        java.util.Set<String> paths = d.fields().stream().map(FieldSpec::path)
+                .collect(java.util.stream.Collectors.toSet());
+        assertTrue(paths.containsAll(List.of("description", "asOf", "illustrative")), paths.toString());
+        assertTrue(fire(d, "as-of-is-a-date", Map.of("tiles", List.of())).isEmpty(), "no asOf → the rule does not apply");
+        assertTrue(fire(d, "as-of-is-a-date", Map.of("asOf", "2026-09-23")).isEmpty(), "an ISO date → ok");
+        assertTrue(fire(d, "as-of-is-a-date", Map.of("asOf", "23 Sep 2026")).isPresent(), "not YYYY-MM-DD → ERROR");
+        assertTrue(fire(d, "as-of-is-a-date", Map.of("asOf", "2026-02-30")).isPresent(), "no such day → ERROR");
+    }
+
     // ── meta cross-field rules ─────────────────────────────────────────────
 
     /**

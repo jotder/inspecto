@@ -260,11 +260,22 @@ The **Query Library** (`/studio/queries`) authors SQL with `$`-parameters and pr
 
 ### 3.5 Dashboards
 
-A `DashboardConfig` is `{tiles: [{widgetId, span}], filter?: ConditionGroup, exposedFields?}`. The
+A `DashboardConfig` is `{tiles: [{widgetId, span}], filter?: ConditionGroup, exposedFields?, description?, asOf?, illustrative?}`. The
 **quick-filter bar** renders chips over `exposedFields` and emits the same `{field, value}` toggle shape
 a tile's drill-down emits. The **drill-through drawer** is a slide-over that reuses the shared data table
 for the rows behind a tile. **PNG export** (`exportPngs()`) downloads every canvas under a dashboard
 tile, so chart tiles export and table/KPI tiles export through their own surfaces.
+
+**Viewer header (UIE-5, 2026-09-25).** Three optional keys, declared in `ConfigSpecs.dashboard()` so the
+component-route key census accepts them: `description` (one line naming the question the page answers),
+`asOf` (a calendar date `YYYY-MM-DD`, shown as *As of 23 Sep 2026* and never zone-shifted; rule
+`as-of-is-a-date`) and `illustrative` (a STAGED page — viewers see an *Illustrative data* chip; absorbs
+DW-02). `<app-dashboard-header>` renders them under the title in the Menu viewer and the public share
+viewer, owns no heading, and renders nothing when all three are absent; the editor authors them in its
+toolbar. ⚠ A blank value or a `false` flag is **not written** (`compactHeader`), so clearing a field in
+the editor removes the key. ⛔ **No date-range selector yet**: the dashboard filter is sent to every tile
+unscoped and the share viewer's public query carries no filter at all, so a dashboard-level period cannot
+yet reach every tile honestly — deferred, not declined.
 
 **Time grain travels on the wire (2026-08-14).** `QuerySpec.grains` (group-by column →
 `day|week|month`) is the one source of truth: each plugin's `buildQuery` fills it from the channel

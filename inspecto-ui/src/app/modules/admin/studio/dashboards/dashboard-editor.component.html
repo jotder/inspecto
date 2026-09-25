@@ -76,6 +76,26 @@
             <span class="text-secondary text-sm">{{ tiles().length }} tile(s)</span>
         </div>
 
+        <!-- UIE-5: the viewer header — what the page answers, the day its figures are as of, and the STAGED flag. -->
+        <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <mat-form-field subscriptSizing="dynamic" class="min-w-64 flex-auto">
+                <mat-label>Description</mat-label>
+                <input
+                    matInput
+                    [formControl]="form.controls.description"
+                    placeholder="The question this dashboard answers"
+                />
+            </mat-form-field>
+            <mat-form-field subscriptSizing="dynamic" class="w-48">
+                <mat-label>As of</mat-label>
+                <input matInput type="date" [formControl]="form.controls.asOf" />
+                @if (form.controls.asOf.hasError('pattern')) {
+                    <mat-error>A date, YYYY-MM-DD.</mat-error>
+                }
+            </mat-form-field>
+            <mat-checkbox [formControl]="form.controls.illustrative">Illustrative data</mat-checkbox>
+        </div>
+
         <!-- AGT-6a: kpi_report_builder's host. It drafts N widgets PLUS the dashboard that tiles them,
              so it needs a pane that can do the multi-component write and still end unsaved for review.
              ⚠ [args] is aiKpiArgs() — identity/context ONLY (dataset + title). Pane args win over the

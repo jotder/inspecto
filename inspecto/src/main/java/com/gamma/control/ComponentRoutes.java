@@ -775,9 +775,9 @@ final class ComponentRoutes implements RouteModule {
      *   <li>{@code widget.dataset} — {@code ShareRoutes.allowedDatasets} and {@code ExchangeRoutes.findKey}
      *       both match {@code Set.of("dataset","datasetId")} anywhere in the content tree, top level
      *       included.</li>
-     *   <li>{@code dashboard.description} — read by {@code MetadataGraphBuilder} (catalog node
-     *       description) although {@code ConfigSpecs.dashboard()} declares no such field. Confirmed
-     *       undeclared-but-read; the exact trap this list exists for.</li>
+     *   <li>({@code dashboard.description} was listed here as undeclared-but-read by
+     *       {@code MetadataGraphBuilder} — the exact trap this list exists for — until UIE-5 declared it
+     *       in {@code ConfigSpecs.dashboard()} as the viewer header's description line.)</li>
      *   <li>{@code dashboard.dataset} / {@code datasetId} / {@code widget} / {@code widgetId} /
      *       {@code widgets} — {@code ShareRoutes.walk} is deliberately shape-tolerant ("dashboards are
      *       authored UI-side") and reads all five off a dashboard's own top level.</li>
@@ -796,7 +796,7 @@ final class ComponentRoutes implements RouteModule {
      */
     private static final Map<String, Set<String>> COMPONENT_PARSER_ONLY_KEYS = Map.of(
             "widget", Set.of("dataset"),
-            "dashboard", Set.of("description", "dataset", "datasetId", "widget", "widgetId", "widgets"),
+            "dashboard", Set.of("dataset", "datasetId", "widget", "widgetId", "widgets"),
             "expectation", Set.of("when", "lastResult", "createdAt", "updatedAt"));
 
     /**
