@@ -387,7 +387,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | ✅ ~~`MAP_AUTHORED` drift~~ **FIXED + PINNED 2026-09-09** — the mirror carried `fields`, and `MapNodeKeyContractTest` parsed `pipeline-editable.ts` and asserted both sets against the Java ones; ⛔ the mirror was deleted outright 2026-09-24 (dead since the mock went) | `pipeline-authoring.md` §2 | Done as a contract, not a fifth hand-fix — then retired with its subject |
 | Onboarding residuals — ✅ D5-ref (`reference.delete` marker column) + D6-ref (`reference.order_by`) **SHIPPED 2026-09-25** (`okf/backend/control-plane/onboarding-authoring.md`); enrichment/job identity by name | `BACKLOG.md` §3 *Onboarding* | Identity-by-name only |
 | Unification W4 (`EnrichmentService` incremental vs full recompute) and W5 (promotion-grade export; import-time referential integrity) | `BACKLOG.md` §3 | |
-| Canonical-pipeline selective bundle export; retire the `authored-pipeline` bundle kind | `BACKLOG.md` §3 *Authoring* | |
+| ✅ Canonical-pipeline selective bundle export — SHIPPED 2026-09-25 as the `pipeline` bundle kind; `authored-pipeline` kept export-only rather than retired (option B) | [metadata-bundle](../../backend/control-plane/metadata-bundle.md) | |
 | `component_draft` / AI drafting for `grammar` / `transform` / `sink` — no low-risk slice; none has a `ConfigSpec` | `BACKLOG.md` §3 | Design first |
 | `D-11` hand-authored `relations` component | `BACKLOG.md` §3 | Deferred until a business relation no Pipeline exercises |
 | `findings-spec` authoring UI | `BACKLOG.md` §3 *D6* | TOON through generic CRUD today |

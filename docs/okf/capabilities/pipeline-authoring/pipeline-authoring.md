@@ -74,9 +74,10 @@ Two facts organise everything else, and both are decisions rather than consequen
 The board rows are accurate and this spec keeps them: **CP-02** (graph editor + Recipe view, insert-between,
 insert-into-branch, undo/redo, snapshots, save-as-template), **CP-03** (validate → save → arm → test-run →
 run → replay) and **CP-04** (bundle export/import with dependency closure) are ✅ in all three editions.
-One qualifier belongs on CP-04: the metadata bundle's authored-pipeline kind still targets the **retired**
-graph-shaped store, so a canonical pipeline transfers only by the datasource archive or the client-side
-bundle (§5).
+The qualifier CP-04 carried until 2026-09-25 — the metadata bundle's authored-pipeline kind targeted the
+**retired** graph-shaped store — is closed: the new `pipeline` kind carries the canonical file and its
+sidecars through the §21 import core, and `authored-pipeline` is export-only
+([metadata-bundle](../../backend/control-plane/metadata-bundle.md)).
 
 ### 2.2 One number per fact
 
@@ -458,8 +459,8 @@ migration to reach semantics that composition already provides.
 * **Test-mapping on a generic parser node** — only reachable where the parse node is per-format; ⚠ the row
   needs re-scoping before anyone builds it, because its gate is discharged.
 * **A host pane for the report builder** — no viable existing pane; a new surface, not an adoption.
-* **Selective bundle export and import for the canonical file** — the metadata bundle's authored-pipeline
-  kind still targets the **retired** graph-shaped store.
+* ✅ ~~**Selective bundle export and import for the canonical file**~~ — **SHIPPED 2026-09-25**: the metadata
+  bundle's `pipeline` kind (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B); `authored-pipeline` is export-only.
 * **AI drafting has no applicable component kind** — three kinds have no backend spec, and no low-risk
   slice survives; design first.
 * ✅ ~~**The client mirror of the authored-key set has drifted**~~ — **FIXED + PINNED 2026-09-09.** It was

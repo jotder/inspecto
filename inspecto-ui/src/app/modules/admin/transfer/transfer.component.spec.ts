@@ -146,7 +146,7 @@ describe('TransferComponent', () => {
     it('loads every artifact family into export groups (components + connections + pipelines + jobs)', () => {
         const { fixture, c } = create();
         fixture.detectChanges();
-        expect(c.groups().map((g) => g.kind)).toEqual(['connection', 'dataset', 'widget', 'authored-pipeline', 'job']);
+        expect(c.groups().map((g) => g.kind)).toEqual(['connection', 'dataset', 'widget', 'pipeline', 'job']);
         // A job's transportable content is the upsert shape — runtime state never travels.
         const job = c.allItems().find((i) => i.kind === 'job')!;
         expect(job.content['onPipeline']).toBe('cdr_ingest');

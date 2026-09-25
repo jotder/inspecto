@@ -46,7 +46,7 @@ const DASHBOARD = item('dashboard', 'overview', {
 });
 const GRAMMAR = item('grammar', 'cdr_asn1_ber', { parser_type: 'asn1' });
 const CONNECTION = item('connection', 'cdr_sftp_prod', { id: 'cdr_sftp_prod', connector: 'sftp' });
-const PIPELINE = item('authored-pipeline', 'mediation_backbone', {
+const PIPELINE = item('pipeline', 'mediation_backbone', {
     name: 'mediation_backbone',
     nodes: [
         { id: 'c', type: 'acquisition', use: 'connection/cdr_sftp_prod' },
@@ -82,17 +82,17 @@ describe('job transport (R2)', () => {
         onPipeline: 'mediation_backbone',
     });
 
-    it("a job's pipeline trigger maps onto the bundle's authored-pipeline kind", () => {
-        expect(refsOf(JOB)).toEqual([{ kind: 'authored-pipeline', id: 'mediation_backbone' }]);
+    it("a job's pipeline trigger is the bundle's pipeline kind", () => {
+        expect(refsOf(JOB)).toEqual([{ kind: 'pipeline', id: 'mediation_backbone' }]);
     });
 
     it('jobs sort after pipelines (their referenced kind) in a bundle', () => {
         const bundle = buildBundle([JOB, PIPELINE], null);
-        expect(bundle.items.map((i) => i.kind)).toEqual(['authored-pipeline', 'job']);
+        expect(bundle.items.map((i) => i.kind)).toEqual(['pipeline', 'job']);
     });
 
     it('with dependencies, exporting a job pulls the pipeline it triggers on', () => {
-        const pipeline = item('authored-pipeline', 'mediation_backbone', {
+        const pipeline = item('pipeline', 'mediation_backbone', {
             name: 'mediation_backbone',
             nodes: [],
             edges: [],
@@ -108,13 +108,13 @@ describe('job transport (R2)', () => {
      * pipeline exported WITHOUT its grammar. The server reads what the engine resolved.
      */
     it('follows a companion the server resolved that no node binding mentions', () => {
-        const pipeline = item('authored-pipeline', 'cdr_ingest', { name: 'cdr_ingest', nodes: [], edges: [] });
+        const pipeline = item('pipeline', 'cdr_ingest', { name: 'cdr_ingest', nodes: [], edges: [] });
         const grammar = item('grammar', 'cdr', { name: 'cdr' });
 
         // without the server's answer the grammar is simply not seen — the hole this closes
         expect(withDependencies([pipeline], [pipeline, grammar]).items.map((i) => i.id)).toEqual(['cdr_ingest']);
 
-        const serverRefs: ServerRefs = new Map([['authored-pipeline/cdr_ingest', [{ kind: 'grammar', id: 'cdr' }]]]);
+        const serverRefs: ServerRefs = new Map([['pipeline/cdr_ingest', [{ kind: 'grammar', id: 'cdr' }]]]);
         const { items, missing } = withDependencies([pipeline], [pipeline, grammar], serverRefs);
         expect(items.map((i) => i.id).sort()).toEqual(['cdr', 'cdr_ingest']);
         expect(missing).toEqual([]);
@@ -122,8 +122,8 @@ describe('job transport (R2)', () => {
 
     /** A server edge to something this instance does not hold is reported, never fatal. */
     it('reports an unresolvable server edge as missing', () => {
-        const pipeline = item('authored-pipeline', 'cdr_ingest', { name: 'cdr_ingest', nodes: [], edges: [] });
-        const serverRefs: ServerRefs = new Map([['authored-pipeline/cdr_ingest', [{ kind: 'grammar', id: 'gone' }]]]);
+        const pipeline = item('pipeline', 'cdr_ingest', { name: 'cdr_ingest', nodes: [], edges: [] });
+        const serverRefs: ServerRefs = new Map([['pipeline/cdr_ingest', [{ kind: 'grammar', id: 'gone' }]]]);
         expect(withDependencies([pipeline], [pipeline], serverRefs).missing).toEqual(['grammar/gone']);
     });
 
@@ -132,16 +132,14 @@ describe('job transport (R2)', () => {
      * `use:` on a draft the server has not stored yet has no server-side counterpart.
      */
     it('keeps a node binding the server did not report', () => {
-        const pipeline = item('authored-pipeline', 'cdr_ingest', {
+        const pipeline = item('pipeline', 'cdr_ingest', {
             name: 'cdr_ingest',
             nodes: [{ id: 'parse', use: 'grammar/from_node' }],
             edges: [],
         });
         const fromNode = item('grammar', 'from_node', { name: 'from_node' });
         const fromServer = item('grammar', 'from_config', { name: 'from_config' });
-        const serverRefs: ServerRefs = new Map([
-            ['authored-pipeline/cdr_ingest', [{ kind: 'grammar', id: 'from_config' }]],
-        ]);
+        const serverRefs: ServerRefs = new Map([['pipeline/cdr_ingest', [{ kind: 'grammar', id: 'from_config' }]]]);
 
         const { items } = withDependencies([pipeline], [pipeline, fromNode, fromServer], serverRefs);
         expect(items.map((i) => i.id).sort()).toEqual(['cdr_ingest', 'from_config', 'from_node']);
@@ -227,7 +225,7 @@ describe('buildBundle / parseBundle round-trip', () => {
             'geo-map-view',
             'widget',
             'dashboard',
-            'authored-pipeline',
+            'pipeline',
         ]);
         const { bundle: parsed, errors } = parseBundle(JSON.stringify(bundle));
         expect(errors).toEqual([]);
@@ -323,7 +321,7 @@ describe('schema is a first-class bundle kind (BUNDLE-SCHEMA-1)', () => {
 
     it('is ordered BEFORE the pipeline that names it, beside grammar and mapping', () => {
         const order = BUNDLE_KINDS.map((k) => k.kind);
-        const pipeline = order.indexOf('authored-pipeline');
+        const pipeline = order.indexOf('pipeline');
         expect(pipeline).toBeGreaterThan(-1);
         for (const companion of ['grammar', 'schema'] as BundleKind[]) {
             const at = order.indexOf(companion);
@@ -332,9 +330,22 @@ describe('schema is a first-class bundle kind (BUNDLE-SCHEMA-1)', () => {
         }
     });
 
-    /** ⚠ The list stays DECLARED but empty — it is what gives a genuinely retired kind a real sort index
-     *  and a place in the known-kinds set, so an old bundle still parses instead of failing whole-file. */
-    it('leaves the legacy list empty rather than deleted', () => {
-        expect(LEGACY_BUNDLE_KINDS).toEqual([]);
+    /** The list is what gives a retired kind a real sort index and a place in the known-kinds set, so an old
+     *  bundle still parses instead of failing whole-file. `authored-pipeline` retired 2026-09-25. */
+    it('holds the retired authored-pipeline kind, which is no longer offered for export', () => {
+        expect(LEGACY_BUNDLE_KINDS).toEqual(['authored-pipeline']);
+        expect(BUNDLE_KINDS.map((k) => k.kind)).not.toContain('authored-pipeline');
+    });
+
+    /** A bundle saved before the retirement parses (the server's import then names `pipeline` in its 422). */
+    it('still parses a bundle carrying an authored-pipeline item', () => {
+        const old = JSON.stringify({
+            format: BUNDLE_FORMAT,
+            version: 2,
+            exportedAt: '2026-09-01T00:00:00Z',
+            sourceSpace: null,
+            items: [{ kind: 'authored-pipeline', id: 'p1', content: { name: 'p1', nodes: [], edges: [] } }],
+        });
+        expect(parseBundle(old).errors).toEqual([]);
     });
 });

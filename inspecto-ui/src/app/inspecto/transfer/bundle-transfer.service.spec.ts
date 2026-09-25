@@ -23,7 +23,7 @@ describe('BundleTransferService — buildExport consults the server closure (gap
     let http: HttpTestingController;
 
     const PIPELINE: BundleItem = {
-        kind: 'authored-pipeline',
+        kind: 'pipeline',
         id: 'cdr_ingest',
         content: { name: 'cdr_ingest', nodes: [], edges: [] },
     };
@@ -58,7 +58,7 @@ describe('BundleTransferService — buildExport consults the server closure (gap
 
         const exportReq = http.expectOne(`${base}/bundle/export`);
         const sent = (exportReq.request.body as { items: { kind: string; id: string }[] }).items;
-        expect(sent.map((i) => `${i.kind}/${i.id}`).sort()).toEqual(['authored-pipeline/cdr_ingest', 'grammar/cdr']);
+        expect(sent.map((i) => `${i.kind}/${i.id}`).sort()).toEqual(['grammar/cdr', 'pipeline/cdr_ingest']);
         exportReq.flush({ bundle: { items: [] } });
         expect(out?.missing).toEqual([]);
     });
@@ -134,5 +134,43 @@ describe('BundleTransferService — buildExport consults the server closure (gap
         svc.draftIntegrity('widget', 'w', {}).subscribe((i) => (integrity = i));
         http.expectOne(`${base}/bundle/preview`).flush({ items: [], requires: [] }); // an older server: no list
         expect(integrity).toBeNull();
+    });
+});
+
+/**
+ * BUNDLE-AUTHORED-PIPELINE-STORE-1, option B: the Transfer screen's pipelines are the REGISTERED
+ * `*_pipeline.toon` files (`GET /pipelines` + `…/graph/raw`), so they must travel as kind `pipeline` —
+ * the server kind whose import lands the file and its sidecars through `POST /pipelines/import`'s core.
+ * As `authored-pipeline` they exported as `missing`, and a write-through import of that kind is now a 422.
+ */
+describe('BundleTransferService — loadAll offers registered pipelines as kind `pipeline`', () => {
+    let svc: BundleTransferService;
+    let http: HttpTestingController;
+
+    beforeEach(() => {
+        TestBed.configureTestingModule({
+            providers: [BundleTransferService, provideHttpClient(withXhr()), provideHttpClientTesting()],
+        });
+        svc = TestBed.inject(BundleTransferService);
+        http = TestBed.inject(HttpTestingController);
+    });
+
+    afterEach(() => http.verify());
+
+    it('emits `pipeline` items filled from graph/raw, and no `authored-pipeline` ones', () => {
+        let items: BundleItem[] | undefined;
+        svc.loadAll().subscribe((i) => (items = i));
+
+        for (const req of http.match(() => true))
+            req.flush(req.request.url === `${base}/pipelines` ? [{ name: 'cdr_ingest', nodes: 1, edges: 0 }] : []);
+        http.expectOne(`${base}/pipelines/cdr_ingest/graph/raw`).flush({
+            name: 'cdr_ingest',
+            active: false,
+            nodes: [],
+            edges: [],
+        });
+
+        const pipelines = (items ?? []).filter((i) => i.kind === 'pipeline' || i.kind === 'authored-pipeline');
+        expect(pipelines.map((i) => `${i.kind}/${i.id}`)).toEqual(['pipeline/cdr_ingest']);
     });
 });

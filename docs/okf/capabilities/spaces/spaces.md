@@ -207,7 +207,8 @@ importable. `BundleRoutes` (`inspecto/src/main/java/com/gamma/control/BundleRout
 - **`POST /bundle/import`** (`:118`) — `canAuthorWorkbench` → write-root 503 → **integrity pre-check 422**
   (MNT-16: only findings the import would *introduce*) → sequential upsert in `APPLY_ORDER` (a referenced
   kind precedes its referencer: `connection, grammar, mapping, schema, transform, sink, dataset, query,
-  widget, dashboard, reconciliation, authored-pipeline, enrichment, job, saved-view`, `:104-107`); existing
+  widget, dashboard, reconciliation, pipeline, authored-pipeline, enrichment, job, saved-view` — an
+  `authored-pipeline` item is refused 422 before any write since 2026-09-25, the kind is export-only); existing
   items default to skip (per-item `overwrite`); identical hash ⇒ `unchanged` — **idempotent re-promotion**;
   per-item outcomes, the batch never aborts. Every kind is served through one `BundleSource` seam whatever
   its backing store.
@@ -338,7 +339,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 | Item | Board id | What remains |
 |---|---|---|
 | **Postgres multi-user** — pool behind `JdbcDrivers`, replace `browseConnection()`, **schema-per-Space** URL wiring, `TriageRunStore` PG impl, concurrency test | `BACKLOG.md` §3 *Postgres multi-user* — ⛔ **PARKED by §6**; `EDITIONS.md` OPS-03 | Isolation on Postgres is a **schema**, not a database (a connection binds one database) |
-| Canonical-pipeline selective bundle export / import; retire the `authored-pipeline` kind that still targets the retired `PipelineStore` | `BACKLOG.md` §3 *Canonical-pipeline selective bundle export/import* | |
+| ✅ Canonical-pipeline selective bundle export / import — SHIPPED 2026-09-25 as the `pipeline` bundle kind; `authored-pipeline` is export-only (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B) | [metadata-bundle](../../backend/control-plane/metadata-bundle.md) | |
 | Bundle residuals — `requires` present-but-different classification; per-editor "load as draft" import | `BACKLOG.md` §3 *Bundle / Exchange* | ⛔ do not fake a draft with a cross-kind `enabled: false` |
 | Space-to-space comparison — residuals only; the storage-growth comparison SHIPPED 2026-09-24 (`space.comparison`, `canAdminister`-gated) | `BACKLOG.md` §3.7 *Job framework — space-to-space comparison (residuals)* | Scheduled cross-Space runs need a persisted grant decision |
 | Cross-Space controller / connector-direct emission (S8) | `BACKLOG.md` §3 | Optional Signal-network slice |

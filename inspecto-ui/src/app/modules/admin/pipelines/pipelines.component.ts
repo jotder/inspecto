@@ -136,7 +136,7 @@ export class PipelinesComponent {
 
     /** Every pipeline in the topology as transfer references — what the export/import menu offers. */
     readonly transferItems = computed(() =>
-        (this.combined()?.pipelines ?? []).map((p) => ({ kind: 'authored-pipeline' as const, id: p.name })),
+        (this.combined()?.pipelines ?? []).map((p) => ({ kind: 'pipeline' as const, id: p.name })),
     );
 
     readonly nodeDisplayLabel = nodeDisplayLabel;

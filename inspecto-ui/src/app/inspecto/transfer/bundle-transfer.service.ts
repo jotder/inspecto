@@ -66,7 +66,7 @@ export interface BundlePreview {
 
 const COMPONENT_KINDS = BUNDLE_KINDS.map((k) => k.kind).filter(
     (k): k is Extract<BundleKind, ComponentType> =>
-        k !== 'connection' && k !== 'authored-pipeline' && k !== 'job' && k !== 'decision-rule',
+        k !== 'connection' && k !== 'pipeline' && k !== 'job' && k !== 'decision-rule',
 );
 
 /** A job's transportable metadata — the upsert shape; runtime state (last status/run/next fire) never travels. */
@@ -119,7 +119,7 @@ export class BundleTransferService {
      * it, must not fail the export; the client-derived closure is then exactly what it was before.
      */
     private serverRefsFor(selected: BundleItem[]): Observable<ServerRefs> {
-        const pipelines = selected.filter((i) => i.kind === 'authored-pipeline');
+        const pipelines = selected.filter((i) => i.kind === 'pipeline');
         if (!pipelines.length) return of(new Map() as ServerRefs);
         return forkJoin(
             pipelines.map((p) =>
@@ -140,7 +140,7 @@ export class BundleTransferService {
                             return { kind: r.ref!.slice(0, slash) as BundleKind, id: r.ref!.slice(slash + 1) };
                         })
                         .filter((r) => BUNDLE_KINDS.some((k) => k.kind === r.kind));
-                    if (refs.length) out.set(`authored-pipeline/${id}`, refs);
+                    if (refs.length) out.set(`pipeline/${id}`, refs);
                 }
                 return out;
             }),
@@ -187,10 +187,13 @@ export class BundleTransferService {
                 for (const c of res['connection'] as ConnectionProfile[]) {
                     items.push({ kind: 'connection', id: c.id, content: c as unknown as Record<string, unknown> });
                 }
+                // REGISTERED pipelines travel as `pipeline` (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B): the
+                // graph here feeds the selection and lineage only — the server's export replaces it with the
+                // file and its sidecars, and `/bundle/import` lands them through `POST /pipelines/import`'s core.
                 for (const p of pipelines)
                     if (p)
                         items.push({
-                            kind: 'authored-pipeline',
+                            kind: 'pipeline',
                             id: p.name,
                             content: p as unknown as Record<string, unknown>,
                         });

@@ -34,7 +34,7 @@ const INCOMING = {
 
 function draft(targetExists: boolean, id = 'demo'): ImportDraft {
     return {
-        kind: 'authored-pipeline',
+        kind: 'pipeline',
         id,
         content: INCOMING,
         sourceSpace: 'staging',

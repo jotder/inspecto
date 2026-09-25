@@ -13,7 +13,7 @@
                 <ng-container *ngTemplateOutlet="modeToggle"></ng-container>
                 <inspecto-transfer-menu
                     [items]="transferItems()"
-                    [allowedKinds]="['authored-pipeline']"
+                    [allowedKinds]="['pipeline']"
                     (changed)="load()"
                     label="Import / export pipelines"
                 />

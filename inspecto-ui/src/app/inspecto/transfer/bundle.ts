@@ -31,6 +31,12 @@ export type BundleKind =
           | 'geo-map-view'
       >
     | 'connection'
+    // A REGISTERED `*_pipeline.toon` (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B, 2026-09-25). The server's
+    // content is the editable graph (`GET …/graph/raw` shape) plus `closure: {manifest, files}` — the file and
+    // its sidecars, imported through the `POST /pipelines/import` core.
+    | 'pipeline'
+    // EXPORT-ONLY on the server: a grandfathered PipelineStore graph (W5 — never newly written). Kept in the
+    // type and in LEGACY_BUNDLE_KINDS so an older bundle still parses; `/bundle/import` refuses it with 422.
     | 'authored-pipeline'
     // The Stage-2 companion (pipeline spec gap 6b, 2026-08-31). Not a registry component — it is the
     // `<name>_enrich.toon` beside the pipeline — so the server serves it through its own BundleSource,
@@ -63,7 +69,7 @@ export const BUNDLE_KINDS: { kind: BundleKind; label: string }[] = [
     { kind: 'geo-map-view', label: 'Geo Map views' },
     { kind: 'widget', label: 'Widgets' },
     { kind: 'dashboard', label: 'Dashboards' },
-    { kind: 'authored-pipeline', label: 'Pipelines' },
+    { kind: 'pipeline', label: 'Pipelines' },
     // After the pipeline: an enrichment's `triggers.on_pipeline` names one, so it is the referencer.
     { kind: 'enrichment', label: 'Enrichments' },
     { kind: 'job', label: 'Jobs' },
@@ -127,8 +133,12 @@ export interface MetadataBundle {
  *  ⚠ Kept as a declared, EMPTY list rather than deleted: it is what gives a genuinely retired kind a real
  *  index in {@link KIND_ORDER} (a missing one makes `byKindThenId` compute NaN) and a place in
  *  `KNOWN_KINDS` so `parseBundle` does not reject a whole old file over one obsolete item. The next
- *  retirement needs this, not a re-invention of it. */
-export const LEGACY_BUNDLE_KINDS: BundleKind[] = [];
+ *  retirement needs this, not a re-invention of it.
+ *
+ *  `authored-pipeline` retired 2026-09-25 (BUNDLE-AUTHORED-PIPELINE-STORE-1): a bundle saved before then carries
+ *  its Pipelines under it, so it must still parse — the server then answers the import with a 422 naming
+ *  `pipeline` as the kind to re-export as. */
+export const LEGACY_BUNDLE_KINDS: BundleKind[] = ['authored-pipeline'];
 
 /** Sort order. Legacy kinds are appended so an item of a retired kind still gets a REAL index — a
  *  missing one would make `byKindThenId` compute NaN and leave an old bundle's items unordered. */
@@ -143,15 +153,10 @@ const byKindThenId = (a: BundleItem, b: BundleItem): number =>
     KIND_ORDER.get(a.kind)! - KIND_ORDER.get(b.kind)! || a.id.localeCompare(b.id);
 
 /** The item's lineage edges, marked included/external against the set of ids travelling in the bundle.
- *  Delegates to the R1 derivation (`refsForComponent`); `pipeline` → the bundle's `authored-pipeline`
- *  store name; refs to kinds a bundle can't carry are dropped. */
+ *  Delegates to the R1 derivation (`refsForComponent`); refs to kinds a bundle can't carry are dropped. */
 function itemRefs(item: BundleItem, includedKeys: Set<string>): BundleRef[] {
     return refsForComponent(item.kind, item.content)
-        .map((r) => ({
-            kind: (r.kind === 'pipeline' ? 'authored-pipeline' : r.kind) as BundleKind,
-            id: r.id,
-            rel: r.rel,
-        }))
+        .map((r) => ({ kind: r.kind as BundleKind, id: r.id, rel: r.rel }))
         .filter((r) => KNOWN_KINDS.has(r.kind))
         .map((r) => ({
             ...r,
@@ -218,11 +223,11 @@ export function parseBundle(text: string): { bundle?: MetadataBundle; errors: st
 }
 
 /** The artifacts an item references — what "include dependencies" pulls into the export. Delegates to
- *  the R1 metadata-network derivation (`refsForComponent`); the model's `pipeline` kind maps onto the
- *  bundle's `authored-pipeline` store name; refs to kinds a bundle can't carry are dropped. */
+ *  the R1 metadata-network derivation (`refsForComponent`); the model's `pipeline` kind IS the bundle's
+ *  (since 2026-09-25); refs to kinds a bundle can't carry are dropped. */
 export function refsOf(item: BundleItem): { kind: BundleKind; id: string }[] {
     return refsForComponent(item.kind, item.content)
-        .map((r) => ({ kind: (r.kind === 'pipeline' ? 'authored-pipeline' : r.kind) as BundleKind, id: r.id }))
+        .map((r) => ({ kind: r.kind as BundleKind, id: r.id }))
         .filter((r) => KNOWN_KINDS.has(r.kind));
 }
 

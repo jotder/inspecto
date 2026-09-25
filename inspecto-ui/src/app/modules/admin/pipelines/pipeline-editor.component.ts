@@ -406,7 +406,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     /** The selected pipeline as a transfer reference — what the export/import menu offers. */
     readonly transferItems = computed(() => {
         const id = this.selectedId();
-        return id ? [{ kind: 'authored-pipeline' as const, id }] : [];
+        return id ? [{ kind: 'pipeline' as const, id }] : [];
     });
     readonly paletteGroups = signal<NodeTypeGroup[]>([]);
     /** The served Step Processor taxonomy for the palette (2026-09-02); `null` = old server → node-type groups. */
@@ -1403,7 +1403,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
 
     /** The transfer menu's draft: open its tab (reading the stored graph + ETag first when it exists). */
     onDraftImported(draft: ImportDraft): void {
-        if (draft.kind !== 'authored-pipeline') return;
+        if (draft.kind !== 'pipeline') return;
         if (!this.canAuthor()) {
             this.toast.warning('Switch to Edit to open an imported draft.');
             return;

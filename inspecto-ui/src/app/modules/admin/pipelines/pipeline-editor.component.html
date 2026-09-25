@@ -269,7 +269,7 @@
                  ⛔ NOT the menu's own Metadata Bundle items beneath it. -->
             <inspecto-transfer-menu
                 [items]="transferItems()"
-                [allowedKinds]="['authored-pipeline']"
+                [allowedKinds]="['pipeline']"
                 [importDraft]="true"
                 (draftImported)="onDraftImported($event)"
                 (changed)="load()"

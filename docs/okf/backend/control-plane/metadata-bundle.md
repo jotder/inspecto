@@ -199,10 +199,12 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
   yet. One draft at a time. ⚠ The preview's `integrity` list is ALWAYS empty for a pipeline —
   `ComponentIntegrity` judges only dataset/query/widget/dashboard/reconciliation — so the editor shows a
   pipeline draft's references as **not checked**, never as clean; Validate and the save gate judge them.
-  🔴 The bundle kind `authored-pipeline` reads/writes `PipelineStore` (`<root>/pipelines/`) server-side,
-  while this editor (and the UI's `loadAll`) work on the REGISTERED `*_pipeline.toon` — a backend export of a
-  registered-only pipeline reports it `missing`, and a write-through import lands in the authored store. The
-  draft path is unaffected (its Save is the editor's own route), but the seam is open.
+  ✅ Since 2026-09-25 the editor's transfer menu, the Pipelines list and the UI's `loadAll` offer
+  **`pipeline`** items (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B — see *Pipelines* above), so the draft
+  reads the server content's top-level `nodes` / `edges` (the editable-graph projection) and ignores its
+  `closure`; Save is still the editor's own route, so a draft carries none of the sidecars — Import… (write
+  -through) is the path that lands them. An older bundle's `authored-pipeline` item still parses (it is in
+  `LEGACY_BUNDLE_KINDS`) but is not offered as a draft, and its write-through import is the server's 422.
 * **Link Analysis / Geo views (D5's last slice).** Both kinds are `ComponentStore.WRITABLE_TYPES`, so the
   bundle door already carried them; the draft is SPA-only. The studio has no per-id route, so a draft always
   opens **here**, never via `ImportDraftHandoff`: adoption runs the pane's own *Load view* (which re-runs the
