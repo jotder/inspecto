@@ -114,7 +114,7 @@ read/written through the uniform `BundleSource` seam regardless of its backing s
 
 The editor-hosted alternative to write-through import: the incoming item opens in its editor as **unsaved
 work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
-[`bundle-load-as-draft-design.md`](../../../superpower/bundle-load-as-draft-design.md) §7; as built:
+[`bundle-load-as-draft-design.md`](../../../archived-documents/plans-archive/bundle-load-as-draft-design.md) §7; as built:
 
 * **Where** — an extra *Import as draft…* item beside *Import…* in the **editor** transfer menus only
   (`<inspecto-transfer-menu [importDraft]="true" (draftImported)>`); libraries and Settings stay write-through

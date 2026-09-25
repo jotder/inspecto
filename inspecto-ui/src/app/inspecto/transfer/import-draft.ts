@@ -1,7 +1,7 @@
 import { BundleItem, BundleKind, MetadataBundle, TargetIndex, withDependencies } from './bundle';
 
 /**
- * Bundle "Import as draft" (operator decisions 2026-09-25, `docs/superpower/bundle-load-as-draft-design.md` §7):
+ * Bundle "Import as draft" (operator decisions 2026-09-25, `docs/archived-documents/plans-archive/bundle-load-as-draft-design.md` §7):
  * one bundle item handed to its editor as UNSAVED work. It is held in memory only (D1) — a reload or a
  * navigation away loses it — and it is saved through the editor's OWN route (D2), never `/bundle/import`.
  */
