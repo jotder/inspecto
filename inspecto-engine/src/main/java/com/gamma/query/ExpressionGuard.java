@@ -58,11 +58,27 @@ public final class ExpressionGuard {
             "case", "when", "then", "else", "end", "and", "or", "not", "is", "null",
             "in", "like", "between", "as");
 
-    /** The scalar functions a calculated column may call (rule 3). */
+    /**
+     * The scalar functions a calculated column may call (rule 3). ⛔ Every name here must be a PURE,
+     * deterministic, row-local DuckDB scalar: no file/network/extension access ({@code read_*},
+     * {@code glob}), no settings or environment ({@code current_setting}, {@code getenv}), no clock or
+     * randomness ({@code now}, {@code random}) — a calculated column is re-evaluated on every read, so a
+     * non-deterministic one would make the same Dataset answer differently per query. The date and string
+     * group (strptime … if) was vetted 2026-09-25 for deriving fields from text-typed sources, e.g. a
+     * {@code 'March 22,2025'} date or a {@code 'Eden Gardens, Kolkata'} venue.
+     */
     static final Set<String> FUNCTIONS = Set.of(
             "abs", "round", "floor", "ceil", "coalesce", "nullif", "greatest", "least",
             "upper", "lower", "trim", "ltrim", "rtrim", "length", "substr", "substring",
-            "concat", "replace", "cast", "try_cast");
+            "concat", "replace", "cast", "try_cast",
+            // dates — parse/format/extract; all pure (no clock: now/current_date stay out)
+            "strptime", "try_strptime", "strftime", "date_trunc", "date_part", "datepart",
+            "year", "month", "day", "dayname", "monthname", "week", "quarter",
+            // strings — splitting, matching (RE2, linear-time), padding
+            "split_part", "starts_with", "ends_with", "contains",
+            "regexp_matches", "regexp_extract", "regexp_replace", "left", "right", "lpad", "rpad",
+            // conditional
+            "if");
 
     /** Functions callable ONLY as a window call — the call must be immediately followed by {@code OVER (…)}
      *  (rule 3 + window rule). The windowed aggregates ({@code sum}/{@code avg}/{@code count}/{@code min}/

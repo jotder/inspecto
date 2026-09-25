@@ -11,9 +11,12 @@
     "then", "when"
   ],
   "functions": [
-    "abs", "cast", "ceil", "coalesce", "concat", "floor", "greatest", "least", "length", "lower",
-    "ltrim", "nullif", "replace", "round", "rtrim", "substr", "substring", "trim", "try_cast",
-    "upper"
+    "abs", "cast", "ceil", "coalesce", "concat", "contains", "date_part", "date_trunc", "datepart",
+    "day", "dayname", "ends_with", "floor", "greatest", "if", "least", "left", "length", "lower",
+    "lpad", "ltrim", "month", "monthname", "nullif", "quarter", "regexp_extract", "regexp_matches",
+    "regexp_replace", "replace", "right", "round", "rpad", "rtrim", "split_part", "starts_with",
+    "strftime", "strptime", "substr", "substring", "trim", "try_cast", "try_strptime", "upper",
+    "week", "year"
   ],
   "windowFunctions": [
     "avg", "count", "cume_dist", "dense_rank", "first_value", "lag", "last_value", "lead", "max",

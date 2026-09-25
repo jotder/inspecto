@@ -48,6 +48,40 @@ class ExpressionGuardTest {
         bad("sum(amount)", "aggregates are the Measure layer's job, not row-level");
     }
 
+    /** The vetted date/string scalars (2026-09-25) — the derived fields a text-typed source needs. */
+    @Test
+    void acceptsTheVettedDateAndStringScalars() {
+        ok("cast(strptime(DATE, '%B %d,%Y') AS date)");
+        ok("monthname(strptime(DATE, '%B %d,%Y'))");
+        ok("try_strptime(raw, '%Y-%m-%d')");
+        ok("strftime(ts, '%Y-%m')");
+        ok("date_trunc('month', ts)");
+        ok("date_part('year', ts) + datepart('month', ts)");
+        ok("year(d) * 100 + month(d) + day(d) + week(d) + quarter(d)");
+        ok("dayname(d)");
+        ok("trim(split_part(VENUE, ',', 2))");
+        ok("starts_with(code, 'A') OR ends_with(code, 'Z') OR contains(code, 'Q')");
+        ok("regexp_matches(code, '^[0-9]+$')");
+        ok("regexp_extract(code, '([0-9]+)', 1)");
+        ok("regexp_replace(code, '[^0-9]', '', 'g')");
+        ok("left(code, 2) || right(code, 2)");
+        ok("lpad(cast(n AS varchar), 4, '0') || rpad(code, 6, '_')");
+        ok("if(WB_RUNS IS NOT NULL, 'Batting first', 'Chasing')");
+    }
+
+    /** Widening the whitelist must not open the file/settings/environment/clock surface. */
+    @Test
+    void stillKillsFileSettingsEnvironmentAndClockFunctions() {
+        bad("read_csv('/etc/passwd')", "file reader");
+        bad("read_csv_auto('x')", "file reader");
+        bad("read_text('x')", "file reader");
+        bad("getenv('HOME')", "environment");
+        bad("current_setting('home_directory')", "settings");
+        bad("now()", "clock — non-deterministic");
+        bad("random()", "randomness — non-deterministic");
+        bad("strptime(read_csv('x'), '%Y')", "a file call nested inside an allowed one");
+    }
+
     @Test
     void acceptsWindowFunctionsWithAnOverClause() {
         ok("sum(amount) OVER (PARTITION BY region ORDER BY day)");

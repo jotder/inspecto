@@ -14,6 +14,28 @@ describe('checkCalculatedExpr', () => {
         expect(checkCalculatedExpr("case when amt > 100 then 'big' else 'small' end")).toBeNull();
     });
 
+    it('allows the vetted date/string scalars a text-typed source needs', () => {
+        for (const expr of [
+            "cast(strptime(DATE, '%B %d,%Y') AS date)",
+            "monthname(strptime(DATE, '%B %d,%Y'))",
+            "trim(split_part(VENUE, ',', 2))",
+            "regexp_replace(code, '[^0-9]', '', 'g')",
+            "if(WB_RUNS IS NOT NULL, 'Batting first', 'Chasing')",
+        ])
+            expect(checkCalculatedExpr(expr), expr).toBeNull();
+    });
+
+    it('still rejects file, settings, environment and clock functions', () => {
+        for (const expr of [
+            "read_csv('x')",
+            "getenv('HOME')",
+            "current_setting('home_directory')",
+            'now()',
+            'random()',
+        ])
+            expect(checkCalculatedExpr(expr), expr).toMatch(/not allowed/i);
+    });
+
     it('allows cast to a whitelisted type', () => {
         expect(checkCalculatedExpr('cast(amt AS double)')).toBeNull();
     });
