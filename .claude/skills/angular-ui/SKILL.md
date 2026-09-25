@@ -152,9 +152,19 @@ src/app/
   branch swallows it** (UIB-26, 2026-09-22): one `[actions]` slot per branch silently emptied every
   standard pane's action row. Capture a slot once in an `<ng-template>` and stamp it into the rendered
   branch with `*ngTemplateOutlet` — the header does exactly this.
-  - **`<inspecto-stat-tile label [value] [hint] [absentReason]>`** — the KPI tile. Tabular numerals so a
-    row lines up; 🔴 an **absent** value (`null`/`undefined`/`''`) renders as an em dash carrying
-    `absentReason`, never as a `0` nobody measured — `0` itself still renders as `0`.
+  - **`<inspecto-stat-tile label [value] [hint] [absentReason]>`** — a pane's counter tile (Home, status
+    strips). Tabular numerals so a row lines up; 🔴 an **absent** value (`null`/`undefined`/`''`) renders as
+    an em dash carrying `absentReason`, never as a `0` nobody measured — `0` itself still renders as `0`.
+    It is NOT the dashboard KPI Widget below — don't use one for the other.
+  - **`<inspecto-kpi [value] [format] [compare] [target] [better]>`** — the dashboard **KPI Widget**
+    (`vizType: kpi`, UIE-1). Format through `inspecto/viz/number-format.ts` (`formatNumber`, pinned `en`
+    locale; `currency`/`percent`/`compact`) — 🔴 never a bare `Intl.NumberFormat()` or `toLocaleString()`
+    in a viz. The `compare` delta is SIGNED and reads as a change ("▼ Down 9.2 % (−15) vs prior period"); a
+    percent KPI changes in **points** ("▼ Down 2.6 pts"). `better: 'lower'` flips the tone (fewer exceptions =
+    green). Dashboard tiles sit on the **4-column grid** (`inspecto/viz/dashboard-grid.ts`: span 1 = a quarter,
+    4 = full row) — one rule for the editor, the menu viewer and the share viewer. Chart colours come from
+    `inspecto/viz/series-colors.ts`: a status-like label takes its `statusTone` colour, any other series a
+    colour stable by NAME, so "FM prevented" is the same colour on every widget (UIE-2).
   - **`<inspecto-section-tabs [tabs] [selected] (selectedChange)>`** — a label strip with a count pill
     per section; the **host** renders the content under it (`@switch`), so nothing hides inside a lazily
     mounted tab body (the R9 rule). 🔴 It holds the active index in its OWN signal: binding

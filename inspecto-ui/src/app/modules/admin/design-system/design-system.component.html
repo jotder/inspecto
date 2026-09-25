@@ -705,6 +705,50 @@
             ><code>{{ snippets.statTile }}</code></pre>
         </section>
 
+        <!-- ── Dashboard KPI Widget (UIE-1…4) ─────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Dashboard KPI Widget</h2>
+                <button mat-stroked-button (click)="copy(snippets.kpi)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>&lt;inspecto-kpi&gt;</code> — the <code>kpi</code> Visualization Type, not the stat tile above.
+                Numbers go through <code>formatNumber</code> (<code>inspecto/viz/number-format.ts</code>); the delta is
+                signed and a percent KPI changes in points; <code>better="lower"</code> makes a fall read green. On a
+                Dashboard, four of these fill one row of the 4-column grid (span 1 = a quarter).
+            </p>
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <inspecto-kpi
+                    label="Exceptions raised today"
+                    [value]="148"
+                    [compare]="163"
+                    [target]="120"
+                    better="lower"
+                />
+                <inspecto-kpi
+                    label="Closed within SLA"
+                    [value]="88.9"
+                    [compare]="91.5"
+                    [target]="90"
+                    [format]="{ style: 'percent', decimals: 1 }"
+                />
+                <inspecto-kpi
+                    label="Suspected exposure"
+                    [value]="373300"
+                    [target]="500000"
+                    better="lower"
+                    [format]="{ style: 'currency', currency: 'SAR', compact: true }"
+                />
+                <inspecto-kpi label="Open cases" [value]="49" />
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.kpi }}</code></pre>
+        </section>
+
         <!-- ── Section tabs ──────────────────────────────── -->
         <section>
             <div class="mb-3 flex items-center justify-between">

@@ -36,6 +36,7 @@ import { QuerySource } from 'app/inspecto/query';
 import { DataTableComponent, DataTableTier } from 'app/inspecto/data-table';
 import { TreeTableComponent, TreeNode, varianceCell } from 'app/inspecto/tree-table';
 import { GeoData, MapViewComponent } from 'app/inspecto/geo';
+import { KpiComponent } from 'app/inspecto/viz/plugins/kpi.component';
 import {
     InspectoSchemaFieldsEditorComponent,
     InspectoSchemaMetadataGridComponent,
@@ -76,6 +77,7 @@ interface DemoRow {
         InspectoEmptyStateComponent,
         InspectoPageHeaderComponent,
         InspectoStatTileComponent,
+        KpiComponent,
         InspectoSectionTabsComponent,
         InspectoBulkActionsComponent,
         InspectoFilterBarComponent,
@@ -369,6 +371,11 @@ export class DesignSystemComponent {
         statTile: `<!-- an ABSENT value renders as an em dash with a reason — never a 0 nobody measured -->
 <inspecto-stat-tile label="Recent Runs" [value]="runs() ?? null" absentReason="Jobs backend not configured" />
 <inspecto-stat-tile label="Datasets written" [value]="written()" hint="last 24h" />`,
+        kpi: `<!-- the dashboard KPI Widget (vizType: kpi) — format, a signed prior-period delta, a target and its good direction -->
+<inspecto-kpi [value]="148" [compare]="163" [target]="120" better="lower" />
+<inspecto-kpi [value]="88.9" [compare]="91.5" [target]="90" [format]="{ style: 'percent', decimals: 1 }" />
+<inspecto-kpi [value]="373300" [format]="{ style: 'currency', currency: 'SAR', compact: true }" />
+<!-- a Widget TOON: options.format {style, currency, compact}, options.kpi {target, better}, controls.compare[1]{field,agg} -->`,
         sectionTabs: `<!-- label strip only: the HOST owns the content, so no lazily-mounted tab bodies -->
 <inspecto-section-tabs [tabs]="tabs" [selected]="tab()" (selectedChange)="tab.set($event)" />
 @switch (tab()) { @case ('grammar') { ... } @case ('schema') { ... } }`,
