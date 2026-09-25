@@ -38,7 +38,7 @@ import { Dataset, DatasetColumn, inferRoles } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { Widget, WidgetOptions, WorkingSetBinding, buildWidget } from './widget-types';
 import { WidgetSaveDialog, WidgetSaveResult } from './widget-save.dialog';
-import { WidgetOptionsDialog } from './widget-options.dialog';
+import { WidgetOptionsData, WidgetOptionsDialog } from './widget-options.dialog';
 import { WidgetsService } from './widgets.service';
 import { ExploreControlsComponent } from './explore-controls.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -325,7 +325,10 @@ export class ExploreComponent implements OnInit {
     /** Open the advanced (cog) options dialog; applies the edited options on close, no-ops on cancel. */
     openOptions(): void {
         this.dialog
-            .open(WidgetOptionsDialog, { data: this.options(), width: '480px' })
+            .open(WidgetOptionsDialog, {
+                data: { options: this.options(), vizType: this.vizType() } satisfies WidgetOptionsData,
+                width: '480px',
+            })
             .afterClosed()
             .subscribe((edited?: WidgetOptions) => {
                 if (edited) this.options.set(edited);

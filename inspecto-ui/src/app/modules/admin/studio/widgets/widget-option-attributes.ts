@@ -21,7 +21,20 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     { key: 'xTitle', label: 'X axis title', type: 'string', tier: 'required', required: false },
     { key: 'yTitle', label: 'Y axis title', type: 'string', tier: 'required', required: false },
     { key: 'y2Title', label: 'Right axis title (Combo)', type: 'string', tier: 'required', required: false },
-    { key: 'legendShow', label: 'Show legend', type: 'boolean', tier: 'required', required: false, default: true },
+    // Auto writes no `legend.show`, so the chart theme decides (a legend only for 2+ series, or a pie/donut's slices).
+    {
+        key: 'legendShow',
+        label: 'Legend',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: 'auto',
+        options: [
+            { value: 'auto', label: 'Auto (only when there are 2+ series)' },
+            { value: 'show', label: 'Show' },
+            { value: 'hide', label: 'Hide' },
+        ],
+    },
     {
         key: 'legendPosition',
         label: 'Legend position',
@@ -60,7 +73,14 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     },
     { key: 'limit', label: 'Limit (top N)', type: 'number', tier: 'required', required: false, min: 1 },
     { key: 'stacked', label: 'Stack series', type: 'boolean', tier: 'required', required: false, default: false },
-    { key: 'hideBlank', label: 'Hide blank categories', type: 'boolean', tier: 'required', required: false, default: false },
+    {
+        key: 'hideBlank',
+        label: 'Hide blank categories',
+        type: 'boolean',
+        tier: 'required',
+        required: false,
+        default: false,
+    },
     // UIE-4: how the widget's numbers read (KPI value, axes, tooltips, table cells).
     {
         key: 'numberStyle',
@@ -190,4 +210,88 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
         required: false,
         placeholder: 'A dimension of this table, e.g. reconciliation_id',
     },
+    // ── Per-Visualization-Type options (kpi-trend / progress-list / treemap / combo) ─────────────────────────────
+    // Shown only for the vizType named in WIDGET_OPTION_VIZ_TYPES below. Blank or the default writes nothing.
+    {
+        key: 'trendCompareBack',
+        label: 'KPI trend: compare with the point this many steps back',
+        type: 'number',
+        tier: 'required',
+        required: false,
+        min: 1,
+        placeholder: '1 (the previous point)',
+    },
+    {
+        key: 'progressMax',
+        label: 'Progress list: value of a full bar',
+        type: 'number',
+        tier: 'required',
+        required: false,
+        placeholder: 'The largest value shown',
+    },
+    {
+        key: 'treemapLimit',
+        label: 'Treemap: groups before the rest fold into "Other"',
+        type: 'number',
+        tier: 'required',
+        required: false,
+        min: 2,
+        placeholder: '20',
+    },
+    // Combo: the right-axis number format (`options.format2`) — the same four fields as the number format above.
+    {
+        key: 'format2Style',
+        label: 'Right axis: number style',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: '',
+        group: 'Right axis format',
+        options: [
+            { value: '', label: 'Number' },
+            { value: 'currency', label: 'Currency' },
+            { value: 'percent', label: 'Percent (value is already in points)' },
+        ],
+    },
+    {
+        key: 'format2Currency',
+        label: 'Right axis: currency code (e.g. SAR)',
+        type: 'string',
+        tier: 'required',
+        required: false,
+        group: 'Right axis format',
+    },
+    {
+        key: 'format2Compact',
+        label: 'Right axis: compact (7.7M)',
+        type: 'boolean',
+        tier: 'required',
+        required: false,
+        default: false,
+        group: 'Right axis format',
+    },
+    {
+        key: 'format2Decimals',
+        label: 'Right axis: decimals',
+        type: 'number',
+        tier: 'required',
+        required: false,
+        min: 0,
+        group: 'Right axis format',
+    },
 ];
+
+/**
+ * Options shown only for one Visualization Type (flat key → vizType). The dialog drops the others from its form,
+ * and a dropped field leaves its stored value untouched.
+ */
+export const WIDGET_OPTION_VIZ_TYPES: Record<string, string> = {
+    trendCompareBack: 'kpi-trend',
+    progressMax: 'progress-list',
+    treemapLimit: 'treemap',
+    format2Style: 'combo',
+    format2Currency: 'combo',
+    format2Compact: 'combo',
+    format2Decimals: 'combo',
+};
+// ── end per-Visualization-Type options ──────────────────────────────────────────────────────────────────────
