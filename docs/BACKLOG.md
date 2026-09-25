@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **36<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 18<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
+> **38<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -24,9 +24,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 18<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 18<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 36<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 38<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -190,6 +190,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Datasets & lineage
 
+- **P2** · **VIRTUAL-DATASET-SQL-1 — a virtual Dataset authored as SQL is unusable end to end** (cricket pilot 2026-09-25) — the Dataset editor's Run evaluates the SQL client-side in AlaSQL (no DuckDB functions: `strptime` → "alasql.fn.strptime is not a function"; `QueryPanelComponent` never forwards `serverRun`/`runOnServer`); a saved hand-edited SQL lands as `QueryModel.sqlOverride`, which `compileSql` (`inspecto/query/query-sql.ts`) silently DROPS for row previews; and `DatasetRelation.baseRelationSql` knows only `view`/`physicalRef`, so `/bi/query` over a `kind: virtual` Dataset 422s. Builders fall back to calculated columns on a physical Dataset. Fix: teach `DatasetRelation` to compile `dataset.query` (prefer `sqlOverride`, SqlGuard-checked), and run the editor preview on the server. → `okf/frontend/features/studio.md`
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises; ⬜ re-confirmed not fired 2026-09-15. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4
 
 ### 3.5 Data quality, Observability, Signals & Alerting
@@ -209,6 +210,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 ### 3.6 Analytics — Queries, BI, Studio & Export
 
 - **P2** · **D-8 XLSX export — bundle proof, two residuals** — the air-gapped half is PROVEN (2026-09-24, as-built in `okf/capabilities/pipeline-authoring/pipeline-authoring.md` §3.0): in STAGED mode (`-Dduckdb.extension.dir`, set by every launcher) `DuckDbExtension` now loads ONLY `<dir>/<name>.duckdb_extension` by path and a missing file fails loudly — never a fall-through to `INSTALL`; and the real route produced a workbook from a bundle with DuckDB's own cache made unreachable. `PipelineDocumentXlsxTest` now RUNS (not skips) wherever a stageable binary exists. Open: **(1)** the bundle used for the proof was the last `package.ps1` Enterprise output with `inspecto.jar` rebuilt, the policy jar removed and `spaces/` re-staged by package.ps1's step-4 rule — the session could not launch PowerShell — so one end-to-end `pwsh inspecto/package.ps1 -Edition Professional` run is owed; **(2)** no `linux_amd64` binary exists on the desk (`~/.duckdb/extensions/v1.5.2/` holds `windows_amd64` only), so a Linux zip still ships no `excel`: it needs `v1.5.2/linux_amd64/excel.duckdb_extension` from `http://extensions.duckdb.org/v1.5.2/linux_amd64/excel.duckdb_extension.gz` (what `node tools/fetch-duckdb-extensions.mjs` fetches), then `-RequireExtensions`. ⛔ **Do not add POI.** → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
+- **P2** · **QUERY-BOUND-WIDGET-1 — a Widget's `queryId` (R3) is modelled but never rendered** (cricket pilot 2026-09-25) — the Query Library says one saved query "can be bound by many widgets", but nothing binds one from the Widget Builder and no render path (widget host, `DatasetResultService`, `/bi/query`) reads `queryId`; a saved query's own filtering (e.g. `player_of_the_match <> ''`) cannot reach a Widget. Interim: the Widget option "Hide blank categories" covers the leaderboard case. → `okf/frontend/features/studio.md`
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (The DuckDB `spatial` extension itself: zero demand, re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 
 Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-overview`, `quality-monitor`,
