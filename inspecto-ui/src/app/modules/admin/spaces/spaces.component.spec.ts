@@ -63,4 +63,16 @@ describe('SpacesComponent', () => {
         const el = fixture.nativeElement as HTMLElement;
         expect(el.querySelector('[aria-label="Create from bundle"]')).not.toBeNull();
     });
+
+    it('hides "New space" and "New from template" without canAdminister — the server would refuse them', () => {
+        const text = (create(true, SPACES, false).nativeElement as HTMLElement).textContent ?? '';
+        expect(text).not.toContain('New space');
+        expect(text).not.toContain('New from template');
+    });
+
+    it('shows "New space" and "New from template" with canAdminister', () => {
+        const text = (create(true, SPACES, true).nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('New space');
+        expect(text).toContain('New from template');
+    });
 });

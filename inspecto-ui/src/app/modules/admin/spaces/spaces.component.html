@@ -12,17 +12,16 @@
             <button mat-icon-button (click)="reload()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
             </button>
-            @if (spaces.multiSpace()) {
-                @if (lens.canAdminister()) {
-                    <button
-                        mat-icon-button
-                        (click)="createFromBundle()"
-                        matTooltip="Create from bundle"
-                        aria-label="Create from bundle"
-                    >
-                        <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
-                    </button>
-                }
+            <!-- Every create is admin-only: the server refuses POST /spaces without canAdminister. -->
+            @if (spaces.multiSpace() && lens.canAdminister()) {
+                <button
+                    mat-icon-button
+                    (click)="createFromBundle()"
+                    matTooltip="Create from bundle"
+                    aria-label="Create from bundle"
+                >
+                    <mat-icon svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                </button>
                 <button mat-stroked-button (click)="newFromTemplate()">
                     <mat-icon svgIcon="heroicons_outline:square-3-stack-3d"></mat-icon>
                     <span class="ml-2">New from template</span>
