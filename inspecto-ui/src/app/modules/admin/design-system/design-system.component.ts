@@ -501,9 +501,9 @@ export class DesignSystemComponent {
               value: [{ field: 'status', agg: 'max' }] },          // a status column needs max / min
   options: { heatmap: { scale: 'status' } } }                       // 'sequential' (default) | 'diverging' | 'status'
 // diverging: options.heatmap.midpoint (default 0); status on numbers: options.kpi.target + better
-// the component on its own (viz-render mounts it; a cell click drills on the ROW dimension):
+// the component on its own (viz-render mounts it; a cell click drills on its row AND column as one toggle):
 <inspecto-heatmap [data]="props.heatmap" [options]="{ scale: 'diverging', midpoint: 0 }" [format]="fmt"
-                  (cellClick)="drill($event.row)" />`;
+                  (cellClick)="drill($event.row, $event.column)" />`;
 
     /** Dashboard tile section: the chart tile's demo series. */
     readonly tileDemoChart: ChartData = {

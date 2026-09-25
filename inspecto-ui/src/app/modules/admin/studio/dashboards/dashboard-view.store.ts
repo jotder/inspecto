@@ -84,16 +84,27 @@ export class DashboardViewStore {
     }
 
     /** A tile's drill-down click (or a quick-filter pick) — toggle `field = value` in the cross-filter: add
-     *  it if absent, remove it if the same value is clicked again. */
-    onDrill({ field, value }: DrillEvent): void {
+     *  it if absent, remove it if the same value is clicked again. A multi-pair drill (a heatmap cell's row AND
+     *  column, via `and`) toggles as ONE unit: when every pair is already present all of them are removed,
+     *  otherwise the missing ones are added. Other conditions are left alone — a click on a different cell adds
+     *  its pair beside the previous one, exactly as a second bar click does. */
+    onDrill(event: DrillEvent): void {
+        const pairs = [event, ...(event.and ?? [])];
         const current = this.filter();
-        const matches = (item: Condition | ConditionGroup): boolean =>
-            item.kind === 'condition' && item.field === field && item.operator === '=' && item.value === value;
-        const idx = current.items.findIndex(matches);
-        const items =
-            idx >= 0
-                ? current.items.filter((_, i) => i !== idx)
-                : [...current.items, { kind: 'condition', field, operator: '=', value } as Condition];
+        const found = pairs.map(({ field, value }) =>
+            current.items.findIndex(
+                (item) =>
+                    item.kind === 'condition' && item.field === field && item.operator === '=' && item.value === value,
+            ),
+        );
+        const items = found.every((i) => i >= 0)
+            ? current.items.filter((_, i) => !found.includes(i))
+            : [
+                  ...current.items,
+                  ...pairs
+                      .filter((_, k) => found[k] < 0)
+                      .map(({ field, value }) => ({ kind: 'condition', field, operator: '=', value }) as Condition),
+              ];
         this.filter.set({ ...current, items });
     }
 

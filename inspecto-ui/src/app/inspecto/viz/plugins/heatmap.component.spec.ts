@@ -130,7 +130,7 @@ describe('HeatmapComponent', () => {
 });
 
 describe('VizRenderComponent — heatmap', () => {
-    it('renders the heatmap and re-emits a cell click as the row value (the one-field drill contract)', () => {
+    it('renders the heatmap and re-emits a cell click as its raw row AND column (the two-field drill)', () => {
         TestBed.configureTestingModule({
             imports: [VizRenderComponent],
             providers: [
@@ -147,9 +147,12 @@ describe('VizRenderComponent — heatmap', () => {
         const el = fixture.nativeElement as HTMLElement;
         const cells = [...el.querySelectorAll<HTMLButtonElement>('[data-testid="heat-cell"]')];
         expect(cells[0].style.background).toContain('var(--gamma-warn-rgb)'); // 1 is below the midpoint 20
-        let emitted: string | undefined;
-        fixture.componentInstance.categoryClick.subscribe((v) => (emitted = v));
+        let emitted: { row: string; column: string } | undefined;
+        let category: string | undefined;
+        fixture.componentInstance.cellClick.subscribe((v) => (emitted = v));
+        fixture.componentInstance.categoryClick.subscribe((v) => (category = v));
         cells[2].click();
-        expect(emitted).toBe('RA-C10');
+        expect(emitted).toEqual({ row: 'RA-C10', column: '2026-09-02' });
+        expect(category).toBeUndefined();
     });
 });

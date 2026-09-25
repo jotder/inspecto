@@ -16,7 +16,7 @@ import { KpiComponent, KpiMode } from './plugins/kpi.component';
 import { KpiTrendComponent } from './plugins/kpi-trend.component';
 import { ProgressListComponent } from './plugins/progress-list.component';
 import { TreemapChannel, TreemapComponent } from './plugins/treemap.component';
-import { HeatmapComponent } from './plugins/heatmap.component';
+import { HeatmapCellClick, HeatmapComponent } from './plugins/heatmap.component';
 import { getVizComponentLoader } from './viz-components';
 import {
     signed,
@@ -106,7 +106,7 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
                             [format]="renderOptions()?.format"
                             [target]="renderOptions()?.kpi?.target"
                             [better]="renderOptions()?.kpi?.better ?? 'higher'"
-                            (cellClick)="categoryClick.emit($event.row)"
+                            (cellClick)="cellClick.emit($event)"
                         />
                     }
                 } @else if (outletComponent(); as cmp) {
@@ -138,9 +138,11 @@ export class VizRenderComponent {
     /** KPI only: the in-place size, when the HOST owns the size control (a Dashboard tile's action set). Absent ⇒
      *  the KPI keeps its own card and size button. */
     readonly kpiSize = input<KpiMode | undefined>(undefined);
-    /** Emits the clicked category's label (bar/line/area/pie/bubble; a heatmap cell's ROW value — the drill event
-     *  carries one field) — the drill-down seam. Gauge has no filterable categories, so it never emits. */
+    /** Emits the clicked category's label (bar/line/area/pie/bubble) — the drill-down seam. Gauge has no filterable
+     *  categories, so it never emits. */
     readonly categoryClick = output<string>();
+    /** Emits a clicked heatmap cell's raw row AND column values — the host drills on both dimensions at once. */
+    readonly cellClick = output<HeatmapCellClick>();
     /** Emits a clicked mark that knows its own channel — the treemap, whose group cells drill on `group` and whose
      *  subgroup cells drill on `subgroup`. The host resolves the channel to its field. */
     readonly channelClick = output<{ channel: ChannelId; value: string }>();

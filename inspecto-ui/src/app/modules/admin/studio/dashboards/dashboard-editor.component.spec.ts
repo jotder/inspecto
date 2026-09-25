@@ -346,4 +346,43 @@ describe('DashboardEditorComponent', () => {
         c.onDrill({ field: 'tariff', value: 'standard' });
         expect(c.filter().items).toHaveLength(2);
     });
+
+    it('a heatmap-cell drill adds BOTH its row and column conditions, and a second click removes both', () => {
+        const c = create().componentInstance;
+        c.onDrill({ field: 'tariff', value: 'premium' }); // an unrelated single-field drill stays put
+        const cell = { field: 'control', value: 'RA-C02', and: [{ field: 'event_date', value: '2025-10-01' }] };
+        c.onDrill(cell);
+        expect(c.filter().items).toEqual([
+            { kind: 'condition', field: 'tariff', operator: '=', value: 'premium' },
+            { kind: 'condition', field: 'control', operator: '=', value: 'RA-C02' },
+            { kind: 'condition', field: 'event_date', operator: '=', value: '2025-10-01' },
+        ]);
+        c.onDrill(cell);
+        expect(c.filter().items).toEqual([{ kind: 'condition', field: 'tariff', operator: '=', value: 'premium' }]);
+    });
+
+    it('a heatmap pair with one half already filtered adds only the missing half; the next click removes the pair', () => {
+        const c = create().componentInstance;
+        c.onDrill({ field: 'control', value: 'RA-C02' });
+        const cell = { field: 'control', value: 'RA-C02', and: [{ field: 'event_date', value: '2025-10-01' }] };
+        c.onDrill(cell);
+        expect(c.filter().items).toHaveLength(2);
+        c.onDrill(cell);
+        expect(c.filter().items).toHaveLength(0);
+    });
+
+    it('the drill-through of a heatmap-cell drill carries both conditions in the request', async () => {
+        rowsCalls.length = 0;
+        const fixture = create();
+        const c = fixture.componentInstance;
+        fixture.detectChanges();
+        c.addWidget('bar1');
+        c.onDrill({ field: 'tariff', value: 'premium', and: [{ field: 'region', value: 'North' }] });
+        c.drillTileIndex.set(0);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        const query = JSON.stringify(rowsCalls.at(-1)?.query);
+        expect(query).toContain('premium');
+        expect(query).toContain('North');
+    });
 });

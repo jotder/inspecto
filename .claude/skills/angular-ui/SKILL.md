@@ -652,7 +652,10 @@ src/app/
 - **Heatmap Visualization Type (`vizType: heatmap`) → `viz/heatmap.ts` + `viz/plugins/heatmap.{plugin,component}.ts`**
   (2026-09-25; gallery: `/design` ▸ *More visualization types*). Channels `rows` × `columns` + one `value`; a real
   `<table>` coloured by `options.heatmap.scale` — `sequential` / `diverging` (`midpoint`) as `rgba(var(--gamma-primary|warn-rgb), a)`
-  ramps, `status` via `statusBadgeClasses()` (numbers vs `options.kpi.target`); a click drills on the ROW dimension only.
+  ramps, `status` via `statusBadgeClasses()` (numbers vs `options.kpi.target`); a cell click drills on its row AND its column:
+  viz-render's `(cellClick)` → widget-host's `onCellClick` emits ONE `DrillEvent` whose `and` carries the column pair,
+  and `DashboardViewStore.onDrill` toggles every pair as a unit (all present ⇒ remove all, else add the missing ones;
+  other conditions untouched — a second cell adds beside the first, like a second bar click).
 - **ag-Grid theme → only** `InspectoGridThemeService` / `GAMMA_GRID_PARAMS`. Never bare `themeQuartz`.
 - Editing the theming plugin (`@gamma/tailwind/plugins/theming.js`) does **not** hot-reload — restart the
   dev server and verify via `getComputedStyle(body).getPropertyValue('--gamma-…')`.

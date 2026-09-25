@@ -10,7 +10,7 @@ import { Widget } from './widget-types';
 import { WidgetsService } from './widgets.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
-import { WidgetHostComponent } from './widget-host.component';
+import { DrillEvent, WidgetHostComponent } from './widget-host.component';
 
 const DS: Dataset = {
     id: 'cdr_sample',
@@ -168,7 +168,7 @@ describe('WidgetHostComponent', () => {
         expect(emitted).toEqual({ field: 'tariff', value: 'premium' });
     });
 
-    it('resolves a heatmap cell click to its ROW dimension (the drill event carries one field)', () => {
+    it('resolves a heatmap cell click to TWO pairs — the rows field and the columns field', () => {
         const heatWidget: Widget = {
             ...WIDGET,
             vizType: 'heatmap',
@@ -184,10 +184,18 @@ describe('WidgetHostComponent', () => {
         ]);
         fixture.componentRef.setInput('widget', heatWidget);
         fixture.componentRef.setInput('dataset', DS);
-        let emitted: { field: string; value: string } | undefined;
+        let emitted: DrillEvent | undefined;
         fixture.componentInstance.drill.subscribe((v) => (emitted = v));
+        fixture.componentInstance.onCellClick({ row: 'RA-C02', column: '2025-10-01' });
+        expect(emitted).toEqual({
+            field: 'control',
+            value: 'RA-C02',
+            and: [{ field: 'event_date', value: '2025-10-01' }],
+        });
+        // A category click is not a heatmap seam: with no x/series channel it drills on nothing.
+        emitted = undefined;
         fixture.componentInstance.onCategoryClick('RA-C02');
-        expect(emitted).toEqual({ field: 'control', value: 'RA-C02' });
+        expect(emitted).toBeUndefined();
     });
 
     it('treemap: a group cell drills on the group field, a subgroup cell on the subgroup field', () => {

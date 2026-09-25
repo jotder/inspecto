@@ -19,6 +19,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { InspectoTileCardComponent, TileState } from 'app/inspecto/components/tile-card.component';
 import { TileShape, tileShapeOf } from 'app/inspecto/viz/dashboard-grid';
 import { StaleMark } from 'app/inspecto/signal/stale-tiles';
+import { HeatmapCellClick } from 'app/inspecto/viz/plugins/heatmap.component';
 import { KpiMode, nextKpiMode } from 'app/inspecto/viz/plugins/kpi.component';
 import { ColumnMeta, ConditionGroup } from 'app/inspecto/query';
 import { ChannelId, VizPlugin, VizProps, getViz } from 'app/inspecto/viz';
@@ -30,10 +31,17 @@ import { WidgetsService } from './widgets.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 
-/** A drilled-down click: filter `field = value` on whatever consumes this widget's data (a dashboard). */
-export interface DrillEvent {
+/** One `field = value` equality condition a drill toggles. */
+export interface DrillPair {
     field: string;
     value: string;
+}
+
+/** A drilled-down click: filter `field = value` on whatever consumes this widget's data (a dashboard). A click that
+ *  pins more than one dimension (a heatmap cell: its row AND its column) carries the further pairs in `and`; the
+ *  consumer toggles every pair as ONE unit. */
+export interface DrillEvent extends DrillPair {
+    and?: DrillPair[];
 }
 
 /**
@@ -139,6 +147,7 @@ export interface DrillEvent {
                                     [kpiSize]="kpiSize()"
                                     (categoryClick)="onCategoryClick($event)"
                                     (channelClick)="onChannelClick($event)"
+                                    (cellClick)="onCellClick($event)"
                                 />
                             }
                         } @else if (datasetFailed()) {
@@ -310,13 +319,22 @@ export class WidgetHostComponent {
         this.kpiSize.update(nextKpiMode);
     }
 
-    /** Resolve the clicked category to the field it came from (the widget's `x` channel, `series` for
-     *  plugins that use it as the point label, e.g. bubble, or a heatmap's `rows` — its drill filters the row
-     *  dimension only, as the event carries one field) and emit the drill event. */
+    /** Resolve the clicked category to the field it came from (the widget's `x` channel, or `series` for
+     *  plugins that use it as the point label, e.g. bubble) and emit the drill event. */
     onCategoryClick(value: string): void {
         const controls = this.resolvedWidget()?.controls;
-        const field = controls?.x?.[0]?.field ?? controls?.series?.[0]?.field ?? controls?.rows?.[0]?.field;
+        const field = controls?.x?.[0]?.field ?? controls?.series?.[0]?.field;
         if (field) this.drill.emit({ field, value });
+    }
+
+    /** A heatmap cell: drill on its row AND its column — the `rows` channel's field and the `columns` channel's
+     *  field, emitted as one event so the consumer toggles the pair together. */
+    onCellClick(e: HeatmapCellClick): void {
+        const controls = this.resolvedWidget()?.controls;
+        const rowField = controls?.rows?.[0]?.field;
+        const columnField = controls?.columns?.[0]?.field;
+        if (rowField && columnField)
+            this.drill.emit({ field: rowField, value: e.row, and: [{ field: columnField, value: e.column }] });
     }
 
     /** A click that names its channel (treemap): drill on THAT channel's field — a group cell on `group`, a subgroup
