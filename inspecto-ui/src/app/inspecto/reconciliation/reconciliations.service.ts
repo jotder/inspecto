@@ -35,8 +35,25 @@ export class ReconciliationsService {
     }
 }
 
+/** The keys {@link toContent} writes itself — dropped from `raw` first, so clearing one in the model removes it. */
+const MODELLED = [
+    'name',
+    'description',
+    'impact',
+    'leftDataset',
+    'rightDataset',
+    'thirdDataset',
+    'keyColumns',
+    'compareColumns',
+    'bands',
+    'breaks',
+    'lastRunAt',
+];
+
 function toContent(r: Reconciliation): Record<string, unknown> {
+    const kept = Object.fromEntries(Object.entries(r.raw ?? {}).filter(([k]) => !MODELLED.includes(k) && k !== 'id'));
     return {
+        ...kept,
         name: r.name,
         // UIE-10: a PUT replaces the whole body, so a field not written back here is deleted by every save.
         ...(r.description ? { description: r.description } : {}),
@@ -74,5 +91,6 @@ function fromContent(name: string, content: Record<string, unknown>): Reconcilia
         bands: c.bands,
         breaks: (c.breaks as ReconBreak[]) ?? [],
         lastRunAt: c.lastRunAt ?? null,
+        raw: content,
     };
 }

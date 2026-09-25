@@ -56,6 +56,44 @@ describe('ReconciliationsService', () => {
         );
     });
 
+    it('a save writes back the keys the model does not carry, and a cleared modelled key stays cleared', () => {
+        const { svc, update, list } = setup();
+        list.mockReturnValue(
+            of([
+                {
+                    type: 'reconciliation',
+                    name: 'hlr_vs_crm',
+                    ref: '',
+                    content: {
+                        name: 'hlr vs crm',
+                        description: 'HLR vs CRM status',
+                        datasets: ['hlr', 'crm'],
+                        keyColumns: ['msisdn'],
+                        compareColumns: [],
+                        columnMap: { crm: { msisdn: 'MSISDN' } },
+                        filters: { hlr: "status <> 'X'" },
+                        cardinality: 'one-to-one',
+                        includeRecordCount: true,
+                        breaks: [],
+                    },
+                },
+            ]) as never,
+        );
+        let read: Reconciliation | undefined;
+        svc.list().subscribe((rs) => (read = rs[0]));
+        svc.save({ ...read!, description: undefined }).subscribe();
+        const body = update.mock.calls[0][2];
+        expect(body).toMatchObject({
+            columnMap: { crm: { msisdn: 'MSISDN' } },
+            filters: { hlr: "status <> 'X'" },
+            cardinality: 'one-to-one',
+            includeRecordCount: true,
+            datasets: ['hlr', 'crm'],
+        });
+        expect(body).not.toHaveProperty('description');
+        expect(body).not.toHaveProperty('raw');
+    });
+
     it('lists reconciliations back from the registry', () => {
         const { svc } = setup();
         let out: { id: string; leftDataset: string }[] = [];

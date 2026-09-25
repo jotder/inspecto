@@ -113,6 +113,9 @@ export interface ReconciliationConfig {
 export interface Reconciliation extends ReconciliationConfig {
     id: string;
     name: string;
+    /** The stored body as read. Keys this model does not carry (`columnMap`, `filters`, `cardinality`, …) are
+     *  written back untouched: a save is a whole-body PUT, so anything not written back is deleted. */
+    raw?: Record<string, unknown>;
 }
 
 export interface ReconSummary {
