@@ -24,12 +24,22 @@ function create(value: string, variant: StatusBadgeVariant = 'pill', label = '')
 }
 
 describe('StatusBadgeComponent', () => {
-    it('pins the height and case: an explicit line-height, upper-case, semibold', () => {
+    it('pins the height: an explicit line-height, semibold, no wrap', () => {
         // text-xs has no line-height of its own in this app — without leading-4 the badge inherits the
         // container's (an ag-Grid cell's is the row height) and the pill grows to fill the row.
-        for (const cls of ['leading-4', 'py-0.5', 'text-xs', 'uppercase', 'font-semibold', 'whitespace-nowrap']) {
+        for (const cls of ['leading-4', 'py-0.5', 'text-xs', 'font-semibold', 'whitespace-nowrap']) {
             expect(STATUS_BADGE_BASE.split(' ')).toContain(cls);
         }
+    });
+
+    it('upper-cases a raw status value, but a label phrase keeps its own case', () => {
+        const html = document.createElement('div');
+        html.innerHTML = statusBadgeHtml('Pass');
+        expect(html.firstElementChild!.classList).toContain('uppercase');
+        html.innerHTML = statusBadgeHtml('good', 'Down 2.6 pts vs prior period');
+        expect(html.firstElementChild!.classList).not.toContain('uppercase');
+        const labelled = create('good', 'pill', 'Target 95 % — on target');
+        expect((labelled.nativeElement.querySelector('span') as HTMLElement).classList).not.toContain('uppercase');
     });
 
     it('renders the same classes from the component and the string renderer', () => {

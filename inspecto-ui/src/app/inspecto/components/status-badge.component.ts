@@ -60,10 +60,12 @@ export type StatusBadgeVariant = 'pill' | 'dot';
  * Shared type + height (kept here so the component and string-renderer paths render identically).
  * `leading-4` pins the badge at 20 px: the app's `text-xs` (10 px) carries no line-height of its own,
  * so a badge used to inherit its container's — inside an ag-Grid cell, whose line-height is the row
- * height, the pill grew to the full row. Always upper-case: status values arrive as `FAIL`, `Pass`,
- * `healthy`, so the case is the badge's, not the data's.
+ * height, the pill grew to the full row. A raw status VALUE is upper-cased (it arrives as `FAIL`, `Pass`,
+ * `healthy`, so the case is the badge's, not the data's); a caller's `label` is a phrase ("Down 2.6 pts vs prior
+ * period", "Target 95 % — below target") and keeps its own case.
  */
-const BADGE_TYPE = 'shrink-0 whitespace-nowrap py-0.5 text-xs font-semibold uppercase leading-4 tracking-wide';
+const BADGE_TYPE = 'shrink-0 whitespace-nowrap py-0.5 text-xs font-semibold leading-4';
+const VALUE_CASE = 'uppercase tracking-wide';
 /** Pill geometry + type. */
 export const STATUS_BADGE_BASE = `inline-flex items-center rounded px-2 ${BADGE_TYPE}`;
 const STATUS_DOT_BASE = `inline-flex items-center gap-1.5 ${BADGE_TYPE}`;
@@ -153,11 +155,12 @@ export function statusBadgeHtml(
     // The text is ESCAPED here: callers hand over raw cell values (alert names, statuses read off data), and this
     // string goes into the grid as HTML.
     const text = escapeHtml(label ?? value ?? '');
+    const kase = label == null ? ` ${VALUE_CASE}` : '';
     if (variant === 'dot') {
         const dot = `<span aria-hidden="true" class="${DOT} ${DOT_CLASSES[statusTone(value)]}"></span>`;
-        return `<span class="${STATUS_DOT_BASE}">${dot}${text}</span>`;
+        return `<span class="${STATUS_DOT_BASE}${kase}">${dot}${text}</span>`;
     }
-    return `<span class="${STATUS_BADGE_BASE} ${statusBadgeClasses(value)}">${text}</span>`;
+    return `<span class="${STATUS_BADGE_BASE}${kase} ${statusBadgeClasses(value)}">${text}</span>`;
 }
 
 /**
@@ -173,9 +176,11 @@ export function statusBadgeHtml(
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         @if (variant === 'dot') {
-            <span [class]="dotBase"><span aria-hidden="true" [class]="dotClasses"></span>{{ label || value }}</span>
+            <span [class]="dotBase + kase"
+                ><span aria-hidden="true" [class]="dotClasses"></span>{{ label || value }}</span
+            >
         } @else {
-            <span [class]="base + ' ' + classes">{{ label || value }}</span>
+            <span [class]="base + kase + ' ' + classes">{{ label || value }}</span>
         }
     `,
 })
@@ -192,6 +197,11 @@ export class StatusBadgeComponent {
 
     get classes(): string {
         return statusBadgeClasses(this.value);
+    }
+
+    /** Upper-case only the raw status value — a `label` is a phrase and keeps its case. */
+    get kase(): string {
+        return this.label ? '' : ` ${VALUE_CASE}`;
     }
 
     get dotClasses(): string {

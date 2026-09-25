@@ -27,8 +27,7 @@ export function tableColDefs(columns: string[], opts?: VizRenderOptions): ColDef
         if (isBadgeColumn(field, opts)) {
             def.cellRenderer = (p: { value: unknown }) => {
                 if (p.value == null || p.value === '') return '';
-                const text = String(p.value);
-                return statusBadgeHtml(text, text);
+                return statusBadgeHtml(String(p.value));
             };
         }
         // UIE-6: the row's id cell links to the object it describes (wins over a badge on the same column).
