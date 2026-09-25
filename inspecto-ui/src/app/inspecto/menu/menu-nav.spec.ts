@@ -1,3 +1,4 @@
+import MENU_ROUTE_CONTRACT from 'app/inspecto/contracts/menu-route.contract.json';
 import { describe, expect, it } from 'vitest';
 import { favoritesNavGroup, landingUrl, MENU_FAVORITES_NAV_ID, menuLeafUrl, menuTreeToNav } from './menu-nav';
 import { MenuNode, routeError } from './menu-types';
@@ -133,5 +134,10 @@ describe('routeError (client mirror of NavMenus.checkRoute)', () => {
             '/' + 'a'.repeat(512),
         ])
             expect(routeError(bad), bad).not.toBeNull();
+    });
+
+    it('accepts exactly the set the server does (menu-route.contract.json, shared with ControlApiNavMenusTest)', () => {
+        for (const ok of MENU_ROUTE_CONTRACT.accept) expect(routeError(ok), ok).toBeNull();
+        for (const bad of MENU_ROUTE_CONTRACT.refuse) expect(routeError(bad), bad).not.toBeNull();
     });
 });

@@ -184,6 +184,44 @@ class ControlApiNavMenusTest {
         }
     }
 
+    /** The route table shared with the SPA's {@code routeError} — both validators must accept exactly this set. */
+    private static final String ROUTE_CONTRACT = "inspecto-ui/src/app/inspecto/contracts/menu-route.contract.json";
+
+    private static JsonNode routeContract() throws Exception {
+        Path dir = Path.of("").toAbsolutePath();
+        for (int up = 0; up < 4 && dir != null; up++, dir = dir.getParent()) {
+            Path candidate = dir.resolve(ROUTE_CONTRACT);
+            if (Files.exists(candidate)) return JSON.readTree(candidate.toFile());
+        }
+        throw new AssertionError("cannot locate " + ROUTE_CONTRACT + " from " + Path.of("").toAbsolutePath());
+    }
+
+    /**
+     * Operator 2026-09-25: a {@code :} is legal in the query and fragment ({@code /cases?since=2026-09-01T00:00})
+     * but still refused in the path; {@code javascript:} and {@code //evil} stay refused.
+     */
+    @Test
+    void routeContractTableIsHonouredOverHttp(@TempDir Path root) throws Exception {
+        JsonNode contract = routeContract();
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String base = "/spaces/acme/nav/menus";
+            for (String key : List.of("accept", "refuse")) {
+                assertFalse(contract.get(key).isEmpty(), key + " must not be empty");
+                for (JsonNode n : contract.get(key)) {
+                    String route = n.asText();
+                    String body = JSON.writeValueAsString(java.util.Map.of("version", 1, "nodes", List.of(java.util.Map.of(
+                            "id", "a", "title", "A", "binding", java.util.Map.of("kind", "route", "route", route)))));
+                    HttpResponse<String> r = send(c.port, "PUT", base, body);
+                    assertEquals(key.equals("accept") ? 200 : 422, r.statusCode(), key + " " + route + ": " + r.body());
+                    if (key.equals("accept"))
+                        assertEquals(route, json(send(c.port, "GET", base, null))
+                                .get("nodes").get(0).get("binding").get("route").asText(), "stored verbatim");
+                }
+            }
+        }
+    }
+
     @Test
     void danglingLandingOnDiskIsDroppedNotFatal(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

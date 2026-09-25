@@ -239,7 +239,9 @@ shared tree**, because a favourite is personal while the tree is shared.
 (Dashboard, Widget, saved view) or, with `kind: route`, an **in-app route** such as `/cases`, so a
 business user reaches platform screens from the Space menu. The server accepts only an absolute in-app
 path — no scheme, no `//` or backslash, no `.`/`..` segment, no whitespace, at most 512 characters — and the
-Menu Builder's *Add screen link* dialog mirrors that check. The tree also carries an optional `landing`
+Menu Builder's *Add screen link* dialog mirrors that check. A `:` is refused in the path but allowed after the
+first `?` or `#` (`/cases?since=2026-09-01T00:00`, operator 2026-09-25); both validators are pinned to one
+table, `inspecto-ui/src/app/inspecto/contracts/menu-route.contract.json`. The tree also carries an optional `landing`
 (a leaf id, refused on write when it names no leaf, dropped on read when stale). Opening the app at `/`
 resolves **per-Demo-User landing → Space landing → platform Home**: the Demo User's `landing` column in
 `demo-users.toon` rides on the sign-in picker entry (a menu item id, never a role), and the first

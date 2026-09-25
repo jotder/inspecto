@@ -136,19 +136,22 @@ record NavMenus(List<Map<String, Object>> nodes, String landing) {
      * A route binding's target must stay inside the SPA: an absolute path ({@code /cases}, optionally with a
      * query or fragment), never a scheme ({@code https:}, {@code javascript:}), a protocol-relative host
      * ({@code //evil}, or {@code /\evil}, which browsers read the same way), a {@code ..} segment, or
-     * whitespace / control characters.
+     * whitespace / control characters. A {@code :} is refused in the PATH only — the query and fragment may
+     * carry one ({@code /cases?since=2026-09-01T00:00}), since a scheme can only lead the path (operator
+     * 2026-09-25). Pinned with the SPA's {@code routeError} by {@code menu-route.contract.json}.
      */
     static String checkRoute(String nodeId, String route) {
         String bad = null;
         if (route.length() > MAX_ROUTE_LENGTH) bad = "is longer than " + MAX_ROUTE_LENGTH + " characters";
         else if (route.charAt(0) != '/') bad = "must start with '/'";
         else if (route.startsWith("//") || route.indexOf('\\') >= 0) bad = "must not name another host";
-        else if (route.contains(":")) bad = "must not carry a scheme";
         else if (route.chars().anyMatch(ch -> ch <= ' ' || ch == 0x7f)) bad = "must not contain whitespace";
         else {
             int end = route.length();
             for (char stop : new char[]{'?', '#'}) { int i = route.indexOf(stop); if (i >= 0 && i < end) end = i; }
-            for (String seg : route.substring(0, end).split("/"))
+            String path = route.substring(0, end);
+            if (path.indexOf(':') >= 0) bad = "must not carry a scheme";
+            else for (String seg : path.split("/"))
                 if (seg.equals("..") || seg.equals(".")) { bad = "must not contain '.' or '..' segments"; break; }
         }
         if (bad != null) throw new IllegalArgumentException("node '" + nodeId + "': route " + bad);

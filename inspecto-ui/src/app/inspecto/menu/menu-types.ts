@@ -29,16 +29,17 @@ export interface RouteBinding {
 /** Longest route the server accepts (`NavMenus.MAX_ROUTE_LENGTH`). */
 export const MAX_ROUTE_LENGTH = 512;
 
-/** Why `route` is not a safe in-app route, or null when it is — the mirror of the server's 422 walk. */
+/** Why `route` is not a safe in-app route, or null when it is — the mirror of the server's 422 walk, pinned to it by `contracts/menu-route.contract.json`. */
 export function routeError(route: string): string | null {
     if (!route) return 'A route is required.';
     if (route.length > MAX_ROUTE_LENGTH) return `Keep the route under ${MAX_ROUTE_LENGTH} characters.`;
     if (!route.startsWith('/')) return 'Start the route with / (for example /cases).';
     if (route.startsWith('//') || route.includes('\\')) return 'The route must stay inside this app.';
-    if (route.includes(':')) return 'The route must not carry a scheme.';
     // eslint-disable-next-line no-control-regex -- refusing whitespace and control characters is the point
     if (/[\u0000- \u007f]/.test(route)) return 'The route must not contain spaces.';
     const path = route.split(/[?#]/)[0];
+    // A `:` only matters in the path (a scheme leads it); the query and fragment may carry one (operator 2026-09-25).
+    if (path.includes(':')) return 'The route must not carry a scheme.';
     if (path.split('/').some((seg) => seg === '.' || seg === '..'))
         return 'The route must not contain . or .. segments.';
     return null;

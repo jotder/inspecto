@@ -1,0 +1,29 @@
+{
+  "accept": [
+    "/",
+    "/cases",
+    "/alerts?status=open",
+    "/link-analysis/ring#n1",
+    "/cases?status=open#top",
+    "/cases?since=2026-09-01T00:00",
+    "/cases#at=10:30",
+    "/cases?next=/x:y",
+    "/cases#a?b:c"
+  ],
+  "refuse": [
+    "cases",
+    "https://evil.example/x",
+    "javascript:alert(1)",
+    "//evil.example",
+    "//evil.example?x=1:2",
+    "/\\evil.example",
+    "/cases/../settings",
+    "/./cases",
+    "/ca ses",
+    "/cases\t",
+    "/x:y",
+    "/x:y?since=1:2",
+    "/cases:open#top",
+    "/cases?q=a b"
+  ]
+}
