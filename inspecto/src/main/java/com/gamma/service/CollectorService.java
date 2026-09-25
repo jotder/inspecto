@@ -506,14 +506,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.alerting = new com.gamma.alert.AlertService(alertRules, configSource, this.status,
                 this.objectEngine.map(ObjectEngineProvider.ObjectEngine::access).orElse(null));
         // BI-5: measure rules evaluate a Dataset measure via the headless BI evaluator. Both roots
-        // resolve lazily — the write root is a -D property, the data root is this space's data dir.
+        // resolve lazily and PER SPACE (MEASURE-PROBE-SPACE-ROOT-1): the registry is this Space's config
+        // root (the default Space alone falls back to -Dassist.write.root), and the data root follows the
+        // same -Ddata.dir-overrides rule as the other call sites here. Reading the JVM-wide property made
+        // every measure rule in a named Space resolve no Dataset, so none could ever fire.
+        final String probeSpace = root.id();
         alerting.measureProbe(new com.gamma.query.DatasetMeasureProbe(
+                () -> com.gamma.pipeline.SpaceConfigRoot.forSpace(probeSpace),
                 () -> {
-                    String wr = System.getProperty("assist.write.root");
-                    return (wr == null || wr.isBlank()) ? null : java.nio.file.Path.of(wr);
-                },
-                () -> {
-                    String dd = root.dataDir();
+                    String dd = System.getProperty("data.dir", root.dataDir());
                     return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
                 })::value);
         // LA-23: Investigation rules, evaluated by the optional inspecto-geo-link module when it ships (absent it,
