@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Save-time guards for the policy-authoring failure modes F1–F9
- * ({@code docs/superpower/policy-authoring-ux-design.md} §1, §4 — operator D1, 2026-09-25: guard all
+ * ({@code docs/archived-documents/plans-archive/policy-authoring-ux-design.md} §1, §4 — operator D1, 2026-09-25: guard all
  * nine at save time). Each test is one failure mode; the ones that need the Enterprise engine (F6's
  * seed names, F7's lockout simulation) live in {@code ControlApiPolicyEnforcementTest}. Every probe
  * here is a document the pre-guard code ACCEPTED (200) or loaded silently — the red run proves it.

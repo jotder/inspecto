@@ -360,7 +360,7 @@ vocabulary constraint is the durable half.)*
 ### `transform` drafting (shipped 2026-09-25)
 
 The author's ask was AI drafting on a non-`schema` kind; the operator named **`transform`** (design
-[`superpower/ai-drafting-non-schema-design.md`](../../../superpower/ai-drafting-non-schema-design.md), D1–D7
+[`archived-documents/plans-archive/ai-drafting-non-schema-design.md`](../../../archived-documents/plans-archive/ai-drafting-non-schema-design.md), D1–D7
 decided 2026-09-25). As built:
 
 - **Spec home: `ComponentSpecs.forKind`** (`inspecto-engine`, `com.gamma.pipeline.exec`), consulted by
@@ -596,7 +596,7 @@ by design here. Runtime validation is revisitable, but only after all 23 schemas
 ## Open rows this concept owns
 
 - ~~**`AI-ASSIST-SCHEMA-DIALOG-1`** — re-enable `<inspecto-ai-assist>` for the `schema` kind inside
-  `SchemaEditorDialog` (design S1 / Option C in `superpower/ai-drafting-non-schema-design.md`). Filed
+  `SchemaEditorDialog` (design S1 / Option C in `archived-documents/plans-archive/ai-drafting-non-schema-design.md`). Filed
   2026-09-25 as its own row by operator decision D2: it does not answer the `transform` ask (D1), so
   closing it must not close that row.~~ ✅ **SHIPPED 2026-09-25** — as-built under *Its host* above. The
   `transform` row stays open.

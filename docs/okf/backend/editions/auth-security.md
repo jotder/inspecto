@@ -167,7 +167,7 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   Enterprise-only (the seam is default-empty; Personal/Professional show authored rows only and
   `{enabled:false}`). UI: Settings ▸ Access ▸ **Policies** tab (effective table + explain panel; authoring
   since 2026-09-25, next bullet).
-- **Policy authoring guards (2026-09-25, `superpower/policy-authoring-ux-design.md` S1–S4, operator D1 =
+- **Policy authoring guards (2026-09-25, `archived-documents/plans-archive/policy-authoring-ux-design.md` S1–S4, operator D1 =
   guard all nine failure modes at save time).** The one grammar `AccessPolicies.validate` (shared by the
   PUT and the file parser) now refuses, as 422s naming the policy and a bracketed check code: an unknown
   key on a policy or `target` (**F8** `unknown-key`/`ambiguous-key`); a `when` reference the engine never

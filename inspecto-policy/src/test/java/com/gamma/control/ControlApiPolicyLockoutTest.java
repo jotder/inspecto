@@ -23,7 +23,7 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * F7 — self-lockout ({@code docs/superpower/policy-authoring-ux-design.md} §1, S2): a draft that would
+ * F7 — self-lockout ({@code docs/archived-documents/plans-archive/policy-authoring-ux-design.md} §1, S2): a draft that would
  * DENY the saver's own next {@code PUT /access/policies} is refused (422 {@code would-lock-out}) before
  * it reaches disk — the route PEP runs before every handler, so once such a doc is live the only
  * recovery is a disk edit. Scope per D9 (taken on recommendation): the SAVER only.
