@@ -199,7 +199,14 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   ⚠ Limits, stated: the preview's role subjects carry no id or claims, so a policy keyed on
   `subject.id` or a claim shows no flip; the lockout guard protects the SAVER only (D9) — a draft that
   denies every *other* access configurer is accepted; and the preview is a POST, so a subject the saved
-  doc already denies cannot preview (F7 keeps the in-product path from reaching that state).
+  doc already denies cannot preview (F7 keeps the in-product path from reaching that state). The preview's
+  optional `route` body field binds `env.route` (default `/`); the design's free-form `probes` argument was
+  **not built** — D7 fixed the axes (roles × read/write/operate, plus each targeted known kind) instead.
+  Decisions D2–D9 were taken on the design's recommendation (D5, D7 on the most fail-closed option) and are
+  reversible.
+  ⚠ **Owed: a browser pass over the Policies-tab editor** (create / edit / delete / override confirm /
+  *Preview impact* / 409 and 422 messages). The editor is covered by vitest specs only; it has not been
+  driven in the preview against an Enterprise backend.
 - **Q3 `canTriageRequirements` grant (2026-07-24, product sign-off).** Seeded to Business + Power + Admin +
   Super (`Roles.SEED`) — requirement triage is a business-analyst activity; Pipeline Developer/Operations
   build/run rather than triage.

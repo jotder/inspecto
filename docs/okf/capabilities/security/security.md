@@ -370,12 +370,27 @@ on the `AccessDecider` SPI. Personal and Standard never bundle it and behave byt
   surviving row); `ABSTAIN` is not a decision and is never audited.
 - **Operability.** `GET /access/policies` surfaces the seed denies too, each row `source: authored|seed`
   (via `AccessDecider.seededPolicies()`, default-empty). `GET /access/explain?route=&method=&resourceKind=`
-  (`AccessRoutes.java:56`; `PolicyEngine.explain`, `:113-136`) is a side-effect-free **"why denied?"**
+  (`AccessRoutes.java:62`; `PolicyEngine.explain`, `:101`) is a side-effect-free **"why denied?"**
   dry-run for the caller's own session — decision, matched policy, per-policy `{targeted, conditionHeld,
   source}` trace, enforcing and auditing nothing. **It is a GET on purpose**: a POST would be a `write` the
   policy under test could `403`, locking the denied subject out of their own explanation. Both are
   Enterprise-only in effect (Personal/Standard answer `{enabled: false}`); UI: Settings ▸ Access ▸
-  **Policies**, read-only by design (`access-policies.component.ts`) — authoring stays TOON + API (§5).
+  **Policies** (`access-policies.component.ts`) — read-only until 2026-09-25, an editor since (next bullet).
+- **Authoring guards (SHIPPED 2026-09-25, SEC-05).** Every way the code lets a hand edit or a PUT go wrong
+  is refused or warned **before it takes effect**, in the one `AccessPolicies.validate` grammar the file
+  parser and `PUT /access/policies` share: 422s for an unknown key (`unknown-key` / `ambiguous-key`), a
+  `when` ref the engine never binds (`unknown-ref`), an untargeted blank-`when` deny (`deny-everything`) and
+  a save that would deny the saver's own next `PUT /access/policies` (`would-lock-out`, via the
+  default-ABSTAIN `AccessDecider.simulate`); warnings (`unknown-capability`, `unknown-role`,
+  `unknown-resource-kind`, `resource-ref-at-route-level`, `seed-override`) on GET and PUT alike, so a
+  hand-edited doc shows them too. An unreadable doc's `error` names the policy and check, to
+  `canConfigureAccess` holders only. `POST /access/policies/preview` (gated `canConfigureAccess`) returns the
+  draft's role × action (× targeted kind) impact, before → after. The Policies tab authors (new / edit /
+  delete, seed "Override…" behind a confirm, `If-Match` full replace, *Preview impact*). ⚠ **Upgrade bites
+  at runtime:** an on-disk doc with a stray key or an un-allowlisted `subject.<claim>` becomes unreadable ⇒
+  deny-all on Enterprise. Mechanism, test pins and stated limits:
+  [auth-security.md](../../backend/editions/auth-security.md) §"Policy authoring guards". ⚠ **Owed: a
+  browser pass over the editor** — covered by vitest specs, not yet driven in the preview.
 
 ### 3.11 Transport and bind address
 
@@ -497,7 +512,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 
 | Item | Board id | What remains |
 |---|---|---|
-| **Policy-authoring UX** — a matrix / create editor beyond hand-authored TOON | `BACKLOG.md` §3 *Security: policy-authoring UX* (P3); `EDITIONS.md` SEC-05 | Seed visibility, explain and the read-only Policies tab shipped; authoring is TOON + `PUT /access/policies` with `422` on a bad `when` |
+| **Policy-authoring UX** — browser pass only | `BACKLOG.md` §3.8 *Security: policy-authoring UX*; `EDITIONS.md` SEC-05 | Guards, impact matrix and editor **SHIPPED 2026-09-25** (§3.10 *Authoring guards*); only a browser pass over the Policies-tab editor remains |
 | **`X-Actor` full removal** | `BACKLOG.md` §2 *X-Actor full removal*; `EDITIONS.md` SEC-11 | Already **rejected** on Standard/Enterprise (§3.2); the header path survives only for Personal's actor attribution. Gate: **the next MAJOR tag** (restated 2026-09-07 — the API-v1 sunset it used to cite was deleted 2026-07-25) |
 | **Vault / cloud-KMS secrets** (GAP-6 / SEC-8) | `BACKLOG.md` §3 *Deployment topology gaps*; §6 standing note | Enterprise-only, **only when a client policy requires it**. The `SecretsProvider` SPI is the seam; nothing else is designed |
 | **Data masking / row scope by field classification** | `EDITIONS.md` SEC-08; `ProcessorCatalog` `quality.pii.mask` + `quality.compliance.redact` (`Status.PLANNED`) | Enterprise-only by decision; no BACKLOG row of its own — the two catalog entries are the only trace |

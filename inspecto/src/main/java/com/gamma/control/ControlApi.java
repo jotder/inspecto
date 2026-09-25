@@ -929,7 +929,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     }
 
     /** The ABAC action verb for a request — the single source of truth shared by the {@link #authorize}
-     *  PEP and the {@code POST /access/explain} dry-run ({@code AccessRoutes}): {@code read} for
+     *  PEP and the {@code GET /access/explain} dry-run ({@code AccessRoutes}): {@code read} for
      *  GET/HEAD, {@code operate} when the route's manifest capability is {@code canOperateRuns}, else
      *  {@code write}. */
     static String actionFor(String method, String path) {

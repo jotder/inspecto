@@ -392,6 +392,15 @@ decided 2026-09-25). As built:
   No backend change was needed — the A5.2 loop already resolves `transform` through `configSchemaJson`
   and keeps the pane's `sampleRows`, so every turn is judged by the preview. Apply is the same handler.
 - `grammar` and `sink` remain unspecced by decision (D1).
+- **Where the spec lives, and why there:** `ComponentSpecs` (`KINDS = [transform]`, `forKind`,
+  `previewFindings`) sits in `com.gamma.pipeline.exec` beside `ComponentPreview`, not in `com.gamma.pipeline`,
+  so `pipeline` gains no package edge onto `exec`. Pinned by `ComponentSpecsTest`, including a negative pin
+  that no kind in `KINDS` reaches `ConfigSpecs.forType`/`TYPES`. The NL instance's pane-identity rule
+  (the model cannot override `kind`) is pinned by `ArgumentDeriverTest.thePanesIdentityFieldsOutrankTheModels`.
+- ⚠ **Owed: a browser check.** Neither transform instance has been driven live in the preview: the
+  deterministic check (S4) needs a backend with the intelligence module, and the NL instance (S6) also needs
+  a configured model. Unit and vitest coverage only until then. The GAUNTLET is owed before a push that
+  carries this change, because it touches `InspectoTools`, a shared seam.
 
 ## Natural-language topologies (A5.3 — shipped 2026-07-27)
 

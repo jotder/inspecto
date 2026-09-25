@@ -78,7 +78,7 @@ public interface AccessDecider {
      * "Why denied?" dry-run (BACKLOG §5): evaluate the same policy stack {@link #decide} would, for
      * {@code subject} against a hypothetical {@code action}/{@code route}/{@code resource}, and return
      * the final {@link Decision}, the matched policy name, and a per-policy {@link Evaluation} trace —
-     * <b>without enforcing or auditing</b>. The core exposes it at {@code POST /access/explain} for the
+     * <b>without enforcing or auditing</b>. The core exposes it at {@code GET /access/explain} for the
      * current session's own subject. Default: an {@code ABSTAIN} with no evaluated policies (no engine).
      */
     default Explanation explain(HttpExchange ex, Subject subject, String action, String route,
