@@ -1,6 +1,6 @@
 # SES/SNS delivery-status adapter — design and security review (`D8-SES-SNS-1`)
 
-> **Status: DESIGN ONLY 2026-09-24 — nothing built.** ⏸ **The SES/SNS adapter (§2–§5, D1–D12) is ON HOLD (operator, 2026-09-25)** until an SES deployment is named. D13 was answered 2026-09-25 by per-user notification read state. Still live: §7 per-user preferences, §6 GeoIP, §8 security triggers, D14. F1 (body cap) and F3 (`X-Forwarded-For`) were fixed 2026-09-24.
+> **Status: DESIGN 2026-09-24; §7 BUILT 2026-09-25.** ⏸ **The SES/SNS adapter (§2–§5, D1–D12) is ON HOLD (operator, 2026-09-25)** until an SES deployment is named. D13 was answered 2026-09-25 by per-user notification read state. ✅ **§7 per-user preferences is BUILT (2026-09-25)** — as-built facts in [`events-metrics.md`](../okf/backend/control-plane/events-metrics.md) § *Preferences are two layers*. Still live: §6 GeoIP, §8 security triggers. F1 (body cap) and F3 (`X-Forwarded-For`) were fixed 2026-09-24.
 > BACKLOG row *Notification residuals (`D8-SES-SNS-1`)*, §3.5. Owner concept:
 > [`okf/backend/control-plane/events-metrics.md`](../okf/backend/control-plane/events-metrics.md)
 > § *Inbound delivery-status webhooks*. Grounded against `master` at `7bb36309c`.
@@ -436,6 +436,12 @@ enricher is **out of scope**. This design covers only the **audit and security**
 ---
 
 ## 7. Per-user notification preferences (fixes F2)
+
+> ✅ **BUILT 2026-09-25** (operator: "build §7 as designed"). `NotificationPreferenceOverrides` (engine),
+> `Subject.email()` = verified claim only, routes as below, SPA grid with Inherited / Overridden markers and a
+> Deployment-default editor. As built, the owner concept is
+> [`events-metrics.md`](../okf/backend/control-plane/events-metrics.md) § *Preferences are two layers*
+> (including the known limits). The text below is the design as it was signed.
 
 **Model.** Two layers. The **deployment default** grid is today's `NotificationPreferences`, editable
 only with `canAdminister`. On top of it, each `Subject.id()` can store a sparse **override**.

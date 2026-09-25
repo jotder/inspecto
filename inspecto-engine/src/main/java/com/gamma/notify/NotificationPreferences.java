@@ -6,9 +6,11 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The single {@code appUser}'s notification preference grid — which {@link NotificationCategory} is
- * delivered over which channel ({@link #IN_APP} / {@link #EMAIL} / any SPI channel id). In the auth-free
- * core there is one global preference set (per-user preferences arrive with the auth module).
+ * The <b>deployment default</b> notification preference grid — which {@link NotificationCategory} is
+ * delivered over which channel ({@link #IN_APP} / {@link #EMAIL} / any SPI channel id). On Personal (no
+ * Subject) it is the one user's grid. With authentication each Subject may hold a sparse override on top of
+ * it ({@link NotificationPreferenceOverrides}, ses-sns-adapter-design §7); editing THIS grid needs
+ * {@code canAdminister}.
  *
  * <p>{@link NotificationCategory#critical() Critical} categories bypass opt-out: {@link #enabled} always
  * returns {@code true} for them and {@link #set} refuses to change them, so a security alert can never be
@@ -62,18 +64,28 @@ public final class NotificationPreferences {
         }
     }
 
-    /** The full grid as JSON-ready rows — one per category, with label/critical/available metadata. */
+    /** The full grid as JSON-ready rows — one per category, with label/critical/available metadata, plus the
+     *  per-channel {@code source} (always {@code inherited}: this IS the default) and {@code editable} (every
+     *  channel of a non-critical category) that {@link NotificationPreferenceOverrides#grid} also carries. */
     public List<Map<String, Object>> grid() {
         List<Map<String, Object>> rows = new java.util.ArrayList<>();
         for (NotificationCategory c : NotificationCategory.values()) {
             Map<String, Boolean> channels = new LinkedHashMap<>();
-            for (String ch : CHANNELS) channels.put(ch, enabled(c.id(), ch));
+            Map<String, String> source = new LinkedHashMap<>();
+            Map<String, Boolean> editable = new LinkedHashMap<>();
+            for (String ch : CHANNELS) {
+                channels.put(ch, enabled(c.id(), ch));
+                source.put(ch, NotificationPreferenceOverrides.INHERITED);
+                editable.put(ch, !c.critical());
+            }
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("category", c.id());
             row.put("label", c.label());
             row.put("critical", c.critical());
             row.put("available", c.available());
             row.put("channels", channels);
+            row.put("source", source);
+            row.put("editable", editable);
             rows.add(row);
         }
         return rows;

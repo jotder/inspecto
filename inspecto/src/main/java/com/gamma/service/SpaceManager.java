@@ -5,6 +5,7 @@ import com.gamma.config.safety.DiscoveredRoots;
 import com.gamma.acquire.ConnectionRegistry;
 import com.gamma.acquire.StabilityGate;
 import com.gamma.event.EventLog;
+import com.gamma.notify.NotificationPreferenceOverrides;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
@@ -68,7 +69,37 @@ public final class SpaceManager implements AutoCloseable {
     /** The container root ({@code -Dspaces.root}) new spaces are created under; {@code null} in single-tenant mode. */
     private volatile Path spacesRoot;
 
+    /** The deployment's per-Subject notification preference overrides (ses-sns-adapter-design §7). ONE per
+     *  deployment, not per Space, because users span Spaces; {@link #wire handed} to every Space's
+     *  {@code NotificationService} as it joins so delivery consults it. */
+    private volatile NotificationPreferenceOverrides notificationOverrides = NotificationPreferenceOverrides.inMemory();
+
     private SpaceManager() {}
+
+    /** The deployment's per-Subject notification preference overrides — backs {@code /notifications/preferences}. */
+    public NotificationPreferenceOverrides notificationOverrides() {
+        return notificationOverrides;
+    }
+
+    /**
+     * Where the overrides live: {@code -Dnotify.preferences.file} when set; else
+     * {@code <spaces container root>/notification-preferences.toon}; else, single-tenant,
+     * {@code <-Dassist.write.root>/notification-preferences.toon}; else nowhere (in memory). ⛔ Never the
+     * working directory — a default that writes into the CWD is the {@code SpaceRoot.legacy()} trap.
+     */
+    static Path notificationOverridesFile(Path containerRoot) {
+        String explicit = System.getProperty("notify.preferences.file");
+        if (explicit != null && !explicit.isBlank()) return Path.of(explicit.trim());
+        if (containerRoot != null) return containerRoot.resolve(NotificationPreferenceOverrides.FILE);
+        String writeRoot = System.getProperty("assist.write.root");
+        if (writeRoot != null && !writeRoot.isBlank()) return Path.of(writeRoot.trim()).resolve(NotificationPreferenceOverrides.FILE);
+        return null;
+    }
+
+    /** A Space joining the deployment: its delivery path consults the deployment's per-Subject overrides. */
+    private void wire(SpaceContext ctx) {
+        ctx.service().notificationService().preferenceOverrides(notificationOverrides);
+    }
 
     /** Wrap a single already-built service as the {@code default} space (single-tenant / CLI / tests). */
     public static SpaceManager single(CollectorService service) {
@@ -76,7 +107,9 @@ public final class SpaceManager implements AutoCloseable {
         SpaceRoot legacy = SpaceRoot.legacy();
         SpaceContext ctx = new SpaceContext(DEFAULT, legacy,
                 new SpaceContext.SpaceManifest(DEFAULT.value(), "", ""), service);
+        m.notificationOverrides = NotificationPreferenceOverrides.open(notificationOverridesFile(null));
         m.spaces.put(DEFAULT, ctx);
+        m.wire(ctx);
         // JOB-PATH-PIPELINEJOBRUNNER-SPLIT-1 (option 1, 2026-09-17): a job's relative path has always meant the
         // launch dir in this layout, NOT -Dassist.write.root — publish that explicitly so the engine holds no
         // cwd assumption of its own (SpaceBootstrap.load's per-space register() covers the multi-space case).
@@ -91,6 +124,7 @@ public final class SpaceManager implements AutoCloseable {
         OperationalDb.verifySelectable();
         SpaceManager m = new SpaceManager();
         m.spacesRoot = spacesRoot.toAbsolutePath().normalize();   // remembered so runtime create/delete can mint/remove dirs
+        m.notificationOverrides = NotificationPreferenceOverrides.open(notificationOverridesFile(m.spacesRoot));
         if (!Files.isDirectory(spacesRoot)) {
             log.warn("Spaces root {} does not exist — no spaces booted", spacesRoot.toAbsolutePath());
             return m;
@@ -198,6 +232,7 @@ public final class SpaceManager implements AutoCloseable {
         try {
             SpaceContext ctx = loadAsSpace(root);
             spaces.put(ctx.id(), ctx);
+            wire(ctx);
         } catch (Exception e) {
             DiscoveredRoots.unregister(root.id());   // a space that never joined must not leave a root behind
             log.warn("Skipping space dir {} — failed to load: {}", dir, e.getMessage());
@@ -286,6 +321,7 @@ public final class SpaceManager implements AutoCloseable {
 
             SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
+            wire(ctx);
             log.info("Created space '{}' at {}", id.value(), base);
             return ctx;
         }
@@ -318,6 +354,7 @@ public final class SpaceManager implements AutoCloseable {
 
             SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
+            wire(ctx);
             log.info("Created space '{}' from bundle at {} ({} config file(s))",
                     id.value(), base, bundle.configEntries().size());
             return ctx;
@@ -399,6 +436,7 @@ public final class SpaceManager implements AutoCloseable {
 
             SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
+            wire(ctx);
             log.info("Created space '{}' from template '{}' at {}", id.value(), templateId, base);
             return ctx;
         }

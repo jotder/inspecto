@@ -30,13 +30,29 @@ export interface ChannelToggles {
     [channel: string]: boolean;
 }
 
-/** One row of the preference grid (GET/PUT /notifications/preferences). */
+/** Where a preference cell's value comes from: the deployment default, or the caller's own override. */
+export type PrefSource = 'inherited' | 'overridden';
+
+/**
+ * One row of a preference grid. `GET /notifications/preferences` returns the CALLER's effective grid (each
+ * cell its own override, else the deployment default); `GET /notifications/preferences/default` returns the
+ * deployment default itself (every cell `inherited`). `editable` is false for a critical category, for
+ * `webhook` on the personal grid, and for `email` when the caller has no verified email address.
+ */
 export interface NotificationPrefRow {
     category: string;
     label: string;
     critical: boolean;
     available: boolean;
     channels: ChannelToggles;
+    source?: Record<string, PrefSource>;
+    editable?: Record<string, boolean>;
+}
+
+/** One category's edits for a preference PUT — `null` resets that cell of the caller's override to the default. */
+export interface PrefChange {
+    category: string;
+    channels: Record<string, boolean | null>;
 }
 
 /** A configured delivery channel (GET/POST /notifications/channels) — C4. Delivery is mocked (no real IO). */
@@ -162,15 +178,31 @@ export class NotificationsService {
         if (was && was.read !== row.read) this.unreadCount.update((c) => Math.max(0, c + (row.read ? -1 : 1)));
     }
 
-    /** The preference grid (GET /notifications/preferences). */
+    /** The caller's effective preference grid (GET /notifications/preferences). */
     preferences(): Observable<NotificationPrefRow[]> {
         return this.http.get<NotificationPrefRow[]>(apiUrl('/notifications/preferences'));
     }
 
-    /** Persist the edited preference grid (PUT /notifications/preferences); returns the refreshed grid. */
-    savePreferences(rows: NotificationPrefRow[]): Observable<NotificationPrefRow[]> {
+    /**
+     * Save the caller's OWN override (PUT /notifications/preferences, self-service) — send only the cells that
+     * changed, since every cell sent becomes an override; `null` resets one. Returns the effective grid. On
+     * Personal (no sign-in) this writes the single grid.
+     */
+    savePreferences(changes: PrefChange[]): Observable<NotificationPrefRow[]> {
         return this.http.put<NotificationPrefRow[]>(apiUrl('/notifications/preferences'), {
-            preferences: rows,
+            preferences: changes,
+        });
+    }
+
+    /** The deployment-default grid every user inherits (GET /notifications/preferences/default). */
+    defaultPreferences(): Observable<NotificationPrefRow[]> {
+        return this.http.get<NotificationPrefRow[]>(apiUrl('/notifications/preferences/default'));
+    }
+
+    /** Edit the deployment default (PUT /notifications/preferences/default) — needs `canAdminister`. */
+    saveDefaultPreferences(changes: PrefChange[]): Observable<NotificationPrefRow[]> {
+        return this.http.put<NotificationPrefRow[]>(apiUrl('/notifications/preferences/default'), {
+            preferences: changes,
         });
     }
 

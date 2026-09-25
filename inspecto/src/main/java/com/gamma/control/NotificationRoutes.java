@@ -2,6 +2,9 @@ package com.gamma.control;
 
 import com.gamma.notify.ChannelConfig;
 import com.gamma.notify.Notification;
+import com.gamma.notify.NotificationCategory;
+import com.gamma.notify.NotificationPreferenceOverrides;
+import com.gamma.notify.NotificationPreferences;
 import com.gamma.notify.NotificationReadState;
 import com.gamma.notify.NotificationRule;
 import com.gamma.notify.NotificationService;
@@ -38,19 +41,24 @@ final class NotificationRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/notifications", (e, m) -> feed(api, e));
         api.get("/notifications/stream", (e, m) -> stream(api, e));
-        api.get("/notifications/unread-count", (e, m) -> Map.of("count", unreadCount(api, ApiContext.actor(e))));
+        api.get("/notifications/unread-count", (e, m) -> Map.of("count", unreadCount(api, e, ApiContext.actor(e))));
         // Read state is PER READER (operator, 2026-09-25): each caller marks its own notifications read /
         // unread, so these three are self-service — open to any authenticated caller, and they touch only
         // the caller's NotificationReadState marks. See read() for the one shared side effect.
         api.post("/notifications/read-all", (e, m) -> Map.of("updated", readAll(api, ApiContext.actor(e))));
         api.post("/notifications/([^/]+)/read", (e, m) -> read(api, ApiContext.actor(e), ApiContext.name(m)));
         api.post("/notifications/([^/]+)/unread", (e, m) -> unread(api, ApiContext.actor(e), ApiContext.name(m)));
-        // ⚠ The archive ("delete") and the preference grid are ONE shared state per Space (neither store
-        // has a recipient), so each write below changes every user's feed or delivery — admin-gated, not
-        // "self-service" (SEC review F2). Reads stay open.
-        api.get("/notifications/preferences", (e, m) -> api.service().notificationPreferences().grid());
-        api.put("/notifications/preferences", ApiContext.withCapability("canAdminister",
+        // Preferences are two layers (ses-sns-adapter-design §7, fixes SEC review F2): the deployment DEFAULT
+        // grid, and a sparse per-Subject override on top. PUT /notifications/preferences writes the CALLER's
+        // override only, so it is self-service; the default changes every user's delivery, so its write is
+        // admin-gated. On Personal (no Subject) there is one user, and PUT keeps writing the single grid.
+        api.get("/notifications/preferences", (e, m) -> myPreferences(api, e));
+        api.put("/notifications/preferences", (e, m) -> saveMyPreferences(api, e, api.body(e)));
+        api.get("/notifications/preferences/default", (e, m) -> api.service().notificationPreferences().grid());
+        api.put("/notifications/preferences/default", ApiContext.withCapability("canAdminister",
                 (e, m) -> savePreferences(api, api.body(e))));
+        // ⚠ The archive ("delete") is ONE shared state per Space (the store has no recipient), so it changes
+        // every user's feed — admin-gated, not "self-service" (SEC review F2). Reads stay open.
         // Channel destinations admin CRUD (registered before the /notifications/{id} routes below, which
         // only match a single segment — "channels/{id}" is two, so there's no collision either way).
         api.get("/notifications/channels", (e, m) -> listChannels(api));
@@ -84,25 +92,79 @@ final class NotificationRoutes implements RouteModule {
     }
 
     /**
-     * {@code PUT /notifications/preferences} — apply the edited grid. Body: {@code {"preferences":[{category,
-     * channels:{inApp,email}}, …]}}. Critical/unknown categories are ignored by the store (locked); the full
-     * refreshed grid is returned.
+     * {@code PUT /notifications/preferences/default} (and, on Personal, {@code PUT /notifications/preferences})
+     * — apply the edited deployment-default grid. Body: {@code {"preferences":[{category, channels:{inApp,email}},
+     * …]}}. Critical/unknown categories are ignored by the store (locked); the full refreshed grid is returned.
      */
-    @SuppressWarnings("unchecked")
     private static Object savePreferences(ApiContext api, Map<String, Object> body) {
         var prefs = api.service().notificationPreferences();
-        Object rows = body.get("preferences");
-        if (rows instanceof List<?> list) {
-            for (Object row : list) {
-                if (!(row instanceof Map<?, ?> r)) continue;
-                Object category = r.get("category");
-                if (!(r.get("channels") instanceof Map<?, ?> channels) || category == null) continue;
-                Map<String, Boolean> toggles = new java.util.LinkedHashMap<>();
-                channels.forEach((k, v) -> { if (v instanceof Boolean b) toggles.put(String.valueOf(k), b); });
-                prefs.set(String.valueOf(category), toggles);
-            }
-        }
+        cells(body).forEach((category, channels) -> {
+            Map<String, Boolean> toggles = new LinkedHashMap<>();
+            channels.forEach((k, v) -> { if (v != null) toggles.put(k, v); });   // null = reset: no meaning here
+            prefs.set(category, toggles);
+        });
         return prefs.grid();
+    }
+
+    /**
+     * {@code GET /notifications/preferences} — the caller's EFFECTIVE grid: each cell its override, else the
+     * default, marked {@code source: inherited | overridden}. No Subject (Personal) ⇒ the single grid.
+     */
+    private static Object myPreferences(ApiContext api, HttpExchange ex) {
+        Subject s = ApiContext.subject(ex).orElse(null);
+        if (s == null) return api.service().notificationPreferences().grid();
+        return overrides(api).grid(api.service().notificationPreferences(), s.id(), s.email());
+    }
+
+    /**
+     * {@code PUT /notifications/preferences} — self-service: writes ONLY the calling Subject's override, keyed
+     * by its stable id. A cell set to {@code null} resets it to the default. ⛔ The email destination is the
+     * Subject's verified email claim; nothing in the body can name an address (no field is read for one), and a
+     * Subject without a claim cannot turn email on. Personal (no Subject): writes the single grid, as before.
+     */
+    private static Object saveMyPreferences(ApiContext api, HttpExchange ex, Map<String, Object> body)
+            throws IOException {
+        Subject s = ApiContext.subject(ex).orElse(null);
+        if (s == null) return savePreferences(api, body);
+        try {
+            overrides(api).apply(s.id(), s.email(), cells(body));
+        } catch (IllegalStateException unreadable) {
+            throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY, unreadable.getMessage());
+        }
+        return myPreferences(api, ex);
+    }
+
+    /** The body's {@code preferences} rows as category → channel → value ({@code null} kept: it means reset). */
+    private static Map<String, Map<String, Boolean>> cells(Map<String, Object> body) {
+        Map<String, Map<String, Boolean>> out = new LinkedHashMap<>();
+        if (!(body.get("preferences") instanceof List<?> list)) return out;
+        for (Object row : list) {
+            if (!(row instanceof Map<?, ?> r) || r.get("category") == null) continue;
+            if (!(r.get("channels") instanceof Map<?, ?> channels)) continue;
+            Map<String, Boolean> toggles = out.computeIfAbsent(String.valueOf(r.get("category")), k -> new LinkedHashMap<>());
+            channels.forEach((k, v) -> {
+                if (v == null) toggles.put(String.valueOf(k), null);
+                else if (v instanceof Boolean b) toggles.put(String.valueOf(k), b);
+            });
+        }
+        return out;
+    }
+
+    private static NotificationPreferenceOverrides overrides(ApiContext api) {
+        return api.spaces().notificationOverrides();
+    }
+
+    /**
+     * Whether {@code reader}'s feed shows {@code n}: with a Subject, only categories whose EFFECTIVE in-app
+     * preference is on (critical always) — the feed is shared, so the per-Subject in-app choice is applied
+     * at read time. Without one (Personal) everything stored is shown, as before, and so is a category the
+     * grid has no row for (an authored rule's own category) — there is no preference to have opted out of.
+     */
+    private static boolean visible(ApiContext api, HttpExchange ex, Notification n) {
+        Subject s = ApiContext.subject(ex).orElse(null);
+        if (s == null || NotificationCategory.byId(n.category()).isEmpty()) return true;
+        return overrides(api).enabled(api.service().notificationPreferences(), n.category(),
+                NotificationPreferences.IN_APP, s.id(), s.email());
     }
 
     private static NotificationStore store(ApiContext api) {
@@ -133,8 +195,9 @@ final class NotificationRoutes implements RouteModule {
         return m;
     }
 
-    private static long unreadCount(ApiContext api, String reader) {
-        return active(api).stream().filter(n -> readState(api).readAt(reader, n.id()) == null).count();
+    private static long unreadCount(ApiContext api, HttpExchange ex, String reader) {
+        return active(api).stream().filter(n -> visible(api, ex, n))
+                .filter(n -> readState(api).readAt(reader, n.id()) == null).count();
     }
 
     /**
@@ -312,7 +375,7 @@ final class NotificationRoutes implements RouteModule {
     private static List<Map<String, Object>> feed(ApiContext api, HttpExchange ex) {
         int limit = ApiContext.parseIntOr(ApiContext.query(ex, "limit"), 50);
         String reader = ApiContext.actor(ex);
-        return store(api).recent(limit).stream().map(n -> view(api, reader, n)).toList();
+        return store(api).recent(limit).stream().filter(n -> visible(api, ex, n)).map(n -> view(api, reader, n)).toList();
     }
 
     /**
@@ -342,6 +405,7 @@ final class NotificationRoutes implements RouteModule {
             writeFrame(os, ": connected\n\n");  // initial comment confirms the stream is live
             while (true) {
                 Notification n = queue.poll(HEARTBEAT_SECONDS, TimeUnit.SECONDS);
+                if (n != null && !visible(api, ex, n)) continue;   // the reader opted out of in-app for it
                 writeFrame(os, n != null
                         ? "data: " + ApiContext.JSON.writeValueAsString(view(api, reader, n)) + "\n\n"
                         : ": ping\n\n");        // heartbeat keeps the connection warm + surfaces a disconnect

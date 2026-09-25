@@ -828,7 +828,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         return notificationService;
     }
 
-    /** The single appUser's notification preference grid (Phase B6) — backs {@code /notifications/preferences}. */
+    /** The deployment-default notification preference grid (Phase B6; ses-sns §7) — backs {@code /notifications/preferences/default}, and {@code /notifications/preferences} on Personal. */
     public com.gamma.notify.NotificationPreferences notificationPreferences() {
         return notificationPreferences;
     }

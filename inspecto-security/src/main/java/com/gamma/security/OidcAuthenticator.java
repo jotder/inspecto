@@ -160,10 +160,19 @@ public final class OidcAuthenticator implements Authenticator {
             ComponentAccess.heldRoles(ex, Set.copyOf(held));
             return Optional.of(new Subject(subjectId, Set.copyOf(capabilities),
                     RoleMapper.dataScopesFor(claims, rolesClaim, defs),
-                    attributes(claims, Roles.attributeClaims(ex))));
+                    attributes(claims, Roles.attributeClaims(ex)), verifiedEmail(claims)));
         } catch (Exception e) {
             return Optional.empty();   // bad signature, wrong issuer/audience, expired, malformed — all 401
         }
+    }
+
+    /** ses-sns §7: the {@code email} claim ONLY when the IdP asserts {@code email_verified: true} — the one
+     *  address a per-user email notification may reach. An unverified or absent claim yields {@code null}:
+     *  some IdPs let a user type any address, and delivering to it would be exfiltration. */
+    private static String verifiedEmail(JWTClaimsSet claims) {
+        Object email = claims.getClaim("email");
+        Object verified = claims.getClaim("email_verified");
+        return email instanceof String s && Boolean.TRUE.equals(verified) ? s : null;
     }
 
     /** ABAC A1: only claims allowlisted in the space's {@code roles.toon} {@code identity.

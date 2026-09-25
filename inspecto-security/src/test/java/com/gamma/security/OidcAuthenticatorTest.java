@@ -432,6 +432,31 @@ class OidcAuthenticatorTest {
         assertEquals(3L, ((Number) ana.attributes().get("clearance")).longValue());
     }
 
+    // ── ses-sns §7: the notification address is the VERIFIED email claim, and only that ──────────
+
+    @Test
+    void onlyAVerifiedEmailClaimBecomesTheSubjectsEmail() throws Exception {
+        assertEquals("ana@example.com", subjectWithEmail("ana@example.com", true).email());
+        assertNull(subjectWithEmail("ana@example.com", false).email(), "email_verified=false ⇒ no address");
+        assertNull(subjectWithEmail("ana@example.com", null).email(), "no email_verified claim ⇒ no address");
+        assertNull(subjectWithEmail(null, true).email());
+        String jwt = token(Instant.now().plusSeconds(60), List.of("operations"), RSA_KEY, ISSUER, AUDIENCE, "ops");
+        assertNull(authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt).orElseThrow().email());
+    }
+
+    private static Subject subjectWithEmail(String email, Boolean verified) throws Exception {
+        JWTClaimsSet.Builder b = new JWTClaimsSet.Builder()
+                .issuer(ISSUER).subject("ana").audience(AUDIENCE)
+                .expirationTime(Date.from(Instant.now().plusSeconds(60)))
+                .claim("roles", List.of("operations"));
+        if (email != null) b.claim("email", email);
+        if (verified != null) b.claim("email_verified", verified);
+        SignedJWT jwt = new SignedJWT(
+                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(RSA_KEY.getKeyID()).build(), b.build());
+        jwt.sign(new RSASSASigner(RSA_KEY));
+        return authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt.serialize()).orElseThrow();
+    }
+
     @Test
     void withoutAnAllowlistSubjectAttributesStayEmpty() throws Exception {
         String jwt = token(Instant.now().plusSeconds(60), List.of("operations"), RSA_KEY, ISSUER, AUDIENCE, "ops");

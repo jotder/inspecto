@@ -507,10 +507,11 @@ infra probes: `/health`, `/ready`, `/metrics`, `/metrics/acquisition`.
 - **Views:** `GET /views`, `GET /views/{id}`, `GET /views/{id}/data?limit=` — `sink.view` materialized-data preview.
 - **Notifications (beyond alerts):** `GET /notifications`, `/notifications/stream` (SSE), `/notifications/unread-count`,
   `POST /notifications/read-all`, `POST /notifications/{id}/read`, `POST /notifications/{id}/unread`,
-  `DELETE /notifications/{id}`, `GET/PUT /notifications/preferences`, `GET/POST /notifications/channels`,
-  `PUT/DELETE /notifications/channels/{id}` *(read/unread/read-all: any signed-in user, and only their own
-  read state — the feed reports `read` per caller; channel writes: canAuthorWorkbench; delete + preference PUT:
-  canAdminister — the feed archive and the grid are shared per Space, not per user)*.
+  `DELETE /notifications/{id}`, `GET/PUT /notifications/preferences`, `GET/PUT /notifications/preferences/default`,
+  `GET/POST /notifications/channels`, `PUT/DELETE /notifications/channels/{id}` *(read/unread/read-all and the
+  preference PUT: any signed-in user, and only their own read state / their own preference override — the feed
+  reports `read` per caller; channel writes: canAuthorWorkbench; delete + the `/default` preference PUT:
+  canAdminister — the feed archive and the deployment-default grid are shared, not per user)*.
 - **Workflows:** `GET /workflows/{type}` — authored `*_workflow.toon` override if registered, else the default state machine.
 - **Investigation / link analysis (INV-1):** `POST /inv/projection` (entity-projection fold; *503 no write root, 404 unknown
   dataset, 422 bad column*), `POST /inv/projection/neighbors` (one-hop expand; same gates). Multi-root/export/undo are

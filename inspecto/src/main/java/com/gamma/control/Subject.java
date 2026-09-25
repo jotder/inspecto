@@ -22,22 +22,33 @@ import java.util.Set;
  * {@code roles.toon} {@code identity.attributeClaims} (never the raw token), populated by the
  * Standard/Enterprise {@link Authenticator}. Always empty in core and on every pre-A1 caller; nothing
  * capability-gated may ever read it (grants stay capability-verbs-only).
+ *
+ * <p><b>Email (ses-sns-adapter-design §7).</b> {@link #email()} is the IdP's <em>verified</em> email
+ * claim ({@code email} with {@code email_verified: true}), or {@code null}. It is the ONLY address a
+ * per-user email notification may go to — never a caller-supplied one, because an editable address
+ * would let any user route notifications (security ones included) to an arbitrary mailbox.
  */
 public record Subject(String id, Set<String> capabilities, Set<String> dataScopes,
-                      Map<String, Object> attributes) {
+                      Map<String, Object> attributes, String email) {
 
     public Subject {
         attributes = attributes == null ? Map.of() : Map.copyOf(attributes);
+        email = email == null || email.isBlank() ? null : email.trim();
+    }
+
+    /** No verified email claim — every pre-§7 caller. */
+    public Subject(String id, Set<String> capabilities, Set<String> dataScopes, Map<String, Object> attributes) {
+        this(id, capabilities, dataScopes, attributes, null);
     }
 
     /** The attribute-free form — every pre-A1 caller (attributes = empty). */
     public Subject(String id, Set<String> capabilities, Set<String> dataScopes) {
-        this(id, capabilities, dataScopes, Map.of());
+        this(id, capabilities, dataScopes, Map.of(), null);
     }
 
     /** The unscoped form (every non-case-type role) — capabilities only, {@code dataScopes = null}. */
     public Subject(String id, Set<String> capabilities) {
-        this(id, capabilities, null, Map.of());
+        this(id, capabilities, null, Map.of(), null);
     }
 
     /** Whether this caller's data visibility is restricted ({@link #dataScopes()} non-null). */

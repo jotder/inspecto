@@ -75,6 +75,15 @@ above the generated commit list.
   boolean **`read`**. New route **`POST /notifications/{id}/unread`** (404 unknown id). A client that read
   another user's mark through the shared `state` no longer can. On Personal the caller is `appUser` (or the
   honour-system `X-Actor`).
+- **Behaviour change (Professional/Enterprise, 2026-09-25 — ses-sns §7):** notification **preferences are
+  per caller**. `PUT /notifications/preferences` is open to any authenticated caller again and writes only
+  that caller's override (a `null` cell resets it); the deployment default moved to the **new `PUT
+  /notifications/preferences/default` (`canAdminister`)** and new `GET /notifications/preferences/default`.
+  `GET /notifications/preferences` returns the caller's effective grid, and every grid row gains additive
+  `source` (`inherited` | `overridden`) and `editable` maps per channel. An admin client that edited the
+  shared grid through `PUT /notifications/preferences` must move to `/default`. The feed, SSE frames and
+  unread count hide a category the caller turned in-app off for. Personal is unchanged (the PUT writes the
+  single grid).
 - **Breaking (every edition):** `X-Forwarded-For` is **ignored by default** — the client IP recorded in the
   audit trail and used as the unauthenticated rate-limit key is the socket peer unless the peer is listed
   in the new `-Dcontrol.trustedProxies` (IPs/CIDRs), and then the right-most untrusted hop wins, not the

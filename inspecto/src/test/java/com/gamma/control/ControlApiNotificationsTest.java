@@ -63,10 +63,11 @@ class ControlApiNotificationsTest {
     void clearAuthenticator() { Authenticators.forTest(null); }
 
     /**
-     * SEC review F2: the preference grid and the archive ("delete") are ONE shared state per Space, not per
-     * caller, so those writes stay admin-gated, fail-closed. Reads stay open. The READ state moved to a
-     * per-Subject store (operator, 2026-09-25) — see {@link #readStateIsPerSubject}. (With no Subject
-     * attached {@code withCapability} is a no-op, hence the FAKE.)
+     * SEC review F2: the deployment-default preference grid and the archive ("delete") are ONE shared state,
+     * not per caller, so those writes stay admin-gated, fail-closed. Reads stay open. The READ state moved to
+     * a per-Subject store (operator, 2026-09-25) — see {@link #readStateIsPerSubject} — and so did the
+     * caller's own preferences ({@code PUT /notifications/preferences}, {@code ControlApiSubjectPreferencesTest}).
+     * (With no Subject attached {@code withCapability} is a no-op, hence the FAKE.)
      */
     @Test
     void sharedFeedAndPreferenceWritesNeedCanAdminister(@TempDir Path dir) throws Exception {
@@ -77,7 +78,7 @@ class ControlApiNotificationsTest {
             String prefs = "{\"preferences\":[{\"category\":\"pipeline\",\"channels\":{\"inApp\":false}}]}";
 
             for (String[] call : new String[][] {
-                    {"PUT", "/notifications/preferences", prefs},
+                    {"PUT", "/notifications/preferences/default", prefs},
                     {"DELETE", "/notifications/" + b.id(), null}}) {
                 HttpResponse<String> denied = send(c.port, call[0], call[1], call[2], "Bearer viewer");
                 assertEquals(403, denied.statusCode(), call[0] + " " + call[1] + " -> " + denied.body());
@@ -88,7 +89,7 @@ class ControlApiNotificationsTest {
             assertEquals(2, json(send(c.port, "GET", "/notifications", null, "Bearer viewer")).size(),
                     "a refused delete changed nothing; reads stay open to every authenticated caller");
 
-            assertEquals(200, send(c.port, "PUT", "/notifications/preferences", prefs, "Bearer admin").statusCode());
+            assertEquals(200, send(c.port, "PUT", "/notifications/preferences/default", prefs, "Bearer admin").statusCode());
             assertFalse(c.svc.notificationPreferences().enabled("pipeline", "inApp"));
             assertEquals(200, send(c.port, "DELETE", "/notifications/" + b.id(), null, "Bearer admin").statusCode());
         }

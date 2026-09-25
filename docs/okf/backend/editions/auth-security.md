@@ -399,10 +399,21 @@ for everyone. All four are now `canAdminister` (fail closed; reads stay open), p
 **Resolved for READ state, 2026-09-25 (operator):** read state is now per reader — `NotificationReadState`,
 keyed by `ApiContext.actor` (the Subject id; on Personal the `appUser` / `X-Actor` fallback) — so `POST
 /notifications/read-all`, `POST /notifications/{id}/read` and the new `POST /notifications/{id}/unread` are
-`self-service` exemptions again, this time scoped in the store. Delete (archive) and the preference PUT stay
-`canAdminister`: those still write the one shared feed and grid. The pin became "exactly these three may be
-exempt". See [events-metrics](../control-plane/events-metrics.md) §Notifications for the one shared side
-effect a read keeps (the dedupe acknowledgement).
+`self-service` exemptions again, this time scoped in the store. Delete (archive) stays `canAdminister`: it
+still writes the one shared feed. See [events-metrics](../control-plane/events-metrics.md) §Notifications
+for the one shared side effect a read keeps (the dedupe acknowledgement).
+**Resolved for preferences, 2026-09-25 (operator; ses-sns-adapter-design §7):** `PUT
+/notifications/preferences` now writes ONLY the calling Subject's sparse override
+(`NotificationPreferenceOverrides`, keyed by the stable Subject id, one per-deployment file) and is a
+`self-service` exemption again; the shared deployment-default grid moved to the new **`PUT
+/notifications/preferences/default`, `canAdminister`** (literal capability). The pin is now "exactly these
+four may be exempt". Personal (no Subject) has no override layer — the PUT keeps writing the one grid.
+⛔ **The notification email address is `Subject.email()` — the IdP's `email` claim ONLY when `email_verified`
+is `true`** (`OidcAuthenticator.verifiedEmail`). It is never taken from a request body and never
+user-editable: an editable address would let any user route notifications, security ones included, to an
+arbitrary mailbox. A Subject with no verified claim can turn on in-app delivery only. ⚠ An IdP that does not
+put `email_verified` in the ACCESS token therefore yields no personal email at all — fail closed, by design.
+Tests: `ControlApiSubjectPreferencesTest` (real HTTP, with Subjects), `OidcAuthenticatorTest.onlyAVerifiedEmailClaimBecomesTheSubjectsEmail`.
 
 🔴 **The client IP is the socket peer unless a trusted proxy vouches otherwise** (SEC review F3,
 2026-09-24). `ApiContext.ip` — the audit trail's `ip` and the throttle key for callers with no Subject —

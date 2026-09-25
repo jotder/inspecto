@@ -4873,27 +4873,49 @@
     "/notifications/preferences" : {
       "get" : {
         "tags" : [ "notifications" ],
-        "summary" : "GET /notifications/preferences (generated skeleton)",
+        "summary" : "The caller’s effective notification preference grid",
         "operationId" : "getNotificationsPreferences",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Each cell is the calling Subject’s override when it has one, else the deployment default; source marks which (inherited | overridden). Critical categories are always on. email is off and not editable for a Subject with no verified email claim; webhook is never personal. Personal edition (no Subject): the single grid.",
         "responses" : {
           "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope): data is the grid, one row per category — {category, label, critical, available, channels:{inApp, email, webhook}, source:{channel: inherited | overridden}, editable:{channel: boolean}}."
           }
-        },
-        "x-generated" : true
+        }
       },
       "put" : {
         "tags" : [ "notifications" ],
-        "summary" : "PUT /notifications/preferences (generated skeleton)",
+        "summary" : "Save the caller’s own preference override (self-service)",
         "operationId" : "putNotificationsPreferences",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Body {\"preferences\":[{category, channels:{inApp?, email?}}]}. Writes ONLY the calling Subject’s override, keyed by its stable id; a null cell resets it to the default. Critical categories, webhook, and email-on without a verified email claim are ignored, as is any address in the body — email goes to the Subject’s verified claim only. Personal edition (no Subject): writes the single grid. 503 when the deployment overrides file exists but is unreadable. Returns the caller’s effective grid.",
         "responses" : {
           "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope): data is the grid, one row per category — {category, label, critical, available, channels:{inApp, email, webhook}, source:{channel: inherited | overridden}, editable:{channel: boolean}}."
           }
-        },
-        "x-generated" : true
+        }
+      }
+    },
+    "/notifications/preferences/default" : {
+      "get" : {
+        "tags" : [ "notifications" ],
+        "summary" : "The deployment-default notification preference grid",
+        "operationId" : "getNotificationsPreferencesDefault",
+        "description" : "The grid every Subject inherits where it has no override (source is always inherited).",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope): data is the grid, one row per category — {category, label, critical, available, channels:{inApp, email, webhook}, source:{channel: inherited | overridden}, editable:{channel: boolean}}."
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "notifications" ],
+        "summary" : "Edit the deployment-default grid (canAdminister)",
+        "operationId" : "putNotificationsPreferencesDefault",
+        "description" : "Body {\"preferences\":[{category, channels:{inApp?, email?, webhook?}}]}. Requires canAdminister (403 PERMISSION_DENIED otherwise). Changes the effective grid of every Subject that has not overridden that cell. Critical categories stay locked on. Returns the refreshed default grid.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope): data is the grid, one row per category — {category, label, critical, available, channels:{inApp, email, webhook}, source:{channel: inherited | overridden}, editable:{channel: boolean}}."
+          }
+        }
       }
     },
     "/notifications/channels" : {

@@ -375,4 +375,51 @@ class NotificationServiceTest {
         assertTrue(email.deliveryIds.stream().allMatch(java.util.Objects::isNull),
                 "with no correlation id — tracking off costs delivery nothing");
     }
+
+    // ---- ses-sns §7: per-Subject preference overrides on the delivery path ---------------------------
+
+    /** A transport recording where each delivery went ({@code "flag"} = its own notify.* destination). */
+    private static NotificationChannel targetRecorder(List<String> targets) {
+        return new NotificationChannel() {
+            public String id() { return NotificationPreferences.EMAIL; }
+            public void deliver(Notification n) { targets.add("flag"); }
+            public void deliver(Notification n, String target) { targets.add(target); }
+            public void deliver(Notification n, String target, String deliveryId) { targets.add(target); }
+        };
+    }
+
+    @Test
+    void personalEmailGoesToEachSubjectWhoseEffectivePreferenceIsOn() throws Exception {
+        NotificationStore store = new InMemoryNotificationStore();
+        List<String> targets = new CopyOnWriteArrayList<>();
+        NotificationService svc = new NotificationService(store, NotificationRules.defaults(),
+                new NotificationPreferences(), List.of(targetRecorder(targets)));
+        NotificationPreferenceOverrides o = NotificationPreferenceOverrides.inMemory();
+        o.apply("alice", "alice@example.com", Map.of("pipeline", Map.of(NotificationPreferences.EMAIL, true)));
+        o.apply("bob", "bob@example.com", Map.of());                 // inherits the default: email off
+        o.apply("carol", null, Map.of("pipeline", Map.of(NotificationPreferences.EMAIL, true)));   // no address
+        svc.preferenceOverrides(o);
+
+        svc.onEvent(batchFailed("orders", "b1", "boom"));
+        svc.close();
+
+        assertEquals(List.of("alice@example.com"), targets,
+                "only alice opted in; bob inherits 'off'; carol has no verified address; the default sends nothing");
+    }
+
+    @Test
+    void anInAppOptInIsStoredEvenWhenTheDefaultIsOff() throws Exception {
+        NotificationStore store = new InMemoryNotificationStore();
+        NotificationPreferences defaults = new NotificationPreferences();
+        defaults.set("pipeline", Map.of(NotificationPreferences.IN_APP, false));
+        NotificationService svc = new NotificationService(store, NotificationRules.defaults(), defaults, List.of());
+        NotificationPreferenceOverrides o = NotificationPreferenceOverrides.inMemory();
+        o.apply("alice", null, Map.of("pipeline", Map.of(NotificationPreferences.IN_APP, true)));
+        svc.preferenceOverrides(o);
+
+        svc.onEvent(batchFailed("orders", "b1", "boom"));
+        svc.close();
+
+        assertEquals(1, store.recent(10).size(), "alice opted in, so the shared feed holds it for her view");
+    }
 }

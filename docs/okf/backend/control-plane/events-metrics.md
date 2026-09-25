@@ -44,13 +44,50 @@ timestamp: 2026-07-16T00:00:00Z
   `POST /notifications/read-all` touch only the caller's marks and are **self-service** (open to any
   authenticated caller — `CapabilityManifest.EXEMPTIONS`); `GET /notifications`, the SSE frames and
   `/notifications/unread-count` report `read` / `state` / `readAt` **as the caller sees them**. Delete
-  (archive) and `PUT /notifications/preferences` stay `canAdminister` — those write the shared feed / grid.
+  (archive) stays `canAdminister` — it writes the shared feed.
   In memory, like the feed it overlays (a restart forgets both); ≤1000 marks per reader, oldest evicted.
   ⚠ **One shared side effect, on purpose:** a read also acknowledges the notification in the shared store
   (`NotificationStore.markRead`), because that is what re-opens the dispatcher's dedupe collapse
   (`hasActiveDuplicate` matches only store-UNREAD rows) so the next identical alert is delivered again, as
   before. It can only let a repeat alert through, never hide one, and no reader's view reports it. Tests:
   `ControlApiNotificationsTest.readStateIsPerSubject` (real HTTP, with Subjects), `NotificationReadStateTest`.
+* **Preferences are two layers** (operator, 2026-09-25; ses-sns-adapter-design §7, fixes SEC review F2) — the
+  **deployment default** is `NotificationPreferences` (per Space's `CollectorService`, in memory, as before),
+  and each Subject may hold a sparse **override** in **`NotificationPreferenceOverrides`**:
+  `enabled(defaults, category, channel, subject, email)` = the override, else the default; critical categories
+  are locked on at both layers (nothing is ever stored for them). Only `inApp` and `email` are personal —
+  `webhook` is an operator destination with no per-user address, so it always inherits.
+  * Routes: `GET /notifications/preferences` = the caller's **effective** grid, each row the old shape plus
+    `source` (`inherited` / `overridden`) and `editable` per channel; `PUT /notifications/preferences` =
+    the caller's override only (**self-service**; a `null` cell resets it; `503` if the file is unreadable);
+    `GET /notifications/preferences/default` (open) and **`PUT /notifications/preferences/default`
+    (`canAdminister`)** = the default grid. **Personal** (no Subject): no override layer, `PUT
+    /notifications/preferences` writes the single grid as before, and every cell reads `inherited`.
+  * **Email destination = `Subject.email()`, the verified email claim only** — never a body field (none is
+    read), never user-editable. A Subject without one cannot turn email on, and reads email as off even where
+    the default says on.
+  * **Storage:** ONE per-deployment file, `notification-preferences.toon` (users span Spaces), found at
+    `-Dnotify.preferences.file`, else `<-Dspaces.root>/`, else single-tenant `<-Dassist.write.root>/`, else
+    in memory — never the CWD. Written through `AtomicFiles` + `ConfigCodec`, keyed by stable subject id.
+    Owned by `SpaceManager` and wired into every Space's `NotificationService` as it joins. An existing but
+    unreadable file makes personal saves refuse (503) rather than overwrite everyone else's overrides.
+  * **Delivery consults it:** the in-app leg stores a notification when the default OR any Subject's override
+    enables in-app, and each reader's feed / SSE / unread count then hides a category that reader's
+    **effective** in-app is off for. Personal email goes to every **enrolled** Subject (one that has saved its
+    preferences with a verified address) whose effective email is on — through the discovered `email` SPI
+    transport, with suppression and a receipt like any addressed destination.
+  * ⚠ **Known limits:** enrolment happens on the Subject's first `PUT`, so a user who never saved receives no
+    personal email even when the default says on; the default grid is still per Space and in memory (a
+    restart resets it; unchanged by this work); with several pods on one `-Dspaces.root` each pod holds its
+    own copy of the overrides file, so the last writer wins across pods; and the email transport is only
+    discovered when `notify.smtp.to` is set, exactly as for `ChannelConfig` email destinations.
+  * Tests: `ControlApiSubjectPreferencesTest` (real HTTP, with Subjects: A's PUT leaves B's grid unchanged,
+    `/default` 403 without `canAdminister`, critical cannot be turned off, a body address is ignored,
+    Personal unchanged, durable across a restart), `NotificationPreferenceOverridesTest`,
+    `NotificationServiceTest` (personal email + in-app opt-in), `CapabilityManifestTest.sharedNotificationStateWritesStayAdminGated`.
+  * SPA: `notification-preferences.component.ts` shows the caller's effective grid with Inherited / Overridden
+    markers and a per-cell Reset (saving only changed cells); administrators also get
+    `deployment-default-preferences.component.ts`.
 * **`NotificationChannel`** is a ServiceLoader SPI — in-app is intrinsic; **email is an edition
   seam**, deliberately not in core. A message broker is deliberately not used: in-process
   virtual-thread executor + append-only `EventStore` is the idiom.

@@ -56,6 +56,10 @@ public final class NotificationService implements NotificationAccess, AutoClosea
     /** Delivery-status receipts (D8), or {@code null} when tracking is not wired (the lean default). */
     private volatile DeliveryReceiptStore receipts;
 
+    /** The deployment's per-Subject preference overrides (ses-sns §7). Shared by every Space's service —
+     *  users span Spaces — and wired by the host; an empty in-memory store until then. */
+    private volatile NotificationPreferenceOverrides overrides = NotificationPreferenceOverrides.inMemory();
+
     /** Per-recipient suppression (D8-SUPPRESS-1); disarmed until a DURABLE receipt store is wired. */
     private volatile SuppressionList suppression = SuppressionList.fromProperties(null);
     private final CopyOnWriteArrayList<Consumer<Notification>> listeners = new CopyOnWriteArrayList<>();
@@ -131,6 +135,17 @@ public final class NotificationService implements NotificationAccess, AutoClosea
                     receipts == null ? "no receipt store wired"
                             : "the receipt store is in-memory, so bounce evidence is evicted");
         }
+    }
+
+    /** Wire the deployment's per-Subject preference overrides (ses-sns §7) — a setter for the same reason as
+     *  {@link #deliveryReceipts}: optional, and one instance is shared across every Space's service. */
+    public void preferenceOverrides(NotificationPreferenceOverrides overrides) {
+        if (overrides != null) this.overrides = overrides;
+    }
+
+    /** The per-Subject preference overrides this service delivers against. */
+    public NotificationPreferenceOverrides preferenceOverrides() {
+        return overrides;
     }
 
     /** The suppression policy in force. Disarmed unless a durable receipt store is wired (D8-SUPPRESS-1). */
@@ -212,9 +227,12 @@ public final class NotificationService implements NotificationAccess, AutoClosea
             Notification n = rule.render(e);
             if (store.hasActiveDuplicate(n.dedupeKey())) return;   // collapse identical unread alerts
             if (!rateLimiter.allow(n.dedupeKey())) return;          // cap identical alerts per rolling hour
-            // In-app (intrinsic): the S1-3 service path (dedupe + store + listeners), unless the user
-            // opted out of in-app for this category (critical categories are always delivered — bypass).
-            if (prefs.enabled(n.category(), NotificationPreferences.IN_APP)) {
+            // In-app (intrinsic): the S1-3 service path (dedupe + store + listeners), unless in-app is off for
+            // this category in the default AND no Subject turned it on for itself (critical: always delivered).
+            // The feed is shared, so each reader's view then filters by that reader's effective preference.
+            NotificationPreferenceOverrides personal = overrides;
+            if (prefs.enabled(n.category(), NotificationPreferences.IN_APP)
+                    || personal.anyEnables(n.category(), NotificationPreferences.IN_APP)) {
                 notify(n);
             }
             // External SPI channels configured from notify.* flags: delivered only when enabled for this category.
@@ -234,6 +252,7 @@ public final class NotificationService implements NotificationAccess, AutoClosea
                     log.warn("channel {} delivery failed: {}", ch.id(), ex.getMessage());
                 }
             }
+            deliverPersonalEmail(personal, n);
             // Persisted channel destinations (admin CRUD): deliver each enabled ChannelConfig through the SPI
             // transport whose id names its kind, to the config's own target — so an operator-managed
             // destination delivers without a restart. No transport for a kind ⇒ nothing to deliver through.
@@ -376,6 +395,32 @@ public final class NotificationService implements NotificationAccess, AutoClosea
             // unreachable transport cannot spin the sweep forever.
             log.warn("soft-bounce retry to {} failed: {}", cfg.target(), ex.getMessage());
             return false;
+        }
+    }
+
+    /**
+     * ses-sns §7: each enrolled Subject whose EFFECTIVE email preference is on (its override, else the
+     * default; critical always) gets the notification at its verified email claim — the only address it can
+     * have, since the store never takes one from a request. Suppression and receipts apply as for any
+     * addressed destination. No email transport ⇒ nothing to deliver through.
+     */
+    private void deliverPersonalEmail(NotificationPreferenceOverrides personal, Notification n) {
+        NotificationChannel email = channelByKind(NotificationPreferences.EMAIL);
+        if (email == null) return;
+        for (NotificationPreferenceOverrides.Enrolled s : personal.enrolled()) {
+            if (!personal.enabled(prefs, n.category(), NotificationPreferences.EMAIL, s.subject(), s.email())) continue;
+            java.util.Optional<String> suppressed = suppression.reasonToSuppress(s.email(), System.currentTimeMillis());
+            if (suppressed.isPresent()) {
+                log.info("personal email to subject {} SUPPRESSED: {}", s.subject(), suppressed.get());
+                continue;
+            }
+            String deliveryId = openReceipt(n.id(), null, s.email(), false);
+            try {
+                if (deliveryId == null) email.deliver(n, s.email());
+                else email.deliver(n, s.email(), deliveryId);
+            } catch (Exception ex) {
+                log.warn("personal email to subject {} failed: {}", s.subject(), ex.getMessage());
+            }
         }
     }
 
