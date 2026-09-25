@@ -2400,6 +2400,47 @@ describe('PipelineEditorComponent', () => {
             expect(c.findings()).toEqual([]);
         });
 
+        /** VALIDATION-STALE-AFTER-DELETE (driven 2026-09-25): the dock kept a deleted Step's error. */
+        it("deleting a Step drops ITS findings at once, and the debounced pass recomputes the rest", () => {
+            const c = make();
+            const timer = captureTimer(c);
+            c.select('demo');
+            TestBed.tick(); // the loaded graph is what the deletion is measured against
+            c.findings.set([
+                { severity: 'error', nodeId: 'flt', message: 'flt: needs configuration.' },
+                { severity: 'warning', nodeId: 'src', message: 'src: not yet tested.' },
+            ]);
+            c.selectedNode.set(c.model()!.nodes.find((n) => n.id === 'flt')!);
+            c.onDeleteKey();
+            TestBed.tick();
+            // Synchronous: no finding about a Step the canvas no longer has, even inside the window.
+            expect(c.findings().some((f) => f.nodeId === 'flt')).toBe(false);
+            expect(c.findings().some((f) => f.nodeId === 'src')).toBe(true);
+            timer.pending!();
+            const recomputed = c.findings();
+            expect(recomputed.some((f) => f.nodeId === 'flt')).toBe(false);
+            expect(c.validate()).toEqual(recomputed); // the debounced pass IS the validator over the new graph
+        });
+
+        it('a tab that turns CLEAN inside the window (Save before it fired) still recomputes a shown list', () => {
+            const c = make();
+            const timer = captureTimer(c);
+            c.select('demo');
+            c.validate(); // the dock shows the current graph's findings
+            c.onDropAdd({ type: 'transform.filter', x: 10, y: 20 });
+            TestBed.tick();
+            const added = c.model()!.nodes[c.model()!.nodes.length - 1].id;
+            c.validate();
+            expect(c.findings().some((f) => f.nodeId === added)).toBe(true);
+            c.selectedNode.set(c.model()!.nodes.find((n) => n.id === added)!);
+            c.onDeleteKey();
+            c.dirty.set(false); // e.g. a Save landed before the debounce fired
+            TestBed.tick();
+            expect(timer.pending).not.toBeNull(); // clean, but the dock shows findings — it must not freeze
+            timer.pending!();
+            expect(c.findings().some((f) => f.nodeId === added)).toBe(false);
+        });
+
         it('closing the dirty tab cancels the pending validate', async () => {
             const c = make();
             const timer = captureTimer(c);

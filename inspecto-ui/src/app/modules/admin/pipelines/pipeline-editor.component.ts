@@ -12,6 +12,7 @@ import {
     inject,
     input,
     signal,
+    untracked,
 } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -3090,6 +3091,8 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
 
     /** The pending live re-validate, if any — one timer, cancelled by the effect on every re-run. */
     private validateTimer: ReturnType<typeof setTimeout> | null = null;
+    /** The Step ids of the model {@link liveValidate} last saw, per tab — what tells a deletion apart. */
+    private lastNodeIds: { tab: string | null; ids: Set<string> } | null = null;
 
     /**
      * Live validation while a tab is dirty: ~1.5s after the LAST graph mutation, re-run the same
@@ -3097,22 +3100,42 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      * signal — every graph mutation goes `model.set(...)` + `dirty.set(true)` — so drawer-form
      * keystrokes (which live outside the model until Apply) never trigger it. The effect only ever
      * CANCELS the timer on re-run, so a tab switch or close cancels a pending validate for free; the
-     * fired callback re-checks the tab and dirtiness, so a stale timer for a clean or switched-away
-     * tab is a no-op. Writes findings only — never `dirty`, never `bottomTab` — so no feedback loop
-     * and no dock popping open uninvited.
+     * fired callback re-checks the tab, so a stale timer for a switched-away tab is a no-op. Writes
+     * findings only — never `dirty`, never `bottomTab` — so no feedback loop and no dock popping open
+     * uninvited.
+     *
+     * <p>🔴 **The dock must never describe a graph that is gone** (VALIDATION-STALE-AFTER-DELETE,
+     * driven 2026-09-25): after deleting a Step the dock kept that Step's error. Two holes, both closed:
+     * (1) for the debounce window a finding naming the deleted Step stayed listed — so findings about a
+     * Step the change REMOVED (in the previous model of this tab, not in this one) are pruned at once, on
+     * the change itself; (2) a tab that turned CLEAN
+     * inside the window (Save before it fired, or undo back to the baseline) cancelled the recompute and
+     * "a clean tab never validates" kept the old list for good — so a clean tab that already SHOWS
+     * findings recomputes too. A clean tab with nothing listed still arms nothing (arrival never
+     * validates unasked). `findings` is read untracked: the effect answers graph changes, not its own
+     * writes.
      */
     private readonly liveValidate = effect(() => {
-        this.model(); // track: every graph mutation lands here
+        const m = this.model(); // track: every graph mutation lands here
         const id = this.selectedId();
         const isDirty = this.dirty();
         if (this.validateTimer !== null) {
             this.cancelValidateTimer(this.validateTimer);
             this.validateTimer = null;
         }
-        if (!id || !isDirty) return; // a clean tab never validates on the timer
+        const ids = new Set((m?.nodes ?? []).map((n) => n.id));
+        const prev = this.lastNodeIds?.tab === id ? this.lastNodeIds.ids : null;
+        this.lastNodeIds = { tab: id, ids };
+        let shown = untracked(() => this.findings());
+        if (prev && shown.length) {
+            const removed = (nodeId?: string) => !!nodeId && prev.has(nodeId) && !ids.has(nodeId);
+            const kept = shown.filter((f) => !removed(f.nodeId));
+            if (kept.length !== shown.length) this.findings.set((shown = kept));
+        }
+        if (!id || (!isDirty && !shown.length)) return; // a clean tab with nothing listed never validates on the timer
         this.validateTimer = this.armValidateTimer(() => {
             this.validateTimer = null;
-            if (this.selectedId() !== id || !this.dirty()) return; // superseded — the operator moved on
+            if (this.selectedId() !== id) return; // superseded — the operator moved on
             this.refreshFindings();
         });
     });
