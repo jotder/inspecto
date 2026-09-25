@@ -146,6 +146,27 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
         required: false,
         default: true,
     },
+    // Heatmap only: how the cells are coloured (`options.heatmap`).
+    {
+        key: 'heatmapScale',
+        label: 'Heatmap: colour scale',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: 'sequential',
+        options: [
+            { value: 'sequential', label: 'Sequential (low → high)' },
+            { value: 'diverging', label: 'Diverging (around a midpoint)' },
+            { value: 'status', label: 'Status (Pass / Fail words, or on / off target)' },
+        ],
+    },
+    {
+        key: 'heatmapMidpoint',
+        label: 'Heatmap: midpoint (diverging, default 0)',
+        type: 'number',
+        tier: 'required',
+        required: false,
+    },
     // UIE-6, table only: each row opens the operational object it describes. Both are needed for a link.
     {
         key: 'rowLinkKind',

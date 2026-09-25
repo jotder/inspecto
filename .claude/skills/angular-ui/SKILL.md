@@ -645,6 +645,10 @@ src/app/
     the step's raw category, never the computed total. `combo` = bars (`y`) + line (`y2`, a new `ChannelId`) with the
     line on a secondary `y2` axis in `options.format2` (`viz/combo-chart.ts`); the theme styles any extra axis the
     caller declares. Both pass their own text alternative via `<inspecto-chart [ariaLabel]>`.
+- **Heatmap Visualization Type (`vizType: heatmap`) → `viz/heatmap.ts` + `viz/plugins/heatmap.{plugin,component}.ts`**
+  (2026-09-25; gallery: `/design` ▸ *More visualization types*). Channels `rows` × `columns` + one `value`; a real
+  `<table>` coloured by `options.heatmap.scale` — `sequential` / `diverging` (`midpoint`) as `rgba(var(--gamma-primary|warn-rgb), a)`
+  ramps, `status` via `statusBadgeClasses()` (numbers vs `options.kpi.target`); a click drills on the ROW dimension only.
 - **ag-Grid theme → only** `InspectoGridThemeService` / `GAMMA_GRID_PARAMS`. Never bare `themeQuartz`.
 - Editing the theming plugin (`@gamma/tailwind/plugins/theming.js`) does **not** hot-reload — restart the
   dev server and verify via `getComputedStyle(body).getPropertyValue('--gamma-…')`.

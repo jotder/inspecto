@@ -41,6 +41,8 @@ import { KpiTrendComponent } from 'app/inspecto/viz/plugins/kpi-trend.component'
 import { ProgressListComponent } from 'app/inspecto/viz/plugins/progress-list.component';
 import { TreemapComponent } from 'app/inspecto/viz/plugins/treemap.component';
 import { TreemapRow } from 'app/inspecto/viz/treemap-layout';
+// More visualization types — heatmap
+import { HeatmapComponent, HeatmapData } from 'app/inspecto/viz/plugins/heatmap.component';
 // Dashboard tile section
 import { InspectoTileCardComponent } from 'app/inspecto/components/tile-card.component';
 import { CHART_CATEGORICAL } from 'app/inspecto/theme/chart-tokens';
@@ -112,6 +114,7 @@ interface DemoRow {
         InspectoSchemaMetadataGridComponent,
         DesignSystemFoundationsComponent,
         VizRenderComponent,
+        HeatmapComponent,
     ],
     templateUrl: './design-system.component.html',
 })
@@ -445,6 +448,62 @@ export class DesignSystemComponent {
     readonly treemapPicked = signal('Click a cell — the drill event appears here.');
     readonly treemapSelect = (channel: string, value: string): void =>
         this.treemapPicked.set(`Drill: ${channel} = "${value}"`);
+    // ── More visualization types — heatmap (viz/plugins/heatmap.*) ─────────────────────────────
+    private readonly heatDays = [
+        '2026-09-18',
+        '2026-09-19',
+        '2026-09-20',
+        '2026-09-21',
+        '2026-09-22',
+        '2026-09-23',
+        '2026-09-24',
+    ];
+    private readonly heatControls = ['RA-C01 Usage to rating', 'RA-C02 Rating to billing', 'RA-C07 Top-up to balance'];
+    /** Sequential: exceptions per control per day, one day missing (an empty cell, not a zero). */
+    readonly heatSequential: HeatmapData = {
+        rows: this.heatControls,
+        columns: this.heatDays,
+        cells: [
+            [0, 3, 1, 0, 2, 0, 1],
+            [48, 52, 61, 45, 70, 66, 58],
+            [4, null, 9, 12, 2, 0, 5],
+        ],
+        rowLabel: 'Control',
+        columnLabel: 'Event date',
+        valueLabel: 'Exceptions (total)',
+    };
+    /** Diverging: variance vs plan in points, around a midpoint of 0. */
+    readonly heatDiverging: HeatmapData = {
+        rows: ['Billing', 'Collections', 'Interconnect'],
+        columns: ['2026-06-01', '2026-07-01', '2026-08-01', '2026-09-01'],
+        cells: [
+            [-2.4, -0.8, 0.6, 1.9],
+            [1.2, 0.4, -1.5, -3.1],
+            [0.2, 2.8, 3.6, -0.4],
+        ],
+        rowLabel: 'Domain',
+        columnLabel: 'Month',
+        valueLabel: 'Variance vs plan (pts)',
+    };
+    /** Status: the RAG matrix — control x day, each cell the run's status word. */
+    readonly heatStatus: HeatmapData = {
+        ...this.heatSequential,
+        cells: [
+            ['Pass', 'Warning', 'Warning', 'Pass', 'Warning', 'Pass', 'Warning'],
+            ['Fail', 'Fail', 'Fail', 'Fail', 'Fail', 'Fail', 'Fail'],
+            ['Warning', null, 'Warning', 'Warning', 'Warning', 'Pass', 'Warning'],
+        ],
+        valueLabel: 'Status',
+    };
+    readonly heatmapSnippet = `// a Widget: vizType 'heatmap', channels rows / columns / value (one aggregate per cell)
+{ vizType: 'heatmap', datasetId: 'control_runs',
+  controls: { rows: [{ field: 'control' }], columns: [{ field: 'event_date', grain: 'day' }],
+              value: [{ field: 'status', agg: 'max' }] },          // a status column needs max / min
+  options: { heatmap: { scale: 'status' } } }                       // 'sequential' (default) | 'diverging' | 'status'
+// diverging: options.heatmap.midpoint (default 0); status on numbers: options.kpi.target + better
+// the component on its own (viz-render mounts it; a cell click drills on the ROW dimension):
+<inspecto-heatmap [data]="props.heatmap" [options]="{ scale: 'diverging', midpoint: 0 }" [format]="fmt"
+                  (cellClick)="drill($event.row)" />`;
 
     /** Dashboard tile section: the chart tile's demo series. */
     readonly tileDemoChart: ChartData = {

@@ -310,11 +310,12 @@ export class WidgetHostComponent {
         this.kpiSize.update(nextKpiMode);
     }
 
-    /** Resolve the clicked category to the field it came from (the widget's `x` channel, or `series` for
-     *  plugins that use it as the point label, e.g. bubble) and emit the drill event. */
+    /** Resolve the clicked category to the field it came from (the widget's `x` channel, `series` for
+     *  plugins that use it as the point label, e.g. bubble, or a heatmap's `rows` — its drill filters the row
+     *  dimension only, as the event carries one field) and emit the drill event. */
     onCategoryClick(value: string): void {
         const controls = this.resolvedWidget()?.controls;
-        const field = controls?.x?.[0]?.field ?? controls?.series?.[0]?.field;
+        const field = controls?.x?.[0]?.field ?? controls?.series?.[0]?.field ?? controls?.rows?.[0]?.field;
         if (field) this.drill.emit({ field, value });
     }
 

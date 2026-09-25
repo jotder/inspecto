@@ -80,6 +80,15 @@ describe('WidgetOptionsDialog', () => {
         expect(saved.kpi).toEqual({ target: 0.3, better: 'lower' });
     });
 
+    it('round-trips the heatmap scale and midpoint; the default sequential scale writes nothing', () => {
+        const { c, ref } = create({ heatmap: { scale: 'diverging', midpoint: 99 } });
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).heatmap).toEqual({ scale: 'diverging', midpoint: 99 });
+        c.schemaForm.form.patchValue({ heatmapScale: 'sequential', heatmapMidpoint: null });
+        c.save();
+        expect((ref.close.mock.calls[1][0] as WidgetOptions).heatmap).toBeUndefined();
+    });
+
     it('keeps a table row link through a save (UIE-6)', () => {
         const { c, ref } = create({ rowLink: { kind: 'reconciliation', idField: 'recon_id' } });
         c.save();

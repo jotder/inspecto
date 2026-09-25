@@ -748,6 +748,46 @@
             <pre
                 class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
             ><code>{{ snippets.moreVizWaterfallCombo }}</code></pre>
+
+            <!-- ── Heatmap (vizType: heatmap) ── -->
+            <div class="mb-3 mt-6 flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Heatmap</h3>
+                <button mat-stroked-button (click)="copy(heatmapSnippet)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                Two dimensions (<code>rows</code> × <code>columns</code>) and one aggregate per cell, drawn as a real
+                <code>&lt;table&gt;</code> with a sticky row header that scrolls sideways inside the tile. Three scales
+                (<code>options.heatmap.scale</code>): <b>sequential</b> — one <code>--gamma-primary</code> ramp, light →
+                strong, with on-colour ink on strong cells; <b>diverging</b> — the warn hue below the midpoint, primary
+                above; <b>status</b> — the status badge's tone per word (a RAG matrix), or on / off
+                <code>options.kpi.target</code> for numbers. The value is printed in the cell (from 13 columns it moves
+                to the cell's name and tooltip), a missing pair stays empty, ISO dates read like a calendar, and a click
+                drills on the row. Toggle light/dark to check both ramps.
+            </p>
+            <div class="grid gap-4 lg:grid-cols-2">
+                <div class="bg-card rounded-2xl p-4 shadow">
+                    <div class="mb-2 text-sm font-medium">Sequential — exceptions per control per day</div>
+                    <inspecto-heatmap [data]="heatSequential" />
+                </div>
+                <div class="bg-card rounded-2xl p-4 shadow">
+                    <div class="mb-2 text-sm font-medium">Status — the RAG matrix</div>
+                    <inspecto-heatmap [data]="heatStatus" [options]="{ scale: 'status' }" />
+                </div>
+                <div class="bg-card rounded-2xl p-4 shadow">
+                    <div class="mb-2 text-sm font-medium">Diverging — variance vs plan, midpoint 0</div>
+                    <inspecto-heatmap
+                        [data]="heatDiverging"
+                        [options]="{ scale: 'diverging', midpoint: 0 }"
+                        [format]="{ decimals: 1 }"
+                    />
+                </div>
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ heatmapSnippet }}</code></pre>
         </section>
 
         <!-- ── Graph hosts (AntV G6) ────────────────────────────────────────────────────── -->

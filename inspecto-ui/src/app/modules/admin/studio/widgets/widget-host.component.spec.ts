@@ -168,6 +168,28 @@ describe('WidgetHostComponent', () => {
         expect(emitted).toEqual({ field: 'tariff', value: 'premium' });
     });
 
+    it('resolves a heatmap cell click to its ROW dimension (the drill event carries one field)', () => {
+        const heatWidget: Widget = {
+            ...WIDGET,
+            vizType: 'heatmap',
+            controls: {
+                rows: [{ field: 'control' }],
+                columns: [{ field: 'event_date' }],
+                value: [{ field: 'breaks', agg: 'sum' }],
+            },
+        };
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+        ]);
+        fixture.componentRef.setInput('widget', heatWidget);
+        fixture.componentRef.setInput('dataset', DS);
+        let emitted: { field: string; value: string } | undefined;
+        fixture.componentInstance.drill.subscribe((v) => (emitted = v));
+        fixture.componentInstance.onCategoryClick('RA-C02');
+        expect(emitted).toEqual({ field: 'control', value: 'RA-C02' });
+    });
+
     it('treemap: a group cell drills on the group field, a subgroup cell on the subgroup field', () => {
         const treemapWidget: Widget = {
             ...WIDGET,

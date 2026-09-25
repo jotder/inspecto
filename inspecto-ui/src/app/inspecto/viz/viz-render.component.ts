@@ -16,6 +16,7 @@ import { KpiComponent, KpiMode } from './plugins/kpi.component';
 import { KpiTrendComponent } from './plugins/kpi-trend.component';
 import { ProgressListComponent } from './plugins/progress-list.component';
 import { TreemapChannel, TreemapComponent } from './plugins/treemap.component';
+import { HeatmapComponent } from './plugins/heatmap.component';
 import { getVizComponentLoader } from './viz-components';
 import {
     signed,
@@ -48,7 +49,7 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
 @Component({
     selector: 'inspecto-viz-render',
     standalone: true,
-    imports: [NgComponentOutlet, InspectoChartComponent, DataTableComponent, StatusBadgeComponent],
+    imports: [NgComponentOutlet, InspectoChartComponent, DataTableComponent, StatusBadgeComponent, HeatmapComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         @switch (renderKind()) {
@@ -95,7 +96,20 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
                 />
             }
             @case ('component') {
-                @if (outletComponent(); as cmp) {
+                @if (isHeatmap()) {
+                    <!-- Rendered directly, not through the outlet: a cell click is the drill-down seam, and an
+                         outlet component cannot emit. It sizes itself (max-h-80) and scrolls inside the tile. -->
+                    @if (props().heatmap; as m) {
+                        <inspecto-heatmap
+                            [data]="m"
+                            [options]="renderOptions()?.heatmap"
+                            [format]="renderOptions()?.format"
+                            [target]="renderOptions()?.kpi?.target"
+                            [better]="renderOptions()?.kpi?.better ?? 'higher'"
+                            (cellClick)="categoryClick.emit($event.row)"
+                        />
+                    }
+                } @else if (outletComponent(); as cmp) {
                     <!-- UIE-1: a KPI (and a KPI trend) is a number, not a canvas - it gets a compact box; a progress
                          list is as tall as its rows; maps and graphs keep h-64. -->
                     <div [class.h-36]="outletBox() === 'compact'" [class.h-64]="outletBox() === 'fixed'">
@@ -124,8 +138,8 @@ export class VizRenderComponent {
     /** KPI only: the in-place size, when the HOST owns the size control (a Dashboard tile's action set). Absent ⇒
      *  the KPI keeps its own card and size button. */
     readonly kpiSize = input<KpiMode | undefined>(undefined);
-    /** Emits the clicked category's label (bar/line/area/pie/bubble) — the drill-down seam. Gauge has no
-     *  filterable categories, so it never emits. */
+    /** Emits the clicked category's label (bar/line/area/pie/bubble; a heatmap cell's ROW value — the drill event
+     *  carries one field) — the drill-down seam. Gauge has no filterable categories, so it never emits. */
     readonly categoryClick = output<string>();
     /** Emits a clicked mark that knows its own channel — the treemap, whose group cells drill on `group` and whose
      *  subgroup cells drill on `subgroup`. The host resolves the channel to its field. */
@@ -146,6 +160,11 @@ export class VizRenderComponent {
     readonly gaugeTarget = computed(() => {
         const o = this.renderOptions();
         return targetStatus(this.props().value ?? 0, o?.kpi?.target, o?.kpi?.better ?? 'higher', o?.format);
+    });
+
+    readonly isHeatmap = computed(() => {
+        const r = this.plugin().render;
+        return r.kind === 'component' && r.componentKey === 'heatmap';
     });
 
     /** The outlet's box: compact for the KPI tiles, the content's own height for a progress list, else h-64. */

@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { RowLinkKind } from 'app/inspecto/viz/viz-types';
+import { HeatmapScale } from 'app/inspecto/viz/heatmap';
 import { WidgetOptions } from './widget-types';
 import { WIDGET_OPTION_ATTRIBUTES } from './widget-option-attributes';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -69,6 +70,8 @@ export class WidgetOptionsDialog {
         waterfallTotalLabel: this.data.waterfall?.totalLabel ?? '',
         waterfallOrder: this.data.waterfall?.order ?? 'data',
         comboSecondaryAxis: this.data.combo?.secondaryAxis ?? true,
+        heatmapScale: this.data.heatmap?.scale ?? 'sequential',
+        heatmapMidpoint: this.data.heatmap?.midpoint ?? null,
         rowLinkKind: this.data.rowLink?.kind ?? '',
         rowLinkIdField: this.data.rowLink?.idField ?? '',
     };
@@ -99,6 +102,8 @@ export class WidgetOptionsDialog {
                 ? { start: start || undefined, totalLabel, order: order === 'data' ? undefined : order }
                 : undefined;
         const secondaryAxis = (v['comboSecondaryAxis'] as boolean) ?? true;
+        const heatScale = (str(v['heatmapScale']) || 'sequential') as HeatmapScale;
+        const heatMid = typeof v['heatmapMidpoint'] === 'number' ? (v['heatmapMidpoint'] as number) : undefined;
         const linkKind = str(v['rowLinkKind']) as '' | RowLinkKind;
         const linkField = str(v['rowLinkIdField']);
         const options: WidgetOptions = {
@@ -124,6 +129,10 @@ export class WidgetOptionsDialog {
             kpi: target != null || better === 'lower' ? { target, better } : undefined,
             waterfall,
             combo: secondaryAxis ? undefined : { secondaryAxis: false },
+            heatmap:
+                heatScale !== 'sequential' || heatMid != null
+                    ? { scale: heatScale, ...(heatMid == null ? {} : { midpoint: heatMid }) }
+                    : undefined,
             rowLink: linkKind && linkField ? { kind: linkKind, idField: linkField } : undefined,
         };
         this.ref.close(options);

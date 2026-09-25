@@ -1,4 +1,5 @@
 import { NumberFormat } from './number-format';
+import type { HeatmapMatrix, HeatmapOptions } from './heatmap';
 import { ColumnType, ConditionGroup } from 'app/inspecto/query';
 import { TreemapRow } from './treemap-layout';
 
@@ -60,8 +61,8 @@ export interface QuerySpec {
     limit?: number | null;
 }
 
-/** The channels a plugin can map fields onto (Tableau-style). */
-export type ChannelId = 'x' | 'y' | 'y2' | 'series' | 'size' | 'color' | 'value' | 'compare' | 'group' | 'subgroup';
+/** The channels a plugin can map fields onto (Tableau-style). `rows` / `columns` are the heatmap's two axes. */
+export type ChannelId = 'x' | 'y' | 'y2' | 'series' | 'size' | 'color' | 'value' | 'compare' | 'group' | 'subgroup' | 'rows' | 'columns';
 
 /** A field-mapper control: one channel, the roles it accepts, and whether it's multi/required. */
 export interface ControlSpec {
@@ -182,6 +183,8 @@ export interface VizRenderOptions {
     rowLink?: RowLink;
     /** Treemap only: how many level-1 groups to draw before the rest fold into one "Other" (default 20). */
     treemap?: { limit?: number };
+    /** Heatmap only: the colour scale (`sequential` default, `diverging` around `midpoint`, `status` by tone). */
+    heatmap?: HeatmapOptions;
 }
 
 /** UIE-6: the operational objects a table row can open — each has a detail route taking its id. */
@@ -205,6 +208,8 @@ export interface VizProps {
     compare?: number;
     /** Treemap: one row per group (and subgroup) with its value — `treemap-layout.ts` builds the tree at render time. */
     treemap?: TreemapRow[];
+    /** Heatmap: the rows × columns matrix, plus the channel names its caption and headers read. */
+    heatmap?: HeatmapMatrix & { rowLabel: string; columnLabel: string; valueLabel: string };
 }
 
 /**
