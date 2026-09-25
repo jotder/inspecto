@@ -171,6 +171,69 @@ class ControlApiShareTest {
         }
     }
 
+    // ── SHARE-SAVED-FILTER-1: the shared Dashboard's STORED filter applies; the caller's never does ──
+
+    private static final String SUM_AMOUNT = "{\"dataset\":\"sales_ds\",\"measures\":[{\"agg\":\"sum\",\"field\":\"amount\"}]%s}";
+
+    private double sharedSum(Ctx c, String dashboard, String extra) throws Exception {
+        String token = V1Body.of(post(c.port, "/dashboards/" + dashboard + "/share", null).body()).get("token").asText();
+        HttpResponse<String> r = post(c.port, "/public/dashboards/" + token + "/query", String.format(SUM_AMOUNT, extra));
+        assertEquals(200, r.statusCode(), r.body());
+        return V1Body.of(r.body()).get("rows").get(0).elements().next().asDouble();
+    }
+
+    private static Map<String, Object> group(String op, Object... items) {
+        return Map.of("kind", "group", "op", op, "items", List.of(items));
+    }
+
+    private static Map<String, Object> cond(String field, String operator, String value) {
+        return Map.of("kind", "condition", "field", field, "operator", operator, "value", value);
+    }
+
+    @Test
+    void theSavedFilterAppliesToASharedQuery(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        System.setProperty("bi.share.secret", "test-secret-0123456789");
+        try (Ctx c = open(cfg, root)) {
+            seed(c);
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("dashboard", "eu_board", Map.of("widgets", List.of("sales_w"),
+                    "filter", group("AND", cond("region", "=", "EU"))));
+            reg.write("dashboard", "empty_filter_board", Map.of("widgets", List.of("sales_w"), "filter", Map.of()));
+
+            assertEquals(10.0, sharedSum(c, "eu_board", ""), "EU only, as the Dashboard shows it");
+            assertEquals(15.0, sharedSum(c, "exec_board", ""), "no saved filter → the whole dataset, unchanged");
+            assertEquals(15.0, sharedSum(c, "empty_filter_board", ""), "an empty stored `filter:` ({}) is no filter");
+        }
+    }
+
+    @Test
+    void aCallerCannotInjectOrDropAFilter(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        System.setProperty("bi.share.secret", "test-secret-0123456789");
+        try (Ctx c = open(cfg, root)) {
+            seed(c);
+            new ComponentStore(c.root.resolve("registry")).write("dashboard", "eu_board",
+                    Map.of("widgets", List.of("sales_w"), "filter", group("AND", cond("region", "=", "EU"))));
+
+            String us = ",\"filters\":[{\"field\":\"region\",\"op\":\"=\",\"value\":\"US\"}]";
+            assertEquals(10.0, sharedSum(c, "eu_board", us), "a sent filter must not replace the saved one");
+            assertEquals(10.0, sharedSum(c, "eu_board", ",\"filters\":[]"), "an empty sent list must not drop it");
+            assertEquals(15.0, sharedSum(c, "exec_board", us), "nor filter a Dashboard that has none");
+        }
+    }
+
+    @Test
+    void aSavedOrFilterIsRefusedNotDropped(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        System.setProperty("bi.share.secret", "test-secret-0123456789");
+        try (Ctx c = open(cfg, root)) {
+            seed(c);
+            new ComponentStore(c.root.resolve("registry")).write("dashboard", "or_board", Map.of("widgets",
+                    List.of("sales_w"), "filter", group("OR", cond("region", "=", "EU"), cond("region", "=", "US"))));
+            String token = V1Body.of(post(c.port, "/dashboards/or_board/share", null).body()).get("token").asText();
+            HttpResponse<String> r = post(c.port, "/public/dashboards/" + token + "/query", String.format(SUM_AMOUNT, ""));
+            assertEquals(422, r.statusCode(), "an unfiltered share would show more than the Dashboard: " + r.body());
+        }
+    }
+
     @Test
     void unknownDashboardShareIs404(@TempDir Path cfg, @TempDir Path root) throws Exception {
         System.setProperty("bi.share.secret", "test-secret-0123456789");

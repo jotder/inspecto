@@ -34,7 +34,9 @@ import java.util.Set;
  *       components it references, read-only. Invalid/expired/tampered tokens are an indistinguishable 404.</li>
  *   <li>{@code POST /public/dashboards/{token}/query} — anonymous headless BI query
  *       (same body as {@code /bi/query}) restricted to the datasets the shared dashboard's widgets
- *       actually reference — a token never becomes a general data API.</li>
+ *       actually reference — a token never becomes a general data API. The body's {@code filters} are
+ *       IGNORED: the shared Dashboard's stored {@code filter} is applied instead (SHARE-SAVED-FILTER-1,
+ *       {@link SharedDashboardFilter}), so a shared link shows what the Dashboard shows.</li>
  * </ul>
  */
 final class ShareRoutes implements RouteModule {
@@ -100,23 +102,28 @@ final class ShareRoutes implements RouteModule {
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "not found"));
 
+        String datasetId = body.get("dataset") == null ? null : String.valueOf(body.get("dataset")).trim();
+        if (datasetId == null || !allowedDatasets(store, dashboard).contains(datasetId))
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "this share link does not cover dataset '" + datasetId + "'");
+        Map<String, Object> dataset = store.get("dataset", datasetId)
+                .map(ComponentRegistry.Component::content)
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + datasetId + "'"));
+
+        // SHARE-SAVED-FILTER-1: the filter is the shared Dashboard's STORED one, never the caller's — a recipient
+        // can neither drop it (seeing more than the Dashboard shows) nor swap in another.
+        Map<String, Object> fenced = new LinkedHashMap<>(body);
         MeasureCompiler.Spec spec;
         String sql;
         try {
-            spec = MeasureCompiler.parse(body, 500, 10_000);
+            fenced.put("filters", SharedDashboardFilter.terms(dashboard.get("filter"), dataset));
+            spec = MeasureCompiler.parse(fenced, 500, 10_000);
             sql = MeasureCompiler.compile(spec);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
-        if (!allowedDatasets(store, dashboard).contains(spec.dataset()))
-            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "this share link does not cover dataset '" + spec.dataset() + "'");
 
         List<Finding> findings = SqlGuard.check(sql);
         if (!findings.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "compiled query failed the SQL safety check");
-
-        Map<String, Object> dataset = store.get("dataset", spec.dataset())
-                .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + spec.dataset() + "'"));
         String relationSql;
         try {
             relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(),

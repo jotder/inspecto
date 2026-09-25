@@ -22,7 +22,9 @@ export interface PublicMeasure {
     field?: string;
 }
 
-/** The `POST /public/dashboards/{token}/query` body — the /bi/query spec, fenced to the share's datasets. */
+/** The `POST /public/dashboards/{token}/query` body — the /bi/query spec, fenced to the share's datasets.
+ *  No `filters`: the server applies the shared Dashboard's STORED filter itself and ignores any sent one
+ *  (SHARE-SAVED-FILTER-1), so a share recipient sees exactly what the Dashboard shows. */
 export interface PublicQueryBody {
     dataset: string;
     measures?: PublicMeasure[];
