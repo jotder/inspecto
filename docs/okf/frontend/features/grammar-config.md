@@ -91,10 +91,18 @@ this is what renders now, and why. Grounding: `grammar-editor.component.{ts,html
   `""` is null). Left alone deliberately: `escape` (engine auto-fills escape = quote), `strict_mode`
   (tri-state), `engine` (blank = `auto`, recorded code decision — `parsing-attributes.ts:301`),
   `rejects_limit`.
-- **Sample | Parsed — the ONLY tabs** (`grammar-editor.component.html:48,93`): paste and upload merge into
+- **Sample | Parsed — the ONLY tabs** (`grammar-editor.component.html`): paste and upload merge into
   one textarea (typing clears captured bytes — the xlsx `sample.b64` rule kept); Import/Export (the Grammar
   CSV round-trip, unchanged) sit beside it; the parsed rows get a 10 · 25 · 50 · 100 page size (default
-  10). Safe from R9 because neither tab hosts a form.
+  10). Safe from R9 because neither tab hosts a form. **In `sampleMode: 'own'` Test parse sits on the
+  tab-header row, beside Sample | Parsed** (2026-09-25; tabs unstretched so it never covers a label) —
+  it used to render below every section, ~40 settings down, where a first-time builder never found it.
+  The settings' order and semantics are unchanged. The **Parsed grid is headed by the real column
+  names** (`order_date`, not ag-Grid's humanised "Order_date" wrapped to "Order_da te") — the shared
+  `dataColumn()` (`inspecto/grid`) every row-derived data-table column now uses.
+- **The dialog host feeds the Pipeline tab's sample thread** (2026-09-25): its sample and a table Test
+  parse land in the same `DefinitionStateService` the Parse drawer's Sample card and the downstream Steps
+  read — see [Pipeline Editor § Parse](pipeline-editor.md).
 - **ONE columns table — "Columns that come out"** (R11; `schema-fields-editor.component.html`): `#` ·
   Name · Type · **Sample value** (first parsed row) · Also known as (the synonym), a search box; ⅋ **no
   Use/include column** — D8 removed include-control, so every row the grid holds is emitted

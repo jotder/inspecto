@@ -33,7 +33,11 @@ Route `/pipelines` (Workbench nav group), dir `modules/admin/pipelines/`. An **A
 graph editor for authoring **Pipelines** (the DAG artifact — never "flow"). Gesture model:
 click = select (and open the Step's config pane — see *Selection is configuration*),
 double-click = configure, plain drag = move, **Shift+drag = draw edge** (two-click Connect also
-available). The editor keeps a persistent `Graph` and mutates in place (G6 patterns:
+available). ⚠ The modifier is the gesture's only "handle", so the canvas **states it**: an author sees
+*"Shift+drag from one Step to another to connect them"* bottom-left (`data-testid="connect-hint"`, hidden
+in the read-only lens), the Connect tooltip names it, and the canvas's accessible name says Shift+drag —
+it used to say "drag Step-to-Step to connect", and a builder dragging Step to Step saw the Step move and
+no edge appear (2026-09-25). The editor keeps a persistent `Graph` and mutates in place (G6 patterns:
 [architecture](../architecture.md)). Backed by `PipelinesService` / `ComponentsService` against a
 real ControlApi — ⚠ the offline mock backend was **deleted 2026-08-31**; `npm start` needs the
 backend on :4204.
@@ -91,7 +95,11 @@ backend on :4204.
   before, broken rows feed `brokenPipelines()` → the dialog's `broken` data, rendered after the list with an
   error `<inspecto-status-badge label="Does not load">`, the loader's message verbatim and the pipeline
   file path — and **no checkbox, pin or export**, since there is no graph to open. A stored open tab
-  naming a broken file is dropped on restore like any other unlisted id. ⛔ Every OTHER consumer
+  naming a broken file is dropped on restore like any other unlisted id. The **empty canvas counts them
+  too** (2026-09-25): when every registered Pipeline is broken it reads *"No pipeline loads — This Space
+  has N pipelines, but none of them load"* with a **Show pipelines…** action opening this dialog, and
+  *"No pipeline open"* appends *"M more do not load"*; *"No authored pipelines"* is kept for a Space that
+  genuinely has none (it used to show over 16 broken ones). ⛔ Every OTHER consumer
   (Catalog registry, Link Analysis, the dashboard editor's stale-widget check) calls `list()`, which
   drops broken rows — do not switch one to `listWithBroken()` without deciding what it should do with a
   Pipeline that cannot run.
@@ -132,6 +140,16 @@ own button reopens it. `applyResponsiveFloor(width)` acts only when the viewport
 open, and widening reopens only a palette the FLOOR closed, not one the author closed. It is
 viewport-based on purpose, not a container measure: the preview browser delivers no `ResizeObserver`
 callbacks, and the shell's nav drawer already leaves the page below `md` (960px).
+
+**Fit to view** (2026-09-25): the canvas fits the whole graph after every (re)build — open, tab switch,
+undo restore, Auto-arrange — and again whenever a resize (a dock opening, closing or dragged) leaves
+content outside the canvas box; a graph that still fits keeps the author's zoom and pan
+(`PipelineEditorGraphComponent.fitToView` / `onHostResize`). 🔴 G6 clamps a fit to `zoomRange`, so with
+the operator's **0.75 wheel floor** `autoFit: 'view'` could not shrink a four-Step graph into the ~200px
+canvas left at 1024px with both docks open — acquisition and sink sat clipped off either edge. The fit
+now runs with a 0.2 lower bound and then restores the floor at `min(0.75, fitted zoom)`, so the wheel
+can always zoom back out to the whole graph but never below it; a 24px `padding` keeps edge labels off
+the border. jsdom cannot host G6: the specs drive the fit against a stand-in that clamps like G6 does.
 
 **Remembered Step positions** (the layout half of the row once filed as `PIPELINE-CONFIG-HISTORY-AND-LAYOUT-1`, 2026-09-23; the history half, `PIPELINE-CONFIG-HISTORY-1`, shipped 2026-09-24 — see *Save*):
 dragging a Step persists every node's position (`node:dragend` → `persistLayout()`), and the next open
@@ -386,6 +404,16 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   `InspectoSamplePanelComponent` takes the thread as an **input** (also keeps it pure — the D2
   rule every definition pane follows). ⚠ Reading the Map inside the `sampleThread()` computed does
   not track it — deliberate; `selectedId` is the only dependency that can change the answer.
+- **The Grammar dialog shares the thread too** (2026-09-25). A new Pipeline's placeholder parse Step is
+  a generic `parser` with no format, so its first configuration happens in `GrammarEditorDialog`, whose
+  editor runs `sampleMode: 'own'`. It used to keep that sample to itself: a builder pasted and
+  test-parsed there, pressed Save, and found the drawer's Sample card empty and the Record Transformer
+  offering 0 fields until the sample was pasted **again**. `openNodeConfig` now passes the tab's
+  `sampleThread()` as `GrammarEditorDialogData.sampleThread`; the dialog seeds its sample box from it,
+  captures the sample into it on a **table** Test parse and on **Save** (a no-op when it is the sample the
+  thread already holds — re-capturing resets every downstream result), and its `previewFn` writes the
+  parsed rows exactly as the drawer's does, **clearing them on a failed re-parse**. The captured sample is
+  named *"sample from Edit Grammar"* on the Sample card.
 - The strip mounts in the **parse drawer** (where the sample is consumed) and supplies the grammar
   editor's `previewFn` — a function because `previewed` fires on SUCCESS only, and a failing
   re-parse must not leave a stale "parsed · N cols" chip standing. Only a **table** result feeds
@@ -693,7 +721,12 @@ after graph mutations (drawer keystrokes live outside the model until Apply, so 
 trigger it) — the dock badge updates live, and the Save button shows a WARNING state (icon +
 tooltip naming the error count) while staying **enabled**: drafts may save with problems.
 🔴 The debounced pass runs `refreshFindings()`, never the dock-opening `validate()` — auto-popping
-the dock 1.5s after every edit is intrusive. ⚠ The debounce timer goes through an overridable seam
+the dock 1.5s after every edit is intrusive. 🔴 **The dock never describes a graph that is gone**
+(2026-09-25 — after deleting a Step the dock kept its error): findings naming a Step the change
+**removed** are pruned at once, on the change itself (the effect remembers the tab's last node-id set,
+so a finding with an id it never knew is left alone), and a tab that turned **clean** inside the window
+(Save before it fired, undo back to the baseline) still recomputes when the dock already shows findings —
+only a clean tab with nothing listed arms nothing, so arrival never validates unasked. ⚠ The debounce timer goes through an overridable seam
 (`armValidateTimer`) on the zone-UNPATCHED `setTimeout`: a zone-patched macrotask armed from an
 effect re-enters `ApplicationRef.tick` (NG0101), and neither fakeAsync nor `vi.useFakeTimers()`
 survives it in this runner — specs capture the armed callback and fire it deterministically.

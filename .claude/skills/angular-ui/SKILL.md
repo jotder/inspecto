@@ -40,6 +40,12 @@ becomes enterprise-scale.
    also OPENS the collapsed `optional`/`advanced` section holding an invalid control (2026-08-30). Before
    that, an invalid value behind a collapsed disclosure blocked submit with **nothing on screen to
    correct** — the button simply did nothing. Any host rolling its own disclosure has the same hole.
+   🔴 **A `<mat-error>` must be the ONLY root of its control-flow block** (2026-09-25): projection matches
+   an `@if`/`@else` block by its single root element, so wrapping the chain in an outer
+   `@if (form.controls.x; as c) { @if (c.hasError(…)) { <mat-error> } }` makes the error miss the form
+   field's error slot and land in its DEFAULT slot beside the input — rendered ALWAYS, touched or not
+   (Onboard Stream showed "A name is required." on open). Test `form.controls.x.hasError(…)` directly;
+   a spec should assert no `mat-error` before submit and one inside `.mat-mdc-form-field-subscript-wrapper` after.
 4. **A11y is not optional** (§6): one `<h1>` per page, `aria-label` on icon-only buttons, `:focus-visible`
    ring (never bare `outline:none`), WCAG 2.2 AA. Add an axe-core assertion to new component specs.
 5. **No new dependencies** without explicit justification — keep the bundle lean.
