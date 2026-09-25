@@ -64,8 +64,11 @@ export type StatusBadgeVariant = 'pill' | 'dot';
  * `healthy`, so the case is the badge's, not the data's); a caller's `label` is a phrase ("Down 2.6 pts vs prior
  * period", "Target 95 % — below target") and keeps its own case.
  */
-const BADGE_TYPE = 'shrink-0 whitespace-nowrap py-0.5 text-xs font-semibold leading-4';
-const VALUE_CASE = 'uppercase tracking-wide';
+const BADGE_TYPE = 'py-0.5 text-xs font-semibold leading-4';
+/** A status value is one word: upper-case, never wraps or shrinks. A label phrase keeps its case and WRAPS inside
+ *  its container — at a quarter-width KPI tile a no-wrap delta line spilled into the neighbouring tile. */
+const VALUE_CASE = 'shrink-0 whitespace-nowrap uppercase tracking-wide';
+const LABEL_FLOW = 'max-w-full';
 /** Pill geometry + type. */
 export const STATUS_BADGE_BASE = `inline-flex items-center rounded px-2 ${BADGE_TYPE}`;
 const STATUS_DOT_BASE = `inline-flex items-center gap-1.5 ${BADGE_TYPE}`;
@@ -155,7 +158,7 @@ export function statusBadgeHtml(
     // The text is ESCAPED here: callers hand over raw cell values (alert names, statuses read off data), and this
     // string goes into the grid as HTML.
     const text = escapeHtml(label ?? value ?? '');
-    const kase = label == null ? ` ${VALUE_CASE}` : '';
+    const kase = ` ${label == null ? VALUE_CASE : LABEL_FLOW}`;
     if (variant === 'dot') {
         const dot = `<span aria-hidden="true" class="${DOT} ${DOT_CLASSES[statusTone(value)]}"></span>`;
         return `<span class="${STATUS_DOT_BASE}${kase}">${dot}${text}</span>`;
@@ -201,7 +204,7 @@ export class StatusBadgeComponent {
 
     /** Upper-case only the raw status value — a `label` is a phrase and keeps its case. */
     get kase(): string {
-        return this.label ? '' : ` ${VALUE_CASE}`;
+        return ` ${this.label ? LABEL_FLOW : VALUE_CASE}`;
     }
 
     get dotClasses(): string {
