@@ -587,6 +587,17 @@ src/app/
   hardcoded colors (§0.1).
 - **Status/severity/level color → only** `status-badge.component.ts`. **Canvas color → only**
   `theme/chart-tokens.ts` (Chart.js can't read CSS vars).
+- **Chart theme → only `theme/chart-theme.ts`, applied by `<inspecto-chart>`** (2026-09-25; gallery: `/design` ▸
+  *Chart theme*). Every Chart.js chart renders through that host; it resolves the `--gamma-*` tokens + body font
+  via `getComputedStyle` at draw time (`resolveChartTokens`) and again when `body.dark` flips (a
+  `MutationObserver`), then deep-merges the caller's `[options]` OVER `themedChartConfig` — so an explicit
+  legend/axis title/stacked/format/`indexAxis` wins and the rest keeps the theme (an explicit `undefined` does
+  not erase a themed key). Where things come from: **series colours** = `seriesColors()` / `CHART_TONE` /
+  `CHART_PALETTES`, set on the DATASETS; **number formats** = `viz/number-format.ts` callbacks; **typography,
+  gridlines, bar radius/max thickness, line tension/points, area tint, tooltip card, legend, donut cutout** = the
+  theme. ⛔ Never set Chart.js colours, fonts or grid styling inline in a pane — change the theme. A single series
+  hides its legend automatically; a Widget's `legend.show` is emitted as `display` ONLY when set, so it still
+  overrides both ways.
 - **ag-Grid theme → only** `InspectoGridThemeService` / `GAMMA_GRID_PARAMS`. Never bare `themeQuartz`.
 - Editing the theming plugin (`@gamma/tailwind/plugins/theming.js`) does **not** hot-reload — restart the
   dev server and verify via `getComputedStyle(body).getPropertyValue('--gamma-…')`.

@@ -43,6 +43,9 @@ import {
     SchemaFieldRow,
 } from 'app/inspecto/schema';
 import { ResizeDemoDialog } from './resize-demo.dialog';
+import { ChartData, ChartOptions } from 'chart.js';
+import { InspectoChartComponent } from 'app/inspecto/components/chart.component';
+import { seriesColors } from 'app/inspecto/viz/series-colors';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 interface DemoRow {
@@ -88,6 +91,7 @@ interface DemoRow {
         DataTableComponent,
         TreeTableComponent,
         MapViewComponent,
+        InspectoChartComponent,
         InspectoSchemaFieldsEditorComponent,
         InspectoSchemaMetadataGridComponent,
     ],
@@ -357,6 +361,52 @@ export class DesignSystemComponent {
     /** Demo-only dirty flag — a real host derives this from its definition pane. */
     readonly drawerDemoDirty = signal(false);
 
+    // ── Chart theme (theme/chart-theme.ts) — series colours via seriesColors(), never inline ──
+    private readonly chartDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    private readonly chartOutcomes = seriesColors(['Pass', 'Fail']);
+    readonly chartBar: ChartData = {
+        labels: ['North', 'South', 'East'],
+        datasets: [{ label: 'Revenue', data: [4200, 3100, 5600], backgroundColor: seriesColors(['Revenue'])[0] }],
+    };
+    readonly chartStacked: ChartData = {
+        labels: this.chartDays,
+        datasets: [
+            {
+                label: 'Pass',
+                data: [120, 132, 101, 134, 90, 60, 72],
+                backgroundColor: this.chartOutcomes[0],
+                stack: 's',
+            },
+            { label: 'Fail', data: [12, 8, 20, 6, 14, 3, 5], backgroundColor: this.chartOutcomes[1], stack: 's' },
+        ],
+    };
+    readonly chartStackedOptions: ChartOptions = { scales: { x: { stacked: true }, y: { stacked: true } } };
+    readonly chartLine: ChartData = (() => {
+        const [calls, dropped] = seriesColors(['Calls', 'Dropped']);
+        return {
+            labels: this.chartDays,
+            datasets: [
+                {
+                    label: 'Calls',
+                    data: [820, 932, 901, 934, 1290, 1330, 1320],
+                    borderColor: calls,
+                    backgroundColor: calls,
+                    fill: true,
+                },
+                {
+                    label: 'Dropped',
+                    data: [120, 132, 101, 134, 90, 230, 210],
+                    borderColor: dropped,
+                    backgroundColor: dropped,
+                },
+            ],
+        };
+    })();
+    readonly chartDonut: ChartData = {
+        labels: ['Open', 'Pending', 'Closed'],
+        datasets: [{ data: [14, 6, 31], backgroundColor: seriesColors(['Open', 'Pending', 'Closed']) }],
+    };
+
     // ── Snippets (copy-paste) ────────────────────────────────────────────────────────────────
     readonly snippets = {
         pageHeader: `<!-- the ONE page header: 22px title, ONE-line subtitle, ? explain, actions right -->
@@ -425,6 +475,11 @@ const SPECS: AttributeSpec[] = [
   <div tabTypes><!-- Types section: the columns table + filename column + column metadata --></div>
 </inspecto-grammar-editor>`,
         mapView: `<!-- offline MapLibre host (bundled Natural Earth basemap, no network) -->\n<inspecto-map-view\n  [data]="geoData"          // GeoData { points, routes }; null ⇒ unmounted (show an empty state)\n  [fill]="true"             // grow into a flex column (default: 62vh page band)\n  (pointClick)="open($event)" />\n// colours live in theme/map-tokens.ts (the map's chart-tokens analog)`,
+        chartTheme: `<!-- every Chart.js chart goes through <inspecto-chart>: it applies theme/chart-theme.ts -->
+<!-- (font, muted ticks, value-axis gridlines, rounded capped bars, card tooltip, point legend) -->
+<inspecto-chart type="bar" [data]="data" [options]="{ scales: { x: { stacked: true }, y: { stacked: true } } }" />
+// series colours: seriesColors(labels) / CHART_TONE / CHART_PALETTES — set on the DATASETS, never a hex inline
+// your [options] deep-merge OVER the theme; one series ⇒ no legend unless plugins.legend.display says so`,
         definitionDrawer: `<!-- the shared definition shell for an editor's right dock (definition-surface D1/D2) -->\n<inspecto-definition-drawer\n  [title]="node.name || node.id"\n  kindLabel="Collector"\n  icon="heroicons_outline:inbox-arrow-down"\n  [dirty]="paneDirty()"          // reported by the projected pane\n  (apply)="pane.submit()"         // Apply = in-memory patch — the toolbar Save persists (D2)\n  (discard)="recreatePane()"      // Discard = recreate the pane from the model\n  (closed)="closeDrawer()">       // dirty close already confirmed by the shell\n  <app-my-definition-pane [node]="node" (applied)="applyPatch($event)" (dirtyChange)="paneDirty.set($event)" />\n</inspecto-definition-drawer>`,
         dialogResize: `<!-- shared resizable/maximizable dialog chrome (inspecto/components/dialog-resize.directive.ts) -->\n<!-- the attribute goes on the dialog title; the drag grip is appended automatically -->\n<h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">\n  <span class="min-w-0 truncate">Edit Grammar · {{ node.id }}</span>\n  <span class="flex-1"></span>\n  <!-- big dialogs add a maximize button; it reuses the .dialog-fullscreen panel class -->\n  <button mat-icon-button type="button" (click)="chrome.toggleMaximize()"\n          [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'">\n    <mat-icon [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in'\n                                            : 'heroicons_outline:arrows-pointing-out'" />\n  </button>\n</h2>\n// panel styles live in styles.scss (.inspecto-dialog-resizable); outside a dialog the directive is inert`,
         menuFavorites: `// personal, client-local overlay — never PUT to the server (inspecto/menu/menu-favorites.ts)\n// storage key: inspecto.menuFavorites.v1, keyed by space id\nfavIds = signal<Set<string>>(loadForSpace());\ntoggleFavorite(id): void { /* mutate the set, persist to localStorage */ }\n\n<!-- a star toggle on each leaf row (aria-pressed, mirrors the sql-editor favorites idiom) -->\n<button [attr.aria-pressed]="isFav(id)" (click)="toggleFavorite(id)"\n        [attr.aria-label]="isFav(id) ? 'Unfavorite' : 'Favorite'">\n  <mat-icon [svgIcon]="isFav(id) ? 'heroicons_solid:star' : 'heroicons_outline:star'" />\n</button>\n\n// a virtual top-of-sidebar "Favorites" group (favoritesNavGroup in menu-nav.ts), prepended in\n// NavigationService: resolves ids against the current tree, drops stale/deleted, re-ids fav-<id>.`,

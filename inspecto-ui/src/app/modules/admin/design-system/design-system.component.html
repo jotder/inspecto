@@ -532,6 +532,46 @@
             </div>
         </section>
 
+        <!-- ── Chart theme (Chart.js) ───────────────────────────────────────────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Chart theme</h2>
+                <button mat-stroked-button (click)="copy(snippets.chartTheme)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                Every Chart.js chart renders through <code>&lt;inspecto-chart&gt;</code>, which applies the ONE theme in
+                <code>theme/chart-theme.ts</code>: the app font, muted ticks, gridlines on the value axis only, rounded
+                bars with a capped thickness, faint area fills, a card tooltip and a point-style legend that hides
+                itself for a single series. Its colours are the <code>--gamma-*</code> tokens, resolved when the chart
+                draws and again when the scheme flips — toggle light/dark to check both. Series colours come from
+                <code>seriesColors()</code> on the datasets.
+            </p>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="bg-card rounded-2xl p-4 shadow">
+                    <div class="mb-2 text-sm font-medium">Bar — one series, no legend</div>
+                    <inspecto-chart type="bar" [data]="chartBar" />
+                </div>
+                <div class="bg-card rounded-2xl p-4 shadow">
+                    <div class="mb-2 text-sm font-medium">Stacked bar — status tones</div>
+                    <inspecto-chart type="bar" [data]="chartStacked" [options]="chartStackedOptions" />
+                </div>
+                <div class="bg-card rounded-2xl p-4 shadow">
+                    <div class="mb-2 text-sm font-medium">Line — area fill + line</div>
+                    <inspecto-chart type="line" [data]="chartLine" />
+                </div>
+                <div class="bg-card rounded-2xl p-4 shadow">
+                    <div class="mb-2 text-sm font-medium">Donut</div>
+                    <inspecto-chart type="doughnut" [data]="chartDonut" />
+                </div>
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.chartTheme }}</code></pre>
+        </section>
+
         <!-- ── Graph hosts (AntV G6) ────────────────────────────────────────────────────── -->
         <section>
             <h2 class="mb-3 text-xl font-semibold">Graph hosts (AntV G6)</h2>

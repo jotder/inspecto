@@ -45,6 +45,7 @@ describe('DesignSystemComponent', () => {
         expect(sections).toContain('Data grid');
         expect(sections).toContain('Data table');
         expect(sections).toContain('Resizable dialog');
+        expect(sections).toContain('Chart theme');
     });
 
     it('the resizable-dialog demo opens with the shared chrome (grip + maximize button)', async () => {

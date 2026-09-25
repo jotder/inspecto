@@ -3,7 +3,6 @@ import {
     booleanAttribute,
     ChangeDetectionStrategy,
     Component,
-    DestroyRef,
     ElementRef,
     EventEmitter,
     inject,
@@ -13,10 +12,8 @@ import {
     Output,
     ViewChild,
 } from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { GammaConfigService } from '@gamma/services/config';
-import { Chart, ChartConfiguration, ChartData, ChartOptions, ChartType, registerables } from 'chart.js';
-import { canvasTheme } from 'app/inspecto/theme/chart-tokens';
+import { Chart, ChartData, ChartOptions, ChartType, registerables } from 'chart.js';
+import { resolveChartTokens, themedChartConfig } from 'app/inspecto/theme/chart-theme';
 import { InspectoEmptyStateComponent } from './empty-state.component';
 
 Chart.register(...registerables);
@@ -32,8 +29,8 @@ function summarize(v: unknown): string {
 }
 
 /**
- * Thin theme-aware Chart.js host. Recreates the chart when data changes and
- * restyles axis/legend colors when the gamma scheme flips between light/dark.
+ * Thin theme-aware Chart.js host. Recreates the chart when data changes, styled by the ONE shared chart theme
+ * (`theme/chart-theme.ts`), and re-resolves that theme's tokens when the scheme class on `<body>` flips.
  */
 @Component({
     selector: 'inspecto-chart',
@@ -99,26 +96,26 @@ export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestr
 
     @ViewChild('canvas') private canvas?: ElementRef<HTMLCanvasElement>;
     private chart: Chart | null = null;
-    private dark = false;
     private ready = false;
     private resizeObserver: ResizeObserver | null = null;
-    private destroyRef = inject(DestroyRef);
+    private schemeObserver: MutationObserver | null = null;
     private hostEl = inject(ElementRef<HTMLElement>);
-
-    constructor() {
-        inject(GammaConfigService)
-            .config$.pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe((config) => {
-                this.dark =
-                    config?.scheme === 'dark' ||
-                    (config?.scheme === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-                if (this.ready) this.rebuild();
-            });
-    }
 
     ngAfterViewInit(): void {
         this.ready = true;
         this.rebuild();
+        // The layout sets the scheme as a class on <body> (light/dark, 'auto' already decided), and the theme's
+        // tokens are the CSS variables that class selects — so watch the class itself and rebuild on a flip.
+        if (typeof MutationObserver !== 'undefined') {
+            // Only a scheme flip rebuilds — other body classes (is-mobile, the colour theme) come and go too.
+            let dark = document.body.classList.contains('dark');
+            this.schemeObserver = new MutationObserver(() => {
+                if (dark === document.body.classList.contains('dark')) return;
+                dark = !dark;
+                this.rebuild();
+            });
+            this.schemeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+        }
         // Chart.js `responsive` reacts to window resize but not container-only changes (dashboard tile
         // span toggle, side-pane collapse, flex reflow). Observe the host box and resize the chart to it.
         // Observe the HOST, not the <canvas> — with maintainAspectRatio:false Chart.js sizes the canvas,
@@ -137,6 +134,7 @@ export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestr
 
     ngOnDestroy(): void {
         this.resizeObserver?.disconnect();
+        this.schemeObserver?.disconnect();
         this.chart?.destroy();
     }
 
@@ -146,14 +144,12 @@ export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestr
         // ⚠ Also guards the canvas itself: with nothing to plot the template renders the empty state
         // instead, so there is no <canvas> for Chart.js to attach to.
         if (!this.data || !this.hasData || !this.canvas) return;
-        const { fg, grid } = canvasTheme(this.dark);
-        // Deep-merge (not replace) legend/scales so a caller's override (e.g. Widget renderOptions — legend
-        // position, an axis title, stacked) composes with the theme's fg/grid colors instead of losing them.
-        const axisDefaults = this.type === 'bar' ? { ticks: { color: fg }, grid: { color: grid } } : {};
-        const config: ChartConfiguration = {
-            type: this.type,
-            data: this.data,
-            options: {
+        // The caller's options (Widget renderOptions: legend, axis titles, stacked, formats) deep-merge OVER the
+        // shared theme, so an override composes with the theme's typography/colours instead of losing them.
+        const config = themedChartConfig(
+            this.type,
+            this.data,
+            {
                 responsive: true,
                 maintainAspectRatio: false,
                 onClick: (_event, elements) => {
@@ -161,19 +157,9 @@ export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestr
                     if (index != null) this.elementClick.emit(index);
                 },
                 ...this.options,
-                plugins: {
-                    ...this.options.plugins,
-                    legend: { labels: { color: fg }, ...this.options.plugins?.legend },
-                },
-                scales:
-                    this.type === 'bar' || this.options.scales
-                        ? {
-                              x: { ...axisDefaults, ...this.options.scales?.['x'] },
-                              y: { ...axisDefaults, ...this.options.scales?.['y'] },
-                          }
-                        : undefined,
             },
-        };
+            resolveChartTokens(),
+        );
         this.chart = new Chart(this.canvas.nativeElement, config);
     }
 }

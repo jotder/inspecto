@@ -264,8 +264,14 @@ export class VizRenderComponent {
         const isGauge = this.plugin().meta.type === 'gauge';
         const opts = this.renderOptions();
         const legend = opts?.legend;
+        // `display` only when the Widget says so: left unset, the chart theme shows a legend for 2+ series only.
         const pluginsOverride = legend
-            ? { legend: { display: legend.show ?? true, position: legend.position ?? 'top' } }
+            ? {
+                  legend: {
+                      ...(legend.show === undefined ? {} : { display: legend.show }),
+                      position: legend.position ?? 'top',
+                  },
+              }
             : isGauge
               ? { legend: { display: false }, tooltip: { enabled: false } }
               : undefined;
