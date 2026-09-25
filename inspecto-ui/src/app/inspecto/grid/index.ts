@@ -242,9 +242,21 @@ export function refreshAllCells(e: { api: GridApi }): void {
     });
 }
 
+/**
+ * A column derived from a row KEY — i.e. a real data column name (`order_date`), not a host-labelled one.
+ *
+ * ⚠ Without an explicit `headerName` ag-Grid HUMANISES the field (`order_date` → "Order_date"), and the
+ * shared `wrapHeaderText` then breaks the unspaced token mid-word at the default min width ("Order_da te"),
+ * so the Parsed grid never showed the names the Grammar actually produced. The header is the key verbatim,
+ * and the min width grows with it so a snake_case name fits on one line (sort + filter icons included).
+ */
+export function dataColumn(field: string): ColDef {
+    return { field, headerName: field, headerTooltip: field, minWidth: Math.max(110, Math.round(field.length * 7.5) + 72) };
+}
+
 /** Derive simple columns from the keys of loose-map rows (audit rows etc.). */
 export function autoColumns(rows: Record<string, unknown>[]): ColDef[] {
-    return rows.length ? Object.keys(rows[0]).map((k) => ({ field: k })) : [];
+    return rows.length ? Object.keys(rows[0]).map((k) => dataColumn(k)) : [];
 }
 
 /**

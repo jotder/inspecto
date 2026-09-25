@@ -23,6 +23,7 @@ import { ColDef, GridApi, IRowNode, RowClickedEvent, RowSelectionOptions } from 
 import {
     actionsColumn,
     autoColumns,
+    dataColumn,
     GridStateService,
     InspectoGridState,
     INSPECTO_DEFAULT_COL_DEF,
@@ -363,7 +364,7 @@ export class DataTableComponent {
         if (result != null) {
             base = result.length ? this.resultColumns(result) : [];
         } else {
-            const all = this.columns() ?? this.allFields().map((f) => ({ field: f }) as ColDef);
+            const all = this.columns() ?? this.allFields().map((f) => dataColumn(f));
             const sel = this.chosen();
             base = sel ? all.filter((c) => sel.includes(String(c.field))) : all;
         }
@@ -380,7 +381,7 @@ export class DataTableComponent {
         const explicit = this.columns();
         if (!explicit) return autoColumns(rows);
         const byField = new Map(explicit.filter((c) => c.field != null).map((c) => [String(c.field), c] as const));
-        return Object.keys(rows[0]).map((k) => byField.get(k) ?? ({ field: k } as ColDef));
+        return Object.keys(rows[0]).map((k) => byField.get(k) ?? dataColumn(k));
     }
 
     readonly noRows = computed(() => noRowsOverlay(this.noRowsTitle(), this.noRowsHint()));

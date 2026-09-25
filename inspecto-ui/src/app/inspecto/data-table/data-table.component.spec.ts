@@ -36,6 +36,20 @@ describe('DataTableComponent', () => {
         expect(c.gridColumns().map((x) => x.field)).toEqual(['id', 'name']);
     });
 
+    it('row-derived columns are headed by the REAL column name, wide enough not to break mid-word', async () => {
+        const f = await create('pro');
+        f.componentRef.setInput('rows', [{ order_id: 1, order_date: '2026-09-25' }]);
+        f.detectChanges();
+        const cols = f.componentInstance.gridColumns();
+        // ag-Grid humanises a bare `field` ("Order_date"), and the shared wrapHeaderText broke it at the
+        // 110px min width ("Order_da te") — the Parsed grid never showed the names the Grammar produced.
+        expect(cols.map((c) => c.headerName)).toEqual(['order_id', 'order_date']);
+        for (const c of cols) expect(c.minWidth).toBeGreaterThanOrEqual(String(c.field).length * 7.5 + 72);
+        // A pro-tier SQL run's result columns are row-derived too.
+        f.componentInstance.proResult.set([{ total_amount: 3 }]);
+        expect(f.componentInstance.gridColumns().map((c) => c.headerName)).toEqual(['total_amount']);
+    });
+
     it('standard = search + columns + export (no SQL editor)', async () => {
         const c = (await create('standard')).componentInstance;
         expect(c.showSearch()).toBe(true);
