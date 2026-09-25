@@ -330,9 +330,10 @@ describe('GrammarEditorDialog', () => {
             expect(opts).toMatchObject({ overwrite: true, file: 'web_orders_schema' });
             expect(draft['raw']['name']).toBe('web_orders');
             expect(draft['raw']['types']).toBe('auto');
+            // FIELD-NAME-CASE-1: the sample header's case is kept — it is the landed column name.
             expect(draft['raw']['fields']).toEqual([
-                { name: 'ORDER_ID', selector: '0', type: 'BIGINT' },
-                { name: 'AMOUNT', selector: '1', type: 'DOUBLE' },
+                { name: 'order_id', selector: '0', type: 'BIGINT' },
+                { name: 'amount', selector: '1', type: 'DOUBLE' },
             ]);
             expect(draft['mapping']['canonicalName']).toBe('web_orders');
             const closed = close.mock.calls[0][0];

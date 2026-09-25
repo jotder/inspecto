@@ -433,6 +433,14 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   also calls. A node that already names a schema is left alone (the drawer re-reads, never re-derives
   over a saved one). The thread's `ParsingPreview` now carries the parse's `columnTypes`, so a surface
   opening on it derives the same typed schema.
+- **A derived field name keeps the sample header's case** (`FIELD-NAME-CASE-1`, builder pilot
+  2026-09-25). `sanitizeIdentifier` (`inspecto/schema/schema-fields-editor.component.ts`) used to
+  uppercase every parsed column, so a lowercase CSV header (`match_id,date,…`) was written as
+  `MATCH_ID, DATE, …` and — since the declared name IS the landed column — the Parquet and every UI label
+  came out shouty. Nothing downstream needed it: `Identifiers.validate` accepts `[A-Za-z_][A-Za-z0-9_]*`
+  and the engine writes the declared name verbatim. It now rewrites only what the rule refuses (spaces,
+  punctuation, a leading digit). The grid's duplicate check folds case instead, because DuckDB does: `id`
+  and `ID` are one landed column. Schemas already saved keep their uppercase names; nothing rewrites them.
 - **The Parse drawer arms Apply over a carried parse.** Opened on a node with no `schema_file` while the
   thread holds a table parse of the pane's own frontend (the dialog's, or its own before a Discard), the
   pane derives the schema from it through `onPreviewed` — the one derivation — so it reads *unapplied*

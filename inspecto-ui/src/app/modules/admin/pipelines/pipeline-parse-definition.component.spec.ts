@@ -918,7 +918,7 @@ describe('PipelineParseDefinitionComponent', () => {
                 pane(fixture)
                     .schemaSeed()
                     .map((r) => r.name),
-            ).toEqual(['A_NUMBER', 'DURATION']);
+            ).toEqual(['a_number', 'DURATION']);
             // Delimited addresses parsed columns by POSITION, so selectors are indices.
             expect(
                 pane(fixture)
@@ -967,7 +967,7 @@ describe('PipelineParseDefinitionComponent', () => {
                     .schemaSeed()
                     .map((r) => [r.name, r.type]),
             ).toEqual([
-                ['A_NUMBER', 'BIGINT'],
+                ['a_number', 'BIGINT'],
                 ['DURATION', 'DOUBLE'],
             ]);
 

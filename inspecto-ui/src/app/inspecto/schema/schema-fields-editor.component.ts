@@ -164,12 +164,10 @@ export interface SchemaFieldRow {
 type SortKey = 'source' | 'name' | 'selector' | 'type';
 
 /** A parsed column name → a valid SQL identifier (`Identifiers.validate`'s own pattern), so an
- *  auto-derived field name is register-able without hand-editing. */
+ *  auto-derived field name is register-able without hand-editing. The sample's CASE is kept: the name
+ *  is the landed column, and a lowercase header must not land shouty (FIELD-NAME-CASE-1). */
 export function sanitizeIdentifier(raw: string, index: number): string {
-    let s = raw
-        .trim()
-        .toUpperCase()
-        .replace(/[^A-Z0-9_]+/g, '_');
+    let s = raw.trim().replace(/[^A-Za-z0-9_]+/g, '_');
     s = s.replace(/^_+/, '').replace(/_+$/, '');
     if (/^[0-9]/.test(s)) s = `_${s}`;
     return s || `FIELD_${index}`;
@@ -527,22 +525,23 @@ export class InspectoSchemaFieldsEditorComponent {
             this.problem.set('Add at least one field.');
             return false;
         }
+        // Case-folded: DuckDB identifiers are case-insensitive, so `id` and `ID` are one landed column.
         const seen = new Set<string>();
         for (const e of included) {
             const n = e.v.name.trim();
-            if (seen.has(n)) {
+            if (seen.has(n.toLowerCase())) {
                 this.revealRow(e.index);
                 this.problem.set(`Duplicate field name "${n}" — names must be unique.`);
                 return false;
             }
-            seen.add(n);
+            seen.add(n.toLowerCase());
         }
         // D3: a synonym must be unique across synonyms ∪ column names — a lookup resolving a
         // synonym must never be ambiguous with another column. `seen` already holds the names.
         for (const e of included) {
             const s = String(e.v.synonym ?? '').trim();
             if (!s) continue;
-            if (seen.has(s)) {
+            if (seen.has(s.toLowerCase())) {
                 this.revealRow(e.index);
                 const c = this.fieldRows.at(e.index)?.get('synonym');
                 c?.setErrors({ duplicate: true });
@@ -550,7 +549,7 @@ export class InspectoSchemaFieldsEditorComponent {
                 this.problem.set(`Duplicate synonym "${s}" — synonyms must be unique across synonyms and names.`);
                 return false;
             }
-            seen.add(s);
+            seen.add(s.toLowerCase());
         }
         return true;
     }

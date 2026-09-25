@@ -6,6 +6,7 @@ import {
     InspectoSchemaFieldsEditorComponent,
     SchemaFieldRow,
     narrowToSchemaType,
+    sanitizeIdentifier,
 } from './schema-fields-editor.component';
 
 /** n included VARCHAR rows named col_0 … col_n-1, selector = the name (a json/text_regex sample). */
@@ -109,6 +110,35 @@ describe('InspectoSchemaFieldsEditorComponent', () => {
         ]);
         expect(c.validate()).toBe(false);
         expect(String(c.problem())).toContain('Duplicate field name "DUP"');
+    });
+
+    /** FIELD-NAME-CASE-1: names keep their case now, but DuckDB folds it — `id`/`ID` land as ONE column. */
+    it('refuses names that differ only by case', async () => {
+        const { c } = await create([
+            { include: true, name: 'id', selector: '0', type: 'VARCHAR' },
+            { include: true, name: 'ID', selector: '1', type: 'VARCHAR' },
+        ]);
+        expect(c.validate()).toBe(false);
+        expect(String(c.problem())).toContain('Duplicate field name "ID"');
+    });
+
+    /**
+     * 🔴 FIELD-NAME-CASE-1 (builder pilot 2026-09-25): a lowercase CSV header (`match_id,date,…`) was
+     * derived as MATCH_ID, DATE, … and LANDED uppercase, so every UI label read shouty. The identifier
+     * rule (`Identifiers.validate`) accepts both cases; only the characters it refuses are rewritten.
+     */
+    describe('sanitizeIdentifier', () => {
+        it('keeps the sample header’s case', () => {
+            expect(sanitizeIdentifier('match_id', 0)).toBe('match_id');
+            expect(sanitizeIdentifier('TossWinner', 1)).toBe('TossWinner');
+            expect(sanitizeIdentifier('DURATION', 2)).toBe('DURATION');
+        });
+
+        it('still rewrites what the identifier rule refuses', () => {
+            expect(sanitizeIdentifier(' a number ', 0)).toBe('a_number');
+            expect(sanitizeIdentifier('9lives', 1)).toBe('_9lives');
+            expect(sanitizeIdentifier('--', 3)).toBe('FIELD_3');
+        });
     });
 
     it('refuses an empty grid, naming the reason for the host', async () => {
