@@ -102,6 +102,14 @@ const config = {
             colors: {
                 gray: colors.slate,
             },
+            // `text-primary` alone reads the scheme-aware `--gamma-text-primary-rgb` (src/styles/styles.scss):
+            // primary-600 in light, primary-400 in dark, for WCAG AA on dark cards. Only the DEFAULT text
+            // colour changes — `text-primary-<n>` shades and every bg/border/fill `primary` keep the palette.
+            textColor: {
+                primary: {
+                    DEFAULT: 'rgba(var(--gamma-text-primary-rgb, var(--gamma-primary-rgb)), <alpha-value>)',
+                },
+            },
             flex: {
                 0: '0 0 auto',
             },

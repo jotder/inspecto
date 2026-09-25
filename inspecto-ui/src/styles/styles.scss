@@ -134,6 +134,24 @@
     border-radius: 6px;
 }
 
+/* Primary as TEXT is scheme-aware; primary as a FILL is not. The palette DEFAULT (primary-600) is 2.33:1 on the
+ * dark card — below WCAG AA — so in dark mode the `text-primary` utility (tailwind.config.js `textColor.primary`)
+ * resolves to primary-400 (4.90:1 on bg-card, 5.98:1 on bg-default). `bg-primary`, `border-primary`, fills and
+ * chart series still read `--gamma-primary`. Same scheme selectors as the theming plugin, so a forced `.light`
+ * island inside a dark page gets primary-600 back. Per-theme: it references the active theme's own palette. */
+body.light,
+.light,
+.dark .light {
+    --gamma-text-primary: var(--gamma-primary);
+    --gamma-text-primary-rgb: var(--gamma-primary-rgb);
+}
+body.dark,
+.dark,
+.light .dark {
+    --gamma-text-primary: var(--gamma-primary-400);
+    --gamma-text-primary-rgb: var(--gamma-primary-400-rgb);
+}
+
 /* Material dialogs render with gamma's LIGHT Material theme even in dark mode (gamma's dark scheme is only
  * the --gamma-* vars, not a dark Material theme). In the CDK overlay the dialog surface stays white while
  * gamma's white text leaks in → white-on-white labels, and typed input ink is dark-on-dark. Re-point the

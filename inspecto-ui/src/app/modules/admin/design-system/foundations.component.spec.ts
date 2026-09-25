@@ -51,6 +51,26 @@ describe('DesignSystemFoundationsComponent', () => {
         expect(el.textContent).not.toContain('NaN');
     });
 
+    it('measures every AA text token — including the scheme-aware text-primary — on both page surfaces', () => {
+        const fixture = create();
+        const pairs = fixture.componentInstance.textPairs.map((p) => `${p.fg}/${p.bg}`);
+        for (const fg of ['text-default', 'text-secondary', 'text-hint', 'text-primary']) {
+            for (const bg of ['bg-card', 'bg-default']) expect(pairs).toContain(`${fg}/${bg}`);
+        }
+        // a raw palette step is a FILL colour, not a text token: it cannot follow the scheme
+        expect(pairs.filter((p) => /^primary/.test(p))).toEqual([]);
+        const el = fixture.nativeElement as HTMLElement;
+        for (const scheme of ['light', 'dark']) {
+            const probe = el.querySelector(`[data-probe="${scheme}:pair:text-primary/bg-card"]`) as HTMLElement;
+            expect(probe.style.color).toBe('var(--gamma-text-primary)');
+        }
+        // the two pairs the fix exists for, at their resolved values (slate-600 / slate-100, indigo-400 / slate-800)
+        expect(contrastRatio([71, 85, 105], [241, 245, 249])).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio([129, 140, 248], [30, 41, 59])).toBeGreaterThanOrEqual(4.5);
+        // …and the values they replaced (slate-500 / slate-100) really failed
+        expect(contrastRatio([100, 116, 139], [241, 245, 249])).toBeLessThan(4.5);
+    });
+
     it('has no a11y violations', async () => {
         await expectNoA11yViolations(create().nativeElement);
     });

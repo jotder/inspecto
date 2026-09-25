@@ -350,10 +350,13 @@ const theming = plugin.withOptions(
                         foreground: {
                             light: {
                                 'text-default': colors.slate[800],
-                                'text-secondary': colors.slate[500],
-                                // slate-500 (not 400) so hint/placeholder text clears WCAG AA 4.5:1
-                                // on white cards; slate-400 measured ~2.56:1 and failed.
-                                'text-hint': colors.slate[500],
+                                // slate-600 (not 500) so secondary AND hint text clear WCAG AA 4.5:1 on
+                                // BOTH bg-card (7.58) and bg-default (6.92); slate-500 measured 4.34:1 on
+                                // bg-default (slate-100) and failed. slate-400 (~2.56:1) failed everywhere.
+                                // The scheme-aware PRIMARY text colour (`text-primary`) is not a customProp
+                                // here — it is `--gamma-text-primary` in src/styles/styles.scss.
+                                'text-secondary': colors.slate[600],
+                                'text-hint': colors.slate[600],
                                 'text-disabled': colors.slate[400],
                                 border: colors.slate[200],
                                 divider: colors.slate[200],

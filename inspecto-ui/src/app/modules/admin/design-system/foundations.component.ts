@@ -102,6 +102,10 @@ export class DesignSystemFoundationsComponent {
         { token: 'text-default', role: 'Body and headings (text-default)' },
         { token: 'text-secondary', role: 'Subtitles, captions, labels (text-secondary)' },
         { token: 'text-hint', role: 'Placeholders, hints (text-hint)' },
+        {
+            token: 'text-primary',
+            role: 'Links, emphasis (text-primary) — primary-600 light, primary-400 dark; fills keep primary',
+        },
         { token: 'text-disabled', role: 'Disabled controls (text-disabled) — exempt from AA' },
     ];
     readonly lines: TokenRow[] = [
@@ -124,15 +128,20 @@ export class DesignSystemFoundationsComponent {
     ];
     readonly hues = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900];
 
-    /** The text-on-surface pairs a screen actually draws; measured per scheme. */
+    /**
+     * The text-on-surface pairs a screen actually draws; measured per scheme. Every AA text token on both
+     * page surfaces (`text-disabled` is exempt) — `text-primary` is the scheme-aware TEXT token, never the
+     * raw palette DEFAULT, which is a fill colour and stays 2.33:1 on the dark card.
+     */
     readonly textPairs: TextPair[] = [
         { fg: 'text-default', bg: 'bg-card' },
         { fg: 'text-default', bg: 'bg-default' },
         { fg: 'text-secondary', bg: 'bg-card' },
         { fg: 'text-secondary', bg: 'bg-default' },
         { fg: 'text-hint', bg: 'bg-card' },
-        { fg: 'primary', bg: 'bg-card' },
-        { fg: 'primary-400', bg: 'bg-card' },
+        { fg: 'text-hint', bg: 'bg-default' },
+        { fg: 'text-primary', bg: 'bg-card' },
+        { fg: 'text-primary', bg: 'bg-default' },
     ];
 
     /** Type roles, grounded in the components that own them. The app's scale is gamma's, not stock Tailwind. */
@@ -197,7 +206,7 @@ export class DesignSystemFoundationsComponent {
         return (this.chartTone as Record<string, string>)[tone] ?? null;
     }
 
-    /** `var(--gamma-…)` for a token; the primary pair is the palette's DEFAULT (600). */
+    /** `var(--gamma-…)` for a token (`text-primary` is defined in `src/styles/styles.scss`, not the plugin). */
     cssVar(token: string): string {
         return `var(--gamma-${token})`;
     }

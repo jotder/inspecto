@@ -679,9 +679,13 @@ in use. Look there before picking a class — do not invent a token.
   caption `text-secondary text-xs` · eyebrow `text-xs font-semibold uppercase tracking-wider` · numbers
   `tabular-nums`. ⚠ gamma's scale: `text-xs` is **10 px** and carries no line-height.
 - **Cards** `bg-card rounded-2xl p-6 shadow`; popovers `shadow-lg`; chips/dots `rounded-full`.
-- ⚠ **`text-primary` (indigo-600) is 2.3:1 on the dark card** — below AA. For text in dark mode step to
-  `dark:text-primary-400` (4.9:1). `text-secondary` on `bg-default` in LIGHT mode is 4.34:1 (the gallery
-  lists it); prefer it on `bg-card`.
+- **`text-primary` is scheme-aware TEXT** (2026-09-25): it reads `--gamma-text-primary` (`src/styles/styles.scss`,
+  wired as `textColor.primary.DEFAULT` in `tailwind.config.js`) — primary-600 in light, **primary-400 in dark**
+  (4.90:1 on the dark card; the raw 600 is 2.33:1). Just write `text-primary`; no `dark:text-primary-400` needed.
+  Only the bare utility changed: `bg-/border-/fill-primary`, `text-primary-<n>` and `var(--gamma-primary)` are
+  still the palette DEFAULT — so never paint TEXT with `[style.color]="var(--gamma-primary)"` or a raw shade.
+  `text-secondary` = `text-hint` = slate-600 light (6.92:1 on `bg-default`, 7.58 on `bg-card`) / slate-400 dark;
+  every text token × surface pair in the gallery now reads AA in both schemes.
 - A scheme-side-by-side specimen needs classes WITHOUT `dark:` (a `dark:` class cannot be switched off
   inside a `.light` island on a dark page) — `statusToneSchemeClasses(tone, scheme)` exists for that.
 
