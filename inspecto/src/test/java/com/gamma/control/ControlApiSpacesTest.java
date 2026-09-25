@@ -91,6 +91,32 @@ class ControlApiSpacesTest {
         }
     }
 
+    /**
+     * Bundles ship NO Spaces (operator decision 2026-09-25), so a fresh install boots with an empty spaces root.
+     * That is a clean state, not a broken one: the probes and the Space list answer, a Space-scoped route answers a
+     * clear 503 naming what to do (it used to be a 500 + stack trace on every request), and creating a Space makes
+     * the same route answer 200.
+     */
+    @Test
+    void zeroSpacesIsACleanStateNotA500(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "GET", "/health", null).statusCode());
+            HttpResponse<String> ready = send(c.port, "GET", "/ready", null);
+            assertEquals(200, ready.statusCode(), ready.body());
+            assertEquals(0, json(ready).get("pipelines").asInt(), "zero Spaces is still READY, with no Pipelines");
+            assertEquals(0, json(send(c.port, "GET", "/spaces", null)).size());
+
+            HttpResponse<String> runs = send(c.port, "GET", "/runs", null);
+            assertEquals(503, runs.statusCode(), runs.body());
+            JsonNode err = json(runs).get("error");
+            assertEquals("CAPABILITY_UNAVAILABLE", err.get("errorCode").asText());
+            assertTrue(err.get("message").asText().contains("No Space is attached"), err.toString());
+
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            assertEquals(200, send(c.port, "GET", "/runs", null).statusCode(), "the attached Space now serves it");
+        }
+    }
+
     @Test
     void updatesSpaceMetadataOverHttp(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {

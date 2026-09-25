@@ -113,7 +113,7 @@ given a row in the table below:
 `check-authgate-coverage` — a gated ControlApi route that no armed test exercises;
 `check-backlog-homes` — a `docs/BACKLOG.md` row's `→` owning-doc pointer must name a doc that mentions its subject;
 `check-bundle-doc-links` — every relative link in a shipped doc must resolve inside the customer bundle;
-`check-bundle-spaces` — a bundle's `spaces/` tree must hold only committed content, never untracked or git-excluded Spaces;
+`check-bundle-spaces` — a bundle's `spaces/` tree must hold only the committed `_templates` gallery — no Space at all, committed or not;
 `check-bundle-platform` — a deployment zip's platform label must come from the runtime it embeds, never a literal;
 `check-family-count` — every stated count of `OperationalDb.Family` must equal the enum;
 `check-reactor-verdict` — a Maven reactor log is a pass only if it proves every module ran;

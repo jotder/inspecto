@@ -138,7 +138,7 @@ public final class WidgetTags {
      *
      * <p>⚠ <b>The migration cannot run at route-registration time</b>, which is where it belongs by
      * symmetry with the object-CSV backfill in {@code CollectorService}: {@code register} runs before any
-     * Space is hosted, so {@code api.service()} throws {@code IllegalState No spaces are hosted} and the
+     * Space is hosted, so {@code api.service()} throws {@code SpaceManager.NoSpaceHostedException} and the
      * whole {@code ControlApi} fails to construct. It therefore runs lazily on the first tag read or write
      * in a Space — the same shape the offline mock uses.
      */

@@ -102,19 +102,34 @@ Verified by building both flavors 2026-08-27 (Personal 169.3 MB, Enterprise 170.
 > jars, Standard **11**, Enterprise **12**. The complete enumerations in code are `package.ps1`'s
 > staging block and its boot-smoke classpath. Owner: [`okf/capabilities/editions/editions.md`](../../capabilities/editions/editions.md) §3.3.
 
-**The `spaces/` tree ships COMMITTED content only** (`BUNDLE-UNTRACKED-SPACES-1`, 2026-09-25). Step 4 is
-`Copy-TrackedSpaces` in `inspecto/package-spaces.ps1`, dot-sourced by `package.ps1`: it lists
-`git ls-tree HEAD -- spaces` and writes those blobs with `git checkout-index` from a throwaway index, so
-.gitattributes eol rules apply as in a fresh checkout. Skip rules are unchanged: top-level `uat` and
-`_shared`; per Space `audit/`, `duckdb/`, `flows/`, `views/`, and under `data/` everything but `data/samples/`.
-- 🔴 **Why.** It used to copy the working-tree `Get-ChildItem spaces/` listing, and a demo bundle built in the
-  shared sandbox checkout shipped a git-excluded client working set and a peer's untracked pilot Space.
-- ⚖ **A locally modified tracked file ships as COMMITTED**, and a file only `git add`ed does not ship — a
-  bundle's Space content is reproducible from its commit. Both are named in a warning, never mixed in silently.
+**Bundles ship NO Spaces — the `spaces/` tree holds only `spaces/_templates`** (operator decision
+2026-09-25, every edition). `_templates` is the Space-template gallery, an underscore sentinel never booted
+as a Space. Spaces are **attached** at deploy time: drop each Space folder (a dir with a `config/` subtree)
+into the bundle's `spaces/` — or point `SPACES_ROOT` (launchers) / `-Dspaces.root` at a folder holding them —
+and restart, or create one in Settings → Spaces (`POST /spaces`, no restart). Step 4 is
+`Copy-SpaceTemplates` in `inspecto/package-spaces.ps1`, dot-sourced by `package.ps1`: it lists
+`git ls-tree HEAD -- spaces`, keeps only `spaces/_templates/**`, and writes those blobs with
+`git checkout-index` from a throwaway index, so .gitattributes eol rules apply as in a fresh checkout.
+Every other top-level entry (the committed `default`/`demo`/`ucc`, untracked or git-excluded dirs, `uat`,
+`_shared`) is named in the build log as not bundled.
+- 🔴 **Why no Spaces.** A hand-over built as "the bundle plus ONE Space folder" opened the sample `default`
+  Space instead of the one dropped in beside it (2026-09-25 rehearsal); `0228534d0` pruned the samples for
+  `-DemoAuth` only, and this decision made it the rule for every edition.
+- 🔴 **Why committed content** (`BUNDLE-UNTRACKED-SPACES-1`). Step 4 used to copy the working-tree
+  `Get-ChildItem spaces/` listing, and a demo bundle built in the shared sandbox checkout shipped a
+  git-excluded client working set and a peer's untracked pilot Space.
+- ⚖ **A locally modified tracked template file ships as COMMITTED**, and a file only `git add`ed does not
+  ship — reproducible from the commit. Modified files are named in a warning, never mixed in silently.
 - **Git is required** — there is no directory-listing fallback (that fallback *is* the leak); no git or not a
-  work tree throws. Untracked / git-excluded Space dirs are named in a warning; the log line lists the Spaces bundled.
-- Pinned by `tools/check-bundle-spaces.mjs` (CI `test` job): a throwaway repo holding every trap, staged for
-  real under pwsh, exact file set asserted.
+  work tree throws.
+- **Zero Spaces is a clean state.** `ControlApi.main` no longer exits when `-Dspaces.root` holds no Space (it
+  logs a WARN); `/health`, `/ready` (`pipelines: 0`) and `/spaces` answer, and a Space-scoped route answers
+  **503** `CAPABILITY_UNAVAILABLE` "No Space is attached …" (`SpaceManager.NoSpaceHostedException`, mapped in
+  `ControlApi.errorBoundary`) instead of a 500 + stack trace per request. The SPA already renders an empty
+  state for it in Settings → Spaces. `run.(sh|bat)` and `serve.(sh|bat)` print a "no Space attached" line.
+- Pinned by `tools/check-bundle-spaces.mjs` (CI `test` job): a throwaway repo holding every trap (including a
+  COMMITTED Space), staged for real under pwsh, exact templates-only file set asserted; and by
+  `ControlApiSpacesTest.zeroSpacesIsACleanStateNotA500`.
 
 ⚠ **`/assist/*` is inert in every bundle `package.ps1` produces, and that is the intended default.**
 The core fat JAR carries the two SPI *interfaces* (`com.gamma.assist.spi.AssistAgent`,

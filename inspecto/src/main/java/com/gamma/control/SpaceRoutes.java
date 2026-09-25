@@ -131,18 +131,17 @@ final class SpaceRoutes implements RouteModule {
     }
 
     /** Deregister + drain a space; {@code ?purge=true} also deletes its directory tree — refused with a
-     *  {@code 409} when it is the last space dir on disk (it would leave the server unbootable). */
+     *  {@code 409} when it is the last space dir on disk (its tree is the last copy). */
     private Object deleteSpace(ApiContext api, HttpExchange e, String id) throws IOException {
         requireMultiSpace(api);
         if (!SpaceId.isValid(id)) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid space id '" + id + "'");
         boolean purge = "true".equalsIgnoreCase(ApiContext.query(e, "purge"));
-        // Purging the last space DIRECTORY is irrecoverable over HTTP: its tree is the last copy, and main()
-        // refuses to boot an empty -Dspaces.root (System.exit(1)), so the server could not be restarted back
-        // into existence either. Deregister-only stays allowed — it leaves the files for re-discovery.
+        // Purging the last space DIRECTORY is irrecoverable over HTTP: its tree is the last copy. (Its first reason —
+        // main() refused to boot an empty -Dspaces.root — is gone since 2026-09-25: zero Spaces is a clean state.)
+        // Deregister-only stays allowed — it leaves the files for re-discovery.
         if (purge && api.spaces().space(SpaceId.of(id)).isPresent() && api.spaces().isLastOnDisk(SpaceId.of(id)))
-            throw new ApiException(409, ErrorCodes.CONFLICT, "refusing to purge '" + id + "' — it is the last space on disk and the "
-                    + "server cannot boot from an empty spaces root; delete it without ?purge=true (the files stay "
-                    + "for re-discovery), or create another space first");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "refusing to purge '" + id + "' — it is the last space on disk; "
+                    + "delete it without ?purge=true (the files stay for re-discovery), or create another space first");
         if (!api.spaces().delete(SpaceId.of(id), purge))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + id + "'");
         return Map.of("id", id, "deleted", true, "purged", purge);

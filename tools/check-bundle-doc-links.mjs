@@ -125,13 +125,8 @@ function toBundlePath(rel, excl) {
     // relocation table is the rewrite's, so the file set and the link re-pointing cannot disagree.
     const moved = repoToBundle(rel);
     if (moved !== rel) return moved;
-    // step 4: spaces/**, minus the runtime trees packaging skips
-    if (parts[0] === 'spaces') {
-        if (['uat', '_shared'].includes(parts[1])) return null;
-        if (['audit', 'duckdb', 'flows', 'views'].includes(parts[2])) return null;
-        if (parts[2] === 'data' && parts[3] !== 'samples') return null;
-        return rel;
-    }
+    // step 4: only spaces/_templates/** — bundles ship no Spaces (operator decision 2026-09-25)
+    if (parts[0] === 'spaces') return parts[1] === '_templates' ? rel : null;
     return null;
 }
 

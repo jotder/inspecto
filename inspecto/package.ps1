@@ -693,36 +693,27 @@ if (Test-Path $uiDistRoot) {
     }
 }
 
-# ── step 4: copy the multi-space config tree (configs + space.toon) ───────────
-# Each space's configs are relocatable: a config ref resolves beside its config and a data path
-# (data/...) under its Space dir, whatever the launch dir — no path rewrite needed. Runtime state
-# (data/audit/duckdb/flows/views) is created on first run and is intentionally NOT bundled.
+# ── step 4: stage spaces/ — the Space-template gallery ONLY ───────────────────
+# BUNDLES SHIP NO SPACES (operator decision 2026-09-25), in every edition: the bundle's spaces/ holds
+# only _templates (the Space-template gallery - an underscore sentinel, never booted as a Space).
+# Spaces are ATTACHED at deploy time by dropping the Space folder(s) into spaces\ (or pointing
+# SPACES_ROOT / -Dspaces.root at a folder holding them); the server boots with zero Spaces and one can
+# be created in Settings -> Spaces. Runtime state is created on first run, never bundled.
 #
-# ONLY COMMITTED CONTENT SHIPS (BUNDLE-UNTRACKED-SPACES-1, 2026-09-25): the tree is staged from
-# `git ls-tree HEAD` by Copy-TrackedSpaces (package-spaces.ps1), never from the working-tree listing
+# ONLY COMMITTED CONTENT SHIPS (BUNDLE-UNTRACKED-SPACES-1, 2026-09-25): the templates are staged from
+# `git ls-tree HEAD` by Copy-SpaceTemplates (package-spaces.ps1), never from the working-tree listing
 # — that listing shipped a git-excluded client working set and a peer's untracked pilot Space. A
 # locally modified tracked file ships as COMMITTED; git is required (no fallback). Nothing is read
 # from the working tree, so a running ControlApi's lock on spaces/<id>/duckdb/*.db cannot fail the copy.
 . (Join-Path $adjParserDir 'package-spaces.ps1')
-$staged = Copy-TrackedSpaces -RepoRoot $sandboxRoot -BundleDir $bundleDir
-if ($DemoAuth) {
-    # DEMO-AUTH-1: a demo bundle is "the build plus ONE Space folder". Shipping the sample Spaces made the bundle
-    # multi-Space with a `default` Space, so the server and the SPA both opened `default` and every Demo User landed
-    # in a sample Space instead of the demo Space dropped in beside it (seen on the 2026-09-25 hand-over rehearsal).
-    # Keep only _templates (the Space-template gallery - an underscore sentinel, never booted as a Space).
-    foreach ($sp in @($staged.Spaces | Where-Object { $_ -ne '_templates' })) {
-        Remove-Item -Recurse -Force (Join-Path $staged.Out $sp)
-    }
-    $staged.Spaces = @($staged.Spaces | Where-Object { $_ -eq '_templates' })
-    Write-Host "DEMO BUILD: sample Spaces not bundled - drop exactly one Space folder into spaces\" -ForegroundColor Yellow
-}
-if ($staged.Spaces.Count -gt 0) {
-    Write-Host "Bundled spaces tree → $($staged.Out) ($($staged.Files) committed files; Spaces: $($staged.Spaces -join ', '))" -ForegroundColor Green
+$staged = Copy-SpaceTemplates -RepoRoot $sandboxRoot -BundleDir $bundleDir
+if ($staged.Templates.Count -gt 0) {
+    Write-Host "Bundled Space templates → $($staged.Out)\_templates ($($staged.Files) committed files; templates: $($staged.Templates -join ', '))" -ForegroundColor Green
 } else {
-    Write-Host "  (no committed Space under spaces/ — bundle carries no Space)" -ForegroundColor Yellow
+    Write-Host "  (no committed template under spaces/_templates — bundle carries an empty spaces\)" -ForegroundColor Yellow
 }
-if ($staged.Untracked.Count -gt 0) {
-    Write-Warning "spaces/: NOT bundled — no committed files (untracked or git-excluded): $($staged.Untracked -join ', ')"
+if ($staged.NotBundled.Count -gt 0) {
+    Write-Host "  spaces/: NOT bundled (bundles ship no Spaces - attach them at deploy time): $($staged.NotBundled -join ', ')" -ForegroundColor DarkGray
 }
 if ($staged.Modified.Count -gt 0) {
     Write-Warning "spaces/: $($staged.Modified.Count) tracked file(s) modified locally — bundled the COMMITTED version: $($staged.Modified -join ', ')"
@@ -753,6 +744,11 @@ $runShContent = @'
 set -euo pipefail
 cd "$(dirname "$0")"
 ADAPTER="${1:?Usage: run.sh <adapter>   (e.g. voucher)}"
+# Bundles ship no Spaces: say so plainly rather than "no pipeline file found".
+if ! ls -d spaces/*/config >/dev/null 2>&1; then
+    echo "ERROR: no Space attached under spaces/ -- drop your Space folder(s) (each with a config/ subtree) into spaces/ first" >&2
+    exit 1
+fi
 # `|| true` is load-bearing: under `set -euo pipefail` a non-matching glob makes `ls` fail, the pipe
 # fail, and the assignment fail -- so the script died at THIS line with exit 2 and no message, and
 # the friendly error below was unreachable (found alongside PKG-2, 2026-08-18).
@@ -841,6 +837,13 @@ rem component silently finds nothing. `for /d` DOES glob directories, so enumera
 rem and leave only the filename wildcard to the inner FOR. First match wins, as in run.sh.
 set "PIPELINE="
 set "SPACE_DIR="
+rem Bundles ship no Spaces: say so plainly rather than "no pipeline file found".
+set "ANY_SPACE="
+for /d %%S in (spaces\*) do if exist "%%S\config\" set "ANY_SPACE=1"
+if not defined ANY_SPACE (
+    echo ERROR: no Space attached under spaces\ -- drop your Space folder(s^) (each with a config\ subtree^) into spaces\ first
+    exit /b 1
+)
 for /d %%S in (spaces\*) do (
     for %%F in ("%%S\config\%1\*_pipeline.toon") do (
         if not defined PIPELINE if exist "%%~F" (
@@ -913,11 +916,12 @@ $uraShContent = @'
 #
 # Examples:
 #   ./ura.sh help
-#   ./ura.sh search           spaces/ucc/config/voucher/voucher_pipeline.toon
-#   ./ura.sh copy             spaces/ucc/config/voucher/voucher_pipeline.toon
-#   ./ura.sh --dry-run backup spaces/ucc/config/voucher/voucher_pipeline.toon
-#   ./ura.sh prepare-inbox    spaces/ucc/config/voucher/voucher_pipeline.toon
-#   ./ura.sh create-schema    voucher  samples/voucher_sample.csv  spaces/ucc/config/voucher/voucher_gen.toon
+#   ./ura.sh search           spaces/<your-space>/config/voucher/voucher_pipeline.toon
+#   ./ura.sh copy             spaces/<your-space>/config/voucher/voucher_pipeline.toon
+#   ./ura.sh --dry-run backup spaces/<your-space>/config/voucher/voucher_pipeline.toon
+#   ./ura.sh prepare-inbox    spaces/<your-space>/config/voucher/voucher_pipeline.toon
+#   ./ura.sh create-schema    voucher  samples/voucher_sample.csv  spaces/<your-space>/config/voucher/voucher_gen.toon
+# Bundles ship no Spaces: drop your Space folder(s) into spaces/ first (or pass any pipeline path).
 set -euo pipefail
 cd "$(dirname "$0")"
 JAVA="java"; [ -x "runtime/bin/java" ] && JAVA="runtime/bin/java"
@@ -981,10 +985,13 @@ $serveShContent = @'
 # The core is AUTH-FREE by design. Real authentication is the `inspecto-security` module (Professional+, OIDC) — see docs/EDITIONS.md.
 # Extra JVM flags: INSPECTO_JAVA_OPTS="-Dui.static.log=DEBUG" ./serve.sh   (see below)
 # Starts the control plane + operator UI over every space under the spaces/ root (discover mode).
+# The bundle ships NO Spaces: drop your Space folder(s) into spaces/ (or set SPACES_ROOT) and restart.
+# With none attached the server still starts; create one in the UI under Settings -> Spaces.
 set -euo pipefail
 cd "$(dirname "$0")"
 PORT="${PORT:-8080}"
 SPACES_ROOT="${SPACES_ROOT:-spaces}"
+ls -d "${SPACES_ROOT}"/*/config >/dev/null 2>&1 || echo "[serve.sh] no Space attached under ./${SPACES_ROOT} -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -> Spaces"
 JAVA_OPTS=(--enable-native-access=ALL-UNNAMED "-Dcontrol.port=${PORT}" "-Dspaces.root=${SPACES_ROOT}")
 [ -d ui ] && JAVA_OPTS+=("-Dui.dir=./ui")
 # DuckDB excel extension (multiformat X1, frontend: xlsx) — auto-detect the bundled per-platform
@@ -1084,10 +1091,15 @@ rem Optional env: PORT (default 8080), CORS_ORIGIN, SPACES_ROOT (default spaces)
 rem The core is AUTH-FREE by design; real auth is the inspecto-security module (Professional+, OIDC).
 rem Extra JVM flags: set "INSPECTO_JAVA_OPTS=-Dui.static.log=DEBUG"   (see below)
 rem Starts the control plane + operator UI over every space under .\spaces (serves bundled .\ui).
+rem The bundle ships NO Spaces: drop your Space folder(s) into spaces\ (or set SPACES_ROOT) and restart.
+rem With none attached the server still starts; create one in the UI under Settings -> Spaces.
 setlocal
 cd /d "%~dp0"
 if "%PORT%"=="" set "PORT=8080"
 if "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"
+set "ANY_SPACE="
+for /d %%S in ("%SPACES_ROOT%\*") do if exist "%%~S\config\" set "ANY_SPACE=1"
+if not defined ANY_SPACE echo [serve.bat] no Space attached under .\%SPACES_ROOT% -- drop your Space folder(s) there (or set SPACES_ROOT) and restart, or create one in Settings -^> Spaces
 set "OPTS=--enable-native-access=ALL-UNNAMED -Dcontrol.port=%PORT% -Dspaces.root=%SPACES_ROOT%"
 if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
 rem DuckDB excel extension (multiformat X1, frontend: xlsx) - auto-detect the bundled
@@ -1544,7 +1556,8 @@ if ($DemoAuth) {
     $serveDemoBat = @"
 @echo off
 rem DEMO BUILD - internal evaluation only (DEMO-AUTH-1). Demo User sign-in, NO real authentication.
-rem Listens on 127.0.0.1 only. Drop a Space folder into .\spaces and open http://127.0.0.1:%PORT%
+rem Listens on 127.0.0.1 only. The bundle ships NO Spaces: drop your Space folder(s) into .\spaces
+rem (or set SPACES_ROOT), then open http://127.0.0.1:%PORT%
 setlocal
 cd /d "%~dp0"
 if "%PORT%"=="" set "PORT=8080"
@@ -1561,7 +1574,8 @@ echo [serve-demo] DEMO BUILD on http://127.0.0.1:%PORT%  (spaces: .\%SPACES_ROOT
     $serveDemoSh = @"
 #!/usr/bin/env bash
 # DEMO BUILD - internal evaluation only (DEMO-AUTH-1). Demo User sign-in, NO real authentication.
-# Listens on 127.0.0.1 only. Drop a Space folder into ./spaces and open http://127.0.0.1:`${PORT}
+# Listens on 127.0.0.1 only. The bundle ships NO Spaces: drop your Space folder(s) into ./spaces
+# (or set SPACES_ROOT), then open http://127.0.0.1:`${PORT}
 set -euo pipefail
 cd "`$(dirname "`$0")"
 PORT="`${PORT:-8080}"
@@ -1581,7 +1595,8 @@ INSPECTO DEMO BUILD - INTERNAL EVALUATION ONLY
 This build signs people in as Demo Users with NO password and NO identity provider (DEMO-AUTH-1).
 It is not secure and must never be given to a customer, exposed on a network, or used with real data.
 
-1. Put a Space folder (for example telco-assurance/) into .\spaces\
+1. This bundle ships NO Spaces. Drop your Space folder(s) (for example telco-assurance/) into .\spaces\
+   (or set SPACES_ROOT to a folder holding them). spaces\_templates is the template gallery, not a Space.
 2. Run serve-demo.bat (Windows) or ./serve-demo.sh (Linux)
 3. Open http://127.0.0.1:8080 and pick a Demo User
 
@@ -1680,6 +1695,8 @@ if ($duckdbExtCacheDir) {
 # gap this closes. It runs LAST, after every stage step: an earlier placement failed on 'no spaces'
 # because the spaces tree is copied in step 4, and a boot check that dies for a reason unrelated to
 # what it tests is worse than none -- it trains you to read its failure as noise.
+# Since 2026-09-25 the bundle ships NO Spaces (only spaces/_templates, never booted), so this smoke also
+# proves the zero-Space boot: ControlApi.main must start on an empty spaces root and answer /health.
 # Professional/Enterprise matter most (they load inspecto-security), but Personal is
 # smoked too: a broken core is the same class of failure.
 if (-not $SkipBootCheck) {
@@ -2027,6 +2044,8 @@ Write-Host "  1. Copy the inspecto-deploy-<platform>.zip matching the server to 
 Write-Host "  2. Expand-Archive inspecto-deploy-windows_amd64.zip   (PowerShell)"
 Write-Host "     or:  unzip inspecto-deploy-linux_amd64.zip         (Linux)"
 Write-Host "  3. cd inspecto-deploy"
+Write-Host "  3b. Attach your Space(s): the bundle ships NO Spaces (only spaces\_templates, the template gallery)."
+Write-Host "       Drop your Space folder(s) into spaces\ (or set SPACES_ROOT), or create one in Settings -> Spaces."
 Write-Host "  4. ETL pipeline (one-shot):"
 Write-Host "       run.bat voucher         (Windows)"
 Write-Host "       bash run.sh voucher     (Linux)"
@@ -2041,8 +2060,8 @@ Write-Host "       verify recovery: kill the process, then curl /health -- do no
 Write-Host "  5. Pre-ETL utilities:"
 Write-Host "       ura.bat help            (Windows)"
 Write-Host "       bash ura.sh help        (Linux)"
-Write-Host "       bash ura.sh search  spaces/ucc/config/voucher/voucher_pipeline.toon"
-Write-Host "       bash ura.sh backup  spaces/ucc/config/voucher/voucher_pipeline.toon"
+Write-Host "       bash ura.sh search  spaces/<your-space>/config/voucher/voucher_pipeline.toon"
+Write-Host "       bash ura.sh backup  spaces/<your-space>/config/voucher/voucher_pipeline.toon"
 Write-Host "  6. Try the worked feature examples (self-contained, synthetic data):"
 Write-Host "       pwsh examples/run-example.ps1 01-ingest/hello-csv     (Windows)"
 Write-Host "       bash examples/run-example.sh  01-ingest/hello-csv     (Linux)"

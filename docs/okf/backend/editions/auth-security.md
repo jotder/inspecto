@@ -273,8 +273,9 @@ via `META-INF/services`. Personal/Professional never bundle it and behave byte-i
   `Authenticator` active, `ControlApi.authenticate` resolved `writeRoot()` → `SpaceManager.current()` for
   *every* request, which throws `IllegalStateException: No spaces are hosted` on a root with none — so every
   route 500ed, including `/health` and the `POST /spaces` that would recover. Findings on investigation:
-  the **bootstrap framing was wrong** (`ControlApi.main` `System.exit(1)`s on an empty `-Dspaces.root`, so a
-  fresh install can never reach a running zero-space server, and single-tenant always hosts exactly one), and
+  the **bootstrap framing was wrong** (`ControlApi.main` `System.exit(1)`ed on an empty `-Dspaces.root`, so a
+  fresh install could never reach a running zero-space server — ⚠ no longer true since 2026-09-25: bundles
+  ship no Spaces, so `main` boots an empty root and Space-scoped routes answer 503), and
   the body was **not** empty — `errorBoundary` returns a structured `INTERNAL` envelope. But it **was**
   reachable by *deleting the last space* at runtime, which had no guard. Two fixes shipped: `authenticate`
   resolves the roles root only when a space is hosted (`Roles.effective(null)` already degrades to the seed

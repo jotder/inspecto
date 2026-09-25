@@ -488,7 +488,7 @@ public final class SpaceManager implements AutoCloseable {
 
     /**
      * True when {@code id}'s directory is the last one under the container root that {@link #discover} would boot —
-     * i.e. purging it would leave an empty spaces root, which {@code ControlApi.main} refuses to start from. Uses the
+     * i.e. purging it would leave an empty spaces root (bootable since 2026-09-25, but the last copy is gone). Uses the
      * same "dir with a {@code config/} subtree" predicate as discovery, so a deregistered-but-still-on-disk space
      * (deleted without {@code purge}) correctly counts as a survivor; {@code false} in single-tenant mode.
      */
@@ -587,14 +587,27 @@ public final class SpaceManager implements AutoCloseable {
      * spaces and no {@code default}, a fresh browser's first un-scoped read (the landing guard's Menu read) could hit
      * a different space from the one the SPA then selects.
      *
-     * @throws IllegalStateException when no spaces are hosted
+     * @throws NoSpaceHostedException when no spaces are hosted
      */
     public SpaceContext current() {
         SpaceContext c = spaces.get(DEFAULT);
         if (c != null) return c;
         return spaces.entrySet().stream().min(java.util.Map.Entry.comparingByKey(java.util.Comparator.comparing(SpaceId::value)))
                 .map(java.util.Map.Entry::getValue)
-                .orElseThrow(() -> new IllegalStateException("No spaces are hosted"));
+                .orElseThrow(NoSpaceHostedException::new);
+    }
+
+    /**
+     * {@link #current()} on a manager hosting ZERO Spaces — a normal state, not a fault: bundles ship no Spaces
+     * (operator decision 2026-09-25), so a fresh install boots empty until a Space folder is dropped into the
+     * spaces root or one is created with {@code POST /spaces}. The control plane answers it as a clear 503, not
+     * a 500. Still an {@link IllegalStateException}, so callers that already degrade on one keep doing so.
+     */
+    public static final class NoSpaceHostedException extends IllegalStateException {
+        public NoSpaceHostedException() {
+            super("No Space is attached - drop a Space folder into the spaces root (-Dspaces.root / SPACES_ROOT) "
+                    + "and restart, or create one in Settings -> Spaces (POST /spaces)");
+        }
     }
 
     /** Every hosted space. */

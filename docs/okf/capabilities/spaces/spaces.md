@@ -108,7 +108,7 @@ lock). Two boot modes (`ControlApi.main`, `ControlApi.java:379-397`):
 | Mode | When | Layout |
 |---|---|---|
 | **single** — `SpaceManager.single(CollectorService)` | `-Dspaces.root` unset | `SpaceRoot.legacy()`: the pre-Spaces **flat, CWD-relative** layout; byte-identical to the product before multi-space; CRUD verbs answer `409 "this server hosts a single space"` |
-| **discover** — `SpaceManager.discover(root)` | `-Dspaces.root=<dir>` | every `spaces/<id>/` with a `config/` subtree boots as a Space (`SpaceRoot.under(base)`: `config/ data/ audit/ duckdb/` + `space.toon`); **zero Spaces ⇒ exit 1** |
+| **discover** — `SpaceManager.discover(root)` | `-Dspaces.root=<dir>` | every `spaces/<id>/` with a `config/` subtree boots as a Space (`SpaceRoot.under(base)`: `config/ data/ audit/ duckdb/` + `space.toon`); **zero Spaces is a clean state** (since 2026-09-25 — bundles ship no Spaces): boot WARNs, `/health` `/ready` `/spaces` answer, Space-scoped routes answer **503** "No Space is attached", `POST /spaces` creates one (it was *exit 1*) |
 
 A `SpaceId` is `[a-z0-9][a-z0-9-]{0,62}` (`SpaceIdTest`); `default` is the default id
 (`EventLog.DEFAULT_SPACE_ID`) and is not editable. `_`-prefixed directories are **sentinels, never Spaces**:

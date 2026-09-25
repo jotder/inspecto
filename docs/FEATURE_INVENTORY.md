@@ -226,12 +226,13 @@ Builds `inspecto-deploy-<platform>.zip` per embedded runtime (Since 2026-09-17 t
 ```
 inspecto-deploy/
   inspecto.jar          shaded fat JAR
-  spaces/                     every committed space (default/demo/ucc) + the _templates gallery,
-                              staged from `git ls-tree HEAD` — never untracked/git-excluded dirs;
-                              config trees + space.toon + data/samples/ ship, runtime state
-                              (audit/duckdb/data-other-than-samples) and the generated uat /
-                              runtime _shared trees are pruned. Configs use repo/bundle-root-relative
-                              spaces/<id>/… paths — no rewrite, no flat config/.
+  spaces/                     ONLY the _templates gallery (every edition, since 2026-09-25) — bundles
+                              ship NO Spaces. Staged from `git ls-tree HEAD` (committed content only).
+                              ATTACH Spaces at deploy time: drop each Space folder (a dir with a
+                              config/ subtree) into spaces/ — or point SPACES_ROOT / -Dspaces.root at
+                              a folder holding them — and restart; or create one in Settings → Spaces.
+                              With none attached the server still boots: /health, /ready and /spaces
+                              answer, Space-scoped routes answer 503 "No Space is attached".
   examples/                   the runnable example suite (run-example.ps1|sh + catalog)   ← added 2026-06-20
   run.(bat|sh)                one-shot ETL launcher
   serve.(bat|sh)              long-running ControlApi + UI

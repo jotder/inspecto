@@ -420,9 +420,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         SpaceManager spaces;
         if (spacesRoot != null && !spacesRoot.isBlank()) {
             spaces = SpaceManager.discover(Path.of(spacesRoot.trim()));
+            // Zero Spaces is a normal state, not a boot failure: bundles ship no Spaces (operator decision
+            // 2026-09-25), so a fresh install starts empty. /health and /spaces answer; Space-scoped routes
+            // answer 503 until a Space folder is dropped in (restart) or one is created with POST /spaces.
             if (spaces.size() == 0) {
-                System.err.println("No spaces (a dir with a config/ subtree) found under -Dspaces.root=" + spacesRoot);
-                System.exit(1);
+                log.warn("No Space attached under -Dspaces.root={} - drop a Space folder (a dir with a config/ "
+                        + "subtree) there and restart, or create one in Settings -> Spaces", spacesRoot);
             }
         } else {
             if (args.length < 1) {
@@ -458,7 +461,9 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         get ("/health", (e, m) -> Map.of("status", "UP"));
         // MNT-15: per-subsystem health — deeper than the liveness probe, auth-gated (not a public path).
         get ("/health/details", (e, m) -> HealthDetails.of(this));
-        get ("/ready",  (e, m) -> Map.of("status", "READY", "pipelines", service().pipelines().size()));
+        // Zero Spaces is still READY: the server must take traffic so a Space can be created (POST /spaces).
+        get ("/ready",  (e, m) -> Map.of("status", "READY",
+                "pipelines", spaces.size() == 0 ? 0 : service().pipelines().size()));
         // ⚠ GET /metrics moved to the optional inspecto-metrics module (EDG-01 cell 5, EDITIONS CP-13).
         // Only the EXPOSITION moved — MetricRegistry is called by nine classes across three modules and stays
         // core. It remains in PUBLIC_PATHS and isInfraRoute below so the module's route is reachable
@@ -668,6 +673,11 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         } catch (ApiException ae) {
             if (ae.errorCode != null) ApiContext.attr(ex, ApiContext.ATTR_ERROR_CODE, ae.errorCode);
             respond(ex, ae.status, Map.of("error", ae.getMessage()));
+        } catch (SpaceManager.NoSpaceHostedException none) {
+            // Zero Spaces is a normal state (bundles ship none): a clear 503, never a 500 + stack per request.
+            log.debug("{} {} needs a Space and none is attached", ex.getRequestMethod(), path(ex));
+            ApiContext.attr(ex, ApiContext.ATTR_ERROR_CODE, ErrorCodes.CAPABILITY_UNAVAILABLE);
+            respond(ex, 503, Map.of("error", none.getMessage()));
         } catch (Exception e) {
             // A client that walks away mid-write is not a server fault. The browser cancels in-flight
             // asset fetches on every reload or navigation, and the write then fails with a platform
