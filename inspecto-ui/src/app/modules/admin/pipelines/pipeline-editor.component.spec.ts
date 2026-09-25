@@ -2127,6 +2127,20 @@ describe('PipelineEditorComponent', () => {
             expect(text).toContain('1 more does not load');
         });
 
+        /** DRAG-TO-CONNECT-UNDISCOVERABLE: plain drag moves (by design); the canvas now says Shift+drag connects. */
+        it('the canvas states the Shift+drag connect gesture to an author, and not in the read-only lens', () => {
+            const { fixture, c } = makeRendered();
+            c.select('demo');
+            fixture.detectChanges();
+            const hint = () => (fixture.nativeElement as HTMLElement).querySelector('[data-testid="connect-hint"]');
+            expect(hint()?.textContent?.replace(/\s+/g, ' ').trim()).toBe(
+                'Shift+drag from one Step to another to connect them',
+            );
+            fixture.componentRef.setInput('readOnly', true);
+            fixture.detectChanges();
+            expect(hint()).toBeNull();
+        });
+
         it('keeps "No authored pipelines" for a Space that genuinely has none', () => {
             api.listWithBroken.mockReturnValue(of([]));
             const { fixture } = makeRendered();

@@ -246,7 +246,7 @@
                     mat-icon-button
                     [disabled]="!selectedNode()"
                     (click)="armConnect()"
-                    matTooltip="Connect"
+                    matTooltip="Connect (or Shift+drag from one Step to another)"
                     aria-label="Connect the selected Step to another"
                 >
                     <mat-icon svgIcon="heroicons_outline:arrow-right"></mat-icon>
@@ -591,6 +591,18 @@
                     (nodeOpen)="onNodeOpen($event)"
                 >
                 </app-pipeline-editor-graph>
+                <!-- Drag-to-connect is Shift+drag (a plain drag MOVES a Step — pipeline-editor.md, gesture
+                     model). Nothing on the canvas said so, and a builder dragging Step-to-Step saw the Step
+                     move and no edge appear. The modifier is the "handle", so it is stated where the gesture
+                     happens. Authoring only: the read-only lens cannot connect. -->
+                @if (canAuthor() && (model()?.nodes ?? []).length > 1) {
+                    <p
+                        class="text-secondary pointer-events-none absolute bottom-3 left-3 z-10 m-0 text-xs"
+                        data-testid="connect-hint"
+                    >
+                        <kbd class="font-mono">Shift</kbd>+drag from one Step to another to connect them
+                    </p>
+                }
                 <!-- Dragged Step positions are remembered per browser (pipeline-layout.ts); this is the
                      way back to the automatic layout. A view preference, so not gated on authoring. -->
                 <button

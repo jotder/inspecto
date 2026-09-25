@@ -29,6 +29,15 @@ import {
 } from './pipeline-layout';
 
 /**
+ * The canvas zoom bounds. The wheel floor is 0.75 (operator ask — below it Step labels stop being
+ * legible); only a FIT may go lower, and only as far as the graph needs to be seen whole.
+ */
+const ZOOM_FLOOR = 0.75;
+const ZOOM_MAX = 3;
+/** How far a fit may shrink a graph that cannot otherwise be seen whole in a narrow canvas. */
+const FIT_ZOOM_MIN = 0.2;
+
+/**
  * Interactive AntV G6 host for the pipeline editor. Unlike the read-only {@link GraphViewComponent} (which
  * `destroy()`s + rebuilds on every data change), this host keeps a **persistent** graph and mutates it in
  * place ({@link addNode}/{@link addEdge}/{@link removeElement}/{@link updateNodeLabel}) so user-arranged
@@ -50,7 +59,7 @@ import {
         class="h-full w-full focus:outline-none"
         tabindex="0"
         role="application"
-        aria-label="Pipeline editor canvas — drag a Step type from the palette, drag Step-to-Step to connect, double-click a Step to configure, Delete to remove"
+        aria-label="Pipeline editor canvas — drag a Step type from the palette, drag a Step to move it, Shift+drag from one Step to another to connect, double-click a Step to configure, Delete to remove"
         (dragover)="onDragOver($event)"
         (drop)="onDrop($event)"
         (keydown)="onKeydown($event)"
@@ -118,7 +127,7 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
         // Observe the host box so the drawing surface follows the dock (same idiom as GraphViewComponent).
         // Absent in jsdom.
         if (typeof ResizeObserver !== 'undefined') {
-            this.resizeObserver = new ResizeObserver(() => this.graph?.resize());
+            this.resizeObserver = new ResizeObserver(() => this.onHostResize());
             this.resizeObserver.observe(this.hostEl.nativeElement);
         }
     }
@@ -132,6 +141,46 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
     ngOnDestroy(): void {
         this.resizeObserver?.disconnect();
         this.graph?.destroy();
+        this.graph = null;
+    }
+
+    /**
+     * The canvas box changed (a side dock opened, closed or was dragged): follow it, and re-fit when the
+     * graph no longer fits. 🔴 Resizing alone left the view where it was, so with both docks open on a
+     * ~1024px viewport the first and last Steps (acquisition, sink) sat clipped off either edge. A graph
+     * that still fits keeps the author's zoom and pan.
+     */
+    onHostResize(): void {
+        if (!this.graph) return;
+        this.graph.resize();
+        void this.fitToView(true);
+    }
+
+    /**
+     * Fit the whole graph into the canvas — on open, and on resize when it overflows. 🔴 G6 clamps a fit
+     * to the zoom range, so with the 0.75 wheel floor a fit could never shrink a long pipeline into a
+     * narrow canvas and `autoFit` silently left it clipped. The fit therefore runs with a lower bound,
+     * then the wheel floor is restored — or kept at the fitted zoom when that is lower, so the author can
+     * always zoom back out to the whole graph.
+     */
+    async fitToView(onlyIfOverflow = false): Promise<void> {
+        const g = this.graph;
+        if (!g) return;
+        if (onlyIfOverflow && !this.contentOverflows(g)) return;
+        g.setZoomRange([FIT_ZOOM_MIN, ZOOM_MAX]);
+        await g.fitView();
+        if (this.graph !== g) return; // rebuilt meanwhile
+        g.setZoomRange([Math.min(ZOOM_FLOOR, g.getZoom()), ZOOM_MAX]);
+    }
+
+    /** Whether any drawn element lies outside the visible canvas box. */
+    private contentOverflows(g: Graph): boolean {
+        const [w, h] = g.getSize();
+        const b = g.getCanvas().getBounds();
+        if (!b || !Number.isFinite(b.min[0]) || !Number.isFinite(b.max[0])) return false; // nothing drawn
+        const [x1, y1] = g.getViewportByCanvas([b.min[0], b.min[1]]);
+        const [x2, y2] = g.getViewportByCanvas([b.max[0], b.max[1]]);
+        return x1 < 0 || y1 < 0 || x2 > w || y2 > h;
     }
 
     // ── public mutation API (parent keeps the logical model; the canvas owns positions) ──
@@ -271,13 +320,15 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
         const graph = new Graph({
             container: this.hostEl.nativeElement,
             data: (restored ?? this.data ?? { nodes: [], edges: [] }) as unknown as GraphData,
-            autoFit: 'view',
+            // No `autoFit`: G6 clamps it to `zoomRange`, which clipped a long pipeline in a narrow canvas —
+            // the fit runs after render through fitToView, which may go below the wheel floor.
             // G6 defaults to [0.01, 10] — 1% (nodes vanish to specks) up to 1000% (one tile fills the
             // canvas). Neither end is a state anyone wants to land in, and scroll-wheel zoom reaches
             // both in a flick. Floor raised two notches (0.25 → 0.75, operator ask) — below that the
-            // node labels stop being legible; still well under any `autoFit: 'view'` a real pipeline
-            // needs so the fit is never clipped.
-            zoomRange: [0.75, 3],
+            // node labels stop being legible.
+            zoomRange: [ZOOM_FLOOR, ZOOM_MAX],
+            // A fit leaves a margin, so the first and last Steps' labels never sit on the canvas edge.
+            padding: 24,
             node: {
                 // Uniform rounded "processor" tile (NiFi style); the category icon + outline distinguish kinds.
                 type: 'rect',
@@ -390,7 +441,9 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
         });
         graph.on('node:pointerleave', () => this.nodeHover.emit(null));
         graph.on(NodeEvent.DRAG_END, () => this.persistLayout());
-        graph.render();
         this.graph = graph;
+        void Promise.resolve(graph.render()).then(() => {
+            if (this.graph === graph) void this.fitToView();
+        });
     }
 }

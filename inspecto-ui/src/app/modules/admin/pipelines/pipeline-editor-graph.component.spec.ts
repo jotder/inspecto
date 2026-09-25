@@ -90,4 +90,73 @@ describe('PipelineEditorGraphComponent', () => {
         expect(disconnect).toHaveBeenCalledTimes(1);
         vi.unstubAllGlobals();
     });
+
+    /** The canvas says how to connect: plain drag MOVES a Step, Shift+drag draws the edge. */
+    it("the canvas's accessible name states the Shift+drag connect gesture, not a plain drag", () => {
+        const host = (create().nativeElement as HTMLElement).querySelector('[role="application"]');
+        const label = host?.getAttribute('aria-label') ?? '';
+        expect(label).toContain('Shift+drag from one Step to another to connect');
+        expect(label).not.toContain('drag Step-to-Step to connect');
+    });
+
+    /**
+     * CANVAS-CLIPPED-AT-1024 (driven 2026-09-25): with both docks open the acquisition and sink Steps sat
+     * off either edge — resizing never re-fit, and G6 clamps a fit to the 0.75 wheel floor. G6 cannot run
+     * in jsdom, so the fit logic is driven against a shaped stand-in.
+     */
+    describe('fit to view', () => {
+        /** A stand-in graph whose drawn content spans canvas x ∈ [0, contentW] in a `viewW`-wide box. */
+        function fakeGraph(viewW: number, contentW: number) {
+            let zoom = 1;
+            let range: [number, number] = [0.75, 3];
+            const g = {
+                resize: vi.fn(),
+                getSize: () => [viewW, 400],
+                getCanvas: () => ({ getBounds: () => ({ min: [0, 0, 0], max: [contentW, 50, 0] }) }),
+                getViewportByCanvas: ([x, y]: number[]) => [x * zoom, y * zoom],
+                setZoomRange: vi.fn((r: [number, number]) => (range = r)),
+                getZoomRange: () => range,
+                // G6 clamps the fitted zoom to the CURRENT range — the trap being fixed.
+                fitView: vi.fn(async () => {
+                    zoom = Math.max(range[0], Math.min(range[1], viewW / contentW));
+                }),
+                getZoom: () => zoom,
+                destroy: vi.fn(),
+            };
+            return g;
+        }
+
+        it('a resize that leaves the graph overflowing re-fits it — below the wheel floor when it must', async () => {
+            const c = create().componentInstance;
+            const g = fakeGraph(200, 600); // needs 0.33 to be seen whole
+            (c as unknown as { graph: unknown }).graph = g;
+            c.onHostResize();
+            await Promise.resolve();
+            await Promise.resolve();
+            expect(g.resize).toHaveBeenCalled();
+            expect(g.fitView).toHaveBeenCalledTimes(1);
+            expect(g.getZoom()).toBeCloseTo(200 / 600); // whole graph visible, not clamped at 0.75
+            // The wheel floor comes back — at the fitted zoom, so zooming out still reaches the whole graph.
+            expect(g.getZoomRange()).toEqual([200 / 600, 3]);
+        });
+
+        it('a resize that still fits keeps the author’s zoom and pan', async () => {
+            const c = create().componentInstance;
+            const g = fakeGraph(900, 600);
+            (c as unknown as { graph: unknown }).graph = g;
+            c.onHostResize();
+            await Promise.resolve();
+            expect(g.resize).toHaveBeenCalled();
+            expect(g.fitView).not.toHaveBeenCalled();
+        });
+
+        it('an explicit fit restores the 0.75 wheel floor when the graph fits above it', async () => {
+            const c = create().componentInstance;
+            const g = fakeGraph(900, 600);
+            (c as unknown as { graph: unknown }).graph = g;
+            await c.fitToView();
+            expect(g.fitView).toHaveBeenCalledTimes(1);
+            expect(g.getZoomRange()).toEqual([0.75, 3]);
+        });
+    });
 });
