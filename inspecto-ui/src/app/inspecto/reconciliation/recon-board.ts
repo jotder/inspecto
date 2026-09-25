@@ -186,6 +186,32 @@ export function breaksFromSets(
 }
 
 /**
+ * UIE-10: the monetary impact of each Break key in `/recon/breaks` sets, keyed by the same
+ * {@link breakKeyOf} string a {@link ReconBreak} carries. Impact is |A − B| of the reconciliation's
+ * declared impact column, a side absent at the key counting 0 (the whole present amount is unmatched).
+ *
+ * ⚠ Empty unless the impact column is one of the compare columns: the payload carries only compared
+ * measures, so for any other column there is no value to read — and an invented 0 would read as "no
+ * money at risk".
+ */
+export function breakImpacts(
+    recon: Pick<Reconciliation, 'keyColumns' | 'compareColumns' | 'impact'>,
+    sets: ReconBreakSets,
+): Record<string, number> {
+    const col = recon.impact?.column;
+    if (!col || !recon.compareColumns.some((c) => c.column === col)) return {};
+    const out: Record<string, number> = {};
+    for (const set of Object.values(sets)) {
+        for (const row of set?.rows ?? []) {
+            const a = row.a?.[col] ?? 0;
+            const b = row.b?.[col] ?? 0;
+            out[breakKeyOf(row.key, recon.keyColumns)] = Math.abs(a - b);
+        }
+    }
+    return out;
+}
+
+/**
  * The in-browser mirror of `POST /recon/run` over already-resolved side rows. Pass {@code thirdRows} to
  * run 3-way: side 0 (left) is the anchor, each further side is reconciled against it (design §6).
  */

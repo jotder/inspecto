@@ -21,6 +21,7 @@ import {
     ageBucketLabel,
     breakAgeDays,
     breakId,
+    breakImpacts,
     breaksFromSets,
     decodePath,
     openAgeBuckets,
@@ -32,6 +33,7 @@ import {
 import { ReconExecService } from './recon-exec.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { formatNumber, NumberFormat } from 'app/inspecto/viz/number-format';
 
 /**
  * Breaks page (`/reconciliation/:id/breaks?path=…`) — the record sets behind one Board cell: three
@@ -125,6 +127,73 @@ export class ReconciliationDetailComponent implements OnInit {
 
     readonly viewMode = signal<'tables' | 'grouped'>('tables');
 
+    /** UIE-10: the page title is the Reconciliation's business description; its id is a code. */
+    readonly title = computed(() => this.recon()?.description || this.recon()?.name || '');
+
+    // ── UIE-10: monetary impact per Break ────────────────────────────────────────────────
+    /** Break key → impact, from the last compute. Empty when the Reconciliation declares no impact. */
+    private readonly impacts = signal<Readonly<Record<string, number>>>({});
+    private readonly impactFormat = computed<NumberFormat | null>(() => {
+        const imp = this.recon()?.impact;
+        return imp ? (imp.currency ? { style: 'currency', currency: imp.currency } : {}) : null;
+    });
+    /** The impact column header, e.g. "Impact (SAR)", or null when no impact is declared. */
+    readonly impactHeader = computed(() => {
+        const imp = this.recon()?.impact;
+        return imp ? (imp.currency ? `Impact (${imp.currency})` : 'Impact') : null;
+    });
+    readonly impactText = (b: ReconBreak): string => {
+        const f = this.impactFormat();
+        const v = this.impacts()[b.key];
+        return f && v !== undefined ? formatNumber(v, f) : '—';
+    };
+    /** Sorted by the NUMBER, rendered through the shared formatter. */
+    private readonly impactColumn = computed<ColDef<ReconBreak>[]>(() => {
+        const header = this.impactHeader();
+        return header
+            ? [
+                  {
+                      colId: 'impact',
+                      headerName: header,
+                      width: 150,
+                      valueGetter: (p) => (p.data ? (this.impacts()[p.data.key] ?? null) : null),
+                      valueFormatter: (p) => (p.data ? this.impactText(p.data) : '—'),
+                  },
+              ]
+            : [];
+    });
+
+    // ── UIE-10: the selected Break — its field diff and a labelled Promote action ────────────
+    private readonly selectedId = signal<string | null>(null);
+    /** Re-resolved against the live list, so a recompute or a lifecycle change shows through. */
+    readonly selected = computed(() => {
+        const id = this.selectedId();
+        return id ? (this.drillBreaks().find((b) => breakId(b) === id) ?? null) : null;
+    });
+    /**
+     * The selected key's MISMATCHED fields only — one per value break at that key (a field within tolerance
+     * produces no break, so it never appears). A cardinality break's one "field" is the row count.
+     */
+    readonly selectedFields = computed(() => {
+        const s = this.selected();
+        if (!s) return [];
+        if (s.type === 'cardinality_break')
+            return [{ field: 'rows', left: fmtVal(s.leftValue), right: fmtVal(s.rightValue) }];
+        if (s.type !== 'value_break') return [];
+        return this.valueBreaks()
+            .filter((b) => b.key === s.key)
+            .map((b) => ({ field: b.column ?? '—', left: fmtVal(b.leftValue), right: fmtVal(b.rightValue) }));
+    });
+    readonly breakLabel = breakLabel;
+
+    select(row: Record<string, unknown>): void {
+        this.selectedId.set(breakId(row as unknown as ReconBreak));
+    }
+
+    clearSelection(): void {
+        this.selectedId.set(null);
+    }
+
     /** Persisted break status/note by identity. */
     private readonly persistedById = computed(() => {
         const m = new Map<string, ReconBreak>();
@@ -157,30 +226,32 @@ export class ReconciliationDetailComponent implements OnInit {
         return days === null ? '—' : `${days}d`;
     };
 
-    /** Key + status (+ actions) — the shape of the two missing-side tables. */
-    readonly missingColumns: ColDef<ReconBreak>[] = [
+    /** Key + impact + status (+ actions) — the shape of the two missing-side tables. */
+    readonly missingColumns = computed<ColDef<ReconBreak>[]>(() => [
         { field: 'key', headerName: 'Key', flex: 1 },
+        ...this.impactColumn(),
         {
             field: 'status',
             headerName: 'Status',
             width: 130,
             cellRenderer: (p: ICellRendererParams<ReconBreak>) => statusBadgeHtml(p.value as string),
         },
-    ];
+    ]);
 
     readonly valueColumns = computed<ColDef<ReconBreak>[]>(() => {
         const r = this.recon();
         return [
             { field: 'key', headerName: 'Key', flex: 1 },
-            { field: 'column', headerName: 'Column', width: 140 },
             {
-                field: 'leftValue',
-                headerName: r?.leftDataset || 'A',
-                width: 140,
-                valueFormatter: (p) => fmtVal(p.value),
+                // UIE-10: the field-level diff, `field: A → B`, named by the two Datasets it compares.
+                colId: 'fieldDiff',
+                headerName: `Field diff (${r?.leftDataset || 'A'} → ${this.sideDataset()})`,
+                flex: 1,
+                minWidth: 220,
+                valueGetter: (p) => (p.data ? fieldDiff(p.data) : ''),
             },
-            { field: 'rightValue', headerName: this.sideDataset(), width: 140, valueFormatter: (p) => fmtVal(p.value) },
             { field: 'diff', headerName: 'Δ', width: 120, cellRenderer: varianceCell() },
+            ...this.impactColumn(),
             {
                 colId: 'age',
                 headerName: 'Age',
@@ -430,10 +501,13 @@ export class ReconciliationDetailComponent implements OnInit {
         if (!r || this.computing()) return;
         this.computing.set(true);
         try {
-            this.liveBreaks.set(breaksFromSets(r, await this.exec.breaks(r, this.path(), null, this.side())));
+            const sets = await this.exec.breaks(r, this.path(), null, this.side());
+            this.liveBreaks.set(breaksFromSets(r, sets));
+            this.impacts.set(breakImpacts(r, sets));
             this.lastEvaluated.set(new Date());
         } catch (e) {
             this.liveBreaks.set(null);
+            this.impacts.set({});
             this.toastr.error(apiErrorMessage(e, 'Could not compute the break sets'));
         } finally {
             this.computing.set(false);
@@ -523,6 +597,10 @@ function breakLabel(type: string): string {
           : type === 'value_break'
             ? 'value break'
             : type;
+}
+/** `active_flag: 1 → 0` — one mismatched field of a value break, A side first. */
+export function fieldDiff(b: ReconBreak): string {
+    return `${b.column ?? '—'}: ${fmtVal(b.leftValue)} → ${fmtVal(b.rightValue)}`;
 }
 function fmtVal(v: unknown): string {
     if (v == null) return '—';

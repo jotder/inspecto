@@ -15,6 +15,7 @@ import {
     reconBreakSets,
     ReconRunResult,
     breaksFromSets,
+    breakImpacts,
     ReconBreakSets,
 } from './recon-board';
 
@@ -314,5 +315,41 @@ describe('breaksFromSets — cardinality_break reaches the client (RECON-CARDINA
         expect(breaks[0].keyValues).toEqual({ region: 'EU', product: 'voice' });
         expect(breaks[0].leftValue).toBe(2);
         expect(breaks[0].rightValue).toBe(1);
+    });
+});
+
+describe('breakImpacts (UIE-10)', () => {
+    const sets: ReconBreakSets = {
+        missing_right: {
+            rows: [{ key: { region: 'MEA', product: 'voice' }, a: { amount: 10 } }],
+            rowCount: 1,
+            truncated: false,
+        },
+        missing_left: {
+            rows: [{ key: { region: 'APAC', product: 'sms' }, b: { amount: 7 } }],
+            rowCount: 1,
+            truncated: false,
+        },
+        value_break: {
+            rows: [{ key: { region: 'EU', product: 'data' }, a: { amount: 114 }, b: { amount: 118 } }],
+            rowCount: 1,
+            truncated: false,
+        },
+    };
+
+    it('is |A - B| of the declared column per Break key, an absent side counting 0', () => {
+        expect(breakImpacts({ ...CONFIG, impact: { column: 'amount', currency: 'SAR' } }, sets)).toEqual({
+            'MEA · voice': 10,
+            'APAC · sms': 7,
+            'EU · data': 4,
+        });
+    });
+
+    it('is empty when no impact is declared', () => {
+        expect(breakImpacts(CONFIG, sets)).toEqual({});
+    });
+
+    it('is empty when the impact column is not compared — the payload has no value to read', () => {
+        expect(breakImpacts({ ...CONFIG, impact: { column: 'monthly_fee_sar' } }, sets)).toEqual({});
     });
 });

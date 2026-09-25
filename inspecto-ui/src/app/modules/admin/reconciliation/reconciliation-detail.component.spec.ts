@@ -15,8 +15,9 @@ import {
     ReconBreak,
     reconBreakSets,
 } from 'app/inspecto/reconciliation';
-import { ReconciliationDetailComponent } from './reconciliation-detail.component';
+import { fieldDiff, ReconciliationDetailComponent } from './reconciliation-detail.component';
 import { ReconExecService } from './recon-exec.service';
+import { formatNumber } from 'app/inspecto/viz/number-format';
 
 /** Same reference fixture as the Board/pure-engine specs: MEA only-A, APAC only-B, EU/data value break. */
 const LEFT = [
@@ -49,12 +50,15 @@ async function create(
         breaks?: ReconBreak[];
         promote?: ReturnType<typeof vi.fn>;
         promoted?: ReturnType<typeof vi.fn>;
+        patch?: Partial<Reconciliation>;
+        left?: Record<string, unknown>[];
+        right?: Record<string, unknown>[];
     } = {},
 ) {
-    let current = recon(opts.breaks ?? []);
+    let current: Reconciliation = { ...recon(opts.breaks ?? []), ...opts.patch };
     const save = vi.fn((r: Reconciliation) => ((current = r), of(r)));
     const breaks = vi.fn(async (r: Reconciliation, path?: Record<string, string> | null) =>
-        reconBreakSets(r, LEFT, RIGHT, path),
+        reconBreakSets(r, opts.left ?? LEFT, opts.right ?? RIGHT, path),
     );
     const promote =
         opts.promote ??
@@ -293,5 +297,103 @@ describe('promoted Breaks (BREAK-INCIDENT-RESOLVE-1)', () => {
         const router = TestBed.inject(Router);
         c.openIncident(c.valueBreaks()[0]);
         expect(router.navigate).not.toHaveBeenCalled();
+    });
+});
+
+describe('Breaks page for an analyst (UIE-10)', () => {
+    /** Two compared fields: EU·data differs on amount only, US·voice on units only. */
+    const LEFT2 = LEFT.map((r) => ({ ...r, units: r.region === 'US' ? 3 : 5 }));
+    const RIGHT2 = RIGHT.map((r) => ({ ...r, units: r.region === 'US' ? 4 : 5 }));
+    const twoFields: Partial<Reconciliation> = {
+        compareColumns: [
+            { column: 'amount', toleranceType: 'percent', tolerance: 0.5 },
+            { column: 'units', toleranceType: 'exact', tolerance: 0 },
+        ],
+    };
+    const text = (el: HTMLElement) => el.textContent ?? '';
+
+    it('titles the page with the description, not the code', async () => {
+        const { fixture } = await create({ patch: { description: 'Mediation vs Billing — daily revenue' } });
+        const h1 = (fixture.nativeElement as HTMLElement).querySelector('h1');
+        expect(h1?.textContent).toContain('Mediation vs Billing — daily revenue');
+        expect(h1?.textContent).not.toContain('med_vs_bill');
+    });
+
+    it('falls back to the name when no description is declared', async () => {
+        const { c } = await create();
+        expect(c.title()).toBe('Mediation vs Billing');
+    });
+
+    it('renders a value break as `field: A → B`', async () => {
+        const { c } = await create();
+        expect(fieldDiff(c.valueBreaks()[0])).toBe('amount: 118 → 114');
+        const col = c.valueColumns().find((d) => d.colId === 'fieldDiff');
+        expect(col?.headerName).toBe('Field diff (mediation_daily → billing_daily)');
+    });
+
+    it('shows only the mismatched fields of the selected Break', async () => {
+        const { fixture, c } = await create({ patch: twoFields, left: LEFT2, right: RIGHT2 });
+        const eu = c.valueBreaks().find((b) => b.key === 'EU · data')!;
+        c.select(eu as unknown as Record<string, unknown>);
+        fixture.detectChanges();
+        expect(c.selectedFields()).toEqual([{ field: 'amount', left: '118', right: '114' }]);
+        const table = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="field-diff"]')!;
+        expect(text(table as HTMLElement)).toContain('amount');
+        expect(text(table as HTMLElement)).not.toContain('units');
+
+        const us = c.valueBreaks().find((b) => b.key === 'US · voice')!;
+        c.select(us as unknown as Record<string, unknown>);
+        expect(c.selectedFields()).toEqual([{ field: 'units', left: '3', right: '4' }]);
+    });
+
+    it('shows the impact per Break in the declared currency', async () => {
+        const { fixture, c } = await create({ patch: { impact: { column: 'amount', currency: 'SAR' } } });
+        const sar = (v: number) => formatNumber(v, { style: 'currency', currency: 'SAR' });
+        expect(c.impactHeader()).toBe('Impact (SAR)');
+        expect(c.impactText(c.valueBreaks()[0])).toBe(sar(4));
+        expect(c.impactText(c.missingA()[0])).toBe(sar(10));
+        expect(c.impactText(c.missingB()[0])).toBe(sar(7));
+        expect(sar(4)).toContain('SAR');
+        expect(c.missingColumns().some((d) => d.colId === 'impact')).toBe(true);
+
+        c.select(c.valueBreaks()[0] as unknown as Record<string, unknown>);
+        fixture.detectChanges();
+        const shown = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="selected-impact"]');
+        expect(text(shown as HTMLElement)).toContain(sar(4));
+    });
+
+    it('carries no impact column when none is declared', async () => {
+        const { c } = await create();
+        expect(c.impactHeader()).toBeNull();
+        expect(c.valueColumns().some((d) => d.colId === 'impact')).toBe(false);
+        expect(c.impactText(c.valueBreaks()[0])).toBe('—');
+    });
+
+    it('offers a labelled Promote to Incident button that promotes the selected Break', async () => {
+        const { fixture, c, promote } = await create();
+        c.select(c.valueBreaks()[0] as unknown as Record<string, unknown>);
+        fixture.detectChanges();
+        const panel = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="selected-break"]')!;
+        const btn = [...panel.querySelectorAll('button')].find((b) => b.textContent?.includes('Promote to Incident'));
+        expect(btn, 'a visible, labelled promote action').toBeDefined();
+
+        btn!.click();
+        await fixture.whenStable();
+        expect(promote).toHaveBeenCalledWith('med_vs_bill', 'EU · data', 'value_break', 'amount', null);
+    });
+
+    it('withdraws the promote button once Incidents are known to be absent', async () => {
+        const promoted = vi.fn(() => throwError(() => ({ status: 503 })));
+        const { fixture, c } = await create({ promoted });
+        c.select(c.valueBreaks()[0] as unknown as Record<string, unknown>);
+        fixture.detectChanges();
+        expect(text(fixture.nativeElement)).not.toContain('Promote to Incident');
+    });
+
+    it('renders the selected Break with no a11y violations', async () => {
+        const { fixture, c } = await create({ patch: { impact: { column: 'amount', currency: 'SAR' } } });
+        c.select(c.valueBreaks()[0] as unknown as Record<string, unknown>);
+        fixture.detectChanges();
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 });

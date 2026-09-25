@@ -38,6 +38,9 @@ export class ReconciliationsService {
 function toContent(r: Reconciliation): Record<string, unknown> {
     return {
         name: r.name,
+        // UIE-10: a PUT replaces the whole body, so a field not written back here is deleted by every save.
+        ...(r.description ? { description: r.description } : {}),
+        ...(r.impact ? { impact: r.impact } : {}),
         leftDataset: r.leftDataset,
         rightDataset: r.rightDataset,
         ...(r.thirdDataset ? { thirdDataset: r.thirdDataset } : {}),
@@ -61,6 +64,8 @@ function fromContent(name: string, content: Record<string, unknown>): Reconcilia
     return {
         id: name,
         name: c.name ?? name,
+        description: c.description || undefined,
+        impact: c.impact?.column ? c.impact : undefined,
         leftDataset: c.leftDataset ?? list[0] ?? '',
         rightDataset: c.rightDataset ?? list[1] ?? '',
         thirdDataset: c.thirdDataset ?? list[2] ?? undefined,

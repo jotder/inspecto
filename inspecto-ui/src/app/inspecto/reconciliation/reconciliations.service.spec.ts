@@ -3,7 +3,7 @@ import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ComponentsService } from 'app/inspecto/api';
 import { ReconciliationsService } from './reconciliations.service';
-import { buildReconciliation } from './reconciliation-types';
+import { buildReconciliation, Reconciliation } from './reconciliation-types';
 
 function setup() {
     const create = vi.fn((_t: string, c: Record<string, unknown>) =>
@@ -143,5 +143,45 @@ describe('ReconciliationsService', () => {
             .subscribe((r) => (out = r));
         expect(out[0].leftDataset).toBe('explicit_left');
         expect(out[0].rightDataset).toBe('explicit_right');
+    });
+
+    // ── UIE-10: description + impact survive a save (a PUT replaces the whole body) ──────────
+
+    it('reads the description and impact, and writes them back on save', () => {
+        const list = vi.fn(() =>
+            of([
+                {
+                    type: 'reconciliation',
+                    name: 'ra_c02_offer_fee',
+                    ref: '',
+                    content: {
+                        name: 'ra_c02_offer_fee',
+                        description: 'RA-C02 - Offer fee CRM vs CBS',
+                        impact: { column: 'monthly_fee_sar', currency: 'SAR' },
+                        leftDataset: 'crm',
+                        rightDataset: 'cbs',
+                        keyColumns: ['msisdn'],
+                        compareColumns: [{ column: 'monthly_fee_sar', toleranceType: 'absolute', tolerance: 0.01 }],
+                        breaks: [],
+                    },
+                },
+            ]),
+        );
+        const { svc, update } = setup();
+        TestBed.inject(ComponentsService).list = list as never;
+        let out: Reconciliation[] = [];
+        svc.list().subscribe((r) => (out = r));
+        expect(out[0].description).toBe('RA-C02 - Offer fee CRM vs CBS');
+        expect(out[0].impact).toEqual({ column: 'monthly_fee_sar', currency: 'SAR' });
+
+        svc.save(out[0]).subscribe();
+        expect(update).toHaveBeenCalledWith(
+            'reconciliation',
+            'ra_c02_offer_fee',
+            expect.objectContaining({
+                description: 'RA-C02 - Offer fee CRM vs CBS',
+                impact: { column: 'monthly_fee_sar', currency: 'SAR' },
+            }),
+        );
     });
 });

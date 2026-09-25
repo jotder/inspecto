@@ -74,8 +74,23 @@ export interface ReconBreak {
     firstSeenAt?: string;
 }
 
+/**
+ * The money a Break puts at risk (UIE-10). `column` must name one of the reconciliation's
+ * {@link CompareColumn}s: the Break payload carries only compared measures, so any other column has no
+ * value to read. A Break's impact is |A - B| of that column at the Break's key, a missing side counting 0.
+ */
+export interface ReconImpact {
+    column: string;
+    /** ISO 4217 code the impact is shown in, e.g. `SAR`. Absent: a plain number. */
+    currency?: string;
+}
+
 /** The persisted body of a `reconciliation` component (everything except id/name). */
 export interface ReconciliationConfig {
+    /** Business description, the Breaks page title (UIE-10). The id is a code, not a name. */
+    description?: string;
+    /** Optional monetary impact per Break (UIE-10). */
+    impact?: ReconImpact;
     leftDataset: string;
     rightDataset: string;
     /** Optional third dataset — turns the recon 3-way (anchor = leftDataset, design §6). */
