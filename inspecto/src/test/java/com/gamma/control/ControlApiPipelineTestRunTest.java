@@ -189,18 +189,16 @@ class ControlApiPipelineTestRunTest {
     @Test
     void anAbsentColumnIsReportedAsTheBinderErrorNotTheDriverPreamble(@TempDir Path dir) throws Exception {
         seedInbox(dir);
-        Path wr = dir.resolve("wr");
-        // The stored graph wins over the lifted one (graphFor), so this is the registered pipeline's own id.
-        new PipelineStore(wr.resolve("flows")).write("test_etl", PipelineCodec.fromMap(JSON.readValue("""
-            {"name":"test_etl","active":false,
-             "nodes":[{"id":"acq","type":"acquisition"},
-                      {"id":"flt","type":"transform.filter","config":{"where":"EVENT_TS IS NOT NULL"}},
-                      {"id":"sink","type":"sink.persistent","config":{"store":"out"}}],
-             "edges":[{"from":"acq","rel":"data","to":"flt"},{"from":"flt","rel":"data","to":"sink"}]}""",
-                Map.class)));
-        String prior = System.getProperty("assist.write.root");
-        System.setProperty("assist.write.root", wr.toString());
-        try (Ctx c = open(dir)) {
+        // The REGISTERED pipeline's own chain carries the absent column: a PipelineStore graph under this id
+        // no longer shadows it (aStoredGraphNeverShadowsTheRegisteredPipeline).
+        Path toon = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
+        // inactive: a steps: chain does not execute on the linear ingest path, so it cannot arm
+        Files.writeString(toon, Files.readString(toon).replace("active: true", "active: false")
+                + "steps[1]:\n  - filter:\n      where: \"EVENT_TS IS NOT NULL\"\n");
+        CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
+        ControlApi api = new ControlApi(svc, 0);
+        api.start();
+        try (Ctx c = new Ctx(svc, api, api.port())) {
             HttpResponse<String> r = send(c.port, "POST",
                     "/pipelines/authored/test_etl/run", "{\"files\":[\"a.csv\"]}");
             assertEquals(422, r.statusCode(), r.body());
@@ -210,6 +208,57 @@ class ControlApiPipelineTestRunTest {
                     "the actionable error must come first: " + message);
             assertTrue(message.contains("EVENT_TS"), "the absent column is named: " + message);
             assertTrue(message.contains("Candidate bindings"), "the candidates are kept: " + message);
+        }
+    }
+
+    /** A grandfathered-store graph under the registered pipeline's id, whose filter names an absent column. */
+    private static void seedShadow(Path wr) throws Exception {
+        new PipelineStore(wr.resolve("flows")).write("test_etl", PipelineCodec.fromMap(JSON.readValue("""
+            {"name":"test_etl","active":false,
+             "nodes":[{"id":"acq","type":"acquisition"},
+                      {"id":"shadow_flt","type":"transform.filter","config":{"where":"EVENT_TS IS NOT NULL"}},
+                      {"id":"sink","type":"sink.persistent","config":{"store":"out"}}],
+             "edges":[{"from":"acq","rel":"data","to":"shadow_flt"},{"from":"shadow_flt","rel":"data","to":"sink"}]}""",
+                Map.class)));
+    }
+
+    /**
+     * BUNDLE-AUTHORED-PIPELINE-STORE-1 (shadowing): a {@code PipelineStore} graph under a REGISTERED
+     * pipeline's id must not replace it in Run to here — the registered {@code *_pipeline.toon} is what the
+     * editor edits and the poll cycle runs, so it is what a test run must run. Before the fix
+     * {@code graphFor} read the store FIRST, so this ran the stored graph and 422'd on its bad column.
+     */
+    @Test
+    void aStoredGraphNeverShadowsTheRegisteredPipeline(@TempDir Path dir) throws Exception {
+        seedInbox(dir);
+        Path wr = dir.resolve("wr");
+        seedShadow(wr);
+        String prior = System.getProperty("assist.write.root");
+        System.setProperty("assist.write.root", wr.toString());
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> r = send(c.port, "POST",
+                    "/pipelines/authored/test_etl/run", "{\"files\":[\"a.csv\"]}");
+            assertEquals(200, r.statusCode(), "the registered pipeline runs, not the stored graph: " + r.body());
+            assertFalse(r.body().contains("shadow_flt"), "the stored graph must not run: " + r.body());
+            assertEquals(2, json(r).get("output").get("rowCount").asInt(), r.body());
+        } finally {
+            if (prior != null) System.setProperty("assist.write.root", prior);
+            else System.clearProperty("assist.write.root");
+        }
+    }
+
+    /** The same hazard on the sibling dry-run route: registered wins, the stored graph is a fallback only. */
+    @Test
+    void aStoredGraphNeverShadowsTheRegisteredPipelineInADryRun(@TempDir Path dir) throws Exception {
+        Path wr = dir.resolve("wr");
+        seedShadow(wr);
+        String prior = System.getProperty("assist.write.root");
+        System.setProperty("assist.write.root", wr.toString());
+        try (Ctx c = open(dir)) {
+            HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/test_etl/dry-run",
+                    "{\"sampleRows\":[{\"ID\":\"a1\",\"AMT\":\"1.0\",\"EVENT_DATE\":\"2020-04-03\"}]}");
+            assertFalse(r.body().contains("shadow_flt"), "the stored graph must not run: " + r.body());
+            assertFalse(r.body().contains("EVENT_TS"), "the stored graph's filter must not run: " + r.body());
         } finally {
             if (prior != null) System.setProperty("assist.write.root", prior);
             else System.clearProperty("assist.write.root");

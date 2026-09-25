@@ -500,14 +500,15 @@ final class PipelineGraphRoutes implements RouteModule {
     private Object dryRunFlow(ApiContext api, String id, Map<String, Object> body) {
         PipelineGraph g = candidateGraph(api, body);
         if (g == null) {
+            // BUNDLE-AUTHORED-PIPELINE-STORE-1: the REGISTERED pipeline wins — a PipelineStore graph under the
+            // same id must never shadow it. The store answers only for a grandfathered, unregistered id.
+            g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
             Path root = PipelineSupport.pipelinesRootOrNull(api);
             try {
-                g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
+                if (g == null && root != null) g = new PipelineStore(root).get(id).orElse(null);
             } catch (IllegalArgumentException e) {
                 throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
             }
-            // W5: the editor now edits registered pipelines too — fall back to the lifted config.
-            if (g == null) g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
             if (g == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'");
         }
         try {
@@ -558,7 +559,9 @@ final class PipelineGraphRoutes implements RouteModule {
             }
         }
 
-        PipelineGraph g = graphFor(api, id);
+        // BUNDLE-AUTHORED-PIPELINE-STORE-1: the REGISTERED config is what runs, never a PipelineStore graph
+        // under the same id — this route already requires the registration, so the store has no say here.
+        PipelineGraph g = PipelineLift.lift(cfg);
         Path scratch;
         try {
             // Short prefix: every partition path is written under this root, and Windows refuses a path
@@ -674,20 +677,6 @@ final class PipelineGraphRoutes implements RouteModule {
             });
         }
         return out;
-    }
-
-    /** The authored graph for a run-to-here: the stored pipeline, else the lifted config. 404 if neither. */
-    private PipelineGraph graphFor(ApiContext api, String id) {
-        Path root = PipelineSupport.pipelinesRootOrNull(api);
-        PipelineGraph g = null;
-        try {
-            g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
-        } catch (IllegalArgumentException e) {
-            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
-        }
-        if (g == null) g = api.service().configFor(id).map(PipelineLift::lift).orElse(null);
-        if (g == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'");
-        return g;
     }
 
     /** The {@code files} body key — a non-empty list of connection-relative paths. */
