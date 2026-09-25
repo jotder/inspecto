@@ -60,6 +60,15 @@ describe('VizRenderComponent', () => {
         expect(clicked).toBe('');
     });
 
+    it('hideBlank drops blank categories before the top-N limit', () => {
+        const props: VizProps = { labels: ['', 'A', 'B', 'C'], series: [{ label: 'm', data: [9, 3, 2, 1] }] };
+        const fixture = create(BAR_PLUGIN, props);
+        fixture.componentRef.setInput('renderOptions', { hideBlank: true, sort: 'desc', limit: 2 });
+        const c = fixture.componentInstance;
+        expect(c.chartData()?.labels).toEqual(['A', 'B']);
+        expect(c.chartData()?.datasets[0].data).toEqual([3, 2]);
+    });
+
     it('uses one backgroundColor per slice for pie', () => {
         const props: VizProps = {
             labels: ['a', 'b', 'c'],

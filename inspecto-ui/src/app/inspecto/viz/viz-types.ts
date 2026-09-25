@@ -144,6 +144,8 @@ export interface VizRenderOptions {
     /** Keep only the first N categories after sorting — a "top N" trim. */
     limit?: number;
     /** Stack series (bar/area only). */
+    /** Drop blank (NULL/empty) categories from a chart — e.g. a leaderboard over a column some rows leave empty. */
+    hideBlank?: boolean;
     stacked?: boolean;
     /** Table only: header text per result column (`max_value` → 'Value'). Unlisted columns get
      *  {@link humanizeColumn}'s default. */

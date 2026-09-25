@@ -55,6 +55,7 @@ export class WidgetOptionsDialog {
         sort: this.data.sort ?? '',
         limit: this.data.limit ?? null,
         stacked: this.data.stacked ?? false,
+        hideBlank: this.data.hideBlank ?? false,
         numberStyle: this.data.format?.style === 'number' ? '' : (this.data.format?.style ?? ''),
         currency: this.data.format?.currency ?? '',
         compact: this.data.format?.compact ?? false,
@@ -93,6 +94,7 @@ export class WidgetOptionsDialog {
             sort: (str(v['sort']) || undefined) as WidgetOptions['sort'],
             limit: (v['limit'] as number) ?? undefined,
             stacked: (v['stacked'] as boolean) ?? false,
+            hideBlank: (v['hideBlank'] as boolean) || undefined,
             format,
             kpi: target != null || better === 'lower' ? { target, better } : undefined,
         };

@@ -117,13 +117,15 @@ export class VizRenderComponent {
         return (r.kind === 'chartjs' ? r.chartType : 'bar') as ChartType;
     });
 
-    /** Props reordered by `sort` (on the first series' value) and trimmed to `limit` categories. Chart.js only —
-     *  table/KPI ignore sort/limit (rows already have their own grid sort; KPI has no categories). */
+    /** Props without blank categories (`hideBlank`), reordered by `sort` (on the first series' value) and trimmed to
+     *  `limit` categories. Chart.js only — table/KPI ignore these (rows already have their own grid sort; KPI has no
+     *  categories). Blanks drop BEFORE the limit, so a "top 10" is ten real categories. */
     private readonly sortedProps = computed<VizProps>(() => {
         const p = this.props();
         const opts = this.renderOptions();
-        if (!opts?.sort && !opts?.limit) return p;
+        if (!opts?.sort && !opts?.limit && !opts?.hideBlank) return p;
         let order = p.labels.map((_, i) => i);
+        if (opts.hideBlank) order = order.filter((i) => (p.labels[i] ?? '').trim() !== '');
         if (opts.sort) {
             const dir = opts.sort === 'asc' ? 1 : -1;
             const value = (i: number): number => p.series[0]?.data[i] ?? 0;

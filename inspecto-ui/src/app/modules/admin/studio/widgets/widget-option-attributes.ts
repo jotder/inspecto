@@ -59,6 +59,7 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     },
     { key: 'limit', label: 'Limit (top N)', type: 'number', tier: 'required', required: false, min: 1 },
     { key: 'stacked', label: 'Stack series', type: 'boolean', tier: 'required', required: false, default: false },
+    { key: 'hideBlank', label: 'Hide blank categories', type: 'boolean', tier: 'required', required: false, default: false },
     // UIE-4: how the widget's numbers read (KPI value, axes, tooltips, table cells).
     {
         key: 'numberStyle',
