@@ -29,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li><b>Enterprise</b>: {@code serve.*} passes {@code -Dobjects.backend=postgres}; with no PostgreSQL URL the
  *       boot is refused, naming the property — and an unreachable one is never papered over with memory.</li>
  *   <li><b>Enterprise {@code -DemoAuth}</b>: {@code serve-demo.*} passes {@code -Dobjects.backend=db} with
- *       {@code -Dauth.mode=demo}; it boots on DuckDB.</li>
+ *       {@code -Dauth.mode=demo}; it boots on DuckDB. (It also passes {@code -Djobs.backend=duckdb}, R2-08 —
+ *       pinned by the launcher-text case below.)</li>
  * </ul>
  * ⚠ The root pom pins {@code objects.backend=memory} for the test reactor, so each case sets or CLEARS the
  * property itself and restores every property it touched.
@@ -118,5 +119,20 @@ class ObjectsBackendEditionBootTest {
             assertEquals(StoreHealth.Status.UP, objects.status(), objects.toString());
             assertTrue(objects.target().startsWith("jdbc:duckdb:"), objects.target());
         }
+    }
+
+    /**
+     * The case above boots with the flags {@code serve-demo.*} is SUPPOSED to pass; this pins that
+     * {@code package.ps1} really writes them — a flag the test sets but the launcher drops is the
+     * inert-flag trap (R2-08: {@code -Djobs.backend=duckdb} was missing, so Home had no run history).
+     */
+    @Test
+    void demoLauncherFlags_areTheOnesTheDemoBootCaseUses() throws Exception {
+        String ps1 = Files.readString(Path.of("..", "inspecto", "package.ps1"));
+        String line = ps1.lines().filter(l -> l.trim().startsWith("$demoFlags ="))
+                .findFirst().orElseThrow(() -> new AssertionError("no $demoFlags in package.ps1"));
+        for (String flag : new String[]{"--enable-native-access=ALL-UNNAMED", "-Dcontrol.bind=127.0.0.1",
+                "-Dauth.mode=demo", "-Dobjects.backend=db", "-Devents.backend=parquet", "-Djobs.backend=duckdb"})
+            assertTrue(line.contains(flag), "serve-demo.* must pass " + flag + ": " + line);
     }
 }

@@ -127,8 +127,10 @@ pwsh -File inspecto/package.ps1 -Edition Enterprise -DemoAuth
 - deletes `serve.*`, `Dockerfile`, `.dockerignore` and the service installers (without the security
   jar they would boot an auth-free server on every interface);
 - writes `serve-demo.bat` / `serve-demo.sh` with `-Dcontrol.bind=127.0.0.1 -Dauth.mode=demo
-  -Dobjects.backend=db -Devents.backend=parquet -Dspaces.root=%SPACES_ROOT%` (default `spaces`,
-  port from `PORT`, default 8080), and `DEMO-BUILD.txt` saying *internal evaluation only*;
+  -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb -Dspaces.root=%SPACES_ROOT%`
+  (default `spaces`, port from `PORT`, default 8080), and `DEMO-BUILD.txt` saying *internal evaluation
+  only*. `-Djobs.backend=duckdb` (R2-08, 2026-09-26) gives Home its run history; the regular `serve.*`
+  leaves it unset (job reporting is opt-in). `ObjectsBackendEditionBootTest` pins the flag list;
 - adds the demo jar and flags to its boot smoke.
 
 Then drop a Space folder that has a `config/demo-users.toon` into `inspecto-demo\spaces\`, seed its

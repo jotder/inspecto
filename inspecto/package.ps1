@@ -1561,6 +1561,9 @@ if (-not $NoRuntime) {
 #                             Enterprise-capability build, and Enterprise's serve.* would demand PostgreSQL
 #                             (OBJECTS-BACKEND-DEFAULT-MEMORY-1); a one-folder hand-over has none
 #   -Devents.backend=parquet  the audit trail survives a restart, as on Professional+
+#   -Djobs.backend=duckdb     run history (Home's Recent Runs, /jobs/runs|metrics) in the Space's duckdb/ (R2-08).
+#                             serve.* leaves it unset (default none) -- job reporting is opt-in there; a demo
+#                             whose Home says "Run history needs the DuckDB jobs backend" is not a demo
 if ($DemoAuth) {
     foreach ($f in 'serve.sh', 'serve.bat', 'Dockerfile', '.dockerignore', 'inspecto.service', 'install-service.sh', 'install-service.ps1') {
         Remove-Item (Join-Path $bundleDir $f) -ErrorAction SilentlyContinue
@@ -1568,7 +1571,7 @@ if ($DemoAuth) {
     $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-notify-channels.jar',
                   'inspecto-backup.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-metrics.jar', 'inspecto-events.jar',
                   'inspecto-ops.jar', 'inspecto-agent.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
-    $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet'
+    $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet -Djobs.backend=duckdb'
     $serveDemoBat = @"
 @echo off
 rem DEMO BUILD - internal evaluation only (DEMO-AUTH-1). Demo User sign-in, NO real authentication.
