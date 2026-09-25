@@ -705,6 +705,17 @@ if (Test-Path $uiDistRoot) {
 # from the working tree, so a running ControlApi's lock on spaces/<id>/duckdb/*.db cannot fail the copy.
 . (Join-Path $adjParserDir 'package-spaces.ps1')
 $staged = Copy-TrackedSpaces -RepoRoot $sandboxRoot -BundleDir $bundleDir
+if ($DemoAuth) {
+    # DEMO-AUTH-1: a demo bundle is "the build plus ONE Space folder". Shipping the sample Spaces made the bundle
+    # multi-Space with a `default` Space, so the server and the SPA both opened `default` and every Demo User landed
+    # in a sample Space instead of the demo Space dropped in beside it (seen on the 2026-09-25 hand-over rehearsal).
+    # Keep only _templates (the Space-template gallery - an underscore sentinel, never booted as a Space).
+    foreach ($sp in @($staged.Spaces | Where-Object { $_ -ne '_templates' })) {
+        Remove-Item -Recurse -Force (Join-Path $staged.Out $sp)
+    }
+    $staged.Spaces = @($staged.Spaces | Where-Object { $_ -eq '_templates' })
+    Write-Host "DEMO BUILD: sample Spaces not bundled - drop exactly one Space folder into spaces\" -ForegroundColor Yellow
+}
 if ($staged.Spaces.Count -gt 0) {
     Write-Host "Bundled spaces tree → $($staged.Out) ($($staged.Files) committed files; Spaces: $($staged.Spaces -join ', '))" -ForegroundColor Green
 } else {
