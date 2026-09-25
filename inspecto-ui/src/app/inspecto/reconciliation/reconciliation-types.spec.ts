@@ -60,7 +60,7 @@ describe('runReconciliation', () => {
         const vb = breaks.find((b) => b.type === 'value_break')!;
         expect(vb.key).toBe('3');
         expect(vb.column).toBe('cost_usd');
-        expect(vb.diff).toBeCloseTo(0.5, 5);
+        expect(vb.diff).toBeCloseTo(-0.5, 5); // right − left: the change along A → B
     });
 
     it('matchedKeyCount counts keys on both sides', () => {

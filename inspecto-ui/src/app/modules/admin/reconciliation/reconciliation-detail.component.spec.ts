@@ -20,6 +20,7 @@ import {
 import { fieldDiff, ReconciliationDetailComponent } from './reconciliation-detail.component';
 import { ReconExecService, serverConfig } from './recon-exec.service';
 import { formatNumber } from 'app/inspecto/viz/number-format';
+import { fmtDateTime } from 'app/inspecto/format';
 
 /** Same reference fixture as the Board/pure-engine specs: MEA only-A, APAC only-B, EU/data value break. */
 const LEFT = [
@@ -349,6 +350,28 @@ describe('Breaks page for an analyst (UIE-10)', () => {
         expect(fieldDiff(c.valueBreaks()[0])).toBe('amount: 118 → 114');
         const col = c.valueColumns().find((d) => d.colId === 'fieldDiff');
         expect(col?.headerName).toBe('Field diff (mediation_daily → billing_daily)');
+    });
+
+    it('signs Δ along the Field diff arrow: 118 → 114 is ▼ -4 (B − A)', async () => {
+        const { c } = await create();
+        const b = c.valueBreaks()[0];
+        expect(fieldDiff(b)).toBe('amount: 118 → 114');
+        expect(b.diff).toBe(-4);
+        const col = c.valueColumns().find((d) => d.field === 'diff')!;
+        const render = col.cellRenderer as (p: { value: unknown }) => string;
+        expect(render({ value: b.diff })).toBe('<span class="text-red-600 dark:text-red-400">▼ -4</span>');
+    });
+
+    it('shows the evaluation date as well as the time', async () => {
+        const { fixture, c } = await create();
+        const at = new Date(2026, 8, 20, 0, 0, 48);
+        c.lastEvaluated.set(at);
+        fixture.detectChanges();
+        const squash = (t: string) => t.replace(/\s+/g, ' ');
+        const text = squash((fixture.nativeElement as HTMLElement).textContent ?? '');
+        expect(text).toContain(squash(`Last evaluated: ${fmtDateTime(at)} ·`));
+        expect(fmtDateTime(at)).toContain(at.toLocaleDateString());
+        expect(fmtDateTime(at)).toContain('2026');
     });
 
     it('shows only the mismatched fields of the selected Break', async () => {

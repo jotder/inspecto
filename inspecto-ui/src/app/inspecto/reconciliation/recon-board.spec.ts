@@ -321,6 +321,37 @@ describe('breaksFromSets — cardinality_break reaches the client (RECON-CARDINA
     });
 });
 
+describe('breaksFromSets — value break Δ reads along A → B (R2-15)', () => {
+    const FEE = {
+        keyColumns: ['msisdn'],
+        compareColumns: [{ column: 'monthly_fee_sar', toleranceType: 'exact', tolerance: 0 } as CompareColumn],
+    };
+    const sets: ReconBreakSets = {
+        value_break: {
+            rows: [
+                { key: { msisdn: 'm1' }, a: { monthly_fee_sar: 149 }, b: { monthly_fee_sar: 99 } },
+                { key: { msisdn: 'm2' }, a: { monthly_fee_sar: 149 }, b: { monthly_fee_sar: 298 } },
+            ],
+            rowCount: 2,
+            truncated: false,
+        },
+    };
+
+    it('is B − A, so 149 → 99 is −50 (B under-bills) and 149 → 298 is +149', () => {
+        const out = breaksFromSets(FEE, sets);
+        expect(out.map((b) => b.diff)).toEqual([-50, 149]);
+        // …the same direction as the Board's anchor-relative Δ% for the same pair
+        expect(Math.sign(deltaPct(149, 99)!)).toBe(Math.sign(out[0].diff!));
+    });
+
+    it('leaves the impact an absolute amount, whatever the sign', () => {
+        expect(breakImpacts({ ...FEE, impact: { column: 'monthly_fee_sar', currency: 'SAR' } }, sets)).toEqual({
+            m1: 50,
+            m2: 149,
+        });
+    });
+});
+
 describe('breakImpacts (UIE-10)', () => {
     const sets: ReconBreakSets = {
         missing_right: {

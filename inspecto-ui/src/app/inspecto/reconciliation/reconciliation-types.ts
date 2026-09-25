@@ -57,7 +57,11 @@ export interface ReconBreak {
     column?: string;
     leftValue?: unknown;
     rightValue?: unknown;
-    /** Signed numeric difference left-right (value breaks on numeric columns only). */
+    /**
+     * Signed change from left to right, `right − left` (value breaks on numeric columns only) — it reads the
+     * same way as the `A → B` field diff and the Board's anchor-relative Δ%: 149 → 99 is −50 (B under-bills).
+     * The Break's impact is an absolute amount computed separately, never derived from this sign.
+     */
     diff?: number;
     status: BreakStatus;
     /** Manual-resolution note (preserved across re-runs). */
@@ -265,7 +269,7 @@ export function runReconciliation(
                 column: c.column,
                 leftValue: lrow[c.column],
                 rightValue: rrow[c.column],
-                diff: Number.isNaN(a) || Number.isNaN(b) ? undefined : a - b,
+                diff: Number.isNaN(a) || Number.isNaN(b) ? undefined : b - a,
                 status: 'open',
             });
         }

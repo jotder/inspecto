@@ -190,7 +190,7 @@ export function breaksFromSets(
                 column: c.column,
                 leftValue: a,
                 rightValue: b,
-                diff: a !== null && b !== null ? a - b : undefined,
+                diff: a !== null && b !== null ? b - a : undefined,
                 status: 'open',
             });
         }

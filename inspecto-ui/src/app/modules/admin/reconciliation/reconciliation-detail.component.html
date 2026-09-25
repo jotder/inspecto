@@ -76,7 +76,7 @@
                     </span>
                     <span class="text-xs text-secondary">
                         @if (lastEvaluated(); as dt) {
-                            Last evaluated: {{ dt | date: 'mediumTime' }}
+                            Last evaluated: {{ fmtDateTime(dt) }}
                         } @else {
                             Evaluation status: Live
                         }

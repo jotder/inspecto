@@ -68,7 +68,9 @@ what drifts first. ⚠ The Board writes ONE instant to both `mergeBreaks(…, ru
   carry rollups, Δ% columns **banded** ok/warn/breach (defaults 1/2 %; independent of record-level
   tolerance). Δ% is **Anchor-relative** (`datasets[0]`; 0-anchor ⇒ exact).
 * **Breaks page** — drill from a Board cell to the three live record sets (only-in-A / only-in-B /
-  common-but-different) with path scoping; 3-way adds a **Presence Pattern** filter bar.
+  common-but-different) with path scoping; 3-way adds a **Presence Pattern** filter bar. A value Break's
+  **Δ is `B − A`** (the change along the *Field diff (A → B)* arrow: 149 → 99 is ▼ −50), the same direction
+  as the Board's anchor-relative Δ%; *Impact* stays an absolute amount (R2-15, 2026-09-26).
 * **3-way** — N=3 anchor reconciliation shipped (DAT-7 P4); N>3, non-additive aggs, and fuzzy key
   matching are explicit non-goals for now.
 * **Reusable** — a Reconciliation renders as a **Widget** and rides bundle export/template flows

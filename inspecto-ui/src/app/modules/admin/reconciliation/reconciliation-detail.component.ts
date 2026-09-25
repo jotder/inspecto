@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
@@ -37,6 +36,7 @@ import { ReconExecService } from './recon-exec.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { formatNumber, NumberFormat } from 'app/inspecto/viz/number-format';
+import { fmtDateTime } from 'app/inspecto/format';
 
 /**
  * Breaks page (`/reconciliation/:id/breaks?path=…`) — the record sets behind one Board cell: three
@@ -62,7 +62,6 @@ import { formatNumber, NumberFormat } from 'app/inspecto/viz/number-format';
         InspectoEmptyStateComponent,
         InspectoAlertComponent,
         StatusBadgeComponent,
-        DatePipe,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     templateUrl: './reconciliation-detail.component.html',
@@ -80,6 +79,8 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly loading = signal(true);
     readonly computing = signal(false);
     readonly lastEvaluated = signal<Date | null>(new Date());
+    /** Date AND time — a bare wall-clock time is ambiguous once the data is as of an earlier day. */
+    readonly fmtDateTime = fmtDateTime;
     /** Live breaks (all `open` from the engine) — persisted statuses overlay by identity below. */
     private readonly liveBreaks = signal<ReconBreak[] | null>(null);
 
