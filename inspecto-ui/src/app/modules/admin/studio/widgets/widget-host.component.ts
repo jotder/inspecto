@@ -79,7 +79,7 @@ export interface DrillEvent {
                 }
             </ng-container>
             <ng-container tileActions>
-                @if (shape() === 'kpi' && tileState() === 'ready') {
+                @if (sizeable() && tileState() === 'ready') {
                     <button
                         mat-icon-button
                         type="button"
@@ -230,6 +230,11 @@ export class WidgetHostComponent {
     });
     /** Which skeleton the tile shows while loading. */
     readonly shape = computed<TileShape>(() => tileShapeOf(this.plugin()?.render));
+    /** Only the plain KPI has in-place sizes; a KPI trend shares its skeleton but not its size control. */
+    readonly sizeable = computed(() => {
+        const r = this.plugin()?.render;
+        return r?.kind === 'component' && r.componentKey === 'kpi';
+    });
     /** Loading until the widget, its dataset and the first result are in; `empty` for a successful run with no
      *  rows. Every failure state (widget/dataset unavailable, revoked, throttled) is `ready` — the body says it. */
     readonly tileState = computed<TileState>(() => {

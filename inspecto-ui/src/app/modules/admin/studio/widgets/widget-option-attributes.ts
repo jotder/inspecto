@@ -77,8 +77,14 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     { key: 'currency', label: 'Currency code (e.g. SAR)', type: 'string', tier: 'required', required: false },
     { key: 'compact', label: 'Compact (7.7M)', type: 'boolean', tier: 'required', required: false, default: false },
     { key: 'decimals', label: 'Decimals', type: 'number', tier: 'required', required: false, min: 0 },
-    // UIE-1: a KPI's target and which direction is good (UIE-8: the Gauge reads the same two).
-    { key: 'kpiTarget', label: 'Target (KPI, Gauge)', type: 'number', tier: 'required', required: false },
+    // UIE-1: a KPI's target and which direction is good (UIE-8: the Gauge, KPI trend and Progress list read the same two).
+    {
+        key: 'kpiTarget',
+        label: 'Target (KPI, KPI trend, Gauge, Progress list)',
+        type: 'number',
+        tier: 'required',
+        required: false,
+    },
     {
         key: 'kpiBetter',
         label: 'Target: better when',

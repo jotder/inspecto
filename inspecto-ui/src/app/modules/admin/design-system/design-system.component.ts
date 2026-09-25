@@ -37,6 +37,8 @@ import { DataTableComponent, DataTableTier } from 'app/inspecto/data-table';
 import { TreeTableComponent, TreeNode, varianceCell } from 'app/inspecto/tree-table';
 import { GeoData, MapViewComponent } from 'app/inspecto/geo';
 import { KpiComponent } from 'app/inspecto/viz/plugins/kpi.component';
+import { KpiTrendComponent } from 'app/inspecto/viz/plugins/kpi-trend.component';
+import { ProgressListComponent } from 'app/inspecto/viz/plugins/progress-list.component';
 // Dashboard tile section
 import { InspectoTileCardComponent } from 'app/inspecto/components/tile-card.component';
 import { CHART_CATEGORICAL } from 'app/inspecto/theme/chart-tokens';
@@ -85,6 +87,8 @@ interface DemoRow {
         InspectoPageHeaderComponent,
         InspectoStatTileComponent,
         KpiComponent,
+        KpiTrendComponent,
+        ProgressListComponent,
         InspectoTileCardComponent,
         InspectoChartComponent,
         InspectoSectionTabsComponent,
@@ -421,6 +425,47 @@ export class DesignSystemComponent {
         labels: ['North', 'South', 'East', 'West'],
         datasets: [{ label: 'Exposure', data: [420, 310, 180, 260], backgroundColor: CHART_CATEGORICAL[0] }],
     };
+
+    // ── More visualization types: KPI trend + Progress list ─────────────────────────────────
+    readonly trendMonths = Array.from({ length: 12 }, (_, i) =>
+        new Date(Date.UTC(2025, 9 + i, 1)).toISOString().slice(0, 10),
+    );
+    readonly trendLeakage = [1.9, 1.7, 1.8, 1.6, 1.5, 1.6, 1.3, 1.2, 1.3, 1.1, 1.0, 0.9];
+    readonly trendCases = [41, 44, 39, 47, 52, 49, 55, 58, 54, 61, 63, 60];
+    readonly progressDetectors = [
+        'SIM box',
+        'Wangiri',
+        'IRSF',
+        'PBX hacking',
+        'Subscription fraud',
+        'Bypass',
+        'Roaming leakage',
+        'Interconnect',
+        'Rating error',
+        'Prepaid top-up',
+        'CLI spoofing',
+        'Refiling',
+    ];
+    readonly progressAlerts = [182, 141, 97, 88, 64, 57, 43, 38, 31, 22, 17, 9];
+    readonly progressControls = [
+        'Usage → billing',
+        'Recharge → balance',
+        'Interconnect CDR',
+        'Roaming TAP',
+        'Provisioning',
+    ];
+    readonly progressPassRate = [99.1, 97.4, 94.2, 91.8, 96.5];
+    readonly progressDemoSelect = (label: string): void => {
+        this.toast.info(`Drill: ${label}`);
+    };
+    readonly moreVizSnippet = `<!-- a Widget picks the type: vizType kpi-trend | progress-list; viz-render mounts the component -->
+kpi-trend      controls: { x: [{field: 'month', grain: 'month'}], value: [{field: 'leakage_pct', agg: 'avg'}] }
+               options:  { format: {style: 'percent'}, kpi: {target: 1.5, better: 'lower'}, trend: {compareBack: 1} }
+progress-list  controls: { x: [{field: 'detector'}], y: [{field: 'alert_id', agg: 'count'}] }
+               options:  { progress: {limit: 10, max: 100}, sort: 'desc', kpi: {target: 95} }
+// standalone (no Widget):
+<inspecto-kpi-trend [labels]="months" [values]="values" [format]="{ style: 'percent' }" [target]="1.5" better="lower" />
+<inspecto-progress-list [labels]="names" [values]="values" [target]="95" [select]="drill" />`;
 
     // ── Snippets (copy-paste) ────────────────────────────────────────────────────────────────
     readonly snippets = {

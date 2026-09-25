@@ -155,6 +155,11 @@ export interface VizRenderOptions {
     /** UIE-1, KPI and (UIE-8) Gauge: the target, and which direction is good. Both state on / off target in words and tone;
      *  the KPI colours its delta the same way, the Gauge draws good / bad zones. `better` defaults to `higher`. */
     kpi?: { target?: number; better?: 'higher' | 'lower' };
+    /** KPI trend only: the delta compares the last point with the point `compareBack` steps earlier (default 1). */
+    trend?: { compareBack?: number };
+    /** Progress list only: how many rows show before "+N more" (default: `limit`, else 10), and the value a full bar
+     *  stands for (default: the largest value shown). */
+    progress?: { limit?: number; max?: number };
     /** UIE-4: how this widget's numbers read — KPI value, chart axes and tooltips, and every table column not named in
      *  {@link columnFormats}. Absent: grouped, up to two decimals (axes compact). */
     format?: NumberFormat;

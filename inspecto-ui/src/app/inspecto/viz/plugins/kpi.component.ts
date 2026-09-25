@@ -4,9 +4,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { formatNumber, NumberFormat } from '../number-format';
 import { targetStatus } from '../target-status';
+import { DeltaTone, kpiDelta, toneBadge } from '../kpi-delta';
 
 export type KpiMode = 'mini' | 'standard' | 'max';
-type Tone = 'good' | 'bad' | 'flat';
+type Tone = DeltaTone;
 
 const KPI_MODES: KpiMode[] = ['mini', 'standard', 'max'];
 
@@ -97,25 +98,9 @@ export class KpiComponent {
 
     readonly display = computed(() => formatNumber(this.value(), this.format()));
 
-    /** "▲ Up 12.4 % (+SAR 0.9M) vs prior period" — change and direction in words, toned by whether it is good.
-     *  The amount is SIGNED and sits before "vs", so it cannot be read as the prior-period value itself. */
-    readonly delta = computed<{ text: string; tone: Tone } | null>(() => {
-        const prev = this.compare();
-        if (prev == null || !Number.isFinite(prev)) return null;
-        const diff = this.value() - prev;
-        if (diff === 0) return { text: 'No change vs prior period', tone: 'flat' };
-        const up = diff > 0;
-        const good = up === (this.better() === 'higher');
-        const tone: Tone = good ? 'good' : 'bad';
-        // A percent KPI changes in POINTS — a relative % beside it would be a second, different percentage.
-        if (this.format()?.style === 'percent') {
-            const pts = formatNumber(Math.abs(diff), { decimals: 1 });
-            return { text: `${up ? '▲ Up' : '▼ Down'} ${pts} pts vs prior period`, tone };
-        }
-        const pct = prev !== 0 ? ` ${formatNumber(Math.abs((diff / prev) * 100), { decimals: 1 })} %` : '';
-        const amount = formatNumber(Math.abs(diff), { ...this.format(), compact: true });
-        return { text: `${up ? '▲ Up' : '▼ Down'}${pct} (${up ? '+' : '−'}${amount}) vs prior period`, tone };
-    });
+    /** "▲ Up 12.4 % (+SAR 0.9M) vs prior period" — change and direction in words, toned by whether it is good
+     *  (the shared wording, {@link kpiDelta}). */
+    readonly delta = computed(() => kpiDelta(this.value(), this.compare(), this.better(), this.format()));
 
     /** "Target 99 — below target" — the target in the widget's format and whether the value meets it. */
     readonly targetLine = computed<{ text: string; tone: Tone } | null>(() => {
@@ -125,7 +110,7 @@ export class KpiComponent {
 
     /** The status-badge value for a tone: the shared badge owns status colour (PASS → success, FAIL → error). */
     badgeFor(tone: Tone): string {
-        return tone === 'good' ? 'PASS' : tone === 'bad' ? 'FAIL' : '';
+        return toneBadge(tone);
     }
 
     cycle(): void {

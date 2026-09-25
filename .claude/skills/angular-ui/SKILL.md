@@ -629,6 +629,11 @@ src/app/
   theme. ⛔ Never set Chart.js colours, fonts or grid styling inline in a pane — change the theme. A single series
   hides its legend automatically; a Widget's `legend.show` is emitted as `display` ONLY when set, so it still
   overrides both ways.
+- **Component-rendered Visualization Types `kpi-trend` + `progress-list`** (2026-09-25; gallery: `/design` ▸ *More
+  visualization types*): SVG / HTML, not canvas — colours are `--gamma-*` tokens (the sparkline) or `CHART_TONE`
+  (good / bad bars), text via `formatNumber`, the delta wording via the shared `viz/kpi-delta.ts` (`kpiDelta`, also
+  used by `kpi`); a component-render plugin that drills takes viz-render's stable `select` callback input, since
+  `NgComponentOutlet` carries inputs only.
 - **ag-Grid theme → only** `InspectoGridThemeService` / `GAMMA_GRID_PARAMS`. Never bare `themeQuartz`.
 - Editing the theming plugin (`@gamma/tailwind/plugins/theming.js`) does **not** hot-reload — restart the
   dev server and verify via `getComputedStyle(body).getPropertyValue('--gamma-…')`.

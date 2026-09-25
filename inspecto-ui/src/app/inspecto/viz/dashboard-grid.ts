@@ -44,8 +44,10 @@ export function spanLabel(span: unknown): string {
 /** What a tile will hold once its data arrives — picks the tile card's loading skeleton. */
 export type TileShape = 'kpi' | 'chart' | 'table';
 
-/** The tile shape for a Widget's render kind: the KPI number, a grid, or (everything else) a chart. */
+/** The tile shape for a Widget's render kind: the KPI number (plain or with its trend), a grid, or (everything
+ *  else) a chart. */
 export function tileShapeOf(render: VizRender | undefined): TileShape {
-    if (render?.kind === 'component' && render.componentKey === 'kpi') return 'kpi';
+    if (render?.kind === 'component' && (render.componentKey === 'kpi' || render.componentKey === 'kpi-trend'))
+        return 'kpi';
     return render?.kind === 'aggrid' ? 'table' : 'chart';
 }

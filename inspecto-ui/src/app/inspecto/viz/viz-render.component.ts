@@ -13,12 +13,18 @@ import { targetStatus } from './target-status';
 import { CHART_CATEGORICAL, CHART_PALETTES, CHART_TONE, GAUGE_TRACK } from 'app/inspecto/theme/chart-tokens';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { KpiComponent, KpiMode } from './plugins/kpi.component';
+import { KpiTrendComponent } from './plugins/kpi-trend.component';
+import { ProgressListComponent } from './plugins/progress-list.component';
 import { getVizComponentLoader } from './viz-components';
 import { VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
 
 /** componentKey → Angular component, for plugins that render via the escape hatch (`render.kind:'component'`).
  *  Only lightweight components belong here — heavy hosts register an async loader instead (`viz-components.ts`). */
-const COMPONENT_BY_KEY: Record<string, Type<unknown>> = { kpi: KpiComponent };
+const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
+    kpi: KpiComponent,
+    'kpi-trend': KpiTrendComponent,
+    'progress-list': ProgressListComponent,
+};
 
 /**
  * Render host — dispatches a {@link VizPlugin}'s `render.kind` to the right shared surface: `chartjs` →
@@ -77,8 +83,9 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = { kpi: KpiComponent };
             }
             @case ('component') {
                 @if (outletComponent(); as cmp) {
-                    <!-- UIE-1: a KPI is a number, not a canvas - it gets a compact box; maps and graphs keep h-64. -->
-                    <div [class.h-36]="isKpi()" [class.h-64]="!isKpi()">
+                    <!-- UIE-1: a KPI (and a KPI trend) is a number, not a canvas - it gets a compact box; a progress
+                         list is as tall as its rows; maps and graphs keep h-64. -->
+                    <div [class.h-36]="outletBox() === 'compact'" [class.h-64]="outletBox() === 'fixed'">
                         <ng-container *ngComponentOutlet="cmp; inputs: outletInputs()" />
                     </div>
                 }
@@ -121,10 +128,16 @@ export class VizRenderComponent {
         return targetStatus(this.props().value ?? 0, o?.kpi?.target, o?.kpi?.better ?? 'higher', o?.format);
     });
 
-    readonly isKpi = computed(() => {
+    /** The outlet's box: compact for the KPI tiles, the content's own height for a progress list, else h-64. */
+    readonly outletBox = computed<'compact' | 'auto' | 'fixed'>(() => {
         const r = this.plugin().render;
-        return r.kind === 'component' && r.componentKey === 'kpi';
+        const key = r.kind === 'component' ? r.componentKey : '';
+        return key === 'kpi' || key === 'kpi-trend' ? 'compact' : key === 'progress-list' ? 'auto' : 'fixed';
     });
+
+    /** The drill-down callback a component-render plugin (the progress list) calls with a row's label. Stable, so
+     *  the outlet's inputs do not change identity on every run. */
+    private readonly emitCategory = (label: string): void => this.categoryClick.emit(label);
 
     /** A lazily-loaded component-render host (from a registered loader), once its import resolves. */
     private readonly loadedComponent = signal<Type<unknown> | null>(null);
@@ -343,9 +356,29 @@ export class VizRenderComponent {
         return cols?.length ? tableColDefs(cols, this.renderOptions()) : undefined;
     });
 
-    /** Inputs for the outlet component — the KPI's value/label, or a view-bound wrapper's saved-view id. */
+    /** Inputs for the outlet component — the KPI's value/label, the KPI trend's / progress list's series, or a
+     *  view-bound wrapper's saved-view id. */
     readonly outletInputs = computed<Record<string, unknown>>(() => {
         const r = this.plugin().render;
+        const o = this.renderOptions();
+        if (r.kind === 'component' && (r.componentKey === 'kpi-trend' || r.componentKey === 'progress-list')) {
+            const series = {
+                labels: this.props().labels,
+                values: this.props().series[0]?.data ?? [],
+                format: o?.format,
+                target: o?.kpi?.target,
+                better: o?.kpi?.better ?? 'higher',
+            };
+            return r.componentKey === 'kpi-trend'
+                ? { ...series, compareBack: o?.trend?.compareBack }
+                : {
+                      ...series,
+                      limit: o?.progress?.limit ?? o?.limit,
+                      sort: o?.sort,
+                      max: o?.progress?.max,
+                      select: this.emitCategory,
+                  };
+        }
         return r.kind === 'component' && r.componentKey === 'kpi'
             ? {
                   value: this.props().value ?? 0,

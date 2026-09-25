@@ -611,6 +611,77 @@
             ><code>{{ snippets.chartTheme }}</code></pre>
         </section>
 
+        <!-- ── More visualization types ─────────────────────────────────────────────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">More visualization types</h2>
+                <button mat-stroked-button (click)="copy(moreVizSnippet)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+
+            <!-- KPI trend (vizType: kpi-trend) -->
+            <h3 class="mb-1 text-base font-semibold">KPI trend</h3>
+            <p class="text-secondary mb-3 text-sm">
+                <code>kpi-trend</code> — channels <code>x</code> (time) + <code>value</code>. The headline is the LAST
+                point; the delta compares it with the point <code>options.trend.compareBack</code> steps earlier
+                (default 1) in the KPI tile's wording (<code>kpiDelta()</code>, shared with <code>kpi</code>); the
+                target is <code>options.kpi</code>. The sparkline is SVG in <code>--gamma-primary</code>, with an
+                <code>aria-label</code> stating low / high / latest. Sized for a quarter-width tile.
+            </p>
+            <div class="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <inspecto-tile-card title="Leakage rate, last 12 months">
+                    <div class="h-36">
+                        <inspecto-kpi-trend
+                            [labels]="trendMonths"
+                            [values]="trendLeakage"
+                            [format]="{ style: 'percent' }"
+                            [target]="1.5"
+                            better="lower"
+                        />
+                    </div>
+                </inspecto-tile-card>
+                <inspecto-tile-card title="Open Cases, month end">
+                    <div class="h-36">
+                        <inspecto-kpi-trend [labels]="trendMonths" [values]="trendCases" better="lower" />
+                    </div>
+                </inspecto-tile-card>
+            </div>
+
+            <!-- Progress list (vizType: progress-list) -->
+            <h3 class="mb-1 text-base font-semibold">Progress list</h3>
+            <p class="text-secondary mb-3 text-sm">
+                <code>progress-list</code> — channels <code>x</code> (label) + <code>y</code> (measure). Ranked largest
+                first (<code>options.sort</code>), top <code>options.progress.limit</code> (else <code>limit</code>,
+                else 10) with a "+N more" footer; bars are a share of <code>options.progress.max</code> or the largest
+                value. With <code>options.kpi.target</code> each bar gets a target tick and a good / bad tone, and the
+                footer counts rows on target. An <code>&lt;ol&gt;</code>, not a canvas; in a Widget each row is a button
+                that drills into its label (click one here).
+            </p>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <inspecto-tile-card title="Top detectors by Alerts">
+                    <inspecto-progress-list
+                        [labels]="progressDetectors"
+                        [values]="progressAlerts"
+                        [select]="progressDemoSelect"
+                    />
+                </inspecto-tile-card>
+                <inspecto-tile-card title="Controls by pass rate vs 95 % target">
+                    <inspecto-progress-list
+                        [labels]="progressControls"
+                        [values]="progressPassRate"
+                        [format]="{ style: 'percent', decimals: 1 }"
+                        [target]="95"
+                        [max]="100"
+                    />
+                </inspecto-tile-card>
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ moreVizSnippet }}</code></pre>
+        </section>
+
         <!-- ── Graph hosts (AntV G6) ────────────────────────────────────────────────────── -->
         <section>
             <h2 class="mb-3 text-xl font-semibold">Graph hosts (AntV G6)</h2>
