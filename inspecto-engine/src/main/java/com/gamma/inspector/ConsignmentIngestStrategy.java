@@ -710,7 +710,7 @@ interface ConsignmentIngestStrategy {
      * matching no file is an error in DuckDB).
      */
     private static String existingStoreReader(String dbDir, String format) {
-        String fmt = (format == null || format.isBlank()) ? "CSV" : format.toUpperCase(java.util.Locale.ROOT);
+        String fmt = (format == null || format.isBlank()) ? "PARQUET" : format.toUpperCase(java.util.Locale.ROOT);
         String ext = com.gamma.sql.SqlViews.ext(fmt);
         java.nio.file.Path root = Paths.get(dbDir);
         if (!java.nio.file.Files.isDirectory(root)) return null;

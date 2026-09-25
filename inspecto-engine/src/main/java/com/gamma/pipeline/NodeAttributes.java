@@ -251,13 +251,14 @@ public final class NodeAttributes {
     /**
      * The {@code output:} block, shared by all three sink kinds and Onboarding's Dataset & Go-live stage —
      * the kind is the materialisation behaviour, not a different config shape. The {@code format} default
-     * is the ENGINE's absent-key behaviour (CSV, the {@code PartitionWriter} default), not a UX suggestion:
-     * a surface wanting to suggest Parquet seeds it via the form's initial values, never by forking this.
+     * is the ENGINE's absent-key behaviour (PARQUET, {@code PipelineConfigParser}'s default), not a UX
+     * suggestion: a surface wanting to suggest another format seeds it via the form's initial values, never
+     * by forking this.
      */
     public static final List<NodeAttribute> OUTPUT = List.of(
-            NodeAttribute.of("format", "Output format", "select", "required").required(false).defaultValue("CSV")
+            NodeAttribute.of("format", "Output format", "select", "required").required(false).defaultValue("PARQUET")
                     .options("CSV", "CSV", "PARQUET", "Parquet")
-                    .help("Stage-1 output file format; absent = CSV (the engine default)."),
+                    .help("Stage-1 output file format; absent = Parquet (the engine default). A CSV store is text: it reads back VARCHAR whatever the schema declares."),
             NodeAttribute.of("compression", "Compression", "string", "optional").placeholder("snappy")
                     .help("Codec for the output (e.g. snappy / zstd / gzip); blank = format default."),
             NodeAttribute.of("filename_column", "Source filename column", "identifier", "advanced")

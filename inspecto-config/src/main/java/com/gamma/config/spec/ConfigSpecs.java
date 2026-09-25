@@ -359,7 +359,7 @@ public final class ConfigSpecs {
                         FieldType.LONG, 5_000_000L,
                         "Rows per generation flush in generation mode; bounds scratch per generation."),
                 FieldSpec.enumField("output.format", "Output format",
-                        List.of("CSV", "PARQUET"), "CSV", "Stage-1 output file format."),
+                        List.of("CSV", "PARQUET"), "PARQUET", "Stage-1 output file format (absent = PARQUET, which keeps the declared types; a CSV store reads back as text)."),
                 FieldSpec.of("output.compression", "Output compression", FieldType.STRING,
                         "Codec for the output (e.g. snappy); blank = format default."),
                 FieldSpec.of("output.filename_column", "Source filename column", FieldType.STRING,

@@ -84,11 +84,31 @@ input; the rest of this section details each block.
 | **Fixed-width text** (column-positional records, one record per line) | built-in (native `read_csv`+`substring`) | `frontend: fixedwidth` + a `fixedwidth:` block (inline or in a `*.grammar.toon`) + a `schema_file` | `record: line`, `trim`, `min_record_length`, `fields[]{name,start,length}` |
 | **Binary / proprietary / multi-event-type** (CDR blobs, fixed-length binary, anything one parser splits into several record types) | [plugin](../engine/plugins.md#plugin-ingester) | `processing.ingester` + `processing.segments` + optional `processing.ingester_config` | `ingester` (FQCN), per-segment schema files, free-form `ingester_config` map for format-specific settings (`record_length`, `byte_order`, …) |
 
-Common to **all** formats: `dirs.*`, `output.format` (`CSV`/`PARQUET`),
+Common to **all** formats: `dirs.*`, `output.format` (`PARQUET`/`CSV`; **absent = `PARQUET`** since
+2026-09-25 — see *Output format and stored types* below),
 `collector.consignment.*` (legacy `processing.batch.*`), `processing.threads`, the `partitions[]` declaration in
 each schema, and the audit/manifest machinery. Format-specific blocks only
 cover *how the bytes become rows* — once rows exist, the M..N partition-and-write
 path is identical regardless of source format.
+
+### Output format and stored types
+
+A declared type survives to rest **only in a Parquet store**. A CSV store is text: every reader of one
+(`SqlViews` → `read_csv(…, all_varchar=true)`, used by `POST /db/query`, `GET /db/table`, Datasets and the
+at-rest Steps) gets `VARCHAR` back, whatever `raw.fields` or a sibling `_structure.csv` declared — and a
+typed value was already rendered as text on the way out (`42.10` → DOUBLE → `"42.1"`).
+
+🔴 Found driving the UI 2026-09-25: a Pipeline authored in the editor (`web_orders`: a Structure CSV
+declaring BIGINT/DATE/DOUBLE, a keep-only Record Transformer slot, a `sink.persistent` with no format)
+ran SUCCESS and `/db/query` answered `typeof(...) = VARCHAR` for every column. Neither the parse, nor
+`keep`, nor the `/db/query` path dropped the type: the write did, because an absent `output.format`
+defaulted to **CSV** (`PipelineConfig.Builder.outputFormat` and `PipelineConfigParser.parseOutputAndSinks`).
+The default is now **PARQUET** in the engine, in `ConfigSpecs` and in the served `NodeAttributes.OUTPUT`
+table (and the SPA's `OUTPUT_ATTRIBUTES` mirror). An explicit `format: CSV` is unchanged and still
+stores text, deliberately — it is the hand-off format. Every shipped Pipeline declares its format, so
+only configs that omitted it change. Pinned by `TypedOutputThroughRecordTransformerTest` (engine: the
+stored Parquet's types) and `ControlApiDbQueryTypedOutputTest` (the same run read back over real HTTP);
+a declared `VARCHAR` field stays `VARCHAR` in both.
 
 ### How a source becomes partitioned output (the transform model)
 

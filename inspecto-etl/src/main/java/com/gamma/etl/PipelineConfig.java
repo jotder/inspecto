@@ -2180,7 +2180,7 @@ public final class PipelineConfig {
         Parquet      parquet;             // null unless frontend: parquet
         TextRegex    textRegex;           // null unless frontend: text_regex
         Collector    collector;          // the parsed collector: block (parser always sets it)
-        String outputFormat  = "CSV";
+        String outputFormat  = "PARQUET";   // absent output.format: Parquet keeps the declared types; CSV reads back as text
         String compression;
         Map<String, Object> duckLakeCfg;
         /** Explicit {@code sinks:} destinations; empty ⇒ synthesise the single-{@code output:} shorthand. */

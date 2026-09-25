@@ -49,7 +49,7 @@ public final class ReferenceReader {
             throw new IllegalArgumentException("reference '" + r.name() + "' binds ref: '" + r.ref()
                     + "' but that pipeline does not declare 'produces: reference'");
         String format = (p.output() == null || p.output().format() == null)
-                ? "CSV" : p.output().format().toUpperCase(Locale.ROOT);
+                ? "PARQUET" : p.output().format().toUpperCase(Locale.ROOT);
         String glob = p.dirs().database() + "/**/*." + SqlViews.ext(format);
         String reader = SqlViews.reader(format, glob, true);
         // Reference Phase-2 P1/P2: an `upsert`/`scd2` reference store is append-only (a version row per

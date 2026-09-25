@@ -935,7 +935,7 @@ final class PipelineConfigParser {
         // ── output ────────────────────────────────────────────────────────────
         Map<String, Object> out = castMapAt(raw, "output");
         if (out != null) {
-            b.outputFormat = String.valueOf(out.getOrDefault("format", "CSV")).toUpperCase();
+            b.outputFormat = String.valueOf(out.getOrDefault("format", "PARQUET")).toUpperCase();
             b.compression  = (String) out.get("compression");
             b.duckLakeCfg  = duckLakeDataPath(castMapAt(out, "ducklake"), configDir, "output.ducklake.data_path");
             // B4: source-filename lineage as an output-row column. Validated as an identifier here;

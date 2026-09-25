@@ -42,11 +42,12 @@ class PipelineConfigSinksTest {
     }
 
     @Test
-    void noOutputBlockStillSynthesisesTheDefaultCsvSink() throws Exception {
+    void noOutputBlockStillSynthesisesTheDefaultParquetSink() throws Exception {
         PipelineConfig cfg = PipelineConfig.fromMap(base());
 
         assertEquals(1, cfg.sinks().size());
-        assertEquals("CSV", cfg.sinks().get(0).format(), "output.format default is CSV");
+        assertEquals("PARQUET", cfg.sinks().get(0).format(),
+                "output.format default is PARQUET — a CSV store reads back VARCHAR, losing every declared type");
         assertEquals(cfg.dirs().database(), cfg.sinks().get(0).database());
     }
 
@@ -119,7 +120,7 @@ class PipelineConfigSinksTest {
         m.put("sinks", List.of(Map.of("database", "out_hot")));
 
         PipelineConfig.Sink s = PipelineConfig.fromMap(m).sinks().get(0);
-        assertEquals("CSV", s.format());
+        assertEquals("PARQUET", s.format());
         assertNull(s.compression());
     }
 

@@ -415,7 +415,7 @@ but execute only when a `route:` pairs them.
 | Key | Type | Tier | Default | What it does |
 |---|---|---|---|---|
 | `database` | string | required | — | **Database directory.** Directory where committed batches land. The pipeline's primary sink must set this; a quarantine sink writes unmatched files to 'dir' instead. |
-| `format` | select (CSV · PARQUET) | required | `CSV` | **Output format.** Stage-1 output file format; absent = CSV (the engine default). |
+| `format` | select (CSV · PARQUET) | required | `PARQUET` | **Output format.** Stage-1 output file format; absent = Parquet (the engine default). A CSV store is text: it reads back VARCHAR whatever the schema declares. |
 | `compression` | string | optional | — | **Compression.** Codec for the output (e.g. snappy / zstd / gzip); blank = format default. |
 | `filename_column` | identifier | advanced | — | **Source filename column.** Adds a column of this name carrying each row’s source file. New pipelines default to file_name; blank = no column (lineage stays in the ledger only). |
 | `priority` | number | advanced | — | **Priority.** Share weight (1-3) for this pipeline's consignments when execution slots are contended: 3 gets ~3x the throughput share of 1. Shares, never precedence — a priority-1 pipeline always keeps making progress. Blank = 1. |
