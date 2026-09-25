@@ -123,6 +123,11 @@ export interface Reconciliation extends ReconciliationConfig {
     raw?: Record<string, unknown>;
 }
 
+/** The readable title of a Reconciliation — its business description, else its name, else its id (UIE-10, R2-16). */
+export function reconciliationTitle(r: Pick<Reconciliation, 'id' | 'name' | 'description'>): string {
+    return r.description?.trim() || r.name?.trim() || r.id;
+}
+
 export interface ReconSummary {
     leftRows: number;
     rightRows: number;

@@ -3,13 +3,19 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { Router } from '@angular/router';
-import { ColDef } from 'ag-grid-community';
+import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { escapeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
-import { buildReconciliation, Reconciliation, ReconciliationsService } from 'app/inspecto/reconciliation';
+import {
+    buildReconciliation,
+    Reconciliation,
+    reconciliationTitle,
+    ReconciliationsService,
+} from 'app/inspecto/reconciliation';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
@@ -40,7 +46,24 @@ export class ReconciliationsComponent implements OnInit {
     readonly loading = signal(false);
 
     readonly columns: ColDef<Reconciliation>[] = [
-        { field: 'name', headerName: 'Reconciliation', flex: 1 },
+        {
+            // R2-16: the readable title leads (sorted on it); the id follows as secondary text, and the quick
+            // search matches either.
+            field: 'name',
+            headerName: 'Reconciliation',
+            flex: 2,
+            valueGetter: (p) => (p.data ? reconciliationTitle(p.data) : ''),
+            getQuickFilterText: (p) => (p.data ? `${reconciliationTitle(p.data)} ${p.data.id}` : ''),
+            cellRenderer: (p: ICellRendererParams<Reconciliation>) => {
+                if (!p.data) return '';
+                const title = reconciliationTitle(p.data);
+                const id =
+                    title === p.data.id
+                        ? ''
+                        : `<span class="text-secondary ml-2 font-mono text-xs">${escapeHtml(p.data.id)}</span>`;
+                return `<span>${escapeHtml(title)}</span>${id}`;
+            },
+        },
         { field: 'leftDataset', headerName: 'Left', flex: 1 },
         { field: 'rightDataset', headerName: 'Right', flex: 1 },
         { headerName: 'Keys', width: 140, valueGetter: (p) => (p.data?.keyColumns ?? []).join(', ') },

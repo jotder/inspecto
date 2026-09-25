@@ -48,6 +48,36 @@ describe('ReconciliationsComponent', () => {
         expect(create([]).fixture.nativeElement.textContent).toContain('No reconciliations yet');
     });
 
+    // R2-16: the list led with the id (`ra_c02_offer_fee`); it now leads with the business title — the same one
+    // the Breaks page shows — with the id as secondary text, sorted by title and searchable by either.
+    it('titles each row by its description, with the id as secondary text', async () => {
+        const offerFee: Reconciliation = {
+            ...RECON,
+            id: 'ra_c02_offer_fee',
+            name: 'ra_c02_offer_fee',
+            description: 'Offer fee billed: CRM vs CBS (daily, 0.01 SAR tolerance)',
+        };
+        const { fixture } = create([offerFee, RECON]);
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const cells = Array.from(
+            fixture.nativeElement.querySelectorAll('.ag-center-cols-container .ag-cell[col-id="name"]'),
+        ) as HTMLElement[];
+        const texts = cells.map((c) => c.textContent?.trim());
+        expect(texts).toContain('Offer fee billed: CRM vs CBS (daily, 0.01 SAR tolerance)ra_c02_offer_fee');
+        // A recon without a description falls back to its name, with its (different) id alongside.
+        expect(texts).toContain('switch vs billingswitch_vs_billing');
+
+        const col = fixture.componentInstance.columns[0];
+        const params = (data: Reconciliation) => ({ data }) as never;
+        expect((col.valueGetter as (p: never) => string)(params(offerFee))).toBe(
+            'Offer fee billed: CRM vs CBS (daily, 0.01 SAR tolerance)',
+        );
+        expect(col.getQuickFilterText!(params(offerFee))).toBe(
+            'Offer fee billed: CRM vs CBS (daily, 0.01 SAR tolerance) ra_c02_offer_fee',
+        );
+    });
+
     it('renders with no a11y violations', async () => {
         await expectNoA11yViolations(create().fixture.nativeElement);
     });
