@@ -183,6 +183,9 @@ export interface VizRenderOptions {
     rowLink?: RowLink;
     /** Treemap only: how many level-1 groups to draw before the rest fold into one "Other" (default 20). */
     treemap?: { limit?: number };
+    /** Gauge only: the scale the arc spans (default 0 and 100, each on its own). `min >= max` is invalid — the Gauge falls
+     *  back to 0–100. The value and target are clamped onto the arc; their text still states the real numbers. */
+    gauge?: { min?: number; max?: number };
     /** Heatmap only: the colour scale (`sequential` default, `diverging` around `midpoint`, `status` by tone). */
     heatmap?: HeatmapOptions;
 }

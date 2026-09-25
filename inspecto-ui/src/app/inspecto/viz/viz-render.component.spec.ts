@@ -2,7 +2,7 @@ import { Component, input, ChangeDetectionStrategy } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { of } from 'rxjs';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -293,6 +293,61 @@ describe('VizRenderComponent', () => {
         fixture.componentRef.setInput('renderOptions', { kpi: { target: 20 } });
         expect(c.chartData()?.datasets[1]?.backgroundColor).toEqual([CHART_TONE.error, CHART_TONE.success]);
         expect(c.gaugeTarget()?.met).toBe(true);
+    });
+
+    it('a gauge draws on its own scale: the fill and the target zones split on (x − min) / (max − min)', () => {
+        const fixture = create(GAUGE_PLUGIN, { labels: [], series: [], value: 250 });
+        fixture.componentRef.setInput('renderOptions', { gauge: { min: 0, max: 500 }, kpi: { target: 400 } });
+        const c = fixture.componentInstance;
+        expect(c.chartData()?.datasets[0].data).toEqual([50, 50]);
+        expect(c.chartData()?.datasets[1].data).toEqual([80, 20]);
+        // A target beyond the scale pins its zone split to the end; the line still states the real target.
+        fixture.componentRef.setInput('renderOptions', { gauge: { min: 0, max: 500 }, kpi: { target: 900 } });
+        expect(c.chartData()?.datasets[1].data).toEqual([100, 0]);
+        expect(c.gaugeTarget()?.text).toBe('Target 900 — below target');
+    });
+
+    it('a gauge prints its scale ends under the arc in the widget format, and its canvas names the range', async () => {
+        const fixture = create(GAUGE_PLUGIN, { labels: [], series: [], value: 1250 });
+        fixture.componentRef.setInput('renderOptions', {
+            gauge: { min: 1000, max: 2000 },
+            format: { style: 'currency', currency: 'SAR' },
+        });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const min = el.querySelector('[data-testid="gauge-min"]')?.textContent?.trim();
+        const max = el.querySelector('[data-testid="gauge-max"]')?.textContent?.trim();
+        expect(min).toContain('1,000');
+        expect(max).toContain('2,000');
+        expect(fixture.componentInstance.chartData()?.datasets[0].data).toEqual([25, 75]);
+        const alt = el.querySelector('canvas')?.getAttribute('aria-label') ?? '';
+        expect(alt).toContain(`on a scale of ${min} to ${max}`);
+        await expectNoA11yViolations(el);
+    });
+
+    it('a gauge without options.gauge shows 0 and 100 as its ends', () => {
+        const fixture = create(GAUGE_PLUGIN, { labels: [], series: [], value: 42 });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="gauge-min"]')?.textContent?.trim()).toBe('0');
+        expect(el.querySelector('[data-testid="gauge-max"]')?.textContent?.trim()).toBe('100');
+        expect(el.querySelector('canvas')?.getAttribute('aria-label')).toBe('Gauge: 42 on a scale of 0 to 100.');
+    });
+
+    it('an invalid gauge scale (min >= max) draws on 0–100 and warns once', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+        try {
+            const fixture = create(GAUGE_PLUGIN, { labels: [], series: [], value: 42 });
+            fixture.componentRef.setInput('renderOptions', { gauge: { min: 50, max: 50 } });
+            const c = fixture.componentInstance;
+            expect(c.chartData()?.datasets[0].data).toEqual([42, 58]);
+            expect(c.gaugeEnds()).toEqual({ min: '0', max: '100' });
+            fixture.componentRef.setInput('renderOptions', { gauge: { min: 60, max: 10 } });
+            expect(c.chartData()?.datasets[0].data).toEqual([42, 58]);
+            expect(warn).toHaveBeenCalledTimes(1);
+        } finally {
+            warn.mockRestore();
+        }
     });
 
     it('reads ISO-date categories as calendar labels and keeps the full date for the tooltip title', () => {

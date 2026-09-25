@@ -91,6 +91,8 @@ export class WidgetOptionsDialog {
         format2Currency: this.data.format2?.currency ?? '',
         format2Compact: this.data.format2?.compact ?? false,
         format2Decimals: this.data.format2?.decimals ?? null,
+        gaugeMin: this.data.gauge?.min ?? null,
+        gaugeMax: this.data.gauge?.max ?? null,
     };
 
     save(): void {
@@ -200,6 +202,10 @@ export class WidgetOptionsDialog {
                 decimals: typeof v['format2Decimals'] === 'number' ? (v['format2Decimals'] as number) : undefined,
             };
             o.format2 = merge<NumberFormat>(undefined, format2);
+        }
+        if ('gaugeMin' in v) {
+            const num = (x: unknown) => (typeof x === 'number' ? x : undefined);
+            o.gauge = merge(o.gauge, { min: num(v['gaugeMin']), max: num(v['gaugeMax']) });
         }
     }
 }

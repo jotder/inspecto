@@ -279,6 +279,9 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
         min: 0,
         group: 'Right axis format',
     },
+    // Gauge: the scale the arc spans (`options.gauge`); a blank end keeps its default (0 / 100) and writes nothing.
+    { key: 'gaugeMin', label: 'Gauge: minimum', type: 'number', tier: 'required', required: false, placeholder: '0' },
+    { key: 'gaugeMax', label: 'Gauge: maximum', type: 'number', tier: 'required', required: false, placeholder: '100' },
 ];
 
 /**
@@ -293,5 +296,7 @@ export const WIDGET_OPTION_VIZ_TYPES: Record<string, string> = {
     format2Currency: 'combo',
     format2Compact: 'combo',
     format2Decimals: 'combo',
+    gaugeMin: 'gauge',
+    gaugeMax: 'gauge',
 };
 // ── end per-Visualization-Type options ──────────────────────────────────────────────────────────────────────

@@ -654,8 +654,13 @@ src/app/
   `<table>` coloured by `options.heatmap.scale` — `sequential` / `diverging` (`midpoint`) as `rgba(var(--gamma-primary|warn-rgb), a)`
   ramps, `status` via `statusBadgeClasses()` (numbers vs `options.kpi.target`); a cell click drills on its row AND its column:
   viz-render's `(cellClick)` → widget-host's `onCellClick` emits ONE `DrillEvent` whose `and` carries the column pair,
-  and `DashboardViewStore.onDrill` toggles every pair as a unit (all present ⇒ remove all, else add the missing ones;
-  other conditions untouched — a second cell adds beside the first, like a second bar click).
+  and `DashboardViewStore.onDrill` toggles the pair as a unit (all present ⇒ remove both; otherwise the pair REPLACES any `=` condition on
+  those fields, so another cell moves the selection; other conditions untouched).
+- **Gauge (`vizType: gauge`) scale → `viz/gauge-scale.ts`** (2026-09-25). The arc spans `options.gauge.min`–`max`
+  (default 0–100, each end on its own); `gaugeFill` = `(x − min) / (max − min)` clamped, for the value AND the
+  `kpi.target` zone split — the value label and target line still state the real numbers. `min >= max` draws on 0–100
+  and dev-warns once. The ends print under the arc in `options.format`, and the canvas `aria-label` names the range.
+  The cog dialog offers *Gauge: minimum / maximum* for a Gauge only (`WIDGET_OPTION_VIZ_TYPES`); a blank end writes nothing.
 - **ag-Grid theme → only** `InspectoGridThemeService` / `GAMMA_GRID_PARAMS`. Never bare `themeQuartz`.
 - Editing the theming plugin (`@gamma/tailwind/plugins/theming.js`) does **not** hot-reload — restart the
   dev server and verify via `getComputedStyle(body).getPropertyValue('--gamma-…')`.

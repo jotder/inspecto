@@ -141,6 +141,30 @@ describe('WidgetOptionsDialog', () => {
         expect(reset.combo).toBeUndefined();
     });
 
+    // ── Gauge scale ──
+    it('offers the Gauge scale only for a Gauge, round-trips it, and a blank end writes nothing', () => {
+        const { fixture, c, ref } = create({ gauge: { min: 0, max: 500 } }, 'gauge');
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('Gauge: minimum');
+        expect(text).toContain('Gauge: maximum');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).gauge).toEqual({ min: 0, max: 500 });
+        c.schemaForm.form.patchValue({ gaugeMin: null });
+        c.save();
+        expect((ref.close.mock.calls[1][0] as WidgetOptions).gauge).toEqual({ max: 500 });
+        c.schemaForm.form.patchValue({ gaugeMax: null });
+        c.save();
+        expect((ref.close.mock.calls[2][0] as WidgetOptions).gauge).toBeUndefined();
+    });
+
+    it('hides the Gauge scale for other types and keeps a stored one as-is', () => {
+        const { fixture, c, ref } = create({ gauge: { max: 10 } }, 'bar');
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Gauge: minimum');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).gauge).toEqual({ max: 10 });
+    });
+    // ── end Gauge scale ──
+
     it('renders with no a11y violations', async () => {
         const { fixture } = create({});
         await expectNoA11yViolations(fixture.nativeElement);

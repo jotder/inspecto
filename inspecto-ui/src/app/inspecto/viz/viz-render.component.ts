@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, Type, computed, effect, input, output, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    Type,
+    computed,
+    effect,
+    input,
+    isDevMode,
+    output,
+    signal,
+} from '@angular/core';
 import { NgComponentOutlet } from '@angular/common';
 import { ColDef } from 'ag-grid-community';
 import { ChartData, ChartOptions, ChartType } from 'chart.js';
@@ -10,6 +20,7 @@ import { formatAxisTick, formatNumber } from './number-format';
 import { seriesColors } from './series-colors';
 import { dateAxisLabels, fullDateLabel } from './date-labels';
 import { targetStatus } from './target-status';
+import { gaugeFill, gaugeScale } from './gauge-scale';
 import { CHART_CATEGORICAL, CHART_PALETTES, CHART_TONE, GAUGE_TRACK } from 'app/inspecto/theme/chart-tokens';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { KpiComponent, KpiMode } from './plugins/kpi.component';
@@ -63,6 +74,7 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
                                 [type]="chartType()"
                                 [data]="data"
                                 [options]="chartJsOptions()"
+                                [ariaLabel]="gaugeAriaLabel()"
                             />
                             <div
                                 class="pointer-events-none absolute inset-x-0 bottom-0 text-center text-3xl font-extrabold tabular-nums leading-none"
@@ -70,6 +82,15 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
                             >
                                 {{ gaugeDisplay() }}
                             </div>
+                        </div>
+                        <!-- The scale's ends, under the arc's ends (the arc is at most twice the canvas height wide). -->
+                        <div
+                            class="text-secondary mx-auto mt-1 flex max-w-xs justify-between text-xs tabular-nums"
+                            data-testid="gauge-range"
+                            aria-hidden="true"
+                        >
+                            <span data-testid="gauge-min">{{ gaugeEnds().min }}</span>
+                            <span data-testid="gauge-max">{{ gaugeEnds().max }}</span>
                         </div>
                     }
                     @if (gaugeTarget(); as t) {
@@ -155,7 +176,36 @@ export class VizRenderComponent {
 
     readonly isGauge = computed(() => this.plugin().meta.type === 'gauge');
 
-    /** UIE-8: the gauge's value as a reader sees it — the widget's format, not the clamped 0–100 fill. */
+    /** The gauge's scale (`options.gauge`, default 0–100). An invalid range (`min >= max`) draws on 0–100 and warns
+     *  once per gauge in dev, so an author sees why their scale was ignored. */
+    readonly gaugeRange = computed(() => {
+        const s = gaugeScale(this.renderOptions()?.gauge);
+        if (s.invalid && !this.warnedInvalidScale && isDevMode()) {
+            this.warnedInvalidScale = true;
+            console.warn(
+                'Gauge: options.gauge needs min < max; drawing on 0–100 instead.',
+                this.renderOptions()?.gauge,
+            );
+        }
+        return s;
+    });
+    private warnedInvalidScale = false;
+
+    /** The scale's end labels, in the widget's format. */
+    readonly gaugeEnds = computed(() => {
+        const { min, max } = this.gaugeRange();
+        const fmt = this.renderOptions()?.format;
+        return { min: formatNumber(min, fmt), max: formatNumber(max, fmt) };
+    });
+
+    /** The canvas's text alternative: the value on its scale (and the target line, when there is one). */
+    readonly gaugeAriaLabel = computed(() => {
+        const { min, max } = this.gaugeEnds();
+        const t = this.gaugeTarget();
+        return `Gauge: ${this.gaugeDisplay()} on a scale of ${min} to ${max}.${t ? ` ${t.text}.` : ''}`;
+    });
+
+    /** UIE-8: the gauge's value as a reader sees it — the widget's format, not the clamped fill. */
     readonly gaugeDisplay = computed(() => formatNumber(this.props().value as number, this.renderOptions()?.format));
 
     /** UIE-8: the gauge's target (`options.kpi`, the same option the KPI tile reads), stated in words. */
@@ -274,15 +324,16 @@ export class VizRenderComponent {
         const axisLabels = (dateAxisLabels(p.labels) ?? p.labels).map(categoryLabel);
 
         if (plugin.meta.type === 'gauge') {
-            const clamp = (n: number): number => Math.max(0, Math.min(100, n));
-            const value = clamp(this.props().value ?? 0);
+            // The arc in percent of its length on the widget's scale (`options.gauge`); out-of-range values pin to an end.
+            const scale = this.gaugeRange();
+            const value = gaugeFill(this.props().value ?? 0, scale);
             const valueRing = { data: [value, 100 - value], backgroundColor: [color(0), GAUGE_TRACK], weight: 3 };
             // UIE-8: with a target, a thin inner ring splits the scale into its bad and good zones at the target —
             // below it is bad when higher is better, good when lower is better. Status tones, never literals.
             const kpi = this.renderOptions()?.kpi;
             if (kpi?.target == null || !Number.isFinite(kpi.target))
                 return { labels: ['Value', 'Remaining'], datasets: [valueRing] };
-            const target = clamp(kpi.target);
+            const target = gaugeFill(kpi.target, scale);
             const [below, above] =
                 (kpi.better ?? 'higher') === 'higher'
                     ? [CHART_TONE.error, CHART_TONE.success]
