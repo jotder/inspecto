@@ -46,6 +46,20 @@ const recon = (breaks: ReconBreak[] = []): Reconciliation => ({
     lastRunAt: null,
 });
 
+/** A `/recon/rows` answer — the raw rows behind one key. */
+const ROWS = {
+    key: { msisdn: 'm9' },
+    a: { rows: [{ msisdn: 'm9', fee: 50 }], rowCount: 1, truncated: false },
+    b: {
+        rows: [
+            { msisdn: 'm9', fee: 50 },
+            { msisdn: 'm9', fee: 50 },
+        ],
+        rowCount: 2,
+        truncated: false,
+    },
+};
+
 async function create(
     opts: {
         path?: string;
@@ -57,6 +71,7 @@ async function create(
         right?: Record<string, unknown>[];
         /** A literal `/recon/breaks` payload instead of the offline mirror (which carries no `impact`). */
         sets?: ReconBreakSets;
+        rows?: ReturnType<typeof vi.fn>;
     } = {},
 ) {
     let current: Reconciliation = { ...recon(opts.breaks ?? []), ...opts.patch };
@@ -91,7 +106,7 @@ async function create(
                 useValue: { navigate: vi.fn(), createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY },
             },
             { provide: ReconciliationsService, useValue: { get: () => of(current), save } },
-            { provide: ReconExecService, useValue: { breaks } },
+            { provide: ReconExecService, useValue: { breaks, rows: opts.rows ?? vi.fn(async () => ROWS) } },
             { provide: ToastrService, useValue: toastr },
             { provide: ReconApiService, useValue: { promote, promoted } },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
@@ -461,6 +476,115 @@ describe('Breaks page for an analyst (UIE-10)', () => {
         const { fixture, c } = await create({ patch: { impact: { column: 'amount', currency: 'SAR' } } });
         c.select(c.valueBreaks()[0] as unknown as Record<string, unknown>);
         fixture.detectChanges();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('Duplicate keys — cardinality Breaks on the Breaks page', () => {
+    /** RA-C01's shape: one_to_one on msisdn, status compared, the fee carried; m9 is billed twice on B. */
+    const SUBS: Partial<Reconciliation> = {
+        id: 'ra_c01',
+        name: 'ra_c01',
+        leftDataset: 'hlr_subscribers',
+        rightDataset: 'cbs_subscribers',
+        keyColumns: ['msisdn'],
+        compareColumns: [{ column: 'active_flag', toleranceType: 'exact', tolerance: 0 }],
+        impact: { column: 'fee', currency: 'SAR' },
+        raw: { cardinality: 'one_to_one' },
+    };
+    const sets: ReconBreakSets = {
+        missing_right: {
+            rows: [{ key: { msisdn: 'm3' }, a: { active_flag: 1 }, impact: { a: 99, b: null } }],
+            rowCount: 1,
+            truncated: false,
+        },
+        value_break: {
+            // the duplicate also sums active_flag to 2 on B — the same key is a value break too
+            rows: [
+                {
+                    key: { msisdn: 'm9' },
+                    a: { active_flag: 1 },
+                    b: { active_flag: 2 },
+                    impact: { a: 50, b: 100 },
+                },
+            ],
+            rowCount: 1,
+            truncated: false,
+        },
+        cardinality_break: {
+            rows: [
+                {
+                    key: { msisdn: 'm9' },
+                    a: { active_flag: 1, __records: 1 },
+                    b: { active_flag: 2, __records: 2 },
+                    impact: { a: 50, b: 100 },
+                },
+            ],
+            rowCount: 1,
+            truncated: false,
+        },
+    };
+    const sar = (v: number) => formatNumber(v, { style: 'currency', currency: 'SAR' });
+    const el = (f: { nativeElement: unknown }) => f.nativeElement as HTMLElement;
+
+    it('maps the cardinality set into its own table with the records on each side', async () => {
+        const { fixture, c } = await create({ sets, patch: SUBS });
+        expect(c.duplicates().map((b) => b.key)).toEqual(['m9']);
+        expect(c.recordsText(c.duplicates()[0])).toBe('A 1 · B 2');
+        expect(c.duplicatedSideText(c.duplicates()[0])).toBe('B — cbs_subscribers');
+        expect(c.duplicateColumns().map((d) => d.headerName)).toEqual([
+            'Key',
+            'Repeated on',
+            'Records',
+            'Impact (SAR)',
+            'Status',
+        ]);
+        const section = el(fixture).querySelector('[data-testid="duplicate-keys"]');
+        expect(section, 'the Duplicate keys table renders').not.toBeNull();
+        expect(section!.textContent).toContain('Duplicate keys — one_to_one (1)');
+        expect(el(fixture).querySelector('[data-testid="duplicates-card"]')?.textContent).toContain('1');
+    });
+
+    it('prices a duplicate by its extra copies, separately from the value break at the same key', async () => {
+        const { c } = await create({ sets, patch: SUBS });
+        // B carries 100 summed over 2 records → one extra copy worth 50; the value break keeps the anchor's fee.
+        expect(c.impactText(c.duplicates()[0])).toBe(sar(50));
+        expect(c.impactText(c.valueBreaks()[0])).toBe(sar(50));
+        expect(c.impactText(c.missingA()[0])).toBe(sar(99));
+    });
+
+    it('offers Promote to Incident and the rows behind the key on a duplicate', async () => {
+        const { c, promote } = await create({ sets, patch: SUBS });
+        const dup = c.duplicates()[0];
+        const hints = c.duplicateActions.filter((a) => !a.visible || a.visible(dup)).map((a) => a.hint);
+        const text = hints.map((h) => (typeof h === 'function' ? h(dup) : h));
+        expect(text).toContain('Promote to Incident');
+        expect(text).toContain('Show the rows behind this break');
+        await c.promote(dup);
+        expect(promote).toHaveBeenCalledWith('ra_c01', 'm9', 'cardinality_break', null, null);
+    });
+
+    it('selecting a duplicate opens the rows behind it', async () => {
+        const rows = vi.fn(async () => ROWS);
+        const { fixture, c } = await create({ sets, patch: SUBS, rows });
+        c.select(c.duplicates()[0] as unknown as Record<string, unknown>);
+        await vi.waitFor(() => expect(c.breakRows()).not.toBeNull());
+        fixture.detectChanges();
+        expect(rows).toHaveBeenCalledWith(expect.anything(), { msisdn: 'm9' }, 'b');
+        expect(el(fixture).querySelector('[data-testid="break-rows"]')?.textContent).toContain('2 on');
+        expect(el(fixture).querySelector('[data-testid="selected-break"]')?.textContent).toContain('duplicate key');
+    });
+
+    it('hides the table and the card when the Reconciliation declares no cardinality', async () => {
+        const { fixture, c } = await create({ sets, patch: { ...SUBS, raw: { cardinality: 'many_to_many' } } });
+        expect(c.cardinality()).toBeNull();
+        expect(c.duplicates()).toEqual([]);
+        expect(el(fixture).querySelector('[data-testid="duplicate-keys"]')).toBeNull();
+        expect(el(fixture).querySelector('[data-testid="duplicates-card"]')).toBeNull();
+    });
+
+    it('renders the Duplicate keys table with no a11y violations', async () => {
+        const { fixture } = await create({ sets, patch: SUBS });
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });

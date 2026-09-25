@@ -89,6 +89,28 @@ export class ReconBoardComponent implements OnInit {
 
     readonly bands = computed(() => this.recon()?.bands ?? DEFAULT_BANDS);
 
+    /** The Breaks page's title rule (UIE-10): the business description, falling back to the name (a code). */
+    readonly title = computed(() => this.recon()?.description || this.recon()?.name || '');
+
+    /**
+     * Duplicate-key (cardinality Break) counts per compared side — present only when the server reports them,
+     * i.e. when the Reconciliation declares a cardinality. Per pair, because on a 3-way the duplicates can sit
+     * on C alone (RA-C01: CBS bills 4 MSISDNs twice) and the flat summary mirrors A↔B only.
+     */
+    readonly duplicateCounts = computed(() => {
+        const s = this.result()?.summary;
+        if (!s) return [];
+        const pairs = s.pairs?.length
+            ? s.pairs
+            : [{ side: 'b' as const, matchedKeys: s.matchedKeys, byType: s.byType }];
+        return pairs
+            .filter((p) => typeof p.byType.cardinality_break === 'number')
+            .map((p) => ({
+                label: pairs.length > 1 ? `duplicate keys A·${p.side.toUpperCase()}` : 'duplicate keys',
+                count: p.byType.cardinality_break!,
+            }));
+    });
+
     /**
      * Open breaks by age across the WHOLE reconciliation (`BREAK-AGING-1`) — the Board is the landing
      * page, so "how long has this been broken" belongs here as well as on the Breaks page. Same shared

@@ -24,10 +24,13 @@ import {
     breakImpacts,
     breaksFromSets,
     decodePath,
+    duplicateImpacts,
+    oneSides,
     openAgeBuckets,
     Reconciliation,
     ReconciliationsService,
     ReconBreak,
+    reconCardinality,
     resolveBreak,
 } from 'app/inspecto/reconciliation';
 import { ReconExecService } from './recon-exec.service';
@@ -133,6 +136,11 @@ export class ReconciliationDetailComponent implements OnInit {
     // ── UIE-10: monetary impact per Break ────────────────────────────────────────────────
     /** Break key → impact, from the last compute. Empty when the Reconciliation declares no impact. */
     private readonly impacts = signal<Readonly<Record<string, number>>>({});
+    /** Duplicate key → the value of its extra copies (see `duplicateImpacts`) — a separate map because the
+     *  same key can also carry a value break, whose impact is a different number. */
+    private readonly dupImpacts = signal<Readonly<Record<string, number>>>({});
+    private readonly impactOf = (b: ReconBreak): number | undefined =>
+        (b.type === 'cardinality_break' ? this.dupImpacts() : this.impacts())[b.key];
     private readonly impactFormat = computed<NumberFormat | null>(() => {
         const imp = this.recon()?.impact;
         return imp ? (imp.currency ? { style: 'currency', currency: imp.currency } : {}) : null;
@@ -144,7 +152,7 @@ export class ReconciliationDetailComponent implements OnInit {
     });
     readonly impactText = (b: ReconBreak): string => {
         const f = this.impactFormat();
-        const v = this.impacts()[b.key];
+        const v = this.impactOf(b);
         return f && v !== undefined ? formatNumber(v, f) : '—';
     };
     /** Sorted by the NUMBER, rendered through the shared formatter. */
@@ -156,7 +164,7 @@ export class ReconciliationDetailComponent implements OnInit {
                       colId: 'impact',
                       headerName: header,
                       width: 150,
-                      valueGetter: (p) => (p.data ? (this.impacts()[p.data.key] ?? null) : null),
+                      valueGetter: (p) => (p.data ? (this.impactOf(p.data) ?? null) : null),
                       valueFormatter: (p) => (p.data ? this.impactText(p.data) : '—'),
                   },
               ]
@@ -187,7 +195,10 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly breakLabel = breakLabel;
 
     select(row: Record<string, unknown>): void {
-        this.selectedId.set(breakId(row as unknown as ReconBreak));
+        const b = row as unknown as ReconBreak;
+        this.selectedId.set(breakId(b));
+        // A duplicate key's counts are a summary; selecting it opens the rows they summarise.
+        if (b.type === 'cardinality_break' && b.keyValues) void this.showRows(b);
     }
 
     clearSelection(): void {
@@ -214,6 +225,11 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly missingA = computed(() => this.drillBreaks().filter((b) => b.type === 'missing_right'));
     readonly missingB = computed(() => this.drillBreaks().filter((b) => b.type === 'missing_left'));
     readonly valueBreaks = computed(() => this.drillBreaks().filter((b) => b.type === 'value_break'));
+    /** Duplicate keys (cardinality Breaks) — shown only when the Reconciliation declares a cardinality. */
+    readonly cardinality = computed(() => reconCardinality(this.recon()));
+    readonly duplicates = computed(() =>
+        this.cardinality() ? this.drillBreaks().filter((b) => b.type === 'cardinality_break') : [],
+    );
     readonly resolvedCount = computed(() => this.drillBreaks().filter((b) => b.status === 'resolved').length);
 
     /** Aging histogram over the open breaks in this scope (`BREAK-AGING-1`); the rollup is shared. */
@@ -229,6 +245,51 @@ export class ReconciliationDetailComponent implements OnInit {
     /** Key + impact + status (+ actions) — the shape of the two missing-side tables. */
     readonly missingColumns = computed<ColDef<ReconBreak>[]>(() => [
         { field: 'key', headerName: 'Key', flex: 1 },
+        ...this.impactColumn(),
+        {
+            field: 'status',
+            headerName: 'Status',
+            width: 130,
+            cellRenderer: (p: ICellRendererParams<ReconBreak>) => statusBadgeHtml(p.value as string),
+        },
+    ]);
+
+    /** The compared side's letter — the rows carry roles a/b, but on a 3-way "A vs C" the compared side is C. */
+    private readonly sideLetter = computed(() => (this.side() === 'c' ? 'C' : 'B'));
+
+    /** `A 1 · C 2` — the record count per side at a duplicate key (the Break's evidence). */
+    readonly recordsText = (b: ReconBreak): string =>
+        `A ${fmtVal(b.leftValue)} · ${this.sideLetter()} ${fmtVal(b.rightValue)}`;
+
+    /** The "one" side(s) that repeat the key, e.g. `C — cbs_subscribers`. */
+    readonly duplicatedSideText = (b: ReconBreak): string => {
+        const card = this.cardinality();
+        if (!card) return '—';
+        const r = this.recon();
+        const names: string[] = [];
+        for (const s of oneSides(card)) {
+            const n = Number(s === 'a' ? b.leftValue : b.rightValue);
+            if (n > 1)
+                names.push(s === 'a' ? `A — ${r?.leftDataset ?? ''}` : `${this.sideLetter()} — ${this.sideDataset()}`);
+        }
+        return names.join(', ') || '—';
+    };
+
+    readonly duplicateColumns = computed<ColDef<ReconBreak>[]>(() => [
+        { field: 'key', headerName: 'Key', flex: 1 },
+        {
+            colId: 'duplicatedSide',
+            headerName: 'Repeated on',
+            flex: 1,
+            minWidth: 180,
+            valueGetter: (p) => (p.data ? this.duplicatedSideText(p.data) : ''),
+        },
+        {
+            colId: 'records',
+            headerName: 'Records',
+            width: 140,
+            valueGetter: (p) => (p.data ? this.recordsText(p.data) : ''),
+        },
         ...this.impactColumn(),
         {
             field: 'status',
@@ -292,6 +353,17 @@ export class ReconciliationDetailComponent implements OnInit {
             hint: () => 'Open the Incident for this Break',
             visible: (b) => !this.incidentsUnavailable() && !!this.incidentFor(b),
             onClick: (b) => this.openIncident(b),
+        },
+    ];
+
+    /** The Duplicate keys table's actions: the shared ones plus the rows behind the key. */
+    readonly duplicateActions: InspectoRowAction<ReconBreak>[] = [
+        ...this.rowActions,
+        {
+            icon: 'heroicons_outline:table-cells',
+            hint: () => 'Show the rows behind this break',
+            visible: (b) => !!b.keyValues,
+            onClick: (b) => this.showRows(b),
         },
     ];
 
@@ -504,10 +576,12 @@ export class ReconciliationDetailComponent implements OnInit {
             const sets = await this.exec.breaks(r, this.path(), null, this.side());
             this.liveBreaks.set(breaksFromSets(r, sets));
             this.impacts.set(breakImpacts(r, sets));
+            this.dupImpacts.set(duplicateImpacts(r, sets));
             this.lastEvaluated.set(new Date());
         } catch (e) {
             this.liveBreaks.set(null);
             this.impacts.set({});
+            this.dupImpacts.set({});
             this.toastr.error(apiErrorMessage(e, 'Could not compute the break sets'));
         } finally {
             this.computing.set(false);
@@ -596,7 +670,9 @@ function breakLabel(type: string): string {
           ? 'missing right'
           : type === 'value_break'
             ? 'value break'
-            : type;
+            : type === 'cardinality_break'
+              ? 'duplicate key'
+              : type;
 }
 /** `active_flag: 1 → 0` — one mismatched field of a value break, A side first. */
 export function fieldDiff(b: ReconBreak): string {

@@ -16,6 +16,9 @@ import {
     ReconRunResult,
     breaksFromSets,
     breakImpacts,
+    duplicateImpacts,
+    oneSides,
+    reconCardinality,
     ReconBreakSets,
 } from './recon-board';
 
@@ -406,5 +409,93 @@ describe('breakImpacts — a carried (non-compared) impact column (operator deci
     it('ignores carried values when the impact column IS compared — |A − B| of the compared values wins', () => {
         const compared = { ...STATUS, impact: { column: 'active_flag' } };
         expect(breakImpacts(compared, sets)).toEqual({ m3: 1, m5: 1, m2: 1, m4: 1, m6: 1 });
+    });
+});
+
+describe('duplicate keys — cardinality and the impact of the extra copies', () => {
+    const SUBS = {
+        keyColumns: ['msisdn'],
+        compareColumns: [{ column: 'active_flag', toleranceType: 'exact', tolerance: 0 } as CompareColumn],
+        impact: { column: 'fee', currency: 'SAR' },
+        raw: { cardinality: 'one_to_one' },
+    };
+    // m9: B bills it twice (fee 100 summed over 2 records); m8: A has it 3× (fee 30 summed), B 2× (fee 20).
+    const sets: ReconBreakSets = {
+        value_break: {
+            rows: [{ key: { msisdn: 'm9' }, a: { active_flag: 1 }, b: { active_flag: 2 }, impact: { a: 50, b: 100 } }],
+            rowCount: 1,
+            truncated: false,
+        },
+        cardinality_break: {
+            rows: [
+                {
+                    key: { msisdn: 'm9' },
+                    a: { [RECON_RECORDS]: 1 },
+                    b: { [RECON_RECORDS]: 2 },
+                    impact: { a: 50, b: 100 },
+                },
+                {
+                    key: { msisdn: 'm8' },
+                    a: { [RECON_RECORDS]: 3 },
+                    b: { [RECON_RECORDS]: 2 },
+                    impact: { a: 30, b: 20 },
+                },
+                {
+                    key: { msisdn: 'm7' },
+                    a: { [RECON_RECORDS]: 1 },
+                    b: { [RECON_RECORDS]: 2 },
+                    impact: { a: 5, b: null },
+                },
+            ],
+            rowCount: 3,
+            truncated: false,
+        },
+    };
+
+    it('reads a declared cardinality from the stored body; blank and many_to_many declare none', () => {
+        expect(reconCardinality({ raw: { cardinality: 'one_to_many' } })).toBe('one_to_many');
+        expect(reconCardinality({ raw: { cardinality: 'many_to_many' } })).toBeNull();
+        expect(reconCardinality({ raw: { cardinality: '' } })).toBeNull();
+        expect(reconCardinality({ raw: {} })).toBeNull();
+        expect(reconCardinality({})).toBeNull();
+        expect(oneSides('one_to_one')).toEqual(['a', 'b']);
+        expect(oneSides('one_to_many')).toEqual(['a']);
+        expect(oneSides('many_to_one')).toEqual(['b']);
+    });
+
+    it('prices a duplicate by its extra copies on the "one" sides, never an invented 0', () => {
+        // m9: 100 × 1/2 = 50 · m8: 30 × 2/3 + 20 × 1/2 = 30 · m7: B has no value → no entry
+        expect(duplicateImpacts(SUBS, sets)).toEqual({ m9: 50, m8: 30 });
+    });
+
+    it('counts nothing on a side the cardinality allows to repeat', () => {
+        expect(duplicateImpacts({ ...SUBS, raw: { cardinality: 'one_to_many' } }, sets)).toEqual({ m8: 20 });
+    });
+
+    it('uses the compared measure when the impact column is compared', () => {
+        const compared = { ...SUBS, impact: { column: 'active_flag' } };
+        const cs: ReconBreakSets = {
+            cardinality_break: {
+                rows: [
+                    {
+                        key: { msisdn: 'm9' },
+                        a: { active_flag: 1, [RECON_RECORDS]: 1 },
+                        b: { active_flag: 2, [RECON_RECORDS]: 2 },
+                    },
+                ],
+                rowCount: 1,
+                truncated: false,
+            },
+        };
+        expect(duplicateImpacts(compared, cs)).toEqual({ m9: 1 });
+    });
+
+    it('is empty with no impact or no cardinality', () => {
+        expect(duplicateImpacts({ ...SUBS, impact: undefined }, sets)).toEqual({});
+        expect(duplicateImpacts({ ...SUBS, raw: {} }, sets)).toEqual({});
+    });
+
+    it('breakImpacts leaves the cardinality set alone, so a value break at the same key keeps its own impact', () => {
+        expect(breakImpacts(SUBS, sets)).toEqual({ m9: 50 });
     });
 });

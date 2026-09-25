@@ -7,7 +7,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { aggregateRecon, Reconciliation, ReconciliationsService, reconBreakSets } from 'app/inspecto/reconciliation';
+import {
+    aggregateRecon,
+    Reconciliation,
+    ReconciliationsService,
+    reconBreakSets,
+    ReconRunResult,
+} from 'app/inspecto/reconciliation';
 import { ReconBoardComponent } from './recon-board.component';
 import { ReconExecService } from './recon-exec.service';
 
@@ -33,7 +39,8 @@ const RIGHT = [
 ];
 const RESULT = aggregateRecon(RECON, LEFT, RIGHT);
 
-async function create() {
+async function create(opts: { patch?: Partial<Reconciliation>; result?: ReconRunResult } = {}) {
+    const recon: Reconciliation = { ...RECON, ...opts.patch };
     const navigate = vi.fn();
     const save = vi.fn((r: Reconciliation) => of(r));
     TestBed.configureTestingModule({
@@ -45,11 +52,11 @@ async function create() {
                 provide: Router,
                 useValue: { navigate, createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY },
             },
-            { provide: ReconciliationsService, useValue: { get: () => of(RECON), save } },
+            { provide: ReconciliationsService, useValue: { get: () => of(recon), save } },
             {
                 provide: ReconExecService,
                 useValue: {
-                    run: vi.fn(async () => RESULT),
+                    run: vi.fn(async () => opts.result ?? RESULT),
                     breaks: vi.fn(async () => reconBreakSets(RECON, LEFT, RIGHT)),
                 },
             },
@@ -119,6 +126,56 @@ describe('ReconBoardComponent', () => {
 
     it('renders with no a11y violations', async () => {
         const { fixture } = await create();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('ReconBoardComponent — title rule and duplicate keys', () => {
+    /** RA-C01's shape: 3-way, `one_to_one`, the duplicates on C (CBS) only. */
+    const withCardinality = (): ReconRunResult => ({
+        ...RESULT,
+        summary: {
+            ...RESULT.summary,
+            byType: { ...RESULT.summary.byType, cardinality_break: 0 },
+            pairs: [
+                { side: 'b', matchedKeys: 2, byType: { ...RESULT.summary.byType, cardinality_break: 0 } },
+                { side: 'c', matchedKeys: 2, byType: { ...RESULT.summary.byType, cardinality_break: 4 } },
+            ],
+        },
+    });
+
+    it('titles the Board with the description and keeps the code in the subtitle', async () => {
+        const { fixture, c } = await create({ patch: { description: 'Mediation vs Billing — daily revenue' } });
+        const el = fixture.nativeElement as HTMLElement;
+        expect(c.title()).toBe('Mediation vs Billing — daily revenue');
+        expect(el.querySelector('h1')?.textContent).toContain('Mediation vs Billing — daily revenue');
+        expect(el.querySelector('h1')?.textContent).not.toContain('Mediation vs Billing ·');
+        expect(el.textContent).toContain('Mediation vs Billing · A mediation_daily');
+    });
+
+    it('falls back to the name, without repeating it in the subtitle', async () => {
+        const { fixture, c } = await create();
+        expect(c.title()).toBe('Mediation vs Billing');
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Mediation vs Billing · A');
+    });
+
+    it('counts duplicate keys per compared side when the server reports them', async () => {
+        const { fixture, c } = await create({ result: withCardinality() });
+        expect(c.duplicateCounts()).toEqual([
+            { label: 'duplicate keys A·B', count: 0 },
+            { label: 'duplicate keys A·C', count: 4 },
+        ]);
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('duplicate keys A·C: 4');
+    });
+
+    it('shows no duplicate-key count for a Reconciliation without a cardinality', async () => {
+        const { fixture, c } = await create();
+        expect(c.duplicateCounts()).toEqual([]);
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-testid="board-duplicates"]')).toBeNull();
+    });
+
+    it('renders the duplicate-key counts with no a11y violations', async () => {
+        const { fixture } = await create({ result: withCardinality(), patch: { description: 'Subscriber status' } });
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });

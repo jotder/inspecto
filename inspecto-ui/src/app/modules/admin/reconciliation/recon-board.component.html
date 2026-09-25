@@ -2,8 +2,9 @@
     @if (recon(); as r) {
         <!-- Header -->
         <inspecto-page-header
-            [title]="r.name"
+            [title]="title()"
             [subtitle]="
+                (title() !== r.name ? r.name + ' · ' : '') +
                 'A ' +
                 r.leftDataset +
                 ' ⇄ B ' +
@@ -62,6 +63,9 @@
                 <span>only in A: {{ res.summary.byType.missing_right }}</span>
                 <span>only in B: {{ res.summary.byType.missing_left }}</span>
                 <span>value breaks: {{ res.summary.byType.value_break }}</span>
+                @for (d of duplicateCounts(); track d.label) {
+                    <span data-testid="board-duplicates">{{ d.label }}: {{ d.count }}</span>
+                }
                 @if (res.statistics.truncated) {
                     <span class="text-amber-600 dark:text-amber-400"
                         >! truncated — add a filter or drop a dimension</span

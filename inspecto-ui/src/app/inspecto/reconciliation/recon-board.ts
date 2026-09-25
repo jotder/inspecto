@@ -38,17 +38,25 @@ export interface ReconGrainRow {
 }
 
 /** One anchor-relative pair's Break summary (design §6 — pairs[0] = A↔B, pairs[1] = A↔C). */
+/** A pair's Break counts; `cardinality_break` is present only when the Reconciliation declares a cardinality. */
+export interface ReconByType {
+    missing_left: number;
+    missing_right: number;
+    value_break: number;
+    cardinality_break?: number;
+}
+
 export interface ReconPairSummary {
     side: SideKey;
     matchedKeys: number;
-    byType: { missing_left: number; missing_right: number; value_break: number };
+    byType: ReconByType;
 }
 
 export interface ReconRunSummary {
     groups: number;
     /** A↔B (mirrors pairs[0]) — kept flat so 2-way consumers are unchanged. */
     matchedKeys: number;
-    byType: { missing_left: number; missing_right: number; value_break: number };
+    byType: ReconByType;
     /** One entry per non-anchor side (present on 3-way; length 1 on 2-way). */
     pairs?: ReconPairSummary[];
 }
@@ -213,7 +221,9 @@ export function breakImpacts(
     if (!col) return {};
     const compared = recon.compareColumns.some((c) => c.column === col);
     const out: Record<string, number> = {};
-    for (const set of Object.values(sets)) {
+    // A duplicate key's money is a different question (the extra copies) — see {@link duplicateImpacts}.
+    for (const [type, set] of Object.entries(sets)) {
+        if (type === 'cardinality_break') continue;
         for (const row of set?.rows ?? []) {
             const key = breakKeyOf(row.key, recon.keyColumns);
             if (compared) {
@@ -223,6 +233,56 @@ export function breakImpacts(
                 if (v !== null && v !== undefined) out[key] = v;
             }
         }
+    }
+    return out;
+}
+
+/** A declared cardinality that asserts something; `many_to_many` (and a blank) asserts nothing. */
+export type ReconCardinality = 'one_to_one' | 'one_to_many' | 'many_to_one';
+
+/**
+ * The Reconciliation's declared cardinality, or null when it declares none. It is stored, not modelled —
+ * read from `raw`, the same place `serverConfig` sends it from — and a blank or `many_to_many` is null
+ * because the server then produces no cardinality Breaks at all.
+ */
+export function reconCardinality(recon: Pick<Reconciliation, 'raw'> | null | undefined): ReconCardinality | null {
+    const c = recon?.raw?.['cardinality'];
+    return c === 'one_to_one' || c === 'one_to_many' || c === 'many_to_one' ? c : null;
+}
+
+/** The pair roles a cardinality declares "one" — the sides on which a repeated key is a Break. */
+export function oneSides(cardinality: ReconCardinality): ('a' | 'b')[] {
+    return cardinality === 'one_to_one' ? ['a', 'b'] : cardinality === 'one_to_many' ? ['a'] : ['b'];
+}
+
+/**
+ * The money behind each duplicate key (a `cardinality_break` row), keyed like {@link breakImpacts}.
+ *
+ * Decision (2026-09-25): a duplicate's impact is the value of its EXTRA copies — what is billed (or
+ * provisioned) beyond the one record the cardinality allows. The impact column arrives SUMMED per side
+ * (compared: `a`/`b` measures; carried: `impact: {a, b}`), so on a "one" side with n records the extra copies
+ * are worth `sum × (n − 1) / n` (the per-record average times the surplus); both "one" sides add up under
+ * `one_to_one`. A "many" side's repeats are allowed and count nothing.
+ *
+ * ⚠ As in {@link breakImpacts}, a key with no value to read gets no entry, never an invented 0.
+ */
+export function duplicateImpacts(
+    recon: Pick<Reconciliation, 'keyColumns' | 'compareColumns' | 'impact' | 'raw'>,
+    sets: ReconBreakSets,
+): Record<string, number> {
+    const col = recon.impact?.column;
+    const cardinality = reconCardinality(recon);
+    if (!col || !cardinality) return {};
+    const compared = recon.compareColumns.some((c) => c.column === col);
+    const out: Record<string, number> = {};
+    for (const row of sets.cardinality_break?.rows ?? []) {
+        let extra: number | null = null;
+        for (const side of oneSides(cardinality)) {
+            const n = row[side]?.[RECON_RECORDS] ?? 0;
+            const sum = compared ? row[side]?.[col] : row.impact?.[side];
+            if (n > 1 && sum !== null && sum !== undefined) extra = (extra ?? 0) + (sum * (n - 1)) / n;
+        }
+        if (extra !== null) out[breakKeyOf(row.key, recon.keyColumns)] = extra;
     }
     return out;
 }

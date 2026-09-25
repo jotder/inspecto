@@ -93,7 +93,7 @@
         </div>
 
         <!-- Count cards -->
-        <div class="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div class="mt-6 grid grid-cols-2 gap-4 {{ cardinality() ? 'sm:grid-cols-5' : 'sm:grid-cols-4' }}">
             <div class="bg-card rounded-2xl p-4 shadow">
                 <div class="text-secondary text-sm">Only in A</div>
                 <div class="mt-1 text-2xl font-bold">{{ missingA().length }}</div>
@@ -109,6 +109,13 @@
                 <div class="mt-1 text-2xl font-bold">{{ valueBreaks().length }}</div>
                 <div class="text-secondary mt-1 text-xs">value breaks</div>
             </div>
+            @if (cardinality()) {
+                <div class="bg-card rounded-2xl p-4 shadow" data-testid="duplicates-card">
+                    <div class="text-secondary text-sm">Duplicate keys</div>
+                    <div class="mt-1 text-2xl font-bold">{{ duplicates().length }}</div>
+                    <div class="text-secondary mt-1 text-xs">{{ cardinality() }}</div>
+                </div>
+            }
             <div class="bg-card rounded-2xl p-4 shadow">
                 <div class="text-secondary text-sm">Resolved</div>
                 <div class="mt-1 text-2xl font-bold">{{ resolvedCount() }}</div>
@@ -203,6 +210,25 @@
                             [rows]="valueBreaks()"
                             [columns]="valueColumns()"
                             [rowActions]="rowActions"
+                            (rowClick)="select($event)"
+                        />
+                    </section>
+                }
+                @if (duplicates().length) {
+                    <!-- Cardinality Breaks: a key repeated on a side the declared cardinality calls "one".
+                         Only a Reconciliation that declares a cardinality can have any (see duplicates()). -->
+                    <section aria-label="Duplicate keys" data-testid="duplicate-keys">
+                        <h2 class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider">
+                            Duplicate keys — {{ cardinality() }} ({{ duplicates().length }})
+                        </h2>
+                        <inspecto-data-table
+                            tier="standard"
+                            sourceName="recon-duplicate-keys"
+                            exportName="recon-duplicate-keys"
+                            stateKey="recon-duplicate-keys"
+                            [rows]="duplicates()"
+                            [columns]="duplicateColumns()"
+                            [rowActions]="duplicateActions"
                             (rowClick)="select($event)"
                         />
                     </section>

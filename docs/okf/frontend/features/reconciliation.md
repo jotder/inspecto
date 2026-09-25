@@ -113,6 +113,26 @@ through the shared `formatNumber`. `column` is **any** column of the reconciled 
   nothing to carry and every carried impact reads `—`. ⚠ A key with no value (null both sides) shows `—`,
   never an invented 0.
 
+**Duplicate keys on the screens** (2026-09-25). Until then `breaksFromSets` mapped `cardinality_break` but only the
+*Grouped* view showed it — the default *Tables* view and the Board had no place for it, so RA-C01's 4 MSISDNs that
+CBS bills twice were invisible. Now:
+* **Breaks page** — a *Duplicate keys* table (Key · *Repeated on* (the "one" side(s) with more than one record) ·
+  *Records* `A 1 · C 2` · Impact · Status · Resolve / Promote to Incident / *Show the rows behind this break*) plus a
+  *Duplicate keys* count card. Selecting a duplicate opens the `/recon/rows` panel. Both show **only when the
+  Reconciliation declares a cardinality** — `reconCardinality(recon)` reads the stored `raw.cardinality` (the model
+  does not carry it) and a blank / `many_to_many` is null. Role `b` is labelled C on a 3-way *A vs C*.
+* **Impact of a duplicate = the value of its extra copies** (`duplicateImpacts`): the impact column arrives SUMMED
+  per side, so on a "one" side with n records the surplus is `sum × (n − 1) / n`; under `one_to_one` both sides add
+  up, and a "many" side's repeats count nothing. ⚠ A separate map from `breakImpacts` (which now skips the
+  cardinality set): the same key usually also carries a value break (a duplicate doubles the compared SUM), and
+  one key-indexed map let the cardinality row overwrite the value break's impact.
+* **Board** — `duplicate keys A·B: n · A·C: n` beside the other counts, per compared side from
+  `summary.pairs[].byType.cardinality_break` (the server sends it only when a cardinality is declared); per pair
+  because the flat summary mirrors A↔B and RA-C01's duplicates sit on C. The Board's `<h1>` now follows the
+  Breaks page's rule — `description`, falling back to `name` — with the name (the code) leading the subtitle.
+* ⚠ Not changed: the Board's lifecycle merge still persists the A↔B pair only, so C-side Breaks are live on the
+  Breaks page but never enter the persisted lifecycle (true of every Break type on a 3-way).
+
 As-built design (archived):
 [`reconciliation-board-design.md`](../../../archived-documents/plans-archive/reconciliation-board-design.md) ·
 review sheet: [`reviews/reconciliation.md`](../../../archived-documents/superpower-reviews/reconciliation.md).
