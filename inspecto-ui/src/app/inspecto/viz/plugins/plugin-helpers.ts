@@ -53,6 +53,9 @@ export function buildXyQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
         ...(channelGrains(dims) ?? {}),
         measures,
         filters: ctx.filters ?? null,
+        // Categories follow ROW order, and an unordered GROUP BY comes back in hash order — months read
+        // "Oct, Jan, Mar, … Nov, Dec". Order by the dimensions; a widget's `sort` option still re-sorts by value.
+        ...(groupBy.length ? { orderBy: groupBy.map((f) => ({ field: f, dir: 'asc' as const })) } : {}),
     };
 }
 

@@ -21,6 +21,11 @@ describe('buildXyQuery', () => {
             field: 'duration_s',
         });
         expect(spec.grains).toBeUndefined();
+        // Categories follow row order, so the query orders by its dimensions (hash order scrambled months).
+        expect(spec.orderBy).toEqual([
+            { field: 'tariff', dir: 'asc' },
+            { field: 'cell_id', dir: 'asc' },
+        ]);
     });
 
     it("carries a temporal channel's grain onto the spec; auto carries nothing", () => {
