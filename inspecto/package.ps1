@@ -79,6 +79,14 @@ param(
     # for it yet.
     [ValidateSet('Personal', 'Professional', 'Standard', 'Enterprise', 'Preview')]
     [string]$Edition = 'Personal',
+    # DEMO-AUTH-1: an OFFLINE DEMO BUILD, never an edition. Requires -Edition Enterprise; swaps
+    # inspecto-security.jar for inspecto-demo-auth.jar (the Demo User sign-in), assembles into
+    # inspecto-demo/ (NOT inspecto-deploy/, which other launch configs run from), writes serve-demo.bat /
+    # serve-demo.sh bound to 127.0.0.1, removes serve.* and the service installers (without the security
+    # jar they would boot an auth-free server on every interface), and zips as inspecto-demo-<platform>.zip.
+    # The demo jar is deliberately outside the three jar enumerations tools/check-sbom-modules.mjs parses,
+    # because no edition ships it; the SBOM therefore still describes the Enterprise module set.
+    [switch]$DemoAuth,
     # ── release integrity (SOC 2 CC8-04) ──
     # SHA-256 checksums are ALWAYS written next to each artifact (no key needed). -Sign additionally
     # produces a GPG detached signature (.asc) per artifact so customers can verify AUTHENTICITY, not
@@ -189,6 +197,10 @@ if ($duckdbExtCacheDir) {
     Write-Host "  (no DuckDB extension cache found — tried: $($duckdbExtCandidates -join ', '))" -ForegroundColor Yellow
 }
 $bundleDir    = Join-Path $sandboxRoot  'inspecto-deploy'
+if ($DemoAuth) {
+    if ($Edition -ne 'Enterprise') { throw "-DemoAuth builds an Enterprise-capability demo; pass -Edition Enterprise (got '$Edition')." }
+    $bundleDir = Join-Path $sandboxRoot 'inspecto-demo'
+}
 
 # ── step 1: build ─────────────────────────────────────────────────────────────
 # Built from the repo root with -pl inspecto -am (same idiom as step 1c) because since S5 the
@@ -628,6 +640,31 @@ Push-Location $sandboxRoot
 $sbomExit = $LASTEXITCODE
 Pop-Location
 if ($sbomExit -ne 0) { throw "SBOM generation failed (exit $sbomExit) — a bundle ships with its SBOM or not at all" }
+
+# DEMO-AUTH-1 (runs AFTER the SBOM step: sbom.mjs requires every Enterprise jar to be staged, so the SBOM
+# describes the Enterprise module set, as DEMO-BUILD.txt says). A demo build signs Demo Users in with no IAM, so the OIDC module must NOT be on its classpath
+# (two Authenticators is unsupported, and the OIDC one would refuse to construct without an issuer).
+if ($DemoAuth) {
+    if (-not $NoBuild) {
+        Push-Location $sandboxRoot
+        & mvn package -pl inspecto-demo-auth -am -DskipTests -q
+        if ($LASTEXITCODE -ne 0) { throw "mvn build of inspecto-demo-auth failed" }
+        Pop-Location
+    }
+    $demoJar = Get-ChildItem (Join-Path $sandboxRoot 'inspecto-demo-auth\target') -Filter 'inspecto-demo-auth-*.jar' |
+        Where-Object { $_.Name -notmatch '(sources|javadoc|tests)\.jar$' } | Select-Object -First 1
+    if (-not $demoJar) { throw "no inspecto-demo-auth jar under inspecto-demo-auth\target - build it first or drop -NoBuild" }
+    Remove-Item (Join-Path $bundleDir 'inspecto-security.jar') -ErrorAction SilentlyContinue
+    Copy-Item -Path $demoJar.FullName -Destination (Join-Path $bundleDir 'inspecto-demo-auth.jar')
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $z = [System.IO.Compression.ZipFile]::OpenRead((Join-Path $bundleDir 'inspecto-demo-auth.jar'))
+    try {
+        foreach ($svc in 'META-INF/services/com.gamma.control.Authenticator', 'META-INF/services/com.gamma.control.TokenRelay') {
+            if (-not ($z.Entries | Where-Object { $_.FullName -eq $svc })) { throw "inspecto-demo-auth.jar lacks $svc" }
+        }
+    } finally { $z.Dispose() }
+    Write-Host "DEMO BUILD: inspecto-security.jar replaced by inspecto-demo-auth.jar (Demo User sign-in, loopback only)" -ForegroundColor Yellow
+}
 
 # ── step 3b: copy the built UI dist → bundle/ui (served by ControlApi via -Dui.dir=./ui) ──
 # Angular emits to ui/dist/<app>[/browser]; locate the folder that actually holds index.html.
@@ -1493,6 +1530,74 @@ if (-not $NoRuntime) {
     $hostPlatform = if ($IsWindows -or $env:OS -eq 'Windows_NT') { 'windows_amd64' } else { 'linux_amd64' }
 }
 
+# ── step 6c-demo: DEMO-AUTH-1 launchers (only with -DemoAuth) ─────────────────────────────────────
+# The regular launchers and installers go: with no inspecto-security.jar, serve.* would boot an auth-free
+# control plane on every interface. serve-demo.* adds the demo module and pins the flags the demo needs:
+#   -Dcontrol.bind=127.0.0.1  demo sign-in is unauthenticated; the module refuses to load otherwise
+#   -Dauth.mode=demo          the SPA's sign-in page shows the Demo User picker
+#   -Dobjects.backend=db      Incidents/Cases/notes persist in the Space's duckdb/ (default is memory)
+#   -Devents.backend=parquet  the audit trail survives a restart, as on Professional+
+if ($DemoAuth) {
+    foreach ($f in 'serve.sh', 'serve.bat', 'Dockerfile', '.dockerignore', 'inspecto.service', 'install-service.sh', 'install-service.ps1') {
+        Remove-Item (Join-Path $bundleDir $f) -ErrorAction SilentlyContinue
+    }
+    $demoJars = @('inspecto.jar', 'inspecto-demo-auth.jar', 'inspecto-policy.jar', 'inspecto-connectors.jar', 'inspecto-notify-channels.jar',
+                  'inspecto-backup.jar', 'inspecto-geo-link.jar', 'inspecto-exchange.jar', 'inspecto-metrics.jar', 'inspecto-events.jar',
+                  'inspecto-ops.jar', 'inspecto-agent.jar', 'postgresql.jar') | Where-Object { Test-Path (Join-Path $bundleDir $_) }
+    $demoFlags = '--enable-native-access=ALL-UNNAMED -Dcontrol.bind=127.0.0.1 -Dauth.mode=demo -Dobjects.backend=db -Devents.backend=parquet'
+    $serveDemoBat = @"
+@echo off
+rem DEMO BUILD - internal evaluation only (DEMO-AUTH-1). Demo User sign-in, NO real authentication.
+rem Listens on 127.0.0.1 only. Drop a Space folder into .\spaces and open http://127.0.0.1:%PORT%
+setlocal
+cd /d "%~dp0"
+if "%PORT%"=="" set "PORT=8080"
+if "%SPACES_ROOT%"=="" set "SPACES_ROOT=spaces"
+set "OPTS=$demoFlags -Dcontrol.port=%PORT% -Dspaces.root=%SPACES_ROOT%"
+if exist ui set "OPTS=%OPTS% -Dui.dir=./ui"
+if exist "duckdb-extensions\windows_amd64" set "OPTS=%OPTS% -Dduckdb.extension.dir=duckdb-extensions\windows_amd64"
+set "JAVA=java"
+if exist runtime\bin\java.exe set "JAVA=runtime\bin\java.exe"
+echo [serve-demo] DEMO BUILD on http://127.0.0.1:%PORT%  (spaces: .\%SPACES_ROOT%)
+"%JAVA%" %OPTS% -cp "$($demoJars -join ';')" com.gamma.control.ControlApi
+"@
+    Write-CrlfScript -Path "$bundleDir\serve-demo.bat" -Content $serveDemoBat
+    $serveDemoSh = @"
+#!/usr/bin/env bash
+# DEMO BUILD - internal evaluation only (DEMO-AUTH-1). Demo User sign-in, NO real authentication.
+# Listens on 127.0.0.1 only. Drop a Space folder into ./spaces and open http://127.0.0.1:`${PORT}
+set -euo pipefail
+cd "`$(dirname "`$0")"
+PORT="`${PORT:-8080}"
+SPACES_ROOT="`${SPACES_ROOT:-spaces}"
+OPTS="$demoFlags -Dcontrol.port=`${PORT} -Dspaces.root=`${SPACES_ROOT}"
+[ -d ui ] && OPTS="`${OPTS} -Dui.dir=./ui"
+[ -d duckdb-extensions/linux_amd64 ] && OPTS="`${OPTS} -Dduckdb.extension.dir=duckdb-extensions/linux_amd64"
+JAVA=java
+[ -x runtime/bin/java ] && JAVA=runtime/bin/java
+echo "[serve-demo] DEMO BUILD on http://127.0.0.1:`${PORT}  (spaces: ./`${SPACES_ROOT})"
+exec "`$JAVA" `$OPTS -cp "$($demoJars -join ':')" com.gamma.control.ControlApi
+"@
+    Write-LfScript -Path "$bundleDir\serve-demo.sh" -Content $serveDemoSh
+    $demoReadme = @"
+INSPECTO DEMO BUILD - INTERNAL EVALUATION ONLY
+===============================================
+This build signs people in as Demo Users with NO password and NO identity provider (DEMO-AUTH-1).
+It is not secure and must never be given to a customer, exposed on a network, or used with real data.
+
+1. Put a Space folder (for example telco-assurance/) into .\spaces\
+2. Run serve-demo.bat (Windows) or ./serve-demo.sh (Linux)
+3. Open http://127.0.0.1:8080 and pick a Demo User
+
+Demo Users are defined per Space in config/demo-users.toon; their roles come from that Space's role table.
+The server listens on 127.0.0.1 only and refuses to start the demo sign-in on any other address.
+The bundled SBOM describes the Enterprise module set: it lists inspecto-security (not shipped here) and
+omits inspecto-demo-auth (shipped here).
+"@
+    Write-CrlfScript -Path "$bundleDir\DEMO-BUILD.txt" -Content $demoReadme
+    Write-Host "DEMO BUILD: serve-demo.bat / serve-demo.sh / DEMO-BUILD.txt written; serve.* and service installers removed" -ForegroundColor Yellow
+}
+
 # ── step 6d: bundle the DuckDB excel extension (multiformat X1), per platform ──
 # ExcelExtension.ensureLoaded (inspecto-etl) loads it in three layers: LOAD (cached/preinstalled) ->
 # LOAD from -Dduckdb.extension.dir (THIS step's whole purpose — an air-gapped deployment ships the
@@ -1589,6 +1694,8 @@ if (-not $SkipBootCheck) {
     # rather than hardcoded, so a sidecar that fails to stage is a boot failure here too.
     $cp = @('inspecto.jar') + @('inspecto-security.jar','inspecto-policy.jar','inspecto-connectors.jar','inspecto-notify-channels.jar','inspecto-backup.jar','inspecto-geo-link.jar','inspecto-exchange.jar','inspecto-metrics.jar','inspecto-events.jar','inspecto-ops.jar','inspecto-agent.jar','postgresql.jar' |
         Where-Object { Test-Path (Join-Path $bundleDir $_) })
+    # DEMO-AUTH-1: appended AFTER the parsed literal on purpose (see the -DemoAuth param note).
+    if ($DemoAuth -and (Test-Path (Join-Path $bundleDir 'inspecto-demo-auth.jar'))) { $cp += 'inspecto-demo-auth.jar' }
     # CONNECTOR-SIDECAR-SHADES-LOGGING-1: assert exactly ONE SLF4J binding registration across the
     # assembled classpath. The core owns the logging binding; every sidecar's shade config excludes
     # META-INF/services/org.slf4j.spi.SLF4JServiceProvider, org/slf4j/impl/** and ch/qos/logback/** so a
@@ -1632,8 +1739,9 @@ if (-not $SkipBootCheck) {
     # PowerShell does not flatten a nested array there, so -ArgumentList (which wants string[]) receives
     # an Object[] element and Start-Process throws before Java is ever launched. `+` does flatten, and an
     # empty @() contributes nothing, so the Personal path stays clean.
+    $demoArgs = if ($DemoAuth) { @('-Dcontrol.bind=127.0.0.1', '-Dauth.mode=demo', '-Dobjects.backend=db') } else { @() }
     $argList = @('--enable-native-access=ALL-UNNAMED', "-Dcontrol.port=$port", '-Dspaces.root=spaces') +
-               $oidcArgs +
+               $oidcArgs + $demoArgs +
                @('-cp', ($cp -join $sep), 'com.gamma.control.ControlApi')
     $proc = Start-Process -FilePath $java -WorkingDirectory $bundleDir -PassThru -NoNewWindow -RedirectStandardOutput $out -RedirectStandardError "$out.err" -ArgumentList $argList
     $healthy = $false
@@ -1832,7 +1940,8 @@ function Compress-BundleForPlatform {
 # ⛔ The platform passed here is what Get-RuntimePlatform read off the embedded image (or, under
 # -NoRuntime, the host OS) — never a literal. On ubuntu-latest this is linux_amd64; the old hard-coded
 # 'windows_amd64' paired a Linux JVM with Windows-only extensions in the only zip a tag published.
-$outZips[$hostPlatform] = Join-Path $sandboxRoot "inspecto-deploy-$hostPlatform.zip"
+$zipStem = if ($DemoAuth) { "inspecto-demo" } else { "inspecto-deploy" }
+$outZips[$hostPlatform] = Join-Path $sandboxRoot "$zipStem-$hostPlatform.zip"
 Compress-BundleForPlatform -Platform $hostPlatform -DestinationPath $outZips[$hostPlatform]
 
 if ($builtLinuxRuntime) {
@@ -1848,7 +1957,7 @@ if ($builtLinuxRuntime) {
     Move-Item $hostRuntimeOut $hostRuntimeTmp
     Move-Item $crossRuntimeSrc $hostRuntimeOut
 
-    $outZips[$crossPlatform] = Join-Path $sandboxRoot "inspecto-deploy-$crossPlatform.zip"
+    $outZips[$crossPlatform] = Join-Path $sandboxRoot "$zipStem-$crossPlatform.zip"
     Compress-BundleForPlatform -Platform $crossPlatform -DestinationPath $outZips[$crossPlatform]
 
     # Restore the host runtime. ⚠ $bundleDir is now a SUPERSET of either zip — it holds both
