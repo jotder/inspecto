@@ -53,9 +53,16 @@ identically to what the UI authors and `ConditionTree` evaluates.
 ## Record-routing consequences run during live pipeline execution
 
 `apply` executes real platform consequences on demand (`emit-signal`, `start-job`,
-`trigger-pipeline`; stub signals for `render-widget`/`generate-report`/`invoke-api`). `start-job` refuses a
-**disabled** job (`skipped`, *"is disabled — not started"*) — disabled means not scheduled, and only the job's own
-manual trigger runs it ([jobs](jobs.md), 2026-09-25). **`create-alert`**
+`trigger-pipeline`; stub signals for `render-widget`/`generate-report`/`invoke-api`). `start-job` on a
+**disabled** job depends on **how the rule was applied** (operator, 2026-09-25; disabled means "not scheduled",
+[jobs](jobs.md)): a **person's** `POST /decision-rules/{name}/apply` (the SPA's *Apply*) runs it like *Run now*
+(`executed`, the entry carries its `runId`, the run's trigger is `manual:<actor>` from `ApiContext.actor`); an
+**automatic** application skips it (`skipped`, *"is disabled — not started"*). The indicator is an explicit
+`automatic` argument on the one seam, `DecisionRoutes.applyConsequences(api, name, rule, automatic, actor)` —
+never inferred from the HTTP thread. ⚠ **No automatic caller exists today** — platform consequences are inert
+during live runs (`DecisionRuleApplier` handles only record-routing actions) — so the skip branch is reached only
+by a future signal/event/schedule evaluator, which must pass `automatic=true`; `ControlApiJobActionsTest` drives
+both values. An enabled job starts either way; an unknown job stays `skipped` *"no such job"*. **`create-alert`**
 (2026-07-19) always records a `decision-rule.create-alert` ledger signal, and additionally opens a
 deduped `ObjectType.INCIDENT` (one per rule) when its `params.severity` is `critical`/`error` — a lower
 severity stays signal-only. Reuses the same `ExpectationRoutes`-style dedup+open pattern as the

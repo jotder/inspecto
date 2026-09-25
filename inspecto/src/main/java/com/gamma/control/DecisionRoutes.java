@@ -61,7 +61,7 @@ final class DecisionRoutes implements RouteModule {
         api.post("/decision-rules/([^/]+)/simulate", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> simulate(api, ApiContext.name(m), api.body(e))));
         api.post("/decision-rules/([^/]+)/apply", ApiContext.withCapability("canOperateRuns",
-                (e, m) -> apply(api, ApiContext.name(m))));
+                (e, m) -> apply(api, ApiContext.name(m), ApiContext.actor(e))));
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────────
@@ -131,25 +131,44 @@ final class DecisionRoutes implements RouteModule {
         return next;
     }
 
-    /** Execute every consequence through whichever real platform primitive exists (see class doc for
-     *  per-action mapping); never side-effects the rule's stored content. */
-    @SuppressWarnings("unchecked")
-    private Object apply(ApiContext api, String name) throws IOException {
+    /** {@code POST /decision-rules/{name}/apply} — a PERSON applying the rule ({@code automatic=false}),
+     *  attributed to the request's actor. */
+    private Object apply(ApiContext api, String name, String actor) throws IOException {
         Map<String, Object> rule = RouteErrors.existing(store(api), TYPE, "decision rule", name);
+        return applyConsequences(api, name, rule, false, actor);
+    }
+
+    /**
+     * The one apply seam: execute every consequence through whichever real platform primitive exists
+     * (see class doc for per-action mapping); never side-effects the rule's stored content.
+     *
+     * <p>{@code automatic} states HOW the rule is being applied, and every caller passes it explicitly — it
+     * is never inferred from the calling thread (operator 2026-09-25). {@code false} = a person applied it
+     * (the {@code /apply} route, the SPA's Apply action): a {@code start-job} on a DISABLED job runs it, like
+     * the job's own Run now, attributed to {@code actor}. {@code true} = the engine fired it (a signal / event /
+     * schedule evaluation): a disabled job is "not scheduled", so it is skipped. ⚠ No automatic caller exists
+     * yet — platform consequences are inert in live runs ({@link com.gamma.query.DecisionRuleApplier}); a
+     * future one must pass {@code true}.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> applyConsequences(ApiContext api, String name, Map<String, Object> rule,
+                                                 boolean automatic, String actor) {
         List<Map<String, Object>> consequences = (List<Map<String, Object>>) (List<?>)
                 (rule.get("consequences") instanceof List<?> l ? l : List.of());
         List<Map<String, Object>> executed = consequences.stream()
-                .map(c -> executeOne(api, name, c)).toList();
+                .map(c -> executeOne(api, name, c, automatic, actor)).toList();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rule", name);
         result.put("executed", executed);
         return result;
     }
 
-    private Map<String, Object> executeOne(ApiContext api, String ruleName, Map<String, Object> c) {
+    private static Map<String, Object> executeOne(ApiContext api, String ruleName, Map<String, Object> c,
+                                                  boolean automatic, String actor) {
         String action = String.valueOf(c.get("action"));
         String status = "skipped";
         String detail;
+        String runId = null;
         switch (action) {
             case "emit-signal" -> {
                 String type = paramStr(c, "type", "decision-rule." + ruleName);
@@ -216,16 +235,18 @@ final class DecisionRoutes implements RouteModule {
             case "start-job" -> {
                 String jobId = targetId(c);
                 JobService svc = api.service().jobService().orElse(null);
-                // A disabled job is "not scheduled" (operator 2026-09-25): only its own manual trigger runs
-                // it, never a Decision Rule consequence — JobService now builds disabled jobs, so gate here.
+                // A disabled job is "not scheduled", not "not runnable" (operator 2026-09-25): an AUTOMATIC
+                // application skips it; a PERSON's apply runs it like Run now. JobService builds disabled
+                // jobs (so /jobs/{name}/trigger works), which is why the automatic skip is gated here.
                 boolean disabled = jobId != null && svc != null
                         && svc.jobConfig(jobId).map(j -> !j.enabled()).orElse(false);
-                if (disabled) {
+                if (disabled && automatic) {
                     detail = "job '" + jobId + "' is disabled — not started";
                 } else if (jobId != null && svc != null
-                        && svc.triggerRun(jobId, "decision-rule:" + ruleName, Map.of()).isPresent()) {
+                        && (runId = svc.triggerRun(jobId, automatic ? "decision-rule:" + ruleName : actor,
+                                Map.of()).orElse(null)) != null) {
                     status = "executed";
-                    detail = "triggered job '" + jobId + "'";
+                    detail = "triggered job '" + jobId + "'" + (disabled ? " (disabled — run on a manual apply)" : "");
                 } else {
                     detail = "no such job '" + jobId + "'";
                 }
@@ -276,6 +297,7 @@ final class DecisionRoutes implements RouteModule {
         out.put("action", action);
         out.put("status", status);
         out.put("detail", detail);
+        if (runId != null) out.put("runId", runId);
         return out;
     }
 

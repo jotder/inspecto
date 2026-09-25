@@ -98,10 +98,12 @@ class ControlApiJobActionsTest {
      * Operator 2026-09-25: a DISABLED job is "not scheduled", not "not runnable" — the KPI & Reports
      * "Run now" ({@code POST /jobs/{name}/trigger}) runs it (202 → SUCCESS) where it used to answer a
      * misleading 404 "no job named" while {@code GET /jobs} listed it. A Decision Rule's {@code start-job}
-     * consequence is automation, so it still refuses a disabled job. An unknown name stays 404.
+     * consequence depends on HOW the rule is applied: a person's {@code POST /decision-rules/{name}/apply}
+     * runs the disabled job like Run now (attributed to that person); an AUTOMATIC application (the
+     * {@code automatic=true} seam) skips it. An unknown name stays 404.
      */
     @Test
-    void aDisabledJobIsManuallyTriggerableButNotStartedByADecisionRule(@TempDir Path root) throws Exception {
+    void aDisabledJobRunsOnAManualDecisionApplyButIsSkippedByAnAutomaticOne(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
             String base = "/spaces/acme";
@@ -118,21 +120,49 @@ class ControlApiJobActionsTest {
             assertEquals(404, send(c.port, "POST", base + "/jobs/nope/trigger", null).statusCode(),
                     "a genuinely unknown name is still 404");
 
-            // a Decision Rule consequence is not a manual trigger: it must not start a disabled job
             assertEquals(200, send(c.port, "POST", base + "/decision-rules",
                     "{\"name\":\"kick\",\"targetType\":\"job\",\"target\":\"cfo_pack\","
                             + "\"consequences\":[{\"action\":\"start-job\",\"target\":{\"id\":\"cfo_pack\"}}]}")
                     .statusCode());
-            JsonNode refused = json(send(c.port, "POST", base + "/decision-rules/kick/apply", null))
-                    .get("executed").get(0);
-            assertEquals("skipped", refused.get("status").asText(), refused.toString());
-            assertTrue(refused.get("detail").asText().contains("disabled"), refused.toString());
 
-            // enabled, the same consequence starts it (positive control for the refusal above)
+            // a PERSON applying the rule runs the disabled job, like Run now, attributed to that person
+            JsonNode manual = json(send(c.port, "POST", base + "/decision-rules/kick/apply", null))
+                    .get("executed").get(0);
+            assertEquals("executed", manual.get("status").asText(), manual.toString());
+            String manualRun = manual.get("runId").asText();
+            assertEquals("SUCCESS", awaitRun(c.port, base, manualRun), "the manual apply's run succeeds");
+            assertEquals("manual:appUser",
+                    json(send(c.port, "GET", base + "/jobs/runs/" + manualRun, null)).get("trigger").asText());
+
+            // an AUTOMATIC application of the same rule skips the disabled job
+            JsonNode automatic = applyAutomatically(c, "acme", "kick", "cfo_pack");
+            assertEquals("skipped", automatic.get("status").asText(), automatic.toString());
+            assertTrue(automatic.get("detail").asText().contains("disabled"), automatic.toString());
+            assertFalse(automatic.has("runId"), automatic.toString());
+
+            // enabled, both ways start it (positive control for the automatic skip above)
             send(c.port, "POST", base + "/jobs/cfo_pack/enable", "{}");
             JsonNode started = json(send(c.port, "POST", base + "/decision-rules/kick/apply", null))
                     .get("executed").get(0);
             assertEquals("executed", started.get("status").asText(), started.toString());
+            awaitRun(c.port, base, started.get("runId").asText());
+            JsonNode auto = applyAutomatically(c, "acme", "kick", "cfo_pack");
+            assertEquals("executed", auto.get("status").asText(), auto.toString());
+            assertEquals("manual:decision-rule:kick", json(send(c.port, "GET",
+                    base + "/jobs/runs/" + auto.get("runId").asText(), null)).get("trigger").asText());
+        }
+    }
+
+    /** Drive the shared apply seam as an engine-driven caller would: bound to {@code space}, {@code automatic=true}. */
+    private static JsonNode applyAutomatically(Ctx c, String space, String rule, String job) {
+        org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, space);
+        try {
+            java.util.Map<String, Object> result = DecisionRoutes.applyConsequences(c.api, rule, java.util.Map.of(
+                    "consequences", java.util.List.of(java.util.Map.of("action", "start-job",
+                            "target", java.util.Map.of("id", job)))), true, "appUser");
+            return JSON.valueToTree(result).get("executed").get(0);
+        } finally {
+            org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
         }
     }
 

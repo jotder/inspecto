@@ -31,9 +31,10 @@ virtual-thread `workers` executor. Four trigger modes:
 
 **A disabled job is "not scheduled", not "not runnable" (operator, 2026-09-25).** `enabled: false` switches
 off every **automatic** path — cron arming (and so `nextFire`), catch-up, `on_pipeline`, `on_signal`, and a
-Decision Rule's `start-job` consequence (`DecisionRoutes` refuses it: *"job 'x' is disabled — not started"*).
-It does **not** switch off the **manual** ones: `POST /jobs/{name}/trigger` (the KPI & Reports page's *Run
-now*), its `?dryRun=true` preview and `POST /jobs/runs/{runId}/replay` all run it. The seam: `JobService` now
+Decision Rule's `start-job` consequence when the rule is applied automatically (*"job 'x' is disabled — not
+started"*). It does **not** switch off the **manual** ones: `POST /jobs/{name}/trigger` (the KPI & Reports page's
+*Run now*), its `?dryRun=true` preview, `POST /jobs/runs/{runId}/replay` and a person's
+`POST /decision-rules/{name}/apply` all run it ([decision-rules](decision-rules.md)). The seam: `JobService` now
 builds **every** configured job into its `jobs` map (boot and `upsertJob`), and the automatic paths gate on
 `JobConfig.enabled()` over `configs` — ⛔ never on membership of `jobs`, which no longer means "enabled". Until
 this rule the map held only enabled jobs, so *Run now* on a disabled job answered a misleading 404 *"no job
