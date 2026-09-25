@@ -16,10 +16,10 @@ const TWO_LEVEL: TreemapRow[] = [
 function create(rows: TreemapRow[], opts: { limit?: number; size?: { w: number; h: number } } = {}) {
     TestBed.configureTestingModule({ imports: [TreemapComponent] });
     const fixture = TestBed.createComponent(TreemapComponent);
-    const picks: [TreemapChannel, string][] = [];
+    const picks: [TreemapChannel, string, string | undefined][] = [];
     fixture.componentRef.setInput('rows', rows);
     fixture.componentRef.setInput('format', { style: 'currency', currency: 'SAR', compact: true });
-    fixture.componentRef.setInput('select', (c: TreemapChannel, v: string) => picks.push([c, v]));
+    fixture.componentRef.setInput('select', (c: TreemapChannel, v: string, g?: string) => picks.push([c, v, g]));
     if (opts.limit != null) fixture.componentRef.setInput('limit', opts.limit);
     fixture.detectChanges();
     fixture.componentInstance.size.set(opts.size ?? { w: 800, h: 400 });
@@ -80,7 +80,7 @@ describe('TreemapComponent', () => {
         expect(el.querySelector('[data-testid="treemap-excluded"]')?.textContent).toContain('1 row with a zero');
     });
 
-    it('a group click drills on group, a subgroup click on subgroup — the raw value, a blank stays blank', () => {
+    it('a group click reports its group; a subgroup click its subgroup AND parent group — raw values, a blank stays blank', () => {
         const { el, picks } = create([...TWO_LEVEL, { group: '', subgroup: 'Dealer', value: 50000 }]);
         cells(el)
             .find((b) => b.getAttribute('aria-label')?.startsWith('IRSF:'))!
@@ -91,10 +91,14 @@ describe('TreemapComponent', () => {
         cells(el)
             .find((b) => b.getAttribute('aria-label')?.startsWith('(blank):'))!
             .click();
+        cells(el)
+            .find((b) => b.getAttribute('aria-label')?.startsWith('Dealer in (blank)'))!
+            .click();
         expect(picks).toEqual([
-            ['group', 'IRSF'],
-            ['subgroup', 'Retail'],
-            ['group', ''],
+            ['group', 'IRSF', undefined],
+            ['subgroup', 'Retail', 'SIM box'],
+            ['group', '', undefined],
+            ['subgroup', 'Dealer', ''],
         ]);
     });
 

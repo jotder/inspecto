@@ -337,12 +337,17 @@ export class WidgetHostComponent {
             this.drill.emit({ field: rowField, value: e.row, and: [{ field: columnField, value: e.column }] });
     }
 
-    /** A click that names its channel (treemap): drill on THAT channel's field — a group cell on `group`, a subgroup
-     *  cell on `subgroup`. The drill carries one field, so a subgroup drill filters on the subgroup value alone
-     *  (every group's "Online", not just the clicked group's). */
-    onChannelClick(e: { channel: ChannelId; value: string }): void {
-        const field = this.resolvedWidget()?.controls?.[e.channel]?.[0]?.field;
-        if (field) this.drill.emit({ field, value: e.value });
+    /** A click that names its channel (treemap): drill on THAT channel's field — a group cell on `group` alone; a
+     *  subgroup cell on `subgroup` AND its parent group (the `group` field, in `and`), so it selects exactly the
+     *  clicked rectangle rather than every group's "Online". */
+    onChannelClick(e: { channel: ChannelId; value: string; group?: string }): void {
+        const controls = this.resolvedWidget()?.controls;
+        const field = controls?.[e.channel]?.[0]?.field;
+        if (!field) return;
+        const groupField = controls?.group?.[0]?.field;
+        if (e.channel === 'subgroup' && e.group !== undefined && groupField)
+            this.drill.emit({ field, value: e.value, and: [{ field: groupField, value: e.group }] });
+        else this.drill.emit({ field, value: e.value });
     }
 
     exportPng(): void {

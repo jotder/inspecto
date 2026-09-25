@@ -446,8 +446,12 @@ export class DesignSystemComponent {
         { group: 'Payment-gateway fraud', subgroup: 'Retail', value: 0 },
     ];
     readonly treemapPicked = signal('Click a cell — the drill event appears here.');
-    readonly treemapSelect = (channel: string, value: string): void =>
-        this.treemapPicked.set(`Drill: ${channel} = "${value}"`);
+    readonly treemapSelect = (channel: string, value: string, group?: string): void =>
+        this.treemapPicked.set(
+            group === undefined
+                ? `Drill: ${channel} = "${value}"`
+                : `Drill: group = "${group}" AND ${channel} = "${value}"`,
+        );
     // ── More visualization types — heatmap (viz/plugins/heatmap.*) ─────────────────────────────
     private readonly heatDays = [
         '2026-09-18',

@@ -198,7 +198,7 @@ describe('WidgetHostComponent', () => {
         expect(emitted).toBeUndefined();
     });
 
-    it('treemap: a group cell drills on the group field, a subgroup cell on the subgroup field', () => {
+    it('treemap: a group cell drills on the group field alone, a subgroup cell on subgroup AND its group', () => {
         const treemapWidget: Widget = {
             ...WIDGET,
             vizType: 'treemap',
@@ -214,14 +214,18 @@ describe('WidgetHostComponent', () => {
         ]);
         fixture.componentRef.setInput('widget', treemapWidget);
         fixture.componentRef.setInput('dataset', DS);
-        const emitted: { field: string; value: string }[] = [];
+        const emitted: DrillEvent[] = [];
         fixture.componentInstance.drill.subscribe((v) => emitted.push(v));
         fixture.componentInstance.onChannelClick({ channel: 'group', value: 'SIM box' });
-        fixture.componentInstance.onChannelClick({ channel: 'subgroup', value: 'Online' });
+        fixture.componentInstance.onChannelClick({ channel: 'subgroup', value: 'Online', group: 'SIM box' });
+        // A blank parent group is still a value: the pair is '', not dropped.
+        fixture.componentInstance.onChannelClick({ channel: 'subgroup', value: 'Dealer', group: '' });
         expect(emitted).toEqual([
             { field: 'typology', value: 'SIM box' },
-            { field: 'channel', value: 'Online' },
+            { field: 'channel', value: 'Online', and: [{ field: 'typology', value: 'SIM box' }] },
+            { field: 'channel', value: 'Dealer', and: [{ field: 'typology', value: '' }] },
         ]);
+        expect(emitted[0].and).toBeUndefined();
     });
 
     it('the tile header shows the widget title and subtitle', () => {

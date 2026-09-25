@@ -40,7 +40,8 @@ const SUMMARY_TOP = 5;
  * - a label (name, value in the widget's format, share of the total) only where it fits, on a card-coloured chip so
  *   it keeps its contrast over any fill; the full text is always the button's accessible name and tooltip;
  * - every cell is a keyboard-focusable button with a two-tone focus ring, and a click reports the cell's channel and
- *   raw value through `select` (the drill seam — "Other" is not a value and never reports);
+ *   raw value through `select` (the drill seam — "Other" is not a value and never reports); a subgroup click also
+ *   reports its parent group's raw value, so the host can select exactly that rectangle;
  * - a text alternative names the total, the largest items and how many rows were left out as zero or negative;
  * - the layout follows the container through a `ResizeObserver` (dashboard span, side-pane collapse).
  */
@@ -144,8 +145,9 @@ export class TreemapComponent implements AfterViewInit, OnDestroy {
     readonly format = input<NumberFormat | undefined>(undefined);
     /** `options.treemap.limit` — groups drawn before the rest fold into "Other". */
     readonly limit = input<number | undefined>(undefined);
-    /** Called with a clicked cell's channel and RAW value (a blank stays ''), for drill-down. */
-    readonly select = input<((channel: TreemapChannel, value: string) => void) | undefined>(undefined);
+    /** Called with a clicked cell's channel and RAW value (a blank stays ''), for drill-down; a subgroup click also
+     *  passes its parent group's raw value. */
+    readonly select = input<((channel: TreemapChannel, value: string, group?: string) => void) | undefined>(undefined);
 
     private readonly box = viewChild<ElementRef<HTMLElement>>('box');
     /** The container's size, from the ResizeObserver (0 until measured — nothing is laid out in a 0 box). */
@@ -230,7 +232,8 @@ export class TreemapComponent implements AfterViewInit, OnDestroy {
 
     pick(c: TreemapCell): void {
         if (c.folded) return;
-        this.select()?.(c.level === 2 ? 'subgroup' : 'group', c.name);
+        if (c.level === 2) this.select()?.('subgroup', c.name, c.group);
+        else this.select()?.('group', c.name);
     }
 
     /** A blank value reads "(blank)" — never an unlabelled cell. */

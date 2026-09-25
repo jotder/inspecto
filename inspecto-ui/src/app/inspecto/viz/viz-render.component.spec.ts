@@ -178,8 +178,13 @@ describe('VizRenderComponent', () => {
         expect(inputs).toMatchObject({ rows: treemap, format: { compact: true }, limit: 5 });
         const clicks: unknown[] = [];
         c.channelClick.subscribe((e) => clicks.push(e));
-        (inputs['select'] as (channel: string, value: string) => void)('subgroup', 'Roaming');
-        expect(clicks).toEqual([{ channel: 'subgroup', value: 'Roaming' }]);
+        const select = inputs['select'] as (channel: string, value: string, group?: string) => void;
+        select('group', 'IRSF');
+        select('subgroup', 'Roaming', 'IRSF');
+        expect(clicks).toEqual([
+            { channel: 'group', value: 'IRSF' },
+            { channel: 'subgroup', value: 'Roaming', group: 'IRSF' },
+        ]);
         // One stable callback, so the outlet never re-binds it.
         expect(c.outletInputs()['select']).toBe(inputs['select']);
         fixture.detectChanges();

@@ -165,12 +165,13 @@ export class VizRenderComponent {
     /** Emits a clicked heatmap cell's raw row AND column values — the host drills on both dimensions at once. */
     readonly cellClick = output<HeatmapCellClick>();
     /** Emits a clicked mark that knows its own channel — the treemap, whose group cells drill on `group` and whose
-     *  subgroup cells drill on `subgroup`. The host resolves the channel to its field. */
-    readonly channelClick = output<{ channel: ChannelId; value: string }>();
+     *  subgroup cells drill on `subgroup` AND their parent group (carried in `group`). The host resolves the channels
+     *  to their fields. */
+    readonly channelClick = output<{ channel: ChannelId; value: string; group?: string }>();
 
     /** Handed to the treemap as its `select` input: one stable reference, so the outlet never re-binds it. */
-    private readonly treemapSelect = (channel: TreemapChannel, value: string): void =>
-        this.channelClick.emit({ channel, value });
+    private readonly treemapSelect = (channel: TreemapChannel, value: string, group?: string): void =>
+        this.channelClick.emit(group === undefined ? { channel, value } : { channel, value, group });
 
     readonly renderKind = computed(() => this.plugin().render.kind);
 

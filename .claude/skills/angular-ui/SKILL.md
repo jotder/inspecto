@@ -657,7 +657,9 @@ src/app/
   visualization types*): DOM buttons over a pure squarified layout (no chart dependency), channels `group` / optional
   `subgroup` / `value`, `options.treemap.limit` (default 20, rest → "Other"), colour = `seriesColors()` by group with
   `color-mix` tints toward `--gamma-bg-card`; a cell click reaches the host as viz-render's `(channelClick)` and
-  `widget-host` drills on THAT channel's field (a subgroup drill filters on the subgroup value alone).
+  `widget-host` drills on THAT channel's field — a group cell on the group alone, a subgroup cell on subgroup AND its
+  parent group (one `DrillEvent` with `and`, carried as `channelClick.group`), so it selects exactly the clicked
+  rectangle and a click in another group moves the selection (operator 2026-09-25); "Other" never drills.
   - **Waterfall + Combo** (2026-09-25; gallery: `/design` ▸ *More visualization types*). `waterfall` = floating
     `[low, high]` bars from `viz/waterfall-chart.ts` (`options.waterfall.start/totalLabel/order`, tones flipped by
     `kpi.better: 'lower'`); it ignores the generic `sort`/`limit` (step order is its meaning) and its drill click emits

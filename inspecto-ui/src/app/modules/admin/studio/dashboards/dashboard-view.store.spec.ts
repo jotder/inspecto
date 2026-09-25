@@ -120,3 +120,32 @@ describe('DashboardViewStore — date range per-tile scoping (UIE-5 d)', () => {
         expect(s.filterFor(DATED)).toBe(s.filterFor(DATED));
     });
 });
+
+describe('DashboardViewStore — treemap subgroup drill (group AND subgroup)', () => {
+    const eq = (field: string, value: string) => ({ kind: 'condition', field, operator: '=', value });
+    const online = (group: string) => ({
+        field: 'channel',
+        value: 'Online',
+        and: [{ field: 'typology', value: group }],
+    });
+
+    it('a subgroup click selects exactly its rectangle; one in another group moves it; the same click clears both', () => {
+        const s = store();
+        s.seed({ id: 'd', name: 'd', tiles: [] });
+        s.onDrill(online('SIM box'));
+        expect(s.filter().items).toEqual([eq('channel', 'Online'), eq('typology', 'SIM box')]);
+        s.onDrill(online('Wangiri'));
+        expect(s.filter().items).toEqual([eq('channel', 'Online'), eq('typology', 'Wangiri')]);
+        s.onDrill(online('Wangiri'));
+        expect(s.filter().items).toEqual([]);
+    });
+
+    it('a group click stays a one-field drill that toggles on its own', () => {
+        const s = store();
+        s.seed({ id: 'd', name: 'd', tiles: [] });
+        s.onDrill({ field: 'typology', value: 'IRSF' });
+        expect(s.filter().items).toEqual([eq('typology', 'IRSF')]);
+        s.onDrill({ field: 'typology', value: 'IRSF' });
+        expect(s.filter().items).toEqual([]);
+    });
+});
