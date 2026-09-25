@@ -1,63 +1,141 @@
 ---
 type: Concept
 title: Local feature testing without a real IAM or Postgres
-description: Two build/run paths — a faked-auth local path for feature testing, and the real Professional/Enterprise release path with a genuine OIDC provider and Postgres.
+description: Two build/run paths — Demo User sign-in (the offline demo build, no IAM, no Postgres) for local evaluation and feature testing, and the real Professional/Enterprise release path with a genuine OIDC provider and Postgres.
 ---
 
 # Local feature testing without a real IAM or Postgres
 
-Two separate goals, two separate procedures. Never conflate them — the fake path exists so a
-developer can exercise Professional/Enterprise route modules (geo-link, exchange, metrics, events,
-ops, notify-channels, backup, the Enterprise ABAC engine) without standing up an IdP or a Postgres
-instance; it must never reach a real deployment. Proven end-to-end 2026-09-21.
+Two separate goals, two separate procedures. Never conflate them. Path A exists so a developer or an
+internal evaluator can exercise Professional/Enterprise route modules (geo-link, exchange, metrics,
+events, ops, notify-channels, backup, the Enterprise ABAC engine) without standing up an IdP or a
+Postgres instance; it must never reach a real deployment.
+
+> **One mock path, not two (decision D-3, 2026-09-25).** Path A used to be a hand-built permit-all
+> authenticator under `tools/local-only-auth-bypass/` (retired — the directory was deleted) that
+> signed every request in as one fixed user with every capability. Demo User sign-in replaced it:
+> it signs in named users with **real roles**, so role-based access, owner-only views and the
+> audit actor behave as they would under OIDC.
 
 ## Default: build/run defaults to Professional
 
 Per standing operator instruction, build and package the app on the **Professional** edition unless
-someone explicitly asks for Personal or Enterprise.
+someone explicitly asks for Personal or Enterprise. (The Demo User build below is the exception: it is
+Enterprise-only by construction.)
 
-## Preview edition — pairs naturally with Path A
+## Preview edition
 
 **`Preview`** (added 2026-09-21, `-Pedition-preview` / `package.ps1 -Edition Preview`) bundles **every**
 optional module unconditionally — see [`EDITIONS.md` §Preview](../../../EDITIONS.md#preview--not-a-customer-facing-tier).
-It is not itself an auth bypass (it still ships real `inspecto-security.jar`/`inspecto-policy.jar` and
-fails closed exactly like Enterprise without a real IdP) — but building `-Edition Preview` once means
-Path A's classpath below never needs updating as new optional modules are added: whatever Preview
-staged, drop `fake-auth.jar` in alongside it instead of `inspecto-security.jar` and enumerating every
-module jar by hand.
+It is not an auth bypass: it ships the real `inspecto-security.jar`/`inspecto-policy.jar` and fails
+closed exactly like Enterprise without a real IdP. `package.ps1 -DemoAuth` accepts only
+`-Edition Enterprise`, so there is no Preview demo build.
 
-## Path A — Fake auth, no Postgres (local feature testing only)
+## Path A — Demo User sign-in, no IAM, no Postgres (offline demo build)
 
-**Goal:** exercise Professional/Enterprise features on your laptop with zero external dependencies.
+**Goal:** evaluate or feature-test Enterprise capabilities on one machine with zero external
+dependencies, signed in as named [**Demo Users**](../../../GLOSSARY.md#1-a-personas--surfaces) with
+real roles. As built by DEMO-AUTH-1 (`9d0eb5da3` module + SPA, `d9911b793` packaging).
 
-### 1. Build the edition(s) you need
+### What it is
 
-```powershell
-$env:JAVA_HOME = "C:\sandbox\.graalvm-cache\jdk-27-win"   # the JDK-27 toolchain — PATH java/mvn errors "release version 27 not supported"
-mvn -o clean package -DskipTests -Pedition-professional -B
+- **Module `inspecto-demo-auth`** — a real Maven module in the default reactor (root `pom.xml`) that
+  **no edition bundles**. It registers two SPIs through `META-INF/services`:
+  - `DemoTokenRelay` (`TokenRelay`) sits behind the existing `/auth/exchange`, `/auth/refresh` and
+    `/auth/logout` routes, so it adds **no route**. `exchangeCode` accepts `code = "demo:<Demo User id>"`
+    for a known Demo User and mints an access token (15 min) and a refresh token (8 h). A token is
+    `base64url(kind|userId|expiry).base64url(HMAC-SHA256)` under a random secret made once per JVM
+    (`DemoTokens`): a restart signs everyone out, and the kind (`a`/`r`) is signed, so a refresh
+    token is never accepted as a Bearer. `revoke` is the interface's default no-op. No password
+    (decision D-4).
+  - `DemoAuthenticator` (`Authenticator`) verifies the Bearer, reads the request's bound Space through
+    `Roles.configRoot(ex)` (the read half of the attribute `ControlApi` stamps before
+    authentication; falls back to `-Dassist.write.root` in legacy single-root mode), looks the Demo
+    User up in that Space, and resolves its roles against the Space's effective role table
+    (`Roles.effective`). It then removes Access Profile denials (`AccessGrants.deniedCapabilities`)
+    and publishes the held roles (`ComponentAccess.heldRoles`) — the same steps the OIDC path takes.
+    The `Subject` id is the Demo User id, so it is the audit actor and the owner in owner-only
+    checks. A forged, expired or wrong-kind token, or a Demo User unknown to the bound Space, gets
+    no Subject (401).
+- **`TokenRelay.bootstrapAuth()`** — a core default method (empty by default). `/bootstrap` emits a
+  non-empty result as `auth` (`BootstrapRoutes`). The demo relay returns
+  `{mock: true, demoUsers: [{id, displayName, title}]}` — never roles or capabilities, because it is
+  served before sign-in.
+- **`-Dauth.mode=demo`** — `/bootstrap` reports it as `features.authMode`; the SPA's `SessionService`
+  treats `demo` like `oidc` (sign-in required, same session flow). The sign-in page
+  (`sign-in.component.ts`) renders a Demo User picker under a *Not secure, local only* notice in
+  place of the SSO button; picking one sends `code=demo:<id>` through the unchanged
+  `/auth/callback` → `POST /auth/exchange` sequence. Sign out routes in-app, so the tester can
+  switch Demo User.
+
+### Demo Users live in the Space
+
+`<space>/config/demo-users.toon`, read by `DemoUsers`:
+
+```toon
+users[2]{id,displayName,title,roles}:
+  ra.analyst,Demo RA Analyst,Revenue Assurance analyst,operations
+  admin,Demo Admin,Platform administrator,admin;super
 ```
 
-To also exercise Enterprise's ABAC engine, additionally build `inspecto-policy` (it only enters the
-reactor under `-Pedition-enterprise`, so a Professional-only build never produces its jar):
+- `roles` is `;`-separated and names roles of **that Space's** role table (`roles.toon` over
+  `Roles.SEED`); names are lower-cased, and a role the table does not define grants nothing.
+  `displayName` defaults to the id, `title` to empty; a row without an `id` makes the file unreadable.
+- A missing file means the Space has no Demo Users. The file is re-read on every call, so edits apply
+  while the server runs.
+- The picker lists the **union across every Space** under `-Dspaces.root` (or the single
+  `-Dassist.write.root`). The same id defined **differently** in two Spaces is refused
+  (`IllegalStateException` when the list is built — at `/bootstrap` or sign-in, not at boot); the
+  same id defined identically is allowed. Roles still resolve per request against the bound Space,
+  so one Demo User can hold different capabilities in different Spaces.
+- No committed Space ships a `demo-users.toon`; a Space intended for a demo must author one.
+
+### Guardrails
+
+- **Loopback or refuse to load.** Both SPI constructors call `LoopbackOnly.require()`: unless
+  `-Dcontrol.bind` resolves to a loopback address, they throw `IllegalStateException` naming the
+  property. Unset counts as a refusal (it means every interface). The `Authenticator` slot is
+  fail-closed and `ControlApi`'s constructor resolves it eagerly, so a demo build bound anywhere else
+  **fails to boot** rather than serving an open sign-in.
+- **Never in a real bundle.** The jar is outside the jar enumerations `tools/check-sbom-modules.mjs`
+  parses, and only `package.ps1 -DemoAuth` stages it. There is no dedicated guard test that fails
+  when the jar is added to an edition, and no `tools/bundle-modules.mjs` entry.
+- **Not with `inspecto-security`.** `-DemoAuth` removes `inspecto-security.jar`. The `Authenticator`
+  slot takes the **first** provider it finds, so a hand-assembled classpath carrying both jars would
+  not refuse to boot — keep them apart by construction.
+
+### How to run it
 
 ```powershell
-mvn -o clean package -DskipTests -Pedition-enterprise -pl inspecto-policy -am -B
+$env:JAVA_HOME = "C:\sandbox\.graalvm-cache\jdk-27-win"   # the JDK-27 toolchain
+pwsh -File inspecto/package.ps1 -Edition Enterprise -DemoAuth
 ```
 
-### 2. Package the deployable bundle
+`-DemoAuth` (`inspecto/package.ps1`) requires `-Edition Enterprise` and:
 
-```powershell
-pwsh -File inspecto/package.ps1 -NoBuild -Edition Professional
-```
+- assembles into `inspecto-demo/` (never `inspecto-deploy/`) and zips as `inspecto-demo-<platform>.zip`;
+- builds `inspecto-demo-auth` (unless `-NoBuild`), then, **after** the SBOM step (the SBOM describes
+  the Enterprise set), deletes `inspecto-security.jar`, copies in `inspecto-demo-auth.jar`, and checks
+  the jar carries both SPI registrations;
+- deletes `serve.*`, `Dockerfile`, `.dockerignore` and the service installers (without the security
+  jar they would boot an auth-free server on every interface);
+- writes `serve-demo.bat` / `serve-demo.sh` with `-Dcontrol.bind=127.0.0.1 -Dauth.mode=demo
+  -Dobjects.backend=db -Devents.backend=parquet -Dspaces.root=%SPACES_ROOT%` (default `spaces`,
+  port from `PORT`, default 8080), and `DEMO-BUILD.txt` saying *internal evaluation only*;
+- adds the demo jar and flags to its boot smoke.
 
-If you built `inspecto-policy` too, copy its jar in manually (the packager doesn't add it under a
-Professional-only edition flag):
+Then drop a Space folder that has a `config/demo-users.toon` into `inspecto-demo\spaces\`, seed its
+inbox if needed (below), run `serve-demo.bat` (or `./serve-demo.sh`), open `http://127.0.0.1:8080`
+and pick a Demo User.
 
-```powershell
-Copy-Item inspecto-policy\target\inspecto-policy-4.0.0-SNAPSHOT.jar inspecto-deploy\inspecto-policy.jar
-```
+> ⚠ **The `-DemoAuth` package run has NOT been verified end to end** (as of 2026-09-25). Run 1
+> reached the SBOM step (the jar swap worked; an ordering bug was fixed); run 2 stopped at `npm ci`
+> on a locked `esbuild.exe`. Nobody has yet booted a packaged demo build and signed in. What *is*
+> verified is the module itself: `DemoAuthHttpTest` (real HTTP) covers the picker, exchange, a
+> per-user Subject and audit actor, a capability 403, a forged token, the loopback refusal and
+> token kinds/expiry.
 
-### 2b. Seed a space's pipeline inbox (first run only)
+### Seed a space's pipeline inbox (first run only)
 
 The packaged bundle ships each space's `data/samples/` (the pristine, committed source feeds) but
 deliberately does **not** ship pipeline output (`data/<pipeline>/database/*.parquet` etc.) —
@@ -72,64 +150,23 @@ samples into `data/inbox/<pipeline>/` for the engine to pick up on its next poll
 manual pipeline trigger):
 
 ```powershell
-pwsh -File inspecto-deploy\spaces\demo\data\samples\seed-inbox.ps1
+pwsh -File inspecto-demo\spaces\demo\data\samples\seed-inbox.ps1
 ```
 
 The already-running `CollectorService` polls every 60s and ingests automatically — no restart needed.
-Verify with:
 
-```powershell
-curl "http://localhost:8080/api/v1/spaces/demo/link-analysis-views"   # or just retry the saved view in the UI after ~60s
-```
+### Verify
 
-### 3. Run with the fake authenticator
-
-```powershell
-pwsh -File tools\local-only-auth-bypass\build-and-run.ps1 -Enterprise
-```
-
-This script (`tools/local-only-auth-bypass/`):
-- compiles `LocalTestAuthenticator` — a permit-all `com.gamma.control.Authenticator` SPI
-  implementation that grants a fixed `local-tester` Subject **every** declared capability
-  (`CapabilityManifest.capabilities()`), regardless of what credentials (if any) a request carries;
-- packages it as `fake-auth.jar` with its own `META-INF/services/com.gamma.control.Authenticator`;
-- launches `ControlApi` with a classpath that includes `fake-auth.jar` **instead of**
-  `inspecto-security.jar` (so no `-Dauth.oidc.*` flags are needed at all — `Authenticators.active()`
-  finds the fake one and never looks for OIDC config), plus every Professional-only route-module jar,
-  plus `inspecto-policy.jar` when `-Enterprise` is passed;
-- never sets `-Dinspecto.db` — it defaults to DuckDB/local disk (`OperationalDb.java`), so no
-  Postgres server is needed either.
-
-### 4. Verify
-
-```powershell
-curl http://localhost:8080/health                                              # 200
-curl http://localhost:8080/api/v1/spaces                                       # 200 with NO credentials at all
-curl "http://localhost:8080/api/v1/access/explain?route=/spaces&method=GET"    # "enabled":true if -Enterprise was passed — proves the ABAC engine is genuinely wired, not stubbed
-```
-
-The boot log names the active authenticator directly: `ControlApi started on port 8080 (Professional
-edition — authentication enforced via com.gamma.control.LocalTestAuthenticator)`. The ABAC module logs
-nothing at boot (unlike route modules, which log "route module discovered: ..."), so `/access/explain`
-is the only real proof it's live — checking for `inspecto-policy.jar`'s presence on disk only proves it
-was built, not that it's wired.
-
-### Caveats
-
-- With no `access-policies.toon` authored beyond the seeded defaults, ABAC mostly returns `ABSTAIN`
-  rather than an active deny — author a policy in a space's `access-policies.toon` to exercise real
-  deny/allow decisions.
-- `LocalTestAuthenticator` source lives under `tools/`, deliberately outside every Maven module and
-  every `pom.xml` — it must never be compiled into `inspecto.jar` or bundled by `package.ps1`. If
-  either ever happens, it's a defect: the Authenticator SPI existing on a real Professional classpath
-  with no real OIDC provider was the exact failure mode Path B's fail-closed design (below) exists to
-  prevent.
+The boot log names the active authenticator: `ControlApi started on port 8080 (Professional edition —
+authentication enforced via com.gamma.demoauth.DemoAuthenticator)`. `/bootstrap` carries
+`auth.mock: true` and the Demo User list. `/bootstrap` also reports `edition: professional` — its
+edition label is "anything but `auth.mode=none`", not the jar set.
 
 ## Path B — The real release: Professional/Enterprise with a genuine IAM and Postgres
 
 **Goal:** ship or run a bundle that actually enforces authentication.
 
-### 1. Build + package (same as Path A steps 1–2, minus the fake-auth detour)
+### 1. Build + package
 
 ```powershell
 $env:JAVA_HOME = "C:\sandbox\.graalvm-cache\jdk-27-win"
@@ -196,16 +233,16 @@ as Path A, with zero other change.
 curl http://localhost:8080/health   # 200
 ```
 then confirm the boot log names the real authenticator: `authentication enforced via
-com.gamma.security.OidcAuthenticator` (not `LocalTestAuthenticator`) — that string is the tell for
-"is this actually a real deployment or did Path A's fake jar end up on the classpath by mistake."
+com.gamma.security.OidcAuthenticator` (not `com.gamma.demoauth.DemoAuthenticator`) — that string is the
+tell for "is this actually a real deployment or did Path A's demo jar end up on the classpath by mistake."
 
 ## Comparison
 
-| | Path A (fake, local) | Path B (real release) |
+| | Path A (Demo User, local) | Path B (real release) |
 |---|---|---|
-| Authenticator | `LocalTestAuthenticator` (permit-all, `tools/`) | `com.gamma.security.OidcAuthenticator` (real IdP) |
+| Authenticator | `com.gamma.demoauth.DemoAuthenticator` (Demo Users with real roles, `inspecto-demo-auth`) | `com.gamma.security.OidcAuthenticator` (real IdP) |
 | Operational DB | DuckDB (default, unset `-Dinspecto.db`) | DuckDB or Postgres (`INSPECTO_DB_URL` set) |
 | Needs a running IdP? | No | Yes |
-| Safe to expose beyond localhost? | **Never** | Yes, per the edition's transport/TLS story |
+| Safe to expose beyond localhost? | **Never** (refuses to load unless bound to loopback) | Yes, per the edition's transport/TLS story |
 | Classpath includes `inspecto-security.jar`? | No (deliberately) | Yes |
-| Boot log tell | `...LocalTestAuthenticator` | `...OidcAuthenticator` |
+| Boot log tell | `...DemoAuthenticator` | `...OidcAuthenticator` |

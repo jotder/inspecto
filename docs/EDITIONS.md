@@ -61,7 +61,7 @@ eventually lands (Personal/Professional/Enterprise).
 - Never ship Preview to a customer, never advertise it externally, and never let it gate a compliance
   claim — it carries no compliance-scope guarantee at all.
 - See [`okf/backend/editions/local-testing-without-iam.md`](okf/backend/editions/local-testing-without-iam.md)
-  for the companion fake-auth/no-Postgres local testing path, which composes with Preview.
+  for the companion no-IAM/no-Postgres local path (Demo User sign-in, an Enterprise-only demo build).
 
 ## Assembly model (how an edition is produced)
 
