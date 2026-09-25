@@ -331,7 +331,9 @@ export class ExploreComponent implements OnInit {
             })
             .afterClosed()
             .subscribe((edited?: WidgetOptions) => {
-                if (edited) this.options.set(edited);
+                if (!edited) return;
+                this.options.set(edited);
+                this.run(); // a table's `tableSort` orders the query itself — re-run so the preview shows it
             });
     }
 
@@ -372,7 +374,12 @@ export class ExploreComponent implements OnInit {
         const plugin = this.plugin();
         const ds = this.dataset();
         if (!plugin || !ds || plugin.meta.viewKind) return;
-        const spec = plugin.buildQuery(this.controls(), { datasetId: ds.id, sourceName: ds.sourceName, filters: null });
+        const spec = plugin.buildQuery(this.controls(), {
+            datasetId: ds.id,
+            sourceName: ds.sourceName,
+            filters: null,
+            options: this.options(),
+        });
         this.running.set(true);
         // Through DatasetResultService: POST /bi/query — the builder previews against the same data
         // path the saved widget will render with.

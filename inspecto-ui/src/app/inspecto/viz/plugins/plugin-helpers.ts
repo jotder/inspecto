@@ -1,7 +1,7 @@
 import { ConditionGroup } from 'app/inspecto/query';
 import { humanizeColumn } from '../column-label';
 import { channelMeasure, channelMeasureId } from '../query-spec';
-import { ChannelValue, ControlValues, QuerySpec, TimeGrain, VizProps } from '../viz-types';
+import { ChannelValue, ControlValues, QuerySpec, TimeGrain, VizProps, VizRenderOptions } from '../viz-types';
 
 /**
  * Shared pure helpers for the standard chart plugins: turn the field mapping into a {@link QuerySpec}, and
@@ -12,6 +12,8 @@ export interface QueryCtx {
     datasetId: string;
     sourceName: string;
     filters?: ConditionGroup | null;
+    /** The widget's options — read by plugins whose query depends on one (the table's `tableSort`). */
+    options?: VizRenderOptions;
 }
 
 function field(cv?: ChannelValue[]): string | undefined {

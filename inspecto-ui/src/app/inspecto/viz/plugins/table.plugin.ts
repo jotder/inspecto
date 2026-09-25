@@ -9,7 +9,18 @@ import { QueryCtx } from './plugin-helpers';
 function buildTableQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
     const groupBy = (values.x ?? []).map((cv) => cv.field);
     const measures = (values.y ?? []).map(channelMeasure);
-    return { datasetId: ctx.datasetId, sourceName: ctx.sourceName, groupBy, measures, filters: ctx.filters ?? null };
+    // `options.tableSort` orders the query itself, so the row limit keeps the top rows. Only a result column can be
+    // ordered by — a field left over from an earlier mapping is dropped rather than failing the whole query.
+    const sort = ctx.options?.tableSort;
+    const sortable = !!sort?.field && (groupBy.includes(sort.field) || measures.some((m) => m.id === sort.field));
+    return {
+        datasetId: ctx.datasetId,
+        sourceName: ctx.sourceName,
+        groupBy,
+        measures,
+        filters: ctx.filters ?? null,
+        ...(sort && sortable ? { orderBy: [{ field: sort.field, dir: sort.dir }] } : {}),
+    };
 }
 
 function transformTable(rows: Record<string, unknown>[]): VizProps {

@@ -282,6 +282,27 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     // Gauge: the scale the arc spans (`options.gauge`); a blank end keeps its default (0 / 100) and writes nothing.
     { key: 'gaugeMin', label: 'Gauge: minimum', type: 'number', tier: 'required', required: false, placeholder: '0' },
     { key: 'gaugeMax', label: 'Gauge: maximum', type: 'number', tier: 'required', required: false, placeholder: '100' },
+    // Table: the row order the query returns (`options.tableSort`, a server-side ORDER BY). A blank column writes nothing.
+    {
+        key: 'tableSortField',
+        label: 'Table: sort rows by column',
+        type: 'string',
+        tier: 'required',
+        required: false,
+        placeholder: 'A dimension or measure column, e.g. sum_exposure_sar',
+    },
+    {
+        key: 'tableSortDir',
+        label: 'Table: sort direction',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: 'desc',
+        options: [
+            { value: 'desc', label: 'Descending (largest first)' },
+            { value: 'asc', label: 'Ascending (smallest first)' },
+        ],
+    },
     // UIE-6: optional readable column carrying the link instead of the id; the id column is then hidden (still queried).
     {
         key: 'rowLinkLabelField',
@@ -307,5 +328,7 @@ export const WIDGET_OPTION_VIZ_TYPES: Record<string, string> = {
     format2Decimals: 'combo',
     gaugeMin: 'gauge',
     gaugeMax: 'gauge',
+    tableSortField: 'table',
+    tableSortDir: 'table',
 };
 // ── end per-Visualization-Type options ──────────────────────────────────────────────────────────────────────

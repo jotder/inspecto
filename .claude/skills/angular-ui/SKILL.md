@@ -197,6 +197,11 @@ src/app/
     (named "Open Reconciliation <label>") and the raw `idField` column is HIDDEN from the grid but stays a queried
     dimension, because the link reads the id from the same row — ⛔ never drop the id from `controls.x`. Without
     `labelField` the id cell itself is the link. A blank id renders plain text; the link wins over a status badge.
+  - **Table Widget default order → `options.tableSort: {field, dir}`** (R2-02, 2026-09-26): `TABLE_PLUGIN.buildQuery`
+    reads it from `ctx.options` and emits a server-side `orderBy` (so the row limit keeps the TOP rows); `field` is a
+    result column id (a chosen dimension or a measure id like `sum_exposure_sar`), anything else is dropped. Not the
+    chart `sort` (client-side, value-of-first-series, ignored by tables). Every `buildQuery` caller that has the
+    widget's options must pass `options`; a grid header click still re-sorts client-side.
   - **`<app-dashboard-date-range [selection] [anchor] (selectionChange)>`** — the Dashboard **date-range**
     control (UIE-5 d, 2026-09-25; `studio/dashboards/`): presets counted back from the Dashboard's `asOf` (or
     today), *All dates*, *Custom* From/To; a labelled `role="group"`, an inverted custom span is announced

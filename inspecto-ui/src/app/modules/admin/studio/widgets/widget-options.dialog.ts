@@ -93,6 +93,8 @@ export class WidgetOptionsDialog {
         format2Decimals: this.data.format2?.decimals ?? null,
         gaugeMin: this.data.gauge?.min ?? null,
         gaugeMax: this.data.gauge?.max ?? null,
+        tableSortField: this.data.tableSort?.field ?? '',
+        tableSortDir: this.data.tableSort?.dir ?? 'desc',
         rowLinkLabelField: this.data.rowLink?.labelField ?? '', // UIE-6 link text column
     };
 
@@ -211,6 +213,11 @@ export class WidgetOptionsDialog {
         if ('gaugeMin' in v) {
             const num = (x: unknown) => (typeof x === 'number' ? x : undefined);
             o.gauge = merge(o.gauge, { min: num(v['gaugeMin']), max: num(v['gaugeMax']) });
+        }
+        if ('tableSortField' in v) {
+            const raw = v['tableSortField'];
+            const field = typeof raw === 'string' ? raw.trim() : '';
+            o.tableSort = field ? { field, dir: v['tableSortDir'] === 'asc' ? 'asc' : 'desc' } : undefined;
         }
     }
 }

@@ -180,6 +180,31 @@ describe('WidgetOptionsDialog', () => {
     });
     // ── end Gauge scale ──
 
+    // ── Table sort (R2-02): the order the query returns ──
+    it('offers the table sort only for a table, round-trips it, and a blank column removes it', () => {
+        const { fixture, c, ref } = create({ tableSort: { field: 'sum_exposure_sar', dir: 'desc' } }, 'table');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Table: sort rows by column');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).tableSort).toEqual({
+            field: 'sum_exposure_sar',
+            dir: 'desc',
+        });
+        c.schemaForm.form.patchValue({ tableSortField: ' region ', tableSortDir: 'asc' });
+        c.save();
+        expect((ref.close.mock.calls[1][0] as WidgetOptions).tableSort).toEqual({ field: 'region', dir: 'asc' });
+        c.schemaForm.form.patchValue({ tableSortField: '' });
+        c.save();
+        expect((ref.close.mock.calls[2][0] as WidgetOptions).tableSort).toBeUndefined();
+    });
+
+    it('hides the table sort for other types and keeps a stored one as-is', () => {
+        const { fixture, c, ref } = create({ tableSort: { field: 'count', dir: 'asc' } }, 'bar');
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Table: sort rows by column');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).tableSort).toEqual({ field: 'count', dir: 'asc' });
+    });
+    // ── end Table sort ──
+
     it('renders with no a11y violations', async () => {
         const { fixture } = create({});
         await expectNoA11yViolations(fixture.nativeElement);

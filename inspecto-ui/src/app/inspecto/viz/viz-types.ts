@@ -62,7 +62,19 @@ export interface QuerySpec {
 }
 
 /** The channels a plugin can map fields onto (Tableau-style). `rows` / `columns` are the heatmap's two axes. */
-export type ChannelId = 'x' | 'y' | 'y2' | 'series' | 'size' | 'color' | 'value' | 'compare' | 'group' | 'subgroup' | 'rows' | 'columns';
+export type ChannelId =
+    | 'x'
+    | 'y'
+    | 'y2'
+    | 'series'
+    | 'size'
+    | 'color'
+    | 'value'
+    | 'compare'
+    | 'group'
+    | 'subgroup'
+    | 'rows'
+    | 'columns';
 
 /** A field-mapper control: one channel, the roles it accepts, and whether it's multi/required. */
 export interface ControlSpec {
@@ -176,6 +188,11 @@ export interface VizRenderOptions {
     waterfall?: { start?: string; totalLabel?: string; order?: 'data' | 'asc' | 'desc' };
     /** Combo only: draw the line measures (`y2`) on a secondary right axis. Default `true` when a line measure exists. */
     combo?: { secondaryAxis?: boolean };
+    /** Table only: the row order the QUERY returns (a server-side ORDER BY, so the row limit keeps the top rows, not
+     *  arbitrary ones). `field` is a result column id — a chosen dimension or a measure id (`sum_exposure_sar`); a field
+     *  that is neither is ignored. Distinct from `sort`, which reorders Chart.js categories client-side by value and
+     *  which a table ignores. A grid header click still re-sorts the loaded rows client-side. */
+    tableSort?: { field: string; dir: SortDir };
     /** UIE-4, table only: a per-column format, keyed by result column id (`sum_exposure_sar`). */
     columnFormats?: Record<string, NumberFormat>;
     /** UIE-6, table only: the operational object each row describes. The `labelField` cell (else the `idField` cell)
@@ -229,7 +246,7 @@ export interface VizPlugin {
     /** Build the structured query from the field mapping (caller supplies dataset id/source). */
     buildQuery(
         values: ControlValues,
-        ctx: { datasetId: string; sourceName: string; filters?: ConditionGroup | null },
+        ctx: { datasetId: string; sourceName: string; filters?: ConditionGroup | null; options?: VizRenderOptions },
     ): QuerySpec;
     /** Shape result rows into render props for this plugin. */
     transformProps(rows: Record<string, unknown>[], values: ControlValues): VizProps;

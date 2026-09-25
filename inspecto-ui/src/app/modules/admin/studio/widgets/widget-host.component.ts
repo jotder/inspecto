@@ -302,6 +302,7 @@ export class WidgetHostComponent {
                 datasetId: dataset.id,
                 sourceName: dataset.sourceName,
                 filters: this.filter(),
+                options: widget.options,
             });
             this.datasetResult
                 .run(spec, this.colMetas())
