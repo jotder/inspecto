@@ -34,7 +34,9 @@ export const landingGuard: CanActivateFn = async (): Promise<UrlTree> => {
     let tree;
     try {
         tree = await firstValueFrom(menus.get().pipe(timeout(LANDING_FETCH_MS)));
-    } catch {
+    } catch (err) {
+        // The one way a signed-in user reaches Home despite a landing — say so, or the fallback reads as a wrong landing.
+        console.warn('Landing skipped: the Menu tree could not be read; opening Home.', err);
         return home;
     }
     await session.sessionSettled();
