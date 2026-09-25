@@ -22,6 +22,7 @@ import {
     DEFAULT_REFRESH_MS,
     LensService,
     NotificationsService,
+    SessionService,
     spaceScopedUrl,
     SpacesService,
     visibleInterval,
@@ -173,6 +174,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 export class NotificationBellComponent implements OnInit, OnDestroy {
     readonly svc = inject(NotificationsService);
     private spaces = inject(SpacesService);
+    private session = inject(SessionService);
     private lens = inject(LensService);
 
     /** Read/unread is each user's own, so every user gets those buttons; delete archives the ONE shared
@@ -228,7 +230,11 @@ export class NotificationBellComponent implements OnInit, OnDestroy {
 
     /** Open the SSE stream; fall back to polling if EventSource is unavailable or the stream errors. */
     private connect(): void {
-        if (typeof EventSource === 'undefined') {
+        // 🔴 R2-12: on a signed-in edition (OIDC / demo auth) the SPA's credential is an in-memory bearer
+        // token, and `EventSource` cannot send an Authorization header — so the stream could only ever answer
+        // 401, and each attempt wrote an `access.denied` row to the audit trail. Poll instead until the server
+        // offers an EventSource-compatible credential.
+        if (typeof EventSource === 'undefined' || this.session.authMode() === 'oidc') {
             this.startPolling();
             return;
         }

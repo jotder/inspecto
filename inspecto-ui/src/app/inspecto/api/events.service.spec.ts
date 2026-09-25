@@ -3,6 +3,7 @@ import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { EventRow, EventsService } from './events.service';
+import { SessionService } from './session.service';
 import { SpacesService } from './spaces.service';
 import { environment } from '../../../environments/environment';
 
@@ -72,6 +73,15 @@ describe('EventsService.stream (GET /signals/stream, CLIENT-HALVES-1 part c)', (
         // guard. This test used to do exactly that.
         expect((errored as Error).message).toBe('EventSource unavailable');
         expect(frames).toBe(0);
+    });
+
+    it('never opens an EventSource on a signed-in edition — it cannot carry the bearer token (R2-12)', () => {
+        setEventSource(FakeEventSource);
+        TestBed.inject(SessionService).authMode.set('oidc');
+        let errored: unknown;
+        svc.stream().subscribe({ error: (e) => (errored = e) });
+        expect(FakeEventSource.last, 'no stream is attempted, so no 401 is audited').toBeUndefined();
+        expect((errored as Error).message).toBe('signal stream cannot carry the bearer token');
     });
 
     it('projects a Signal frame onto the EventRow view', () => {

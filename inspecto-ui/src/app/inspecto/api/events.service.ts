@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import { spaceScopedUrl } from './space-scope';
+import { SessionService } from './session.service';
 import { SpacesService } from './spaces.service';
 import type { Ref } from '../component-model/component-types';
 import { signalToEvent, type Signal, type SignalSeverity } from '../signal/signal';
@@ -96,6 +97,7 @@ export const EVENT_TYPES: string[] = [
 export class EventsService {
     private http = inject(HttpClient);
     private spaces = inject(SpacesService);
+    private session = inject(SessionService);
 
     /** Filtered events, newest-first (GET /events/search). An empty filter returns the newest `limit` events. */
     /**
@@ -180,6 +182,12 @@ export class EventsService {
         return new Observable<EventRow>((subscriber) => {
             if (typeof EventSource === 'undefined') {
                 subscriber.error(new Error('EventSource unavailable'));
+                return;
+            }
+            // R2-12: a signed-in edition authenticates with a bearer header `EventSource` cannot send, so the
+            // stream could only answer 401 (and audit an access.denied) — error at once so the caller polls.
+            if (this.session.authMode() === 'oidc') {
+                subscriber.error(new Error('signal stream cannot carry the bearer token'));
                 return;
             }
             const params = toParams(filter as Record<string, unknown>).toString();

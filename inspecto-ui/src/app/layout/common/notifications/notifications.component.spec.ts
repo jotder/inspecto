@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
@@ -8,8 +8,30 @@ import { SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { NotificationBellComponent } from './notifications.component';
 
+/** Counts `EventSource` constructions, so the transport choice is observable in jsdom (which has none). */
+class FakeEventSource {
+    static opened: string[] = [];
+    onmessage: ((e: MessageEvent<string>) => void) | null = null;
+    onerror: ((e: Event) => void) | null = null;
+    constructor(readonly url: string) {
+        FakeEventSource.opened.push(url);
+    }
+    close(): void {
+        /* nothing to release */
+    }
+}
+const G = globalThis as unknown as Record<string, unknown>;
+
 describe('NotificationBellComponent', () => {
+    let hadEventSource: boolean;
+
+    afterEach(() => {
+        if (!hadEventSource) delete G['EventSource'];
+    });
+
     beforeEach(() => {
+        hadEventSource = 'EventSource' in G;
+        FakeEventSource.opened = [];
         TestBed.configureTestingModule({
             imports: [NotificationBellComponent],
             // provideRouter: the delete gate reads LensService → SessionService, which needs the router.
@@ -32,6 +54,29 @@ describe('NotificationBellComponent', () => {
 
         session.capabilities.set(['canAdminister']);
         expect(cmp.canDelete()).toBe(true);
+    });
+
+    // R2-12: EventSource cannot send the in-memory bearer token, so on a signed-in edition the stream could
+    // only 401 — and each refusal was an `access.denied` audit row. The bell must poll there instead.
+    it('polls instead of opening the stream on a signed-in edition', () => {
+        G['EventSource'] = FakeEventSource;
+        TestBed.inject(SessionService).authMode.set('oidc');
+        const fixture = TestBed.createComponent(NotificationBellComponent);
+        fixture.detectChanges(); // ngOnInit → connect()
+        flushInitialLoad();
+
+        expect(FakeEventSource.opened).toEqual([]);
+    });
+
+    it('still streams on the auth-free edition, where no bearer is needed', () => {
+        G['EventSource'] = FakeEventSource;
+        TestBed.inject(SessionService).authMode.set('none');
+        const fixture = TestBed.createComponent(NotificationBellComponent);
+        fixture.detectChanges();
+        flushInitialLoad();
+
+        expect(FakeEventSource.opened).toHaveLength(1);
+        expect(FakeEventSource.opened[0]).toContain('/notifications/stream');
     });
 
     function flushInitialLoad(): void {
