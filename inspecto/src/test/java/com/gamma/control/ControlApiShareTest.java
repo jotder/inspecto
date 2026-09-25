@@ -234,6 +234,58 @@ class ControlApiShareTest {
         }
     }
 
+    // ── UIE-5 (d): the shared Dashboard's DEFAULT date range applies server-side, scoped per Dataset ──
+
+    private static final String DATED_SUM = "{\"dataset\":\"dated_ds\",\"measures\":[{\"agg\":\"sum\",\"field\":\"amount\"}]%s}";
+
+    private double datedSum(Ctx c, String token, String extra) throws Exception {
+        HttpResponse<String> r = post(c.port, "/public/dashboards/" + token + "/query", String.format(DATED_SUM, extra));
+        assertEquals(200, r.statusCode(), r.body());
+        return V1Body.of(r.body()).get("rows").get(0).elements().next().asDouble();
+    }
+
+    private String shareToken(Ctx c, String dashboard) throws Exception {
+        return V1Body.of(post(c.port, "/dashboards/" + dashboard + "/share", null).body()).get("token").asText();
+    }
+
+    @Test
+    void theDefaultDateRangeFencesASharedQuery(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        System.setProperty("bi.share.secret", "test-secret-0123456789");
+        try (Ctx c = open(cfg, root)) {
+            seed(c);
+            // TIMESTAMPs: the first day's midnight and the last day's evening are IN; one second before and the
+            // next midnight are OUT — the range is inclusive days, even on a timestamp column.
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("dated_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES (TIMESTAMP '2026-09-24 18:00:00', 1.0), (TIMESTAMP '2026-09-18 00:00:00', 2.0),"
+                            + " (TIMESTAMP '2026-09-17 23:59:59', 4.0), (TIMESTAMP '2026-09-25 00:00:00', 8.0))"
+                            + " AS t(sold_at, amount)", "2026-09-24T00:00:00Z"));
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("dataset", "dated_ds", Map.of("view", "dated_view",
+                    "columns", List.of(Map.of("name", "sold_at", "type", "date"), Map.of("name", "amount", "type", "number"))));
+            reg.write("widget", "dated_w", Map.of("kind", "bar", "datasetId", "dated_ds"));
+            reg.write("dashboard", "ranged_board", Map.of("widgets", List.of("dated_w", "sales_w"),
+                    "dateField", "sold_at", "asOf", "2026-09-24", "defaultRange", "last-7-days"));
+            reg.write("dashboard", "custom_board", Map.of("widgets", List.of("dated_w"), "dateField", "sold_at",
+                    "defaultRange", Map.of("from", "2026-09-17", "to", "2026-09-17")));
+            reg.write("dashboard", "bad_range_board", Map.of("widgets", List.of("dated_w"), "dateField", "sold_at",
+                    "defaultRange", "last-week"));
+
+            String token = shareToken(c, "ranged_board");
+            assertEquals(3.0, datedSum(c, token, ""), "last 7 days to 24 Sep: 18 Sep 00:00 .. 24 Sep 18:00 only");
+            String widen = ",\"filters\":[{\"field\":\"sold_at\",\"op\":\">=\",\"value\":\"2000-01-01\"}]";
+            assertEquals(3.0, datedSum(c, token, widen), "a recipient cannot widen the range");
+            assertEquals(3.0, datedSum(c, token, ",\"filters\":[]"), "nor drop it");
+            // The same share's other Dataset has no sold_at column → unranged, not an error.
+            assertEquals(15.0, sharedSum(c, "ranged_board", ""), "a Dataset without the date column is not range-filtered");
+
+            assertEquals(4.0, datedSum(c, shareToken(c, "custom_board"), ""), "a custom one-day span");
+
+            HttpResponse<String> refused = post(c.port, "/public/dashboards/" + shareToken(c, "bad_range_board") + "/query",
+                    String.format(DATED_SUM, ""));
+            assertEquals(422, refused.statusCode(), "an unreadable range is refused, never dropped: " + refused.body());
+        }
+    }
+
     @Test
     void unknownDashboardShareIs404(@TempDir Path cfg, @TempDir Path root) throws Exception {
         System.setProperty("bi.share.secret", "test-secret-0123456789");

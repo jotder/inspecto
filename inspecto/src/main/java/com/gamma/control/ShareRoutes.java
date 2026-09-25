@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -36,7 +37,9 @@ import java.util.Set;
  *       (same body as {@code /bi/query}) restricted to the datasets the shared dashboard's widgets
  *       actually reference — a token never becomes a general data API. The body's {@code filters} are
  *       IGNORED: the shared Dashboard's stored {@code filter} is applied instead (SHARE-SAVED-FILTER-1,
- *       {@link SharedDashboardFilter}), so a shared link shows what the Dashboard shows.</li>
+ *       {@link SharedDashboardFilter}), so a shared link shows what the Dashboard shows — and so is its
+ *       DEFAULT date range, for a Dataset that has the Dashboard's {@code dateField} ({@link DashboardDateRange}).
+ *       A recipient cannot choose another range.</li>
  * </ul>
  */
 final class ShareRoutes implements RouteModule {
@@ -115,7 +118,10 @@ final class ShareRoutes implements RouteModule {
         MeasureCompiler.Spec spec;
         String sql;
         try {
-            fenced.put("filters", SharedDashboardFilter.terms(dashboard.get("filter"), dataset));
+            // UIE-5 (d): and the Dashboard's DEFAULT date range, for a Dataset that has its date column — same fence.
+            List<Map<String, Object>> filters = new ArrayList<>(SharedDashboardFilter.terms(dashboard.get("filter"), dataset));
+            filters.addAll(DashboardDateRange.terms(dashboard, dataset, LocalDate.now()));
+            fenced.put("filters", filters);
             spec = MeasureCompiler.parse(fenced, 500, 10_000);
             sql = MeasureCompiler.compile(spec);
         } catch (IllegalArgumentException bad) {
