@@ -83,8 +83,35 @@ describe('KpiReportsComponent', () => {
     it('lists saved dashboards as gallery cards with tile/filter counts', () => {
         const text = create().fixture.nativeElement.textContent as string;
         expect(text).toContain('cdr_overview');
-        expect(text).toContain('1 tile(s)');
-        expect(text).toContain('1 quick filter(s)');
+        expect(text).toContain('1 tile · 1 quick filter');
+        expect(text).not.toContain('(s)');
+    });
+
+    // R2-16: cards showed the Dashboard id (`assurance_cockpit`) and "8 tile(s)". They now lead with the readable
+    // title — an authored name, else the header description — with the id secondary, ordered by title.
+    it('titles cards by the Dashboard title with the id secondary, sorted by title', () => {
+        const tiles = (n: number) => Array.from({ length: n }, (_, i) => ({ widgetId: 'w' + i, span: 1 as const }));
+        const { fixture } = create({
+            dashboards: [
+                {
+                    id: 'fm_kpi_scorecard',
+                    name: 'fm_kpi_scorecard',
+                    description: 'Fraud KPI scorecard',
+                    tiles: tiles(1),
+                },
+                { id: 'assurance_cockpit', name: 'Assurance cockpit', tiles: tiles(8), exposedFields: ['a', 'b'] },
+            ],
+        });
+        const cards = Array.from(
+            fixture.nativeElement.querySelectorAll('a[href^="/studio/dashboards/"]'),
+        ) as HTMLElement[];
+        const lines = cards.map((c) =>
+            Array.from(c.querySelectorAll('span')).map((s) => (s as HTMLElement).textContent?.trim()),
+        );
+        expect(lines).toEqual([
+            ['Assurance cockpit', 'assurance_cockpit', '8 tiles · 2 quick filters'],
+            ['Fraud KPI scorecard', 'fm_kpi_scorecard', '1 tile'],
+        ]);
     });
 
     it('shows the empty state when there are no dashboards', () => {

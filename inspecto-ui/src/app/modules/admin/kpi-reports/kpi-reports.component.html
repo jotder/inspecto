@@ -38,13 +38,12 @@
                                 class="text-primary icon-size-5"
                                 svgIcon="heroicons_outline:squares-2x2"
                             ></mat-icon>
-                            <span class="truncate font-semibold">{{ d.name }}</span>
+                            <span class="truncate font-semibold">{{ dashboardTitle(d) }}</span>
                         </div>
-                        <span class="text-secondary text-sm">
-                            {{ d.tiles.length }} tile(s){{
-                                d.exposedFields?.length ? ' · ' + d.exposedFields!.length + ' quick filter(s)' : ''
-                            }}
-                        </span>
+                        @if (dashboardTitle(d) !== d.id) {
+                            <span class="text-secondary truncate font-mono text-xs">{{ d.id }}</span>
+                        }
+                        <span class="text-secondary text-sm">{{ cardSummary(d) }}</span>
                     </a>
 
                     <!-- C6: scheduled exports for this dashboard -->

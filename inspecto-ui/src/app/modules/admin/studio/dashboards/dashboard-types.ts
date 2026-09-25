@@ -79,6 +79,16 @@ export interface Dashboard extends DashboardConfig {
     name: string;
 }
 
+/**
+ * The readable title of a Dashboard (R2-16): an authored `name` that differs from the id, else its header
+ * `description`, else the id. `name` defaults to the id when the config carries none, so it is only a title
+ * when someone actually wrote one.
+ */
+export function dashboardTitle(d: Pick<Dashboard, 'id' | 'name' | 'description'>): string {
+    const name = d.name?.trim();
+    return (name && name !== d.id ? name : '') || d.description?.trim() || d.id;
+}
+
 /** Build a {@link Dashboard} from a name + tiles/filter (mirrors `buildWidget`); blank header fields are dropped. */
 export function buildDashboard(
     name: string,

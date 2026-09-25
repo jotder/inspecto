@@ -11,7 +11,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { fmtDateTime } from 'app/inspecto/grid';
-import { Dashboard } from '../studio/dashboards/dashboard-types';
+import { Dashboard, dashboardTitle } from '../studio/dashboards/dashboard-types';
 import { DashboardsService } from '../studio/dashboards/dashboards.service';
 import { ScheduleExportData, ScheduleExportDialog, ScheduleExportResult } from './schedule-export.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -60,6 +60,7 @@ export class KpiReportsComponent implements OnInit {
     readonly loadError = signal(false);
     readonly statusBadgeHtml = statusBadgeHtml;
     readonly fmtDateTime = fmtDateTime;
+    readonly dashboardTitle = dashboardTitle;
 
     createDashboard(): void {
         this.router.navigate(['/studio/dashboards/new']);
@@ -74,7 +75,8 @@ export class KpiReportsComponent implements OnInit {
         this.loadError.set(false);
         this.dashboardsApi.list().subscribe({
             next: (d) => {
-                this.dashboards.set(d);
+                // R2-16: cards are titled by the Dashboard's readable title, so they are ordered by it too.
+                this.dashboards.set([...d].sort((a, b) => dashboardTitle(a).localeCompare(dashboardTitle(b))));
                 this.loading.set(false);
             },
             error: () => {
@@ -99,6 +101,15 @@ export class KpiReportsComponent implements OnInit {
         });
     }
 
+    /** The card's count line: "8 tiles · 1 quick filter" — singular for one, never "tile(s)". */
+    cardSummary(d: Dashboard): string {
+        const tiles = d.tiles.length;
+        const filters = d.exposedFields?.length ?? 0;
+        const parts = [`${tiles} tile${tiles === 1 ? '' : 's'}`];
+        if (filters) parts.push(`${filters} quick filter${filters === 1 ? '' : 's'}`);
+        return parts.join(' · ');
+    }
+
     jobsFor(dashboardId: string): JobDetail[] {
         return this.reportJobs().filter((j) => this.paramsOf(j).dashboardId === dashboardId);
     }
@@ -115,7 +126,7 @@ export class KpiReportsComponent implements OnInit {
     scheduleExport(d: Dashboard): void {
         const data: ScheduleExportData = {
             dashboardId: d.id,
-            dashboardName: d.name,
+            dashboardName: dashboardTitle(d),
             existingNames: this.reportJobs().map((j) => j.name),
         };
         this.dialog
@@ -130,7 +141,7 @@ export class KpiReportsComponent implements OnInit {
     }
 
     editSchedule(job: JobDetail, d: Dashboard): void {
-        const data: ScheduleExportData = { dashboardId: d.id, dashboardName: d.name, job };
+        const data: ScheduleExportData = { dashboardId: d.id, dashboardName: dashboardTitle(d), job };
         this.dialog
             .open(ScheduleExportDialog, { data, width: '560px', maxHeight: '88vh' })
             .afterClosed()
