@@ -62,6 +62,7 @@ function create(object: OperationalObject = INCIDENT, findingsSpec: FindingsSpec
     // graph() feeds the CaseContentsComponent child the CASE-object tests render.
     const api = {
         update: vi.fn(() => of(object)),
+        saveFindings: vi.fn(() => of(object)),
         graph: vi.fn(() => of({ root: object.id, depth: 1, nodes: [], edges: [] })),
     };
     const toastr = { success: vi.fn(), error: vi.fn() };
@@ -110,7 +111,7 @@ describe('PostmortemPanelComponent', () => {
         expect(saved.fiveWhys).toBeUndefined();
     });
 
-    it('round-trips case Findings + team + target date as one attributes patch (C3/C6)', () => {
+    it('saves Findings on the collaboration route and an edited team + target date on the PATCH (C3/C6)', () => {
         const CASE: OperationalObject = {
             ...INCIDENT,
             id: 'c1',
@@ -137,13 +138,16 @@ describe('PostmortemPanelComponent', () => {
         fixture.detectChanges();
 
         c.saveFindings();
+        // Findings values: PUT /objects/{id}/findings, open to anyone who can see the Case (operator 2026-09-25).
+        // The server derives the flat impactAmount/recordsAffected copies, so the client no longer sends them.
+        const [fid, findings] = (api.saveFindings as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect(fid).toBe('c1');
+        expect(findings.disposition).toBe('RECOVERED');
+        expect(findings.impactAmount).toBe('99');
+        // Team + target date: still the canAdminister PATCH, and it carries nothing of the Findings.
         const [id, patch] = (api.update as ReturnType<typeof vi.fn>).mock.calls[0];
         expect(id).toBe('c1');
-        expect(patch.attributes.assignees).toBe('alice,carol');
-        expect(patch.attributes.targetDate).toBe('2026-07-01');
-        expect(JSON.parse(patch.attributes.findings).disposition).toBe('RECOVERED');
-        // The flat, queryable copy the C4 analytics roll-up sums still rides along.
-        expect(patch.attributes.impactAmount).toBe('99');
+        expect(patch.attributes).toEqual({ assignees: 'alice,carol', targetDate: '2026-07-01' });
     });
 
     it('renders the deployment-authored section set instead of the built-in one (D6)', () => {
@@ -174,10 +178,10 @@ describe('PostmortemPanelComponent', () => {
 
         schema.form.patchValue({ outcome: 'WIN' });
         c.saveFindings();
-        const [, patch] = (api.update as ReturnType<typeof vi.fn>).mock.calls[0];
-        expect(JSON.parse(patch.attributes.findings)).toEqual({ outcome: 'WIN' });
-        // `disposition` is not configured here, so no flat impact copy is fabricated.
-        expect(patch.attributes.impactAmount).toBe('');
+        const [, findings] = (api.saveFindings as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect(findings).toEqual({ outcome: 'WIN' });
+        // The team form is untouched, so the canAdminister PATCH is not sent — a viewer's save succeeds.
+        expect(api.update).not.toHaveBeenCalled();
     });
 
     it('drops the soft no-disposition gate when the section is not configured (D6)', async () => {

@@ -73,8 +73,18 @@ the real ControlApi.
   the Case desk that resolves Cases authors its Findings, so `operations`/`support`/`admin`/`power` may save
   one and the builder roles may not; every other component kind is unchanged
   ([auth-security.md](../../backend/editions/auth-security.md) has the route shape).
+  **Saving the values is collaboration (operator 2026-09-25)** — open to anyone who can see the Case, like a
+  comment, through its own route **`PUT /objects/{id}/findings {findings:{…}}`** (`ObjectRoutes.saveFindings`
+  → `ObjectService.saveFindings`). `PATCH /objects/{id}` stays `canAdminister` because it also edits priority /
+  severity / assignee, so the Findings save could not ride it. The route writes **only** the blob and its flat
+  copies, refuses any other body key (422 — it is not a way round the PATCH), keeps the scope guard's 404, and
+  audits an `OBJECT_ACTIVITY` event (`action: findings`, actor = the authenticated Subject). The flat
+  `impactAmount`/`recordsAffected` copies are now **derived on the server** from the blob (`""` when absent),
+  where the panel used to compute them. The panel's **team + target date** (C6) still go on the PATCH, and
+  only when that form was edited — so a viewer's Findings save succeeds, and their team edit would 403.
+  Pinned by `ControlApiFindingsWriteTest` (real scoped Subject without `canAdminister`).
   **Values are validated too, since 2026-07-26** — `FindingsSpec.validateFindings(findings, previous)`,
-  called from `ObjectRoutes.validateFindings` on `PATCH /objects/{id}` (→ **422**): `select` membership,
+  called from `ObjectRoutes.validateFindings` on `PUT /objects/{id}/findings` and `PATCH /objects/{id}` (→ **422**): `select` membership,
   `number` with `min`/`max`, `boolean`, and `pattern`; a section hidden by its `dependsOn` is skipped
   entirely (the form never showed it, so it cannot be required). Four rules are load-bearing:
   * **The `attributes.findings` JSON blob is the canonical home of Findings values** (D3 = (a), operator
@@ -131,7 +141,7 @@ the real ControlApi.
   * **UI consequences:** `Findings` is now an open `Record<string, string>` (`mail-model.ts`), the panel's
     team + target date moved to a sibling `teamForm` (they are C6, not Findings), the flat
     `impactAmount`/`recordsAffected` copies the C4 analytics roll-up sums are written **on every Findings
-    save** — as `''` when the section is not configured, so removing those sections blanks the roll-up for
+    save** (by the server since 2026-09-25) — as `''` when the section is not configured, so removing those sections blanks the roll-up for
     each Case as it is next saved (corrected 2026-09-25; this line used to say "only while configured",
     which the code never did) — and the soft no-disposition prompt on resolve **only fires while
     `disposition` is a configured section**. `CASE_DISPOSITIONS` was removed from `mail-model.ts` — the

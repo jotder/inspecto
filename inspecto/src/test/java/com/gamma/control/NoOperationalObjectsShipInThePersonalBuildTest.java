@@ -105,6 +105,7 @@ class NoOperationalObjectsShipInThePersonalBuildTest {
             {"POST", "/objects/id16/attachments"},
             {"GET", "/objects/id17/attachments"},
             {"POST", "/objects/id18/rca"},
+            {"PUT", "/objects/id47/findings"},
             {"GET", "/objects/id19"},
             {"GET", "/rca/templates"},
             {"GET", "/workflows/id20"},

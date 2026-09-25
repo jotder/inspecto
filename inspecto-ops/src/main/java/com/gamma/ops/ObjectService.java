@@ -308,6 +308,30 @@ public final class ObjectService {
         return next == obj ? obj : store.update(next);
     }
 
+    /**
+     * Save a Case's Findings values ({@code PUT /objects/{id}/findings}, operator 2026-09-25): merge
+     * {@code attributes} — the {@code findings} blob and its flat copies, assembled and validated at the edge —
+     * over the stored bag, and audit it as an {@link EventType#OBJECT_ACTIVITY} {@code findings} event naming
+     * the {@code actor}. Unlike {@link #patch} it always writes and always audits: the save is a collaboration
+     * act anyone who can see the object may perform, so the record of who did it is the point.
+     *
+     * @throws NoSuchElementException if no object has this id
+     */
+    public OperationalObject saveFindings(String id, Map<String, String> attributes, String actor) {
+        OperationalObject obj = require(id);
+        OperationalObject updated = store.update(obj.withAttributes(attributes, System.currentTimeMillis()));
+        EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
+                .level(EventLevel.INFO)
+                .source(SOURCE)
+                .correlationId(obj.correlationId())
+                .message(obj.objectType() + " " + id + ": findings saved" + (actor == null ? "" : " by " + actor))
+                .attr("objectId", id)
+                .attr("objectType", obj.objectType().name())
+                .attr("action", "findings")
+                .attr("actor", actor));
+        return updated;
+    }
+
     /** Convenience: acknowledge an object (the {@code ack} action). */
     public OperationalObject ack(String id, String actor) {
         return transition(id, "ack", actor);

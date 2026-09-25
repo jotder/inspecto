@@ -6773,6 +6773,48 @@
         "x-optional-module" : true
       }
     },
+    "/objects/{objectId}/findings" : {
+      "put" : {
+        "tags" : [ "objects" ],
+        "summary" : "Save a Case's Findings values (collaboration; open to anyone who can see the object)",
+        "operationId" : "putObjectsByObjectIdFindings",
+        "description" : "Stores the canonical attributes.findings blob plus the flat impactAmount/recordsAffected copies, validated against the effective findings-spec (422). The body may carry ONLY 'findings' — any other key is refused 422, so disposition stays on the canAdminister PATCH /objects/{id}. Missing 'findings' → 400; out-of-scope or unknown id → 404. Audited as an OBJECT_ACTIVITY 'findings' event with the request's actor.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "findings" ],
+                "additionalProperties" : false,
+                "properties" : {
+                  "findings" : {
+                    "type" : "object",
+                    "description" : "Findings values by section key; each a scalar",
+                    "additionalProperties" : { "type" : [ "string", "number", "boolean", "null" ] }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data is the updated object."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
     "/objects/{objectId}" : {
       "get" : {
         "tags" : [ "objects" ],

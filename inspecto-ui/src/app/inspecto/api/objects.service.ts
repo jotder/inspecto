@@ -311,6 +311,16 @@ export class ObjectsService {
         return this.http.patch<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}`), patch);
     }
 
+    /**
+     * Save a Case's Findings values — PUT /objects/{id}/findings. Open to anyone who can see the Case
+     * (collaboration, operator 2026-09-25), unlike the `canAdminister` {@link update}; the server stores the
+     * `attributes.findings` blob, derives the flat `impactAmount`/`recordsAffected` copies, and refuses any
+     * key but `findings`.
+     */
+    saveFindings(id: string, findings: Record<string, string>): Observable<OperationalObject> {
+        return this.http.put<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/findings`), { findings });
+    }
+
     /** Apply a workflow action (e.g. assign / start / resolve / close / investigate / escalate). */
     transition(id: string, action: string, actor?: string): Observable<OperationalObject> {
         return this.http.post<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/transition`), {

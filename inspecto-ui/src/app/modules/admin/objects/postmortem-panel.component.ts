@@ -19,6 +19,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { concatMap } from 'rxjs';
 import { apiErrorMessage, FindingsSpecDef, ObjectsService, OperationalObject, WorkflowDef } from 'app/inspecto/api';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -314,42 +315,44 @@ export class PostmortemPanelComponent {
         });
     }
 
-    /** C3 + C6: persist the case's Findings + team + target date as an attributes patch. */
+    /**
+     * C3 + C6: persist the case's Findings, then — only when edited — its team + target date. The two halves
+     * ride different routes on purpose (operator 2026-09-25): Findings values are collaboration
+     * (`PUT /objects/{id}/findings`, open to anyone who can see the Case; the server derives the flat
+     * `impactAmount`/`recordsAffected` copies the C4 roll-up sums), while team + target date stay on the
+     * `canAdminister` PATCH.
+     */
     saveFindings(): void {
         const schema = this.findingsSchema();
         if (schema && !schema.validate()) return; // house rule: markAllAsTouched, surface inline errors
-        const findings = this.findingsValues();
+        const id = this.object().id;
+        const findings$ = this.api.saveFindings(id, this.findingsValues());
         const v = this.teamForm.getRawValue();
         const team = (v.team ?? '')
             .split(',')
             .map((t) => t.trim())
             .filter(Boolean)
             .join(',');
+        const save$ = this.teamForm.dirty
+            ? findings$.pipe(
+                  concatMap(() =>
+                      this.api.update(id, { attributes: { assignees: team, targetDate: (v.targetDate ?? '').trim() } }),
+                  ),
+              )
+            : findings$;
         this.saving.set(true);
-        this.api
-            .update(this.object().id, {
-                attributes: {
-                    findings: JSON.stringify(findings),
-                    // Flat, queryable copies so case analytics (C4) can sum impact without parsing the blob.
-                    // A deployment that removes these sections (D6) simply stops feeding the roll-up.
-                    impactAmount: findings['impactAmount'] ?? '',
-                    recordsAffected: findings['recordsAffected'] ?? '',
-                    assignees: team,
-                    targetDate: (v.targetDate ?? '').trim(),
-                },
-            })
-            .subscribe({
-                next: () => {
-                    this.saving.set(false);
-                    this.teamForm.markAsPristine();
-                    schema?.form.markAsPristine(); // the values are already in place — just clear dirtiness
-                    this.toastr.success('Findings saved');
-                    this.changed.emit();
-                },
-                error: (e) => {
-                    this.saving.set(false);
-                    this.toastr.error(apiErrorMessage(e, 'Save failed'));
-                },
-            });
+        save$.subscribe({
+            next: () => {
+                this.saving.set(false);
+                this.teamForm.markAsPristine();
+                schema?.form.markAsPristine(); // the values are already in place — just clear dirtiness
+                this.toastr.success('Findings saved');
+                this.changed.emit();
+            },
+            error: (e) => {
+                this.saving.set(false);
+                this.toastr.error(apiErrorMessage(e, 'Save failed'));
+            },
+        });
     }
 }

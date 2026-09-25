@@ -287,6 +287,16 @@ above the generated commit list.
   unchanged — renaming it is a separate, unmade decision.
 
 **Operator-visible behaviour**
+- **New route (additive, 2026-09-25, operator decision — Findings values are collaboration):**
+  `PUT /objects/{id}/findings {findings:{key: scalar…}}` saves a Case's Findings values, **open to anyone who
+  can see the object** (the SEC-7d/ABAC scope guard still answers 404) and recorded as a `collaboration`
+  exemption in `CapabilityManifest.EXEMPTIONS`. It writes only the `attributes.findings` blob plus the flat
+  `impactAmount`/`recordsAffected` copies (now derived **server-side**, `""` when absent), is judged by the
+  same findings-spec gate as the PATCH (**422**), refuses any other body key (**422**) and a missing
+  `findings` (**400**), and emits an `OBJECT_ACTIVITY` event with `action: findings` and the request's actor.
+  `PATCH /objects/{id}` is **unchanged** (still `canAdminister`, still accepts `attributes.findings`). The
+  SPA Findings panel now saves through the new route and sends team + target date on the PATCH only when
+  they were edited. [objects](../../frontend/features/objects.md)
 - **New route (additive, 2026-09-25, EXECUTION-RESIDUALS X4):** `POST /runs/{name}/replay-rejects {file}`
   (`canOperateRuns`) replays ONE file's rejected records from its reject sidecar as a new Consignment,
   without re-ingesting the file's good records; a second replay of the same sidecar is **409**.

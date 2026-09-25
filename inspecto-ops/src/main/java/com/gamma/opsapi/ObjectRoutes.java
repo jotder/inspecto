@@ -85,6 +85,11 @@ public final class ObjectRoutes implements RouteModule {
         api.post("/objects/([^/]+)/attachments", scoped(api, (e, m) -> addAttachment(api, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/attachments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.ATTACHMENT))));
         api.post("/objects/([^/]+)/rca", scoped(api, (e, m) -> applyRca(api, ApiContext.name(m), api.body(e))));
+        // Operator decision 2026-09-25: saving a Case's FINDINGS VALUES is collaboration, like a comment — open
+        // to anyone who can see the object (the scope guard still answers 404), recorded in
+        // CapabilityManifest.EXEMPTIONS. It writes ONLY attributes.findings + its flat copies and refuses any
+        // other key (422), so it is not a way round the canAdminister PATCH below.
+        api.put("/objects/([^/]+)/findings", scoped(api, (e, m) -> saveFindings(api, e, ApiContext.name(m), api.body(e))));
         api.patch("/objects/([^/]+)", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> patchObject(api, ApiContext.name(m), api.body(e)))));
         api.get("/objects/([^/]+)", scoped(api, (e, m) -> objectById(api, ApiContext.name(m))));
         api.get("/rca/templates", (e, m) -> rcaTemplateList(api));
@@ -730,6 +735,44 @@ public final class ObjectRoutes implements RouteModule {
         if (attrs != null) validateFindings(api, id, attrs);
         try {
             return OpsEngine.of(api).patch(id, priority, severity, assignee, attrs).toMap();
+        } catch (java.util.NoSuchElementException notFound) {
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
+        }
+    }
+
+    /** The flat, queryable copies of Findings values the C4 case analytics roll-up sums (no blob parsing). */
+    private static final List<String> FINDINGS_FLAT_COPIES = List.of("impactAmount", "recordsAffected");
+
+    /**
+     * {@code PUT /objects/{id}/findings} — save a Case's Findings values; body {@code {findings:{key: scalar…}}}
+     * and NOTHING else (operator 2026-09-25: open as collaboration, so it must not carry disposition). Stores
+     * the object as the canonical {@code attributes.findings} blob (D3) plus the flat
+     * {@code impactAmount}/{@code recordsAffected} copies ({@code ""} when absent — the rule the panel applied
+     * client-side until this route took the save over), judged exactly as the PATCH judges a blob → 422.
+     * A missing/non-object {@code findings} → 400; any other key, or a non-scalar value → 422; unknown or
+     * out-of-scope id → 404. Audited with the request's actor ({@link ApiContext#actor} — the authenticated
+     * Subject when there is one, never a body field).
+     */
+    private Object saveFindings(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
+        if (!(body.get(FINDINGS_ATTR) instanceof Map<?, ?> values))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'findings' as an object");
+        List<String> extra = body.keySet().stream().filter(k -> !FINDINGS_ATTR.equals(k)).sorted().toList();
+        if (!extra.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "only 'findings' may be saved here, not " + extra + " — disposition changes use PATCH /objects/{id}");
+        Map<String, Object> blob = new LinkedHashMap<>();
+        values.forEach((k, v) -> {
+            if (v instanceof Map<?, ?> || v instanceof List<?>)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                        "findings value '" + k + "' must be a scalar");
+            blob.put(k.toString(), v);
+        });
+        Map<String, String> attrs = new LinkedHashMap<>();
+        attrs.put(FINDINGS_ATTR, JsonAttributes.toPayloadJson(blob));
+        for (String flat : FINDINGS_FLAT_COPIES) attrs.put(flat, blob.get(flat) == null ? "" : blob.get(flat).toString());
+        validateFindings(api, id, attrs);
+        try {
+            return OpsEngine.of(api).saveFindings(id, attrs, ApiContext.actor(ex)).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }

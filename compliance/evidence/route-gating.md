@@ -106,10 +106,10 @@ system: the evidence cannot say something the code does not.
 | POST | `/bundle/export` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BundleRoutes.java:123` |
 | POST | `/bundle/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/BundleRoutes.java:126` |
 | POST | `/bundle/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BundleRoutes.java:124` |
-| POST | `/cases/from-entities` | gated | `canManageIncidents` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:110` |
-| POST | `/cases/rules` | gated | `canAuthorWorkbench` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:103` |
-| DELETE | `/cases/rules/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:104` |
-| POST | `/cases/rules/([^/]+)/evaluate` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:105` |
+| POST | `/cases/from-entities` | gated | `canManageIncidents` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:115` |
+| POST | `/cases/rules` | gated | `canAuthorWorkbench` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:108` |
+| DELETE | `/cases/rules/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:109` |
+| POST | `/cases/rules/([^/]+)/evaluate` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:110` |
 | POST | `/collectors/([^/]+)/notify` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java:28` |
 | POST | `/components/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:72` |
 | DELETE | `/components/([^/]+)/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:74` |
@@ -215,11 +215,12 @@ system: the evidence cannot say something the code does not.
 | PUT | `/notifications/rules/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/NotificationRoutes.java:68` |
 | DELETE | `/notifications/suppressions` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DeliveryStatusRoutes.java:73` |
 | POST | `/objects` | gated | `canManageIncidents` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:57` |
-| PATCH | `/objects/([^/]+)` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:88` |
+| PATCH | `/objects/([^/]+)` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:93` |
 | POST | `/objects/([^/]+)/ack` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:73` |
 | POST | `/objects/([^/]+)/assign` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:76` |
 | POST | `/objects/([^/]+)/attachments` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:85` |
 | POST | `/objects/([^/]+)/comments` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:83` |
+| PUT | `/objects/([^/]+)/findings` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:92` |
 | DELETE | `/objects/([^/]+)/links` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:79` |
 | POST | `/objects/([^/]+)/links` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:77` |
 | POST | `/objects/([^/]+)/merge` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:80` |
@@ -238,7 +239,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/pipelines/authored/([^/]+)/dry-run` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:62` |
 | POST | `/pipelines/authored/([^/]+)/run` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:66` |
 | POST | `/pipelines/authored/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:71` |
-| POST | `/pipelines/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineBundleRoutes.java:94` |
+| POST | `/pipelines/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineBundleRoutes.java:95` |
 | POST | `/pipelines/rename/resume` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineRenameRoutes.java:56` |
 | POST | `/public/dashboards/([^/]+)/query` | exempt | self-verifying-public | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:50` |
 | POST | `/public/delivery-status/([^/]+)` | exempt | self-verifying-public | `inspecto/src/main/java/com/gamma/control/DeliveryStatusRoutes.java:63` |

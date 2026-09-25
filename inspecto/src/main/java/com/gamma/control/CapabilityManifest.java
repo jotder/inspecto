@@ -383,6 +383,8 @@ final class CapabilityManifest {
             new Exemption("POST", "/objects/([^/]+)/links", "collaboration", "correlates two objects; neither's state changes"),
             new Exemption("DELETE", "/objects/([^/]+)/links", "collaboration", "removes a correlation link"),
             new Exemption("POST", "/objects/([^/]+)/rca", "collaboration", "seeds an RCA skeleton as comments"),
+            new Exemption("PUT", "/objects/([^/]+)/findings", "collaboration",
+                    "operator 2026-09-25: saving Findings values is open to anyone who can see the Case, like a comment; writes ONLY attributes.findings + its flat copies and refuses every other key (422), so disposition stays on the canAdminister PATCH — pinned by ControlApiFindingsWriteTest"),
             new Exemption("POST", "/notes/([^/]+)/([^/]+)/comments", "collaboration", "adds a comment on any note-bearing object"),
             new Exemption("POST", "/notes/([^/]+)/([^/]+)/attachments", "collaboration", "attaches evidence on any note-bearing object"));
 
