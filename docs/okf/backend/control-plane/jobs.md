@@ -29,6 +29,22 @@ virtual-thread `workers` executor. Four trigger modes:
   the caller polls `GET /jobs/runs/{runId}`, and an `Idempotency-Key` header replays the cached response on
   retry. Pipeline triggers gained the identical async contract in W5b (poll `GET /runs/runs/{runId}`).
 
+**A disabled job is "not scheduled", not "not runnable" (operator, 2026-09-25).** `enabled: false` switches
+off every **automatic** path — cron arming (and so `nextFire`), catch-up, `on_pipeline`, `on_signal`, and a
+Decision Rule's `start-job` consequence (`DecisionRoutes` refuses it: *"job 'x' is disabled — not started"*).
+It does **not** switch off the **manual** ones: `POST /jobs/{name}/trigger` (the KPI & Reports page's *Run
+now*), its `?dryRun=true` preview and `POST /jobs/runs/{runId}/replay` all run it. The seam: `JobService` now
+builds **every** configured job into its `jobs` map (boot and `upsertJob`), and the automatic paths gate on
+`JobConfig.enabled()` over `configs` — ⛔ never on membership of `jobs`, which no longer means "enabled". Until
+this rule the map held only enabled jobs, so *Run now* on a disabled job answered a misleading 404 *"no job
+named"* while `GET /jobs` listed it (found on the telco demo rehearsal — all four report jobs ship disabled).
+⚠ Building a disabled job is **lenient**: one that cannot build (e.g. a pipeline job with no authored-pipeline
+store) is a WARN, not a boot failure or a refused disable — it just stays untriggerable. A genuinely unknown
+name is still 404; replay's 409 *"no longer registered"* now means deleted (or its type is not hosted), not
+disabled. Pinned by `JobServiceTest.disabledJobIsNotScheduledButRunsManually` (enabled twins as the positive
+control), `togglingEnabledKeepsExactlyOneBuiltJobAndArmsOnlyWhenEnabled`, and over HTTP by
+`ControlApiJobActionsTest.aDisabledJobIsManuallyTriggerableButNotStartedByADecisionRule`.
+
 ⚠ **The write contract is the `job:` TOON section, not a DTO.** `POST /jobs` / `PUT /jobs/{name}` pass the
 body straight to `JobConfig.fromMap`, so keys are **snake_case** (`on_pipeline`, `on_signal`, `catch_up`)
 and type-specific parameters are **flat** alongside them. An unrecognised key is **absorbed as a parameter,

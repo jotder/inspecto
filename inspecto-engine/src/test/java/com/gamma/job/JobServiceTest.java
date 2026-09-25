@@ -675,19 +675,85 @@ class JobServiceTest {
         }
     }
 
+    /**
+     * Operator 2026-09-25: a DISABLED job is "not scheduled", not "not runnable". Every automatic path —
+     * cron, catch-up, on_pipeline, on_signal — stays silent for it, while a manual trigger runs it to
+     * SUCCESS. The enabled twins on the same event/signal are the positive control: they prove the probe
+     * reached the dispatch loops, so the disabled jobs' silence is the gate and not a dead probe.
+     */
     @Test
-    void disabledJobIsNotBuiltOrScheduled(@TempDir Path dir) throws Exception {
-        JobConfig off = new JobConfig("off", JobType.MAINTENANCE, "* * * * * *", null, false, false,
+    void disabledJobIsNotScheduledButRunsManually(@TempDir Path dir) throws Exception {
+        Path auditDir = dir.resolve("audit");
+        seedAudit(auditDir, "off_cron", "2000-01-01 00:00:00");   // catch-up would fire at once if enabled
+        Map<String, String> hb = Map.of("task", "heartbeat");
+        List<JobConfig> cfgs = List.of(
+                new JobConfig("off_cron", JobType.MAINTENANCE, "* * * * * *", null, false, true, hb),
+                new JobConfig("off_event", JobType.MAINTENANCE, null, "UPSTREAM", false, false, hb),
+                new JobConfig("off_signal", JobType.MAINTENANCE, null, null, false, false, hb, "pipeline.commit", null),
+                new JobConfig("on_event", JobType.MAINTENANCE, null, "UPSTREAM", true, false, hb),
+                new JobConfig("on_signal", JobType.MAINTENANCE, null, null, true, false, hb, "pipeline.commit", null));
+        ConsignmentEventBus bus = new ConsignmentEventBus();
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(cfgs, bus, s, null, auditDir.toString())) {
+            js.eventLog(com.gamma.event.EventLog.create());
+            js.start();
+            bus.publish(new ConsignmentEvent("UPSTREAM", "b1", "SUCCESS", List.of("p=1"), 1L, 1L, 0));
+            await(() -> js.lastRunOf("on_event").orElse(null));
+            await(() -> js.lastRunOf("on_signal").orElse(null));
+            Thread.sleep(1_500);   // more than one tick of the every-second cron
+
+            for (String off : List.of("off_cron", "off_event", "off_signal"))
+                assertTrue(js.runsFor(off).stream().allMatch(r -> "r1".equals(r.runId())),
+                        off + " is disabled — no automatic path may fire it: " + js.runsFor(off));
+            assertTrue(js.jobs().stream().filter(v -> v.name().equals("off_cron")).findFirst()
+                    .orElseThrow().nextFire().isBlank(), "a disabled cron job shows no next fire");
+
+            // ...but it IS runnable: the manual trigger (the KPI & Reports "Run now") runs it to SUCCESS
+            assertTrue(js.has("off_cron"), "a disabled job is still built");
+            String runId = js.triggerRun("off_cron", "ops").orElseThrow(
+                    () -> new AssertionError("a disabled job must be manually triggerable"));
+            JobRun run = await(() -> js.runById(runId).filter(r -> !"RUNNING".equals(r.status())).orElse(null));
+            assertEquals("SUCCESS", run.status(), run.toString());
+            assertEquals("manual:ops", run.trigger());
+            assertFalse(js.trigger("nope"), "an unknown name is still not triggerable");
+        }
+    }
+
+    @Test
+    void togglingEnabledKeepsExactlyOneBuiltJobAndArmsOnlyWhenEnabled(@TempDir Path dir) throws Exception {
+        JobConfig on = maintenance("tog", "* * * * * *", null, Map.of("task", "heartbeat"));
+        JobConfig off = new JobConfig("tog", JobType.MAINTENANCE, "* * * * * *", null, false, false,
                 Map.of("task", "heartbeat"));
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(off), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString())) {
             js.start();
-            assertFalse(js.has("off"), "disabled job is not registered");
-            assertFalse(js.trigger("off"), "disabled job cannot be triggered");
-            // it still appears in the listing (for visibility) but with no next fire
+            js.upsertJob(on);
+            await(() -> js.runsFor("tog").stream().filter(r -> "schedule".equals(r.trigger())).findFirst().orElse(null));
+            js.upsertJob(off);
+            Thread.sleep(300);   // let an already-admitted fire finish
+            int settled = js.runsFor("tog").size();
+            Thread.sleep(1_500);
+            assertEquals(settled, js.runsFor("tog").size(), "disabling cancels the cron — no further fires");
+            assertEquals(1, js.jobs().size(), "one config, never duplicated by the toggle");
+            assertTrue(js.has("tog"), "disabling keeps the job built (manually runnable)");
+            assertTrue(js.trigger("tog"));
+            js.upsertJob(on);
             assertEquals(1, js.jobs().size());
-            assertTrue(js.jobs().get(0).nextFire().isBlank());
+            assertTrue(js.has("tog"));
+        }
+    }
+
+    @Test
+    void aDisabledJobThatCannotBuildDoesNotCostTheSpaceItsBoot(@TempDir Path dir) throws Exception {
+        // the enabled twin throws from the constructor (flowJobWithoutAFlowStoreFailsClosed); disabled, it is a WARN
+        JobConfig fj = new JobConfig("fj", JobType.PIPELINE, null, null, false, false, Map.of("flow", "some_flow"));
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(fj), new ConsignmentEventBus(), s, null,
+                     dir.resolve("audit").toString())) {
+            js.start();
+            assertEquals(1, js.jobs().size(), "still listed");
+            assertFalse(js.trigger("fj"), "unbuildable, so not runnable either — as before");
         }
     }
 

@@ -53,7 +53,9 @@ identically to what the UI authors and `ConditionTree` evaluates.
 ## Record-routing consequences run during live pipeline execution
 
 `apply` executes real platform consequences on demand (`emit-signal`, `start-job`,
-`trigger-pipeline`; stub signals for `render-widget`/`generate-report`/`invoke-api`). **`create-alert`**
+`trigger-pipeline`; stub signals for `render-widget`/`generate-report`/`invoke-api`). `start-job` refuses a
+**disabled** job (`skipped`, *"is disabled — not started"*) — disabled means not scheduled, and only the job's own
+manual trigger runs it ([jobs](jobs.md), 2026-09-25). **`create-alert`**
 (2026-07-19) always records a `decision-rule.create-alert` ledger signal, and additionally opens a
 deduped `ObjectType.INCIDENT` (one per rule) when its `params.severity` is `critical`/`error` — a lower
 severity stays signal-only. Reuses the same `ExpectationRoutes`-style dedup+open pattern as the

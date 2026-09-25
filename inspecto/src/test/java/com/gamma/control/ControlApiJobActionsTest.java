@@ -94,6 +94,58 @@ class ControlApiJobActionsTest {
         }
     }
 
+    /**
+     * Operator 2026-09-25: a DISABLED job is "not scheduled", not "not runnable" — the KPI & Reports
+     * "Run now" ({@code POST /jobs/{name}/trigger}) runs it (202 → SUCCESS) where it used to answer a
+     * misleading 404 "no job named" while {@code GET /jobs} listed it. A Decision Rule's {@code start-job}
+     * consequence is automation, so it still refuses a disabled job. An unknown name stays 404.
+     */
+    @Test
+    void aDisabledJobIsManuallyTriggerableButNotStartedByADecisionRule(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String base = "/spaces/acme";
+            assertEquals(200, send(c.port, "POST", base + "/jobs",
+                    "{\"name\":\"cfo_pack\",\"type\":\"maintenance\",\"task\":\"heartbeat\","
+                            + "\"cron\":\"0 6 * * *\",\"enabled\":false}").statusCode());
+            assertFalse(json(send(c.port, "GET", base + "/jobs/cfo_pack", null)).get("enabled").asBoolean());
+
+            HttpResponse<String> fired = send(c.port, "POST", base + "/jobs/cfo_pack/trigger", null);
+            assertEquals(202, fired.statusCode(), fired.body());
+            String runId = json(fired).get("runId").asText();
+            assertEquals("SUCCESS", awaitRun(c.port, base, runId), "the disabled job's manual run succeeds");
+
+            assertEquals(404, send(c.port, "POST", base + "/jobs/nope/trigger", null).statusCode(),
+                    "a genuinely unknown name is still 404");
+
+            // a Decision Rule consequence is not a manual trigger: it must not start a disabled job
+            assertEquals(200, send(c.port, "POST", base + "/decision-rules",
+                    "{\"name\":\"kick\",\"targetType\":\"job\",\"target\":\"cfo_pack\","
+                            + "\"consequences\":[{\"action\":\"start-job\",\"target\":{\"id\":\"cfo_pack\"}}]}")
+                    .statusCode());
+            JsonNode refused = json(send(c.port, "POST", base + "/decision-rules/kick/apply", null))
+                    .get("executed").get(0);
+            assertEquals("skipped", refused.get("status").asText(), refused.toString());
+            assertTrue(refused.get("detail").asText().contains("disabled"), refused.toString());
+
+            // enabled, the same consequence starts it (positive control for the refusal above)
+            send(c.port, "POST", base + "/jobs/cfo_pack/enable", "{}");
+            JsonNode started = json(send(c.port, "POST", base + "/decision-rules/kick/apply", null))
+                    .get("executed").get(0);
+            assertEquals("executed", started.get("status").asText(), started.toString());
+        }
+    }
+
+    private String awaitRun(int port, String base, String runId) throws Exception {
+        long deadline = System.nanoTime() + 10_000_000_000L;
+        String status = "RUNNING";
+        while ("RUNNING".equals(status) && System.nanoTime() < deadline) {
+            Thread.sleep(50);
+            status = json(send(port, "GET", base + "/jobs/runs/" + runId, null)).get("status").asText();
+        }
+        return status;
+    }
+
     private HttpResponse<String> send(int port, String method, String path, String body) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));

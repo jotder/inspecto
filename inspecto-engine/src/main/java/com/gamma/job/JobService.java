@@ -374,7 +374,6 @@ public final class JobService implements AutoCloseable {
                 this::onPackUnloaded, JobPackManager.stagingRootFor(auditDir));   // P0: never the system temp dir
         this.packs.scanAtStartup();
         for (JobConfig c : this.configs) {
-            if (!c.enabled()) continue;
             // DEMO-SPACE-PERSONAL-UNBOOTABLE-1 (2026-09-15): a job whose TYPE is not registered on this
             // classpath — an optional module's type on a Personal/core boot, or a Job Pack that is not
             // installed — is skipped with a WARN naming the type, and the SPACE STILL BOOTS. Before this the
@@ -388,7 +387,27 @@ public final class JobService implements AutoCloseable {
                         c.name(), c.type(), registry.ids());
                 continue;
             }
+            if (c.enabled()) jobs.put(c.name(), build(c));
+            else buildDisabled(c);
+        }
+    }
+
+    /**
+     * Build a DISABLED job into {@link #jobs} too (operator 2026-09-25): disabled means <b>not scheduled</b>,
+     * not <b>not runnable</b> — a manual {@code POST /jobs/{name}/trigger}, a replay and a dry run all resolve
+     * the Job from {@link #jobs}, so a job left out of it answered a misleading 404 "no job named" while
+     * {@code GET /jobs} listed it. Every AUTOMATIC path (cron arming, catch-up, on_pipeline, on_signal) stays
+     * gated on {@link JobConfig#enabled()} over {@link #configs}, never on membership of {@link #jobs}.
+     * ⚠ Lenient on purpose: a disabled job that cannot build (e.g. a pipeline job with no authored-pipeline
+     * store) must neither cost the space its boot nor refuse the disable that switched it off — it is a WARN
+     * and the job simply stays untriggerable, exactly as it was before this rule.
+     */
+    private void buildDisabled(JobConfig c) {
+        try {
             jobs.put(c.name(), build(c));
+        } catch (RuntimeException e) {
+            log.warn("[JOB] disabled job '{}' cannot be built, so it cannot be run manually either: {}",
+                    c.name(), e.getMessage());
         }
     }
 
@@ -679,7 +698,8 @@ public final class JobService implements AutoCloseable {
      * Hot-register a Job at runtime (Scheduler write actions — job CRUD): create or replace the config
      * under {@code c.name()}, build+arm it immediately. Event/signal triggers self-derive from
      * {@link #configs} on each dispatch, so appending here is sufficient for those; cron needs an explicit
-     * {@link #armCron}. A disabled config ({@code enabled=false}) is recorded but not armed/built.
+     * {@link #armCron}. A disabled config ({@code enabled=false}) is built (so it can be run manually)
+     * but never armed — no cron, no signal coalescer; see {@link #buildDisabled}.
      */
     public synchronized void upsertJob(JobConfig c) {
         removeJobInternal(c.name());
@@ -688,6 +708,8 @@ public final class JobService implements AutoCloseable {
             jobs.put(c.name(), build(c));
             if (c.hasSignal()) signalCoalescers.put(c.name(), new TriggerCoalescer());
             if (c.hasCron() && started) armCron(c);
+        } else {
+            buildDisabled(c);
         }
         auditOrphanOutputStores();   // a job change is an orphan transition source (e.g. disabling the runner)
         auditSharedPipelines();      // ...and may be the moment a second job is pointed at one pipeline
@@ -968,7 +990,8 @@ public final class JobService implements AutoCloseable {
         return v instanceof Boolean b ? b : Boolean.parseBoolean(String.valueOf(v));
     }
 
-    /** Run a job once by name, off the caller's thread. Returns false if no such (enabled) job. */
+    /** Run a job once by name, off the caller's thread — a disabled job too (disabled = not scheduled).
+     *  Returns false if no such job. */
     public boolean trigger(String name) {
         return trigger(name, null);
     }
@@ -976,7 +999,7 @@ public final class JobService implements AutoCloseable {
     /**
      * Run a job once by name, attributing the manual fire to {@code actor} (an operator id / channel) when given
      * (T32 Phase C). The recorded trigger becomes {@code manual:<actor>}; cron / event / catch-up self-attribute
-     * ({@code schedule}, {@code event:<pipeline>}, {@code catch-up}). Returns false if no such (enabled) job.
+     * ({@code schedule}, {@code event:<pipeline>}, {@code catch-up}). Returns false if no such job.
      */
     public boolean trigger(String name, String actor) {
         return triggerRun(name, actor).isPresent();
@@ -984,7 +1007,7 @@ public final class JobService implements AutoCloseable {
 
     /**
      * Run a job once by name and return its {@code runId} (W5) so an async HTTP caller can poll
-     * {@link #runById}. Empty if no such (enabled) job. Attribution matches {@link #trigger(String, String)}.
+     * {@link #runById}. Empty if no such job. Attribution matches {@link #trigger(String, String)}.
      */
     public Optional<String> triggerRun(String name, String actor) {
         return triggerRun(name, actor, Map.of());
@@ -1816,7 +1839,7 @@ public final class JobService implements AutoCloseable {
         return packs.rescan();
     }
 
-    /** Whether any job by this name is registered and enabled. */
+    /** Whether a job by this name is registered (built) — enabled or not; see {@link #buildDisabled}. */
     public boolean has(String name) { return jobs.containsKey(name); }
 
     // -- system jobs (platform-armed) ----------------------------------------------------------------

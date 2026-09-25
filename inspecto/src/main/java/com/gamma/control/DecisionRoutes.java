@@ -216,7 +216,13 @@ final class DecisionRoutes implements RouteModule {
             case "start-job" -> {
                 String jobId = targetId(c);
                 JobService svc = api.service().jobService().orElse(null);
-                if (jobId != null && svc != null
+                // A disabled job is "not scheduled" (operator 2026-09-25): only its own manual trigger runs
+                // it, never a Decision Rule consequence — JobService now builds disabled jobs, so gate here.
+                boolean disabled = jobId != null && svc != null
+                        && svc.jobConfig(jobId).map(j -> !j.enabled()).orElse(false);
+                if (disabled) {
+                    detail = "job '" + jobId + "' is disabled — not started";
+                } else if (jobId != null && svc != null
                         && svc.triggerRun(jobId, "decision-rule:" + ruleName, Map.of()).isPresent()) {
                     status = "executed";
                     detail = "triggered job '" + jobId + "'";
