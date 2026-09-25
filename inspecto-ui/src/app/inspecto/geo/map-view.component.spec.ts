@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { of } from 'rxjs';
 import { GammaConfigService } from '@gamma/services/config';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { MapViewComponent } from './map-view.component';
+import { getWorkerUrl } from 'maplibre-gl';
+import ANGULAR_JSON from '../../../../angular.json';
+import { ensureMaplibreSetup, MapViewComponent, maplibreWorkerUrl } from './map-view.component';
 import { GeoData } from './geo-types';
 
 const CONFIG_PROVIDER = { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } };
@@ -47,5 +49,28 @@ describe('MapViewComponent', () => {
         fixture.componentInstance.data = { points: [], routes: [] };
         fixture.componentInstance.ngOnChanges({} as SimpleChanges);
         expect(fixture.nativeElement.querySelector('canvas')).toBeNull();
+    });
+});
+
+// DW-16b: maplibre-gl 6 looks for its worker beside its own module URL — inside our bundle a file the
+// build never emitted, so every map painted only its background. The worker is now copied to
+// assets/maplibre/ (with the shared module it imports) and MapLibre is pointed there before any map.
+describe('MapLibre worker', () => {
+    it('is served from assets/maplibre, resolved against the base href', () => {
+        expect(maplibreWorkerUrl()).toBe(new URL('assets/maplibre/maplibre-gl-worker.mjs', document.baseURI).href);
+    });
+
+    it('is the worker MapLibre uses once the map host has set up', () => {
+        ensureMaplibreSetup();
+        expect(getWorkerUrl()).toBe(maplibreWorkerUrl());
+    });
+
+    it('is copied into the build together with the shared module it imports', () => {
+        const assets = ANGULAR_JSON.projects.gamma.architect.build.options.assets as unknown[];
+        const copied = assets
+            .filter((a): a is { glob: string; input: string; output: string } => typeof a === 'object')
+            .filter((a) => a.input === 'node_modules/maplibre-gl/dist' && a.output === 'assets/maplibre')
+            .map((a) => a.glob);
+        expect(copied).toEqual(expect.arrayContaining(['maplibre-gl-worker.mjs', 'maplibre-gl-shared.mjs']));
     });
 });

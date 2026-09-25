@@ -28,12 +28,24 @@ import { GeoData } from './geo-types';
 
 const EMPTY_FC: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
-/** Register the pmtiles:// protocol once (customer vector-tile archives, Phase 4 seam). */
-let pmtilesRegistered = false;
-function ensurePmtilesProtocol(): void {
-    if (!pmtilesRegistered) {
+/**
+ * Where MapLibre's worker script is served. maplibre-gl 6 derives it from its own module URL
+ * (`./maplibre-gl-worker.mjs` beside `import.meta.url`), which inside our bundled chunk points at a
+ * file the build never emits — the worker fails, no GeoJSON source ever loads, and every map paints
+ * only its background colour (DW-16b). `angular.json` copies the worker and the shared module it
+ * imports into `assets/maplibre/`; this points MapLibre there.
+ */
+export function maplibreWorkerUrl(): string {
+    return new URL('assets/maplibre/maplibre-gl-worker.mjs', document.baseURI).toString();
+}
+
+/** Point MapLibre at the served worker and register the pmtiles:// protocol, once. */
+let maplibreReady = false;
+export function ensureMaplibreSetup(): void {
+    if (!maplibreReady) {
+        maplibregl.setWorkerUrl(maplibreWorkerUrl());
         maplibregl.addProtocol('pmtiles', new Protocol().tile);
-        pmtilesRegistered = true;
+        maplibreReady = true;
     }
 }
 
@@ -242,7 +254,7 @@ export class MapViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     private mount(): void {
         if (!MapViewComponent.webglAvailable()) return; // jsdom / headless: stay unmounted
-        ensurePmtilesProtocol();
+        ensureMaplibreSetup();
         this.zone.runOutsideAngular(() => {
             const map = new maplibregl.Map({
                 container: this.hostEl.nativeElement,
