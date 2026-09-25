@@ -178,3 +178,36 @@ transfer menus) lives in the frontend bundle. Design history: `docs/archived-doc
   `PipelineStore` (`<root>/pipelines/`), not the registered `*_pipeline.toon` files the Pipeline editor and
   the runtime use: exporting a registered-file-only Pipeline reports it missing, and an ordinary import lands
   it where nothing runs it. Found 2026-09-25 (load-as-draft slice 5); the draft path is unaffected.
+  **Grounded 2026-09-25 — ⏳ DECISION OWED, no code changed.** Both stores are live, for different reasons:
+  * **Registered `*_pipeline.toon`** is what the editor edits (`GET …/graph/raw`, `PUT …/graph`) and what the
+    poll cycle runs — canonical since W5 (`d079c1398`, 2026-08-01), with its own fully gated transfer door
+    already shipped: `GET /pipelines/{name}/bundle` + `POST /pipelines/import` (`PipelineBundleRoutes`,
+    [editable round-trip §21](../pipeline-graph/editable-round-trip.md) — closure, satellites, safety gate,
+    register).
+  * **`PipelineStore`** holds the GRANDFATHERED `*_flow.toon` graphs — the topologies the flat config cannot
+    lower (`transform.derive`/`route`, `sink.view`/`materialized`, a second sink). W5 decided they stay
+    *readable / runnable / deletable, never newly written*; they still run, through a pipeline job's
+    `pipeline:` param (`PipelineJobRunner`) and `POST /pipelines/authored/{id}/trigger`, and feed lineage and
+    the deletion fence. The shipped example `inspecto/examples/06-serve/pipeline-job` depends on one.
+  * The **only writer** `PipelineStore` has left is this bundle kind's import (`BundleRoutes.PipelineBundleSource`),
+    so it breaks W5's own rule. Meanwhile its **only client** — the SPA's `loadAll` — fills
+    `authored-pipeline` items with REGISTERED pipelines (`pipelineGraphRaw`), and the SPA imports through
+    `/bundle/import`. The SPA's export works (it is built client-side); the round trip does not.
+  * ⚠ Two corrections to the row as filed: an imported flow is not unrunnable (a job or the authored trigger
+    route runs it) — the poll cycle and the editor just never see it; and it can **shadow** the editor's
+    Pipeline. `PipelineGraphRoutes.graphFor` (Run to here) reads `PipelineStore` **before** the registered
+    config, so an imported `orders` flow beside a registered `orders_pipeline.toon` makes Run to here run
+    the imported graph. (Found by reading the code; no test pins it yet.)
+  * Why this is not a mechanical retarget: editable round-trip §21 records that the kind *"stays serving
+    grandfathered flows only"*, while spaces/metamodel track *retiring* it — the records disagree. And a
+    metadata-bundle item carries one content map, while a registered Pipeline has files beside it (its
+    `_schema.toon`, `_mapping.csv`, `_enrich.toon`), which `ConfigSafetyValidator` needs on disk before it
+    accepts the config. Retargeting in place would re-implement §21's closure in a second place.
+  * **Options.** (A) Retarget `authored-pipeline` to the registered files through the editor's gates;
+    grandfathered flows stop being transferable, and the files beside the config have to travel some new
+    way. (B) Add a `pipeline` kind for registered files that calls `PipelineBundleRoutes`' import core
+    (one gate, one closure), keep `authored-pipeline` for grandfathered flows only, and switch `loadAll` to
+    emit `pipeline`. (C) Retire the kind: Pipelines move through the §21 door only, and the Transfer pane
+    uses it. **Recommended: B or C** — both keep one gated import path. Whichever is chosen, the
+    `PipelineStore` write should stop, or at least refuse an id that a registered Pipeline already holds,
+    because that is the shadowing hazard above.
