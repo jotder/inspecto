@@ -148,6 +148,9 @@ export class VizRenderComponent {
         // colour across widgets. An explicitly chosen non-default palette (monochrome) keeps positional colours.
         const positional = !!this.renderOptions()?.palette && this.renderOptions()?.palette !== 'categorical';
         const colorsFor = (labels: readonly string[]): string[] => (positional ? labels.map((_, i) => color(i)) : seriesColors(labels));
+        // Display only: a NULL/empty category drew as an unlabelled bar. Clicks still emit the raw label
+        // (onElementClick reads sortedProps), so drill-down keeps filtering on the real value.
+        const shown = p.labels.map(categoryLabel);
 
         if (plugin.meta.type === 'gauge') {
             const value = Math.max(0, Math.min(100, this.props().value ?? 0));
@@ -160,7 +163,7 @@ export class VizRenderComponent {
             const [xs, ys] = p.series;
             const points = (xs?.data ?? []).map((x, i) => ({ x, y: ys?.data[i] ?? 0 }));
             return {
-                labels: p.labels,
+                labels: shown,
                 datasets: [{ label: 'Scatter', data: points, backgroundColor: colorsFor(p.labels) }],
             };
         }
@@ -174,7 +177,7 @@ export class VizRenderComponent {
                 r: toRadius(sizes?.data[i] ?? 0),
             }));
             return {
-                labels: p.labels,
+                labels: shown,
                 datasets: [{ label: 'Bubble', data: points, backgroundColor: colorsFor(p.labels) }],
             };
         }
@@ -182,15 +185,15 @@ export class VizRenderComponent {
         const isPie = r.chartType === 'pie' || r.chartType === 'doughnut';
         if (isPie) {
             return {
-                labels: p.labels,
+                labels: shown,
                 datasets: [{ data: p.series[0]?.data ?? [], backgroundColor: colorsFor(p.labels) }],
             };
         }
         const colors = colorsFor(p.series.map((s) => s.label));
         return {
-            labels: p.labels,
+            labels: shown,
             datasets: p.series.map((s, i) => ({
-                label: seriesLabel(s.label),
+                label: categoryLabel(seriesLabel(s.label)),
                 data: s.data,
                 backgroundColor: colors[i],
                 borderColor: colors[i],
@@ -290,6 +293,11 @@ export class VizRenderComponent {
         const label = this.sortedProps().labels[index];
         if (label != null) this.categoryClick.emit(label);
     }
+}
+
+/** A category/series value as a reader sees it — an empty value reads "(blank)", never an unlabelled mark. */
+export function categoryLabel(label: string): string {
+    return label.trim() === '' ? '(blank)' : label;
 }
 
 /** UIE-4: a measure's generated label (`sum(value_at_risk_sar)`) as a reader says it ("Value at risk (SAR)"). A

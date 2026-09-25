@@ -50,6 +50,16 @@ describe('VizRenderComponent', () => {
         expect(c.chartData()?.datasets[0].data).toEqual([1, 2]);
     });
 
+    it('labels an empty category "(blank)" but a click still emits the raw value for drill-down', () => {
+        const props: VizProps = { labels: ['PBKS', ''], series: [{ label: 'm', data: [12, 1] }] };
+        const c = create(BAR_PLUGIN, props).componentInstance;
+        expect(c.chartData()?.labels).toEqual(['PBKS', '(blank)']);
+        let clicked: string | undefined;
+        c.categoryClick.subscribe((v) => (clicked = v));
+        c.onElementClick(1);
+        expect(clicked).toBe('');
+    });
+
     it('uses one backgroundColor per slice for pie', () => {
         const props: VizProps = {
             labels: ['a', 'b', 'c'],
