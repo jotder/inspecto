@@ -120,6 +120,40 @@ class DemoAuthHttpTest {
     }
 
     @Test
+    void aDemoUserFromOneSpaceIsAuthenticatedOnPlatformRoutesAndInAnotherSpace(@TempDir Path root) throws Exception {
+        // Two Spaces; the Demo User is defined only in `acme` — the hand-over shape (sample Spaces + the demo Space).
+        Path acme = Files.createDirectories(root.resolve("acme").resolve("config"));
+        Files.createDirectories(root.resolve("beta").resolve("config"));
+        Files.writeString(acme.resolve("demo-users.toon"), """
+                users[1]{id,displayName,title,roles,landing}:
+                  ra.analyst,Demo RA Analyst,Revenue Assurance analyst,business,
+                """);
+        System.setProperty("control.bind", "127.0.0.1");
+        System.setProperty("spaces.root", root.toString());
+        SpaceManager spaces = SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        api.start();
+        try {
+            int port = api.port();
+            String analyst = signIn(port, "ra.analyst");
+            // platform-level routes bind the default Space, which defines no Demo Users
+            assertEquals(200, send(port, "GET", "/spaces", analyst, null).statusCode(), "the Space list is a platform read");
+            assertEquals(200, send(port, "GET", "/nav/menus", analyst, null).statusCode(), "the unscoped menu read the SPA makes first");
+            // another Space: authenticated (the identity is global) and roles resolved against THAT Space's table
+            assertEquals(200, send(port, "GET", "/spaces/beta/alerts/rules", analyst, null).statusCode());
+            String rule = "{\"name\":\"r1\",\"dataset\":\"d\",\"measure\":\"count\",\"comparator\":\"gt\",\"threshold\":1,\"severity\":\"WARNING\"}";
+            assertEquals(403, send(port, "POST", "/spaces/beta/alerts/rules", analyst, rule).statusCode(),
+                    "still gated: the business role lacks canAuthorAlertRules in beta too");
+            assertEquals(401, send(port, "GET", "/spaces", DemoTokens.mint('a', "nobody", System.currentTimeMillis() / 1000), null).statusCode(),
+                    "a validly signed token for an id no Space defines is still unauthenticated");
+        } finally {
+            api.close();
+            spaces.close();
+            MetricRegistry.global().reset();
+        }
+    }
+
+    @Test
     void demoAuthRefusesToLoadUnlessBoundToLoopback() {
         System.clearProperty("control.bind");
         IllegalStateException e = assertThrows(IllegalStateException.class, DemoAuthenticator::new);

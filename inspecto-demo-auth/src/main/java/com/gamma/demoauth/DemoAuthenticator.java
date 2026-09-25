@@ -20,8 +20,14 @@ import java.util.Set;
  * the Demo User's roles resolve against the <b>bound Space's</b> role table ({@link Roles#effective}, stamped on
  * the exchange before authentication), Access Profile denials are removed ({@link AccessGrants}), and the held
  * role names are published for role-subject component sharing ({@link ComponentAccess#heldRoles}). So a demo
- * sees exactly the access production would give the same roles. A Demo User unknown to the bound Space gets no
- * Subject (401), as does an expired or forged token.
+ * sees exactly the access production would give the same roles.
+ *
+ * <p>The IDENTITY is global, as an OIDC token's is: a Demo User defined in any Space's {@code demo-users.toon}
+ * (the same union the sign-in picker lists) authenticates on every route, and the bound Space decides only which of
+ * the user's role NAMES it grants. Resolving the identity in the bound Space alone made every platform-level call
+ * ({@code /spaces}, an unscoped {@code /nav/menus}, bound to the {@code default} Space) 401 in a multi-Space
+ * deployment, so the SPA bounced a freshly signed-in Demo User back to sign-in (2026-09-25, the hand-over bundle).
+ * An unknown id, an expired or a forged token still get no Subject (401).
  */
 public final class DemoAuthenticator implements Authenticator {
 
@@ -38,6 +44,7 @@ public final class DemoAuthenticator implements Authenticator {
         Path bound = Roles.configRoot(ex);
         Path configRoot = bound != null ? bound : legacyRoot();
         DemoUsers.User user = DemoUsers.find(configRoot, id.get());
+        if (user == null) user = DemoTokenRelay.known().get(id.get());
         if (user == null) return Optional.empty();
 
         Map<String, Roles.Def> defs = Roles.effective(ex);
