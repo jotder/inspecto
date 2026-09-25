@@ -29,12 +29,13 @@ import static org.junit.jupiter.api.Assertions.*;
 class DemoAuthHttpTest {
 
     private final HttpClient client = HttpClient.newHttpClient();
-    private String bind, spacesRoot;
+    private String bind, spacesRoot, authMode;
 
     @BeforeEach
     void save() {
         bind = System.getProperty("control.bind");
         spacesRoot = System.getProperty("spaces.root");
+        authMode = System.getProperty("auth.mode");
         com.gamma.etl.EditionFeatures.overrideForTest(java.util.Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
     }
 
@@ -43,6 +44,7 @@ class DemoAuthHttpTest {
         com.gamma.etl.EditionFeatures.overrideForTest(null);
         set("control.bind", bind);
         set("spaces.root", spacesRoot);
+        set("auth.mode", authMode);
     }
 
     private static void set(String k, String v) {
@@ -146,6 +148,32 @@ class DemoAuthHttpTest {
                     "still gated: the business role lacks canAuthorAlertRules in beta too");
             assertEquals(401, send(port, "GET", "/spaces", DemoTokens.mint('a', "nobody", System.currentTimeMillis() / 1000), null).statusCode(),
                     "a validly signed token for an id no Space defines is still unauthenticated");
+        } finally {
+            api.close();
+            spaces.close();
+            MetricRegistry.global().reset();
+        }
+    }
+
+    /**
+     * R2-19: the demo bundle ships NO Spaces, so an evaluator's first page load is against an empty
+     * {@code -Dspaces.root}. {@code /bootstrap} must still answer 200 with the demo's authMode and the real
+     * loopback bind — the SPA reads any failure as {@code {}} (authMode none, not loopback) and Home then
+     * warns that an auth-free control plane listens on every interface, which is false on both counts.
+     */
+    @Test
+    void withZeroSpacesTheBootstrapStillReportsDemoAuthOnLoopback(@TempDir Path root) throws Exception {
+        System.setProperty("control.bind", "127.0.0.1");
+        System.setProperty("auth.mode", "demo");
+        System.setProperty("spaces.root", root.toString());
+        SpaceManager spaces = SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        api.start();
+        try {
+            HttpResponse<String> boot = send(api.port(), "GET", "/bootstrap", null, null);
+            assertEquals(200, boot.statusCode(), boot.body());
+            assertTrue(boot.body().contains("\"authMode\":\"demo\""), boot.body());
+            assertTrue(boot.body().contains("\"loopbackOnly\":true"), boot.body());
         } finally {
             api.close();
             spaces.close();

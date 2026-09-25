@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.service.SpaceContext;
+import com.gamma.service.SpaceManager;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -90,7 +91,7 @@ final class BootstrapRoutes implements RouteModule {
 
     private static Map<String, Object> features(ApiContext api) {
         Map<String, Object> f = new LinkedHashMap<>();
-        f.put("authoring", api.writeRoot() != null);      // write-root set ⇒ config authoring enabled
+        f.put("authoring", writeRootOrNull(api) != null); // write-root set ⇒ config authoring enabled
         f.put("multiSpace", api.spaces().supportsCrud());
         // EDITIONS SEC-10 (EDG-01 cell 4): BOTH conditions. The multi-space runtime is necessary
         // (-Dspaces.root) but not sufficient — the optional inspecto-exchange module must also have
@@ -119,6 +120,22 @@ final class BootstrapRoutes implements RouteModule {
         return f;
     }
 
+    /**
+     * The bound Space's config root, or {@code null} when ZERO Spaces are hosted. ⛔ R2-19 (2026-09-26):
+     * {@code api.writeRoot()} resolves the current Space and throws {@link SpaceManager.NoSpaceHostedException}
+     * on an empty spaces root, which the error boundary turns into a 503 for the WHOLE bootstrap. The SPA
+     * reads a failed bootstrap as {@code {}} — authMode {@code none}, not loopback — so a fresh demo bundle
+     * (which ships no Spaces) showed the "listening on every network interface, no sign-in" banner while
+     * bound to 127.0.0.1 behind demo sign-in. Bootstrap is platform-level and must answer with no Space.
+     */
+    private static java.nio.file.Path writeRootOrNull(ApiContext api) {
+        try {
+            return api.writeRoot();
+        } catch (SpaceManager.NoSpaceHostedException none) {
+            return null;
+        }
+    }
+
     /** Every config spec in one payload (the {@code GET /config/spec/{type}} calls folded together). */
     private static Map<String, Object> configSpecs() {
         Map<String, Object> specs = new LinkedHashMap<>();
@@ -139,7 +156,7 @@ final class BootstrapRoutes implements RouteModule {
     /** The bound space's {@code branding.toon}, in the same wire shape {@code GET /settings/branding}
      *  serves — nulls kept, so a client with no configured branding falls back to the shipped defaults. */
     private static Map<String, Object> branding(ApiContext api) {
-        java.nio.file.Path root = api.writeRoot();
+        java.nio.file.Path root = writeRootOrNull(api);
         BrandingSettings b = root == null
                 ? BrandingSettings.EMPTY
                 : BrandingSettings.read(root.resolve("branding.toon"));

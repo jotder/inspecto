@@ -94,8 +94,8 @@ class ControlApiSpacesTest {
     /**
      * Bundles ship NO Spaces (operator decision 2026-09-25), so a fresh install boots with an empty spaces root.
      * That is a clean state, not a broken one: the probes and the Space list answer, a Space-scoped route answers a
-     * clear 503 naming what to do (it used to be a 500 + stack trace on every request), and creating a Space makes
-     * the same route answer 200.
+     * clear 503 naming what to do (it used to be a 500 + stack trace on every request), {@code /bootstrap} answers,
+     * and creating a Space makes the same route answer 200.
      */
     @Test
     void zeroSpacesIsACleanStateNotA500(@TempDir Path root) throws Exception {
@@ -105,6 +105,12 @@ class ControlApiSpacesTest {
             assertEquals(200, ready.statusCode(), ready.body());
             assertEquals(0, json(ready).get("pipelines").asInt(), "zero Spaces is still READY, with no Pipelines");
             assertEquals(0, json(send(c.port, "GET", "/spaces", null)).size());
+            // R2-19: /bootstrap is platform-level. It used to 503 here (it resolved the current Space for
+            // `authoring` and branding), and the SPA read that as "no sign-in, every interface" on Home.
+            HttpResponse<String> boot = send(c.port, "GET", "/bootstrap", null);
+            assertEquals(200, boot.statusCode(), boot.body());
+            assertFalse(json(boot).get("features").get("authoring").asBoolean(), "no Space ⇒ nothing to author");
+            assertTrue(json(boot).get("features").has("loopbackOnly"), boot.body());
 
             HttpResponse<String> runs = send(c.port, "GET", "/runs", null);
             assertEquals(503, runs.statusCode(), runs.body());
