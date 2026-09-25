@@ -39,6 +39,8 @@ import { GeoData, MapViewComponent } from 'app/inspecto/geo';
 import { KpiComponent } from 'app/inspecto/viz/plugins/kpi.component';
 import { KpiTrendComponent } from 'app/inspecto/viz/plugins/kpi-trend.component';
 import { ProgressListComponent } from 'app/inspecto/viz/plugins/progress-list.component';
+import { TreemapComponent } from 'app/inspecto/viz/plugins/treemap.component';
+import { TreemapRow } from 'app/inspecto/viz/treemap-layout';
 // Dashboard tile section
 import { InspectoTileCardComponent } from 'app/inspecto/components/tile-card.component';
 import { CHART_CATEGORICAL } from 'app/inspecto/theme/chart-tokens';
@@ -89,6 +91,7 @@ interface DemoRow {
         KpiComponent,
         KpiTrendComponent,
         ProgressListComponent,
+        TreemapComponent,
         InspectoTileCardComponent,
         InspectoChartComponent,
         InspectoSectionTabsComponent,
@@ -420,6 +423,24 @@ export class DesignSystemComponent {
         labels: ['Open', 'Pending', 'Closed'],
         datasets: [{ data: [14, 6, 31], backgroundColor: seriesColors(['Open', 'Pending', 'Closed']) }],
     };
+    // ── More visualization types ▸ Treemap — fraud loss by typology × channel (the zero row shows the exclusion note) ──
+    readonly treemapDemo: TreemapRow[] = [
+        { group: 'SIM box', subgroup: 'Online', value: 412000 },
+        { group: 'SIM box', subgroup: 'Retail', value: 188000 },
+        { group: 'SIM box', subgroup: 'Dealer', value: 61000 },
+        { group: 'IRSF', subgroup: 'Roaming', value: 356000 },
+        { group: 'IRSF', subgroup: 'Online', value: 94000 },
+        { group: 'Wangiri', subgroup: 'Online', value: 143000 },
+        { group: 'Subscription fraud', subgroup: 'Retail', value: 121000 },
+        { group: 'Subscription fraud', subgroup: 'Dealer', value: 77000 },
+        { group: 'PBX hacking', subgroup: 'Enterprise', value: 52000 },
+        { group: 'Payment-gateway fraud', subgroup: 'Online', value: 38000 },
+        { group: 'Payment-gateway fraud', subgroup: 'Retail', value: 0 },
+    ];
+    readonly treemapPicked = signal('Click a cell — the drill event appears here.');
+    readonly treemapSelect = (channel: string, value: string): void =>
+        this.treemapPicked.set(`Drill: ${channel} = "${value}"`);
+
     /** Dashboard tile section: the chart tile's demo series. */
     readonly tileDemoChart: ChartData = {
         labels: ['North', 'South', 'East', 'West'],
@@ -550,6 +571,27 @@ const SPECS: AttributeSpec[] = [
 <inspecto-chart type="bar" [data]="data" [options]="{ scales: { x: { stacked: true }, y: { stacked: true } } }" />
 // series colours: seriesColors(labels) / CHART_TONE / CHART_PALETTES — set on the DATASETS, never a hex inline
 // your [options] deep-merge OVER the theme; one series ⇒ no legend unless plugins.legend.display says so`,
+        treemap: `# vizType: treemap — a Widget TOON; the tile renders <inspecto-treemap> through viz-render
+name: fm_ty_treemap
+vizType: treemap
+datasetId: fraud_cases
+controls:
+  group[1]{field}:
+    typology
+  subgroup[1]{field}:
+    enabler
+  value[1]{field,agg}:
+    confirmed_loss_sar,sum
+options:
+  title: Confirmed fraud loss by typology and enabler
+  format:
+    style: currency
+    currency: SAR
+    compact: true
+  treemap:
+    limit: 20
+# subgroup is optional (one level); zero / negative rows are left out and counted in the text alternative;
+# groups past the limit fold into "Other"; a group cell drills on group's field, a subgroup cell on subgroup's`,
         definitionDrawer: `<!-- the shared definition shell for an editor's right dock (definition-surface D1/D2) -->\n<inspecto-definition-drawer\n  [title]="node.name || node.id"\n  kindLabel="Collector"\n  icon="heroicons_outline:inbox-arrow-down"\n  [dirty]="paneDirty()"          // reported by the projected pane\n  (apply)="pane.submit()"         // Apply = in-memory patch — the toolbar Save persists (D2)\n  (discard)="recreatePane()"      // Discard = recreate the pane from the model\n  (closed)="closeDrawer()">       // dirty close already confirmed by the shell\n  <app-my-definition-pane [node]="node" (applied)="applyPatch($event)" (dirtyChange)="paneDirty.set($event)" />\n</inspecto-definition-drawer>`,
         dialogResize: `<!-- shared resizable/maximizable dialog chrome (inspecto/components/dialog-resize.directive.ts) -->\n<!-- the attribute goes on the dialog title; the drag grip is appended automatically -->\n<h2 mat-dialog-title class="flex items-center gap-2" inspectoDialogResize #chrome="inspectoDialogResize">\n  <span class="min-w-0 truncate">Edit Grammar · {{ node.id }}</span>\n  <span class="flex-1"></span>\n  <!-- big dialogs add a maximize button; it reuses the .dialog-fullscreen panel class -->\n  <button mat-icon-button type="button" (click)="chrome.toggleMaximize()"\n          [attr.aria-label]="chrome.maximized() ? 'Exit full screen' : 'Full screen'">\n    <mat-icon [svgIcon]="chrome.maximized() ? 'heroicons_outline:arrows-pointing-in'\n                                            : 'heroicons_outline:arrows-pointing-out'" />\n  </button>\n</h2>\n// panel styles live in styles.scss (.inspecto-dialog-resizable); outside a dialog the directive is inert`,
         menuFavorites: `// personal, client-local overlay — never PUT to the server (inspecto/menu/menu-favorites.ts)\n// storage key: inspecto.menuFavorites.v1, keyed by space id\nfavIds = signal<Set<string>>(loadForSpace());\ntoggleFavorite(id): void { /* mutate the set, persist to localStorage */ }\n\n<!-- a star toggle on each leaf row (aria-pressed, mirrors the sql-editor favorites idiom) -->\n<button [attr.aria-pressed]="isFav(id)" (click)="toggleFavorite(id)"\n        [attr.aria-label]="isFav(id) ? 'Unfavorite' : 'Favorite'">\n  <mat-icon [svgIcon]="isFav(id) ? 'heroicons_solid:star' : 'heroicons_outline:star'" />\n</button>\n\n// a virtual top-of-sidebar "Favorites" group (favoritesNavGroup in menu-nav.ts), prepended in\n// NavigationService: resolves ids against the current tree, drops stale/deleted, re-ids fav-<id>.`,

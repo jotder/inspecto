@@ -680,6 +680,40 @@
             <pre
                 class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
             ><code>{{ moreVizSnippet }}</code></pre>
+
+            <!-- ▸ Treemap (vizType: treemap) -->
+            <div class="mb-6" data-testid="viz-treemap">
+                <div class="mb-3 flex items-center justify-between">
+                    <h3 class="text-lg font-semibold">Treemap</h3>
+                    <button mat-stroked-button (click)="copy(snippets.treemap)">
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                        <span class="ml-1">Copy snippet</span>
+                    </button>
+                </div>
+                <p class="text-secondary mb-4 text-sm">
+                    Part-to-whole across many categories, optionally two levels — <code>group</code>, an optional
+                    <code>subgroup</code>, and a <code>value</code> measure. Groups take their colour from
+                    <code>seriesColors()</code>, subgroups a tint of it; groups past <code>options.treemap.limit</code>
+                    (default 20) fold into a neutral "Other". A cell shows name, value and share where it fits and
+                    always carries the full text as its accessible name. Every cell is a focusable button: a group cell
+                    drills on the group field, a subgroup cell on the subgroup field. Zero and negative values are left
+                    out and counted. Resize the window to see the layout follow its box.
+                </p>
+                <div class="bg-card rounded-2xl p-4 shadow">
+                    <div class="mb-2 text-sm font-medium">Confirmed fraud loss by typology and channel</div>
+                    <div class="h-64">
+                        <inspecto-treemap
+                            [rows]="treemapDemo"
+                            [format]="{ style: 'currency', currency: 'SAR', compact: true }"
+                            [select]="treemapSelect"
+                        />
+                    </div>
+                    <div class="text-secondary mt-2 text-xs" aria-live="polite">{{ treemapPicked() }}</div>
+                </div>
+                <pre
+                    class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+                ><code>{{ snippets.treemap }}</code></pre>
+            </div>
         </section>
 
         <!-- ── Graph hosts (AntV G6) ────────────────────────────────────────────────────── -->

@@ -168,6 +168,32 @@ describe('WidgetHostComponent', () => {
         expect(emitted).toEqual({ field: 'tariff', value: 'premium' });
     });
 
+    it('treemap: a group cell drills on the group field, a subgroup cell on the subgroup field', () => {
+        const treemapWidget: Widget = {
+            ...WIDGET,
+            vizType: 'treemap',
+            controls: {
+                group: [{ field: 'typology' }],
+                subgroup: [{ field: 'channel' }],
+                value: [{ field: 'loss', agg: 'sum' }],
+            },
+        };
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+        ]);
+        fixture.componentRef.setInput('widget', treemapWidget);
+        fixture.componentRef.setInput('dataset', DS);
+        const emitted: { field: string; value: string }[] = [];
+        fixture.componentInstance.drill.subscribe((v) => emitted.push(v));
+        fixture.componentInstance.onChannelClick({ channel: 'group', value: 'SIM box' });
+        fixture.componentInstance.onChannelClick({ channel: 'subgroup', value: 'Online' });
+        expect(emitted).toEqual([
+            { field: 'typology', value: 'SIM box' },
+            { field: 'channel', value: 'Online' },
+        ]);
+    });
+
     it('the tile header shows the widget title and subtitle', () => {
         const fixture = create([
             { provide: WidgetsService, useValue: {} },

@@ -634,6 +634,11 @@ src/app/
   (good / bad bars), text via `formatNumber`, the delta wording via the shared `viz/kpi-delta.ts` (`kpiDelta`, also
   used by `kpi`); a component-render plugin that drills takes viz-render's stable `select` callback input, since
   `NgComponentOutlet` carries inputs only.
+- **Treemap (`vizType: treemap`) → `viz/treemap-layout.ts` + `<inspecto-treemap>`** (2026-09-25; `/design` ▸ *More
+  visualization types*): DOM buttons over a pure squarified layout (no chart dependency), channels `group` / optional
+  `subgroup` / `value`, `options.treemap.limit` (default 20, rest → "Other"), colour = `seriesColors()` by group with
+  `color-mix` tints toward `--gamma-bg-card`; a cell click reaches the host as viz-render's `(channelClick)` and
+  `widget-host` drills on THAT channel's field (a subgroup drill filters on the subgroup value alone).
 - **ag-Grid theme → only** `InspectoGridThemeService` / `GAMMA_GRID_PARAMS`. Never bare `themeQuartz`.
 - Editing the theming plugin (`@gamma/tailwind/plugins/theming.js`) does **not** hot-reload — restart the
   dev server and verify via `getComputedStyle(body).getPropertyValue('--gamma-…')`.

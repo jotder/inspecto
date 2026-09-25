@@ -15,8 +15,9 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { KpiComponent, KpiMode } from './plugins/kpi.component';
 import { KpiTrendComponent } from './plugins/kpi-trend.component';
 import { ProgressListComponent } from './plugins/progress-list.component';
+import { TreemapChannel, TreemapComponent } from './plugins/treemap.component';
 import { getVizComponentLoader } from './viz-components';
-import { VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
+import { ChannelId, VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
 
 /** componentKey → Angular component, for plugins that render via the escape hatch (`render.kind:'component'`).
  *  Only lightweight components belong here — heavy hosts register an async loader instead (`viz-components.ts`). */
@@ -24,6 +25,7 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
     kpi: KpiComponent,
     'kpi-trend': KpiTrendComponent,
     'progress-list': ProgressListComponent,
+    treemap: TreemapComponent,
 };
 
 /**
@@ -114,6 +116,13 @@ export class VizRenderComponent {
     /** Emits the clicked category's label (bar/line/area/pie/bubble) — the drill-down seam. Gauge has no
      *  filterable categories, so it never emits. */
     readonly categoryClick = output<string>();
+    /** Emits a clicked mark that knows its own channel — the treemap, whose group cells drill on `group` and whose
+     *  subgroup cells drill on `subgroup`. The host resolves the channel to its field. */
+    readonly channelClick = output<{ channel: ChannelId; value: string }>();
+
+    /** Handed to the treemap as its `select` input: one stable reference, so the outlet never re-binds it. */
+    private readonly treemapSelect = (channel: TreemapChannel, value: string): void =>
+        this.channelClick.emit({ channel, value });
 
     readonly renderKind = computed(() => this.plugin().render.kind);
 
@@ -360,6 +369,14 @@ export class VizRenderComponent {
      *  view-bound wrapper's saved-view id. */
     readonly outletInputs = computed<Record<string, unknown>>(() => {
         const r = this.plugin().render;
+        if (r.kind === 'component' && r.componentKey === 'treemap') {
+            return {
+                rows: this.props().treemap ?? [],
+                format: this.renderOptions()?.format,
+                limit: this.renderOptions()?.treemap?.limit,
+                select: this.treemapSelect,
+            };
+        }
         const o = this.renderOptions();
         if (r.kind === 'component' && (r.componentKey === 'kpi-trend' || r.componentKey === 'progress-list')) {
             const series = {

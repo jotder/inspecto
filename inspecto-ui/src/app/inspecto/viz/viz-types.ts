@@ -1,5 +1,6 @@
 import { NumberFormat } from './number-format';
 import { ColumnType, ConditionGroup } from 'app/inspecto/query';
+import { TreemapRow } from './treemap-layout';
 
 /**
  * The visualization seam — a framework-agnostic `VizPlugin` registry that is the **first `ComponentKind`
@@ -60,7 +61,7 @@ export interface QuerySpec {
 }
 
 /** The channels a plugin can map fields onto (Tableau-style). */
-export type ChannelId = 'x' | 'y' | 'series' | 'size' | 'color' | 'value' | 'compare';
+export type ChannelId = 'x' | 'y' | 'series' | 'size' | 'color' | 'value' | 'compare' | 'group' | 'subgroup';
 
 /** A field-mapper control: one channel, the roles it accepts, and whether it's multi/required. */
 export interface ControlSpec {
@@ -168,6 +169,8 @@ export interface VizRenderOptions {
     /** UIE-6, table only: the operational object each row describes. The `idField` cell becomes a link to it; a row
      *  with no id stays plain text. `idField` must be a result column (a chosen dimension). */
     rowLink?: RowLink;
+    /** Treemap only: how many level-1 groups to draw before the rest fold into one "Other" (default 20). */
+    treemap?: { limit?: number };
 }
 
 /** UIE-6: the operational objects a table row can open — each has a detail route taking its id. */
@@ -189,6 +192,8 @@ export interface VizProps {
     value?: number;
     /** UIE-1, KPI: the prior-period value from the optional `compare` channel — the delta's baseline. */
     compare?: number;
+    /** Treemap: one row per group (and subgroup) with its value — `treemap-layout.ts` builds the tree at render time. */
+    treemap?: TreemapRow[];
 }
 
 /**

@@ -108,7 +108,8 @@ export function autoAssignChannels(plugin: VizPlugin, fields: VizField[], rowCou
     const values: ControlValues = {};
 
     for (const control of plugin.controls) {
-        if (control.channel === 'series' && !control.required) continue; // optional break-down stays empty
+        // An optional break-down (bar's `series`, treemap's `subgroup`) stays empty.
+        if ((control.channel === 'series' || control.channel === 'subgroup') && !control.required) continue;
         const pick = takeNext(control.acceptRoles, pools, used);
         if (!pick) continue;
         const cv: ChannelValue = control.isMeasure ? { field: pick.name, agg: 'sum' } : { field: pick.name };

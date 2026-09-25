@@ -21,7 +21,7 @@ import { TileShape, tileShapeOf } from 'app/inspecto/viz/dashboard-grid';
 import { StaleMark } from 'app/inspecto/signal/stale-tiles';
 import { KpiMode, nextKpiMode } from 'app/inspecto/viz/plugins/kpi.component';
 import { ColumnMeta, ConditionGroup } from 'app/inspecto/query';
-import { VizPlugin, VizProps, getViz } from 'app/inspecto/viz';
+import { ChannelId, VizPlugin, VizProps, getViz } from 'app/inspecto/viz';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
@@ -138,6 +138,7 @@ export interface DrillEvent {
                                     [renderOptions]="widget.options"
                                     [kpiSize]="kpiSize()"
                                     (categoryClick)="onCategoryClick($event)"
+                                    (channelClick)="onChannelClick($event)"
                                 />
                             }
                         } @else if (datasetFailed()) {
@@ -315,6 +316,14 @@ export class WidgetHostComponent {
         const controls = this.resolvedWidget()?.controls;
         const field = controls?.x?.[0]?.field ?? controls?.series?.[0]?.field;
         if (field) this.drill.emit({ field, value });
+    }
+
+    /** A click that names its channel (treemap): drill on THAT channel's field — a group cell on `group`, a subgroup
+     *  cell on `subgroup`. The drill carries one field, so a subgroup drill filters on the subgroup value alone
+     *  (every group's "Online", not just the clicked group's). */
+    onChannelClick(e: { channel: ChannelId; value: string }): void {
+        const field = this.resolvedWidget()?.controls?.[e.channel]?.[0]?.field;
+        if (field) this.drill.emit({ field, value: e.value });
     }
 
     exportPng(): void {

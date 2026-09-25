@@ -6,7 +6,16 @@ import { describe, expect, it } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { of } from 'rxjs';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { BAR_PLUGIN, BUBBLE_PLUGIN, GAUGE_PLUGIN, KPI_PLUGIN, PIE_PLUGIN, TABLE_PLUGIN } from './plugins';
+import {
+    BAR_PLUGIN,
+    BUBBLE_PLUGIN,
+    GAUGE_PLUGIN,
+    KPI_PLUGIN,
+    PIE_PLUGIN,
+    TABLE_PLUGIN,
+    TREEMAP_PLUGIN,
+} from './plugins';
+import { TreemapComponent } from './plugins/treemap.component';
 import { getVizComponentLoader, registerVizComponent } from './viz-components';
 import { VizPlugin, VizProps } from './viz-types';
 import { VizRenderComponent } from './viz-render.component';
@@ -127,6 +136,24 @@ describe('VizRenderComponent', () => {
         expect(c.outletComponent()).toBeTruthy();
         // UIE-1: the widget card carries the title, so the tile gets the value and what it means — no source-name label.
         expect(c.outletInputs()).toEqual({ value: 99, compare: undefined, format: undefined, target: undefined, better: 'higher' });
+    });
+
+    it('treemap: mounts the treemap component with its rows, format and limit, and re-emits its clicks as channelClick', () => {
+        const treemap = [{ group: 'IRSF', subgroup: 'Roaming', value: 5 }];
+        const fixture = create(TREEMAP_PLUGIN, { labels: [], series: [], treemap });
+        fixture.componentRef.setInput('renderOptions', { format: { compact: true }, treemap: { limit: 5 } });
+        const c = fixture.componentInstance;
+        expect(c.outletComponent()).toBe(TreemapComponent);
+        const inputs = c.outletInputs();
+        expect(inputs).toMatchObject({ rows: treemap, format: { compact: true }, limit: 5 });
+        const clicks: unknown[] = [];
+        c.channelClick.subscribe((e) => clicks.push(e));
+        (inputs['select'] as (channel: string, value: string) => void)('subgroup', 'Roaming');
+        expect(clicks).toEqual([{ channel: 'subgroup', value: 'Roaming' }]);
+        // One stable callback, so the outlet never re-binds it.
+        expect(c.outletInputs()['select']).toBe(inputs['select']);
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('inspecto-treemap')).toBeTruthy();
     });
 
     it('resolves a view-bound plugin through the async loader registry and passes the viewId', async () => {
