@@ -165,6 +165,32 @@ describe('HomeComponent', () => {
         expect(text).toContain('write_config');
     });
 
+    // R2-08: the tile asked the server for status OPEN, which the Incident lifecycle never stores, so it
+    // read 0 beside two CRITICAL Incidents. Open = anything short of RESOLVED / ARCHIVED, in either vocabulary.
+    it('counts IDENTIFIED and DIAGNOSING Incidents as open, never RESOLVED or ARCHIVED ones', () => {
+        const { el, objects } = create({
+            runs: [RUN()],
+            opsEnabled: true,
+            incidents: [
+                { id: 'INC-1', title: 'new', status: 'IDENTIFIED', createdAt: 1 },
+                { id: 'INC-2', title: 'triage', status: 'DIAGNOSING', createdAt: 2 },
+                { id: 'INC-3', title: 'legacy', status: 'OPEN', createdAt: 3 },
+                { id: 'INC-4', title: 'done', status: 'RESOLVED', createdAt: 4 },
+                { id: 'INC-5', title: 'filed', status: 'ARCHIVED', createdAt: 5 },
+                { id: 'INC-6', title: 'legacy done', status: 'CLOSED', createdAt: 6 },
+            ],
+        });
+        expect(objects.list).toHaveBeenCalledWith(expect.not.objectContaining({ status: expect.anything() }));
+        const text = el.textContent ?? '';
+        expect(text).toContain('INC-1');
+        expect(text).toContain('INC-2');
+        expect(text).toContain('INC-3');
+        expect(text).not.toContain('INC-4');
+        expect(text).not.toContain('INC-5');
+        expect(text).not.toContain('INC-6');
+        expect(text).toContain('3 things need your attention.');
+    });
+
     // Module presence, never the edition string: an absent ops module 503s on every path, so the pane
     // must not even ask, and the Incidents affordances must not render.
     it('asks for Incidents only when the ops module registered', () => {

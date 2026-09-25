@@ -17,6 +17,7 @@ import {
     SpacesService,
     apiErrorMessage,
     isFeatureAbsent,
+    normalizeIncidentStatus,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
@@ -40,6 +41,9 @@ interface AttentionRow {
 }
 
 const NOTICE_DISMISSED = 'inspecto.home.bindNoticeDismissed';
+
+/** An Incident no one needs to act on, in lifecycle terms (a legacy CLOSED normalizes to ARCHIVED). */
+const CLOSED_INCIDENT = new Set(['RESOLVED', 'ARCHIVED']);
 
 /**
  * Home — the one landing route, in every edition (landing-page plan D1, 2026-09-15). Root redirects
@@ -216,8 +220,12 @@ export class HomeComponent implements OnInit {
         // Gate on the flag first: an absent ops module 503s on every path, so asking at all would only
         // produce an error to swallow (the dashboard's precedent).
         if (this.opsEnabled()) {
-            this.objects.list({ type: 'INCIDENT', status: 'OPEN', limit: 10 }).subscribe({
-                next: (o) => this.incidents.set(o),
+            // ⚠ Never `status: 'OPEN'`: Incidents are stored in the lifecycle's own words (IDENTIFIED →
+            // DIAGNOSING → RESOLVED → ARCHIVED), so that filter matched nothing and the tile read 0 beside
+            // open CRITICAL Incidents (R2-08). The server filters one status only; fetch and keep the open ones.
+            this.objects.list({ type: 'INCIDENT', limit: 100 }).subscribe({
+                next: (o) =>
+                    this.incidents.set(o.filter((i) => !CLOSED_INCIDENT.has(normalizeIncidentStatus(i.status)))),
                 error: () => this.incidents.set([]),
             });
         }
