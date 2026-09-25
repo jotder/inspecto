@@ -1,8 +1,10 @@
 import { Injectable, inject } from '@angular/core';
 import { JobRunRow } from './jobs.service';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 import { apiErrorMessage, apiUrl, toParams } from './api-base';
+import { visibleDelay } from './auto-refresh';
 import {
     AuditRow,
     DrainResult,
@@ -138,6 +140,23 @@ export interface ConsignmentOutputsPage {
     derivedRuns?: JobRunRow[];
 }
 
+/** One manual run's status (`GET /runs/runs/{runId}`, W5b). `total`/`failed` are -1 while `RUNNING`. */
+export interface PipelineRunStatus {
+    runId: string;
+    pipeline?: string;
+    status: 'RUNNING' | 'SUCCESS' | 'FAILED' | string;
+    startedAt?: string;
+    finishedAt?: string | null;
+    total?: number;
+    failed?: number;
+    message?: string | null;
+}
+
+/** Delays (ms) between polls of a triggered run; the last one repeats until it settles. */
+export const RUN_POLL_BACKOFF_MS: readonly number[] = [500, 1000, 2000, 4000, 5000];
+/** Give up after this many polls (~5 min at the capped delay) — the Auto refresh takes over from there. */
+export const RUN_POLL_MAX = 60;
+
 /** Ingest run lifecycle + audit queries (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
 export class RunsService {
@@ -150,6 +169,24 @@ export class RunsService {
      *  refresh the list, which shows the outcome). Mirrors the job trigger. */
     trigger(name: string): Observable<{ runId: string }> {
         return this.http.post<{ runId: string }>(apiUrl(`/runs/${encodeURIComponent(name)}/trigger`), {});
+    }
+    /** One manual run's status by the id {@link trigger} returned; 404 once evicted or unknown. */
+    run(runId: string): Observable<PipelineRunStatus> {
+        return this.http.get<PipelineRunStatus>(apiUrl(`/runs/runs/${encodeURIComponent(runId)}`));
+    }
+    /**
+     * Poll {@link run} on {@link RUN_POLL_BACKOFF_MS} until it leaves `RUNNING`, then emit its last status once
+     * and complete. Delays only count while the page is visible. Emits `null` when a poll fails (404 = evicted
+     * or unknown) and the last `RUNNING` status after {@link RUN_POLL_MAX} polls — the caller refreshes either way.
+     */
+    awaitRun(runId: string): Observable<PipelineRunStatus | null> {
+        const poll = (i: number): Observable<PipelineRunStatus | null> =>
+            visibleDelay(RUN_POLL_BACKOFF_MS[Math.min(i, RUN_POLL_BACKOFF_MS.length - 1)]).pipe(
+                switchMap(() => this.run(runId)),
+                switchMap((r) => (r.status === 'RUNNING' && i + 1 < RUN_POLL_MAX ? poll(i + 1) : of(r))),
+                catchError(() => of(null)),
+            );
+        return poll(0);
     }
     runAll(): Observable<Record<string, RunResult>> {
         return this.http.post<Record<string, RunResult>>(apiUrl('/trigger'), {});

@@ -1,11 +1,21 @@
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { provideHttpClient, withXhr } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, ParamMap, provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
 import { BehaviorSubject, Observable, of } from 'rxjs';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { LensService, RunResult, RunsService, RunView } from 'app/inspecto/api';
+import {
+    DEFAULT_REFRESH_MS,
+    LensService,
+    RUN_POLL_BACKOFF_MS,
+    RunResult,
+    RunsService,
+    RunView,
+} from 'app/inspecto/api';
+import { environment } from 'environments/environment';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -114,5 +124,125 @@ describe('RunsComponent', () => {
     it('renders with no a11y violations', async () => {
         const fixture = create();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+/** Override the read-only document.hidden getter, then fire visibilitychange. */
+function setHidden(hidden: boolean): void {
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+    document.dispatchEvent(new Event('visibilitychange'));
+}
+
+/**
+ * Refresh behaviour against the REAL RunsService over a mocked backend (fake timers): the list must catch a
+ * triggered run's outcome without a manual refresh, and "Auto" must tick on DEFAULT_REFRESH_MS while visible.
+ */
+describe('RunsComponent refresh', () => {
+    const listUrl = `${environment.apiBaseUrl}/v1/runs`;
+    const row = (committedBatches: number): RunView => ({ ...RUN, paused: false, committedBatches });
+    let http: HttpTestingController;
+
+    function createLive(): ComponentFixture<RunsComponent> {
+        TestBed.configureTestingModule({
+            imports: [RunsComponent],
+            providers: [
+                provideNoopAnimations(),
+                provideRouter([]),
+                provideHttpClient(withXhr()),
+                provideHttpClientTesting(),
+                { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({})) } },
+                { provide: MatDialog, useValue: {} },
+                { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
+                { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
+                {
+                    provide: ToastrService,
+                    useValue: { warning: () => undefined, success: () => undefined, error: () => undefined },
+                },
+            ],
+        });
+        http = TestBed.inject(HttpTestingController);
+        const fixture = TestBed.createComponent(RunsComponent);
+        fixture.detectChanges();
+        http.expectOne(listUrl).flush([row(0)]); // the initial load
+        return fixture;
+    }
+
+    const listRequests = () => http.match((r) => r.method === 'GET' && r.url === listUrl);
+
+    beforeEach(() => {
+        localStorage.removeItem('inspecto.currentLens');
+        vi.useFakeTimers();
+        setHidden(false);
+    });
+
+    afterEach(() => {
+        http.verify();
+        vi.useRealTimers();
+        setHidden(false);
+    });
+
+    it('after a trigger, polls the run with backoff and re-fetches the list once it leaves RUNNING', async () => {
+        const c = createLive().componentInstance;
+        c.autoRefresh = false; // prove the post-trigger refresh does not depend on the Auto clock
+
+        await c.trigger('cdr_ingest');
+        http.expectOne(`${listUrl}/cdr_ingest/trigger`).flush({ runId: 'r1' });
+        listRequests().forEach((r) => r.flush([row(0)])); // an immediate re-fetch races the run: still 0
+
+        vi.advanceTimersByTime(RUN_POLL_BACKOFF_MS[0]);
+        http.expectOne(`${listUrl}/runs/r1`).flush({ runId: 'r1', status: 'RUNNING' });
+        expect(listRequests()).toHaveLength(0); // still running: no list refresh yet
+
+        vi.advanceTimersByTime(RUN_POLL_BACKOFF_MS[1] - 1);
+        http.expectNone(`${listUrl}/runs/r1`); // backoff, not a busy loop
+        vi.advanceTimersByTime(1);
+        http.expectOne(`${listUrl}/runs/r1`).flush({ runId: 'r1', status: 'SUCCESS' });
+
+        const refresh = listRequests();
+        expect(refresh).toHaveLength(1);
+        refresh[0].flush([row(1)]);
+        expect(c.runs()[0].committedBatches).toBe(1);
+
+        vi.advanceTimersByTime(60_000);
+        http.expectNone(`${listUrl}/runs/r1`); // polling stops at the terminal status
+    });
+
+    it('stops polling a triggered run when the page is destroyed', async () => {
+        const fixture = createLive();
+        await fixture.componentInstance.trigger('cdr_ingest');
+        http.expectOne(`${listUrl}/cdr_ingest/trigger`).flush({ runId: 'r1' });
+        listRequests().forEach((r) => r.flush([row(0)]));
+
+        fixture.destroy();
+        vi.advanceTimersByTime(60_000);
+        http.expectNone(`${listUrl}/runs/r1`);
+        expect(listRequests()).toHaveLength(0);
+    });
+
+    it('"Auto" re-fetches every DEFAULT_REFRESH_MS while visible — not when off, not while hidden', () => {
+        const c = createLive().componentInstance;
+
+        vi.advanceTimersByTime(DEFAULT_REFRESH_MS - 1);
+        expect(listRequests()).toHaveLength(0);
+        vi.advanceTimersByTime(1);
+        expect(listRequests().map((r) => r.flush([row(1)]))).toHaveLength(1);
+        expect(c.runs()[0].committedBatches).toBe(1);
+
+        vi.advanceTimersByTime(DEFAULT_REFRESH_MS);
+        expect(listRequests().map((r) => r.flush([row(2)]))).toHaveLength(1);
+
+        c.autoRefresh = false;
+        vi.advanceTimersByTime(DEFAULT_REFRESH_MS * 2);
+        expect(listRequests()).toHaveLength(0);
+
+        c.autoRefresh = true;
+        setHidden(true);
+        vi.advanceTimersByTime(DEFAULT_REFRESH_MS * 2);
+        expect(listRequests()).toHaveLength(0);
+
+        setHidden(false);
+        vi.advanceTimersByTime(DEFAULT_REFRESH_MS);
+        expect(listRequests().map((r) => r.flush([row(3)]))).toHaveLength(1);
+        expect(c.runs()[0].committedBatches).toBe(3);
     });
 });

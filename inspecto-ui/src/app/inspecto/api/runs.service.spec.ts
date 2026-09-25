@@ -1,8 +1,8 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { RunsService } from './runs.service';
+import { RUN_POLL_BACKOFF_MS, RunsService } from './runs.service';
 import { InboxStatus } from './models';
 import { environment } from '../../../environments/environment';
 
@@ -66,5 +66,40 @@ describe('RunsService', () => {
         const req = httpMock.expectOne((r) => r.url === `${base}/runs/mini_etl/lineage`);
         expect(req.request.params.get('batchId')).toBe('b1');
         req.flush([]);
+    });
+
+    describe('awaitRun()', () => {
+        const setHidden = (hidden: boolean) => {
+            Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden });
+            document.dispatchEvent(new Event('visibilitychange'));
+        };
+        beforeEach(() => {
+            vi.useFakeTimers();
+            setHidden(false);
+        });
+        afterEach(() => {
+            vi.useRealTimers();
+            setHidden(false);
+        });
+
+        it('emits null and stops on a failed poll (404 = evicted/unknown)', () => {
+            const seen: unknown[] = [];
+            let done = false;
+            svc.awaitRun('r9').subscribe({ next: (r) => seen.push(r), complete: () => (done = true) });
+            vi.advanceTimersByTime(RUN_POLL_BACKOFF_MS[0]);
+            httpMock.expectOne(`${base}/runs/runs/r9`).flush({}, { status: 404, statusText: 'Not Found' });
+            expect(seen).toEqual([null]);
+            expect(done).toBe(true);
+        });
+
+        it('does not poll while the page is hidden', () => {
+            svc.awaitRun('r1').subscribe();
+            setHidden(true);
+            vi.advanceTimersByTime(60_000);
+            httpMock.expectNone(`${base}/runs/runs/r1`);
+            setHidden(false);
+            vi.advanceTimersByTime(RUN_POLL_BACKOFF_MS[0]);
+            httpMock.expectOne(`${base}/runs/runs/r1`).flush({ runId: 'r1', status: 'FAILED' });
+        });
     });
 });

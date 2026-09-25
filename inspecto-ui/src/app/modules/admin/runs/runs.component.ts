@@ -148,10 +148,16 @@ export class RunsComponent implements OnInit {
         if (!this.lens.canOperateRuns()) return; // Business lens: read-only observe
         if (!(await this.confirm.confirm(`Trigger run "${name}" now?`, 'Trigger run'))) return;
         this.api.trigger(name).subscribe({
-            // v1 async contract (W5b): the trigger returns 202 + runId; the refreshed list shows the outcome.
-            next: () => {
+            // v1 async contract (W5b): the trigger returns 202 + runId while the run is still going, so an
+            // immediate re-fetch races it — poll the run until it settles, then refresh the list again.
+            next: ({ runId }) => {
                 this.toastr.success(`Run "${name}" started.`);
                 this.load();
+                if (!runId) return;
+                this.api
+                    .awaitRun(runId)
+                    .pipe(takeUntilDestroyed(this.destroyRef))
+                    .subscribe(() => this.load());
             },
             error: (e) => this.toastr.error(apiErrorMessage(e, `Trigger failed for ${name}`)),
         });

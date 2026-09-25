@@ -1,5 +1,5 @@
 import { EMPTY, fromEvent, merge, Observable, of, timer } from 'rxjs';
-import { map, switchMap } from 'rxjs/operators';
+import { map, switchMap, take } from 'rxjs/operators';
 
 /** Emits the current page-visibility, now and on every visibilitychange. */
 function whenVisible(): Observable<boolean> {
@@ -14,6 +14,17 @@ function whenVisible(): Observable<boolean> {
  */
 export function visibleInterval(intervalMs: number): Observable<number> {
     return whenVisible().pipe(switchMap((visible) => (visible ? timer(intervalMs, intervalMs) : EMPTY)));
+}
+
+/**
+ * A one-shot delay that only counts while the page is visible: emits once after `ms` of visibility, then
+ * completes. Hiding the tab cancels the pending delay; becoming visible again restarts it.
+ */
+export function visibleDelay(ms: number): Observable<number> {
+    return whenVisible().pipe(
+        switchMap((visible) => (visible ? timer(ms) : EMPTY)),
+        take(1),
+    );
 }
 
 /** Default operator-console refresh cadence (ms). */
