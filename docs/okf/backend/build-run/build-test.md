@@ -102,6 +102,20 @@ Verified by building both flavors 2026-08-27 (Personal 169.3 MB, Enterprise 170.
 > jars, Standard **11**, Enterprise **12**. The complete enumerations in code are `package.ps1`'s
 > staging block and its boot-smoke classpath. Owner: [`okf/capabilities/editions/editions.md`](../../capabilities/editions/editions.md) §3.3.
 
+**The `spaces/` tree ships COMMITTED content only** (`BUNDLE-UNTRACKED-SPACES-1`, 2026-09-25). Step 4 is
+`Copy-TrackedSpaces` in `inspecto/package-spaces.ps1`, dot-sourced by `package.ps1`: it lists
+`git ls-tree HEAD -- spaces` and writes those blobs with `git checkout-index` from a throwaway index, so
+.gitattributes eol rules apply as in a fresh checkout. Skip rules are unchanged: top-level `uat` and
+`_shared`; per Space `audit/`, `duckdb/`, `flows/`, `views/`, and under `data/` everything but `data/samples/`.
+- 🔴 **Why.** It used to copy the working-tree `Get-ChildItem spaces/` listing, and a demo bundle built in the
+  shared sandbox checkout shipped a git-excluded client working set and a peer's untracked pilot Space.
+- ⚖ **A locally modified tracked file ships as COMMITTED**, and a file only `git add`ed does not ship — a
+  bundle's Space content is reproducible from its commit. Both are named in a warning, never mixed in silently.
+- **Git is required** — there is no directory-listing fallback (that fallback *is* the leak); no git or not a
+  work tree throws. Untracked / git-excluded Space dirs are named in a warning; the log line lists the Spaces bundled.
+- Pinned by `tools/check-bundle-spaces.mjs` (CI `test` job): a throwaway repo holding every trap, staged for
+  real under pwsh, exact file set asserted.
+
 ⚠ **`/assist/*` is inert in every bundle `package.ps1` produces, and that is the intended default.**
 The core fat JAR carries the two SPI *interfaces* (`com.gamma.assist.spi.AssistAgent`,
 `com.gamma.intelligence.spi.IntelligenceAgent`) but no implementor and no `META-INF/services` entry, so

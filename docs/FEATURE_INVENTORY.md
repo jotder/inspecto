@@ -226,7 +226,8 @@ Builds `inspecto-deploy-<platform>.zip` per embedded runtime (Since 2026-09-17 t
 ```
 inspecto-deploy/
   inspecto.jar          shaded fat JAR
-  spaces/                     every committed space (default/demo/ucc) + the _templates gallery;
+  spaces/                     every committed space (default/demo/ucc) + the _templates gallery,
+                              staged from `git ls-tree HEAD` — never untracked/git-excluded dirs;
                               config trees + space.toon + data/samples/ ship, runtime state
                               (audit/duckdb/data-other-than-samples) and the generated uat /
                               runtime _shared trees are pruned. Configs use repo/bundle-root-relative

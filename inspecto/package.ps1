@@ -696,42 +696,25 @@ if (Test-Path $uiDistRoot) {
 # ── step 4: copy the multi-space config tree (configs + space.toon) ───────────
 # Each space's configs are relocatable: a config ref resolves beside its config and a data path
 # (data/...) under its Space dir, whatever the launch dir — no path rewrite needed. Runtime state
-# (data/audit/duckdb/flows) is created on first run and is intentionally NOT bundled.
+# (data/audit/duckdb/flows/views) is created on first run and is intentionally NOT bundled.
 #
-# The excluded trees are SKIPPED AT COPY TIME, not copied-then-pruned (2026-07-31): a locally running
-# ControlApi holds an exclusive handle on spaces/<id>/duckdb/*.db, so the old copy-everything pass
-# failed outright ("being used by another process") — packaging a bundle should not require stopping
-# the dev server, least of all to copy files it then deletes.
-$spacesSrc = Join-Path $sandboxRoot 'spaces'
-if (Test-Path $spacesSrc) {
-    $spacesOut = Join-Path $bundleDir 'spaces'
-    # Never ship runtime/generated trees: uat is a generated clone (tools/seed-uat.ps1) and _shared
-    # holds the Exchange's runtime ledgers. _templates (the shipped template gallery) DOES ship.
-    $skipTop = @('uat', '_shared')
-    # Per space: skip runtime state but KEEP authored config/flows/ (canonical since the
-    # flows-divergence fix) and the pristine data/samples/ feeds (committed, seed scripts copy them).
-    $skipGen = @('audit', 'duckdb', 'flows', 'views')
-    $null = New-Item -ItemType Directory $spacesOut -Force
-    foreach ($entry in Get-ChildItem -Path $spacesSrc -Force) {
-        if (-not $entry.PSIsContainer) { Copy-Item $entry.FullName $spacesOut -Force; continue }
-        if ($skipTop -contains $entry.Name) { continue }
-        $spaceOut = Join-Path $spacesOut $entry.Name
-        $null = New-Item -ItemType Directory $spaceOut -Force
-        foreach ($child in Get-ChildItem -Path $entry.FullName -Force) {
-            if ($skipGen -contains $child.Name) { continue }
-            if ($child.PSIsContainer -and $child.Name -eq 'data') {
-                $dataOut = Join-Path $spaceOut 'data'
-                $null = New-Item -ItemType Directory $dataOut -Force
-                $samples = Join-Path $child.FullName 'samples'
-                if (Test-Path $samples) { Copy-Item $samples $dataOut -Recurse -Force }
-                continue
-            }
-            Copy-Item $child.FullName $spaceOut -Recurse -Force
-        }
-    }
-    Write-Host "Bundled spaces tree → $spacesOut (samples + config/flows kept, runtime skipped)" -ForegroundColor Green
+# ONLY COMMITTED CONTENT SHIPS (BUNDLE-UNTRACKED-SPACES-1, 2026-09-25): the tree is staged from
+# `git ls-tree HEAD` by Copy-TrackedSpaces (package-spaces.ps1), never from the working-tree listing
+# — that listing shipped a git-excluded client working set and a peer's untracked pilot Space. A
+# locally modified tracked file ships as COMMITTED; git is required (no fallback). Nothing is read
+# from the working tree, so a running ControlApi's lock on spaces/<id>/duckdb/*.db cannot fail the copy.
+. (Join-Path $adjParserDir 'package-spaces.ps1')
+$staged = Copy-TrackedSpaces -RepoRoot $sandboxRoot -BundleDir $bundleDir
+if ($staged.Spaces.Count -gt 0) {
+    Write-Host "Bundled spaces tree → $($staged.Out) ($($staged.Files) committed files; Spaces: $($staged.Spaces -join ', '))" -ForegroundColor Green
 } else {
-    Write-Host "  (no spaces/ tree found at $spacesSrc — skipping config bundle)" -ForegroundColor Yellow
+    Write-Host "  (no committed Space under spaces/ — bundle carries no Space)" -ForegroundColor Yellow
+}
+if ($staged.Untracked.Count -gt 0) {
+    Write-Warning "spaces/: NOT bundled — no committed files (untracked or git-excluded): $($staged.Untracked -join ', ')"
+}
+if ($staged.Modified.Count -gt 0) {
+    Write-Warning "spaces/: $($staged.Modified.Count) tracked file(s) modified locally — bundled the COMMITTED version: $($staged.Modified -join ', ')"
 }
 
 # ── step 4b: copy runnable examples ───────────────────────────────────────────

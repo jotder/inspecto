@@ -277,6 +277,13 @@ jobs:
       - name: Guard — the bundle's platform is read from the embedded runtime, never hard-coded
         run: node tools/check-bundle-platform.mjs
 
+      # Bundle-spaces guard (BUNDLE-UNTRACKED-SPACES-1, 2026-09-25). A demo bundle built in the shared
+      # checkout shipped a git-excluded client working set and a peer's untracked pilot Space, because
+      # step 4 copied the working-tree spaces/ listing. Staging now reads `git ls-tree HEAD` only
+      # (inspecto/package-spaces.ps1); this runs it under pwsh against a throwaway repo full of traps.
+      - name: Guard — a bundle ships only committed Space content
+        run: node tools/check-bundle-spaces.mjs
+
   test:
     runs-on: ubuntu-latest
     # DAT-6-CI-1 (2026-09-07). The embedded-Postgres harness was removed by operator decision — Postgres is

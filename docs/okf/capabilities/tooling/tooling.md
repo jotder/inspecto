@@ -105,14 +105,15 @@ sentence this whole area turns on: **a clean run says nothing about what it decl
 
 ### 3.2 The guard roster
 
-This is the inventory that existed nowhere. **Twenty-four guard scripts, plus two inline pipeline checks** —
-twenty-one under `tools/` (`check-vocabulary` · `check-secrets` · `check-doc-links` · `check-doc-citations` ·
+This is the inventory that existed nowhere. **Twenty-five guard scripts, plus two inline pipeline checks** —
+twenty-two under `tools/` (`check-vocabulary` · `check-secrets` · `check-doc-links` · `check-doc-citations` ·
 `check-doc-counts` · `check-nul-bytes` · `check-gate-tally` · `check-board-heads` · `check-coverage` ·
-`check-dependencies` · `check-sbom-modules` · `check-launchers`, and nine more listed here but not yet
+`check-dependencies` · `check-sbom-modules` · `check-launchers`, and ten more listed here but not yet
 given a row in the table below:
 `check-authgate-coverage` — a gated ControlApi route that no armed test exercises;
 `check-backlog-homes` — a `docs/BACKLOG.md` row's `→` owning-doc pointer must name a doc that mentions its subject;
 `check-bundle-doc-links` — every relative link in a shipped doc must resolve inside the customer bundle;
+`check-bundle-spaces` — a bundle's `spaces/` tree must hold only committed content, never untracked or git-excluded Spaces;
 `check-bundle-platform` — a deployment zip's platform label must come from the runtime it embeds, never a literal;
 `check-family-count` — every stated count of `OperationalDb.Family` must equal the enum;
 `check-reactor-verdict` — a Maven reactor log is a pass only if it proves every module ran;
