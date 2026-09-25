@@ -371,6 +371,18 @@ describe('DashboardEditorComponent', () => {
         expect(c.filter().items).toHaveLength(0);
     });
 
+    it('clicking ANOTHER heatmap cell moves the selection: its pair replaces the previous one', () => {
+        const c = create().componentInstance;
+        c.onDrill({ field: 'tariff', value: 'premium' }); // other fields are untouched
+        c.onDrill({ field: 'control', value: 'RA-C02', and: [{ field: 'event_date', value: '2025-10-01' }] });
+        c.onDrill({ field: 'control', value: 'RA-C07', and: [{ field: 'event_date', value: '2025-10-02' }] });
+        expect(c.filter().items).toEqual([
+            { kind: 'condition', field: 'tariff', operator: '=', value: 'premium' },
+            { kind: 'condition', field: 'control', operator: '=', value: 'RA-C07' },
+            { kind: 'condition', field: 'event_date', operator: '=', value: '2025-10-02' },
+        ]);
+    });
+
     it('the drill-through of a heatmap-cell drill carries both conditions in the request', async () => {
         rowsCalls.length = 0;
         const fixture = create();
