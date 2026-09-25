@@ -16,7 +16,6 @@ import com.gamma.job.JobService;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineCodec;
-import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineStore;
 import com.gamma.service.SpaceRoot;
 import com.gamma.util.AtomicFiles;
@@ -54,6 +53,11 @@ import java.util.Set;
  * ({@link com.gamma.acquire.ConnectionProfile}). Every supported kind is read/written through the uniform
  * {@link BundleSource} seam (below) regardless of its backing store.
  *
+ * <p><b>Pipelines (2026-09-25, BUNDLE-AUTHORED-PIPELINE-STORE-1 option B):</b> {@code pipeline} carries a
+ * REGISTERED {@code *_pipeline.toon} with its sidecars inside the item, through {@link PipelineBundleRoutes}'
+ * own export/import core; {@code authored-pipeline} is now EXPORT-ONLY (grandfathered {@link PipelineStore}
+ * graphs, W5 "never newly written") and an import carrying one is refused 422 before any write.
+ *
  * <p><b>{@code connection} is reference-only, secrets stripped</b> (BACKLOG decision D2). A connection
  * item carries the profile's shape (connector/host/port/database/base path/username, tunnel, proxy) and any
  * secret expressed as a {@code ${ENV:…}}-style {@link com.gamma.acquire.SecretResolver} reference — but
@@ -81,7 +85,16 @@ final class BundleRoutes implements RouteModule {
 
     /** The non-{@link ComponentStore} kinds this module also serves (each has its own {@link BundleSource}). */
     private static final Set<String> OWN_STORE_KINDS =
-            Set.of("authored-pipeline", "job", "saved-view", "connection", "enrichment");
+            Set.of("pipeline", "authored-pipeline", "job", "saved-view", "connection", "enrichment");
+
+    /**
+     * W5: grandfathered {@code PipelineStore} graphs are readable / runnable / deletable, NEVER newly written —
+     * and this kind's import was the last writer left (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B). It is also
+     * how a stored graph came to shadow a registered Pipeline of the same id. So the kind is export-only.
+     */
+    static final String AUTHORED_PIPELINE_READ_ONLY = "the 'authored-pipeline' kind is read-only: grandfathered "
+            + "PipelineStore graphs are never newly written (W5) — re-export the Pipeline as kind 'pipeline', "
+            + "which carries the registered *_pipeline.toon and its sidecars";
 
     /** Supported kinds in dependency order (referenced kinds first) — the import apply order. {@code connection}
      *  is first: it has no outbound refs of its own and an authored pipeline's source may reference it.
@@ -108,10 +121,15 @@ final class BundleRoutes implements RouteModule {
      *  <p>⚠ Absence is not always a bug: a kind that REFERENCES a pipeline rather than being referenced by
      *  one ({@code expectation}, {@code decision-rule}) is correct to apply last, which is exactly what
      *  omission gives it. So the invariant worth pinning is "a referenced kind precedes its referencer",
-     *  not "every supported kind appears here" — see {@code ControlApiBundleImportTest}. */
+     *  not "every supported kind appears here" — see {@code ControlApiBundleImportTest}.
+     *
+     *  <p>{@code pipeline} (2026-09-25) takes the place a pipeline always had: after the registry kinds it may
+     *  name ({@code grammar/<id>}, {@code schema/<id>}), before {@code enrichment}/{@code job}, which trigger on
+     *  it. Its own sidecars travel INSIDE the item, so they need no slot. {@code authored-pipeline} never
+     *  imports ({@link #AUTHORED_PIPELINE_READ_ONLY}); it keeps its slot for export ordering only. */
     static final List<String> APPLY_ORDER =
             List.of("connection", "grammar", "mapping", "schema", "transform", "sink", "dataset", "query",
-                    "widget", "dashboard", "reconciliation", "authored-pipeline", "enrichment", "job",
+                    "widget", "dashboard", "reconciliation", "pipeline", "authored-pipeline", "enrichment", "job",
                     "saved-view");
 
     private static boolean supported(String kind) {
@@ -278,6 +296,10 @@ final class BundleRoutes implements RouteModule {
         // Gate 2 — structural validation → 422.
         Map<String, Object> bundle = body.get("bundle") instanceof Map<?, ?> ? cast(body.get("bundle")) : body;
         validateEnvelope(bundle);
+        // W5 — a grandfathered PipelineStore graph is never newly written: refuse the whole import before any
+        // write, rather than land the rest of a promotion that expected this item to travel with it.
+        if (asMapList(bundle.get("items")).stream().anyMatch(i -> "authored-pipeline".equals(ApiContext.str(i, "kind"))))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, AUTHORED_PIPELINE_READ_ONLY);
         Map<String, Object> actions = body.get("actions") instanceof Map<?, ?> ? cast(body.get("actions")) : Map.of();
 
         ComponentStore store = new ComponentStore(registry);
@@ -432,6 +454,8 @@ final class BundleRoutes implements RouteModule {
             Path root = componentRootOrNull(api);
             return root == null ? null : new ComponentBundleSource(new ComponentStore(root), kind);
         }
+        // A registered pipeline exports with or without a write root, exactly like GET /pipelines/{name}/bundle.
+        if ("pipeline".equals(kind)) return new RegisteredPipelineBundleSource(api);
         Path root = api.writeRoot();
         if (root == null) return null;
         return switch (kind) {
@@ -463,22 +487,91 @@ final class BundleRoutes implements RouteModule {
         }
     }
 
-    /** {@code authored-pipeline} — {@link PipelineStore}, round-tripped through {@link PipelineCodec}. */
+    /**
+     * {@code pipeline} — a REGISTERED {@code *_pipeline.toon} (what the editor edits and the poll cycle runs),
+     * carried with its sidecars INSIDE the item (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B, operator
+     * 2026-09-25). Content = the editable graph ({@code GET …/graph/raw}'s shape — lineage + Import as draft
+     * read it) plus {@code closure: {manifest, files}}, which is {@link PipelineBundleRoutes#exportClosure}
+     * verbatim. ⚠ The graph is a PROJECTION: a write-through import writes {@code closure} alone, through
+     * {@link PipelineBundleRoutes#importClosure} — the §21 gates, not a second copy of them — onto the
+     * registered file on overwrite, landing inactive and registered. A refusal fails THIS item.
+     */
+    private record RegisteredPipelineBundleSource(ApiContext api) implements BundleSource {
+        public Optional<Map<String, Object>> get(String id) {
+            if (api.service().configFor(id).isEmpty()) return Optional.empty();
+            try {
+                PipelineBundleRoutes.Closure c = PipelineBundleRoutes.exportClosure(api, id);
+                Map<String, Object> content = new LinkedHashMap<>(com.gamma.pipeline.PipelineEditable.toMap(
+                        api.service().configFor(id).orElseThrow(),
+                        ConfigLoader.filesystem().decode(api.service().pathFor(id).orElseThrow().toString())));
+                Map<String, Object> files = new LinkedHashMap<>();
+                c.entries().forEach((name, bytes) -> files.put(name, encodeFile(bytes)));
+                Map<String, Object> closure = new LinkedHashMap<>();
+                closure.put("manifest", c.manifest());
+                closure.put("files", files);
+                content.put("closure", closure);
+                return Optional.of(content);
+            } catch (IOException unreadable) {
+                throw new java.io.UncheckedIOException(unreadable);
+            }
+        }
+        public boolean exists(String id) { return api.service().configFor(id).isPresent(); }
+        public Map<String, Object> write(String id, Map<String, Object> content) throws IOException {
+            if (!(content.get("closure") instanceof Map<?, ?> closure) || !(closure.get("manifest") instanceof Map<?, ?> m)
+                    || !(closure.get("files") instanceof Map<?, ?> files))
+                throw new IllegalArgumentException("a 'pipeline' item carries closure.manifest and closure.files "
+                        + "(export it from this server); a graph alone is not a transferable pipeline");
+            Map<String, Object> manifest = cast(m);
+            LinkedHashMap<String, byte[]> entries = new LinkedHashMap<>();
+            files.forEach((name, v) -> entries.put(String.valueOf(name), decodeFile(String.valueOf(name), v)));
+            PipelineBundleRoutes.Imported r;
+            try {
+                PipelineBundleRoutes.checkManifest(manifest);
+                r = PipelineBundleRoutes.importClosure(api, api.writeRoot(), manifest, entries, id,
+                        exists(id) ? "overwrite" : "refuse");   // BundleRoutes already decided skip vs overwrite
+            } catch (ApiException refused) {
+                throw new IllegalArgumentException(refused.getMessage());
+            }
+            if (!r.written())
+                throw new IllegalArgumentException("pipeline '" + id + "' has ERROR-level findings, not written: "
+                        + r.body().get("findings"));
+            return r.body();
+        }
+        public Map<String, Object> normalized(String id, Map<String, Object> content) {
+            return content;   // stored form == exported form; a retargeted import honestly reads as drifted
+        }
+    }
+
+    /** A closure entry as JSON: its UTF-8 text, or {@code {base64}} for bytes that are not UTF-8 (byte-verbatim). */
+    private static Object encodeFile(byte[] bytes) {
+        try {
+            return StandardCharsets.UTF_8.newDecoder().decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+        } catch (java.nio.charset.CharacterCodingException binary) {
+            return Map.of("base64", java.util.Base64.getEncoder().encodeToString(bytes));
+        }
+    }
+
+    private static byte[] decodeFile(String name, Object v) {
+        if (v instanceof String s) return s.getBytes(StandardCharsets.UTF_8);
+        if (v instanceof Map<?, ?> m && m.get("base64") instanceof String b64) {
+            try {
+                return java.util.Base64.getDecoder().decode(b64);
+            } catch (IllegalArgumentException bad) {
+                throw new IllegalArgumentException("closure file '" + name + "' is not valid base64");
+            }
+        }
+        throw new IllegalArgumentException("closure file '" + name + "' must be text or {base64}");
+    }
+
+    /** {@code authored-pipeline} — {@link PipelineStore}, read through {@link PipelineCodec}. EXPORT-ONLY
+     *  ({@link #AUTHORED_PIPELINE_READ_ONLY}): {@link #importBundle} refuses the kind before any write. */
     private record PipelineBundleSource(PipelineStore store) implements BundleSource {
         public Optional<Map<String, Object>> get(String id) {
             return store.get(id).map(PipelineCodec::toMap);
         }
         public boolean exists(String id) { return store.exists(id); }
-        public Map<String, Object> write(String id, Map<String, Object> content) throws IOException {
-            Map<String, Object> stamped = new LinkedHashMap<>(content);
-            stamped.put("name", id);   // in-file identity == URL id, mirroring ComponentStore.write
-            PipelineGraph g;
-            try {
-                g = PipelineCodec.fromMap(stamped);
-            } catch (RuntimeException ex) {
-                throw new IllegalArgumentException(ex.getMessage());
-            }
-            return PipelineCodec.toMap(store.write(id, g));
+        public Map<String, Object> write(String id, Map<String, Object> content) {
+            throw new IllegalArgumentException(AUTHORED_PIPELINE_READ_ONLY);
         }
         public Map<String, Object> normalized(String id, Map<String, Object> content) {
             Map<String, Object> stamped = new LinkedHashMap<>(content);

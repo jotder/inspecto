@@ -252,8 +252,9 @@ now `{from, rel: "companion", to, derived: true}` (`PipelineGraphRoutes.COMPANIO
 - **SPA:** `AuthoredEdge.derived`; `withoutDerivedEdges` in `pipelines.service.ts` strips it from
   `savePipelineGraph` and the `dryRunAuthored` candidate; `authoredToG6` renders it with no run overlay,
   dotted and faded, and `isDerivedEdge` keeps `edge:click` from selecting it (not editable).
-- ⚠ Not covered: the authored-pipeline store (`BundleRoutes` `authored-pipeline` kind) and the catalog
-  export carry a `graph/raw` body opaquely; they do not validate data flow, so the edge rides along there.
+- ⚠ Not covered: the catalog export carries a `graph/raw` body opaquely; it does not validate data flow,
+  so the edge rides along there. (The metadata bundle's `pipeline` item projects its graph with
+  `PipelineEditable.toMap` alone, so it carries no companion edge; §21.)
 
 *Verified: `ControlApiPipelineGraphCompanionTest` (real HTTP: raw shape, untouched PUT → 200 with the
 companion byte-unchanged, candidate dry run → 200, a hand-authored sink `data` edge still `ILLEGAL_EMIT`);
@@ -534,8 +535,26 @@ UI side: [Grammar configuration](../../frontend/features/grammar-config.md).
   capability-manifest drift guard fires on any new gated route — declare it in
   `CapabilityManifest` in the same change (only the FULL reactor showed it).
 - The UI's Duplicate + row export still ride the client stream-bundle — migration onto these
-  routes is the BACKLOG follow-up; the metadata bundle's `authored-pipeline` kind stays serving
-  grandfathered flows only.
+  routes is the BACKLOG follow-up.
+- **The Metadata Bundle's `pipeline` kind is this door (2026-09-25, BUNDLE-AUTHORED-PIPELINE-STORE-1
+  option B, operator).** The route bodies were split into two package-private cores,
+  `PipelineBundleRoutes.exportClosure` (→ `Closure{id, manifest, entries}`) and `importClosure`
+  (everything after the write-root gate → `Imported{written, body}`), and `BundleRoutes`'
+  `RegisteredPipelineBundleSource` calls them: the item's `content.closure` is `{manifest, files}` —
+  the same manifest and entries as the zip, text as UTF-8 (`{base64}` otherwise) — so the sidecars
+  travel INSIDE the one item and meet the same gates in the same order. ⚠ `exported_at` moved out of
+  the core into the zip route: inside an item's content it made every export hash as drifted.
+  ⚠ The item also carries the editable graph (`PipelineEditable.toMap`, the `graph/raw` shape) as a
+  PROJECTION for lineage and Import as draft; a write-through import ignores it. ⚠ `BundleRoutes`
+  decides skip-vs-overwrite first, so the core sees `conflict=overwrite` for an existing id and
+  `refuse` otherwise (never `rename`); every `ApiException` / ERROR verdict becomes that item's
+  `failed`. Pinned by `ControlApiPipelineKindBundleTest` (round trip into a fresh instance under a real
+  Subject: 403 without the capability, registered + listed + dry-runs, skip/overwrite; tampered sha
+  and graph-only items fail with nothing written).
+- The metadata bundle's `authored-pipeline` kind is **export-only** since the same change — an import
+  carrying one is 422 (W5: grandfathered `PipelineStore` graphs are never newly written) — and a
+  `PipelineStore` graph no longer shadows a registered pipeline of the same id in Run to here /
+  dry-run (the registered config wins; the store answers only an unregistered grandfathered id).
 
 ## 22. The data-source bundle's forward closure — the Reference Datasets a Pipeline reads (W5, 2026-09-24)
 

@@ -489,13 +489,13 @@ class ControlApiBundleImportTest {
      */
     @Test
     void aPipelinesCompanionsAreAppliedBeforeThePipeline() {
-        int pipeline = BundleRoutes.APPLY_ORDER.indexOf("authored-pipeline");
-        assertTrue(pipeline >= 0, "authored-pipeline must be ordered at all");
+        int pipeline = BundleRoutes.APPLY_ORDER.indexOf("pipeline");
+        assertTrue(pipeline >= 0, "pipeline must be ordered at all");
         for (String companion : java.util.List.of("grammar", "mapping", "schema", "connection")) {
             int at = BundleRoutes.APPLY_ORDER.indexOf(companion);
             assertTrue(at >= 0, companion + " is a supported kind an authored pipeline references, so "
                     + "leaving it out of APPLY_ORDER applies it AFTER the pipeline that needs it");
-            assertTrue(at < pipeline, companion + " must be applied before authored-pipeline, got "
+            assertTrue(at < pipeline, companion + " must be applied before pipeline, got "
                     + at + " vs " + pipeline + " in " + BundleRoutes.APPLY_ORDER);
         }
     }
@@ -504,7 +504,7 @@ class ControlApiBundleImportTest {
     @Test
     void aJobIsAppliedAfterThePipelineItMayTriggerOn() {
         assertTrue(BundleRoutes.APPLY_ORDER.indexOf("job")
-                        > BundleRoutes.APPLY_ORDER.indexOf("authored-pipeline"),
+                        > BundleRoutes.APPLY_ORDER.indexOf("pipeline"),
                 BundleRoutes.APPLY_ORDER.toString());
     }
 

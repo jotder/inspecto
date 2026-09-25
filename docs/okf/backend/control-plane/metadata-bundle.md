@@ -27,8 +27,10 @@ hot-registers via `upsertJob`, exactly like the `/jobs` write routes), and `save
 `SavedViewStore`; **not** the run-generated `pipeline.ViewStore` `sink.view` definitions, which aren't
 authored config), and, since 2026-07-25, `connection` (the live `CollectorService` connection registry —
 **reference-only, secrets stripped**; see the boundary section), and, since 2026-08-31, `enrichment`
-(the `<write-root>/<id>_enrich.toon` companion — pipeline spec gap 6b). Every supported kind is
-read/written through the uniform `BundleSource` seam regardless of its backing store:
+(the `<write-root>/<id>_enrich.toon` companion — pipeline spec gap 6b), and, since 2026-09-25, `pipeline`
+(a REGISTERED `*_pipeline.toon` with its sidecars — see *Pipelines* below; `authored-pipeline` is
+export-only from the same day). Every supported kind is read/written through the uniform `BundleSource`
+seam regardless of its backing store:
 
 * **`POST /bundle/export`** — `{items, provenance?, requires?}` → `{bundle, missing}`; real content + real
   `provenance.contentHash`; each resolvable `requires` ref is stamped with an `originHash` (the source's stored
@@ -51,6 +53,41 @@ read/written through the uniform `BundleSource` seam regardless of its backing s
   findings the import would *introduce* — computed over (registry ∪ incoming) minus pre-existing). Existing
   defaults to skip (per-item `overwrite` opt-in); identical hash ⇒ `unchanged` (idempotent re-promotion);
   per-item outcomes, the batch never aborts.
+
+## Pipelines — `pipeline` and the read-only `authored-pipeline` (SHIPPED 2026-09-25, operator: option B)
+
+Closes BUNDLE-AUTHORED-PIPELINE-STORE-1 (the grounding is kept below, struck).
+
+* **`pipeline`** = a REGISTERED `*_pipeline.toon` — what the editor edits and the poll cycle runs.
+  `BundleRoutes.RegisteredPipelineBundleSource` delegates to `PipelineBundleRoutes`' two cores, so there is
+  ONE closure and ONE set of gates ([editable round-trip §21](../pipeline-graph/editable-round-trip.md)):
+  * **Content** = the editable graph (`PipelineEditable.toMap`, the `GET …/graph/raw` shape — lineage and
+    Import as draft read it) **plus `closure: {manifest, files}`**: the zip door's manifest (no
+    `exported_at` — a timestamp in content made every export hash as drifted) and every entry it names
+    (the pipeline toon, satellites, `*_enrich.toon` companions) as UTF-8 text, `{base64}` for non-UTF-8
+    bytes. The sidecars travel **inside the item**, never as separate items — the Decision 2026-09-06
+    namespace rule (`schema` in a manifest is the registry id) holds.
+  * **Import** writes `closure` alone through `importClosure`: manifest/sha256 422 → zip-slip jail 403 →
+    retarget → `SaveGate` → satellites, companions, pipeline → register, landing `<write-root>/<id>/`,
+    `active: false`. ⚠ The graph is a projection: an import ignores it. Existing id ⇒ skipped unless
+    `actions` says `overwrite`, which lands on the REGISTERED file. Any refusal (incl. an ERROR finding) is
+    that item's `failed`, with nothing written.
+  * ⚠ `normalized` is the identity: on the SOURCE a re-export previews `unchanged`; on a target the
+    imported copy is retargeted (dirs, `active: false`), so a second import honestly reads `drifted` and is
+    skipped by default.
+  * Ordered in `APPLY_ORDER` where a pipeline always was — after the registry kinds it names
+    (`grammar/<id>`, `schema/<id>`), before `enrichment` / `job`.
+* **`authored-pipeline`** is **export-only** — W5's rule is that the grandfathered `PipelineStore` graphs
+  are readable / runnable / deletable, *never newly written*, and this kind's import was the last writer.
+  **Decision (recorded 2026-09-25): refuse the kind outright**, not "refuse only an id a registered
+  pipeline holds": W5 already answers whether a grandfathered graph may be newly written, and nothing
+  records a need to import one. `POST /bundle/import` answers **422 before any write** when the envelope
+  carries one (`BundleRoutes.AUTHORED_PIPELINE_READ_ONLY` names the rule and `pipeline` as the kind to
+  use), rather than landing the rest of a promotion that expected it. Export and preview still work.
+* **Shadowing closed.** `PipelineGraphRoutes` Run to here runs `PipelineLift.lift` of the registered config
+  it already requires; dry-run asks the registration first and falls back to `PipelineStore` only for an
+  unregistered grandfathered id. Pinned by `ControlApiPipelineTestRunTest.aStoredGraphNeverShadows…`
+  (both routes; red before the fix).
 
 ## Boundary & invariants
 
@@ -189,11 +226,14 @@ transfer menus) lives in the frontend bundle. Design history: `docs/archived-doc
 
 ## Open rows this concept owns
 
-- **`BUNDLE-AUTHORED-PIPELINE-STORE-1`** — the `authored-pipeline` bundle kind reads and writes
+- ~~**`BUNDLE-AUTHORED-PIPELINE-STORE-1`**~~ ✅ **CLOSED 2026-09-25 — operator chose option B**; as built in
+  *Pipelines — `pipeline` and the read-only `authored-pipeline`* above (the `pipeline` kind, `authored-pipeline`
+  export-only, the shadowing fix, `loadAll` emitting `pipeline`). The grounding below is kept as history
+  and describes the code BEFORE the fix: the `authored-pipeline` bundle kind read and wrote
   `PipelineStore` (`<root>/pipelines/`), not the registered `*_pipeline.toon` files the Pipeline editor and
   the runtime use: exporting a registered-file-only Pipeline reports it missing, and an ordinary import lands
   it where nothing runs it. Found 2026-09-25 (load-as-draft slice 5); the draft path is unaffected.
-  **Grounded 2026-09-25 — ⏳ DECISION OWED, no code changed.** Both stores are live, for different reasons:
+  **Grounded 2026-09-25 — decision answered the same day (option B).** Both stores are live, for different reasons:
   * **Registered `*_pipeline.toon`** is what the editor edits (`GET …/graph/raw`, `PUT …/graph`) and what the
     poll cycle runs — canonical since W5 (`d079c1398`, 2026-08-01), with its own fully gated transfer door
     already shipped: `GET /pipelines/{name}/bundle` + `POST /pipelines/import` (`PipelineBundleRoutes`,

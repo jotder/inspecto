@@ -46,11 +46,12 @@ import static com.gamma.util.Values.mapAt;
  *   POST /pipelines/import           import such a zip (query: ?name=&amp;conflict=refuse|overwrite|rename)
  * </pre>
  *
- * <p><b>Why this is not a {@link BundleRoutes} kind</b>: that format carries component-registry
- * artifacts addressed by id; a canonical pipeline's satellites are <em>config-namespace paths</em>
- * that must be rewritten for the target, which the id-based {@code BundleRef} cannot express — and
- * the two namespaces collide on the word <em>schema</em>. Its {@code authored-pipeline} kind keeps
- * serving grandfathered {@code *_flow.toon} flows only.
+ * <p><b>The Metadata Bundle's {@code pipeline} kind is this same door</b> (BUNDLE-AUTHORED-PIPELINE-STORE-1,
+ * option B, operator 2026-09-25): {@link BundleRoutes} carries the {@link #exportClosure closure} whole inside
+ * one item and imports it through {@link #importClosure}, so there is one closure and one set of gates. The
+ * satellites stay <em>config-namespace files</em> inside that item — never separate id-addressed items,
+ * because the two namespaces collide on the word <em>schema</em>. Its {@code authored-pipeline} kind is
+ * read-only: it exports grandfathered {@code PipelineStore} graphs and never imports (W5).
  *
  * <p><b>Closure enumeration reuses the engine's own resolution</b>: the exported satellite set is
  * {@link PipelineConfig#referencedFiles()} — every schema / per-segment schema / grammar / mapping
@@ -108,6 +109,27 @@ final class PipelineBundleRoutes implements RouteModule {
      * hold both under the portable bare name — rename one at the source).
      */
     private Object exportBundle(ApiContext api, HttpExchange e, String name) throws IOException {
+        Closure c = exportClosure(api, name);
+        c.manifest().put("exported_at", java.time.Instant.now().toString());
+        byte[] zip = zip(c.manifest(), c.entries());
+        log.info("[PIPELINE-BUNDLE] exported '{}' as a zip, {} bytes", c.id(), zip.length);
+        return download(e, zip, c.id() + ".pipeline-bundle.zip");
+    }
+
+    /**
+     * One registered pipeline's transferable closure — the manifest and every entry it names, byte-verbatim.
+     * The {@code manifest} carries no {@code exported_at}: the zip door stamps one, while the Metadata Bundle's
+     * {@code pipeline} kind carries this as an item's content, where a timestamp would make every export hash
+     * as drifted (the envelope's own {@code provenance.exportedAt} records the time).
+     */
+    record Closure(String id, Map<String, Object> manifest, LinkedHashMap<String, byte[]> entries) {}
+
+    /**
+     * The ONE export core — shared by {@code GET /pipelines/{name}/bundle} and the Metadata Bundle's
+     * {@code pipeline} kind (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B), so both carry the same closure.
+     * 404 unknown pipeline; 409 on a satellite basename collision (see {@link #exportBundle}).
+     */
+    static Closure exportClosure(ApiContext api, String name) throws IOException {
         PipelineConfig cfg = api.service().configFor(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         Path file = api.service().pathFor(name)
@@ -180,16 +202,14 @@ final class PipelineBundleRoutes implements RouteModule {
         manifest.put("version", VERSION);
         manifest.put("pipeline", id);
         manifest.put("pipeline_file", pipelineEntry);
-        manifest.put("exported_at", java.time.Instant.now().toString());
         if (!satellites.isEmpty()) manifest.put("satellites", satellites);
         if (!enrichments.isEmpty()) manifest.put("enrichments", enrichments);
         if (!requirements.isEmpty()) manifest.put("requirements", requirements);
         if (!notes.isEmpty()) manifest.put("notes", notes);
 
-        byte[] zip = zip(manifest, entries);
-        log.info("[PIPELINE-BUNDLE] exported '{}': {} satellite(s), {} companion(s), {} bytes",
-                id, satellites.size(), enrichments.size(), zip.length);
-        return download(e, zip, id + ".pipeline-bundle.zip");
+        log.info("[PIPELINE-BUNDLE] closure of '{}': {} satellite(s), {} companion(s)",
+                id, satellites.size(), enrichments.size());
+        return new Closure(id, manifest, entries);
     }
 
     // ── import ───────────────────────────────────────────────────────────────────
@@ -209,6 +229,29 @@ final class PipelineBundleRoutes implements RouteModule {
         // Gate 2 — manifest / spec validation → 422.
         LinkedHashMap<String, byte[]> entries = unzip(e.getRequestBody().readAllBytes());
         Map<String, Object> manifest = manifestOf(entries);
+        Imported r = importClosure(api, writeRoot, manifest, entries,
+                ApiContext.query(e, "name"), ApiContext.query(e, "conflict"));
+        return r.written() ? r.body() : ApiContext.respondJson(e, 422, r.body());
+    }
+
+    /** The import core's answer: {@code written} ⇒ the route's 200 body; otherwise the 422 refusal body. */
+    record Imported(boolean written, Map<String, Object> body) {}
+
+    /**
+     * The ONE import core — shared by {@code POST /pipelines/import} and the Metadata Bundle's {@code pipeline}
+     * kind (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B), so a pipeline travelling either way meets the same
+     * gates in the same order (class doc; everything after the write-root gate, which the caller ran). A
+     * refusal is an {@link ApiException} (422/403/409), or — for a {@link SaveGate} ERROR — an unwritten
+     * {@link Imported} carrying the findings; either way nothing is left written.
+     *
+     * @param manifest   an already-{@link #checkManifest checked} manifest
+     * @param entries    every entry the manifest names, by entry name (the manifest itself excluded)
+     * @param requested  the target id, or null/blank for the bundle's own
+     * @param conflictOr {@code refuse} (null ⇒ refuse) | {@code overwrite} | {@code rename}
+     */
+    static Imported importClosure(ApiContext api, Path writeRoot, Map<String, Object> manifest,
+                                  LinkedHashMap<String, byte[]> entries, String requested, String conflictOr)
+            throws IOException {
         String sourceId = ApiContext.str(manifest, "pipeline");
         String pipelineEntry = ApiContext.str(manifest, "pipeline_file");
         byte[] pipelineBytes = pipelineEntry == null ? null : entries.get(pipelineEntry);
@@ -232,12 +275,10 @@ final class PipelineBundleRoutes implements RouteModule {
         }
 
         // The target identity: caller's ?name= wins, else the bundle's own id. 422 on an unsafe name.
-        String requested = ApiContext.query(e, "name");
         String newId = WriteGates.safeName(
                 (requested == null || requested.isBlank() ? sourceId : requested).trim().toLowerCase(),
                 "pipeline name");
-        String conflict = String.valueOf(
-                java.util.Objects.requireNonNullElse(ApiContext.query(e, "conflict"), "refuse")).toLowerCase();
+        String conflict = String.valueOf(java.util.Objects.requireNonNullElse(conflictOr, "refuse")).toLowerCase();
         if (!Set.of("refuse", "overwrite", "rename").contains(conflict))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "conflict must be refuse, overwrite or rename");
 
@@ -326,7 +367,7 @@ final class PipelineBundleRoutes implements RouteModule {
                     // someone else's file appeared — leave the directory rather than risk their data
                 }
             }
-            return ApiContext.respondJson(e, 422, Map.of("written", false,
+            return new Imported(false, Map.of("written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
         }
 
@@ -393,7 +434,7 @@ final class PipelineBundleRoutes implements RouteModule {
         if (!requirements.isEmpty()) r.put("requirements", requirements);
         if (!notes.isEmpty()) r.put("notes", notes);
         r.put("findings", findings);
-        return r;
+        return new Imported(true, r);
     }
 
     // ── retargeting (identity travels INSIDE each body) ───────────────────────────
@@ -787,12 +828,17 @@ final class PipelineBundleRoutes implements RouteModule {
         } catch (RuntimeException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "invalid " + MANIFEST + ": " + bad.getMessage());
         }
+        checkManifest(manifest);
+        return manifest;
+    }
+
+    /** 422 on a decoded manifest that is not a v1 pipeline bundle's. */
+    static void checkManifest(Map<String, Object> manifest) {
         if (!FORMAT.equals(ApiContext.str(manifest, "format")))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "not a pipeline bundle (format must be '" + FORMAT + "')");
         Object v = manifest.get("version");
         if (!(v instanceof Number n) || n.intValue() != VERSION)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsupported bundle version (expected " + VERSION + ")");
-        return manifest;
     }
 
     private static String sha256(byte[] bytes) {

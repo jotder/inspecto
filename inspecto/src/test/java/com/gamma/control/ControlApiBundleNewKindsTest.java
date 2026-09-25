@@ -63,23 +63,26 @@ class ControlApiBundleNewKindsTest {
 
     // ── authored-pipeline ────────────────────────────────────────────────────────
 
-    @Test
-    void authoredPipelineImportsAndExportsRoundTrip(@TempDir Path dir) throws Exception {
-        try (Ctx c = open(dir, dir.resolve("wr"))) {
-            String content = "{\"name\":\"p1\",\"active\":false,\"nodes\":[],\"edges\":[]}";
-            JsonNode imp = json(send(c.port, "POST", "/bundle/import", bundleOf("authored-pipeline", "p1", content)));
-            assertEquals(1, imp.get("imported").asInt(), imp.toString());
-            assertEquals(200, send(c.port, "GET", "/pipelines/authored/p1", null).statusCode(),
-                    "landed in PipelineStore, readable via the real CRUD route");
+    /** A grandfathered PipelineStore graph, written straight to the store (nothing else writes one any more — W5). */
+    private static void seedAuthored(Path writeRoot, String id, String contentJson) throws Exception {
+        new com.gamma.pipeline.PipelineStore(writeRoot.resolve("pipelines")).write(id,
+                com.gamma.pipeline.PipelineCodec.fromMap(JSON.readValue(contentJson, java.util.Map.class)));
+    }
 
+    /** Since 2026-09-25 the kind is EXPORT-ONLY (BUNDLE-AUTHORED-PIPELINE-STORE-1, option B). */
+    @Test
+    void authoredPipelineExportsButNeverImports(@TempDir Path dir) throws Exception {
+        String content = "{\"name\":\"p1\",\"active\":false,\"nodes\":[],\"edges\":[]}";
+        seedAuthored(dir.resolve("wr"), "p1", content);
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
             JsonNode exp = json(send(c.port, "POST", "/bundle/export",
                     "{\"items\":[{\"kind\":\"authored-pipeline\",\"id\":\"p1\"}]}"));
             assertEquals(1, exp.get("bundle").get("items").size());
             assertEquals("p1", exp.get("bundle").get("items").get(0).get("content").get("name").asText());
 
-            // re-import identical content → idempotent
-            JsonNode imp2 = json(send(c.port, "POST", "/bundle/import", bundleOf("authored-pipeline", "p1", content)));
-            assertEquals(1, imp2.get("unchanged").asInt(), imp2.toString());
+            // even identical content is refused — the kind has no write path at all
+            HttpResponse<String> imp = send(c.port, "POST", "/bundle/import", bundleOf("authored-pipeline", "p1", content));
+            assertEquals(422, imp.statusCode(), imp.body());
         }
     }
 
@@ -226,9 +229,9 @@ class ControlApiBundleNewKindsTest {
 
     /** ⚠ An enrichment NAMES the pipeline it triggers on, so it must be applied after one. */
     @Test
-    void enrichmentIsAppliedAfterTheAuthoredPipeline() {
+    void enrichmentIsAppliedAfterThePipeline() {
         assertTrue(BundleRoutes.APPLY_ORDER.indexOf("enrichment")
-                        > BundleRoutes.APPLY_ORDER.indexOf("authored-pipeline"),
+                        > BundleRoutes.APPLY_ORDER.indexOf("pipeline"),
                 BundleRoutes.APPLY_ORDER.toString());
     }
 
@@ -342,7 +345,7 @@ class ControlApiBundleNewKindsTest {
     void previewClassifiesNewKindsAndUnknownKindStaysUnsupported(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
             String content = "{\"name\":\"p2\",\"active\":false,\"nodes\":[],\"edges\":[]}";
-            send(c.port, "POST", "/bundle/import", bundleOf("authored-pipeline", "p2", content));
+            seedAuthored(dir.resolve("wr"), "p2", content);
 
             JsonNode preview = json(send(c.port, "POST", "/bundle/preview",
                     "{\"format\":\"inspecto-metadata-bundle\",\"version\":2,\"items\":["

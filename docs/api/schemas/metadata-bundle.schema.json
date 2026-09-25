@@ -41,7 +41,7 @@
   },
   "$defs": {
     "kind": {
-      "description": "The artifact families a bundle can carry. Import applies them in this order (referenced kinds first).",
+      "description": "The artifact families a bundle can carry. Import applies them in this order (referenced kinds first). 'pipeline' = a registered *_pipeline.toon whose content carries its sidecars under closure {manifest, files}; 'authored-pipeline' (grandfathered PipelineStore graph) is export-only — an import carrying one is refused.",
       "type": "string",
       "enum": [
         "connection",
@@ -54,6 +54,7 @@
         "geo-map-view",
         "widget",
         "dashboard",
+        "pipeline",
         "authored-pipeline",
         "job"
       ]

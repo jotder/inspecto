@@ -81,6 +81,22 @@ above the generated commit list.
   first. A deployment behind a proxy must list it, or it audits and throttles every caller as the proxy.
   An unparseable entry fails the boot.
 
+**Breaking — Metadata Bundle Pipelines (2026-09-25, BUNDLE-AUTHORED-PIPELINE-STORE-1 option B)**
+- New bundle kind **`pipeline`**: a REGISTERED `*_pipeline.toon`. `POST /bundle/export` returns its content
+  as the editable graph (the `GET …/graph/raw` shape) plus `closure: {manifest, files}` — the
+  `GET /pipelines/{name}/bundle` manifest (without `exported_at`) and every entry it names as UTF-8 text
+  (`{base64}` for non-UTF-8 bytes). `POST /bundle/import` writes `closure` alone through the
+  `POST /pipelines/import` core (same gates, same `<write-root>/<id>/` layout, always `active: false`,
+  registered); an existing id is skipped unless `actions` says `overwrite`; a refusal fails that item.
+  [metadata-bundle](metadata-bundle.md) · [editable round-trip §21](../pipeline-graph/editable-round-trip.md).
+- **Breaking:** `POST /bundle/import` **422s** (`CONFIG_VALIDATION_FAILED`, before any write) when the
+  envelope carries any **`authored-pipeline`** item — the kind is export-only (W5: grandfathered
+  `PipelineStore` graphs are never newly written). Bundles saved by the SPA before this change carry their
+  Pipelines as `authored-pipeline` and must be re-exported (they now come out as `pipeline`).
+- **Behaviour change:** `POST /pipelines/authored/{id}/run` (Run to here) runs the REGISTERED pipeline's
+  graph, and `…/dry-run` prefers it, even when a `PipelineStore` graph has the same id; the store answers a
+  dry-run only for an unregistered, grandfathered id.
+
 **Breaking — Access Policy save-time guards (2026-09-25, policy-authoring UX S1–S4, operator D1)**
 - `PUT /access/policies` now **422s** (`CONFIG_VALIDATION_FAILED`, the message naming the policy and a
   bracketed check code): an unknown key on a policy or its `target` (`[unknown-key]`; both `resourceKinds`
