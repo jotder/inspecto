@@ -144,4 +144,22 @@ describe('ShareViewerComponent', () => {
         const section = fixture.nativeElement.querySelector('section')!;
         expect(section.querySelector('inspecto-alert')).toBeNull();
     });
+
+    it('draws each tile in the shared tile card: a zero-row answer is the compact empty line (and passes axe)', async () => {
+        const fixture = await create({
+            resolve: () =>
+                of({
+                    dashboard: { id: 'd', content: { name: 'D', tiles: [{ widgetId: 'w1', span: 1 }] } },
+                    widgets: [{ id: 'w1', content: BAR_WIDGET }],
+                    expiresAt: '2026-12-31T00:00:00Z',
+                }),
+            query: () => of({ rows: [], rowCount: 0, truncated: false }),
+        } as Partial<ShareService>);
+        const el: HTMLElement = fixture.nativeElement;
+        const tile = el.querySelector('inspecto-tile-card')!;
+        expect(tile.querySelector('h2')!.textContent).toContain('Sales by region');
+        expect(tile.querySelector('[data-testid="tile-empty"]')!.textContent).toContain('No data for this selection');
+        expect(tile.querySelector('inspecto-viz-render')).toBeNull();
+        await expectNoA11yViolations(el);
+    });
 });

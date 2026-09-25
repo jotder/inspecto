@@ -37,6 +37,9 @@ import { DataTableComponent, DataTableTier } from 'app/inspecto/data-table';
 import { TreeTableComponent, TreeNode, varianceCell } from 'app/inspecto/tree-table';
 import { GeoData, MapViewComponent } from 'app/inspecto/geo';
 import { KpiComponent } from 'app/inspecto/viz/plugins/kpi.component';
+// Dashboard tile section
+import { InspectoTileCardComponent } from 'app/inspecto/components/tile-card.component';
+import { CHART_CATEGORICAL } from 'app/inspecto/theme/chart-tokens';
 import {
     InspectoSchemaFieldsEditorComponent,
     InspectoSchemaMetadataGridComponent,
@@ -82,6 +85,8 @@ interface DemoRow {
         InspectoPageHeaderComponent,
         InspectoStatTileComponent,
         KpiComponent,
+        InspectoTileCardComponent,
+        InspectoChartComponent,
         InspectoSectionTabsComponent,
         InspectoBulkActionsComponent,
         InspectoFilterBarComponent,
@@ -92,7 +97,6 @@ interface DemoRow {
         DataTableComponent,
         TreeTableComponent,
         MapViewComponent,
-        InspectoChartComponent,
         InspectoSchemaFieldsEditorComponent,
         InspectoSchemaMetadataGridComponent,
         DesignSystemFoundationsComponent,
@@ -412,9 +416,24 @@ export class DesignSystemComponent {
         labels: ['Open', 'Pending', 'Closed'],
         datasets: [{ data: [14, 6, 31], backgroundColor: seriesColors(['Open', 'Pending', 'Closed']) }],
     };
+    /** Dashboard tile section: the chart tile's demo series. */
+    readonly tileDemoChart: ChartData = {
+        labels: ['North', 'South', 'East', 'West'],
+        datasets: [{ label: 'Exposure', data: [420, 310, 180, 260], backgroundColor: CHART_CATEGORICAL[0] }],
+    };
 
     // ── Snippets (copy-paste) ────────────────────────────────────────────────────────────────
     readonly snippets = {
+        dashboardTile: `<!-- the Dashboard tile frame — WidgetHostComponent already wraps every Widget in it -->
+<inspecto-tile-card [title]="w.options?.title || w.name" [subtitle]="w.options?.subtitle"
+                    [state]="tileState()"      // 'loading' (skeleton) | 'empty' (one quiet line) | 'ready'
+                    [shape]="tileShapeOf(plugin.render)">  // 'kpi' | 'chart' | 'table' — picks the skeleton
+  <inspecto-status-badge tileStatus value="WARNING" label="Stale" />   <!-- always visible -->
+  <button tileActions mat-icon-button aria-label="Export as PNG">…</button>  <!-- hover AND focus -->
+  <inspecto-viz-render … />                   <!-- the body: render it only when state is 'ready' -->
+</inspecto-tile-card>
+<!-- a Dashboard host adds its own controls (drag, width, remove) the same way: -->
+<app-dashboard-tile [widget]="w" [dataset]="d"><ng-container tileActions [ngTemplateOutlet]="controls" /></app-dashboard-tile>`,
         pageHeader: `<!-- the ONE page header: 22px title, ONE-line subtitle, ? explain, actions right -->
 <inspecto-page-header title="Alerts" subtitle="Fired alert-rule breaches." [terms]="['Alert', 'Alert Rule']">
   <ng-container actions>

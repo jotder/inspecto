@@ -181,74 +181,69 @@
         >
             @for (tile of tiles(); track $index) {
                 <div cdkDrag class="min-w-0" [style.flex-basis]="tileBasis(tile.span)">
-                    <div class="relative">
-                        <div class="absolute right-2 top-2 z-10 flex items-center gap-1">
-                            <button
-                                mat-icon-button
-                                cdkDragHandle
-                                matTooltip="Drag to reorder"
-                                aria-label="Drag to reorder"
-                            >
-                                <mat-icon
-                                    class="icon-size-4"
-                                    svgIcon="heroicons_outline:arrows-pointing-out"
-                                ></mat-icon>
-                            </button>
-                            @if (widgetOf(tile); as w) {
-                                @if (!isViewBound(w)) {
-                                    <button
-                                        mat-icon-button
-                                        (click)="drillTileIndex.set($index)"
-                                        matTooltip="View rows"
-                                        aria-label="View underlying rows"
-                                    >
-                                        <mat-icon
-                                            class="icon-size-4"
-                                            svgIcon="heroicons_outline:table-cells"
-                                        ></mat-icon>
-                                    </button>
-                                }
+                    <!-- The editor's tile controls join the tile card's header action set (revealed on hover
+                         and on keyboard focus). Declared inside cdkDrag so the handle still finds its drag. -->
+                    <ng-template #tileControls>
+                        <button mat-icon-button cdkDragHandle matTooltip="Drag to reorder" aria-label="Drag to reorder">
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrows-up-down"></mat-icon>
+                        </button>
+                        @if (widgetOf(tile); as w) {
+                            @if (!isViewBound(w)) {
+                                <button
+                                    mat-icon-button
+                                    (click)="drillTileIndex.set($index)"
+                                    matTooltip="View rows"
+                                    aria-label="View underlying rows"
+                                >
+                                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:table-cells"></mat-icon>
+                                </button>
                             }
-                            <button
-                                mat-icon-button
-                                (click)="toggleSpan($index)"
-                                [matTooltip]="'Width: ' + spanLabel(tile.span) + ' — click to change'"
-                                [attr.aria-label]="'Change width (now ' + spanLabel(tile.span) + ')'"
-                            >
-                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrows-right-left"></mat-icon>
-                            </button>
-                            <button
-                                mat-icon-button
-                                (click)="removeTile($index)"
-                                matTooltip="Remove"
-                                aria-label="Remove tile"
-                            >
-                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
-                            </button>
-                        </div>
-                        @if (widgetOf(tile); as widget) {
-                            @if (isViewBound(widget)) {
-                                <!-- View-bound tile: the saved view is the binding — the cross-filter doesn't apply. -->
-                                <app-dashboard-tile [widget]="widget" [stale]="staleOf(tile)" />
-                            } @else if (datasetOf(tile); as dataset) {
-                                <app-dashboard-tile
-                                    [widget]="widget"
-                                    [dataset]="dataset"
-                                    [stale]="staleOf(tile)"
-                                    [filter]="filter()"
-                                    (drill)="onDrill($event)"
-                                />
-                            } @else {
-                                <div class="bg-card text-secondary rounded-2xl p-4 text-sm shadow">
-                                    Dataset for “{{ widget.datasetId }}” not found.
-                                </div>
-                            }
-                        } @else {
-                            <div class="bg-card text-secondary rounded-2xl p-4 text-sm shadow">
-                                Widget “{{ tile.widgetId }}” not found.
-                            </div>
                         }
-                    </div>
+                        <button
+                            mat-icon-button
+                            (click)="toggleSpan($index)"
+                            [matTooltip]="'Width: ' + spanLabel(tile.span) + ' — click to change'"
+                            [attr.aria-label]="'Change width (now ' + spanLabel(tile.span) + ')'"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrows-right-left"></mat-icon>
+                        </button>
+                        <button
+                            mat-icon-button
+                            (click)="removeTile($index)"
+                            matTooltip="Remove"
+                            aria-label="Remove tile"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                        </button>
+                    </ng-template>
+                    @if (widgetOf(tile); as widget) {
+                        @if (isViewBound(widget)) {
+                            <!-- View-bound tile: the saved view is the binding — the cross-filter doesn't apply. -->
+                            <app-dashboard-tile [widget]="widget" [stale]="staleOf(tile)">
+                                <ng-container tileActions [ngTemplateOutlet]="tileControls" />
+                            </app-dashboard-tile>
+                        } @else if (datasetOf(tile); as dataset) {
+                            <app-dashboard-tile
+                                [widget]="widget"
+                                [dataset]="dataset"
+                                [stale]="staleOf(tile)"
+                                [filter]="filter()"
+                                (drill)="onDrill($event)"
+                            >
+                                <ng-container tileActions [ngTemplateOutlet]="tileControls" />
+                            </app-dashboard-tile>
+                        } @else {
+                            <inspecto-tile-card [title]="widget.options?.title || widget.name">
+                                <ng-container tileActions [ngTemplateOutlet]="tileControls" />
+                                <p class="text-secondary text-sm">Dataset for “{{ widget.datasetId }}” not found.</p>
+                            </inspecto-tile-card>
+                        }
+                    } @else {
+                        <inspecto-tile-card [title]="tile.widgetId">
+                            <ng-container tileActions [ngTemplateOutlet]="tileControls" />
+                            <p class="text-secondary text-sm">Widget “{{ tile.widgetId }}” not found.</p>
+                        </inspecto-tile-card>
+                    }
                 </div>
             }
         </div>

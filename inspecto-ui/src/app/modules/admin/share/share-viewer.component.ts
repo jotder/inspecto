@@ -1,8 +1,9 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, input, signal } from '@angular/core';
-import { TileSpan, tileBasis, tileSpan } from 'app/inspecto/viz/dashboard-grid';
+import { TileShape, TileSpan, tileBasis, tileShapeOf, tileSpan } from 'app/inspecto/viz/dashboard-grid';
 import { PublicMeasure, PublicQueryBody, ShareService, SharedDashboard, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
+import { InspectoTileCardComponent, TileState } from 'app/inspecto/components/tile-card.component';
 import { fmtWhen } from 'app/inspecto/format';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
 // Side-effect import: registers the built-in VizPlugins. Essential here — /share/:token is a guest,
@@ -31,6 +32,8 @@ interface TileVm {
     detail?: string;
     plugin?: VizPlugin;
     props?: VizProps;
+    /** Rows the query returned; 0 ⇒ the tile card's compact empty state. */
+    rowCount?: number;
 }
 
 /**
@@ -78,12 +81,28 @@ export function embedQueryBody(widget: EmbedWidget): PublicQueryBody | null {
     selector: 'app-share-viewer',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [InspectoAlertComponent, InspectoSkeletonComponent, VizRenderComponent, DashboardHeaderComponent],
+    imports: [
+        InspectoAlertComponent,
+        InspectoSkeletonComponent,
+        InspectoTileCardComponent,
+        VizRenderComponent,
+        DashboardHeaderComponent,
+    ],
     templateUrl: './share-viewer.component.html',
 })
 export class ShareViewerComponent implements OnInit {
     /** UIE-3: a tile's width on the four-column grid. */
     readonly tileBasis = tileBasis;
+
+    /** The tile card's state: its skeleton while loading, the compact empty state for a zero-row answer. */
+    tileState(tile: TileVm): TileState {
+        if (tile.state === 'loading') return 'loading';
+        return tile.state === 'ready' && tile.rowCount === 0 ? 'empty' : 'ready';
+    }
+
+    tileShape(tile: TileVm): TileShape {
+        return tileShapeOf(tile.plugin?.render);
+    }
 
     /** The share token, bound from the `:token` route param (`withComponentInputBinding`). */
     readonly token = input.required<string>();
@@ -153,6 +172,7 @@ export class ShareViewerComponent implements OnInit {
                         ...vm,
                         state: 'ready',
                         props: vm.plugin!.transformProps(r.rows, widget.controls ?? {}),
+                        rowCount: r.rows.length,
                     }),
                 error: (err) =>
                     this.patchTile(i, {

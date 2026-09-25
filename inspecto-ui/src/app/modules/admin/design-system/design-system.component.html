@@ -828,6 +828,43 @@
             ><code>{{ snippets.kpi }}</code></pre>
         </section>
 
+        <!-- ── Dashboard tile (tile card chrome) ───────────── -->
+        <section>
+            <div class="mb-3 flex items-center justify-between">
+                <h2 class="text-xl font-semibold">Dashboard tile</h2>
+                <button mat-stroked-button (click)="copy(snippets.dashboardTile)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <code>&lt;inspecto-tile-card&gt;</code> — the frame every Widget sits in on a Dashboard (editor, Menu
+                viewer, share viewer). A clear title, a muted subtitle, and tile actions that appear on hover
+                <em>and</em> on keyboard focus (tab into a tile to see them). While the query runs it shows a skeleton
+                shaped like the Widget type; a query with no rows is one quiet line, not a dashed box. Tiles in a row
+                share a height.
+            </p>
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <inspecto-tile-card title="Open cases" subtitle="All queues" shape="kpi">
+                    <button tileActions mat-icon-button type="button" aria-label="KPI size: standard (click to change)">
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrows-pointing-out"></mat-icon>
+                    </button>
+                    <div class="h-36"><inspecto-kpi size="standard" [value]="49" [compare]="44" better="lower" /></div>
+                </inspecto-tile-card>
+                <inspecto-tile-card title="Exposure by region" subtitle="SAR, last 30 days">
+                    <button tileActions mat-icon-button type="button" aria-label="Export as PNG">
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                    </button>
+                    <inspecto-chart type="bar" [data]="tileDemoChart" />
+                </inspecto-tile-card>
+                <inspecto-tile-card title="Top offenders" state="loading" shape="table" />
+                <inspecto-tile-card title="Fraud alerts" subtitle="Filtered to Region = North" state="empty" />
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.dashboardTile }}</code></pre>
+        </section>
+
         <!-- ── Section tabs ──────────────────────────────── -->
         <section>
             <div class="mb-3 flex items-center justify-between">

@@ -168,6 +168,110 @@ describe('WidgetHostComponent', () => {
         expect(emitted).toEqual({ field: 'tariff', value: 'premium' });
     });
 
+    it('the tile header shows the widget title and subtitle', () => {
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            { provide: DatasetResultService, useValue: { run: () => new Promise(() => undefined) } },
+        ]);
+        fixture.componentRef.setInput('widget', {
+            ...WIDGET,
+            options: { title: 'Exposure', subtitle: 'SAR, last 30 days' },
+        });
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('inspecto-tile-card h2')?.textContent?.trim()).toBe('Exposure');
+        expect(el.querySelector('inspecto-tile-card header p')?.textContent?.trim()).toBe('SAR, last 30 days');
+    });
+
+    it('while the query runs the tile shows a skeleton shaped like the Widget type, then the render', async () => {
+        let resolve!: (v: unknown) => void;
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            { provide: DatasetResultService, useValue: { run: () => new Promise((r) => (resolve = r)) } },
+        ]);
+        fixture.componentRef.setInput('widget', WIDGET); // kpi
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="tile-skeleton"]')?.getAttribute('data-shape')).toBe('kpi');
+        expect(el.querySelector('inspecto-viz-render')).toBeNull();
+        await expectNoA11yViolations(el);
+
+        resolve({ ok: true, rows: [{ sum_duration_s: 5 }] });
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="tile-skeleton"]')).toBeNull();
+        expect(el.querySelector('inspecto-viz-render')).toBeTruthy();
+    });
+
+    it('a successful run with no rows shows the compact empty line, not an empty chart', async () => {
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            { provide: DatasetResultService, useValue: { run: () => Promise.resolve({ ok: true, rows: [] }) } },
+        ]);
+        fixture.componentRef.setInput('widget', { ...WIDGET, vizType: 'bar' });
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="tile-empty"]')?.textContent).toContain('No data for this selection');
+        expect(el.querySelector('inspecto-viz-render')).toBeNull();
+        expect(el.querySelector('inspecto-empty-state')).toBeNull();
+        await expectNoA11yViolations(el);
+    });
+
+    it('the KPI size cycle lives in the tile action set and drives the KPI (which drops its own button)', async () => {
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: { run: () => Promise.resolve({ ok: true, rows: [{ sum_duration_s: 5 }] }) },
+            },
+        ]);
+        fixture.componentRef.setInput('widget', WIDGET);
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        const size = el.querySelector(
+            '[data-testid="tile-actions"] button[aria-label^="KPI size"]',
+        ) as HTMLButtonElement;
+        expect(size.getAttribute('aria-label')).toContain('standard');
+        expect(el.querySelectorAll('inspecto-kpi button').length).toBe(0);
+        size.click();
+        fixture.detectChanges();
+        expect(size.getAttribute('aria-label')).toContain('max');
+        expect(el.querySelector('[data-testid="kpi-value"]')?.className).toContain('text-6xl');
+        await expectNoA11yViolations(el);
+    });
+
+    it('a chart tile offers Export as PNG in its action set once rendered', async () => {
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: { run: () => Promise.resolve({ ok: true, rows: [{ x: 'a', y: 1 }] }) },
+            },
+        ]);
+        fixture.componentRef.setInput('widget', { ...WIDGET, vizType: 'bar' });
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const btn = (fixture.nativeElement as HTMLElement).querySelector(
+            '[data-testid="tile-actions"] button[aria-label="Export as PNG"]',
+        );
+        expect(btn?.querySelector('mat-icon')?.getAttribute('svgIcon')).toBe('heroicons_outline:arrow-down-tray');
+    });
+
     it('a throttled run shows the explained Rate limited state with Retry — not an empty chart', async () => {
         let calls = 0;
         const fixture = create([
@@ -195,6 +299,8 @@ describe('WidgetHostComponent', () => {
         const alert = fixture.nativeElement.querySelector('inspecto-alert');
         expect(alert?.textContent).toContain('Rate limited');
         expect(fixture.nativeElement.querySelector('inspecto-viz-render')).toBeNull();
+        expect(fixture.nativeElement.querySelector('[data-testid="tile-empty"]')).toBeNull();
+        expect(fixture.nativeElement.querySelector('[data-testid="tile-skeleton"]')).toBeNull();
         await expectNoA11yViolations(fixture.nativeElement);
 
         (alert.querySelector('button') as HTMLButtonElement).click();

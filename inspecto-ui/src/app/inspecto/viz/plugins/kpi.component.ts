@@ -5,8 +5,15 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { formatNumber, NumberFormat } from '../number-format';
 import { targetStatus } from '../target-status';
 
-type KpiMode = 'mini' | 'standard' | 'max';
+export type KpiMode = 'mini' | 'standard' | 'max';
 type Tone = 'good' | 'bad' | 'flat';
+
+const KPI_MODES: KpiMode[] = ['mini', 'standard', 'max'];
+
+/** The next in-place size: mini → standard → max → mini. */
+export function nextKpiMode(mode: KpiMode): KpiMode {
+    return KPI_MODES[(KPI_MODES.indexOf(mode) + 1) % KPI_MODES.length];
+}
 
 /**
  * KPI tile — the `kpi` plugin's component escape hatch, mounted by `viz-render` via `NgComponentOutlet`. The widget
@@ -18,6 +25,10 @@ type Tone = 'good' | 'bad' | 'flat';
  * Both are said in WORDS and arrows as well as tone, so colour is never the only signal (WCAG 1.4.1). Which
  * direction is good comes from `better`: an exposure is better lower, a recovery higher. Three in-place sizes
  * (mini → standard → max) toggle with one button. Tone rides the shared status badge, the sanctioned colour owner.
+ *
+ * Inside a Dashboard tile the tile card owns the frame AND the size button (it sits in the tile's hover/focus
+ * action set), so the host passes `size` and the KPI drops its own card and button. Standalone (the assistant's KPI
+ * artifact) it keeps both.
  */
 @Component({
     selector: 'inspecto-kpi',
@@ -26,25 +37,31 @@ type Tone = 'good' | 'bad' | 'flat';
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <div
-            class="bg-card relative flex h-full flex-col justify-center rounded-2xl p-4 shadow"
-            [class.items-center]="mode() !== 'standard'"
+            class="relative flex h-full flex-col justify-center"
+            [class.bg-card]="!framed()"
+            [class.rounded-2xl]="!framed()"
+            [class.p-4]="!framed()"
+            [class.shadow]="!framed()"
+            [class.items-center]="effectiveMode() !== 'standard'"
         >
-            <button
-                mat-icon-button
-                class="absolute right-1 top-1"
-                (click)="cycle()"
-                [attr.aria-label]="'KPI size: ' + mode() + ' (click to change)'"
-            >
-                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrows-pointing-out"></mat-icon>
-            </button>
+            @if (!framed()) {
+                <button
+                    mat-icon-button
+                    class="absolute right-1 top-1"
+                    (click)="cycle()"
+                    [attr.aria-label]="'KPI size: ' + effectiveMode() + ' (click to change)'"
+                >
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrows-pointing-out"></mat-icon>
+                </button>
+            }
             @if (label(); as l) {
                 <div class="text-secondary mb-1 text-xs font-medium">{{ l }}</div>
             }
             <div
                 class="whitespace-nowrap font-extrabold tabular-nums leading-none"
-                [class.text-2xl]="mode() === 'mini'"
-                [class.text-4xl]="mode() === 'standard'"
-                [class.text-6xl]="mode() === 'max'"
+                [class.text-2xl]="effectiveMode() === 'mini'"
+                [class.text-4xl]="effectiveMode() === 'standard'"
+                [class.text-6xl]="effectiveMode() === 'max'"
                 data-testid="kpi-value"
             >
                 {{ display() }}
@@ -73,6 +90,10 @@ export class KpiComponent {
     readonly target = input<number | undefined>(undefined);
     readonly better = input<'higher' | 'lower'>('higher');
     readonly mode = signal<KpiMode>('standard');
+    /** Set by a host that owns the frame and the size control (a Dashboard tile); absent ⇒ standalone. */
+    readonly size = input<KpiMode | undefined>(undefined);
+    readonly framed = computed(() => this.size() !== undefined);
+    readonly effectiveMode = computed(() => this.size() ?? this.mode());
 
     readonly display = computed(() => formatNumber(this.value(), this.format()));
 
@@ -108,7 +129,6 @@ export class KpiComponent {
     }
 
     cycle(): void {
-        const order: KpiMode[] = ['mini', 'standard', 'max'];
-        this.mode.set(order[(order.indexOf(this.mode()) + 1) % order.length]);
+        this.mode.update(nextKpiMode);
     }
 }

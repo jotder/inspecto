@@ -12,7 +12,7 @@ import { dateAxisLabels, fullDateLabel } from './date-labels';
 import { targetStatus } from './target-status';
 import { CHART_CATEGORICAL, CHART_PALETTES, CHART_TONE, GAUGE_TRACK } from 'app/inspecto/theme/chart-tokens';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
-import { KpiComponent } from './plugins/kpi.component';
+import { KpiComponent, KpiMode } from './plugins/kpi.component';
 import { getVizComponentLoader } from './viz-components';
 import { VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
 
@@ -101,6 +101,9 @@ export class VizRenderComponent {
     /** For a view-bound plugin whose binding is more than an id (LA-21's Working Set Widget): handed to the outlet
      *  component as its `binding` input. Pass a STABLE reference — a new object per change detection re-runs its reads. */
     readonly viewBinding = input<unknown>(undefined);
+    /** KPI only: the in-place size, when the HOST owns the size control (a Dashboard tile's action set). Absent ⇒
+     *  the KPI keeps its own card and size button. */
+    readonly kpiSize = input<KpiMode | undefined>(undefined);
     /** Emits the clicked category's label (bar/line/area/pie/bubble) — the drill-down seam. Gauge has no
      *  filterable categories, so it never emits. */
     readonly categoryClick = output<string>();
@@ -350,6 +353,7 @@ export class VizRenderComponent {
                   format: this.renderOptions()?.format,
                   target: this.renderOptions()?.kpi?.target,
                   better: this.renderOptions()?.kpi?.better ?? 'higher',
+                  size: this.kpiSize(),
               }
             : this.viewBinding() === undefined
               ? { viewId: this.viewId() }

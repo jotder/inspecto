@@ -16,7 +16,10 @@ import { isSharedRef } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
+import { InspectoTileCardComponent, TileState } from 'app/inspecto/components/tile-card.component';
+import { TileShape, tileShapeOf } from 'app/inspecto/viz/dashboard-grid';
 import { StaleMark } from 'app/inspecto/signal/stale-tiles';
+import { KpiMode, nextKpiMode } from 'app/inspecto/viz/plugins/kpi.component';
 import { ColumnMeta, ConditionGroup } from 'app/inspecto/query';
 import { VizPlugin, VizProps, getViz } from 'app/inspecto/viz';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
@@ -56,100 +59,111 @@ export interface DrillEvent {
         InspectoEmptyStateComponent,
         InspectoAlertComponent,
         StatusBadgeComponent,
+        InspectoTileCardComponent,
     ],
+    host: { class: 'block h-full min-w-0' },
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
-        <div class="bg-card flex h-full flex-col rounded-2xl p-4 shadow">
-            @if (resolvedWidget(); as widget) {
-                <div class="mb-0.5 flex items-start justify-between gap-2">
-                    <div class="min-w-0">
-                        <div class="truncate text-sm font-semibold">{{ widget.options?.title || widget.name }}</div>
-                        @if (widget.options?.subtitle) {
-                            <div class="text-secondary text-xs">{{ widget.options?.subtitle }}</div>
-                        }
-                    </div>
-                    @if (stale(); as mark) {
-                        <!-- SIGNAL-STALE-TILES-1: the tile's data source has an unresolved disruption. Text
-                             AND tone carry the meaning (never colour alone), and the reason is the tooltip
-                             rather than a toast — this is a property of the data, not an event. -->
-                        <inspecto-status-badge
-                            value="WARNING"
-                            label="Stale"
-                            class="shrink-0"
-                            [matTooltip]="mark.reason"
-                        />
-                    }
-                    @if (canExport()) {
-                        <button
-                            mat-icon-button
-                            (click)="exportPng()"
-                            matTooltip="Export as PNG"
-                            aria-label="Export as PNG"
-                        >
-                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:download"></mat-icon>
-                        </button>
-                    }
-                </div>
-                @if (plugin(); as p) {
-                    @if (viewBound()) {
-                        <!-- View-bound (geo-map / link-analysis): the saved view is the binding — no dataset/query. -->
-                        <inspecto-viz-render
-                            [plugin]="p"
-                            [props]="props()"
-                            [title]="widget.name"
-                            [viewId]="widget.viewId"
-                            [viewBinding]="widget.workingSet"
-                        />
-                    } @else if (resolvedDataset(); as dataset) {
-                        @if (showRevoked()) {
-                            <!-- A shared-bound dataset whose grant was revoked/expired no longer resolves (fail-closed). -->
-                            <inspecto-empty-state
-                                icon="heroicons_outline:lock-closed"
-                                title="Access revoked"
-                                message="This widget's shared dataset is no longer available — the owner space may have revoked or expired the grant."
-                            />
-                        } @else if (throttled()) {
-                            <!-- The server kept answering 429 RATE_LIMITED after the retries. Say so: an
-                                 empty chart here read as "No data", which is false and not actionable. -->
-                            <inspecto-alert variant="warning" title="Rate limited">
-                                Too many queries in a short time — the server is throttling this widget.
-                                <button mat-button type="button" (click)="retry()">Retry</button>
-                            </inspecto-alert>
-                        } @else {
+        <inspecto-tile-card
+            [title]="tileTitle()"
+            [subtitle]="resolvedWidget()?.options?.subtitle"
+            [state]="tileState()"
+            [shape]="shape()"
+        >
+            <ng-container tileStatus>
+                @if (stale(); as mark) {
+                    <!-- SIGNAL-STALE-TILES-1: the tile's data source has an unresolved disruption. Text
+                         AND tone carry the meaning (never colour alone), and the reason is the tooltip
+                         rather than a toast — this is a property of the data, not an event. -->
+                    <inspecto-status-badge value="WARNING" label="Stale" [matTooltip]="mark.reason" />
+                }
+            </ng-container>
+            <ng-container tileActions>
+                @if (shape() === 'kpi' && tileState() === 'ready') {
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="cycleKpiSize()"
+                        [matTooltip]="'Size: ' + kpiSize() + ' — click to change'"
+                        [attr.aria-label]="'KPI size: ' + kpiSize() + ' (click to change)'"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrows-pointing-out"></mat-icon>
+                    </button>
+                }
+                @if (canExport() && tileState() === 'ready') {
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="exportPng()"
+                        matTooltip="Export as PNG"
+                        aria-label="Export as PNG"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                    </button>
+                }
+                <ng-content select="[tileActions]" />
+            </ng-container>
+            @if (tileState() === 'ready') {
+                @if (resolvedWidget(); as widget) {
+                    @if (plugin(); as p) {
+                        @if (viewBound()) {
+                            <!-- View-bound (geo-map / link-analysis): the saved view is the binding — no dataset/query. -->
                             <inspecto-viz-render
                                 [plugin]="p"
                                 [props]="props()"
-                                [title]="dataset.sourceName"
-                                [renderOptions]="widget.options"
-                                (categoryClick)="onCategoryClick($event)"
+                                [title]="widget.name"
+                                [viewId]="widget.viewId"
+                                [viewBinding]="widget.workingSet"
+                            />
+                        } @else if (resolvedDataset(); as dataset) {
+                            @if (showRevoked()) {
+                                <!-- A shared-bound dataset whose grant was revoked/expired no longer resolves (fail-closed). -->
+                                <inspecto-empty-state
+                                    icon="heroicons_outline:lock-closed"
+                                    title="Access revoked"
+                                    message="This widget's shared dataset is no longer available — the owner space may have revoked or expired the grant."
+                                />
+                            } @else if (throttled()) {
+                                <!-- The server kept answering 429 RATE_LIMITED after the retries. Say so: an
+                                     empty chart here read as "No data", which is false and not actionable. -->
+                                <inspecto-alert variant="warning" title="Rate limited">
+                                    Too many queries in a short time — the server is throttling this widget.
+                                    <button mat-button type="button" (click)="retry()">Retry</button>
+                                </inspecto-alert>
+                            } @else {
+                                <inspecto-viz-render
+                                    [plugin]="p"
+                                    [props]="props()"
+                                    [title]="dataset.sourceName"
+                                    [renderOptions]="widget.options"
+                                    [kpiSize]="kpiSize()"
+                                    (categoryClick)="onCategoryClick($event)"
+                                />
+                            }
+                        } @else if (datasetFailed()) {
+                            <!-- The dataset fetch FAILED (deleted dataset, backend down). Without this the
+                                 branch simply drew nothing: a title row above an empty body, forever. A
+                                 dataset still in flight is the loading skeleton (tileState), not this. -->
+                            <inspecto-empty-state
+                                icon="heroicons_outline:exclamation-triangle"
+                                title="Dataset unavailable"
+                                message="This widget's dataset could not be loaded. It may have been deleted, or the backend is unreachable."
                             />
                         }
-                    } @else if (datasetFailed()) {
-                        <!-- The dataset fetch FAILED (deleted dataset, backend down). Without this the
-                             branch simply drew nothing: a title row above an empty body, forever.
-                             Gated on the failure flag rather than a bare else, so a dataset still in
-                             flight keeps showing nothing rather than briefly accusing the server. -->
-                        <inspecto-empty-state
-                            icon="heroicons_outline:exclamation-triangle"
-                            title="Dataset unavailable"
-                            message="This widget's dataset could not be loaded. It may have been deleted, or the backend is unreachable."
-                        />
+                    } @else {
+                        <div class="text-secondary text-sm">Unknown visualization “{{ widget.vizType }}”.</div>
                     }
-                } @else {
-                    <div class="text-secondary text-sm">Unknown visualization “{{ widget.vizType }}”.</div>
+                } @else if (loadFailed()) {
+                    <!-- A 404 (deleted widget, stale bookmark) used to sit on “Loading…” for ever, which is
+                         indistinguishable from a slow server and gives the operator nothing to act on. -->
+                    <inspecto-empty-state
+                        icon="heroicons_outline:exclamation-triangle"
+                        title="Widget unavailable"
+                        message="This widget could not be loaded. It may have been deleted, or the backend is unreachable."
+                    />
                 }
-            } @else if (loadFailed()) {
-                <!-- A 404 (deleted widget, stale bookmark) used to sit on “Loading…” for ever, which is
-                     indistinguishable from a slow server and gives the operator nothing to act on. -->
-                <inspecto-empty-state
-                    icon="heroicons_outline:exclamation-triangle"
-                    title="Widget unavailable"
-                    message="This widget could not be loaded. It may have been deleted, or the backend is unreachable."
-                />
-            } @else {
-                <div class="text-secondary flex h-32 items-center justify-center text-sm">Loading…</div>
             }
-        </div>
+        </inspecto-tile-card>
     `,
 })
 export class WidgetHostComponent {
@@ -202,6 +216,31 @@ export class WidgetHostComponent {
     /** Show the "access revoked" empty-state: a shared-bound dataset whose backing grant no longer resolves. */
     readonly showRevoked = computed(() => isSharedRef(this.resolvedDataset()?.physicalRef) && !this.runOk());
 
+    /** The first result has arrived — until then the tile shows its skeleton. A later re-run (a cross-filter
+     *  click) keeps the current render on screen rather than flashing the skeleton. */
+    private readonly resultArrived = signal(false);
+    /** Rows in the last successful result; 0 ⇒ the compact empty state, not an empty chart. */
+    private readonly rowCount = signal(0);
+    /** The KPI tile's in-place size, cycled from the tile's action set. */
+    readonly kpiSize = signal<KpiMode>('standard');
+
+    readonly tileTitle = computed(() => {
+        const w = this.resolvedWidget();
+        return w ? w.options?.title || w.name : (this.widgetId() ?? 'Widget');
+    });
+    /** Which skeleton the tile shows while loading. */
+    readonly shape = computed<TileShape>(() => tileShapeOf(this.plugin()?.render));
+    /** Loading until the widget, its dataset and the first result are in; `empty` for a successful run with no
+     *  rows. Every failure state (widget/dataset unavailable, revoked, throttled) is `ready` — the body says it. */
+    readonly tileState = computed<TileState>(() => {
+        if (!this.resolvedWidget()) return this.loadFailed() ? 'ready' : 'loading';
+        if (!this.plugin() || this.viewBound()) return 'ready';
+        if (!this.resolvedDataset()) return this.datasetFailed() ? 'ready' : 'loading';
+        if (this.throttled() || this.showRevoked()) return 'ready';
+        if (!this.resultArrived()) return 'loading';
+        return this.runOk() && this.rowCount() === 0 ? 'empty' : 'ready';
+    });
+
     private readonly colMetas = computed<ColumnMeta[]>(() =>
         (this.resolvedDataset()?.columns ?? []).map((c) => ({ name: c.name, type: c.type })),
     );
@@ -242,11 +281,14 @@ export class WidgetHostComponent {
                 .then((res) => {
                     this.runOk.set(res.ok);
                     this.throttled.set(!!res.throttled);
+                    this.rowCount.set(res.ok ? res.rows.length : 0);
                     this.props.set(plugin.transformProps(res.ok ? res.rows : [], widget.controls));
+                    this.resultArrived.set(true);
                 })
                 .catch(() => {
                     this.runOk.set(false);
                     this.props.set({ labels: [], series: [] });
+                    this.resultArrived.set(true);
                 });
         });
     }
@@ -255,6 +297,11 @@ export class WidgetHostComponent {
     retry(): void {
         this.throttled.set(false);
         this.retryTick.update((n) => n + 1);
+    }
+
+    /** The KPI size action: mini → standard → max. */
+    cycleKpiSize(): void {
+        this.kpiSize.update(nextKpiMode);
     }
 
     /** Resolve the clicked category to the field it came from (the widget's `x` channel, or `series` for

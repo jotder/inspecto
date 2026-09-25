@@ -171,6 +171,21 @@ src/app/
     4 = full row) — one rule for the editor, the menu viewer and the share viewer. Chart colours come from
     `inspecto/viz/series-colors.ts`: a status-like label takes its `statusTone` colour, any other series a
     colour stable by NAME, so "FM prevented" is the same colour on every widget (UIE-2).
+  - **`<inspecto-tile-card title [subtitle] [state] [shape]>`** — the **Dashboard tile** frame
+    (`inspecto/components/tile-card.component.ts`, 2026-09-25). `WidgetHostComponent` wraps every Widget in
+    it, so the editor, the Menu viewer and the share viewer draw the same card: `bg-card` + `border` +
+    `rounded-2xl` + `p-4`, a `text-base font-semibold` `<h2>` title, a muted one-line subtitle, a
+    `[tileStatus]` slot (the Stale badge — always visible) and a `[tileActions]` slot of icon buttons that
+    appear on hover **and on `:focus-within`** (always on a touch screen) — 🔴 never hover-only, and never
+    `display:none`/`aria-hidden` them. `state`: `loading` → an `<inspecto-skeleton>` shaped by `shape`
+    (`tileShapeOf(plugin.render)` in `dashboard-grid.ts`: `kpi` value bars · `chart` bar blocks · `table`
+    row lines); `empty` → one quiet line ("No data for this selection"), 🔴 never the dashed
+    `<inspecto-empty-state>` box inside a tile; `ready` → the body. Failure states (throttled + Retry,
+    revoked, unavailable) stay `ready` and render their alert/empty-state in the body. The body is projected
+    unconditionally — the HOST renders it only when `ready`. The KPI size cycle is a tile action: pass
+    `[kpiSize]` to `<inspecto-viz-render>` and the KPI drops its own card and button. A host adds its own
+    controls with `<app-dashboard-tile><ng-container tileActions [ngTemplateOutlet]="controls" /></app-dashboard-tile>`.
+    The card fills its flex cell, so tiles in one row share a height.
   - **`<inspecto-section-tabs [tabs] [selected] (selectedChange)>`** — a label strip with a count pill
     per section; the **host** renders the content under it (`@switch`), so nothing hides inside a lazily
     mounted tab body (the R9 rule). 🔴 It holds the active index in its OWN signal: binding

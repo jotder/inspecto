@@ -49,6 +49,20 @@ describe('DesignSystemComponent', () => {
         expect(sections).toContain('Chart theme');
     });
 
+    it('the Dashboard tile section shows a KPI, a chart, a loading and an empty tile side by side', async () => {
+        const fixture = await create();
+        const el = fixture.nativeElement as HTMLElement;
+        const heading = Array.from(el.querySelectorAll('section > div > h2')).find(
+            (h) => h.textContent?.trim() === 'Dashboard tile',
+        );
+        const tiles = heading!.closest('section')!.querySelectorAll('inspecto-tile-card');
+        expect(tiles.length).toBe(4);
+        expect(tiles[0].querySelector('inspecto-kpi')).toBeTruthy();
+        expect(tiles[1].querySelector('inspecto-chart')).toBeTruthy();
+        expect(tiles[2].querySelector('[data-testid="tile-skeleton"]')).toBeTruthy();
+        expect(tiles[3].querySelector('[data-testid="tile-empty"]')).toBeTruthy();
+    });
+
     it('the resizable-dialog demo opens with the shared chrome (grip + maximize button)', async () => {
         const fixture = await create();
         fixture.componentInstance.openResizeDemo();

@@ -8,6 +8,8 @@
  * the same width wherever it is seen. Framework-free.
  */
 
+import type { VizRender } from './viz-types';
+
 export type TileSpan = 1 | 2 | 3 | 4;
 
 export const GRID_COLUMNS = 4;
@@ -37,4 +39,13 @@ export function nextSpan(span: unknown): TileSpan {
 /** How the width is said in a tooltip or an aria-label. */
 export function spanLabel(span: unknown): string {
     return ({ 1: 'quarter width', 2: 'half width', 3: 'three-quarter width', 4: 'full width' } as const)[tileSpan(span)];
+}
+
+/** What a tile will hold once its data arrives — picks the tile card's loading skeleton. */
+export type TileShape = 'kpi' | 'chart' | 'table';
+
+/** The tile shape for a Widget's render kind: the KPI number, a grid, or (everything else) a chart. */
+export function tileShapeOf(render: VizRender | undefined): TileShape {
+    if (render?.kind === 'component' && render.componentKey === 'kpi') return 'kpi';
+    return render?.kind === 'aggrid' ? 'table' : 'chart';
 }

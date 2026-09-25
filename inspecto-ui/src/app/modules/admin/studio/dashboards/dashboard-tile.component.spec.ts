@@ -1,3 +1,4 @@
+import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
@@ -96,6 +97,36 @@ describe('DashboardTileComponent', () => {
         const tooltip = fixture.debugElement.query(By.directive(MatTooltip));
         expect(tooltip).not.toBeNull();
         expect(tooltip.injector.get(MatTooltip).message).toBe(STALE.reason);
+    });
+
+    it('a host’s own tile controls project into the tile card’s header action set', async () => {
+        @Component({
+            standalone: true,
+            imports: [DashboardTileComponent],
+            template: `<app-dashboard-tile [widget]="widget" [dataset]="dataset">
+                <button tileActions type="button" aria-label="Remove tile">x</button>
+            </app-dashboard-tile>`,
+        })
+        class EditorLikeHost {
+            readonly widget = WIDGET;
+            readonly dataset = DS;
+        }
+        TestBed.configureTestingModule({
+            imports: [EditorLikeHost],
+            providers: [
+                provideNoopAnimations(),
+                { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
+                { provide: WidgetsService, useValue: {} },
+                { provide: DatasetsService, useValue: {} },
+            ],
+        });
+        const fixture = TestBed.createComponent(EditorLikeHost);
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(
+            el.querySelector('inspecto-tile-card header [data-testid="tile-actions"] button[aria-label="Remove tile"]'),
+        ).toBeTruthy();
+        await expectNoA11yViolations(el);
     });
 
     it('has no accessibility violations while badged', async () => {

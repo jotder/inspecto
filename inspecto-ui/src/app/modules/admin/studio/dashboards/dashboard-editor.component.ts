@@ -10,6 +10,7 @@ import {
     signal,
 } from '@angular/core';
 import { nextSpan, spanLabel, tileBasis } from 'app/inspecto/viz/dashboard-grid';
+import { NgTemplateOutlet } from '@angular/common';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -35,6 +36,7 @@ import { ColumnMeta, ConditionGroup, QueryConditionGroupComponent } from 'app/in
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoTileCardComponent } from 'app/inspecto/components/tile-card.component';
 import {
     BundleTransferService,
     ImportDraft,
@@ -112,6 +114,8 @@ function splitStores(v: string | undefined): string[] | undefined {
         InspectoEmptyStateComponent,
         QueryConditionGroupComponent,
         DashboardTileComponent,
+        InspectoTileCardComponent,
+        NgTemplateOutlet,
         DashboardFilterBarComponent,
         DashboardDrillDrawerComponent,
         TransferMenuComponent,
