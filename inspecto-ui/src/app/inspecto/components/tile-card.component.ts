@@ -34,7 +34,7 @@ let nextTileId = 0;
         >
             <header class="mb-3 flex min-h-8 items-start gap-2">
                 <div class="min-w-0 flex-1">
-                    <h2 [id]="titleId" class="truncate text-base font-semibold leading-6" [title]="title()">
+                    <h2 [id]="titleId" class="line-clamp-2 text-base font-semibold leading-6" [title]="title()">
                         {{ title() }}
                     </h2>
                     @if (subtitle()) {
