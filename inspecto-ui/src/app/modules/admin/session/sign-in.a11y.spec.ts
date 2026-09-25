@@ -16,6 +16,7 @@ function create(
         loginRequired: () => true,
         beginLogin: vi.fn(),
         version: signal<string | null>(version),
+        demoUsers: signal([]),
         branding: signal({
             logoDataUrl: branding.logoDataUrl ?? null,
             caption: branding.caption ?? null,

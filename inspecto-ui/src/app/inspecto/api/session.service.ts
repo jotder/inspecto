@@ -30,6 +30,13 @@ export interface OidcConfig {
     mock?: boolean;
 }
 
+/** DEMO-AUTH-1: one entry of the demo build's sign-in picker, as `/bootstrap` `auth.demoUsers` serves it (never roles). */
+export interface DemoUser {
+    id: string;
+    displayName: string;
+    title: string;
+}
+
 /** The deployment's own branding, as `GET /bootstrap` serves it. Nulls mean "use the shipped defaults". */
 export interface BootstrapBranding {
     logoDataUrl: string | null;
@@ -45,7 +52,7 @@ interface Bootstrap {
     features?: { authMode?: string; exchange?: boolean; geoLink?: boolean; events?: boolean; ops?: boolean };
     session?: { authenticated?: boolean; actor?: string; capabilities?: string[] };
     branding?: Partial<BootstrapBranding>;
-    auth?: Partial<OidcConfig>;
+    auth?: Partial<OidcConfig> & { demoUsers?: DemoUser[] };
 }
 
 const VERIFIER_KEY = 'inspecto.pkce.verifier';
@@ -125,6 +132,9 @@ export class SessionService {
      */
     readonly opsEnabled = signal(false);
 
+    /** DEMO-AUTH-1: the demo build's Demo Users (empty everywhere else) — the sign-in page renders a picker from it. */
+    readonly demoUsers = signal<DemoUser[]>([]);
+
     private readonly accessToken = signal<string | null>(null);
     private oidc: OidcConfig | null = null;
 
@@ -147,7 +157,9 @@ export class SessionService {
         );
         this.edition.set(boot.edition ?? 'personal');
         this.version.set(boot.version?.trim() ? boot.version.trim() : null);
-        const mode = boot.features?.authMode === 'oidc' ? 'oidc' : 'none';
+        // DEMO-AUTH-1: the demo build signs in through the same backend session routes as OIDC, so it IS the
+        // 'oidc' path here — only the code comes from the Demo User picker instead of an IAM redirect.
+        const mode = boot.features?.authMode === 'oidc' || boot.features?.authMode === 'demo' ? 'oidc' : 'none';
         this.authMode.set(mode);
         this.capabilities.set(boot.session?.capabilities ?? []);
         this.branding.set({
@@ -169,6 +181,7 @@ export class SessionService {
             endSessionUrl: boot.auth?.endSessionUrl ?? environment.oidc?.endSessionUrl ?? '',
             mock: boot.auth?.mock ?? environment.oidc?.mock ?? false,
         };
+        this.demoUsers.set(boot.auth?.demoUsers ?? []);
         // A returning user still holds the httpOnly refresh cookie — mint an access token from it. A 401
         // just means "not signed in yet"; the guard will route to sign-in.
         const token = await firstValueFrom(this.refresh().pipe(catchError(() => of(null))));
@@ -179,7 +192,7 @@ export class SessionService {
     }
 
     /** Start the Authorization-Code + PKCE redirect (or, in mock mode, grant a code locally offline). */
-    async beginLogin(): Promise<void> {
+    async beginLogin(demoUserId?: string): Promise<void> {
         const { randomVerifier, randomState, challengeFromVerifier } = await import('./pkce');
         const verifier = randomVerifier();
         const state = randomState();
@@ -188,7 +201,9 @@ export class SessionService {
 
         if (this.oidc?.mock) {
             // Offline demo: no real IAM to redirect to — grant a fake code and jump straight to the callback.
-            this.router.navigate(['/auth/callback'], { queryParams: { code: 'mock-code', state } });
+            // DEMO-AUTH-1: a picked Demo User travels as the code; the demo relay mints that user's session.
+            const code = demoUserId ? `demo:${demoUserId}` : 'mock-code';
+            this.router.navigate(['/auth/callback'], { queryParams: { code, state } });
             return;
         }
         const challenge = await challengeFromVerifier(verifier);

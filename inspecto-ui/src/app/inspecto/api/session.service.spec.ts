@@ -254,6 +254,28 @@ describe('SessionService (W6d edition switch)', () => {
         assign.mockRestore();
     });
 
+    // DEMO-AUTH-1: a demo build reports authMode 'demo' and a Demo User list; it signs in through the same backend
+    // session routes as OIDC, and a picked Demo User travels as `demo:<id>` instead of an IAM code.
+    it("treats authMode 'demo' as a login-required session and signs in as the picked Demo User", async () => {
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({
+            features: { authMode: 'demo' },
+            auth: { mock: true, demoUsers: [{ id: 'ra.analyst', displayName: 'Demo RA Analyst', title: 'RA' }] },
+        });
+        await tick();
+        httpMock.expectOne(`${base}/auth/refresh`).flush({ error: 'no session' }, { status: 401, statusText: 'x' });
+        await done;
+        expect(svc.loginRequired()).toBe(true);
+        expect(svc.demoUsers().map((u) => u.id)).toEqual(['ra.analyst']);
+
+        const navigate = vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        await svc.beginLogin('ra.analyst');
+        expect(navigate).toHaveBeenCalledWith(['/auth/callback'], {
+            queryParams: { code: 'demo:ra.analyst', state: sessionStorage.getItem('inspecto.pkce.state') },
+        });
+        navigate.mockRestore();
+    });
+
     // RP-Initiated Logout 1.0. Without this the Inspecto session ends but the IdP's SSO session does
     // not, so the next sign-in completes with no credential prompt (BACKLOG §5).
     it('logout redirects to the provider end_session_endpoint when one is configured', async () => {

@@ -59,6 +59,13 @@ public final class Roles {
         ApiContext.attr(ex, ATTR_CONFIG_ROOT, root);
     }
 
+    /** The config root bound to this request by {@link #configRoot(com.sun.net.httpserver.HttpExchange, java.nio.file.Path)},
+     *  or {@code null} — the read half of the seam, for an out-of-package Authenticator (the demo-auth module reads its
+     *  Space's {@code demo-users.toon} from it). */
+    public static java.nio.file.Path configRoot(com.sun.net.httpserver.HttpExchange ex) {
+        return ApiContext.attr(ex, ATTR_CONFIG_ROOT) instanceof java.nio.file.Path p ? p : null;
+    }
+
     static final String FILE = "roles.toon";
 
     // ── capability vocabulary (must stay congruent with the withCapability route gates; R4 will

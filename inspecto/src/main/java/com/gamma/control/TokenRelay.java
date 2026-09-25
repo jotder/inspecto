@@ -29,4 +29,11 @@ public interface TokenRelay {
 
     /** Best-effort revocation on logout; default no-op (the cookie is cleared regardless). */
     default void revoke(String refreshToken) {}
+
+    /**
+     * What an anonymous {@code GET /bootstrap} tells the SPA about signing in, published as its {@code auth}
+     * block — empty (the default) publishes nothing. It is PRE-SIGN-IN by construction, so it must never carry
+     * roles, capabilities or secrets: only what a sign-in page needs to render (the demo relay's Demo User list).
+     */
+    default java.util.Map<String, Object> bootstrapAuth() { return java.util.Map.of(); }
 }

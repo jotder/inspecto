@@ -56,6 +56,9 @@ final class BootstrapRoutes implements RouteModule {
         // that shares state — which decides whether a degraded store is tolerable or a boot failure.
         data.put("topology", com.gamma.util.Topology.mode().name().toLowerCase());
         data.put("features", features(api));
+        // DEMO-AUTH-1: the session broker's pre-sign-in context (the demo relay's Demo User picker). Omitted when
+        // no relay is installed or it publishes nothing — the OIDC relay, and Personal, are unchanged.
+        TokenRelays.active().map(TokenRelay::bootstrapAuth).filter(a -> !a.isEmpty()).ifPresent(a -> data.put("auth", a));
         // Landing-page plan D2 (2026-09-15): the deployment's own branding is PRE-SIGN-IN CONTEXT, not
         // inventory, so it is served to an anonymous caller too — it is what makes the sign-in page belong
         // to this deployment, and the operator authored it precisely to be displayed. ⚠ The SPA cannot get

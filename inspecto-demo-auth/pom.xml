@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-demo-auth</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — demo auth (offline demo builds only, NEVER an edition)</name>
+    <description>
+        DEMO-AUTH-1: a Demo User sign-in for an offline demo build with no IAM. Contributes a TokenRelay
+        (behind /auth/exchange) and an Authenticator; Demo Users live in each Space's config/demo-users.toon
+        and resolve to capabilities through that Space's role table, exactly as OIDC groups do. It proves
+        nothing about identity, so it refuses to load unless the control plane is bound to loopback, and no
+        edition bundles it: tools/bundle-modules.mjs does not list it, and only `package.ps1 -DemoAuth`
+        stages it. Built in the default reactor so its tests always run. No third-party dependency.
+    </description>
+
+    <dependencies>
+        <!-- The core: Authenticator / TokenRelay SPIs, Subject, Roles. PROVIDED — the jar is dropped onto a
+             running engine's classpath, where inspecto.jar already supplies all of it. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

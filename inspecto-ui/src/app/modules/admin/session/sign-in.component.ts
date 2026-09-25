@@ -74,16 +74,40 @@ import { environment } from 'environments/environment';
                             We couldn't complete sign-in. Please try again.
                         </inspecto-alert>
                     }
-                    <button mat-flat-button color="primary" class="mt-6 w-full" [disabled]="busy()" (click)="signIn()">
-                        @if (busy()) {
-                            <mat-progress-spinner diameter="20" mode="indeterminate" aria-label="Signing in" />
-                        } @else {
-                            <ng-container>
-                                <mat-icon svgIcon="heroicons_outline:lock-closed" />
-                                <span>Sign in with SSO</span>
-                            </ng-container>
-                        }
-                    </button>
+                    @if (demoUsers().length) {
+                        <inspecto-alert class="mt-4 block text-left" variant="warning" title="Demo sign-in">
+                            Not secure, local only. Pick who you are for this demo.
+                        </inspecto-alert>
+                        <ul class="mt-4 flex flex-col gap-2 text-left" aria-label="Demo Users">
+                            @for (u of demoUsers(); track u.id) {
+                                <li>
+                                    <button
+                                        mat-stroked-button
+                                        class="w-full"
+                                        [disabled]="busy()"
+                                        [attr.data-demo-user]="u.id"
+                                        (click)="signIn(u.id)"
+                                    >
+                                        <span class="flex w-full flex-col items-start py-1">
+                                            <span class="font-medium">{{ u.displayName }}</span>
+                                            <span class="text-secondary text-sm">{{ u.title }}</span>
+                                        </span>
+                                    </button>
+                                </li>
+                            }
+                        </ul>
+                    } @else {
+                        <button mat-flat-button color="primary" class="mt-6 w-full" [disabled]="busy()" (click)="signIn()">
+                            @if (busy()) {
+                                <mat-progress-spinner diameter="20" mode="indeterminate" aria-label="Signing in" />
+                            } @else {
+                                <ng-container>
+                                    <mat-icon svgIcon="heroicons_outline:lock-closed" />
+                                    <span>Sign in with SSO</span>
+                                </ng-container>
+                            }
+                        </button>
+                    }
                     <p class="text-secondary mt-6 border-t pt-4 text-sm">Need access? Ask your space administrator.</p>
                 </div>
             </div>
@@ -104,6 +128,8 @@ export class SignInComponent implements OnInit {
     readonly footer = computed(() => this.session.branding().footerText ?? environment.footerText);
     /** HOME-VERSION-1: the version the backend reports — the field a support call reads aloud. Absent until known. */
     readonly version = computed(() => this.session.version());
+    /** DEMO-AUTH-1: a demo build's Demo Users — non-empty replaces the SSO button with a picker. */
+    readonly demoUsers = computed(() => this.session.demoUsers());
 
     ngOnInit(): void {
         // Already signed in (or Personal/offline where login is never required) → straight into the app.
@@ -115,8 +141,8 @@ export class SignInComponent implements OnInit {
         sessionStorage.removeItem('inspecto.signInFailed');
     }
 
-    async signIn(): Promise<void> {
+    async signIn(demoUserId?: string): Promise<void> {
         this.busy.set(true);
-        await this.session.beginLogin();
+        await this.session.beginLogin(demoUserId);
     }
 }

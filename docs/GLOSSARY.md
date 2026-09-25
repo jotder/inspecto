@@ -106,6 +106,8 @@ operational features). A Lens filters navigation and toolbars; it is **not** a p
 the security module and maps onto Lenses. ⛔ Never use *Lens* to mean an authorization: a Lens is
 self-selected and freely switchable; a **Role** is assigned and enforced.
 
+**Demo User** — A **sign-in identity for an offline demo build only** (`inspecto-demo-auth`, never an edition): a named entry in a Space's `config/demo-users.toon` that holds one or more **Roles** of that Space's role table, chosen from the sign-in page's picker with no password. It becomes a real authenticated subject, so RBAC, owner-only views and the audit trail behave as they would for the same Roles. ⛔ Not *persona* (that word belongs to the **Lens** model), and never a security feature: the module refuses to load unless the control plane is bound to loopback.
+
 **Role** — An **assigned authorization** (security-module editions): a named grant set held by a user
 (e.g. Business User, Pipeline Developer, Operations/Support, Power User, Admin, Super User). A user may hold
 several Roles; Roles *project onto* Lenses (they decide which Lenses are available and which **Capabilities**
