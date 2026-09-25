@@ -1160,6 +1160,19 @@ describe('PipelineEditorComponent', () => {
             expect(c.definitionNode()).toBeNull();
         });
 
+        /** SAMPLE-FLOW: the dialog gets the TAB's thread, so its sample reaches the drawer + downstream. */
+        it("hands the Grammar dialog the tab's sample thread", () => {
+            const c = make();
+            c.select('demo');
+            dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+            const plain = { id: 'pp', type: 'parser', config: { schema_file: 's.toon' } };
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, plain] }));
+            c.openNodeConfig(plain);
+            const data = dialog.open.mock.calls[0][1].data as { sampleThread?: unknown };
+            expect(c.sampleThread()).not.toBeNull();
+            expect(data.sampleThread).toBe(c.sampleThread());
+        });
+
         /**
          * S5/D8 — the legacy generic `parser` joins the drawer when its own config maps to a built-in
          * frontend. Grounded first: the engine merges `csv_settings` and `parsing:` into one map

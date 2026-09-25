@@ -6,12 +6,22 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { AuthoredNode, ComponentDef, ComponentsService, ParserDef, ParserPreview } from 'app/inspecto/api';
+import { Observable, catchError, tap, throwError } from 'rxjs';
+import {
+    AuthoredNode,
+    ComponentDef,
+    ComponentsService,
+    ParserDef,
+    ParserPreview,
+    ParsersService,
+    apiErrorMessage,
+} from 'app/inspecto/api';
 import { flattenBlock, nestKeys, parseUseRef } from 'app/inspecto/component-model';
 import { downloadCsv } from 'app/inspecto/data-table/core/csv';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import {
     GrammarEditorComponent,
@@ -51,7 +61,18 @@ export interface GrammarEditorDialogData {
      *  DERIVED output schema beside the authored one (`DERIVED-SCHEMA-PANEL-ORPHAN-1`). ⚠ This travels
      *  purely as a pass-through — nothing in THIS dialog reads it. */
     pipeline?: string;
+    /**
+     * The editor TAB's sample thread — the same {@link DefinitionStateService} the Parse drawer's sample
+     * panel and every downstream Step (the Record Transformer's fields) read. The dialog seeds its sample
+     * box from it and writes back into it on a successful Test parse and on Save, so ONE sample follows
+     * the builder: before this, a sample pasted and test-parsed here was lost on Save, and the drawer's
+     * Sample card and the Transformer's field list were empty until it was pasted again.
+     */
+    sampleThread?: DefinitionStateService | null;
 }
+
+/** The name the thread's Sample card shows for a sample captured in this dialog. */
+export const GRAMMAR_DIALOG_SAMPLE_NAME = 'sample from Edit Grammar';
 
 /**
  * Edit the **Grammar** a parse node applies — a thin host over the shared
@@ -103,7 +124,46 @@ export class GrammarEditorDialog {
     private confirm = inject(InspectoConfirmService);
     private ref = inject(MatDialogRef<GrammarEditorDialog, NodeConfigResult>);
     private dialog = inject(MatDialog);
+    private parsers = inject(ParsersService);
     readonly data = inject<GrammarEditorDialogData>(MAT_DIALOG_DATA);
+
+    /** The thread's sample when the dialog opened — seeds the editor's own sample box. */
+    readonly seedSample = this.data.sampleThread?.sample() ?? null;
+
+    /**
+     * With a thread, Test parse goes through here so the result lands in the thread exactly as the
+     * drawer's `previewFn` does — including the FAILURE arm: a failing re-parse clears the thread's parsed
+     * hop, so no downstream Step keeps columns from a Grammar that no longer parses. Only a TABLE result
+     * feeds it (a record tree is not rows a downstream Step can cast). Without a thread the editor keeps
+     * its stateless default.
+     */
+    readonly previewFn = this.data.sampleThread
+        ? (type: string, grammar: Record<string, unknown>, text: string, b64?: string): Observable<ParserPreview> => {
+              const thread = this.data.sampleThread!;
+              thread.parseError.set(null);
+              return this.parsers.preview(type, grammar, text, b64, this.data.configSubdir?.trim() || undefined).pipe(
+                  tap((p) => {
+                      if (p.kind !== 'table') return;
+                      this.shareSample();
+                      thread.parsePreview.set({
+                          frontend: type,
+                          columns: p.columns,
+                          rows: p.rows,
+                          rowCount: p.rowCount,
+                          rejectedRows: p.rejectedRows,
+                      });
+                      // Re-parsing invalidates any cast checked against the old rows.
+                      thread.schemaPreview.set(null);
+                      thread.schemaError.set(null);
+                  }),
+                  catchError((e) => {
+                      thread.parsePreview.set(null);
+                      thread.parseError.set(apiErrorMessage(e, 'The sample does not parse with these settings.'));
+                      return throwError(() => e);
+                  }),
+              );
+          }
+        : undefined;
 
     @ViewChild(GrammarEditorComponent) private editor?: GrammarEditorComponent;
 
@@ -290,8 +350,26 @@ export class GrammarEditorDialog {
         }
     }
 
+    /**
+     * Put the editor's current sample into the tab's thread. A no-op when it is the sample the thread
+     * already holds — re-capturing would reset every downstream result for nothing.
+     */
+    private shareSample(): void {
+        const thread = this.data.sampleThread;
+        if (!thread || !this.editor) return;
+        const text = this.editor.sampleText();
+        const b64 = this.editor.sampleB64();
+        if (!text && !b64) return;
+        const current = thread.sample();
+        if (current && current.text === text && (current.b64 ?? null) === b64) return;
+        if (b64) thread.captureBinarySample(GRAMMAR_DIALOG_SAMPLE_NAME, b64, text);
+        else thread.captureSample(GRAMMAR_DIALOG_SAMPLE_NAME, text);
+    }
+
     save(): void {
         if (this.pluginBlocked() || !this.editor?.validate()) return;
+        // The sample follows the builder out of the dialog, parsed or not.
+        this.shareSample();
         // Always inline — a bound node MIGRATES to an independent copy rather than writing back to the
         // shared component (D4). `closeInline` already drops the `use:`, so both cases are one path.
         this.closeInline(this.editor.value());

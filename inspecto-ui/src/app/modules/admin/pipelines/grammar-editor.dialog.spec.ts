@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -14,10 +14,11 @@ import {
     ParsersService,
 } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { GrammarEditorComponent } from 'app/inspecto/grammar';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { GrammarEditorDialog, GrammarEditorDialogData } from './grammar-editor.dialog';
+import { GRAMMAR_DIALOG_SAMPLE_NAME, GrammarEditorDialog, GrammarEditorDialogData } from './grammar-editor.dialog';
 
 const TABLE_PREVIEW: ParserPreview = {
     kind: 'table',
@@ -51,7 +52,13 @@ function saved(name: string, content: Record<string, unknown> = {}): ComponentDe
 }
 
 async function create(
-    opts: { node?: AuthoredNode; grammars?: ComponentDef[]; dialogOpen?: ReturnType<typeof vi.fn> } = {},
+    opts: {
+        node?: AuthoredNode;
+        grammars?: ComponentDef[];
+        dialogOpen?: ReturnType<typeof vi.fn>;
+        thread?: DefinitionStateService;
+        preview?: ReturnType<typeof vi.fn>;
+    } = {},
 ) {
     const close = vi.fn();
     const components = {
@@ -59,11 +66,12 @@ async function create(
         create: vi.fn(() => of(saved('x'))),
         update: vi.fn((_t: string, id: string) => of(saved(id))),
     };
-    const parsers = { list: vi.fn(() => of(CATALOG)), preview: vi.fn(() => of(TABLE_PREVIEW)) };
+    const parsers = { list: vi.fn(() => of(CATALOG)), preview: opts.preview ?? vi.fn(() => of(TABLE_PREVIEW)) };
     const data: GrammarEditorDialogData = {
         node: opts.node ?? { id: 'parse', type: 'parser.dsv' },
         typeLabel: 'parser.dsv',
         categoryLabel: 'Parser',
+        sampleThread: opts.thread,
     };
     TestBed.configureTestingModule({
         imports: [GrammarEditorDialog],
@@ -215,6 +223,60 @@ describe('GrammarEditorDialog', () => {
 
         c.onPreviewed({ kind: 'tree', recordCount: 1, nodes: [] });
         expect(c.previewRows()).toEqual([]);
+    });
+
+    /**
+     * SAMPLE-FLOW (driven as a first-time builder, 2026-09-25): a sample pasted + test-parsed here was
+     * lost on Save — the drawer's Sample card was empty and the Record Transformer had 0 fields until
+     * the sample was pasted AGAIN. The dialog now reads and writes the TAB's thread.
+     */
+    describe('the tab sample thread', () => {
+        const SAMPLE = 'id\n1\n';
+
+        it('a table Test parse captures the sample AND the parsed rows into the thread', async () => {
+            const thread = new DefinitionStateService();
+            const { fixture, editor } = await create({ thread });
+            editor.onSampleText(SAMPLE);
+            editor.test();
+            fixture.detectChanges();
+            expect(thread.sample()).toEqual({ name: GRAMMAR_DIALOG_SAMPLE_NAME, text: SAMPLE });
+            // What the Transformer's field list reads (upstreamSchemaColumns → parsedRows).
+            expect(thread.parsedRows()).toEqual(TABLE_PREVIEW.rows);
+            expect(thread.parsePreview()?.columns).toEqual(['id']);
+        });
+
+        it('Save carries an UNPARSED sample into the thread too', async () => {
+            const thread = new DefinitionStateService();
+            const { c, editor, close } = await create({ thread });
+            editor.onSampleText(SAMPLE);
+            c.save();
+            expect(close).toHaveBeenCalled();
+            expect(thread.sample()?.text).toBe(SAMPLE);
+        });
+
+        it('opens with the thread sample in its sample box, and re-saving it keeps the parsed rows', async () => {
+            const thread = new DefinitionStateService();
+            thread.captureSample('orders.csv', SAMPLE);
+            thread.parsePreview.set({ frontend: 'delimited', columns: ['id'], rows: [{ id: '1' }], rowCount: 1, rejectedRows: 0 });
+            const { c, editor, fixture } = await create({ thread });
+            expect(editor.sampleText()).toBe(SAMPLE);
+            expect((fixture.nativeElement as HTMLElement).querySelector('textarea')?.value).toBe(SAMPLE);
+            c.save();
+            // Same sample ⇒ not re-captured: the name and the downstream result survive.
+            expect(thread.sample()?.name).toBe('orders.csv');
+            expect(thread.parsedRows()).toEqual([{ id: '1' }]);
+        });
+
+        it('a FAILED re-parse clears the parsed hop rather than leaving stale columns downstream', async () => {
+            const thread = new DefinitionStateService();
+            thread.captureSample('orders.csv', SAMPLE);
+            thread.parsePreview.set({ frontend: 'delimited', columns: ['id'], rows: [{ id: '1' }], rowCount: 1, rejectedRows: 0 });
+            const preview = vi.fn(() => throwError(() => ({ status: 422, error: { error: { message: 'bad quote' } } })));
+            const { editor } = await create({ thread, preview });
+            editor.test();
+            expect(thread.parsePreview()).toBeNull();
+            expect(thread.parseError()).toBeTruthy();
+        });
     });
 
     it('has no a11y violations', async () => {

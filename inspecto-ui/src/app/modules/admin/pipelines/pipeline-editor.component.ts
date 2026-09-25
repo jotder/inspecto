@@ -2227,6 +2227,9 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                     // it is passed on to the Schema editor's derived-schema panel, which asks
                     // `GET /config/schema/derived?pipeline=` and that resolves through `configFor`.
                     pipeline: this.selectedId(),
+                    // The TAB's sample thread: the dialog seeds from it and feeds it back (Test parse,
+                    // Save), so the Parse drawer's Sample card and downstream Steps see the same sample.
+                    sampleThread: this.sampleThread(),
                 },
             })
             .afterClosed()
