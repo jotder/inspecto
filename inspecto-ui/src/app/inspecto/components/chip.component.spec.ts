@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { ChipComponent } from './chip.component';
+import { statusBadgeClasses } from './status-badge.component';
+import { CHIP_BASE, CHIP_TONES, ChipComponent, chipClasses, chipSoftSchemeClasses } from './chip.component';
 
 @Component({
     standalone: true,
@@ -19,7 +20,7 @@ class HostComponent {
     // Zoneless CD: plain-field mutations don't mark the OnPush host dirty, so the verify sweep
     // would trip NG0100 on stale stored bindings. Signals keep the harness honest.
     variant = signal<'outline' | 'soft'>('outline');
-    tone = signal<'neutral' | 'primary'>('neutral');
+    tone = signal<'neutral' | 'primary' | 'warning'>('neutral');
     removable = signal(false);
     onRemoved = vi.fn();
 }
@@ -51,6 +52,27 @@ describe('ChipComponent', () => {
         const pill = fixture.nativeElement.querySelector('inspecto-chip > span') as HTMLElement;
         expect(pill.className).toContain('bg-primary-100');
         expect(pill.className).not.toContain('border ');
+    });
+
+    it('uses the status warning pair for the soft warning tone, in both schemes', () => {
+        const fixture = create();
+        fixture.componentInstance.variant.set('soft');
+        fixture.componentInstance.tone.set('warning');
+        fixture.detectChanges();
+        const pill = fixture.nativeElement.querySelector('inspecto-chip > span') as HTMLElement;
+        for (const c of statusBadgeClasses('warning').split(' ')) expect(pill.className).toContain(c);
+        expect(pill.className).toContain('dark:text-amber-200');
+    });
+
+    it('keeps the per-scheme soft table in step with the dark:-prefixed one', () => {
+        for (const tone of CHIP_TONES) {
+            const light = chipSoftSchemeClasses(tone, 'light');
+            const dark = chipSoftSchemeClasses(tone, 'dark')
+                .split(' ')
+                .map((c) => `dark:${c}`)
+                .join(' ');
+            expect(chipClasses('soft', tone)).toBe(`${CHIP_BASE} ${light} ${dark}`);
+        }
     });
 
     it('shows no remove button unless removable, then emits (removed) on click', () => {

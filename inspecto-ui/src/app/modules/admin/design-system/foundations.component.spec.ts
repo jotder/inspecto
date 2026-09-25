@@ -46,6 +46,12 @@ describe('DesignSystemFoundationsComponent', () => {
                 // the island's own classes, never a dark: variant that a .light island could not switch off
                 expect(probe.className).not.toContain('dark:');
             }
+            // the soft chip tones (incl. warning, the Dashboard header's Illustrative data chip) are measured too
+            for (const tone of ['neutral', 'primary', 'warning']) {
+                const probe = el.querySelector(`[data-probe="${scheme}:chip:${tone}"]`) as HTMLElement;
+                expect(probe).toBeTruthy();
+                expect(probe.className).not.toContain('dark:');
+            }
         }
         // jsdom has no stylesheet: unresolved values read as a dash, never as a fabricated number
         expect(el.textContent).not.toContain('NaN');

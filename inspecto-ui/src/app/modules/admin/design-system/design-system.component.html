@@ -73,9 +73,11 @@
                 toggles, the events correlation filter, glob patterns, query tokens). Two <code>variant</code>s (<code
                     >outline</code
                 >
-                / <code>soft</code>) × two <code>tone</code>s (<code>neutral</code> / <code>primary</code>), with an
-                optional <code>removable</code> ✕. Content is projected — drop a <code>&lt;mat-icon&gt;</code> or mono
-                span inside.
+                / <code>soft</code>) × three <code>tone</code>s (<code>neutral</code> / <code>primary</code> /
+                <code>warning</code>), with an optional <code>removable</code> ✕. <code>warning</code> is for a caution
+                the reader must not miss — the Dashboard header's <em>Illustrative data</em> chip; its soft pair is the
+                status warning pair (contrast measured under Foundations). Content is projected — drop a
+                <code>&lt;mat-icon&gt;</code> or mono span inside.
             </p>
             <div class="bg-card flex flex-col gap-4 rounded-2xl p-6 shadow">
                 <div class="flex flex-wrap items-center gap-2">
@@ -83,6 +85,12 @@
                     <inspecto-chip tone="primary">outline primary</inspecto-chip>
                     <inspecto-chip variant="soft">soft neutral</inspecto-chip>
                     <inspecto-chip variant="soft" tone="primary">soft primary</inspecto-chip>
+                    <inspecto-chip tone="warning">outline warning</inspecto-chip>
+                    <inspecto-chip variant="soft" tone="warning">
+                        <span title="The figures on this page are synthetic, shown to illustrate the view"
+                            >Illustrative data</span
+                        >
+                    </inspecto-chip>
                     <inspecto-chip variant="soft" tone="primary" removable removeLabel="Clear demo filter">
                         correlation: <span class="font-mono">abc-123</span>
                     </inspecto-chip>

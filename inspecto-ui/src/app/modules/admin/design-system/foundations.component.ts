@@ -4,6 +4,7 @@ import {
     STATUS_TONES,
     statusToneSchemeClasses,
 } from 'app/inspecto/components/status-badge.component';
+import { CHIP_BASE, CHIP_TONES, ChipTone, chipSoftSchemeClasses } from 'app/inspecto/components/chip.component';
 import { CHART_TONE } from 'app/inspecto/theme/chart-tokens';
 
 type Scheme = 'light' | 'dark';
@@ -88,6 +89,7 @@ export class DesignSystemFoundationsComponent {
     readonly tones = STATUS_TONES;
     readonly badgeBase = STATUS_BADGE_BASE;
     readonly chartTone = CHART_TONE;
+    readonly chipTones = CHIP_TONES;
 
     /** Scheme-dependent tokens: `customProps` in `theming.js` (values differ per `.light` / `.dark`). */
     readonly surfaces: TokenRow[] = [
@@ -200,6 +202,11 @@ export class DesignSystemFoundationsComponent {
 
     toneClasses(tone: (typeof STATUS_TONES)[number], scheme: Scheme): string {
         return `${this.badgeBase} ${statusToneSchemeClasses(tone, scheme)}`;
+    }
+
+    /** A soft `<inspecto-chip>` specimen for one scheme — the chip's own per-scheme pair, measured like a badge. */
+    chipToneClasses(tone: ChipTone, scheme: Scheme): string {
+        return `${CHIP_BASE} ${chipSoftSchemeClasses(tone, scheme)}`;
     }
 
     chartColor(tone: string): string | null {

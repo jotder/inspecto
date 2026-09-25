@@ -23,7 +23,7 @@ import { DashboardHeader, asOfLabel } from './dashboard-types';
                     <span class="text-secondary whitespace-nowrap">As of {{ label }}</span>
                 }
                 @if (header()?.illustrative) {
-                    <inspecto-chip variant="soft" tone="primary">
+                    <inspecto-chip variant="soft" tone="warning">
                         <span title="The figures on this page are synthetic, shown to illustrate the view"
                             >Illustrative data</span
                         >

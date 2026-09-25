@@ -164,6 +164,9 @@ describe('MenuArtifactComponent', () => {
         expect(header.textContent).toContain('Which stages decide the season?');
         expect(header.textContent).toContain('As of 23 Sep 2026');
         expect(header.querySelector('inspecto-chip')!.textContent).toContain('Illustrative data');
+        // Operator 2026-09-25: a caution, so the warning tone (amber), with its explanation kept as a tooltip.
+        expect(header.querySelector('inspecto-chip > span')!.className).toContain('text-amber-800');
+        expect(header.querySelector('inspecto-chip [title]')!.getAttribute('title')).toContain('synthetic');
         // The host (menu item) owns the page's <h1>; the header adds no heading of its own.
         expect(header.querySelector('h1, h2, h3')).toBeNull();
         await expectNoA11yViolations(f.nativeElement);

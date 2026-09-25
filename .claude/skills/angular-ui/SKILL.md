@@ -132,9 +132,11 @@ src/app/
   variant), `<inspecto-empty-state>`, `<inspecto-skeleton>`,
   `InspectoConfirmService.confirm()/confirmDestructive()`, the grid helpers, `<inspecto-connectivity-banner>`
   (the app-wide offline/backend-down strip, already mounted in the layout — distinct from `<inspecto-alert>`),
-  `<inspecto-chip variant=outline|soft tone=neutral|primary [removable]>` (the shared tag/token/filter
+  `<inspecto-chip variant=outline|soft tone=neutral|primary|warning [removable]>` (the shared tag/token/filter
   pill — never hand-roll a `rounded-full … text-xs` span; 20 px tall like the badge, `font-medium`, case
   left as authored (it holds user text); outline-primary steps to `primary-400` in dark mode for AA;
+  `tone=warning` = a caution the reader must not miss (the Dashboard header's *Illustrative data*, explanation
+  in a `title` tooltip) — its soft pair IS the status warning pair, measured under `/design` → Foundations → Chip tones;
   content is projected, `(removed)` emits on
   the optional ✕; a clickable filter toggle keeps its own `<button>` around the chip for
   `aria-pressed`/keyboard).

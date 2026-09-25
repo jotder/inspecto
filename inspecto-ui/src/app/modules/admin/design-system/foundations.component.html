@@ -113,6 +113,44 @@
                 </table>
             </div>
 
+            <!-- Chip tones: the soft <inspecto-chip> per-scheme pairs, contrast measured from the rendered specimen -->
+            <div>
+                <h4 class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider">
+                    Chip tones (soft) — contrast
+                </h4>
+                <table class="w-full text-sm" [attr.aria-label]="s + ' scheme chip tone contrast'">
+                    <thead>
+                        <tr class="text-secondary text-left text-xs">
+                            <th scope="col" class="py-1 font-medium">Tone</th>
+                            <th scope="col" class="py-1 font-medium">Chip</th>
+                            <th scope="col" class="py-1 text-right font-medium">Ratio</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (t of chipTones; track t) {
+                            <tr class="border-t">
+                                <td class="py-1.5 font-mono text-xs">{{ t }}</td>
+                                <td class="py-1.5">
+                                    <span
+                                        [class]="chipToneClasses(t, s)"
+                                        [attr.data-probe]="s + ':chip:' + t"
+                                        data-measure="pair"
+                                        >{{ t }}</span
+                                    >
+                                </td>
+                                <td class="py-1.5 text-right font-mono text-xs">
+                                    @if (ratio(s + ':chip:' + t); as r) {
+                                        {{ r }}:1 <span class="font-semibold">{{ r >= 4.5 ? 'AA' : 'FAIL' }}</span>
+                                    } @else {
+                                        —
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+
             <!-- Text on surfaces -->
             <div>
                 <h4 class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider">
