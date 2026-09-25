@@ -30,6 +30,8 @@ export interface ReconServerConfig {
     includeRecordCount?: boolean;
     columnMap?: Record<string, Record<string, string>>;
     filters?: Record<string, string>;
+    /** Break impact; a non-compared `column` is carried on each Break as `impact: {a, b}`, never compared. */
+    impact?: { column: string; currency?: string };
 }
 
 /** One side's raw rows behind a key (`POST /recon/rows`, RECON-CARDINALITY-2). */

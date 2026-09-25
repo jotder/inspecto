@@ -73,6 +73,11 @@ export interface ReconBreakRow {
     key: Record<string, unknown>;
     a?: Record<string, number | null>;
     b?: Record<string, number | null>;
+    /**
+     * The carried impact column's per-side value — present only when the Reconciliation's `impact.column` is
+     * NOT a compare column. Never compared; a side absent at the key (or without the column) is null.
+     */
+    impact?: { a: number | null; b: number | null };
 }
 
 export interface ReconBreakSet {
@@ -187,25 +192,36 @@ export function breaksFromSets(
 
 /**
  * UIE-10: the monetary impact of each Break key in `/recon/breaks` sets, keyed by the same
- * {@link breakKeyOf} string a {@link ReconBreak} carries. Impact is |A − B| of the reconciliation's
- * declared impact column, a side absent at the key counting 0 (the whole present amount is unmatched).
+ * {@link breakKeyOf} string a {@link ReconBreak} carries. Two cases, by whether the impact column is compared:
  *
- * ⚠ Empty unless the impact column is one of the compare columns: the payload carries only compared
- * measures, so for any other column there is no value to read — and an invented 0 would read as "no
- * money at risk".
+ * - **Compared** — |A − B| of that column, a side absent at the key counting 0 (the whole present amount
+ *   is unmatched).
+ * - **Carried** (not a compare column; operator decision 2026-09-25) — the server puts the column's per-side
+ *   value on each row as `impact: {a, b}` without comparing it. A carried column says what the key is WORTH,
+ *   not how far apart the sides are, so the impact is the value on the side that has it: the anchor's (`a`)
+ *   when present, else the compared side's (`b`). E.g. a subscriber active in the HLR but absent from or
+ *   inactive in billing → that subscriber's monthly fee.
+ *
+ * ⚠ A key with no value to read (no `impact` on the row, or null on both sides) gets no entry, never an
+ * invented 0 — a 0 would read as "no money at risk".
  */
 export function breakImpacts(
     recon: Pick<Reconciliation, 'keyColumns' | 'compareColumns' | 'impact'>,
     sets: ReconBreakSets,
 ): Record<string, number> {
     const col = recon.impact?.column;
-    if (!col || !recon.compareColumns.some((c) => c.column === col)) return {};
+    if (!col) return {};
+    const compared = recon.compareColumns.some((c) => c.column === col);
     const out: Record<string, number> = {};
     for (const set of Object.values(sets)) {
         for (const row of set?.rows ?? []) {
-            const a = row.a?.[col] ?? 0;
-            const b = row.b?.[col] ?? 0;
-            out[breakKeyOf(row.key, recon.keyColumns)] = Math.abs(a - b);
+            const key = breakKeyOf(row.key, recon.keyColumns);
+            if (compared) {
+                out[key] = Math.abs((row.a?.[col] ?? 0) - (row.b?.[col] ?? 0));
+            } else {
+                const v = row.impact?.a ?? row.impact?.b;
+                if (v !== null && v !== undefined) out[key] = v;
+            }
         }
     }
     return out;

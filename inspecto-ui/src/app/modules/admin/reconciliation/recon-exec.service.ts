@@ -51,5 +51,7 @@ export function serverConfig(recon: Reconciliation): ReconServerConfig {
             tolerance: c.tolerance,
         })),
         includeRecordCount: true,
+        // A non-compared impact column is carried on each Break only if the server is told about it.
+        ...(recon.impact ? { impact: recon.impact } : {}),
     };
 }

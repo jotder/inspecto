@@ -349,7 +349,62 @@ describe('breakImpacts (UIE-10)', () => {
         expect(breakImpacts(CONFIG, sets)).toEqual({});
     });
 
-    it('is empty when the impact column is not compared — the payload has no value to read', () => {
+    it('is empty for a non-compared column when the server carried no value — never an invented 0', () => {
         expect(breakImpacts({ ...CONFIG, impact: { column: 'monthly_fee_sar' } }, sets)).toEqual({});
+    });
+});
+
+describe('breakImpacts — a carried (non-compared) impact column (operator decision 2026-09-25)', () => {
+    // RA-C01 shape: status compared, the monthly fee only carried as impact: {a, b}.
+    const STATUS = {
+        keyColumns: ['msisdn'],
+        compareColumns: [{ column: 'active_flag', toleranceType: 'exact', tolerance: 0 } as CompareColumn],
+        impact: { column: 'monthly_fee_sar', currency: 'SAR' },
+    };
+    const sets: ReconBreakSets = {
+        missing_right: {
+            rows: [{ key: { msisdn: 'm3' }, a: { active_flag: 1 }, impact: { a: 99, b: null } }],
+            rowCount: 1,
+            truncated: false,
+        },
+        missing_left: {
+            rows: [{ key: { msisdn: 'm5' }, b: { active_flag: 1 }, impact: { a: null, b: 30 } }],
+            rowCount: 1,
+            truncated: false,
+        },
+        value_break: {
+            rows: [
+                // status differs, both sides know the fee → the fee, NOT |A − B| (which would be 0)
+                { key: { msisdn: 'm2' }, a: { active_flag: 1 }, b: { active_flag: 0 }, impact: { a: 149, b: 149 } },
+                // the compared side's Dataset lacks the column → the anchor's value
+                { key: { msisdn: 'm4' }, a: { active_flag: 0 }, b: { active_flag: 1 }, impact: { a: 50, b: null } },
+                // neither side has a value → no entry
+                { key: { msisdn: 'm6' }, a: { active_flag: 0 }, b: { active_flag: 1 }, impact: { a: null, b: null } },
+            ],
+            rowCount: 3,
+            truncated: false,
+        },
+    };
+
+    it('is the value on the side that has it, the anchor first', () => {
+        expect(breakImpacts(STATUS, sets)).toEqual({ m3: 99, m5: 30, m2: 149, m4: 50 });
+    });
+
+    it('prefers the anchor when the two sides carry different values', () => {
+        const differ: ReconBreakSets = {
+            value_break: {
+                rows: [
+                    { key: { msisdn: 'm7' }, a: { active_flag: 1 }, b: { active_flag: 0 }, impact: { a: 199, b: 99 } },
+                ],
+                rowCount: 1,
+                truncated: false,
+            },
+        };
+        expect(breakImpacts(STATUS, differ)).toEqual({ m7: 199 });
+    });
+
+    it('ignores carried values when the impact column IS compared — |A − B| of the compared values wins', () => {
+        const compared = { ...STATUS, impact: { column: 'active_flag' } };
+        expect(breakImpacts(compared, sets)).toEqual({ m3: 1, m5: 1, m2: 1, m4: 1, m6: 1 });
     });
 });

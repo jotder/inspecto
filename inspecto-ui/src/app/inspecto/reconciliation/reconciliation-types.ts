@@ -75,9 +75,10 @@ export interface ReconBreak {
 }
 
 /**
- * The money a Break puts at risk (UIE-10). `column` must name one of the reconciliation's
- * {@link CompareColumn}s: the Break payload carries only compared measures, so any other column has no
- * value to read. A Break's impact is |A - B| of that column at the Break's key, a missing side counting 0.
+ * The money a Break puts at risk (UIE-10). `column` is any column of the reconciled Datasets. A compared
+ * column's impact is |A - B| at the Break's key, a missing side counting 0; any other column is CARRIED on
+ * each Break by the server without being compared, and its impact is the value on the side that has it
+ * (anchor first) — see `breakImpacts`.
  */
 export interface ReconImpact {
     column: string;

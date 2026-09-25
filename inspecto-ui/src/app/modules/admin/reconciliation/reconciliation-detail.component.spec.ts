@@ -13,10 +13,11 @@ import {
     Reconciliation,
     ReconciliationsService,
     ReconBreak,
+    ReconBreakSets,
     reconBreakSets,
 } from 'app/inspecto/reconciliation';
 import { fieldDiff, ReconciliationDetailComponent } from './reconciliation-detail.component';
-import { ReconExecService } from './recon-exec.service';
+import { ReconExecService, serverConfig } from './recon-exec.service';
 import { formatNumber } from 'app/inspecto/viz/number-format';
 
 /** Same reference fixture as the Board/pure-engine specs: MEA only-A, APAC only-B, EU/data value break. */
@@ -53,12 +54,15 @@ async function create(
         patch?: Partial<Reconciliation>;
         left?: Record<string, unknown>[];
         right?: Record<string, unknown>[];
+        /** A literal `/recon/breaks` payload instead of the offline mirror (which carries no `impact`). */
+        sets?: ReconBreakSets;
     } = {},
 ) {
     let current: Reconciliation = { ...recon(opts.breaks ?? []), ...opts.patch };
     const save = vi.fn((r: Reconciliation) => ((current = r), of(r)));
-    const breaks = vi.fn(async (r: Reconciliation, path?: Record<string, string> | null) =>
-        reconBreakSets(r, opts.left ?? LEFT, opts.right ?? RIGHT, path),
+    const breaks = vi.fn(
+        async (r: Reconciliation, path?: Record<string, string> | null) =>
+            opts.sets ?? reconBreakSets(r, opts.left ?? LEFT, opts.right ?? RIGHT, path),
     );
     const promote =
         opts.promote ??
@@ -360,6 +364,46 @@ describe('Breaks page for an analyst (UIE-10)', () => {
         fixture.detectChanges();
         const shown = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="selected-impact"]');
         expect(text(shown as HTMLElement)).toContain(sar(4));
+    });
+
+    it('shows a CARRIED (non-compared) impact column as the value on the side that has it', async () => {
+        // MEA active only in A (fee 199), APAC only in B (fee 30), EU/data differs with both fees 149:
+        // `fee` is not compared, so the server carried it as impact: {a, b}.
+        const sets: ReconBreakSets = {
+            missing_right: {
+                rows: [{ key: { region: 'MEA', product: 'voice' }, a: { amount: 10 }, impact: { a: 199, b: null } }],
+                rowCount: 1,
+                truncated: false,
+            },
+            missing_left: {
+                rows: [{ key: { region: 'APAC', product: 'sms' }, b: { amount: 7 }, impact: { a: null, b: 30 } }],
+                rowCount: 1,
+                truncated: false,
+            },
+            value_break: {
+                rows: [
+                    {
+                        key: { region: 'EU', product: 'data' },
+                        a: { amount: 118 },
+                        b: { amount: 114 },
+                        impact: { a: 149, b: 149 },
+                    },
+                ],
+                rowCount: 1,
+                truncated: false,
+            },
+        };
+        const { breaks, c } = await create({ sets, patch: { impact: { column: 'fee', currency: 'SAR' } } });
+        const sar = (v: number) => formatNumber(v, { style: 'currency', currency: 'SAR' });
+        expect(c.impactHeader()).toBe('Impact (SAR)');
+        expect(c.impactText(c.missingA()[0])).toBe(sar(199));
+        expect(c.impactText(c.missingB()[0])).toBe(sar(30));
+        expect(c.impactText(c.valueBreaks()[0])).toBe(sar(149));
+        // the server is told the column, or it has nothing to carry
+        expect(serverConfig(breaks.mock.calls[0][0] as Reconciliation).impact).toEqual({
+            column: 'fee',
+            currency: 'SAR',
+        });
     });
 
     it('carries no impact column when none is declared', async () => {
