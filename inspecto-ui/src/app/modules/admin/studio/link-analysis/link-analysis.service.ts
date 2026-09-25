@@ -64,8 +64,13 @@ export class LinkAnalysisService {
         return this.store.get(id);
     }
 
-    save(view: LinkAnalysisView, opts?: { update?: boolean }): Observable<LinkAnalysisView> {
+    save(view: LinkAnalysisView, opts?: { update?: boolean; ifMatch?: string }): Observable<LinkAnalysisView> {
         return this.store.save(view, opts);
+    }
+
+    /** A view decoded from a Component's `content` (an imported bundle item — Import as draft). */
+    fromContent(id: string, content: Record<string, unknown>): LinkAnalysisView {
+        return this.store.fromContent(id, content);
     }
 
     remove(id: string): Observable<unknown> {

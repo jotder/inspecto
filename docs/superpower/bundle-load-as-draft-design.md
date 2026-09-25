@@ -2,14 +2,18 @@
 
 > **Status: DECIDED 2026-09-25 (operator answered D1–D8 in §7) — IN FLIGHT.** Build order as signed: the
 > read-only preview extension (§5 row 4, built FIRST) then the editor slices (§5 rows 1–3) for Dashboard, Widget and
-> Dataset, then authored Pipeline (row 5). Link Analysis / Geo views are a later slice, not started.
+> Dataset, then authored Pipeline (row 5), then Link Analysis / Geo views (row 5b). Every build slice has
+> shipped; slice 6 is not built by D1. Not archived yet: the browser drive is open and `docs/BACKLOG.md` §3.7
+> still links here.
 > **Shipped 2026-09-25:** §5 row 4 (preview `integrity`) and rows 1–3 for Dashboard, Widget and Dataset — as-built
 > facts in [`metadata-bundle.md`](../okf/backend/control-plane/metadata-bundle.md) § *Import as draft* (D7).
 > **Shipped 2026-09-25 (later):** §5 row 5 — authored Pipeline, and row 4's second half — the Dashboard,
 > Widget and Dataset editors re-check integrity against the *edited* draft just before Save (advisory, D3) —
 > as-built in the same concept section.
-> **Open:** Link Analysis / Geo views; a browser drive of the four editors (§6); the preview judges no
-> pipeline references, so the Pipeline editor shows *not checked* and does not re-check; the
+> **Shipped 2026-09-25 (last slice):** Link Analysis / Geo views — *Import as draft…* in both studios' editor
+> menus; the preview judges neither kind, so both banners say *not checked* and Save runs no re-check.
+> **Open:** a browser drive of the six editors (§6); the preview judges no pipeline or view references, so
+> those editors show *not checked* and do not re-check; the
 > `authored-pipeline` bundle kind reads `PipelineStore` while the editor edits the registered config (found
 > building row 5 — see the concept page).
 > Concept pages: [`metadata-bundle.md`](../okf/backend/control-plane/metadata-bundle.md) (the import this
@@ -147,6 +151,7 @@ wider closure only means more rows in the prerequisite list of slice 3. Nothing 
 | 3 | Prerequisites: when the preview's `requires` has `missing` rows or the envelope carries other-kind items the target references, the draft dialog lists them and offers "Import these first" → existing `/bundle/import` over just those items; the draft opens only after that call succeeds (partial failure: stop, name what landed — the `applyKpiReport` rule). | SPA | spec: prerequisite 422 ⇒ no draft opened |
 | 4 | `POST /bundle/preview` adds `integrity: [...]` (introduced findings for the previewed items, read-only). The editor calls preview with the *current draft content* before Save and shows findings in the draft banner. | backend + SPA | real-HTTP test in `ControlApiBundleTest`; `openapi-v1.json` response shape updated — ✅ both halves shipped 2026-09-25 (pre-Save re-check: Dashboard/Widget/Dataset) |
 | 5 | `authored-pipeline` in the Pipeline editor via the existing `applyPipelineDraft` path (lifecycle kept; a brand-new id still needs the scaffold write the editor does for "new", `pipeline-editor.component.ts:1288-1289` — D5). | SPA | spec + browser drive — ✅ SPA + spec shipped 2026-09-25 (scaffold deferred to Save; browser drive open) |
+| 5b | Link Analysis / Geo views (D5's later slice): the studios' own *Load view* adopts the draft, Save is the pane's `/components` create/update (`If-Match` for an existing id). | SPA | per-editor spec — ✅ shipped 2026-09-25 (browser drive open) |
 | 6 | *Only if D1 = server staging:* Option B as its own plan (store, 4 routes, invisibility invariant, retention). Re-scope before starting. | backend + SPA | its own plan |
 
 Out of every slice: `connection` (secrets are stripped at export and refused raw at import — a draft editor

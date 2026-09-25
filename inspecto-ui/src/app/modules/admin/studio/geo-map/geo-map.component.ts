@@ -29,7 +29,7 @@ import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
-import { TransferMenuComponent } from 'app/inspecto/transfer';
+import { ImportDraft, ImportDraftBannerComponent, TransferMenuComponent } from 'app/inspecto/transfer';
 import {
     GeoBBox,
     GeoCamera,
@@ -63,7 +63,7 @@ import {
     PivotService,
     uniqueNameValidator,
 } from 'app/inspecto/investigation';
-import { GeoSettingsService, apiErrorMessage, SessionService } from 'app/inspecto/api';
+import { ComponentsService, GeoSettingsService, apiErrorMessage, SessionService } from 'app/inspecto/api';
 import { Dataset } from 'app/modules/admin/studio/datasets/dataset-types';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
@@ -140,6 +140,7 @@ interface PointRow {
         MapViewComponent,
         DataTableComponent,
         TransferMenuComponent,
+        ImportDraftBannerComponent,
         GeoAnalysisToolboxComponent,
     ],
     templateUrl: './geo-map.component.html',
@@ -161,6 +162,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     private geoSources = inject(GeoSourcesService);
     private datasetsService = inject(DatasetsService);
     private viewsService = inject(GeoMapService);
+    private components = inject(ComponentsService);
     /** LA-22: the shared Geo ↔ Link brush (keyed by `GeoPoint.key`, D-U3). */
     private brush = inject(GeoLinkBrushService);
     private geoSettings = inject(GeoSettingsService);
@@ -397,6 +399,13 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         name: ['', [Validators.required, uniqueNameValidator(() => this.views().map((v) => v.name))]],
         description: [''],
     });
+
+    /** An imported draft this editor holds UNSAVED (Import as draft, D1–D8) — in memory only. */
+    readonly importDraft = signal<ImportDraft | null>(null);
+    /** The stored copy the draft replaces (D6 diff baseline); null when the id is new here. */
+    readonly draftStored = signal<Record<string, unknown> | null>(null);
+    /** The stored copy's hash, sent as `If-Match` on the draft's Save so it cannot clobber a concurrent edit. */
+    private draftIfMatch: string | undefined;
 
     /** An incoming investigation pivot (ui-design-review R8) awaiting a map load to resolve against —
      *  cleared after the first query run, found or not. */
@@ -828,22 +837,16 @@ export class GeoMapComponent implements OnInit, OnDestroy {
             return;
         }
         const { name, description } = this.saveForm.getRawValue();
-        const query = this.lastRun();
-        if (!query) return;
-        const view: GeoMapView = {
-            id: name
+        const view = this.viewFromState(
+            name
                 .trim()
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/^-|-$/g, ''),
-            name: name.trim(),
-            description: description.trim() || undefined,
-            sourceId: this.sourceId(),
-            query,
-            display: this.displayMode(),
-            camera: this.mapView?.getCamera() ?? undefined,
-            notes: this.notes().length ? this.notes() : undefined,
-        };
+            name.trim(),
+            description.trim() || undefined,
+        );
+        if (!view) return;
         this.saving.set(true);
         try {
             await firstValueFrom(this.viewsService.save(view, { update: this.views().some((v) => v.id === view.id) }));
@@ -856,6 +859,94 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         } finally {
             this.saving.set(false);
         }
+    }
+
+    /** The last run and the map's state as a saved view under `id` — null when nothing has run yet. */
+    private viewFromState(id: string, name: string, description: string | undefined): GeoMapView | null {
+        const query = this.lastRun();
+        if (!query) return null;
+        return {
+            id,
+            name,
+            description,
+            sourceId: this.sourceId(),
+            query,
+            display: this.displayMode(),
+            camera: this.mapView?.getCamera() ?? undefined,
+            notes: this.notes().length ? this.notes() : undefined,
+        };
+    }
+
+    // ── Import as draft (operator decisions 2026-09-25; D5's Geo view slice) ──
+
+    /**
+     * Adopt the transfer menu's draft as UNSAVED work (D1): the view's state loads exactly as "Load view"
+     * does — re-running its read-only projection — and nothing is written until {@link saveDraft}. An
+     * existing id (D6) also reads the stored copy: the banner's diff baseline and the Save's `If-Match`.
+     */
+    async onDraftImported(draft: ImportDraft): Promise<void> {
+        // `/bundle/preview` judges references only for the kinds ComponentIntegrity knows (dataset, query,
+        // widget, dashboard, reconciliation) — never a geo-map-view — so its list is ALWAYS empty here,
+        // which the banner would show as clean. Say "not checked" instead.
+        this.importDraft.set({ ...draft, integrity: null });
+        this.draftStored.set(null);
+        this.draftIfMatch = undefined;
+        if (draft.targetExists) {
+            this.components.get('geo-map-view', draft.id).subscribe({
+                next: (def) => {
+                    if (this.importDraft()?.id !== draft.id) return; // discarded or replaced meanwhile
+                    this.draftStored.set(def?.content ?? null);
+                    this.draftIfMatch = def?.contentHash;
+                },
+                error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load view "${draft.id}"`)),
+            });
+        }
+        await this.loadView(this.viewsService.fromContent(draft.id, draft.content));
+    }
+
+    /** Save the draft through the pane's own route (D2): create for a new id, else an update carrying
+     *  `If-Match` (D6). A refused Save keeps the draft on the page. */
+    async saveDraft(): Promise<void> {
+        const draft = this.importDraft();
+        if (!draft) return;
+        if (draft.targetExists && !this.draftIfMatch) {
+            this.toastr.warning(`The stored "${draft.id}" has not loaded, so the draft cannot be saved safely.`);
+            return;
+        }
+        const incoming = this.viewsService.fromContent(draft.id, draft.content);
+        const view = this.viewFromState(draft.id, incoming.name, incoming.description);
+        if (!view) {
+            this.toastr.warning('Run the drafted query before saving it — a view saves the query that last ran.');
+            return;
+        }
+        this.saving.set(true);
+        try {
+            await firstValueFrom(
+                this.viewsService.save(view, { update: draft.targetExists, ifMatch: this.draftIfMatch }),
+            );
+            this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
+            this.clearDraft();
+            this.toastr.success(`Saved view '${view.name}'.`);
+        } catch (err) {
+            this.toastr.error(apiErrorMessage(err, 'Saving the draft failed.'));
+        } finally {
+            this.saving.set(false);
+        }
+    }
+
+    /** Drop the draft, writing nothing: an existing id goes back to its stored view; a new one leaves the
+     *  map as unsaved exploration. */
+    async discardDraft(): Promise<void> {
+        const draft = this.importDraft();
+        const stored = this.draftStored();
+        this.clearDraft();
+        if (draft?.targetExists && stored) await this.loadView(this.viewsService.fromContent(draft.id, stored));
+    }
+
+    private clearDraft(): void {
+        this.importDraft.set(null);
+        this.draftStored.set(null);
+        this.draftIfMatch = undefined;
     }
 
     /** Per-view tags (D7) — labels the saved view in place, through the cross-entity assignment edges.

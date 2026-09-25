@@ -33,6 +33,7 @@ import { ToastrService } from 'ngx-toastr';
 import { firstValueFrom } from 'rxjs';
 import { map } from 'rxjs/operators';
 import {
+    ComponentsService,
     ExchangeService,
     InvService,
     LensService,
@@ -50,7 +51,7 @@ import { ComponentHistoryDialog } from 'app/inspecto/components/component-histor
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
-import { TransferMenuComponent } from 'app/inspecto/transfer';
+import { ImportDraft, ImportDraftBannerComponent, TransferMenuComponent } from 'app/inspecto/transfer';
 import {
     G6GraphData,
     EntityProjection,
@@ -224,6 +225,7 @@ const SERVER_PATH_LIMIT = 100;
         GraphViewComponent,
         DataTableComponent,
         TransferMenuComponent,
+        ImportDraftBannerComponent,
         LinkAnalysisToolboxComponent,
         LinkAnalysisQueryPanelComponent,
         LinkAnalysisLegendComponent,
@@ -288,6 +290,7 @@ export class LinkAnalysisComponent implements OnInit {
     private readonly limits = inject(LinkAnalysisSettingsService);
     private pipelinesService = inject(PipelinesService);
     private viewsService = inject(LinkAnalysisService);
+    private components = inject(ComponentsService);
     /** Evidence snapshots (UI-first, session-scoped — see the service). */
     readonly snapshots = inject(LinkAnalysisSnapshotsService);
     /** The most recent snapshot of the current graph, if any — what Attach to Case offers first. */
@@ -844,6 +847,13 @@ export class LinkAnalysisComponent implements OnInit {
         description: [''],
     });
     readonly saving = signal(false);
+
+    /** An imported draft this editor holds UNSAVED (Import as draft, D1–D8) — in memory only. */
+    readonly importDraft = signal<ImportDraft | null>(null);
+    /** The stored copy the draft replaces (D6 diff baseline); null when the id is new here. */
+    readonly draftStored = signal<Record<string, unknown> | null>(null);
+    /** The stored copy's hash, sent as `If-Match` on the draft's Save so it cannot clobber a concurrent edit. */
+    private draftIfMatch: string | undefined;
 
     /** An incoming investigation pivot (ui-design-review R8) awaiting a graph to resolve against —
      *  cleared after the first query run, found or not. */
@@ -1595,28 +1605,16 @@ export class LinkAnalysisComponent implements OnInit {
     async saveView(): Promise<void> {
         this.saveForm.markAllAsTouched();
         if (this.saveForm.invalid) return;
-        const q = this.queryPanel?.buildQuery() ?? { error: 'The query form is not ready.' };
-        if ('error' in q) {
-            this.loadError.set(q.error);
-            return;
-        }
         const { name, description } = this.saveForm.getRawValue();
-        const view: LinkAnalysisView = {
-            id: name
+        const view = this.viewFromState(
+            name
                 .trim()
                 .toLowerCase()
                 .replace(/[^a-z0-9]+/g, '-'),
-            name: name.trim(),
-            description: description.trim() || undefined,
-            sourceId: this.sourceId(),
-            query: q,
-            display: this.displayOptions(), // styling travels with the view; reapplied on load
-            layout: this.layoutId(),
-            profile: this.profileId() === 'generic' ? undefined : this.profileId(),
-            view: { plugins: this.viewOptions(), legend: this.legendOpen(), workingSet: this.workingSetOpen() },
-            // LA-10: no server list exists — the view is where this screen remembers its Investigation ids.
-            investigations: this.investigation.refs().length ? this.investigation.refs() : undefined,
-        };
+            name.trim(),
+            description.trim() || undefined,
+        );
+        if (!view) return;
         this.saving.set(true);
         try {
             await firstValueFrom(this.viewsService.save(view, { update: this.views().some((v) => v.id === view.id) }));
@@ -1629,6 +1627,98 @@ export class LinkAnalysisComponent implements OnInit {
         } finally {
             this.saving.set(false);
         }
+    }
+
+    /** The screen's current state as a saved view under `id` — null (with the reason shown) when the query
+     *  form cannot build a query. */
+    private viewFromState(id: string, name: string, description: string | undefined): LinkAnalysisView | null {
+        const q = this.queryPanel?.buildQuery() ?? { error: 'The query form is not ready.' };
+        if ('error' in q) {
+            this.loadError.set(q.error);
+            return null;
+        }
+        return {
+            id,
+            name,
+            description,
+            sourceId: this.sourceId(),
+            query: q,
+            display: this.displayOptions(), // styling travels with the view; reapplied on load
+            layout: this.layoutId(),
+            profile: this.profileId() === 'generic' ? undefined : this.profileId(),
+            view: { plugins: this.viewOptions(), legend: this.legendOpen(), workingSet: this.workingSetOpen() },
+            // LA-10: no server list exists — the view is where this screen remembers its Investigation ids.
+            investigations: this.investigation.refs().length ? this.investigation.refs() : undefined,
+        };
+    }
+
+    // ── Import as draft (operator decisions 2026-09-25; D5's Link Analysis view slice) ──
+
+    /**
+     * Adopt the transfer menu's draft as UNSAVED work (D1): the view's state loads exactly as "Load view"
+     * does — re-running its read-only projection — and nothing is written until {@link saveDraft}. An
+     * existing id (D6) also reads the stored copy: the banner's diff baseline and the Save's `If-Match`.
+     */
+    async onDraftImported(draft: ImportDraft): Promise<void> {
+        // `/bundle/preview` judges references only for the kinds ComponentIntegrity knows (dataset, query,
+        // widget, dashboard, reconciliation) — never a link-analysis-view — so its list is ALWAYS empty
+        // here, which the banner would show as clean. Say "not checked" instead.
+        this.importDraft.set({ ...draft, integrity: null });
+        this.draftStored.set(null);
+        this.draftIfMatch = undefined;
+        if (draft.targetExists) {
+            this.components.get('link-analysis-view', draft.id).subscribe({
+                next: (def) => {
+                    if (this.importDraft()?.id !== draft.id) return; // discarded or replaced meanwhile
+                    this.draftStored.set(def?.content ?? null);
+                    this.draftIfMatch = def?.contentHash;
+                },
+                error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load view "${draft.id}"`)),
+            });
+        }
+        await this.loadView(this.viewsService.fromContent(draft.id, draft.content));
+    }
+
+    /** Save the draft through the pane's own route (D2): create for a new id, else an update carrying
+     *  `If-Match` (D6). A refused Save keeps the draft on the page. */
+    async saveDraft(): Promise<void> {
+        const draft = this.importDraft();
+        if (!draft) return;
+        if (draft.targetExists && !this.draftIfMatch) {
+            this.toastr.warning(`The stored "${draft.id}" has not loaded, so the draft cannot be saved safely.`);
+            return;
+        }
+        const incoming = this.viewsService.fromContent(draft.id, draft.content);
+        const view = this.viewFromState(draft.id, incoming.name, incoming.description);
+        if (!view) return;
+        this.saving.set(true);
+        try {
+            await firstValueFrom(
+                this.viewsService.save(view, { update: draft.targetExists, ifMatch: this.draftIfMatch }),
+            );
+            this.views.set([...this.views().filter((v) => v.id !== view.id), view]);
+            this.clearDraft();
+            this.toastr.success(`Saved “${view.name}”.`);
+        } catch (err) {
+            this.toastr.error(apiErrorMessage(err, 'Saving the draft failed.'));
+        } finally {
+            this.saving.set(false);
+        }
+    }
+
+    /** Drop the draft, writing nothing: an existing id goes back to its stored view; a new one leaves the
+     *  canvas as unsaved exploration. */
+    async discardDraft(): Promise<void> {
+        const draft = this.importDraft();
+        const stored = this.draftStored();
+        this.clearDraft();
+        if (draft?.targetExists && stored) await this.loadView(this.viewsService.fromContent(draft.id, stored));
+    }
+
+    private clearDraft(): void {
+        this.importDraft.set(null);
+        this.draftStored.set(null);
+        this.draftIfMatch = undefined;
     }
 
     async loadView(view: LinkAnalysisView): Promise<void> {

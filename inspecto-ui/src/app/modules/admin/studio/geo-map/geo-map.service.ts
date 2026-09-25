@@ -67,8 +67,13 @@ export class GeoMapService {
         return this.store.get(id);
     }
 
-    save(view: GeoMapView, opts?: { update?: boolean }): Observable<GeoMapView> {
+    save(view: GeoMapView, opts?: { update?: boolean; ifMatch?: string }): Observable<GeoMapView> {
         return this.store.save(view, opts);
+    }
+
+    /** A view decoded from a Component's `content` (an imported bundle item — Import as draft). */
+    fromContent(id: string, content: Record<string, unknown>): GeoMapView {
+        return this.store.fromContent(id, content);
     }
 
     remove(id: string): Observable<unknown> {

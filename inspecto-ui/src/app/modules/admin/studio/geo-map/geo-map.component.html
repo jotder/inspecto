@@ -11,6 +11,16 @@
         @if (loadError()) {
             <inspecto-alert variant="error" title="Query failed">{{ loadError() }}</inspecto-alert>
         }
+        @if (importDraft(); as draft) {
+            <div class="flex flex-col gap-2">
+                <inspecto-import-draft-banner [draft]="draft" [stored]="draftStored()" (discard)="discardDraft()" />
+                <div class="flex justify-end">
+                    <button type="button" mat-flat-button color="primary" [disabled]="saving()" (click)="saveDraft()">
+                        Save draft as “{{ draft.id }}”
+                    </button>
+                </div>
+            </div>
+        }
         @if (geo(); as g) {
             @if (g.truncated) {
                 <inspecto-alert variant="warning" title="Truncated">
@@ -393,6 +403,8 @@
             <inspecto-transfer-menu
                 [items]="transferItems()"
                 [allowedKinds]="['geo-map-view']"
+                [importDraft]="true"
+                (draftImported)="onDraftImported($event)"
                 (changed)="reloadViews()"
                 label="Import / export saved views"
             />

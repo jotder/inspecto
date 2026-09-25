@@ -39,11 +39,22 @@ export class SavedViewStore<TView extends { id: string }> {
             .pipe(map((d: ComponentDef | null) => (d ? this.codec.fromContent(d.name, d.content) : null)));
     }
 
+    /** A view decoded from a Component's `content` — e.g. an imported bundle item (Import as draft). */
+    fromContent(id: string, content: Record<string, unknown>): TView {
+        return this.codec.fromContent(id, content);
+    }
+
     /** Create by default; pass `{update: true}` when the id already exists (save-under-same-name
-     *  overwrite) — the backend 409s a create on an existing id. */
-    save(view: TView, opts?: { update?: boolean }): Observable<TView> {
+     *  overwrite) — the backend 409s a create on an existing id. `ifMatch` (update only) is the stored
+     *  copy's `contentHash`: the save is refused (409) instead of clobbering a concurrent edit. */
+    save(view: TView, opts?: { update?: boolean; ifMatch?: string }): Observable<TView> {
         const req$ = opts?.update
-            ? this.components.update(this.kind, view.id, this.codec.toContent(view))
+            ? this.components.update(
+                  this.kind,
+                  view.id,
+                  this.codec.toContent(view),
+                  opts.ifMatch ? { ifMatch: opts.ifMatch } : undefined,
+              )
             : this.components.create(this.kind, { id: view.id, ...this.codec.toContent(view) });
         return req$.pipe(map(() => view));
     }

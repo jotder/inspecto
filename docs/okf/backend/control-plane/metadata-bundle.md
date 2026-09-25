@@ -110,7 +110,7 @@ read/written through the uniform `BundleSource` seam regardless of its backing s
   ref's export-stamped `originHash` to the target's stored hash; a ref that travels hash-less (older bundle, or
   unresolvable at export) can only be `satisfied`/`missing`, so the classification degrades gracefully.
 
-## Import as draft (SHIPPED 2026-09-25 for Dashboard, Widget, Dataset, authored Pipeline)
+## Import as draft (SHIPPED 2026-09-25 for Dashboard, Widget, Dataset, authored Pipeline, Link Analysis / Geo views)
 
 The editor-hosted alternative to write-through import: the incoming item opens in its editor as **unsaved
 work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
@@ -118,8 +118,9 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
 
 * **Where** — an extra *Import as draft…* item beside *Import…* in the **editor** transfer menus only
   (`<inspecto-transfer-menu [importDraft]="true" (draftImported)>`); libraries and Settings stay write-through
-  (D8). Shipped on the Dashboard, Widget and Dataset editors and the authored Pipeline editor (D5). ⏳ Not
-  yet: Link Analysis / Geo views. ⛔ `connection` never (a draft editor would invite typing a secret).
+  (D8). Shipped on the Dashboard, Widget and Dataset editors, the authored Pipeline editor, and the Link
+  Analysis and Geo Map studios (their saved-view editors, D5). ⛔ `connection` never (a draft editor would
+  invite typing a secret).
 * **The dialog** is `ImportBundleDialog` with `mode: 'draft'`: the operator picks ONE row of the host's kind;
   the dialog never posts the target to `/bundle/import`. It closes with an `ImportDraft`
   (`inspecto-ui/src/app/inspecto/transfer/import-draft.ts`: content, `sourceSpace`, `targetExists`, `integrity`, `prerequisites`).
@@ -165,6 +166,20 @@ work**. Decisions D1–D8 (operator, 2026-09-25) are recorded in
   while this editor (and the UI's `loadAll`) work on the REGISTERED `*_pipeline.toon` — a backend export of a
   registered-only pipeline reports it `missing`, and a write-through import lands in the authored store. The
   draft path is unaffected (its Save is the editor's own route), but the seam is open.
+* **Link Analysis / Geo views (D5's last slice).** Both kinds are `ComponentStore.WRITABLE_TYPES`, so the
+  bundle door already carried them; the draft is SPA-only. The studio has no per-id route, so a draft always
+  opens **here**, never via `ImportDraftHandoff`: adoption runs the pane's own *Load view* (which re-runs the
+  view's read-only projection — a `POST` that writes nothing, and a Geo draft saves only after that run
+  succeeded, because a Geo view saves the query that last ran). Save is a host button under the shared banner
+  (*Save draft as “‹id›”*) — the draft keeps its bundle **id and name**; the name form's duplicate-name guard
+  is the ordinary *Save view*'s business. New id ⇒ `POST /components/{kind}`; existing id ⇒ `PUT` with the
+  stored copy's hash as `If-Match` (`SavedViewStore.save` gained `ifMatch`), and Save refuses to run until
+  that stored copy has loaded, so it can never go out unconditional. Discard reloads the stored view (existing
+  id) or leaves the canvas as unsaved exploration (new id). ⚠ The preview's `integrity` list is ALWAYS empty
+  for these kinds — `ComponentIntegrity` judges none of them, so a view's missing `datasetId` is never a
+  finding — hence the banner says **not checked** and Save runs no re-check (the Pipeline editor's rule). Its
+  Datasets still arrive as D4 prerequisites: `investigationViewRefs` derives them, so the dialog imports them
+  first.
 * ⛔ **No `enabled:false` stamp** — a Dataset/Widget/Dashboard has no inactive meaning; a stamped write-through
   would be visible, resolvable and counted while carrying a key nothing reads.
 
