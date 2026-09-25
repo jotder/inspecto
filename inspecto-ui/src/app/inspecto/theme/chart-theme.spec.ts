@@ -104,6 +104,15 @@ describe('themedChartConfig', () => {
         expect(o['datasets'].bar.borderRadius).toBe(0);
     });
 
+    it('themes a further axis the caller declares (the Combo y2): muted ticks and title, no gridlines of its own', () => {
+        const o = opts('bar', TWO, { scales: { y2: { position: 'right', title: { display: true, text: 'Rate' } } } });
+        expect(o['scales'].y2.ticks.color).toBe('MUTED');
+        expect(o['scales'].y2.title.color).toBe('MUTED');
+        expect(o['scales'].y2.title.text).toBe('Rate');
+        expect(o['scales'].y2.grid.display).toBe(false);
+        expect(o['scales'].y2.position).toBe('right');
+    });
+
     it("keeps the caller's axis options, and an undefined title does not erase the themed title style", () => {
         const tick = (v: number | string) => `#${v}`;
         const o = opts('bar', ONE, {

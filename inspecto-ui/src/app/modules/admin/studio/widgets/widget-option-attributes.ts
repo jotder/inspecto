@@ -20,6 +20,7 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     { key: 'subtitle', label: 'Subtitle', type: 'string', tier: 'required', required: false },
     { key: 'xTitle', label: 'X axis title', type: 'string', tier: 'required', required: false },
     { key: 'yTitle', label: 'Y axis title', type: 'string', tier: 'required', required: false },
+    { key: 'y2Title', label: 'Right axis title (Combo)', type: 'string', tier: 'required', required: false },
     { key: 'legendShow', label: 'Show legend', type: 'boolean', tier: 'required', required: false, default: true },
     {
         key: 'legendPosition',
@@ -77,7 +78,8 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     { key: 'currency', label: 'Currency code (e.g. SAR)', type: 'string', tier: 'required', required: false },
     { key: 'compact', label: 'Compact (7.7M)', type: 'boolean', tier: 'required', required: false, default: false },
     { key: 'decimals', label: 'Decimals', type: 'number', tier: 'required', required: false, min: 0 },
-    // UIE-1: a KPI's target and which direction is good (UIE-8: the Gauge, KPI trend and Progress list read the same two).
+    // UIE-1: a KPI's target and which direction is good (UIE-8: the Gauge, KPI trend and Progress list read the same two; the Waterfall reads
+    // the direction alone, to tone its increases and decreases).
     {
         key: 'kpiTarget',
         label: 'Target (KPI, KPI trend, Gauge, Progress list)',
@@ -87,7 +89,7 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     },
     {
         key: 'kpiBetter',
-        label: 'Target: better when',
+        label: 'Better when (KPI, Gauge, Waterfall)',
         type: 'select',
         tier: 'required',
         required: false,
@@ -96,6 +98,53 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
             { value: 'higher', label: 'Higher' },
             { value: 'lower', label: 'Lower' },
         ],
+    },
+    // Waterfall only: the opening step, the closing total bar, and the order of the change steps.
+    {
+        key: 'waterfallStart',
+        label: 'Waterfall: opening step',
+        type: 'string',
+        tier: 'required',
+        required: false,
+        placeholder: 'The step whose value is the starting total, e.g. Billed revenue',
+    },
+    {
+        key: 'waterfallShowTotal',
+        label: 'Waterfall: show total bar',
+        type: 'boolean',
+        tier: 'required',
+        required: false,
+        default: true,
+    },
+    {
+        key: 'waterfallTotalLabel',
+        label: 'Waterfall: total bar label',
+        type: 'string',
+        tier: 'required',
+        required: false,
+        placeholder: 'Total',
+    },
+    {
+        key: 'waterfallOrder',
+        label: 'Waterfall: step order',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: 'data',
+        options: [
+            { value: 'data', label: 'As queried (by step)' },
+            { value: 'asc', label: 'Largest decrease first' },
+            { value: 'desc', label: 'Largest increase first' },
+        ],
+    },
+    // Combo only: the line measures on their own right axis.
+    {
+        key: 'comboSecondaryAxis',
+        label: 'Combo: line on a right axis',
+        type: 'boolean',
+        tier: 'required',
+        required: false,
+        default: true,
     },
     // UIE-6, table only: each row opens the operational object it describes. Both are needed for a link.
     {

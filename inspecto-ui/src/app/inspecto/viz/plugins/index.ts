@@ -10,10 +10,12 @@ import { FUNNEL_PLUGIN } from './funnel.plugin';
 import { KPI_TREND_PLUGIN } from './kpi-trend.plugin';
 import { PROGRESS_LIST_PLUGIN } from './progress-list.plugin';
 import { TREEMAP_PLUGIN } from './treemap.plugin';
+import { WATERFALL_PLUGIN } from './waterfall.plugin';
+import { COMBO_PLUGIN } from './combo.plugin';
 import { GEO_MAP_PLUGIN, LINK_ANALYSIS_PLUGIN, RECONCILIATION_PLUGIN, WORKING_SET_PLUGIN } from './view.plugins';
 
 /** The plugin set. KPI + table first (always-available), then the Chart.js standards, then the P3 breadth
- *  additions (bubble, gauge, scatter, funnel, kpi-trend, progress-list, treemap), then the view-bound investigation plugins (Phase 4). */
+ *  additions (bubble, gauge, scatter, funnel, kpi-trend, progress-list, treemap, waterfall, combo), then the view-bound investigation plugins (Phase 4). */
 export const BUILTIN_VIZ_PLUGINS: VizPlugin[] = [
     KPI_PLUGIN,
     TABLE_PLUGIN,
@@ -28,6 +30,8 @@ export const BUILTIN_VIZ_PLUGINS: VizPlugin[] = [
     KPI_TREND_PLUGIN,
     PROGRESS_LIST_PLUGIN,
     TREEMAP_PLUGIN,
+    WATERFALL_PLUGIN,
+    COMBO_PLUGIN,
     GEO_MAP_PLUGIN,
     LINK_ANALYSIS_PLUGIN,
     RECONCILIATION_PLUGIN,
@@ -57,6 +61,8 @@ export { FUNNEL_PLUGIN } from './funnel.plugin';
 export { KPI_TREND_PLUGIN } from './kpi-trend.plugin';
 export { PROGRESS_LIST_PLUGIN } from './progress-list.plugin';
 export { TREEMAP_PLUGIN } from './treemap.plugin';
+export { WATERFALL_PLUGIN } from './waterfall.plugin';
+export { COMBO_PLUGIN } from './combo.plugin';
 export {
     GEO_MAP_PLUGIN,
     LINK_ANALYSIS_PLUGIN,

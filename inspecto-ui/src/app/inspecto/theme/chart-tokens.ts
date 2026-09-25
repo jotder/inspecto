@@ -74,6 +74,9 @@ export const CHART_PALETTES: Readonly<Record<string, readonly string[]>> = {
  *  scheme, since `VizRenderComponent` (unlike `InspectoChartComponent`) doesn't thread the dark/light flag. */
 export const GAUGE_TRACK = '#9ca3af';
 
+/** A thin neutral guide line drawn over data (the Waterfall's step-to-step connectors) — the same scheme-neutral gray. */
+export const CHART_CONNECTOR = GAUGE_TRACK;
+
 /**
  * Colours for the Link Analysis SVG export (Phase F): a standalone downloaded file has no host page
  * defining `--gamma-*`, so — like every other canvas/file token here — these are hardcoded, not CSS

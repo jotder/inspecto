@@ -131,7 +131,11 @@ export function chartThemeOptions(
             border: { display: false },
             grid: { display: value, color: t.grid, drawTicks: false },
         });
-        theme['scales'] = { x: axis(horizontal), y: axis(!horizontal) };
+        const scales: Record<string, unknown> = { x: axis(horizontal), y: axis(!horizontal) };
+        // Any further axis the caller declares (the Combo's secondary `y2`) gets the same ticks and titles, and no
+        // gridlines of its own — two sets of horizontal lines at different scales would read as one muddle.
+        for (const id of Object.keys(opts.scales ?? {})) if (!(id in scales)) scales[id] = axis(false);
+        theme['scales'] = scales;
         const stacked = !!(opts.scales?.['x']?.stacked || opts.scales?.['y']?.stacked);
         theme['datasets'] = {
             bar: { maxBarThickness: 48, categoryPercentage: 0.7, barPercentage: 0.85, borderRadius: stacked ? 0 : 4 },

@@ -54,6 +54,9 @@ export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestr
     @Input({ required: true }) type: ChartType = 'bar';
     @Input({ required: true }) data: ChartData | null = null;
     @Input() options: ChartOptions = {};
+    /** The host's own text alternative, for a chart whose data points do not read as values (the Waterfall's
+     *  `[low, high]` bars, the Combo's two kinds). Absent: {@link altText} is derived from the first series. */
+    @Input() ariaLabel: string | null = null;
     /** Shown in place of the canvas when there is nothing to plot. */
     @Input() emptyMessage = 'No data to chart yet.';
     /**
@@ -86,6 +89,7 @@ export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestr
     /** Text alternative for the canvas (WCAG 1.1.1 — canvases are invisible to screen readers): the chart
      *  type plus each category's first-series value, capped so long series don't produce an essay. */
     get altText(): string {
+        if (this.ariaLabel) return this.ariaLabel;
         const d = this.data;
         if (!d?.labels?.length) return `${this.type} chart`;
         const values = (d.datasets?.[0]?.data ?? []) as unknown[];

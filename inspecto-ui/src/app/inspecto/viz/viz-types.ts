@@ -61,7 +61,7 @@ export interface QuerySpec {
 }
 
 /** The channels a plugin can map fields onto (Tableau-style). */
-export type ChannelId = 'x' | 'y' | 'series' | 'size' | 'color' | 'value' | 'compare' | 'group' | 'subgroup';
+export type ChannelId = 'x' | 'y' | 'y2' | 'series' | 'size' | 'color' | 'value' | 'compare' | 'group' | 'subgroup';
 
 /** A field-mapper control: one channel, the roles it accepts, and whether it's multi/required. */
 export interface ControlSpec {
@@ -136,7 +136,8 @@ export interface VizSeries {
  * `WidgetOptions` extends this with the caption-only `title`/`subtitle` fields.
  */
 export interface VizRenderOptions {
-    axis?: { xTitle?: string; yTitle?: string };
+    /** Axis titles. `y2Title` is the Combo's secondary (right) axis. */
+    axis?: { xTitle?: string; yTitle?: string; y2Title?: string };
     legend?: { show?: boolean; position?: 'top' | 'right' | 'bottom' | 'left' };
     /** A named palette key resolved by the render host (`app/inspecto/theme/chart-tokens`). */
     palette?: string;
@@ -154,7 +155,8 @@ export interface VizRenderOptions {
     /** Table only: columns rendered as status badges. Default: columns named status / severity / rag. */
     badgeColumns?: string[];
     /** UIE-1, KPI and (UIE-8) Gauge: the target, and which direction is good. Both state on / off target in words and tone;
-     *  the KPI colours its delta the same way, the Gauge draws good / bad zones. `better` defaults to `higher`. */
+     *  the KPI colours its delta the same way, the Gauge draws good / bad zones. `better` defaults to `higher`. The Waterfall reads `better` alone: with
+     *  `lower`, a decrease is the good (success-toned) step. */
     kpi?: { target?: number; better?: 'higher' | 'lower' };
     /** KPI trend only: the delta compares the last point with the point `compareBack` steps earlier (default 1). */
     trend?: { compareBack?: number };
@@ -164,6 +166,15 @@ export interface VizRenderOptions {
     /** UIE-4: how this widget's numbers read — KPI value, chart axes and tooltips, and every table column not named in
      *  {@link columnFormats}. Absent: grouped, up to two decimals (axes compact). */
     format?: NumberFormat;
+    /** Combo only: how the line measures (`y2`) read — the secondary axis and their tooltip values. Absent: {@link format}. */
+    format2?: NumberFormat;
+    /** Waterfall only (see `waterfall-chart.ts`). `start`: the step label (an `x` value) whose measure is the OPENING
+     *  total — drawn from zero and placed first. `totalLabel`: the trailing computed total bar (default `Total`; an
+     *  empty string draws none). `order`: the change steps in query order (`data`, the step dimension ascending) or
+     *  by their signed change. The generic `sort`/`limit` never reorder or trim a waterfall — a step's place is its meaning. */
+    waterfall?: { start?: string; totalLabel?: string; order?: 'data' | 'asc' | 'desc' };
+    /** Combo only: draw the line measures (`y2`) on a secondary right axis. Default `true` when a line measure exists. */
+    combo?: { secondaryAxis?: boolean };
     /** UIE-4, table only: a per-column format, keyed by result column id (`sum_exposure_sar`). */
     columnFormats?: Record<string, NumberFormat>;
     /** UIE-6, table only: the operational object each row describes. The `idField` cell becomes a link to it; a row

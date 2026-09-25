@@ -55,6 +55,10 @@ import { InspectoChartComponent } from 'app/inspecto/components/chart.component'
 import { seriesColors } from 'app/inspecto/viz/series-colors';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { DesignSystemFoundationsComponent } from './foundations.component';
+// More visualization types: Waterfall + Combo
+import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
+import { VizProps, VizRenderOptions } from 'app/inspecto/viz/viz-types';
+import { COMBO_PLUGIN, WATERFALL_PLUGIN } from 'app/inspecto/viz/plugins';
 
 interface DemoRow {
     pipeline: string;
@@ -107,6 +111,7 @@ interface DemoRow {
         InspectoSchemaFieldsEditorComponent,
         InspectoSchemaMetadataGridComponent,
         DesignSystemFoundationsComponent,
+        VizRenderComponent,
     ],
     templateUrl: './design-system.component.html',
 })
@@ -487,6 +492,28 @@ progress-list  controls: { x: [{field: 'detector'}], y: [{field: 'alert_id', agg
 // standalone (no Widget):
 <inspecto-kpi-trend [labels]="months" [values]="values" [format]="{ style: 'percent' }" [target]="1.5" better="lower" />
 <inspecto-progress-list [labels]="names" [values]="values" [target]="95" [select]="drill" />`;
+    // ── More visualization types: Waterfall + Combo (the real plugins through the real render host) ──
+    readonly waterfallPlugin = WATERFALL_PLUGIN;
+    readonly waterfallProps: VizProps = {
+        labels: ['Billed revenue', 'Rating errors', 'Unbilled usage', 'Duplicate CDRs', 'Recovered'],
+        series: [{ label: 'Change', data: [4200000, -310000, -180000, -95000, 260000] }],
+    };
+    readonly waterfallOptions: VizRenderOptions = {
+        waterfall: { start: 'Billed revenue', totalLabel: 'Net billed' },
+        format: { style: 'currency', currency: 'SAR', compact: true },
+    };
+    readonly comboPlugin = COMBO_PLUGIN;
+    readonly comboProps: VizProps = {
+        labels: ['2026-08-03', '2026-08-10', '2026-08-17', '2026-08-24', '2026-08-31', '2026-09-07'],
+        series: [
+            { label: 'Alerts', data: [142, 118, 165, 97, 131, 88], kind: 'bar' },
+            { label: 'Precision', data: [61, 66, 58, 72, 70, 79], kind: 'line' },
+        ],
+    };
+    readonly comboOptions: VizRenderOptions = {
+        axis: { yTitle: 'Alerts', y2Title: 'Precision' },
+        format2: { style: 'percent', decimals: 0 },
+    };
 
     // ── Snippets (copy-paste) ────────────────────────────────────────────────────────────────
     readonly snippets = {
@@ -566,6 +593,19 @@ const SPECS: AttributeSpec[] = [
   <div tabTypes><!-- Types section: the columns table + filename column + column metadata --></div>
 </inspecto-grammar-editor>`,
         mapView: `<!-- offline MapLibre host (bundled Natural Earth basemap, no network) -->\n<inspecto-map-view\n  [data]="geoData"          // GeoData { points, routes }; null ⇒ unmounted (show an empty state)\n  [fill]="true"             // grow into a flex column (default: 62vh page band)\n  (pointClick)="open($event)" />\n// colours live in theme/map-tokens.ts (the map's chart-tokens analog)`,
+        moreVizWaterfallCombo: `<!-- Waterfall (bridge) — vizType 'waterfall': x = step, y = the step's SIGNED change -->
+options: { waterfall: { start: 'Billed revenue',   // the step whose value is the OPENING total (drawn from 0, first)
+                        totalLabel: 'Net billed',   // trailing computed total; '' draws none (default 'Total')
+                        order: 'data' },            // 'data' (by step) | 'asc' | 'desc' (by signed change)
+           kpi: { better: 'lower' } }               // flips the tones: a decrease is the good (success) step
+// generic sort/limit never reorder a waterfall; hideBlank does apply
+
+<!-- Combo — vizType 'combo': x, y = bar measure(s), y2 = line measure(s) -->
+options: { combo: { secondaryAxis: true },          // default when a y2 exists; false = one shared axis
+           axis: { yTitle: 'Alerts', y2Title: 'Precision' },
+           format: { … },                           // bars (left axis)
+           format2: { style: 'percent' } }          // lines (right axis + their tooltips); absent = format
+<inspecto-viz-render [plugin]="plugin" [props]="props" [renderOptions]="options" (categoryClick)="drill($event)" />`,
         chartTheme: `<!-- every Chart.js chart goes through <inspecto-chart>: it applies theme/chart-theme.ts -->
 <!-- (font, muted ticks, value-axis gridlines, rounded capped bars, card tooltip, point legend) -->
 <inspecto-chart type="bar" [data]="data" [options]="{ scales: { x: { stacked: true }, y: { stacked: true } } }" />

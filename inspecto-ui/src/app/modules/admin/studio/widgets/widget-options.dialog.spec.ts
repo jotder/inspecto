@@ -104,6 +104,33 @@ describe('WidgetOptionsDialog', () => {
         expect((ref.close.mock.calls[2][0] as WidgetOptions).rowLink).toBeUndefined();
     });
 
+    it('round-trips the Waterfall and Combo options, a hidden total included; defaults save no block at all', () => {
+        const { c, ref } = create({
+            waterfall: { start: 'Opening exposure', totalLabel: '', order: 'desc' },
+            combo: { secondaryAxis: false },
+            axis: { y2Title: 'Recovery rate' },
+            format2: { style: 'percent' },
+        });
+        c.save();
+        const saved = ref.close.mock.calls[0][0] as WidgetOptions;
+        expect(saved.waterfall).toEqual({ start: 'Opening exposure', totalLabel: '', order: 'desc' });
+        expect(saved.combo).toEqual({ secondaryAxis: false });
+        expect(saved.axis?.y2Title).toBe('Recovery rate');
+        expect(saved.format2).toEqual({ style: 'percent' }); // not modelled here, kept
+
+        c.schemaForm.form.patchValue({
+            waterfallStart: '',
+            waterfallShowTotal: true,
+            waterfallTotalLabel: '',
+            waterfallOrder: 'data',
+            comboSecondaryAxis: true,
+        });
+        c.save();
+        const reset = ref.close.mock.calls[1][0] as WidgetOptions;
+        expect(reset.waterfall).toBeUndefined();
+        expect(reset.combo).toBeUndefined();
+    });
+
     it('renders with no a11y violations', async () => {
         const { fixture } = create({});
         await expectNoA11yViolations(fixture.nativeElement);

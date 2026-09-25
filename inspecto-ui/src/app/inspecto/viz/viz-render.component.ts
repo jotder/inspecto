@@ -17,6 +17,16 @@ import { KpiTrendComponent } from './plugins/kpi-trend.component';
 import { ProgressListComponent } from './plugins/progress-list.component';
 import { TreemapChannel, TreemapComponent } from './plugins/treemap.component';
 import { getVizComponentLoader } from './viz-components';
+import {
+    signed,
+    WATERFALL_KIND_LABEL,
+    waterfallAltText,
+    waterfallChartData,
+    WaterfallStep,
+    waterfallSteps,
+    waterfallTones,
+} from './waterfall-chart';
+import { comboAltText, comboChartData, comboSeriesFormat, comboUsesSecondaryAxis } from './combo-chart';
 import { ChannelId, VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
 
 /** componentKey → Angular component, for plugins that render via the escape hatch (`render.kind:'component'`).
@@ -71,6 +81,7 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
                         [type]="chartType()"
                         [data]="data"
                         [options]="chartJsOptions()"
+                        [ariaLabel]="chartAriaLabel()"
                         (elementClick)="onElementClick($event)"
                     />
                 }
@@ -181,24 +192,47 @@ export class VizRenderComponent {
 
     /** Props without blank categories (`hideBlank`), reordered by `sort` (on the first series' value) and trimmed to
      *  `limit` categories. Chart.js only — table/KPI ignore these (rows already have their own grid sort; KPI has no
-     *  categories). Blanks drop BEFORE the limit, so a "top 10" is ten real categories. */
+     *  categories). Blanks drop BEFORE the limit, so a "top 10" is ten real categories. A Waterfall honours only
+     *  `hideBlank`: its step order is its meaning (`options.waterfall.order` reorders it) and a trim would falsify the total. */
     private readonly sortedProps = computed<VizProps>(() => {
         const p = this.props();
         const opts = this.renderOptions();
-        if (!opts?.sort && !opts?.limit && !opts?.hideBlank) return p;
+        const ordered = this.plugin().meta.type === 'waterfall';
+        const sort = ordered ? undefined : opts?.sort;
+        const limit = ordered ? undefined : opts?.limit;
+        if (!sort && !limit && !opts?.hideBlank) return p;
         let order = p.labels.map((_, i) => i);
-        if (opts.hideBlank) order = order.filter((i) => (p.labels[i] ?? '').trim() !== '');
-        if (opts.sort) {
-            const dir = opts.sort === 'asc' ? 1 : -1;
+        if (opts?.hideBlank) order = order.filter((i) => (p.labels[i] ?? '').trim() !== '');
+        if (sort) {
+            const dir = sort === 'asc' ? 1 : -1;
             const value = (i: number): number => p.series[0]?.data[i] ?? 0;
             order = [...order].sort((a, b) => dir * (value(a) - value(b)));
         }
-        if (opts.limit) order = order.slice(0, opts.limit);
+        if (limit) order = order.slice(0, limit);
         return {
             ...p,
             labels: order.map((i) => p.labels[i]),
             series: p.series.map((s): VizSeries => ({ ...s, data: order.map((i) => s.data[i]) })),
         };
+    });
+
+    /** The Waterfall's steps (running totals, opening and closing bars) — empty for every other type. */
+    readonly waterfall = computed<WaterfallStep[]>(() => {
+        if (this.plugin().meta.type !== 'waterfall') return [];
+        const p = this.sortedProps();
+        return waterfallSteps(p.labels, p.series[0]?.data ?? [], this.renderOptions()?.waterfall);
+    });
+
+    /** A text alternative for the canvas when the generic one (first series, value per category) would mislead. */
+    readonly chartAriaLabel = computed<string | null>(() => {
+        const type = this.plugin().meta.type;
+        const opts = this.renderOptions();
+        if (type === 'waterfall') return waterfallAltText(this.waterfall(), opts?.format);
+        if (type === 'combo') {
+            const p = this.sortedProps();
+            return comboAltText(p, p.labels.map(categoryLabel), opts, (l) => categoryLabel(seriesLabel(l)));
+        }
+        return null;
     });
 
     readonly chartData = computed<ChartData | null>(() => {
@@ -236,6 +270,18 @@ export class VizRenderComponent {
                 labels: ['Value', 'Remaining'],
                 datasets: [valueRing, { data: [target, 100 - target], backgroundColor: [below, above], weight: 1 }],
             };
+        }
+        if (plugin.meta.type === 'waterfall') {
+            const steps = this.waterfall();
+            return waterfallChartData(
+                steps,
+                steps.map((s) => categoryLabel(s.label)),
+                this.renderOptions()?.kpi?.better,
+            );
+        }
+        if (plugin.meta.type === 'combo') {
+            const names = (l: string): string => categoryLabel(seriesLabel(l));
+            return comboChartData(p, axisLabels, colorsFor(p.series.map((s) => s.label)), this.renderOptions(), names);
         }
         if (plugin.meta.type === 'scatter') {
             const [xs, ys] = p.series;
@@ -325,11 +371,13 @@ export class VizRenderComponent {
                                 },
                             }
                           : {}),
-                      label: (ctx: { dataset: { label?: string }; parsed: unknown; label?: string }) => {
+                      label: (ctx: { dataset: { label?: string; type?: string }; parsed: unknown; label?: string }) => {
                           const parsed = ctx.parsed as number | { x?: number; y?: number } | null;
                           const n = typeof parsed === 'number' ? parsed : isFunnel ? parsed?.x : parsed?.y;
                           const name = isPie ? ctx.label : ctx.dataset.label;
-                          const value = n == null ? '' : formatNumber(n, fmt);
+                          // A Combo's line measure reads in its own format (`format2`).
+                          const f = type === 'combo' ? comboSeriesFormat(ctx.dataset.type === 'line', opts) : fmt;
+                          const value = n == null ? '' : formatNumber(n, f);
                           return name ? `${name}: ${value}` : value;
                       },
                   },
@@ -337,7 +385,7 @@ export class VizRenderComponent {
         const plugins = pluginsOverride ?? (tooltip ? {} : undefined);
         if (plugins && tooltip && !isGauge) (plugins as Record<string, unknown>)['tooltip'] = tooltip;
         const valueAxis = isFunnel ? 'x' : 'y';
-        return {
+        const result = {
             ...(isGauge ? { circumference: 180, rotation: 270, cutout: '70%' } : {}),
             ...(isFunnel ? { indexAxis: 'y' as const } : {}),
             plugins,
@@ -357,7 +405,102 @@ export class VizRenderComponent {
                       }
                     : undefined,
         } as ChartOptions;
+        if (type === 'waterfall') return this.waterfallOptions(result);
+        if (type === 'combo') return this.comboOptions(result);
+        return result;
     });
+
+    /** The Waterfall's overrides on the shared cartesian options: a legend naming the step kinds (so colour is not the
+     *  only signal), tooltips giving the change and the running total, the connector line kept out of both, and never
+     *  stacked (the bars already float). */
+    private waterfallOptions(base: ChartOptions): ChartOptions {
+        const opts = this.renderOptions();
+        const fmt = opts?.format;
+        const steps = this.waterfall();
+        const tones = waterfallTones(opts?.kpi?.better);
+        const kinds = (['start', 'increase', 'decrease', 'total'] as const).filter((k) =>
+            steps.some((s) => s.kind === k),
+        );
+        const scales = base.scales as Record<string, Record<string, unknown>> | undefined;
+        return {
+            ...base,
+            plugins: {
+                ...base.plugins,
+                legend: {
+                    display: opts?.legend?.show ?? true,
+                    position: opts?.legend?.position ?? 'top',
+                    // A kind is not a dataset — there is nothing to toggle.
+                    onClick: () => undefined,
+                    labels: {
+                        // A custom label carries its own text colour: take the themed one the chart resolved.
+                        generateLabels: (chart: {
+                            options: { plugins?: { legend?: { labels?: { color?: unknown } } } };
+                        }) =>
+                            kinds.map((k) => ({
+                                text: WATERFALL_KIND_LABEL[k],
+                                fontColor: chart.options.plugins?.legend?.labels?.color,
+                                fillStyle: tones[k],
+                                strokeStyle: tones[k],
+                                lineWidth: 0,
+                                pointStyle: 'rect',
+                                hidden: false,
+                                datasetIndex: 0,
+                            })),
+                    },
+                },
+                tooltip: {
+                    filter: (item: { datasetIndex: number }) => item.datasetIndex === 0,
+                    callbacks: {
+                        title: (items: { dataIndex: number }[]) => {
+                            const s = steps[items[0]?.dataIndex ?? -1];
+                            return s ? categoryLabel(s.label) : '';
+                        },
+                        label: (ctx: { dataIndex: number }) => {
+                            const s = steps[ctx.dataIndex];
+                            if (!s) return '';
+                            if (s.kind === 'start' || s.kind === 'total')
+                                return `${WATERFALL_KIND_LABEL[s.kind]}: ${formatNumber(s.to, fmt)}`;
+                            return [
+                                `${WATERFALL_KIND_LABEL[s.kind]}: ${signed(s.delta, fmt)}`,
+                                `Running total: ${formatNumber(s.to, fmt)}`,
+                            ];
+                        },
+                    },
+                },
+            },
+            scales: {
+                ...scales,
+                x: { ...scales?.['x'], stacked: false },
+                y: { ...scales?.['y'], stacked: false },
+            },
+        } as ChartOptions;
+    }
+
+    /** The Combo's overrides: the secondary right axis `y2` for the line measures (its own ticks format and title), and
+     *  a tooltip listing every measure at the hovered category. */
+    private comboOptions(base: ChartOptions): ChartOptions {
+        const opts = this.renderOptions();
+        const plugins = base.plugins as Record<string, Record<string, unknown>> | undefined;
+        const withTooltip = {
+            ...plugins,
+            tooltip: { ...plugins?.['tooltip'], mode: 'index', intersect: false },
+        };
+        if (!comboUsesSecondaryAxis(this.sortedProps(), opts)) return { ...base, plugins: withTooltip } as ChartOptions;
+        const fmt2 = comboSeriesFormat(true, opts);
+        const y2Title = opts?.axis?.y2Title;
+        return {
+            ...base,
+            plugins: withTooltip,
+            scales: {
+                ...base.scales,
+                y2: {
+                    position: 'right',
+                    ticks: { callback: (v: string | number) => formatAxisTick(Number(v), fmt2) },
+                    title: y2Title ? { display: true, text: y2Title } : undefined,
+                },
+            },
+        } as ChartOptions;
+    }
 
     /** Table columns: readable headers (or the widget's `columnLabels`) and status columns as badges. */
     readonly colDefs = computed<ColDef[] | undefined>(() => {
@@ -414,6 +557,12 @@ export class VizRenderComponent {
      *  labels the chart actually rendered) and emit it — skipped for gauge, whose slices aren't categories. */
     onElementClick(index: number): void {
         if (this.plugin().meta.type === 'gauge') return;
+        // A Waterfall's bars are its steps (reordered, plus a computed total that is no category): emit the step's source.
+        if (this.plugin().meta.type === 'waterfall') {
+            const source = this.waterfall()[index]?.source;
+            if (source != null) this.categoryClick.emit(source);
+            return;
+        }
         const label = this.sortedProps().labels[index];
         if (label != null) this.categoryClick.emit(label);
     }

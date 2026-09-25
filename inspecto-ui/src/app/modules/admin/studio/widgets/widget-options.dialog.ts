@@ -50,6 +50,7 @@ export class WidgetOptionsDialog {
         subtitle: this.data.subtitle ?? '',
         xTitle: this.data.axis?.xTitle ?? '',
         yTitle: this.data.axis?.yTitle ?? '',
+        y2Title: this.data.axis?.y2Title ?? '',
         legendShow: this.data.legend?.show ?? true,
         legendPosition: this.data.legend?.position ?? 'top',
         palette: this.data.palette ?? undefined,
@@ -63,6 +64,11 @@ export class WidgetOptionsDialog {
         decimals: this.data.format?.decimals ?? null,
         kpiTarget: this.data.kpi?.target ?? null,
         kpiBetter: this.data.kpi?.better ?? 'higher',
+        waterfallStart: this.data.waterfall?.start ?? '',
+        waterfallShowTotal: this.data.waterfall?.totalLabel !== '',
+        waterfallTotalLabel: this.data.waterfall?.totalLabel ?? '',
+        waterfallOrder: this.data.waterfall?.order ?? 'data',
+        comboSecondaryAxis: this.data.combo?.secondaryAxis ?? true,
         rowLinkKind: this.data.rowLink?.kind ?? '',
         rowLinkIdField: this.data.rowLink?.idField ?? '',
     };
@@ -72,6 +78,7 @@ export class WidgetOptionsDialog {
         const str = (x: unknown) => (typeof x === 'string' ? x.trim() : '');
         const xTitle = str(v['xTitle']);
         const yTitle = str(v['yTitle']);
+        const y2Title = str(v['y2Title']);
         const style = str(v['numberStyle']) as '' | 'currency' | 'percent';
         const currency = str(v['currency']).toUpperCase();
         const decimals = typeof v['decimals'] === 'number' ? (v['decimals'] as number) : undefined;
@@ -82,6 +89,16 @@ export class WidgetOptionsDialog {
                 : undefined;
         const target = typeof v['kpiTarget'] === 'number' ? (v['kpiTarget'] as number) : undefined;
         const better = (str(v['kpiBetter']) || 'higher') as 'higher' | 'lower';
+        // A waterfall block only when something differs from the defaults (opening none, total "Total", data order).
+        const start = str(v['waterfallStart']);
+        const totalLabel =
+            (v['waterfallShowTotal'] as boolean) === false ? '' : str(v['waterfallTotalLabel']) || undefined;
+        const order = (str(v['waterfallOrder']) || 'data') as 'data' | 'asc' | 'desc';
+        const waterfall =
+            start || totalLabel !== undefined || order !== 'data'
+                ? { start: start || undefined, totalLabel, order: order === 'data' ? undefined : order }
+                : undefined;
+        const secondaryAxis = (v['comboSecondaryAxis'] as boolean) ?? true;
         const linkKind = str(v['rowLinkKind']) as '' | RowLinkKind;
         const linkField = str(v['rowLinkIdField']);
         const options: WidgetOptions = {
@@ -90,7 +107,10 @@ export class WidgetOptionsDialog {
             ...this.data,
             title: str(v['title']) || undefined,
             subtitle: str(v['subtitle']) || undefined,
-            axis: xTitle || yTitle ? { xTitle: xTitle || undefined, yTitle: yTitle || undefined } : undefined,
+            axis:
+                xTitle || yTitle || y2Title
+                    ? { xTitle: xTitle || undefined, yTitle: yTitle || undefined, y2Title: y2Title || undefined }
+                    : undefined,
             legend: {
                 show: (v['legendShow'] as boolean) ?? true,
                 position: (v['legendPosition'] as 'top' | 'right' | 'bottom' | 'left') ?? 'top',
@@ -102,6 +122,8 @@ export class WidgetOptionsDialog {
             hideBlank: (v['hideBlank'] as boolean) || undefined,
             format,
             kpi: target != null || better === 'lower' ? { target, better } : undefined,
+            waterfall,
+            combo: secondaryAxis ? undefined : { secondaryAxis: false },
             rowLink: linkKind && linkField ? { kind: linkKind, idField: linkField } : undefined,
         };
         this.ref.close(options);

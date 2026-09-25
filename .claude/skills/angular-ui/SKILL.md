@@ -639,6 +639,12 @@ src/app/
   `subgroup` / `value`, `options.treemap.limit` (default 20, rest → "Other"), colour = `seriesColors()` by group with
   `color-mix` tints toward `--gamma-bg-card`; a cell click reaches the host as viz-render's `(channelClick)` and
   `widget-host` drills on THAT channel's field (a subgroup drill filters on the subgroup value alone).
+  - **Waterfall + Combo** (2026-09-25; gallery: `/design` ▸ *More visualization types*). `waterfall` = floating
+    `[low, high]` bars from `viz/waterfall-chart.ts` (`options.waterfall.start/totalLabel/order`, tones flipped by
+    `kpi.better: 'lower'`); it ignores the generic `sort`/`limit` (step order is its meaning) and its drill click emits
+    the step's raw category, never the computed total. `combo` = bars (`y`) + line (`y2`, a new `ChannelId`) with the
+    line on a secondary `y2` axis in `options.format2` (`viz/combo-chart.ts`); the theme styles any extra axis the
+    caller declares. Both pass their own text alternative via `<inspecto-chart [ariaLabel]>`.
 - **ag-Grid theme → only** `InspectoGridThemeService` / `GAMMA_GRID_PARAMS`. Never bare `themeQuartz`.
 - Editing the theming plugin (`@gamma/tailwind/plugins/theming.js`) does **not** hot-reload — restart the
   dev server and verify via `getComputedStyle(body).getPropertyValue('--gamma-…')`.

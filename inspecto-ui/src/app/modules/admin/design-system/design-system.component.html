@@ -714,6 +714,40 @@
                     class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
                 ><code>{{ snippets.treemap }}</code></pre>
             </div>
+
+            <!-- ▸ Waterfall + Combo (vizType: waterfall | combo) -->
+            <div class="mb-3 mt-6 flex items-center justify-between">
+                <h3 class="text-lg font-semibold">Waterfall and Combo</h3>
+                <button mat-stroked-button (click)="copy(snippets.moreVizWaterfallCombo)">
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:clipboard"></mat-icon>
+                    <span class="ml-1">Copy snippet</span>
+                </button>
+            </div>
+            <p class="text-secondary mb-4 text-sm">
+                <b>Waterfall</b> bridges an opening value to a closing one through signed steps: floating bars, rises
+                and falls in the success / error tones (flipped by <code>options.kpi.better: 'lower'</code>), totals in
+                the primary colour, dashed connectors at the running total, a legend and tooltips that say
+                <i>Increase / Decrease</i> in words. <b>Combo</b> draws bar measures and a line measure on one category
+                axis, the line on a secondary right axis in its own format (<code>options.format2</code>); bars show as
+                squares and lines as circles in the legend.
+            </p>
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div class="bg-card rounded-2xl p-4 shadow">
+                    <div class="mb-2 text-sm font-medium">Waterfall — billed revenue to net billed</div>
+                    <inspecto-viz-render
+                        [plugin]="waterfallPlugin"
+                        [props]="waterfallProps"
+                        [renderOptions]="waterfallOptions"
+                    />
+                </div>
+                <div class="bg-card rounded-2xl p-4 shadow">
+                    <div class="mb-2 text-sm font-medium">Combo — alerts per week and precision</div>
+                    <inspecto-viz-render [plugin]="comboPlugin" [props]="comboProps" [renderOptions]="comboOptions" />
+                </div>
+            </div>
+            <pre
+                class="bg-default text-secondary mt-3 overflow-x-auto rounded-lg p-4 text-xs leading-relaxed"
+            ><code>{{ snippets.moreVizWaterfallCombo }}</code></pre>
         </section>
 
         <!-- ── Graph hosts (AntV G6) ────────────────────────────────────────────────────── -->
