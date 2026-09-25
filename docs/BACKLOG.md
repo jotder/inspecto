@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **38<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
+> **37<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -25,8 +25,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 18<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 38<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 17<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 37<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -199,8 +199,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 - **P2** · `DUCKLE-C1-DATASET-FRESHNESS-1` — **Dataset freshness: core shipped 2026-09-16; badge, auto-armed sweep, retention floor and shape-aware spec 2026-09-24 — one residual.** Freshness is an Alert Rule shape (`dataset:` + `maximumAge:`) evaluated against the last `dataset.write` Signal; as-built (the `system.freshness-sweep` system job, the `dataset-publications.tsv` floor, the per-shape `ConfigSpecs.alert()` rules) in `docs/okf/capabilities/studio/studio.md` §3.4. Open: **(2)** owner-routed alerting — the design is decided (owner = the authenticated `Subject`, `"appUser"` where none), but the substrate is absent: `AlertRule` has no owner, `NotificationRule` hardcodes the recipient, `ChannelConfig` routes by a flat `target`, and config-authored rules are evaluated with no request `Subject` to capture — a multi-seam design pass.
 - **P2** · **Completeness KPI (when the hold lifts)** — K1 (`DbConsignmentOutputStore.dailyVolume()`) and K2 (`FileSequenceGaps`; `SeqScope` already ships) are unwired — `VolumeBaseline`/`FileSequenceGaps` have no production caller; **K4**, a `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, a Signal plus a deduped Incident on breach, refusing loudly when `-Dconsignment.outputs.backend=none`), is designed but unbuilt (`superpower/completeness-kpi-k4-design.md`); K3, the baseline-window default as a job parameter. K5 shipped. Open inside the design: `kpi.completeness.*` is a **Signal** type and there is no `SignalType` home (the dotted literals are scattered) — whether to create one; `KPI-UNKNOWN-1` — a null-`bounds` sink's daily count is **unknown, not zero**, end to end; and where the sequence template comes from (the Collector's, a job parameter, or the Collector's with an override). Held by the §2 *Completeness KPI hold*. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
-
-- **P3** · `BACKUP-CATALOG-SPACE-ROOT-1` — **the backup catalog row is written to the JVM-wide registry, not the Space's.** `BackupTask.catalogRow` (`inspecto-backup/src/main/java/com/gamma/backup/BackupTask.java:355`) reads `System.getProperty("assist.write.root")` for the `maintenance_backups` Dataset while the data sits in the Space's own directory, so in multi-Space mode the row is skipped or lands in another Space's registry. Same bug class as `MEASURE-PROBE-SPACE-ROOT-1` (fixed 2026-09-25): resolve through `SpaceConfigRoot.forSpace(ctx.spaceId())` and move the data root with it (the java-backend skill's pair rule). Found by the 2026-09-25 audit of `assist.write.root` readers; the other readers are default-Space fallbacks, or `inspecto-intelligence`, which no edition ships.
 
 #### Signals, decisions & notifications
 

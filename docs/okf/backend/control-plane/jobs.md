@@ -464,7 +464,9 @@ these three live in the optional `inspecto-backup` module (Professional+, EDITIO
 through the **`MaintenanceTaskProvider`** ServiceLoader seam: the built-in `switch` always wins first, and its
 `default` arm consults discovered providers before throwing *unknown maintenance task*. A task claimed by two
 providers is refused fail-closed rather than resolved by classpath order. Findings emit `maintenance.*` signals
-for Alert Rules.
+for Alert Rules. A `backup`'s `maintenance_backups` catalog row registers in the running Space's own registry
+(`SpaceConfigRoot.current()`, beside the Space's data root), never the JVM-wide `-Dassist.write.root`
+(`BACKUP-CATALOG-SPACE-ROOT-1`, 2026-09-25).
 
 * **Dry run (MNT-1)** — `POST /jobs/{name}/trigger?dryRun=true` (v1 202 body echoes it); `JobContext.dryRun()`;
   tasks with no preview do nothing on a dry run (fail-closed).

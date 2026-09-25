@@ -352,8 +352,12 @@ final class BackupTask {
      */
     private static void catalogRow(JobContext ctx, String dataDir, String stamp, Path source,
                                    Path zip, String zipSha, int fileCount, long totalBytes) {
-        String writeRoot = System.getProperty("assist.write.root");
-        if (dataDir == null || dataDir.isBlank() || writeRoot == null || writeRoot.isBlank()) {
+        // BACKUP-CATALOG-SPACE-ROOT-1: the registry is THIS Space's config root (the default Space alone falls
+        // back to -Dassist.write.root), paired with dataDir, which MaintenanceJob already receives per Space.
+        // ⛔ NOT System.getProperty("assist.write.root") — JVM-wide, so a named Space's catalog row was skipped
+        // (property unset) or registered in another Space's registry beside this Space's Parquet.
+        Path writeRoot = SpaceConfigRoot.current();
+        if (dataDir == null || dataDir.isBlank() || writeRoot == null) {
             if (ctx != null) ctx.log().info("backup catalog skipped (no data root / write root configured)");
             return;
         }
@@ -382,7 +386,7 @@ final class BackupTask {
                             + "' (FORMAT PARQUET)");
                 }
             }
-            ComponentStore store = new ComponentStore(Path.of(writeRoot).resolve("registry"));
+            ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
             Map<String, Object> content = new LinkedHashMap<>();
             content.put("name", CATALOG_DATASET);
             content.put("physicalRef", CATALOG_DATASET);
