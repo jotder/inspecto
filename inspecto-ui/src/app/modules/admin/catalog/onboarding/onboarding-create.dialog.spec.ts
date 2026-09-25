@@ -93,6 +93,21 @@ describe('OnboardingCreateDialog', () => {
         expect(api.write).not.toHaveBeenCalled();
     });
 
+    it('shows "A name is required." only after submit — never on open (the error lands in the subscript)', () => {
+        const { fixture, api } = create({ kind: 'stream' });
+        const el = fixture.nativeElement as HTMLElement;
+        // Untouched: no error anywhere. The old nested "@if (…; as c)" wrapper mis-projected the
+        // <mat-error> into the form field's DEFAULT slot, so it rendered beside the input on open.
+        expect(el.querySelector('mat-error')).toBeNull();
+        expect(el.textContent).not.toContain('A name is required');
+        fixture.componentInstance.create();
+        fixture.detectChanges();
+        const err = el.querySelector('mat-error');
+        expect(err?.textContent).toContain('A name is required');
+        expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+        expect(api.write).not.toHaveBeenCalled();
+    });
+
     it('a 503 write shows the writes-disabled notice instead of closing', () => {
         const { fixture, ref } = create(
             { kind: 'stream' },

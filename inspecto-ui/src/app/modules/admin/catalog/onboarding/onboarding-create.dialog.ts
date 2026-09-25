@@ -153,16 +153,18 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Name</mat-label>
                     <input matInput formControlName="name" required cdkFocusInitial placeholder="orders_feed" />
-                    @if (form.controls.name; as c) {
-                        @if (c.hasError('required')) {
-                            <mat-error>A name is required.</mat-error>
-                        } @else if (c.hasError('pattern')) {
-                            <mat-error
-                                >Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error
-                            >
-                        } @else if (c.hasError('duplicate')) {
-                            <mat-error>A pipeline with this name already exists.</mat-error>
-                        }
+                    <!-- ⚠ Each branch's ONLY root is the <mat-error>. Content projection matches a control-flow
+                         block only by its single root element, so the old outer "@if (… ; as c)" wrapper made
+                         the errors miss mat-form-field's error slot and land in its DEFAULT slot beside the
+                         input — rendered always, touched or not ("A name is required." on open). -->
+                    @if (form.controls.name.hasError('required')) {
+                        <mat-error>A name is required.</mat-error>
+                    } @else if (form.controls.name.hasError('pattern')) {
+                        <mat-error
+                            >Start with a letter or digit; then letters, digits, <code>. _ -</code> only.</mat-error
+                        >
+                    } @else if (form.controls.name.hasError('duplicate')) {
+                        <mat-error>A pipeline with this name already exists.</mat-error>
                     }
                 </mat-form-field>
 
