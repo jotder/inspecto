@@ -260,7 +260,7 @@ The **Query Library** (`/studio/queries`) authors SQL with `$`-parameters and pr
 
 ### 3.5 Dashboards
 
-A `DashboardConfig` is `{tiles: [{widgetId, span}], filter?: ConditionGroup, exposedFields?, description?, asOf?, illustrative?}`. The
+A `DashboardConfig` is `{tiles: [{widgetId, span}], filter?: ConditionGroup, exposedFields?, description?, asOf?, illustrative?, dateField?, defaultRange?}`. The
 **quick-filter bar** renders chips over `exposedFields` and emits the same `{field, value}` toggle shape
 a tile's drill-down emits. The **drill-through drawer** is a slide-over that reuses the shared data table
 for the rows behind a tile. **PNG export** (`exportPngs()`) downloads every canvas under a dashboard
@@ -273,9 +273,30 @@ component-route key census accepts them: `description` (one line naming the ques
 DW-02). `<app-dashboard-header>` renders them under the title in the Menu viewer and the public share
 viewer, owns no heading, and renders nothing when all three are absent; the editor authors them in its
 toolbar. ⚠ A blank value or a `false` flag is **not written** (`compactHeader`), so clearing a field in
-the editor removes the key. ⛔ **No date-range selector yet**: the dashboard filter is sent to every tile
-unscoped and the share viewer's public query carries no filter at all, so a dashboard-level period cannot
-yet reach every tile honestly — deferred, not declined.
+the editor removes the key.
+
+**Date-range selector (UIE-5 d, 2026-09-25).** Viewer-only (operator decision): two optional keys, declared
+in `ConfigSpecs.dashboard()` — `dateField` (the date column) and `defaultRange` (a preset id or a custom
+`{from, to}`; rule `default-range-is-valid`). Presets count back from `asOf`, or from today when it is unset:
+`last-7-days`, `last-30-days`, `last-90-days`, `month-to-date`, `quarter-to-date`, `year-to-date`,
+`last-12-months`. Both ends are inclusive days; quarters are calendar quarters; last 12 months is the day after
+`asOf − 12 months` (month-end clamped). The maths is `dashboard-date-range.ts`, mirrored server-side by
+`DashboardDateRange.java` — change one, change the other (`ConfigSpecs.DASHBOARD_RANGE_PRESETS` is the id
+list both are tested against). `<app-dashboard-date-range>` sits in the viewer's filter card beside the
+quick-filter bar (Menu viewer and editor preview), seeded from `defaultRange` and transient; the editor authors
+`dateField` (suggestions = the columns every tiled Dataset declares; free text allowed) and the default.
+- **Per-tile scoping.** `DashboardViewStore.filterFor(dataset)` adds the range ONLY for a Dataset that declares
+  `dateField` (column or calculated column); other tiles keep the plain cross-filter, which still reaches every
+  tile unchanged. The range is ANDed around the cross-filter, never spliced into it, so the quick-filter bar and
+  drill toggles see exactly what they did before.
+- **Half-open terms.** The range is `field >= from AND field < to + 1 day`, not `between`: identical on a DATE
+  column, and on a TIMESTAMP column `<= to` would stop at midnight and drop the last day.
+- **Share links** get the Dashboard's DEFAULT range server-side (`ShareRoutes` → `DashboardDateRange`), inside
+  the same fence as the stored filter: the recipient's `filters` are ignored, so the range can be neither
+  widened nor dropped, and an unreadable `defaultRange` is a 422, never an unranged share. A viewer-chosen range
+  on the share page is **out of scope**. With no `asOf`, "today" is the server's calendar day on a share and the
+  viewer's wall-clock day in the app.
+- ⚠ A Dataset that declares no `columns` is treated as lacking the column — its tiles are never range-filtered.
 
 **Time grain travels on the wire (2026-08-14).** `QuerySpec.grains` (group-by column →
 `day|week|month`) is the one source of truth: each plugin's `buildQuery` fills it from the channel

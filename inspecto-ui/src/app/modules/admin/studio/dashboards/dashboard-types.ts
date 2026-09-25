@@ -1,5 +1,6 @@
 import { ConditionGroup, emptyGroup } from 'app/inspecto/query';
 import { TileSpan } from 'app/inspecto/viz/dashboard-grid';
+import { DateRangeSelection, asRangeSelection } from './dashboard-date-range';
 
 /**
  * Studio **Dashboard** model — a composite of saved widgets laid out in a grid, with an optional dashboard-level
@@ -55,7 +56,17 @@ export function compactHeader(h: DashboardHeader): DashboardHeader {
     };
 }
 
-export interface DashboardConfig extends DashboardHeader {
+/**
+ * UIE-5 (d) — the viewer's date-range selector. `dateField` names the date column the range filters; a tile whose
+ * Dataset lacks that column is left unfiltered by it. `defaultRange` is the range a viewer starts from (and the one
+ * a shared link is fenced to). Both optional; see `dashboard-date-range.ts`.
+ */
+export interface DashboardDateRange {
+    dateField?: string;
+    defaultRange?: DateRangeSelection;
+}
+
+export interface DashboardConfig extends DashboardHeader, DashboardDateRange {
     tiles: DashboardTile[];
     /** Cross-filter applied to every tile's QuerySpec (reuses the Query Core filter). */
     filter?: ConditionGroup | null;
@@ -75,6 +86,7 @@ export function buildDashboard(
     filter?: ConditionGroup | null,
     exposedFields?: string[],
     header: DashboardHeader = {},
+    dateRange: DashboardDateRange = {},
 ): Dashboard {
     return {
         id: name,
@@ -83,5 +95,17 @@ export function buildDashboard(
         filter: filter ?? emptyGroup('AND'),
         exposedFields: exposedFields ?? [],
         ...compactHeader(header),
+        ...compactDateRange(dateRange),
+    };
+}
+
+/** Only the date-range keys that say something — a blank `dateField` or an invalid `defaultRange` is omitted.
+ *  Tolerant of raw stored content. */
+export function compactDateRange(r: DashboardDateRange): DashboardDateRange {
+    const dateField = typeof r.dateField === 'string' ? r.dateField.trim() : '';
+    const defaultRange = asRangeSelection(r.defaultRange);
+    return {
+        ...(dateField ? { dateField } : {}),
+        ...(defaultRange ? { defaultRange } : {}),
     };
 }

@@ -1028,7 +1028,15 @@ public final class ConfigSpecs {
                 FieldSpec.of("asOf", "As of", FieldType.STRING,
                         "The calendar day the figures describe (YYYY-MM-DD), shown as \"As of <date>\"."),
                 FieldSpec.of("illustrative", "Illustrative data", FieldType.BOOL,
-                        "The figures are synthetic, shown to illustrate the view — viewers see an Illustrative data chip.")
+                        "The figures are synthetic, shown to illustrate the view — viewers see an Illustrative data chip."),
+                // UIE-5 (d): the viewer's date-range selector.
+                FieldSpec.of("dateField", "Date field", FieldType.STRING,
+                        "The date column the viewer's date range filters; a tile whose Dataset lacks it is not range-filtered."),
+                // STRING for the common case; a custom range is the map {from, to} (rule default-range-is-valid).
+                FieldSpec.of("defaultRange", "Default range", FieldType.STRING,
+                        "The range a viewer starts from, counted back from asOf (or today): one of "
+                                + String.join(", ", DASHBOARD_RANGE_PRESETS)
+                                + ", or a custom {from, to} of YYYY-MM-DD days. A shared link is fenced to it.")
         );
         List<CrossFieldRule> rules = List.of(
                 new CrossFieldRule(
@@ -1045,9 +1053,28 @@ public final class ConfigSpecs {
                         "asOf is a calendar date, YYYY-MM-DD.",
                         Severity.ERROR,
                         List.of("asOf"),
-                        raw -> !present(raw, "asOf") || isIsoDate(str(raw, "asOf")))
+                        raw -> !present(raw, "asOf") || isIsoDate(str(raw, "asOf"))),
+                new CrossFieldRule(
+                        "default-range-is-valid",
+                        "defaultRange is a preset (" + String.join(", ", DASHBOARD_RANGE_PRESETS)
+                                + ") or {from, to} with real YYYY-MM-DD days and from on or before to.",
+                        Severity.ERROR,
+                        List.of("defaultRange"),
+                        raw -> !present(raw, "defaultRange") || isRange(at(raw, "defaultRange")))
         );
         return new ConfigSpec("dashboard", fields, rules);
+    }
+
+    /** UIE-5 (d): the Dashboard {@code defaultRange} preset ids — mirrored by {@code dashboard-date-range.ts} and
+     *  resolved server-side for a shared link by {@code DashboardDateRange}. */
+    public static final List<String> DASHBOARD_RANGE_PRESETS = List.of("last-7-days", "last-30-days", "last-90-days",
+            "month-to-date", "quarter-to-date", "year-to-date", "last-12-months");
+
+    private static boolean isRange(Object v) {
+        if (v instanceof String s) return DASHBOARD_RANGE_PRESETS.contains(s);
+        if (v instanceof Map<?, ?> m && m.get("from") instanceof String from && m.get("to") instanceof String to)
+            return isIsoDate(from) && isIsoDate(to) && from.compareTo(to) <= 0;
+        return false;
     }
 
     /** A real calendar date in exactly {@code YYYY-MM-DD} form ({@code 2026-02-30} is not one). */

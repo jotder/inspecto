@@ -65,4 +65,46 @@ describe('DashboardsService', () => {
         expect(odd.description).toBeUndefined();
         expect(odd.illustrative).toBeUndefined();
     });
+
+    it('UIE-5 (d): dateField + defaultRange survive the persistence pair; blank or invalid ones write nothing', () => {
+        const { svc } = setup();
+        const preset = buildDashboard(
+            'd1',
+            [{ widgetId: 'c1', span: 1 }],
+            null,
+            [],
+            {},
+            {
+                dateField: ' event_date ',
+                defaultRange: 'quarter-to-date',
+            },
+        );
+        const content = svc.toContent(preset);
+        expect(content).toMatchObject({ dateField: 'event_date', defaultRange: 'quarter-to-date' });
+        expect(svc.fromContent('d1', content)).toMatchObject({
+            dateField: 'event_date',
+            defaultRange: 'quarter-to-date',
+        });
+
+        const custom = svc.toContent(
+            buildDashboard(
+                'd2',
+                [],
+                null,
+                [],
+                {},
+                { dateField: 'd', defaultRange: { from: '2026-01-01', to: '2026-03-31' } },
+            ),
+        );
+        expect(svc.fromContent('d2', custom).defaultRange).toEqual({ from: '2026-01-01', to: '2026-03-31' });
+
+        const blank = svc.toContent(buildDashboard('d3', [], null, [], {}, { dateField: '  ' }));
+        expect(Object.keys(blank)).not.toContain('dateField');
+        expect(Object.keys(blank)).not.toContain('defaultRange');
+        const odd = svc.fromContent('d4', { tiles: [], dateField: 3, defaultRange: 'last-week' });
+        expect(odd.dateField).toBeUndefined();
+        expect(odd.defaultRange).toBeUndefined();
+        const inverted = svc.fromContent('d5', { tiles: [], defaultRange: { from: '2026-02-01', to: '2026-01-01' } });
+        expect(inverted.defaultRange).toBeUndefined();
+    });
 });

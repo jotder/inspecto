@@ -96,6 +96,34 @@
             <mat-checkbox [formControl]="form.controls.illustrative">Illustrative data</mat-checkbox>
         </div>
 
+        <!-- UIE-5 (d): the viewer's date range — which column it filters, and the range a viewer starts from. -->
+        <div class="flex flex-wrap items-center gap-4 border-t border-gray-200 pt-4 dark:border-gray-700">
+            <mat-form-field subscriptSizing="dynamic" class="w-56">
+                <mat-label>Date field</mat-label>
+                <input
+                    matInput
+                    [formControl]="form.controls.dateField"
+                    [matAutocomplete]="dateFieldAuto"
+                    placeholder="e.g. event_date"
+                />
+                <mat-autocomplete #dateFieldAuto="matAutocomplete">
+                    @for (col of dateFieldOptions(); track col) {
+                        <mat-option [value]="col">{{ col }}</mat-option>
+                    }
+                </mat-autocomplete>
+            </mat-form-field>
+            @if (dateField()) {
+                <app-dashboard-date-range
+                    label="Default range"
+                    [selection]="defaultRange()"
+                    [anchor]="anchor()"
+                    (selectionChange)="setDefaultRange($event)"
+                />
+            } @else {
+                <span class="text-secondary text-sm">Name a date field to give viewers a date-range control.</span>
+            }
+        </div>
+
         <!-- AGT-6a: kpi_report_builder's host. It drafts N widgets PLUS the dashboard that tiles them,
              so it needs a pane that can do the multi-component write and still end unsaved for review.
              ⚠ [args] is aiKpiArgs() — identity/context ONLY (dataset + title). Pane args win over the
@@ -153,15 +181,25 @@
         }
     </div>
 
-    <!-- Viewer-facing quick-filter bar (renders only when fields are exposed) -->
-    @if (exposedFields().length) {
-        <div class="bg-card mt-4 rounded-2xl p-4 shadow">
-            <app-dashboard-filter-bar
-                [fields]="exposedFields()"
-                [values]="exposedValues()"
-                [filter]="filter()"
-                (drillToggle)="onDrill($event)"
-            />
+    <!-- Viewer-facing controls — the preview of what the Menu viewer shows: the date range (when a date field is
+         set) and the quick-filter bar (when fields are exposed). -->
+    @if (exposedFields().length || dateField()) {
+        <div class="bg-card mt-4 flex flex-wrap items-center gap-4 rounded-2xl p-4 shadow">
+            @if (dateField()) {
+                <app-dashboard-date-range
+                    [selection]="range()"
+                    [anchor]="anchor()"
+                    (selectionChange)="range.set($event)"
+                />
+            }
+            @if (exposedFields().length) {
+                <app-dashboard-filter-bar
+                    [fields]="exposedFields()"
+                    [values]="exposedValues()"
+                    [filter]="filter()"
+                    (drillToggle)="onDrill($event)"
+                />
+            }
         </div>
     }
 
@@ -227,7 +265,7 @@
                                 [widget]="widget"
                                 [dataset]="dataset"
                                 [stale]="staleOf(tile)"
-                                [filter]="filter()"
+                                [filter]="tileFilter(dataset)"
                                 (drill)="onDrill($event)"
                             >
                                 <ng-container tileActions [ngTemplateOutlet]="tileControls" />

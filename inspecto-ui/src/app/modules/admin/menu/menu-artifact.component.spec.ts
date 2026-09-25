@@ -61,14 +61,14 @@ const SAVED_FILTER: ConditionGroup = {
     items: [{ kind: 'condition', field: 'SEASON', operator: '=', value: '2024' }],
 };
 
-function create(dashboard: Dashboard | null) {
+function create(dashboard: Dashboard | null, widgets: Widget[] = [WIDGET], datasets: Dataset[] = [DS]) {
     TestBed.configureTestingModule({
         imports: [MenuArtifactComponent],
         providers: [
             provideNoopAnimations(),
             { provide: DashboardsService, useValue: { get: () => of(dashboard) } },
-            { provide: WidgetsService, useValue: { list: () => of([WIDGET]) } },
-            { provide: DatasetsService, useValue: { list: () => of([DS]) } },
+            { provide: WidgetsService, useValue: { list: () => of(widgets) } },
+            { provide: DatasetsService, useValue: { list: () => of(datasets) } },
             {
                 provide: DatasetRowsService,
                 useValue: {
@@ -177,5 +177,53 @@ describe('MenuArtifactComponent', () => {
         await settle(f);
         expect(f.nativeElement.querySelector('[data-testid="dashboard-header"]')).toBeNull();
         expect(f.nativeElement.textContent).not.toContain('Illustrative data');
+    });
+
+    it('UIE-5 (d): a date field shows the range control, seeded from the default; only dated tiles get the range', async () => {
+        const dated: Dataset = {
+            ...DS,
+            id: 'calls',
+            columns: [...DS.columns, { name: 'event_date', type: 'date', role: 'temporal' }],
+        };
+        const datedWidget: Widget = { ...WIDGET, id: 'w2', datasetId: 'calls' };
+        const f = create(
+            {
+                ...dashboard([]),
+                tiles: [
+                    { widgetId: 'w1', span: 2 },
+                    { widgetId: 'w2', span: 2 },
+                ],
+                asOf: '2026-09-24',
+                dateField: 'event_date',
+                defaultRange: 'last-7-days',
+            },
+            [WIDGET, datedWidget],
+            [DS, dated],
+        );
+        await settle(f);
+        const control: HTMLElement = f.nativeElement.querySelector('app-dashboard-date-range');
+        expect(control).not.toBeNull();
+        expect(control.querySelector('[data-testid="date-range-span"]')!.textContent).toContain('18 Sep – 24 Sep 2026');
+        await expectNoA11yViolations(f.nativeElement);
+
+        const tiles = f.debugElement
+            .queryAll((d) => d.componentInstance instanceof StubTileComponent)
+            .map((d) => d.componentInstance as StubTileComponent);
+        const byDataset = (id: string) => tiles.find((t) => t.dataset()?.id === id)!;
+        expect(byDataset('matches').filter()).toEqual(SAVED_FILTER); // no event_date column → untouched
+        expect(byDataset('calls').filter()!.items[1]).toEqual({
+            kind: 'group',
+            op: 'AND',
+            items: [
+                { kind: 'condition', field: 'event_date', operator: '>=', value: '2026-09-18' },
+                { kind: 'condition', field: 'event_date', operator: '<', value: '2026-09-25' },
+            ],
+        });
+    });
+
+    it('UIE-5 (d): no date field → no range control', async () => {
+        const f = create(dashboard([]));
+        await settle(f);
+        expect(f.nativeElement.querySelector('app-dashboard-date-range')).toBeNull();
     });
 });

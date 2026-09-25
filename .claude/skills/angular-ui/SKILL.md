@@ -194,6 +194,13 @@ src/app/
     (named "Open Reconciliation <label>") and the raw `idField` column is HIDDEN from the grid but stays a queried
     dimension, because the link reads the id from the same row — ⛔ never drop the id from `controls.x`. Without
     `labelField` the id cell itself is the link. A blank id renders plain text; the link wins over a status badge.
+  - **`<app-dashboard-date-range [selection] [anchor] (selectionChange)>`** — the Dashboard **date-range**
+    control (UIE-5 d, 2026-09-25; `studio/dashboards/`): presets counted back from the Dashboard's `asOf` (or
+    today), *All dates*, *Custom* From/To; a labelled `role="group"`, an inverted custom span is announced
+    (`role="alert"`) and never emitted. It sits in the viewer's filter card beside the quick-filter bar. 🔴 A tile
+    gets its filter through `DashboardViewStore.filterFor(dataset)` — never `filter()` directly — so the range
+    reaches ONLY tiles whose Dataset declares `dateField`; the maths lives in `dashboard-date-range.ts` and is
+    mirrored by the server's `DashboardDateRange.java` (share links) — change both.
   - **`<inspecto-section-tabs [tabs] [selected] (selectedChange)>`** — a label strip with a count pill
     per section; the **host** renders the content under it (`@switch`), so nothing hides inside a lazily
     mounted tab body (the R9 rule). 🔴 It holds the active index in its OWN signal: binding

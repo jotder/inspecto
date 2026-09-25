@@ -453,6 +453,29 @@ class ConfigSpecsTest {
         assertTrue(fire(d, "as-of-is-a-date", Map.of("asOf", "2026-02-30")).isPresent(), "no such day → ERROR");
     }
 
+    /** UIE-5 (d): the date-range keys are declared, and {@code defaultRange} is a known preset or a real,
+     *  ordered {from, to} span. */
+    @Test
+    void dashboardDeclaresTheDateRangeAndDefaultRangeIsValid() {
+        ConfigSpec d = ConfigSpecs.dashboard();
+        java.util.Set<String> paths = d.fields().stream().map(FieldSpec::path)
+                .collect(java.util.stream.Collectors.toSet());
+        assertTrue(paths.containsAll(List.of("dateField", "defaultRange")), paths.toString());
+        assertTrue(fire(d, "default-range-is-valid", Map.of("tiles", List.of())).isEmpty(), "absent → the rule does not apply");
+        for (String preset : ConfigSpecs.DASHBOARD_RANGE_PRESETS)
+            assertTrue(fire(d, "default-range-is-valid", Map.of("defaultRange", preset)).isEmpty(), preset);
+        assertTrue(fire(d, "default-range-is-valid",
+                Map.of("defaultRange", Map.of("from", "2026-01-01", "to", "2026-01-01"))).isEmpty(), "a one-day span → ok");
+        assertTrue(fire(d, "default-range-is-valid", Map.of("defaultRange", "last-week")).isPresent(), "unknown preset");
+        assertTrue(fire(d, "default-range-is-valid", Map.of("defaultRange", "custom")).isPresent(), "'custom' is not a preset");
+        assertTrue(fire(d, "default-range-is-valid",
+                Map.of("defaultRange", Map.of("from", "2026-02-01", "to", "2026-01-01"))).isPresent(), "inverted span");
+        assertTrue(fire(d, "default-range-is-valid",
+                Map.of("defaultRange", Map.of("from", "2026-02-30", "to", "2026-03-01"))).isPresent(), "no such day");
+        assertTrue(fire(d, "default-range-is-valid",
+                Map.of("defaultRange", Map.of("from", "2026-01-01"))).isPresent(), "half a span");
+    }
+
     // ── meta cross-field rules ─────────────────────────────────────────────
 
     /**

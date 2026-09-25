@@ -15,6 +15,7 @@ import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatAutocompleteModule } from '@angular/material/autocomplete';
 import { MatDialog } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -22,6 +23,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage, ComponentsService, EventsService, PipelinesService } from 'app/inspecto/api';
 import {
@@ -61,6 +63,8 @@ import { DashboardsService } from './dashboards.service';
 import { ShareDashboardDialog } from './share-dashboard.dialog';
 import { DashboardTileComponent } from './dashboard-tile.component';
 import { DashboardFilterBarComponent } from './dashboard-filter-bar.component';
+import { DashboardDateRangeComponent } from './dashboard-date-range.component';
+import { DateRangeSelection } from './dashboard-date-range';
 import { DashboardDrillDrawerComponent } from './dashboard-drill-drawer.component';
 import { uniqueNameValidator } from 'app/inspecto/investigation/unique-name';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -102,6 +106,7 @@ function splitStores(v: string | undefined): string[] | undefined {
         DragDropModule,
         ReactiveFormsModule,
         FormsModule,
+        MatAutocompleteModule,
         MatButtonModule,
         MatCheckboxModule,
         MatFormFieldModule,
@@ -117,6 +122,7 @@ function splitStores(v: string | undefined): string[] | undefined {
         InspectoTileCardComponent,
         NgTemplateOutlet,
         DashboardFilterBarComponent,
+        DashboardDateRangeComponent,
         DashboardDrillDrawerComponent,
         TransferMenuComponent,
         ImportDraftBannerComponent,
@@ -205,6 +211,26 @@ export class DashboardEditorComponent implements OnInit {
         description: [''],
         asOf: ['', Validators.pattern(AS_OF_PATTERN)],
         illustrative: [false],
+        // UIE-5 (d): the date column the viewer's range filters — optional.
+        dateField: [''],
+    });
+
+    /** UIE-5 (d): the range a viewer starts from (saved as `defaultRange`); null = all dates. */
+    readonly defaultRange = signal<DateRangeSelection | null>(null);
+    /** The preview's date field, live range and the day presets count back from — the shared viewer state. */
+    readonly dateField = this.view.dateField;
+    readonly range = this.view.range;
+    readonly anchor = this.view.anchor;
+
+    /** Date-field suggestions: the columns EVERY tiled Dataset declares (free text is accepted too — a tile whose
+     *  Dataset lacks the column is simply not range-filtered). */
+    readonly dateFieldOptions = computed<string[]>(() => {
+        const sets = this.tiles()
+            .map((t) => this.datasetOf(t))
+            .filter((d): d is Dataset => !!d)
+            .map((d) => new Set(d.columns.map((c) => c.name)));
+        if (!sets.length) return [];
+        return [...sets[0]].filter((name) => sets.every((set) => set.has(name))).sort();
     });
 
     /**
@@ -243,13 +269,19 @@ export class DashboardEditorComponent implements OnInit {
     readonly drillView = signal<DrillView | null>(null);
 
     constructor() {
+        // UIE-5 (d): the preview follows the authored date field and as-of day as they are typed.
+        this.form.controls.dateField.valueChanges
+            .pipe(takeUntilDestroyed())
+            .subscribe((v) => this.view.dateField.set((v ?? '').trim()));
+        this.form.controls.asOf.valueChanges.pipe(takeUntilDestroyed()).subscribe((v) => this.view.asOf.set(v ?? ''));
+
         // Drill-through: the open tile's rows. The cross-filter travels IN the request (composed with the
         // dataset's own model), so the server filters — a page filtered afterwards would be the wrong rows.
         effect(() => {
             const index = this.drillTileIndex();
             const tile = index == null ? undefined : this.tiles()[index];
             const dataset = tile ? this.datasetOf(tile) : undefined;
-            const filter = this.filter();
+            const filter = dataset ? this.view.filterFor(dataset) : this.filter();
             const title = tile ? (this.widgetOf(tile)?.name ?? dataset?.name ?? '') : '';
             if (!dataset) {
                 this.drillView.set(null);
@@ -277,6 +309,16 @@ export class DashboardEditorComponent implements OnInit {
     }
     isViewBound(widget: Widget): boolean {
         return this.view.isViewBound(widget);
+    }
+    /** The filter a tile over `dataset` runs — the cross-filter plus the preview's date range where it applies. */
+    tileFilter(dataset: Dataset): ConditionGroup {
+        return this.view.filterFor(dataset);
+    }
+
+    /** The author picked a default range — it is also what the preview shows from now on. */
+    setDefaultRange(selection: DateRangeSelection | null): void {
+        this.defaultRange.set(selection);
+        this.view.range.set(selection);
     }
 
     ngOnInit(): void {
@@ -349,7 +391,9 @@ export class DashboardEditorComponent implements OnInit {
             description: d.description ?? '',
             asOf: d.asOf ?? '',
             illustrative: d.illustrative ?? false,
+            dateField: d.dateField ?? '',
         });
+        this.defaultRange.set(d.defaultRange ?? null);
     }
 
     // ── Import as draft (operator decisions 2026-09-25) ──────────────────────────────────────────
@@ -545,11 +589,21 @@ export class DashboardEditorComponent implements OnInit {
             this.toastr.warning('Add at least one widget.');
             return;
         }
-        const dashboard = buildDashboard(name, this.tiles(), this.filter(), this.exposedFields(), {
-            description: header.description.value ?? '',
-            asOf: header.asOf.value ?? '',
-            illustrative: !!header.illustrative.value,
-        });
+        const dashboard = buildDashboard(
+            name,
+            this.tiles(),
+            this.filter(),
+            this.exposedFields(),
+            {
+                description: header.description.value ?? '',
+                asOf: header.asOf.value ?? '',
+                illustrative: !!header.illustrative.value,
+            },
+            {
+                dateField: header.dateField.value ?? '',
+                defaultRange: this.defaultRange() ?? undefined,
+            },
+        );
         this.saving.set(true);
         const draft = this.importDraft();
         const ifMatch = draft ? this.draftIfMatch : undefined;

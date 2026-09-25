@@ -8,6 +8,7 @@ import { WidgetsService } from '../widgets/widgets.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { Dashboard, DashboardTile } from './dashboard-types';
+import { DateRangeSelection, isIsoDay, rangeCondition, resolveRange, todayIso } from './dashboard-date-range';
 
 /**
  * The viewer-facing state of ONE rendered Dashboard — shared by the Dashboard editor and every read-only
@@ -31,6 +32,15 @@ export class DashboardViewStore {
     readonly filter = signal<ConditionGroup>(emptyGroup('AND'));
     readonly exposedFields = signal<string[]>([]);
 
+    /** UIE-5 (d): the date column the range filters (blank = no range control), the Dashboard's `asOf` day the
+     *  presets count back from, and the viewer's live range — seeded from the Dashboard's `defaultRange`,
+     *  transient like the filter. */
+    readonly dateField = signal('');
+    readonly asOf = signal('');
+    readonly range = signal<DateRangeSelection | null>(null);
+    /** The day presets count back from: `asOf` when it is a real day, else today. */
+    readonly anchor = computed(() => (isIsoDay(this.asOf()) ? this.asOf() : todayIso()));
+
     /** Value suggestions per exposed field — the quick-filter pickers' choices, read off one PAGE of each
      *  tiled dataset (so they are offers, not the column's full domain) and capped so a high-cardinality
      *  column doesn't flood the select. */
@@ -38,6 +48,24 @@ export class DashboardViewStore {
 
     private readonly widgetsById = computed(() => new Map(this.widgets().map((w) => [w.id, w])));
     private readonly datasetsById = computed(() => new Map(this.datasets().map((d) => [d.id, d])));
+
+    /**
+     * UIE-5 (d): dataset id → the filter its tiles run — the cross-filter AND the date range, ONLY for a Dataset
+     * that declares the `dateField` column (a tile over any other Dataset keeps the plain cross-filter, so the
+     * range never errors a tile that lacks the column). Recomputed as a whole so each tile's filter keeps its
+     * identity between renders and a tile re-queries only when its own filter changes.
+     */
+    private readonly rangedFilters = computed(() => {
+        const out = new Map<string, ConditionGroup>();
+        const field = this.dateField();
+        const span = field ? resolveRange(this.range(), this.anchor()) : null;
+        if (!span) return out;
+        const base = this.filter();
+        const range = rangeCondition(field, span);
+        const composed: ConditionGroup = base.items.length ? { kind: 'group', op: 'AND', items: [base, range] } : range;
+        for (const ds of this.datasets()) if (hasColumn(ds, field)) out.set(ds.id, composed);
+        return out;
+    });
 
     constructor() {
         // Value suggestions: one page per distinct tiled store, re-read when the tiles or the exposed
@@ -69,6 +97,14 @@ export class DashboardViewStore {
         // A stored empty `filter:` key arrives as `{}` — not nullish, but no group either.
         this.filter.set(d.filter?.items ? d.filter : emptyGroup('AND'));
         this.exposedFields.set(d.exposedFields ?? []);
+        this.dateField.set(d.dateField ?? '');
+        this.asOf.set(d.asOf ?? '');
+        this.range.set(d.defaultRange ?? null);
+    }
+
+    /** The filter a tile over `dataset` runs — the cross-filter, plus the date range when the Dataset has the column. */
+    filterFor(dataset: Dataset): ConditionGroup {
+        return this.rangedFilters().get(dataset.id) ?? this.filter();
     }
 
     widgetOf(tile: DashboardTile): Widget | undefined {
@@ -131,4 +167,9 @@ export class DashboardViewStore {
         }
         this.exposedValues.set(Object.fromEntries(Object.entries(out).map(([f, set]) => [f, [...set].sort()])));
     }
+}
+
+/** The Dataset declares `field` — as a column or a calculated column. An undeclared column is treated as absent. */
+function hasColumn(ds: Dataset, field: string): boolean {
+    return (ds.columns ?? []).some((c) => c.name === field) || (ds.calculated ?? []).some((c) => c.name === field);
 }

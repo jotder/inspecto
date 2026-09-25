@@ -8,6 +8,7 @@ import { MenuBinding } from 'app/inspecto/menu';
 // dashboard tiles use. They live under studio/ but are render components meant to be embedded.
 import { Dashboard } from 'app/modules/admin/studio/dashboards/dashboard-types';
 import { DashboardsService } from 'app/modules/admin/studio/dashboards/dashboards.service';
+import { DashboardDateRangeComponent } from 'app/modules/admin/studio/dashboards/dashboard-date-range.component';
 import { DashboardFilterBarComponent } from 'app/modules/admin/studio/dashboards/dashboard-filter-bar.component';
 import { DashboardHeaderComponent } from 'app/modules/admin/studio/dashboards/dashboard-header.component';
 import { DashboardTileComponent } from 'app/modules/admin/studio/dashboards/dashboard-tile.component';
@@ -33,6 +34,7 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
         WidgetHostComponent,
         GeoViewWidgetComponent,
         LinkViewWidgetComponent,
+        DashboardDateRangeComponent,
         DashboardFilterBarComponent,
         DashboardHeaderComponent,
         DashboardTileComponent,
@@ -54,14 +56,24 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
                 @case ('dashboard') {
                     @if (dashboard(); as d) {
                         <app-dashboard-header class="mb-4 block empty:hidden" [header]="d" />
-                        @if (view.exposedFields().length) {
-                            <div class="bg-card mb-4 rounded-2xl p-4 shadow">
-                                <app-dashboard-filter-bar
-                                    [fields]="view.exposedFields()"
-                                    [values]="view.exposedValues()"
-                                    [filter]="view.filter()"
-                                    (drillToggle)="view.onDrill($event)"
-                                />
+                        @if (view.exposedFields().length || view.dateField()) {
+                            <div class="bg-card mb-4 flex flex-wrap items-center gap-4 rounded-2xl p-4 shadow">
+                                @if (view.dateField()) {
+                                    <!-- UIE-5 (d): the viewer's date range — transient, seeded from the default. -->
+                                    <app-dashboard-date-range
+                                        [selection]="view.range()"
+                                        [anchor]="view.anchor()"
+                                        (selectionChange)="view.range.set($event)"
+                                    />
+                                }
+                                @if (view.exposedFields().length) {
+                                    <app-dashboard-filter-bar
+                                        [fields]="view.exposedFields()"
+                                        [values]="view.exposedValues()"
+                                        [filter]="view.filter()"
+                                        (drillToggle)="view.onDrill($event)"
+                                    />
+                                }
                             </div>
                         }
                         <div class="flex flex-wrap gap-4">
@@ -74,7 +86,7 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
                                             <app-dashboard-tile
                                                 [widget]="widget"
                                                 [dataset]="dataset"
-                                                [filter]="view.filter()"
+                                                [filter]="view.filterFor(dataset)"
                                                 (drill)="view.onDrill($event)"
                                             />
                                         } @else {

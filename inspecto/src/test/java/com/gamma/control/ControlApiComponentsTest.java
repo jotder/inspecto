@@ -698,11 +698,12 @@ class ControlApiComponentsTest {
                     "{\"vizType\":\"kpi\",\"datasetId\":\"orders\",\"refreshInterval\":30}");
             assertEquals(422, badUpdate.statusCode(), badUpdate.body());
 
-            // dashboard: the UIE-5 header keys are spec-declared ⇒ pass; `widgets` is spec-UNDECLARED but
-            // ShareRoutes-read (parser-only) ⇒ must pass too
+            // dashboard: the UIE-5 header + date-range keys are spec-declared ⇒ pass; `widgets` is spec-UNDECLARED
+            // but ShareRoutes-read (parser-only) ⇒ must pass too
             assertEquals(200, send(c.port, "POST", "/components/dashboard",
                     "{\"id\":\"d1\",\"name\":\"D1\",\"tiles\":[{\"widgetId\":\"w1\",\"span\":1}],"
                             + "\"description\":\"board\",\"asOf\":\"2026-09-23\",\"illustrative\":true,"
+                            + "\"dateField\":\"event_date\",\"defaultRange\":{\"from\":\"2026-09-01\",\"to\":\"2026-09-23\"},"
                             + "\"widgets\":[\"w1\"]}").statusCode());
             HttpResponse<String> badBoard = send(c.port, "POST", "/components/dashboard",
                     "{\"id\":\"d2\",\"tiles\":[{\"widgetId\":\"w1\",\"span\":1}],\"autoRefresh\":true}");

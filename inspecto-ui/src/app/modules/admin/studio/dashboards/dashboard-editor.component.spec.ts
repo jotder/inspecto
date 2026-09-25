@@ -249,6 +249,47 @@ describe('DashboardEditorComponent', () => {
         expect('description' in saved || 'asOf' in saved || 'illustrative' in saved).toBe(false);
     });
 
+    it('UIE-5 (d): authors a date field + default range — suggested from the tiled Datasets, previewed, saved', async () => {
+        const save = vi.fn((d: Dashboard) => of(d));
+        const stored: Dashboard = {
+            id: 'ra_board',
+            name: 'ra_board',
+            tiles: [{ widgetId: 'bar1', span: 2 }],
+            filter: null,
+            asOf: '2026-09-24',
+            dateField: 'tariff',
+            defaultRange: 'month-to-date',
+        };
+        const fixture = create(save, [], {}, rowsStub(), () => of(stored));
+        fixture.componentInstance.id = 'ra_board';
+        vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        expect(c.form.controls.dateField.value).toBe('tariff');
+        expect(c.defaultRange()).toBe('month-to-date');
+        expect(c.dateFieldOptions()).toEqual(['duration_s', 'tariff']);
+        // The authoring control and the preview control both render.
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.querySelectorAll('app-dashboard-date-range').length).toBe(2);
+        expect(el.querySelector('[aria-label="Default range"]')).not.toBeNull();
+        await expectNoA11yViolations(el);
+
+        c.setDefaultRange({ from: '2026-09-01', to: '2026-09-10' });
+        expect(c.range()).toEqual({ from: '2026-09-01', to: '2026-09-10' }); // the preview follows the default
+        c.save();
+        expect(save).toHaveBeenCalledWith(
+            expect.objectContaining({ dateField: 'tariff', defaultRange: { from: '2026-09-01', to: '2026-09-10' } }),
+            { update: true },
+        );
+
+        // Clearing the date field removes the control from the preview.
+        c.form.controls.dateField.setValue('');
+        fixture.detectChanges();
+        expect(el.querySelectorAll('app-dashboard-date-range').length).toBe(0);
+    });
+
     it('blocks save on a duplicate id (case-insensitive) per the product-wide rule', () => {
         const save = vi.fn((d: Dashboard) => of(d));
         const existing: Dashboard = { id: 'cdr_overview', name: 'cdr_overview', tiles: [], filter: null };
