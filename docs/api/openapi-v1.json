@@ -6876,6 +6876,26 @@
         },
         "x-generated" : true,
         "x-optional-module" : true
+      },
+      "patch" : {
+        "tags" : [ "objects" ],
+        "summary" : "Edit an object's operator-mutable fields (priority, severity, assignee, attributes)",
+        "operationId" : "patchObjectsByObjectId",
+        "description" : "Gated canAdminister (disposition is administrative, operator decision 2026-09-15). Findings values have their own collaboration route, PUT /objects/{objectId}/findings. On a build without inspecto-ops the core stub answers 503 not-installed.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); data is the updated object."
+          }
+        },
+        "x-optional-module" : true
       }
     },
     "/rca/templates" : {
