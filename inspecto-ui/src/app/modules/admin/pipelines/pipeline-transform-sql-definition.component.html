@@ -63,6 +63,11 @@
             Switching to Fields keeps every column; an expression the catalog does not know stays as custom SQL.
         }
     </p>
+    @if (slotSqlRefusal(); as refusal) {
+        <inspecto-alert class="mt-2 block" variant="warning" title="Cannot apply this SQL here">
+            {{ refusal }}
+        </inspecto-alert>
+    }
 } @else {
     <!-- toolbar: search + view-only lenses. Neither changes what is written. -->
     <div class="mb-2 flex flex-wrap items-center gap-2">

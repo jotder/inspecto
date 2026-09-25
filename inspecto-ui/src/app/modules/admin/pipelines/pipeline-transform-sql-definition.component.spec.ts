@@ -377,6 +377,45 @@ describe('Transform pane: Apply', () => {
         expect(fixture.componentInstance.dirty).toBe(false);
     });
 
+    /**
+     * The projection SLOT (the default template's Record Transformer, id `map`) is compiled by the engine
+     * from `fields[]` and `processing.map` has no home for `sql` — writing both refused the first Save of
+     * every new Pipeline with `UNSUPPORTED_MAP_KEY` (2026-09-25).
+     */
+    it('in the projection slot writes fields[] only — never the rendered sql', async () => {
+        const slot: AuthoredNode = { id: 'map', type: 'transform.sql', name: 'Record Transformer', config: {} };
+        const fixture = await create(slot, undefined, ['order_id', 'amount']);
+        const c = comp(fixture);
+        c.setFunction(c.fields()[1].id, 'convert.type');
+        c.setArg(c.fields()[1].id, 'type', 'DECIMAL(18,2)');
+        c.submit();
+        fixture.detectChanges();
+        const config = fixture.componentInstance.applied!.config!;
+        expect(Object.keys(config)).toEqual(['fields']);
+        expect((config['fields'] as SqlField[]).map((f) => [f.name, f.fn, f.args])).toEqual([
+            ['order_id', 'keep', {}],
+            ['amount', 'convert.type', { type: 'DECIMAL(18,2)' }],
+        ]);
+    });
+
+    it('in the projection slot the SQL view applies as the rows it reconciles to, and refuses a non-projection', async () => {
+        const slot: AuthoredNode = { id: 'map', type: 'transform.sql', config: {} };
+        const fixture = await create(slot, undefined, ['a']);
+        const c = comp(fixture);
+        c.showSqlView();
+        c.onSqlEdited('SELECT TRIM(a) AS b FROM input');
+        expect(c.slotSqlRefusal()).toBeNull();
+        c.submit();
+        const config = fixture.componentInstance.applied!.config!;
+        expect(Object.keys(config)).toEqual(['fields']);
+        expect((config['fields'] as SqlField[]).map((f) => [f.name, f.from])).toEqual([['b', 'a']]);
+
+        c.onSqlEdited("SELECT a FROM input WHERE a = 'x'");
+        fixture.detectChanges();
+        expect(c.slotSqlRefusal()).toContain('saved as fields');
+        expect(c.canApply()).toBe(false);
+    });
+
     it('surfaces DuckDB binder errors and blocks Apply', async () => {
         const fixture = await create(sqlNode(), [{ a: '1' }]);
         const c = comp(fixture);

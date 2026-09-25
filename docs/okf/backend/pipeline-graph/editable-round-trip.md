@@ -159,6 +159,16 @@ processing:
   reach by `PipelineDryRun`) are **derived** — never lowered, never refused. ⛔ A blanket "map has config
   ⇒ refuse" would have refused **every existing pipeline's save**, because every lifted map node carries
   a derived `schema`. Any key outside both sets refuses `UNSUPPORTED_MAP_KEY`.
+- **`sql` on the projection slot is derived only beside a non-empty `fields[]`** (2026-09-25). The slot
+  (`transform.sql`, id `map`) compiles from `fields[]` (`RecordTransform`), so a `sql` next to rows is
+  the Fields grid's own rendering of them: `authoredMapConfig` skips it and it is never written. A `sql`
+  with NO fields is a hand-written SELECT the slot has no home for, and still refuses
+  `UNSUPPORTED_MAP_KEY` ("compiles from fields[]"). Found when every new Pipeline's first Save refused —
+  the pane wrote the chain step's `{sql, fields}` shape into the slot; the SPA now writes `{fields}` only
+  there (pinned by `ControlApiRecordTransformerSlotSaveTest`, which PUTs the captured payload).
+- **A save refreshes the registry** (`CollectorService.refreshConfigs()` after the write, as the history
+  restore route already did). `GET …/graph/raw` lifts the REGISTERED config, so before this a reopen
+  straight after Save served the pre-save graph until the next poll cycle.
 - ⚠ **This block executes.** Unlike its three neighbours (authoring-only until a recipe-driven executor),
   `RowShaper` reads `columns`/`rules` on the graph executor `PipelineJobRunner` already runs in
   production — so a preserved `columns` changes what the *next* run projects. `PipelineConfig.prepare()`

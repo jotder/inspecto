@@ -26,6 +26,7 @@ import {
     readFields,
     seedFields,
 } from './pipeline-transform-sql';
+import { isProjectionSlot } from './pipeline-editable';
 import { ReconcileResult, reconcileSql } from './pipeline-transform-sql-reconcile';
 import { SqlFunction, quoteIdentifier, sqlFunctionsByCategory, usesSource } from './sql-functions';
 import { InputRelation } from './step-workbench-inputs';
@@ -70,8 +71,12 @@ export interface FieldRow extends CompiledField {
  * output column, a function per row, and a form control per declared parameter, with the row's source
  * column bound to the function's `{source}` automatically.
  *
- * <p><b>Persisted shape.</b> `{ sql, fields }`. The engine declares and reads only `sql`; `fields` rides
- * the `steps:` chain opaquely and exists so reopening rebuilds the grid exactly.
+ * <p><b>Persisted shape.</b> A CHAIN step writes `{ sql, fields }`: the engine reads only `sql`, and `fields`
+ * rides the `steps:` chain opaquely so reopening rebuilds the grid exactly. The PROJECTION SLOT (the
+ * Record Transformer between parser and sink, {@link isProjectionSlot}) writes `{ fields }` only — there
+ * the engine compiles `fields[]` itself (`RecordTransform`) into `processing.map`, which has no home for
+ * `sql`; an empty grid writes `{}`, the pass-through. Sending both is what made a new Pipeline's first
+ * Save refuse with `UNSUPPORTED_MAP_KEY` (2026-09-25).
  *
  * <p><b>Two views of one Step (2026-09-05).</b> Fields and SQL are peers, switched from the pane's
  * header. Fields → SQL is the compiler; SQL → Fields is the bounded {@link reconcileSql}: a projection
@@ -291,7 +296,19 @@ export class PipelineTransformSqlDefinitionComponent {
      * early, so editing hand-written SQL saved NOTHING and said nothing. The binder check above already
      * guards what is typed there.
      */
-    readonly canApply = computed(() => this.counts().problems === 0 && !this.binderError());
+    readonly canApply = computed(
+        () => this.counts().problems === 0 && !this.binderError() && !this.slotSqlRefusal(),
+    );
+
+    /**
+     * In the projection slot, SQL that is more than a projection cannot be applied: the slot is saved as
+     * `fields[]`, so the SQL view's text must reconcile to rows. `null` when it does, or off the slot.
+     */
+    readonly slotSqlRefusal = computed(() => {
+        if (!isProjectionSlot(this.node()) || this.view() !== 'sql') return null;
+        const why = this.reconciled()?.unsupported;
+        return why ? `This Record Transformer is saved as fields, so this SQL cannot be applied here. ${why}` : null;
+    });
 
     // ── preview ─────────────────────────────────────────────────────────────────────────────────────
     readonly preview = signal<RelationsPreview | null>(null);
@@ -641,10 +658,18 @@ export class PipelineTransformSqlDefinitionComponent {
         // when they were authored: a Step applied from the SQL view writes `fields: []` and reopens as
         // SQL, and the reconciler offers Fields again from there — never a grid invented behind the
         // author's back.
-        const config: Record<string, unknown> = {
-            sql: this.generatedSql(),
-            fields: this.view() === 'fields' ? this.fields() : [],
-        };
+        let config: Record<string, unknown>;
+        if (isProjectionSlot(n)) {
+            // The slot is `fields[]` only (see the class doc) — the SQL view's text goes in as the rows the
+            // reconciler reads it as (canApply already refused one that is not a projection).
+            const rows = this.view() === 'fields' ? this.fields() : (this.reconciled()?.fields ?? []);
+            config = rows.length ? { fields: rows } : {};
+        } else {
+            config = {
+                sql: this.generatedSql(),
+                fields: this.view() === 'fields' ? this.fields() : [],
+            };
+        }
         this.loaded = this.snapshot();
         this.lastDirty = false;
         this.dirtyChange.emit(false);

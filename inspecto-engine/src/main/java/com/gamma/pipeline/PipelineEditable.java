@@ -1401,7 +1401,9 @@ public final class PipelineEditable {
      * <ul>
      *   <li>{@link #UNSUPPORTED_MAP_KEY} — a key that is neither {@link #MAP_AUTHORED} nor
      *       {@link #MAP_DERIVED}. ⛔ A blanket "map has config ⇒ refuse" would refuse every existing
-     *       pipeline, because the lift puts a derived {@code schema} on every map node.</li>
+     *       pipeline, because the lift puts a derived {@code schema} on every map node. {@code sql} is
+     *       derived only beside a non-empty {@code fields[]} (the grid's rendering of them) and is then
+     *       dropped; alone it refuses.</li>
      *   <li>{@link #MAPPING_CONFLICT} — authored {@code columns} alongside an explicitly declared
      *       {@code processing.mapping_file}. {@code RowShaper.columnsOf} checks {@code columns} first and
      *       never consults the schema when it finds one, so the authored list would silently outrank a
@@ -1418,11 +1420,25 @@ public final class PipelineEditable {
         Map<String, Object> authored = null;
         String authoredBy = null;
         for (PipelineNode n : mapNodes) {
-            for (String k : n.config().keySet())
+            for (String k : n.config().keySet()) {
+                // `sql` beside a non-empty fields[] is the Fields grid's own rendering of those rows —
+                // derived, like `schema`: the engine compiles the slot from fields[] (RecordTransform),
+                // so it is never written. Without fields it is a hand-written SELECT the slot has no
+                // home for, and it refuses by name rather than being dropped (2026-09-25, the default
+                // template's Record Transformer refused on its first save).
+                if ("sql".equals(k)) {
+                    if (n.cfg("fields") instanceof List<?> f && !f.isEmpty()) continue;
+                    refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_MAP_KEY, n.id(),
+                            "the projection slot compiles from fields[], so a hand-written 'sql' has no home "
+                                    + "in the flat pipeline config; author it as fields (a projection converts "
+                                    + "in the Fields view)"));
+                    continue;
+                }
                 if (!MAP_AUTHORED.contains(k) && !MAP_DERIVED.contains(k))
                     refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_MAP_KEY, n.id(),
                             "a map node has no home for '" + k + "' in the flat pipeline config; it accepts "
                                     + new TreeSet<>(MAP_AUTHORED)));
+            }
             Map<String, Object> mine = new LinkedHashMap<>();
             for (String k : List.of("columns", "rules", "fields")) putIfPresent(mine, k, n.cfg(k));
             if (mine.isEmpty()) continue;

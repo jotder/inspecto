@@ -480,7 +480,11 @@ entirely with the metadata grid (D2) — (it IS an output column, stamped at wri
   `ComponentsService.previewTransform` (the existing path — `transform.sql` qualifies by prefix). The
   persisted config is **`{ sql, fields }`** — `submit()` writes both on every Apply and `seedFrom`
   rehydrates the grid from `fields`. 🔴 It is NOT `{ sql }` only, and a stored `fields[]` is NOT
-  dropped. Full as-built, what the grid did and why it went:
+  dropped. 🔴 **Except in the projection slot** (`isProjectionSlot`, id `map`): there `submit()` writes
+  `{ fields }` only (SQL view → the reconciler's rows; a non-projection is refused by `slotSqlRefusal`,
+  which blocks Apply), and an empty grid writes `{}` — the pass-through. `processing.map` has no home for
+  `sql`, so sending both made every new Pipeline's first Save 422 `UNSUPPORTED_MAP_KEY` (2026-09-25).
+  Full as-built, what the grid did and why it went:
   [schema-mapping-authoring.md](schema-mapping-authoring.md) §0; engine half:
   [`catalog-vs-executors.md`](../../backend/engine/catalog-vs-executors.md).
 - ⚠ `sql` is the single `NodeAttributes` entry — but that is the DECLARED attribute schema, **not** the
@@ -568,8 +572,10 @@ entirely with the metadata grid (D2) — (it IS an output column, stamped at wri
   on a map Step are `MAP_DERIVED` — engine-resolved, dropped by `lower`. ⛔ A single drawer over
   schema + mapping + table would span three Step types and break the one-node-in/one-node-out
   contract every drawer holds (operator, 2026-08-16).
-- 🔴 A derived `transform.map` Step is on EVERY lifted graph and reads `unconfigured` — readiness
-  logic keys on **authored evidence**, never that Step's presence or status.
+- 🔴 A derived projection-slot Step is on EVERY lifted graph — readiness logic keys on **authored
+  evidence**, never that Step's presence or status. Since 2026-09-25 an empty slot reads `configured`,
+  not `unconfigured` (`computeNodeStatus` exempts `isProjectionSlot`): it is the pass-through, and the
+  old "Needs config" chip on every new Pipeline's Record Transformer was false.
 - **Test mapping** posts `{raw: <parser schema's raw>, mapping: {rules}}` over the rows the parse
   drawer already parsed — the rules being EDITED, not the node's. The result is written back as
   the thread's cast hop; an edited rule clears the grid (a result may never outlive the config it

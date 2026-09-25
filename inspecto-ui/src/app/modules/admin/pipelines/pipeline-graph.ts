@@ -12,6 +12,7 @@ import {
     ProvenanceCount,
 } from 'app/inspecto/api';
 import { pipelineHome, storeDirs } from 'app/inspecto/component-model/pipeline-scaffold';
+import { isProjectionSlot } from './pipeline-editable';
 import { GLYPH_LIBRARY, G6GraphData, iconDataUri, nodeColor, nodeIcon } from 'app/modules/admin/catalog/catalog-graph';
 import { FAMILY_CODE_COLORS } from 'app/inspecto/theme/chart-tokens';
 
@@ -113,8 +114,10 @@ export function computeNodeStatus(
     const bindKind = bindKindFor(category);
     const ref = node.use?.trim();
     const hasInlineConfig = !!node.config && Object.keys(node.config).length > 0;
-    // Unconfigured only when it needs settings but has neither a ref nor inline config.
-    if (NEEDS_CONFIG.has(category) && !ref && !hasInlineConfig) return 'unconfigured';
+    // Unconfigured only when it needs settings but has neither a ref nor inline config. The projection
+    // slot is exempt: an empty Record Transformer there is the pass-through (the schema projects as-is),
+    // a complete configuration — flagging it made every new Pipeline open with a false "Needs config".
+    if (NEEDS_CONFIG.has(category) && !ref && !hasInlineConfig && !isProjectionSlot(node)) return 'unconfigured';
     if (checkDangling && ref && bindKind && !validRefs.has(ref)) return 'dangling';
     return tested.get(node.id) ?? 'configured';
 }

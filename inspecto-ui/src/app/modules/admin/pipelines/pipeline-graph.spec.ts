@@ -317,6 +317,16 @@ describe('computeNodeStatus', () => {
         expect(computeNodeStatus({ id: 'p', type: 'parser' }, 'PARSE', refs, noTests)).toBe('unconfigured');
     });
 
+    it('an empty transform is unconfigured, but the empty projection SLOT is the pass-through — configured', () => {
+        expect(computeNodeStatus({ id: 'sql', type: 'transform.sql' }, 'TRANSFORM', refs, noTests)).toBe(
+            'unconfigured',
+        );
+        // The default template's Record Transformer, untouched (2026-09-25: it opened as "Needs config").
+        expect(computeNodeStatus({ id: 'map', type: 'transform.sql', config: {} }, 'TRANSFORM', refs, noTests)).toBe(
+            'configured',
+        );
+    });
+
     it('flags a bound-but-missing ref as dangling (only once the registry is loaded)', () => {
         const n = { id: 'p', type: 'parser', use: 'grammar/ghost' };
         expect(computeNodeStatus(n, 'PARSE', refs, noTests)).toBe('dangling');

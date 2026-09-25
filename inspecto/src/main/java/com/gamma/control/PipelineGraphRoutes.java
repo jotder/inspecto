@@ -334,6 +334,9 @@ final class PipelineGraphRoutes implements RouteModule {
         byte[] bytes = ConfigCodec.toToon(lowered).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
         PipelineHistory.record(writeRoot, target);   // PIPELINE-CONFIG-HISTORY-1
+        // GET …/graph/raw lifts the REGISTERED config, so without this a reopen straight after Save served
+        // the pre-save graph until the next poll cycle (the history restore route does the same).
+        api.service().refreshConfigs();
         log.info("[PIPELINE-WRITE] lowered graph '{}' to {} ({} bytes)", name, target.getFileName(), bytes.length);
         // The etag a next save (or a re-read) must accept — the same bytes just written, not the pre-save hash.
         ETags.set(e, ETags.of(ContentHash.of(lowered)));
