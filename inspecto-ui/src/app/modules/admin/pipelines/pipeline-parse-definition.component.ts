@@ -35,8 +35,9 @@ import {
     isStaleVersionError,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
+import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
-import { flattenBlock, nestKeys } from 'app/inspecto/component-model';
+import { KEY_SEP, flattenBlock, nestKeys } from 'app/inspecto/component-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { downloadCsv } from 'app/inspecto/data-table/core/csv';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
@@ -111,7 +112,8 @@ export const isParseNodeType = (type: string): boolean => type === 'parser' || t
  * The served form holds every field at its default, and on the server every key the Pipeline sets wins
  * over the profile — so persisting (or previewing) the whole form would silently fork the Pipeline off
  * its vendor profile (`record_header_length: 0` over the profile's `4`). Kept: `profile_file`,
- * `segments`, keys the saved block already carried, and keys the user changed; blanks never.
+ * `segments`, keys the saved block already set (non-blank), and keys the user changed; blanks never.
+ * `dirty` is the editor's own {@link GrammarEditorComponent#dirtyKeys} — FLAT control keys (`asn1__strictness`).
  * Without a profile the block is returned unchanged.
  */
 export function decodeProfileOverrides(
@@ -123,10 +125,63 @@ export function decodeProfileOverrides(
     if (typeof profile !== 'string' || profile.trim() === '') return asn1;
     const out: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(asn1)) {
-        if (v === undefined || v === null || (typeof v === 'string' && v.trim() === '')) continue;
-        if (k === 'profile_file' || k === 'segments' || (prior && k in prior) || dirty.has('asn1.' + k)) out[k] = v;
+        if (!isSetValue(v)) continue;
+        // A key SAVED blank is unset (the server's rule), so a profile value the form was seeded with is not
+        // re-written as an override just because the Pipeline once carried the key empty.
+        if (k === 'profile_file' || k === 'segments' || isSetValue(prior?.[k]) || dirty.has('asn1' + KEY_SEP + k))
+            out[k] = v;
     }
     return out;
+}
+
+/** Blank = unset, the Decode Profile overlay's own rule (`DecodeProfile.overlay`). */
+function isSetValue(v: unknown): boolean {
+    return v !== undefined && v !== null && !(typeof v === 'string' && v.trim() === '');
+}
+
+/** Where an `asn1` key's effective value comes from on a profile-backed Pipeline. */
+export type DecodeProfileSource = 'profile' | 'here' | 'default';
+export interface DecodeProfileRow {
+    key: string;
+    label: string;
+    value: unknown;
+    source: DecodeProfileSource;
+}
+
+/**
+ * Each served `asn1` key's EFFECTIVE value and its provenance, by the server's overlay rule: a key the
+ * Pipeline sets wins (`overrides` — exactly what {@link decodeProfileOverrides} would Save), then the
+ * profile's own value, then the served default. Blank is unset at every level.
+ */
+export function decodeProfileProvenance(
+    keys: { key: string; label: string; defaultValue?: unknown }[],
+    profile: Record<string, unknown>,
+    overrides: Record<string, unknown>,
+): DecodeProfileRow[] {
+    return keys.map(({ key, label, defaultValue }): DecodeProfileRow => {
+        if (isSetValue(overrides[key])) return { key, label, value: overrides[key], source: 'here' };
+        if (isSetValue(profile[key])) return { key, label, value: profile[key], source: 'profile' };
+        return { key, label, value: defaultValue, source: 'default' };
+    });
+}
+
+/**
+ * The block the form is SEEDED from on a profile-backed Pipeline: the profile's keys under the Pipeline's
+ * own (a blank own key is unset, so the profile's shows). `segments` stays the Pipeline's — it is not a form
+ * field, and the segments editor re-hydrates from the Pipeline's own refs. Seeding never makes a value an
+ * override: Save keeps only what {@link decodeProfileOverrides} keeps.
+ */
+export function withDecodeProfile(
+    block: Record<string, unknown>,
+    profile: Record<string, unknown> | null,
+): Record<string, unknown> {
+    const own = block['asn1'];
+    if (!profile || !own || typeof own !== 'object') return block;
+    const merged: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(profile)) if (k !== 'segments' && isSetValue(v)) merged[k] = v;
+    for (const [k, v] of Object.entries(own as Record<string, unknown>))
+        if (isSetValue(v) || !(k in merged)) merged[k] = v;
+    return { ...block, asn1: merged };
 }
 
 /**
@@ -170,6 +225,7 @@ export function decodeProfileOverrides(
         MatTooltipModule,
         GrammarEditorComponent,
         InspectoAlertComponent,
+        ChipComponent,
         InspectoOptionPickerComponent,
         InspectoSamplePanelComponent,
         InspectoSegmentsEditorComponent,
@@ -296,6 +352,65 @@ export function decodeProfileOverrides(
                     [readOnly]="readOnly()"
                     [help]="pluginChoices().length ? '' : 'No ingestable plugin is deployed on this server.'"
                 />
+            }
+            <!--
+                Decode Profile read-back: a profile-backed Pipeline's form is seeded with the profile's own
+                values, and this list says where each effective value comes from. "set here" is exactly
+                what Apply keeps — a value that came from the profile is never written into the Pipeline.
+            -->
+            @if (decodeProfileFile()) {
+                <section class="mb-3" data-test="decode-profile" aria-labelledby="decode-profile-heading">
+                    <div id="decode-profile-heading" class="mb-1 text-xs font-semibold uppercase opacity-70">
+                        Decode Profile · <span class="font-mono normal-case">{{ decodeProfileFile() }}</span>
+                    </div>
+                    @if (profileError(); as err) {
+                        <inspecto-alert variant="warning">
+                            {{ err }} The fields below show the served defaults, not the profile's values.
+                        </inspecto-alert>
+                    } @else if (asn1Provenance().length) {
+                        <table class="w-full table-fixed text-sm">
+                            <caption class="sr-only">
+                                Effective value of each ASN.1 key and where it comes from
+                            </caption>
+                            <thead class="sr-only">
+                                <tr>
+                                    <th scope="col">Key</th>
+                                    <th scope="col">Effective value</th>
+                                    <th scope="col">From</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (row of asn1Provenance(); track row.key) {
+                                    <tr>
+                                        <td class="w-1/3 truncate py-0.5 pr-2">{{ row.label }}</td>
+                                        <td class="truncate py-0.5 pr-2 font-mono" [title]="provenanceText(row.value)">
+                                            {{ provenanceText(row.value) }}
+                                        </td>
+                                        <td class="w-40 py-0.5 text-right">
+                                            @switch (row.source) {
+                                                @case ('here') {
+                                                    <inspecto-chip variant="soft" tone="primary"
+                                                        >set here</inspecto-chip
+                                                    >
+                                                }
+                                                @case ('profile') {
+                                                    <inspecto-chip variant="soft"
+                                                        >from profile {{ decodeProfileName() }}</inspecto-chip
+                                                    >
+                                                }
+                                                @default {
+                                                    <inspecto-chip>default</inspecto-chip>
+                                                }
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    } @else {
+                        <p class="text-secondary text-xs">Reading the Decode Profile…</p>
+                    }
+                </section>
             }
             <inspecto-grammar-editor
                 [initial]="seedBlock()"
@@ -1013,8 +1128,76 @@ export class PipelineParseDefinitionComponent {
     /** A seed that replaces the node's own block until Apply — set by a Grammar CSV import. */
     private readonly templateBlock = signal<Record<string, unknown> | null>(null);
 
-    /** What the editor is seeded from: an imported copy, else the node's own block. */
-    readonly seedBlock = computed<Record<string, unknown>>(() => this.templateBlock() ?? this.parsingBlock());
+    /**
+     * What the editor is seeded from: an imported copy, else the node's own block — with a Decode Profile's
+     * own values under it once read back, so the form shows each key's EFFECTIVE value, not the default.
+     */
+    readonly seedBlock = computed<Record<string, unknown>>(
+        () => this.templateBlock() ?? withDecodeProfile(this.parsingBlock(), this.profileSeed()),
+    );
+
+    // ── Decode Profile read-back (asn1.profile_file) ─────────────────────────────
+
+    /** The `asn1.profile_file` this node names, as authored — `''` when none (or not an asn1 node). */
+    readonly decodeProfileFile = computed(() => {
+        if (this.frontend() !== 'asn1') return '';
+        const a = this.parsingBlock()['asn1'];
+        const f = a && typeof a === 'object' ? (a as Record<string, unknown>)['profile_file'] : undefined;
+        return typeof f === 'string' ? f.trim() : '';
+    });
+    /** The profile's file name, for the per-key "from profile …" label (the full ref heads the section). */
+    readonly decodeProfileName = computed(() => this.decodeProfileFile().split(/[\\/]/).pop() ?? '');
+    /** The profile's own `asn1:` block (`GET /parsers/asn1/profile`), or null until read / on failure. */
+    readonly profileValues = signal<Record<string, unknown> | null>(null);
+    /** The same block, but only when it may re-seed the form — never over edits already made. */
+    private readonly profileSeed = signal<Record<string, unknown> | null>(null);
+    readonly profileError = signal<string | null>(null);
+    /** The form's asn1 values and dirty keys, snapshotted on interaction (the editor exposes methods, not signals). */
+    private readonly asn1Edit = signal<{ form: Record<string, unknown>; dirty: Set<string> } | null>(null);
+
+    /** Each served `asn1` key's effective value and where it comes from — what Save would keep is "set here". */
+    readonly asn1Provenance = computed<DecodeProfileRow[]>(() => {
+        const profile = this.profileValues();
+        const served = this.plugin();
+        const file = this.decodeProfileFile();
+        if (!file || !profile || served?.id !== 'asn1') return [];
+        const keys = served.grammarSchema
+            .filter((s) => s.path.startsWith('asn1.') && s.path !== 'asn1.profile_file')
+            .map((s) => ({ key: s.path.slice('asn1.'.length), label: s.label, defaultValue: s.defaultValue }));
+        const prior = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
+        const edit = this.asn1Edit();
+        const overrides = decodeProfileOverrides(
+            { ...(edit?.form ?? prior ?? {}), profile_file: file },
+            prior,
+            edit?.dirty ?? new Set(),
+        );
+        return decodeProfileProvenance(keys, profile, overrides);
+    });
+
+    /** Display text for a provenance row's value — long module text is cut, the full value is its title. */
+    protected provenanceText(v: unknown): string {
+        if (v === undefined || v === null || (typeof v === 'string' && v.trim() === '')) return '—';
+        return typeof v === 'object' ? JSON.stringify(v) : String(v);
+    }
+
+    private loadDecodeProfile(): void {
+        this.profileValues.set(null);
+        this.profileSeed.set(null);
+        this.profileError.set(null);
+        this.asn1Edit.set(null);
+        const file = this.decodeProfileFile();
+        if (!file) return;
+        // `subdir` always sent ('' = a Pipeline at the root): the ref resolves beside the Pipeline, as it loads.
+        this.parsersApi.decodeProfile(file, this.configSubdir().trim()).subscribe({
+            next: (r) => {
+                const block = r?.asn1 ?? {};
+                this.profileValues.set(block);
+                // Re-seeding `[initial]` rebuilds the form, so a late read must not land over edits.
+                if (!this.editor?.isDirty()) this.profileSeed.set(block);
+            },
+            error: (e) => this.profileError.set(apiErrorMessage(e, 'Could not read the Decode Profile.')),
+        });
+    }
 
     private lastDirty = false;
     /**
@@ -1078,6 +1261,7 @@ export class PipelineParseDefinitionComponent {
             this.emitDirty();
             this.loadSavedSegments();
             this.loadSavedSchema();
+            this.loadDecodeProfile();
         }
     }
 
@@ -1339,6 +1523,13 @@ export class PipelineParseDefinitionComponent {
     }
 
     private emitDirty(): void {
+        if (this.decodeProfileFile() && this.editor) {
+            const form = this.editor.grammar()['asn1'];
+            this.asn1Edit.set({
+                form: form && typeof form === 'object' ? (form as Record<string, unknown>) : {},
+                dirty: this.editor.dirtyKeys(),
+            });
+        }
         const dirty =
             this.templateDirty ||
             this.typesModeTouched ||

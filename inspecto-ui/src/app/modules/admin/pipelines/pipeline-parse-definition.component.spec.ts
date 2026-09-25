@@ -1,8 +1,9 @@
 import { Component, ChangeDetectionStrategy, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of, throwError } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthoredNode, ConfigService, ParsersService, SpacesService } from 'app/inspecto/api';
@@ -12,7 +13,11 @@ import { DefinitionStateService } from 'app/inspecto/definition/definition-state
 import { GrammarEditorComponent, grammarToCsv, parsingAttributesFor } from 'app/inspecto/grammar';
 import { InspectoSegmentsEditorComponent } from 'app/inspecto/segments';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { PipelineParseDefinitionComponent, decodeProfileOverrides } from './pipeline-parse-definition.component';
+import {
+    PipelineParseDefinitionComponent,
+    decodeProfileOverrides,
+    decodeProfileProvenance,
+} from './pipeline-parse-definition.component';
 
 /**
  * Host so the required signal `node` input binds naturally and outputs are captured — these specs pin
@@ -190,6 +195,45 @@ const ASN1_DEF = {
     ],
 };
 
+/** The asn1 def as the server serves it today: with `profile_file` and a defaulted framing knob. */
+const ASN1_PROFILE_DEF = {
+    ...ASN1_DEF,
+    grammarSchema: [
+        ...ASN1_DEF.grammarSchema,
+        { path: 'asn1.profile_file', label: 'Decode Profile', type: 'STRING', description: 'A .decode.toon.' },
+        {
+            path: 'asn1.record_header_length',
+            label: 'Record header length',
+            type: 'INT',
+            defaultValue: 0,
+            description: 'Bytes.',
+        },
+    ],
+};
+
+/** A Pipeline backed by a Decode Profile, overriding only `root_type` (and carrying its own segments). */
+function profileNode(): AuthoredNode {
+    return {
+        id: 'parse',
+        type: 'parser.asn1',
+        name: 'Parser (ASN.1)',
+        config: {
+            parsing: {
+                frontend: 'asn1',
+                asn1: {
+                    profile_file: '../vendors/acme/acme.decode.toon',
+                    root_type: 'Record',
+                    segments: { Record: 'config/record_schema.toon' },
+                },
+            },
+        },
+    };
+}
+
+/** What `GET /parsers/asn1/profile` answers — the profile's own block, as authored. */
+let profileReply: Observable<{ asn1: Record<string, unknown> }> = of({ asn1: {} });
+const decodeProfileCalls: { file: string; subdir?: string }[] = [];
+
 /** Segment-schema writes the pane made, in order — the two-hop contract is what these assert. */
 const schemaWrites: { type: string; config: Record<string, unknown>; opts?: Record<string, unknown> }[] = [];
 let schemaWriteFails = false;
@@ -221,8 +265,10 @@ async function create(
     // ⚠ Must be set BEFORE the first detectChanges to matter for loadSavedSchema — the seed effect
     // tracks only the node input, so assigning it afterwards affects rendering, never the load.
     pipelineName = '',
+    configSubdir = '',
 ) {
     schemaWrites.length = 0;
+    decodeProfileCalls.length = 0;
     TestBed.configureTestingModule({
         imports: [HostComponent],
         providers: [
@@ -232,6 +278,10 @@ async function create(
                 useValue: {
                     list: () => (servedDelayMs ? of(served).pipe(delay(servedDelayMs)) : of(served)),
                     preview: vi.fn(() => of({ kind: 'table', rows: [] })),
+                    decodeProfile: (file: string, subdir?: string) => {
+                        decodeProfileCalls.push({ file, subdir });
+                        return profileReply;
+                    },
                 },
             },
             {
@@ -298,6 +348,7 @@ async function create(
     fixture.componentInstance.node.set(node);
     fixture.componentInstance.sample = sample;
     fixture.componentInstance.pipelineName.set(pipelineName);
+    fixture.componentInstance.configSubdir.set(configSubdir);
     fixture.detectChanges();
     return fixture;
 }
@@ -1767,7 +1818,10 @@ describe('decodeProfileOverrides', () => {
         const out = decodeProfileOverrides(
             { ...form, segments: { moCallRecord: 'mo.toon' } },
             { profile_file: 'x', max_value_bytes: 1024 },
-            new Set(['asn1.strictness']),
+            // The editor's dirtyKeys() are FLAT control keys. This set said `asn1.strictness` until
+            // 2026-09-25, which matched the function but never the editor — every edit of a key the
+            // Pipeline did not already carry was silently dropped on Save.
+            new Set(['asn1__strictness']),
         );
         expect(out).toEqual({
             profile_file: '../vendors/acme/acme.decode.toon',
@@ -1785,5 +1839,143 @@ describe('decodeProfileOverrides', () => {
     it('leaves a block without a profile untouched', () => {
         const inline = { ...form, profile_file: '' };
         expect(decodeProfileOverrides(inline, undefined, new Set())).toBe(inline);
+    });
+
+    it('treats a key saved BLANK as unset, so a profile value seeded into it is not written', () => {
+        const out = decodeProfileOverrides(
+            { profile_file: 'p.decode.toon', grammar_file: 'acme.asn' },
+            { profile_file: 'p.decode.toon', grammar_file: '' },
+            new Set(),
+        );
+        expect(out).toEqual({ profile_file: 'p.decode.toon' });
+    });
+});
+
+/**
+ * The drawer reads the Decode Profile back (`GET /parsers/asn1/profile`) so every `asn1` key shows its
+ * EFFECTIVE value — the profile's, unless the Pipeline sets it — with where it comes from. Save is unchanged:
+ * a value the form was seeded with from the profile is not an override and is never written.
+ */
+describe('Decode Profile read-back', () => {
+    const PROFILE = {
+        grammar_file: 'acme.asn',
+        root_type: 'NoSuchType',
+        strictness: 'DER',
+        segments: { mo: 'mo.toon' },
+    };
+
+    beforeEach(() => {
+        localStorage.removeItem('inspecto.currentLens');
+        profileReply = of({ asn1: PROFILE });
+    });
+
+    it('reads the profile beside the Pipeline and seeds the form with the effective values', async () => {
+        const fixture = await create(profileNode(), [ASN1_PROFILE_DEF], 0, null, '', 'msc');
+        fixture.detectChanges();
+
+        expect(decodeProfileCalls).toEqual([{ file: '../vendors/acme/acme.decode.toon', subdir: 'msc' }]);
+        const v = editor(fixture).rawValue();
+        expect(v['asn1__grammar_file']).toBe('acme.asn'); // from the profile, not the blank default
+        expect(v['asn1__strictness']).toBe('DER'); // from the profile, not the served BER
+        expect(v['asn1__root_type']).toBe('Record'); // the Pipeline's own key wins
+        expect(v['asn1__record_header_length']).toBe(0); // neither sets it: the served default
+    });
+
+    it('names each key’s provenance: from profile, set here, or default', async () => {
+        const fixture = await create(profileNode(), [ASN1_PROFILE_DEF], 0, null, '', 'msc');
+        fixture.detectChanges();
+
+        const rows = Object.fromEntries(
+            pane(fixture)
+                .asn1Provenance()
+                .map((r) => [r.key, r]),
+        );
+        expect(rows['grammar_file']).toMatchObject({ source: 'profile', value: 'acme.asn' });
+        expect(rows['strictness']).toMatchObject({ source: 'profile', value: 'DER' });
+        expect(rows['root_type']).toMatchObject({ source: 'here', value: 'Record' });
+        expect(rows['record_header_length']).toMatchObject({ source: 'default', value: 0 });
+        expect(rows['profile_file']).toBeUndefined();
+
+        const el = (fixture.nativeElement as HTMLElement).querySelector('[data-test="decode-profile"]');
+        const text = el?.textContent ?? '';
+        expect(text).toContain('from profile acme.decode.toon');
+        expect(text).toContain('set here');
+        expect(text).toContain('default');
+        await expectNoA11yViolations(el as HTMLElement);
+    });
+
+    it('flips an edited profile key to “set here”, and Save writes only the overrides', async () => {
+        const fixture = await create(profileNode(), [ASN1_PROFILE_DEF], 0, null, '', 'msc');
+        fixture.detectChanges();
+        const c = editor(fixture).controlFor('asn1__strictness')!;
+        c.setValue('CER');
+        c.markAsDirty();
+        pane(fixture).onInteraction();
+        fixture.detectChanges();
+
+        const strict = pane(fixture)
+            .asn1Provenance()
+            .find((r) => r.key === 'strictness');
+        expect(strict).toMatchObject({ source: 'here', value: 'CER' });
+
+        pane(fixture).submit();
+        const parsing = fixture.componentInstance.applied!.config!['parsing'] as Record<string, unknown>;
+        const a = parsing['asn1'] as Record<string, unknown>;
+        // grammar_file came from the profile into the FORM, never into the Pipeline.
+        expect(Object.keys(a).sort()).toEqual(['profile_file', 'root_type', 'segments', 'strictness']);
+        expect(a['strictness']).toBe('CER');
+    });
+
+    it('keeps the profile values when the catalog and the profile both land late', async () => {
+        profileReply = of({ asn1: PROFILE }).pipe(delay(20));
+        const fixture = await create(profileNode(), [ASN1_PROFILE_DEF], 10, null, '', 'msc');
+        await new Promise((r) => setTimeout(r, 50));
+        fixture.detectChanges();
+
+        const v = editor(fixture).rawValue();
+        expect(v['asn1__grammar_file']).toBe('acme.asn');
+        expect(v['asn1__root_type']).toBe('Record');
+    });
+
+    it('says so when the profile cannot be read, and the fields stay at the defaults', async () => {
+        profileReply = throwError(
+            () =>
+                new HttpErrorResponse({ status: 422, error: { error: { message: 'asn1.profile_file not readable' } } }),
+        );
+        const fixture = await create(profileNode(), [ASN1_PROFILE_DEF], 0, null, '', 'msc');
+        fixture.detectChanges();
+
+        const el = (fixture.nativeElement as HTMLElement).querySelector('[data-test="decode-profile"]');
+        expect(el?.querySelector('inspecto-alert')?.textContent).toContain('not readable');
+        expect(editor(fixture).rawValue()['asn1__strictness']).toBe('BER');
+    });
+
+    it('reads nothing for a block without a profile', async () => {
+        const fixture = await create(asn1Node(), [ASN1_PROFILE_DEF]);
+        fixture.detectChanges();
+        expect(decodeProfileCalls).toEqual([]);
+        expect((fixture.nativeElement as HTMLElement).querySelector('[data-test="decode-profile"]')).toBeNull();
+    });
+});
+
+describe('decodeProfileProvenance', () => {
+    const keys = [
+        { key: 'grammar_file', label: 'Grammar file' },
+        { key: 'strictness', label: 'Strictness', defaultValue: 'BER' },
+        { key: 'root_type', label: 'Root type' },
+    ];
+
+    it('an override wins, then the profile, then the served default', () => {
+        const rows = decodeProfileProvenance(keys, { grammar_file: 'a.asn', strictness: 'DER' }, { strictness: 'CER' });
+        expect(rows.map((r) => [r.key, r.source, r.value])).toEqual([
+            ['grammar_file', 'profile', 'a.asn'],
+            ['strictness', 'here', 'CER'],
+            ['root_type', 'default', undefined],
+        ]);
+    });
+
+    it('a blank profile value is unset, as on the server', () => {
+        const rows = decodeProfileProvenance(keys, { grammar_file: '  ' }, {});
+        expect(rows[0]).toMatchObject({ source: 'default' });
     });
 });

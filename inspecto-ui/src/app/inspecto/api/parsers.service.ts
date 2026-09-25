@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ServedFieldSpec } from 'app/inspecto/component-model';
 import { apiUrl } from './api-base';
@@ -68,5 +68,16 @@ export class ParsersService {
             ...(sampleB64 ? { sample_b64: sampleB64 } : { sample_text: sampleText }),
             ...(subdir !== undefined ? { subdir } : {}),
         });
+    }
+
+    /**
+     * The Decode Profile a Pipeline's `asn1.profile_file` names (`GET /parsers/asn1/profile`): the profile's
+     * own `asn1:` block AS AUTHORED (refs relative to the profile). `subdir` means what it means on
+     * {@link preview} — the ref resolves beside the Pipeline, as the load resolves it. Read-only.
+     */
+    decodeProfile(profileFile: string, subdir?: string): Observable<{ asn1: Record<string, unknown> }> {
+        let params = new HttpParams().set('profile_file', profileFile);
+        if (subdir !== undefined) params = params.set('subdir', subdir);
+        return this.http.get<{ asn1: Record<string, unknown> }>(apiUrl('/parsers/asn1/profile'), { params });
     }
 }

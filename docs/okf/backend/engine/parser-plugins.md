@@ -159,7 +159,7 @@ length-prefix machinery (`lengthOffset`/`lengthSize`/endianness/`lengthIncludesH
 offering knobs nothing has needed. They stay available in asn-core the moment a real file demands
 them.
 
-## Control plane (`ParserRoutes`, both compute-only — no write gate; a capability only for a pack parser's preview)
+## Control plane (`ParserRoutes`, all read/compute-only — no write gate; a capability only for a pack parser's preview)
 
 - `GET /parsers` → `[{id, label, hierarchical, ingestable, ingesterClass?, source, grammarSchema}]`.
   `source` (2026-09-25, additive) is `builtin`, `classpath` or `pack:<jar filename>` for a parser a Job
@@ -170,6 +170,8 @@ them.
   sibling of `POST /config/preview/parsing`, which stays byte-identical as the draft-true path.
   **403 `PERMISSION_DENIED` when the parser came from a Job Pack and the caller lacks
   `canAuthorWorkbench`** (operator D4 2026-09-25, below). Built-in and classpath parsers stay open.
+- `GET /parsers/asn1/profile?profile_file=<ref>&subdir=<dir>` → `{asn1: {…}}`, a Decode Profile's own block as
+  authored (2026-09-25; *Decode Profile* below).
 
 ## UI adoption
 
@@ -499,12 +501,24 @@ declaration for `asn1.*`.
 key the Pipeline sets wins over the profile, so persisting the whole form would silently fork the Pipeline
 off its profile (`record_header_length: 0` over the profile's `4`). `decodeProfileOverrides`
 (`pipeline-parse-definition.component.ts`) keeps only `profile_file`, `segments`, keys the saved block
-already carried, and keys the user changed (`GrammarEditorComponent.dirtyKeys`). Blank values are always
-dropped. The drawer's preview sends the same subset with its `subdir`. A block without a profile is
-untouched.
-⚠ **Residual:** the form still shows the served defaults for keys the profile sets, not the profile's
-effective values (the drawer does not read the profile back). The help text on `asn1.profile_file` says the
-Pipeline's keys win.
+already set non-blank, and keys the user changed (`GrammarEditorComponent.dirtyKeys`, FLAT control keys —
+`asn1__strictness`; the function matched a dotted spelling until 2026-09-25, which silently dropped every
+such edit on Save). Blank values are always dropped. The drawer's preview sends the same subset with its
+`subdir`. A block without a profile is untouched.
+
+**The drawer reads the profile back (2026-09-25)** through `GET /parsers/asn1/profile?profile_file=<ref>&subdir=<pipeline dir>`
+(`ParserRoutes.decodeProfile`), which returns `{asn1: <the profile's own block, AS AUTHORED>}` — refs stay
+relative to the profile, never the resolved absolute paths. It reads through `DecodeProfile.read`, the half of
+`overlay` that resolves, jails and validates, so the read and the overlay cannot disagree on what a profile
+is: `.toon` checked first, jail before the readability probe (escape **403**), and the same never-echo error
+text (**422**: a `.toon` that is not a profile, or not valid TOON, is refused without quoting it). Missing
+`profile_file` or an absolute `subdir` is **400**. `subdir` means what it means on the preview. Read-only, so
+ungated (a GET needs no manifest entry) — open to the same users as a built-in's preview. The drawer seeds its
+form with the profile's values under the Pipeline's and lists each key's provenance (*from profile* / *set
+here* / *default*) — see [grammar-config.md](../../frontend/features/grammar-config.md). Save is unchanged.
+⚠ **Residuals:** the profile's `segments` are not shown (the segments editor re-hydrates only the Pipeline's
+own refs), and Apply on a profile-backed Pipeline that carries NO `segments` of its own is refused with *Add
+at least one segment* — the drawer's segments gate predates profiles.
 
 **Bundles (D6).** Export ships the profile byte-verbatim as its own satellite beside its grammar and schemas,
 and the Pipeline keeps only `profile_file` (never inlined, which would import as N un-shared copies). Two
@@ -525,8 +539,12 @@ inline, the Pipeline's `root_type` wins, escape 403),
 `ControlApiPipelineBundleTest.aDecodeProfileTravelsAsItsOwnSatelliteAndItsRefsAreRewritten` +
 `twoProfileSatellitesSharingABasenameAreRefused`,
 `DemoCorpusIngestTest.mscCdrSplitIntoADecodeProfilePreviewsAndIngestsIdenticallyToInline` (the msc_cdr demo
-split into profile + Pipeline: same preview tree, the same rows in every segment), and the drawer spec
-`decodeProfileOverrides`. **Mutation-checked**: merging `segments`, probing readability before the jail,
+split into profile + Pipeline: same preview tree, the same rows in every segment),
+`ControlApiDecodeProfileReadTest` (real HTTP with a viewer Subject: as-authored values beside the subdir,
+escape 403, `.asn` 422, two non-profile `.toon` files refused without echoing a marker, 400s), and the drawer
+specs `decodeProfileOverrides` + *Decode Profile read-back* (seeded effective values, provenance, an edited
+profile key becomes *set here* and Save writes only the overrides, late catalog + late profile, read failure;
+mutation-checked: without the seed or with the dotted dirty key, four go red). **Mutation-checked**: merging `segments`, probing readability before the jail,
 dropping the preview overlay, and dropping the in-profile import rewrite each go red.
 
 ### Deferred by decision (the trust design's open items)

@@ -64,6 +64,54 @@ public final class DecodeProfile {
             without.remove(KEY);
             return new Resolved(without, null);
         }
+        Profile profile = read(ref, configDir);
+        Path file = profile.file();
+        Map<?, ?> profileBlock = profile.asn1();
+
+        Path profileDir = file.getParent();
+        Map<String, Object> merged = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : ((Map<?, ?>) profileBlock).entrySet()) {
+            String k = String.valueOf(e.getKey());
+            Object v = e.getValue();
+            if ("grammar_file".equals(k) && v instanceof String s && !s.isBlank())
+                v = besideProfile(profileDir, s, "asn1.grammar_file");
+            else if ("segments".equals(k) && v instanceof Map<?, ?> segs) {
+                Map<String, Object> resolved = new LinkedHashMap<>();
+                for (Map.Entry<?, ?> s : segs.entrySet())
+                    resolved.put(String.valueOf(s.getKey()), s.getValue() instanceof String path
+                            && !path.startsWith("schema/")   // a registry ref is an id, not a path
+                            ? besideProfile(profileDir, path, "asn1.segments." + s.getKey()) : s.getValue());
+                v = resolved;
+            }
+            merged.put(k, v);
+        }
+        // A null or blank value is UNSET, not an override: a form that submits every served field empty
+        // must not clear the profile's grammar_file.
+        for (Map.Entry<String, Object> e : asn1.entrySet())
+            if (!KEY.equals(e.getKey()) && e.getValue() != null
+                    && !(e.getValue() instanceof String s && s.isBlank()))
+                merged.put(e.getKey(), e.getValue());
+        return new Resolved(merged, file);
+    }
+
+    /**
+     * @param asn1 the profile's own {@code asn1:} block, as authored (refs still relative to the profile)
+     * @param file the jailed profile file
+     */
+    public record Profile(Map<String, Object> asn1, Path file) {
+    }
+
+    /**
+     * Read and validate the profile {@code ref} names — every check {@link #overlay} applies, in the same order,
+     * with the same never-echo error text — without overlaying anything. The Parse drawer's read route
+     * ({@code GET /parsers/asn1/profile}) serves this block so the drawer can show the profile's own values.
+     *
+     * @param ref       a non-blank {@code profile_file} value
+     * @param configDir the referring config's directory; {@code null} keeps the working-directory reading
+     */
+    @SuppressWarnings("unchecked")
+    public static Profile read(String ref, Path configDir) throws IOException {
+        ref = ref.trim();
         if (!ref.toLowerCase(Locale.ROOT).endsWith(".toon"))
             throw new IllegalArgumentException(FIELD + " must name a Decode Profile .toon file, got: " + ref);
         Path file = PathJail.requireUnderAny(PathJail.allowedRoots(),
@@ -92,30 +140,7 @@ public final class DecodeProfile {
             throw new IllegalArgumentException("Decode Profile " + file + " names another profile_file — "
                     + "profiles do not nest");
 
-        Path profileDir = file.getParent();
-        Map<String, Object> merged = new LinkedHashMap<>();
-        for (Map.Entry<?, ?> e : ((Map<?, ?>) profileBlock).entrySet()) {
-            String k = String.valueOf(e.getKey());
-            Object v = e.getValue();
-            if ("grammar_file".equals(k) && v instanceof String s && !s.isBlank())
-                v = besideProfile(profileDir, s, "asn1.grammar_file");
-            else if ("segments".equals(k) && v instanceof Map<?, ?> segs) {
-                Map<String, Object> resolved = new LinkedHashMap<>();
-                for (Map.Entry<?, ?> s : segs.entrySet())
-                    resolved.put(String.valueOf(s.getKey()), s.getValue() instanceof String path
-                            && !path.startsWith("schema/")   // a registry ref is an id, not a path
-                            ? besideProfile(profileDir, path, "asn1.segments." + s.getKey()) : s.getValue());
-                v = resolved;
-            }
-            merged.put(k, v);
-        }
-        // A null or blank value is UNSET, not an override: a form that submits every served field empty
-        // must not clear the profile's grammar_file.
-        for (Map.Entry<String, Object> e : asn1.entrySet())
-            if (!KEY.equals(e.getKey()) && e.getValue() != null
-                    && !(e.getValue() instanceof String s && s.isBlank()))
-                merged.put(e.getKey(), e.getValue());
-        return new Resolved(merged, file);
+        return new Profile((Map<String, Object>) profileBlock, file);
     }
 
     private static String besideProfile(Path profileDir, String ref, String field) {

@@ -3311,6 +3311,20 @@
         "x-generated" : true
       }
     },
+    "/parsers/asn1/profile" : {
+      "get" : {
+        "tags" : [ "parsers" ],
+        "summary" : "GET /parsers/asn1/profile (generated skeleton)",
+        "operationId" : "getParsersAsn1Profile",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/parsers/{parserId}/preview" : {
       "post" : {
         "tags" : [ "parsers" ],

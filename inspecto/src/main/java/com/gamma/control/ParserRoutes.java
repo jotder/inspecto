@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.config.safety.PathJail;
+import com.gamma.etl.DecodeProfile;
 import com.gamma.parse.ParseResult;
 import com.gamma.parse.ParserPlugin;
 import com.gamma.parse.Parsers;
@@ -36,6 +37,7 @@ final class ParserRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/parsers", (e, m) -> catalog());
         api.post("/parsers/([^/]+)/preview", (e, m) -> preview(api, e, ApiContext.name(m), api.body(e)));
+        api.get("/parsers/asn1/profile", (e, m) -> decodeProfile(api, e));
     }
 
     private static List<Map<String, Object>> catalog() {
@@ -84,6 +86,31 @@ final class ParserRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, callerError.getMessage());
         } catch (Exception parseFail) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "sample does not parse with this grammar: " + parseFail.getMessage());
+        }
+    }
+
+    /**
+     * {@code GET /parsers/asn1/profile?profile_file=<ref>&subdir=<pipeline dir>} — the Decode Profile a Pipeline's
+     * {@code asn1.profile_file} names, as {@code {asn1: <the profile's own block, as authored>}}, so the Parse
+     * drawer can show each key's effective value and where it comes from instead of the served defaults.
+     * Resolved beside {@code subdir} exactly as the preview resolves it, and read by {@link DecodeProfile#read}:
+     * the same checks and the same never-echo error text as the preview and the load (a {@code .toon} that is
+     * not a profile is refused without quoting it). Read-only, so ungated like a built-in's preview.
+     */
+    private static Object decodeProfile(ApiContext api, com.sun.net.httpserver.HttpExchange ex) {
+        String ref = ApiContext.query(ex, "profile_file");
+        if (ref == null || ref.isBlank())
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "query parameter 'profile_file' is required");
+        String subdir = ApiContext.query(ex, "subdir");
+        Map<String, Object> ctx = new LinkedHashMap<>();
+        if (subdir != null) ctx.put("subdir", subdir);
+        Path configDir = configDirOf(api, ctx);
+        try {
+            return Map.of("asn1", DecodeProfile.read(ref, configDir).asn1());
+        } catch (PathJail.Escape escape) {
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, escape.getMessage());
+        } catch (IllegalArgumentException | java.io.IOException bad) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
     }
 

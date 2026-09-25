@@ -360,6 +360,20 @@ like the built-ins. Three consequences, each of which cost a test:
   no `asn1.*` keys at all, so Apply would write an EMPTY grammar over a deployed one and report success. The
   pane refuses instead (`asn1Unavailable`). The editor's own "jar not deployed" banner does **not** cover this:
   it keys on the `configuredIngester` FQCN input, which the drawer never passes.
+* **A Decode Profile is READ BACK, so the form shows effective values** (2026-09-25). When the block names
+  `asn1.profile_file`, the pane calls `ParsersService.decodeProfile(ref, subdir)` (`GET /parsers/asn1/profile`,
+  [parser-plugins.md § Decode Profile](../../backend/engine/parser-plugins.md)) and seeds the editor with the
+  profile's own values UNDER the Pipeline's (`withDecodeProfile`; a key the Pipeline saved blank is unset, and
+  `segments` stays the Pipeline's). A `data-test="decode-profile"` list above the editor names each served
+  `asn1.*` key's effective value and provenance — **from profile `<file>`**, **set here**, or **default**
+  (`decodeProfileProvenance`). "Set here" is by construction exactly what Save keeps (it runs the same
+  `decodeProfileOverrides`), so a value seeded from the profile is never written into the Pipeline. The list
+  re-derives on interaction (the editor exposes methods, not signals). A late read never re-seeds a form that
+  is already dirty; a failed read shows a warning and leaves the served defaults.
+  🔴 **Found while building it:** `decodeProfileOverrides` checked `dirty.has('asn1.' + k)`, but the editor's
+  `dirtyKeys()` are FLAT control keys (`asn1__strictness`), so every edit of a key the Pipeline did not already
+  carry was silently dropped on Save. Its unit test passed a hand-built dotted Set and never went through the
+  editor; the drawer-level spec that edits a control and Saves now pins it.
 
 ⚠ **The shared editor's catalog fetch runs in its CONSTRUCTOR**, so with a synchronously-resolved source it
 completes *before* Angular sets the inputs. `configuredIngester` already re-attempted for that reason; `type`
