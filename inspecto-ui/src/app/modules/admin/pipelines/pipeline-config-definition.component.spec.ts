@@ -943,6 +943,8 @@ describe('PipelineConfigDefinitionComponent', () => {
             // Every other key from the read rides verbatim — the partitions[]-drop lesson generalised.
             expect(config['raw']).toEqual(SCHEMA_CONFIG.raw);
             expect(config['mapping']).toEqual(SCHEMA_CONFIG.mapping);
+            // SCHEMA-FILE-NAME-1: back into the file it was read from — never the one `raw.name` names.
+            expect((writeSpy.mock.calls[0] as unknown[])[2]).toEqual(expect.objectContaining({ file: 'x_schema' }));
         });
 
         it('refuses to save an invalid segment, with an inline error', async () => {

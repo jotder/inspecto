@@ -636,6 +636,10 @@ export class PipelineConfigDefinitionComponent {
         this.configApi
             .write('schema', draft, {
                 overwrite: true,
+                // SCHEMA-FILE-NAME-1: back into the file it was READ from. Named by `raw.name` alone, a
+                // schema declaring the pipeline's name (every committed one) landed at `<pipeline>.toon`
+                // and the partitioning never reached the `<pipeline>_schema.toon` the pipeline loads.
+                file: this.partitionsSchemaName,
                 subdir: this.satelliteSubdir(),
                 ifMatch: this.partitionsSchemaEtag,
             })
