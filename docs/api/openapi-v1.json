@@ -3373,6 +3373,37 @@
         "x-generated" : true
       }
     },
+    "/datasets/{datasetId}/rows" : {
+      "get" : {
+        "tags" : [ "datasets" ],
+        "summary" : "GET /datasets/{datasetId}/rows",
+        "operationId" : "getDatasetsByDatasetIdRows",
+        "description" : "One page of the Dataset's relation (its view or physicalRef plus its calculated columns) — where GET /db/table reads the raw store. Same payload as /db/table: columns[{name,type,role,cardinality}], rows, statistics{rowCount,elapsedMs,truncated}. 503 write root unset · 404 unknown or shared-away Dataset · 422 unusable Dataset config or a failed read.",
+        "parameters" : [ {
+          "name" : "datasetId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "limit",
+          "in" : "query",
+          "required" : false,
+          "schema" : {
+            "type" : "integer",
+            "minimum" : 1,
+            "maximum" : 5000,
+            "default" : 200
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
     "/space-comparisons" : {
       "post" : {
         "tags" : [ "space-comparisons" ],

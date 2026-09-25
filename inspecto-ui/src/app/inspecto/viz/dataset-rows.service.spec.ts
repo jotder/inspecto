@@ -38,14 +38,15 @@ const CATALOG = {
 };
 
 /** One TestBed per test (house rule); the DbBrowserService stub records every live-path call. */
-function setup(over: Partial<Record<'table' | 'query' | 'catalog', unknown>> = {}) {
+function setup(over: Partial<Record<'table' | 'query' | 'catalog' | 'datasetRows', unknown>> = {}) {
     const table = (over.table as ReturnType<typeof vi.fn>) ?? vi.fn(() => of(dbResult()));
     const query = (over.query as ReturnType<typeof vi.fn>) ?? vi.fn(() => of(dbResult()));
     const catalog = (over.catalog as ReturnType<typeof vi.fn>) ?? vi.fn(() => of(CATALOG));
+    const datasetRows = (over.datasetRows as ReturnType<typeof vi.fn>) ?? vi.fn(() => of(dbResult()));
     TestBed.configureTestingModule({
-        providers: [{ provide: DbBrowserService, useValue: { table, query, catalog } }],
+        providers: [{ provide: DbBrowserService, useValue: { table, query, catalog, datasetRows } }],
     });
-    return { svc: TestBed.inject(DatasetRowsService), table, query, catalog };
+    return { svc: TestBed.inject(DatasetRowsService), table, query, catalog, datasetRows };
 }
 
 const CDR: RowSourceRef = { sourceName: 'cdr' };
@@ -99,6 +100,51 @@ describe('DatasetRowsService — rows', () => {
         expect((await svc.rows(CDR)).error).toBeTruthy();
         expect((await svc.rows(CDR)).rows.length).toBe(1);
         expect(table).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('DatasetRowsService — a Dataset with calculated columns (DAT-5)', () => {
+    const MATCHES: RowSourceRef = {
+        id: 'matches',
+        sourceName: 'matches',
+        calculated: [{ name: 'match_date', expr: "cast(strptime(DATE, '%B %d,%Y') AS date)" }],
+    };
+
+    it("reads the saved Dataset's RELATION, not the raw store — the store has no calculated column", async () => {
+        const datasetRows = vi.fn(() =>
+            of(
+                dbResult({
+                    columns: [
+                        { name: 'DATE', type: 'string', role: 'dimension', cardinality: 3 },
+                        { name: 'match_date', type: 'date', role: 'temporal' },
+                        { name: 'city', type: 'string', role: 'dimension', cardinality: 2 },
+                    ],
+                }),
+            ),
+        );
+        const { svc, table, query } = setup({ datasetRows });
+        const res = await svc.rows(MATCHES, 300);
+        expect(datasetRows).toHaveBeenCalledWith('matches', 300);
+        expect(table).not.toHaveBeenCalled();
+        expect(query).not.toHaveBeenCalled();
+        expect(res.columns.find((c) => c.name === 'match_date')?.type).toBe('date');
+        expect(res.columns.find((c) => c.name === 'city')).toMatchObject({ type: 'string', cardinality: 2 });
+    });
+
+    it('an unsaved ref (no id) or one with no calculated columns keeps reading the raw store', async () => {
+        const { svc, table, datasetRows } = setup();
+        await svc.rows({ sourceName: 'matches', calculated: MATCHES.calculated });
+        svc.clear(); // both refs read the same raw page, so the second would otherwise come from the cache
+        await svc.rows({ id: 'matches', sourceName: 'matches', calculated: [] });
+        expect(datasetRows).not.toHaveBeenCalled();
+        expect(table).toHaveBeenCalledTimes(2);
+    });
+
+    it('an embedded Query Core model keeps precedence over the relation read', async () => {
+        const { svc, query, datasetRows } = setup();
+        await svc.rows({ ...MATCHES, query: premiumOnly(), columns: [{ name: 'tariff', type: 'string' }] });
+        expect(query).toHaveBeenCalled();
+        expect(datasetRows).not.toHaveBeenCalled();
     });
 });
 

@@ -5,9 +5,12 @@ import { apiErrorMessage } from 'app/inspecto/api/api-base';
 import { ColumnMeta, ColumnType, QueryModel, compileSql, dbColumnType } from 'app/inspecto/query';
 
 /**
- * The **rows seam**: what a Dataset's `sourceName` actually resolves to. It is always the real
- * store, read over `/db/table` (or `/db/query` when the dataset embeds a Query Core model, compiled by
- * {@link compileSql}).
+ * The **rows seam**: what a Dataset's `sourceName` actually resolves to. It is the real store, read over
+ * `/db/table` (or `/db/query` when the dataset embeds a Query Core model, compiled by {@link compileSql})
+ * — EXCEPT a saved Dataset with calculated columns (DAT-5), which is read as its server-side relation over
+ * `GET /datasets/{id}/rows`: the raw store has no calculated column, so no screen could type, count or
+ * offer one from it. That relation is also exactly what `/bi/query` evaluates, so the page and the
+ * aggregate agree.
  *
  * This is the layer under {@link DatasetResultService}: that one runs a {@link QuerySpec} over
  * `/bi/query`, this one supplies the rows a screen reads directly — drill-throughs, filter-value
@@ -39,7 +42,9 @@ export class DatasetRowsService {
                 truncated: false,
                 error: 'This Dataset names no store, so its rows cannot be read. Set its source.',
             });
-        const key = `${ds.sourceName}|${limit}|${ds.query ? JSON.stringify(ds.query) : ''}`;
+        const key = `${ds.sourceName}|${limit}|${ds.query ? JSON.stringify(ds.query) : ''}|${
+            readsRelation(ds) ? `${ds.id}:${JSON.stringify(ds.calculated)}` : ''
+        }`;
         const cached = this.cache.get(key);
         if (cached) return cached;
         const promise = this.remoteRows(ds, limit);
@@ -94,7 +99,8 @@ export class DatasetRowsService {
         this.cache.clear();
     }
 
-    /** Live: the real store over `/db/query` (a virtual dataset's model) or `/db/table` (everything else). */
+    /** Live: the real store over `/db/query` (a virtual dataset's model), the Dataset's relation over
+     *  `/datasets/{id}/rows` (a saved Dataset with calculated columns), or `/db/table` (everything else). */
     private async remoteRows(ds: RowSourceRef, limit: number): Promise<DatasetRows> {
         const declared = declaredColumns(ds);
         try {
@@ -105,7 +111,9 @@ export class DatasetRowsService {
                           sql: compileSql(ds.query, { name: ds.sourceName, rows: [], columns: declared }),
                           limit,
                       })
-                    : this.db.table({ name: ds.sourceName, limit }),
+                    : readsRelation(ds)
+                      ? this.db.datasetRows(ds.id!, limit)
+                      : this.db.table({ name: ds.sourceName, limit }),
             );
             return fromDbResult(res, declared);
         } catch (e) {
@@ -144,6 +152,19 @@ export interface RowSourceRef {
     /** A virtual/materialized dataset's Query Core model; compiled to SQL live, evaluated offline. */
     query?: QueryModel | null;
     columns?: readonly { name: string; type: ColumnType }[];
+    /** The saved Dataset's id — with {@link calculated}, the page is read as its relation (see the class doc). */
+    id?: string;
+    /** Row-level calculated columns (DAT-5); present ⇒ the raw store cannot serve them. */
+    calculated?: readonly { name: string; expr: string }[];
+}
+
+/**
+ * Read `ds` as its server-side relation rather than its raw store: a SAVED Dataset (it has an id the
+ * server can resolve) with calculated columns and no embedded Query Core model (that path compiles its
+ * own SQL over the store and keeps precedence, as before).
+ */
+function readsRelation(ds: RowSourceRef): boolean {
+    return !ds.query && !!ds.id && !!ds.calculated?.length;
 }
 
 /**

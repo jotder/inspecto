@@ -163,12 +163,30 @@ export class ExploreComponent implements OnInit {
     private readonly page = signal<DatasetRows | null>(null);
     private readonly rows = computed(() => this.page()?.rows ?? []);
     /** The Dataset's declared columns — or, when it declares none (a Stream's Dataset registered at go-live),
-     *  the columns the store served for the page, role-seeded, so the field mapper is never empty. */
+     *  the columns the store served for the page, role-seeded, so the field mapper is never empty — plus
+     *  its calculated columns (DAT-5), typed and role-seeded from what the relation served for them
+     *  (date → temporal, number → measure, text → dimension). A calculated column the page could not serve
+     *  (the read failed) is still offered, as a text dimension, rather than silently missing. */
     private readonly columns = computed<DatasetColumn[]>(() => {
         const declared = this.dataset()?.columns ?? [];
-        return declared.length ? declared : inferRoles(this.page()?.columns ?? []);
+        const servedCols = this.page()?.columns ?? [];
+        const base = declared.length ? declared : inferRoles(servedCols);
+        const have = new Set(base.map((c) => c.name));
+        const calculated = (this.dataset()?.calculated ?? [])
+            .filter((c) => !have.has(c.name))
+            .map(
+                (c) =>
+                    inferRoles(servedCols.filter((s) => s.name === c.name))[0] ?? {
+                        name: c.name,
+                        type: 'string' as const,
+                        role: 'dimension' as const,
+                    },
+            );
+        return [...base, ...calculated];
     });
-    private readonly colMetas = computed<ColumnMeta[]>(() => this.columns().map((c) => ({ name: c.name, type: c.type })));
+    private readonly colMetas = computed<ColumnMeta[]>(() =>
+        this.columns().map((c) => ({ name: c.name, type: c.type })),
+    );
 
     ngOnInit(): void {
         this.datasetsApi.list().subscribe({

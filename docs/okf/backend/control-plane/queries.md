@@ -75,8 +75,25 @@ A calculated column is caller-authored SQL **fragment** text spliced inside the 
   consumer inherits it (`/bi/query`, `/queries/{id}/run`, reports, measure alerts, DAT-4
   materialize, shares). Surviving bare identifiers are column refs resolved by DuckDB's binder
   (clean 4xx if unknown).
+* **Date/string scalars (2026-09-25).** The whitelist grew by a vetted pure, deterministic set so a
+  text-typed source can yield typed fields (`'March 22,2025'` → a DATE, `'Eden Gardens, Kolkata'` →
+  a city): `strptime try_strptime strftime date_trunc date_part datepart year month day dayname
+  monthname week quarter split_part starts_with ends_with contains regexp_matches regexp_extract
+  regexp_replace left right lpad rpad if`. ⛔ The admission rule for a new name: row-local, no file/
+  network/extension access, no settings or environment (`current_setting`, `getenv`), no clock or
+  randomness (`now`, `random`) — a calculated column is re-evaluated on every read.
+  `ControlApiDatasetRowsTest.everyNewlyAllowedScalarRunsInDuckDb` executes each one, so a name the guard
+  admits but DuckDB cannot bind fails the build.
 * The UI's inline `calculated-column-guard.ts` mirrors the three rules for instant feedback but is
   **not authoritative** — the server re-validates at query time regardless.
+* **The relation page — `GET /datasets/{id}/rows?limit=` (2026-09-25).** `/db/table` reads the raw
+  store, which has no calculated column, so the Widget Builder could neither type, count nor offer one.
+  This read route runs `SELECT *` over the Dataset's relation (same payload as `/db/table`: typed
+  `columns` with role + cardinality, `rows`, `statistics.truncated`; limit 1..5000, default 200; 503/404/
+  422 like `/bi/query`, ungated like it). The SPA rows seam (`DatasetRowsService`) uses it only for a
+  **saved** Dataset with calculated columns and no embedded Query Core model; every other read stays on
+  `/db/table` / `/db/query`. ⚠ A dashboard drill-through (`filtered()` in the dashboard editor) still
+  reads the raw store through `/db/query`, so a cross-filter ON a calculated column cannot resolve there.
 
 ## Time grain on `/bi/query` (shipped 2026-08-14)
 

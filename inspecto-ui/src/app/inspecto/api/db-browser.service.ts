@@ -75,4 +75,15 @@ export class DbBrowserService {
     query(body: DbAdHocQuery): Observable<DbResult> {
         return this.http.post<DbResult>(apiUrl('/db/query'), body);
     }
+
+    /**
+     * One page of a saved Dataset's RELATION (`GET /datasets/{id}/rows`) — its store PLUS its calculated
+     * columns, typed and counted server-side. Same payload as {@link table}; `table` reads the raw store,
+     * which has no calculated columns.
+     */
+    datasetRows(id: string, limit?: number): Observable<DbResult> {
+        return this.http.get<DbResult>(apiUrl(`/datasets/${encodeURIComponent(id)}/rows`), {
+            params: toParams({ limit }),
+        });
+    }
 }

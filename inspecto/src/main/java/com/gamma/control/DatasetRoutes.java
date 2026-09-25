@@ -3,15 +3,24 @@ package com.gamma.control;
 import com.gamma.job.JobService;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.pipeline.ViewStore;
+import com.gamma.query.DatasetRelation;
+import com.gamma.query.QueryExecutor;
+import com.gamma.query.ResultSetDescriptor;
+import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
- * Dataset actions ({@code POST /datasets/{id}/materialize}) — the one capability the generic component
+ * Dataset actions ({@code POST /datasets/{id}/materialize}) plus the Dataset's own row page
+ * ({@code GET /datasets/{id}/rows}, see {@link #rows}) — the one capability the generic component
  * CRUD ({@code /components/dataset/{id}}) cannot express, because materializing is an <em>action</em> on a
  * Dataset rather than an edit of its document.
  *
@@ -41,11 +50,79 @@ import java.util.Map;
  */
 final class DatasetRoutes implements RouteModule {
 
+    private static final int DEFAULT_ROW_LIMIT = 200;
+    private static final int MAX_ROW_LIMIT = 5_000;
+
     @Override
     public void register(ApiContext api) {
+        api.get("/datasets/([^/]+)/rows", (e, m) -> rows(api, e, ApiContext.name(m)));
         api.post("/datasets/([^/]+)/materialize",
                 ApiContext.withCapability("canOperateRuns",
                         (e, m) -> materialize(api, e, ApiContext.name(m))));
+    }
+
+    /**
+     * {@code GET /datasets/{id}/rows?limit=} — one page of the Dataset's <em>relation</em>
+     * ({@link DatasetRelation#relationSql}: its view or {@code physicalRef} PLUS its calculated columns),
+     * where {@code GET /db/table} reads the raw store behind it. This is what lets the Widget Builder see a
+     * calculated column's served type and cardinality at all — the raw store has no such column. Same
+     * payload shape as {@code /db/table} ({@code columns[{name,type,role,cardinality}], rows, statistics}),
+     * so the UI rows seam maps both identically.
+     *
+     * <p>Read-only, so no capability gate (like {@code POST /bi/query}). Fail-closed: write root unset → 503 ·
+     * unknown or shared-away Dataset → 404 · an unusable Dataset config (a calculated expression the
+     * {@code ExpressionGuard} refuses, no view/physicalRef, a ref escaping the data root) or a DuckDB failure
+     * → 422. Bounded: {@code limit} clamps to 1..5000 and {@code statistics.truncated} says the relation
+     * held more.
+     */
+    private Object rows(ApiContext api, HttpExchange ex, String id) {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "dataset rows");
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        Map<String, Object> dataset;
+        try {
+            dataset = store.get("dataset", id).map(ComponentRegistry.Component::content)
+                    .orElseThrow(() -> new ApiException(404, "no dataset '" + id + "'"));
+        } catch (IllegalArgumentException bad) {             // an id the store refuses to resolve
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
+        }
+        if (!ComponentAccess.canView(ex, dataset))             // R3: shared-away ⇒ indistinguishable from absence
+            throw new ApiException(404, "no dataset '" + id + "'");
+        String relationSql;
+        try {
+            relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, bad.getMessage());
+        }
+        int limit = Math.max(1, Math.min(MAX_ROW_LIMIT,
+                ApiContext.parseIntOr(ApiContext.query(ex, "limit"), DEFAULT_ROW_LIMIT)));
+        // The view is named after the Dataset id; QueryExecutor quotes it on CREATE VIEW the same way.
+        String sql = "SELECT * FROM \"" + id.replace("\"", "\"\"") + "\"";
+        QueryExecutor.Result r;
+        try {
+            r = QueryExecutor.run(new QueryExecutor.Request(id, relationSql, sql, limit, 0, List.of(), List.of()));
+        } catch (SQLException e) {
+            throw new ApiException(422, "dataset read failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+        } catch (IOException e) {
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + e.getMessage());
+        }
+        List<Map<String, Object>> columns = new ArrayList<>();
+        for (ResultSetDescriptor.Column c : r.columns()) {
+            Map<String, Object> col = new LinkedHashMap<>();
+            col.put("name", c.name());
+            col.put("type", c.type());
+            col.put("role", c.role());
+            col.put("cardinality", c.cardinality());
+            columns.add(col);
+        }
+        Map<String, Object> statistics = new LinkedHashMap<>();
+        statistics.put("rowCount", r.rowCount());
+        statistics.put("elapsedMs", r.elapsedMs());
+        statistics.put("truncated", r.truncated());
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("columns", columns);
+        data.put("rows", r.rows());
+        data.put("statistics", statistics);
+        return data;
     }
 
     private Object materialize(ApiContext api, HttpExchange ex, String id) throws IOException {
