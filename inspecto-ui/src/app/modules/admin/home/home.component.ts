@@ -109,7 +109,9 @@ export class HomeComponent implements OnInit {
     /** Personal ships no authenticator and binds every interface by default, so the control plane —
      *  config writes included — is reachable by anyone who can reach the port (EDITIONS, the listen
      *  -address note). Shown only there, and dismissible per browser. */
-    readonly showBindNotice = computed(() => this.session.authMode() === 'none' && !this.noticeDismissed());
+    readonly showBindNotice = computed(
+        () => this.session.authMode() === 'none' && !this.session.loopbackOnly() && !this.noticeDismissed(),
+    );
     private readonly noticeDismissed = signal(this.restoreDismissed());
 
     // ── Loaded state ────────────────────────────────────────────────────────────────────────────

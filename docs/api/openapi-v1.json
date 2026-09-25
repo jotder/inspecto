@@ -9108,6 +9108,10 @@
               },
               "authMode" : {
                 "type" : "string"
+              },
+              "loopbackOnly" : {
+                "type" : "boolean",
+                "description" : "True only when -Dcontrol.bind narrows the listener to a loopback address. UIE-9, 2026-09-25."
               }
             }
           },

@@ -49,7 +49,14 @@ interface Bootstrap {
     edition?: string;
     /** HOME-VERSION-1: the deployment's own version, from the jar manifest — "dev" when unstamped. */
     version?: string;
-    features?: { authMode?: string; exchange?: boolean; geoLink?: boolean; events?: boolean; ops?: boolean };
+    features?: {
+        authMode?: string;
+        loopbackOnly?: boolean;
+        exchange?: boolean;
+        geoLink?: boolean;
+        events?: boolean;
+        ops?: boolean;
+    };
     session?: { authenticated?: boolean; actor?: string; capabilities?: string[] };
     branding?: Partial<BootstrapBranding>;
     auth?: Partial<OidcConfig> & { demoUsers?: DemoUser[] };
@@ -131,6 +138,8 @@ export class SessionService {
      * ⚠ Set by `init()`, an APP_INITIALIZER, so it is settled before any route resolver builds the nav.
      */
     readonly opsEnabled = signal(false);
+    /** `features.loopbackOnly`: the control plane is bound to loopback only (`-Dcontrol.bind=127.0.0.1`). UIE-9. */
+    readonly loopbackOnly = signal(false);
 
     /** DEMO-AUTH-1: the demo build's Demo Users (empty everywhere else) — the sign-in page renders a picker from it. */
     readonly demoUsers = signal<DemoUser[]>([]);
@@ -171,6 +180,7 @@ export class SessionService {
         this.geoLinkEnabled.set(boot.features?.geoLink === true);
         this.eventsEnabled.set(boot.features?.events === true);
         this.opsEnabled.set(boot.features?.ops === true);
+        this.loopbackOnly.set(boot.features?.loopbackOnly === true);
 
         if (mode !== 'oidc') return; // Personal / offline — done, no login path.
 

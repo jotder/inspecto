@@ -49,6 +49,19 @@ class ControlApiBindTest {
     }
 
     @Test
+    @DisplayName("loopbackOnly (UIE-9) is true only for a loopback bind — the wildcard and a LAN address are exposed")
+    void loopbackOnlyFollowsTheRealBind() {
+        bind(null);
+        assertFalse(ControlApi.bindsLoopbackOnly(), "the wildcard default is exposed");
+        bind("0.0.0.0");
+        assertFalse(ControlApi.bindsLoopbackOnly());
+        bind("127.0.0.1");
+        assertTrue(ControlApi.bindsLoopbackOnly());
+        bind("localhost");
+        assertTrue(ControlApi.bindsLoopbackOnly());
+    }
+
+    @Test
     @DisplayName("an explicit host restricts the listener — the single-user install's answer")
     void explicitHostRestricts() throws IOException {
         bind("127.0.0.1");

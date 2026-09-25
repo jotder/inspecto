@@ -114,6 +114,8 @@ final class BootstrapRoutes implements RouteModule {
         // The SPA hides the Incidents, Cases and Tags nav entries and the cross-entity tag menus on it.
         f.put("ops", api.hasRoute("POST", "/objects"));
         f.put("authMode", System.getProperty("auth.mode", "none"));
+        // UIE-9: the Home exposure notice keys off the real bind, not off authMode alone.
+        f.put("loopbackOnly", ControlApi.bindsLoopbackOnly());
         return f;
     }
 

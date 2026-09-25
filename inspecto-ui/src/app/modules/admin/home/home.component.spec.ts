@@ -28,6 +28,7 @@ interface Stubs {
     incidents?: unknown[];
     approvals?: unknown[];
     authMode?: 'none' | 'oidc';
+    loopbackOnly?: boolean;
     actor?: string | null;
     opsEnabled?: boolean;
     eventsEnabled?: boolean;
@@ -64,6 +65,7 @@ function create(s: Stubs = {}) {
     const session = {
         actor: signal(s.actor ?? null),
         authMode: signal(s.authMode ?? 'none'),
+        loopbackOnly: signal(s.loopbackOnly ?? false),
         opsEnabled: signal(s.opsEnabled ?? false),
         eventsEnabled: signal(s.eventsEnabled ?? false),
         capabilities: signal(s.capabilities ?? []),
@@ -195,6 +197,12 @@ describe('HomeComponent', () => {
     it('warns about the open listen address only where there is no authenticator', () => {
         expect(create({ runs: [RUN()], authMode: 'none' }).el.textContent).toContain('every network interface');
         expect(create({ runs: [RUN()], authMode: 'oidc' }).el.textContent).not.toContain('every network interface');
+    });
+
+    // UIE-9: the notice follows the real bind — a loopback-only listener is not exposed, so it must not claim to be.
+    it('does not warn about the listen address when the control plane is bound to loopback', () => {
+        const loopback = create({ runs: [RUN()], authMode: 'none', loopbackOnly: true });
+        expect(loopback.el.textContent).not.toContain('every network interface');
     });
 
     it('shows the resolved grants only in a multi-space deployment that published some', () => {

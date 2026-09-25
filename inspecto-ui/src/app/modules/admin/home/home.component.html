@@ -1,5 +1,5 @@
 <div class="flex w-full flex-col gap-6 p-6 md:p-8">
-    <!-- Personal binds every interface and ships no sign-in: the one thing a new operator must be told. -->
+    <!-- No sign-in AND not bound to loopback (the real bind, UIE-9): the one thing a new operator must be told. -->
     @if (showBindNotice()) {
         <inspecto-alert variant="warning" title="This control plane is listening on every network interface">
             <div class="flex flex-col gap-2">

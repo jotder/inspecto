@@ -312,6 +312,21 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     }
 
     /**
+     * True only when {@code -Dcontrol.bind} narrows the listener to a loopback address. {@code GET /bootstrap}
+     * reports it so the SPA's "listening on every network interface" notice follows the REAL bind instead of
+     * assuming it from the auth mode (UIE-9). Unset (the wildcard) or unresolvable ⇒ false: the notice errs
+     * toward warning.
+     */
+    static boolean bindsLoopbackOnly() {
+        try {
+            InetSocketAddress address = bindAddress(0);
+            return address.getAddress() != null && address.getAddress().isLoopbackAddress();
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
      * Plain HTTP by default (Personal edition, unchanged). Set {@code -Dhttps.keystore=<PKCS12 path>}
      * (+ {@code -Dhttps.keystore.password=<pw>}) to serve over TLS 1.3 instead (Professional edition,
      * docs/EDITIONS.md); pure JDK ({@link HttpsServer} + {@code javax.net.ssl}), no new dependency.
