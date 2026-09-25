@@ -8280,6 +8280,73 @@
         },
         "x-generated" : true
       }
+    },
+    "/pipelines/authored/{authoredId}/inbox" : {
+      "get" : {
+        "tags" : [ "pipelines" ],
+        "summary" : "List the files waiting in a Pipeline's inbox (dirs.poll)",
+        "operationId" : "getPipelinesAuthoredByAuthoredIdInbox",
+        "description" : "Open read. The regular files directly in the Pipeline's poll directory, newest first, by bare name (the name POST /pipelines/authored/{authoredId}/run takes for a Pipeline that binds no connection). Bounded at 500 with truncated + the true total; an absent directory lists empty. 404 unknown Pipeline; 501 a Dataset-fed Pipeline (it has no inbox); 422 no dirs.poll.",
+        "parameters" : [ {
+          "name" : "authoredId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {pipeline, inbox, total, truncated, files: [{name, size, modifiedAt}]}."
+          }
+        }
+      },
+      "post" : {
+        "tags" : [ "pipelines" ],
+        "summary" : "Upload one file into a Pipeline's inbox (dirs.poll)",
+        "operationId" : "postPipelinesAuthoredByAuthoredIdInbox",
+        "description" : "canAuthorWorkbench. The raw request body is landed as <dirs.poll>/<file>, staged as a .tmp sibling and moved into place so a poll cycle never sees a half-written file. Gates in order: 503 no write root (-Dassist.write.root); 404 unknown Pipeline; 501 a Dataset-fed Pipeline; 422 no/blank file name; 403 a name that is a path (separator, .., colon) or escapes the poll directory; 413 over 64 MiB; 422 an empty body; 409 the file exists and overwrite is not true.",
+        "parameters" : [ {
+          "name" : "authoredId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "file",
+          "in" : "query",
+          "required" : true,
+          "description" : "The bare file name to land in the inbox",
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "overwrite",
+          "in" : "query",
+          "required" : false,
+          "description" : "true replaces an existing file of the same name",
+          "schema" : {
+            "type" : "boolean"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/octet-stream" : {
+              "schema" : {
+                "type" : "string",
+                "format" : "binary"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped {pipeline, file, size, replaced}."
+          }
+        }
+      }
     }
   },
   "components" : {

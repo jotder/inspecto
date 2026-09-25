@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
@@ -7,6 +8,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import {
     AuthoredNode,
     ConnectionProbeService,
+    PipelineInboxFile,
     PipelineRunResult,
     PipelinesService,
     ResourceNode,
@@ -15,6 +17,7 @@ import {
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { ConnectionTreeComponent } from 'app/modules/admin/connections/connection-tree.component';
 
 /** Dialog data: which authored pipeline + which node to run up to, plus the source's bound connection (if any). */
@@ -79,13 +82,75 @@ export interface RunToHereData {
                     <h3 class="text-sm font-semibold">Inbox files</h3>
                     @if (data.connectionId) {
                         <span class="text-secondary font-mono text-xs">connection/{{ data.connectionId }}</span>
+                    } @else {
+                        <!-- INBOX-UPLOAD-1: a Stream onboarded from the Catalog binds no connection and polls
+                             dirs.poll — this is the only way to give it a file without copying one by hand. -->
+                        <button mat-stroked-button type="button" [disabled]="uploading()" (click)="uploadInput.click()">
+                            @if (uploading()) {
+                                <mat-spinner diameter="16" class="mr-2"></mat-spinner>
+                            }
+                            <mat-icon class="icon-size-5" svgIcon="heroicons_outline:arrow-up-tray"></mat-icon>
+                            <span class="ml-1">Upload to inbox</span>
+                        </button>
+                        <input
+                            #uploadInput
+                            type="file"
+                            class="hidden"
+                            aria-label="File to upload to the inbox"
+                            (change)="onUploadPicked($event)"
+                        />
                     }
                 </div>
 
-                @if (!data.connectionId) {
-                    <inspecto-alert class="mt-2 block" variant="info" icon="heroicons_outline:information-circle">
-                        No source connection is bound — the run uses a built-in sample.
+                @if (uploadError()) {
+                    <inspecto-alert class="mt-2 block" variant="error" icon="heroicons_outline:x-circle">
+                        {{ uploadError() }}
                     </inspecto-alert>
+                }
+
+                @if (!data.connectionId) {
+                    @if (inboxLoading()) {
+                        <div class="mt-3 flex items-center gap-2 text-sm">
+                            <mat-spinner diameter="16"></mat-spinner> Reading the inbox…
+                        </div>
+                    } @else if (inboxError()) {
+                        <inspecto-alert
+                            class="mt-2 block"
+                            variant="warning"
+                            icon="heroicons_outline:exclamation-triangle"
+                        >
+                            {{ inboxError() }}
+                        </inspecto-alert>
+                    } @else if (inboxFiles().length) {
+                        <ul class="mt-2 max-h-48 overflow-auto" aria-label="Inbox files">
+                            @for (f of inboxFiles(); track f.name) {
+                                <li>
+                                    <button
+                                        type="button"
+                                        class="hover:bg-hover flex w-full items-center gap-2 rounded px-2 py-1 text-left text-sm"
+                                        [attr.aria-pressed]="isSelected(f.name)"
+                                        (click)="toggleFile(f.name)"
+                                    >
+                                        <mat-icon
+                                            class="icon-size-4"
+                                            [svgIcon]="
+                                                isSelected(f.name)
+                                                    ? 'heroicons_outline:check-circle'
+                                                    : 'heroicons_outline:document'
+                                            "
+                                        ></mat-icon>
+                                        <span class="min-w-0 flex-1 truncate font-mono">{{ f.name }}</span>
+                                        <span class="text-secondary text-xs">{{ f.size }} B</span>
+                                    </button>
+                                </li>
+                            }
+                        </ul>
+                    } @else {
+                        <inspecto-empty-state
+                            icon="heroicons_outline:folder-open"
+                            message="The inbox is empty — upload a file to test with."
+                        />
+                    }
                 } @else if (exploring()) {
                     <div class="mt-3 flex items-center gap-2 text-sm">
                         <mat-spinner diameter="16"></mat-spinner> Exploring…
@@ -231,6 +296,7 @@ export interface RunToHereData {
 export class RunToHereDialog implements OnInit {
     private api = inject(PipelinesService);
     private probe = inject(ConnectionProbeService);
+    private confirm = inject(InspectoConfirmService);
     /** Public: the template closes WITH the result (see the Close button). */
     readonly ref = inject(MatDialogRef<RunToHereDialog>);
     readonly data = inject<RunToHereData>(MAT_DIALOG_DATA);
@@ -244,12 +310,22 @@ export class RunToHereDialog implements OnInit {
     readonly loadingPaths = signal<Set<string>>(new Set());
     readonly selectedFiles = signal<string[]>([]);
 
+    /** The inbox (`dirs.poll`) listing — only for a pipeline that binds no connection (INBOX-UPLOAD-1). */
+    readonly inboxFiles = signal<PipelineInboxFile[]>([]);
+    readonly inboxLoading = signal(false);
+    readonly inboxError = signal<string | null>(null);
+    readonly uploading = signal(false);
+    readonly uploadError = signal<string | null>(null);
+
     readonly running = signal(false);
     readonly result = signal<PipelineRunResult | null>(null);
     readonly error = signal<string | null>(null);
 
     ngOnInit(): void {
-        if (!this.data.connectionId) return;
+        if (!this.data.connectionId) {
+            this.loadInbox();
+            return;
+        }
         this.exploring.set(true);
         this.probe.explore(this.data.connectionId).subscribe({
             next: (ns) => {
@@ -304,6 +380,47 @@ export class RunToHereDialog implements OnInit {
         this.selectedFiles.set([...sel]);
     }
 
+    isSelected(path: string): boolean {
+        return this.selectedFiles().includes(path);
+    }
+
+    toggleFile(path: string): void {
+        this.selectedFiles.set(
+            this.isSelected(path) ? this.selectedFiles().filter((p) => p !== path) : [...this.selectedFiles(), path],
+        );
+    }
+
+    onUploadPicked(event: Event): void {
+        const input = event.target as HTMLInputElement;
+        const file = input.files?.[0];
+        input.value = ''; // picking the same file again must fire (change) again
+        if (file) this.upload(file, false);
+    }
+
+    /** Upload, asking before replacing a file of the same name (409), then refresh the list + select the upload. */
+    upload(file: File, overwrite: boolean): void {
+        this.uploading.set(true);
+        this.uploadError.set(null);
+        this.api.uploadToInbox(this.data.pipelineId, file, overwrite).subscribe({
+            next: (r) => {
+                this.uploading.set(false);
+                this.loadInbox(r.file);
+            },
+            error: async (e: unknown) => {
+                this.uploading.set(false);
+                if (!overwrite && e instanceof HttpErrorResponse && e.status === 409) {
+                    const replace = await this.confirm.confirm(
+                        `"${file.name}" is already in the inbox. Replace it?`,
+                        'Replace inbox file',
+                    );
+                    if (replace) this.upload(file, true);
+                    return;
+                }
+                this.uploadError.set(apiErrorMessage(e, 'Upload failed'));
+            },
+        });
+    }
+
     removeFile(path: string): void {
         this.selectedFiles.set(this.selectedFiles().filter((p) => p !== path));
     }
@@ -343,6 +460,22 @@ export class RunToHereDialog implements OnInit {
     basename(path: string): string {
         const i = path.lastIndexOf('/');
         return i >= 0 ? path.slice(i + 1) : path;
+    }
+
+    private loadInbox(select?: string): void {
+        this.inboxLoading.set(true);
+        this.api.inboxFiles(this.data.pipelineId).subscribe({
+            next: (l) => {
+                this.inboxFiles.set(l.files);
+                this.inboxError.set(null);
+                this.inboxLoading.set(false);
+                if (select && !this.isSelected(select)) this.selectedFiles.set([...this.selectedFiles(), select]);
+            },
+            error: (e: unknown) => {
+                this.inboxError.set(apiErrorMessage(e, 'Could not read the inbox'));
+                this.inboxLoading.set(false);
+            },
+        });
     }
 
     private clearLoading(path: string): void {

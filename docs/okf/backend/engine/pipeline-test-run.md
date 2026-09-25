@@ -97,6 +97,29 @@ The body is caller-supplied, so without containment this route is an arbitrary-f
   2026-09-22). It used to answer a `{files:[…]}` run with 200 *“no rows were parsed”* — an empty
   success where the honest answer is a refusal. Row `TESTRUN-DATASET-COLLECTOR-SILENT-1`.
 
+## Getting a file into the inbox (INBOX-UPLOAD-1, 2026-09-25)
+
+A Stream onboarded from the Catalog binds **no connection** and polls `data/inbox/<stream>` under the Space
+root, so its run-to-here jail root is `dirs.poll` — and until this route the builder had to copy a file
+there by hand (found in a builder pilot). `PipelineInboxRoutes`:
+
+- `GET /pipelines/authored/{id}/inbox` — open read: the regular files directly in `dirs.poll`, newest
+  first, by **bare name** (exactly what `files` takes for a connection-less Pipeline). Capped at 500 with
+  `truncated` + the true `total`.
+- `POST /pipelines/authored/{id}/inbox?file=<name>[&overwrite=true]` — `canAuthorWorkbench` (like
+  run-to-here). The **raw body** is the file. Gates in order: 503 no write root · 404 · 501 Dataset-fed ·
+  422 no name · **403 a name that is a path** (separator, `..`, colon — refused, never resolved; the
+  resolved target is still jailed to `dirs.poll`) · 413 over 64 MiB (on the declared length, before
+  buffering) · 422 empty body · 409 exists without `overwrite` · then `AtomicFiles.write` — the staging
+  file is a `.tmp` sibling, which the poll's in-flight exclusion ignores.
+- ⚠ It writes into the **production** inbox: an ACTIVE Pipeline ingests the file on its next poll. That is
+  the point for a draft Stream's first file; it is not a scratch copy.
+- ⚠ A connection-bound Pipeline's run-to-here jails against the connection's `base_path`, not
+  `dirs.poll`, so the editor offers the upload only when no connection is bound.
+- The UI is the Run-to-here dialog's *Inbox files* section (`run-to-here.dialog.ts`): it lists the inbox,
+  uploads a picked file, asks before replacing (409 → confirm → `overwrite=true`), then refreshes the list
+  and selects the upload.
+
 ## Response, and the two grains in it
 
 `PipelineRunResult` = `{seedNode, toNode, files[], relations[], output|null, warnings[]}`.
@@ -406,6 +429,7 @@ and when a probe leaves a test green, suspect the test, not the probe.
 - `inspecto-etl/…/etl/PipelineConfig.java` — `forScratchRun(Path)`
 - `inspecto/…/control/PipelineGraphRoutes.java` — `testRun`, `testRunRoot`, `graphFor`, `fileList`, `runResult`
 - `inspecto-acquire/…/acquire/LocalConnectionWorkbench.java` — `jail(Path, String)`
+- `inspecto/…/control/PipelineInboxRoutes.java` — `list`, `upload` (INBOX-UPLOAD-1); test `ControlApiPipelineInboxTest` (8, real HTTP)
 - `inspecto-engine/…/pipeline/exec/PipelineExecutor.java` — `dryRun(…, stopAtNodeId)`, `ancestorsOf`
 - `inspecto-engine/…/pipeline/exec/PipelineDryRun.java` — `run(…, stopAtNodeId)`, `notExecutedWarnings`, the `WebhookSink.plan` loop in `runSeeded`
 - `inspecto-util/…/util/DuckDbUtil.java` — `withoutPendingQueryPreamble`

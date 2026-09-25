@@ -333,6 +333,30 @@ export interface PipelineRunResult {
     warnings: string[];
 }
 
+/** One file waiting in a pipeline's inbox (GET /pipelines/authored/{id}/inbox). */
+export interface PipelineInboxFile {
+    name: string;
+    size: number;
+    modifiedAt: string;
+}
+
+/** The pipeline's inbox (`dirs.poll`) listing; `total` is the true count even when `truncated`. */
+export interface PipelineInboxListing {
+    pipeline: string;
+    inbox: string;
+    total: number;
+    truncated: boolean;
+    files: PipelineInboxFile[];
+}
+
+/** Receipt of POST /pipelines/authored/{id}/inbox?file= — the file landed in the inbox. */
+export interface PipelineInboxUpload {
+    pipeline: string;
+    file: string;
+    size: number;
+    replaced: boolean;
+}
+
 // ── Data-plane provenance (T22) — per-edge record counts of a past pipeline run ──
 
 /** One run of a pipeline that recorded provenance (GET /provenance/batches), newest first. */
@@ -757,6 +781,26 @@ export class PipelinesService {
             apiUrl(`/pipelines/authored/${encodeURIComponent(id)}/run`),
             { files },
             { params: { to: nodeId } },
+        );
+    }
+
+    /** The files waiting in the pipeline's inbox (`dirs.poll`), newest first (INBOX-UPLOAD-1). */
+    inboxFiles(id: string): Observable<PipelineInboxListing> {
+        return this.http.get<PipelineInboxListing>(apiUrl(`/pipelines/authored/${encodeURIComponent(id)}/inbox`));
+    }
+
+    /**
+     * Upload one file into the pipeline's inbox as the raw request body. 409 when a file of that name is
+     * already there unless `overwrite`; 403 for a name that is a path; 413 over the server's cap.
+     */
+    uploadToInbox(id: string, file: File, overwrite = false): Observable<PipelineInboxUpload> {
+        return this.http.post<PipelineInboxUpload>(
+            apiUrl(`/pipelines/authored/${encodeURIComponent(id)}/inbox`),
+            file,
+            {
+                params: overwrite ? { file: file.name, overwrite: 'true' } : { file: file.name },
+                headers: { 'Content-Type': 'application/octet-stream' },
+            },
         );
     }
 

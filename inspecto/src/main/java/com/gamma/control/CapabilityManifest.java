@@ -200,6 +200,9 @@ final class CapabilityManifest {
             // fires a production run — hence author, unlike its /trigger sibling below.
             new Entry("POST", "/pipelines/authored/([^/]+)/run", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/pipelines/authored/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
+            // PipelineInboxRoutes — INBOX-UPLOAD-1: upload one file into the poll directory from the
+            // editor; author, like run-to-here (the GET listing is a read and carries no gate).
+            new Entry("POST", "/pipelines/authored/([^/]+)/inbox", Roles.CAN_AUTHOR_WORKBENCH),
             // PipelineHistoryRoutes — restoring a config version is a save (PIPELINE-CONFIG-HISTORY-1);
             // the list/read/diff reads carry no gate, like GET /pipelines/{name}/graph/raw.
             new Entry("POST", "/pipelines/([^/]+)/history/([^/]+)/restore", Roles.CAN_AUTHOR_WORKBENCH),
