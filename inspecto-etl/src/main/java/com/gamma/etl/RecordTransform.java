@@ -301,6 +301,22 @@ public final class RecordTransform {
                                                     SourceZones zones,
                                                     String sourceTable,
                                                     boolean typedSource) {
+        return compile(fields, fieldTypes, Map.of(), csv, zones, sourceTable, typedSource);
+    }
+
+    /**
+     * As {@link #compile(List, Map, PipelineConfig.CsvSettings, SourceZones, String, boolean)}, with
+     * each raw field's own strptime {@code format} ({@link SchemaFieldTypes#formatsOf}, keyed like
+     * {@code fieldTypes} by the SOURCE column): a {@code keep} of a formatted date-like field parses
+     * with that one format instead of the pipeline's list.
+     */
+    public static List<Map<String, Object>> compile(List<Map<String, Object>> fields,
+                                                    Map<String, String> fieldTypes,
+                                                    Map<String, String> fieldFormats,
+                                                    PipelineConfig.CsvSettings csv,
+                                                    SourceZones zones,
+                                                    String sourceTable,
+                                                    boolean typedSource) {
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> field : fields) {
             String name = str(field, "name");
@@ -321,7 +337,10 @@ public final class RecordTransform {
                     throw new IllegalArgumentException("field '" + name + "' keeps a column but names none");
                 String col = "\"" + sourceTable + "\".\"" + from + '"';
                 String type = fieldTypes.getOrDefault(from, SchemaFieldTypes.VARCHAR);
-                expr = SchemaFieldTypes.castSql(col, type, csv.dateFormats(), csv.tsFormats(),
+                String fmt = fieldFormats.get(from);
+                expr = SchemaFieldTypes.castSql(col, type,
+                        SchemaFieldTypes.formatsFor(fmt, csv.dateFormats()),
+                        SchemaFieldTypes.formatsFor(fmt, csv.tsFormats()),
                         zones.zoneArg(from, sourceTable));
             } else if (CONCAT_PARTS.equals(fn.id()) && !typedSource) {
                 // The CONCAT_DT analogue on the raw table, byte-for-byte what TransformCompiler.concatDt

@@ -264,16 +264,21 @@ class ControlApiOnboardingLifecycleTest {
         try (Ctx c = open(cfg, null)) {
             String body = """
                     {"sampleRows":[
-                       {"ORDER_ID":"1001","QUANTITY":"3.5","ORDER_DAY":"2026-01-01"},
-                       {"ORDER_ID":"1002","QUANTITY":"2","ORDER_DAY":"2026-01-02"}]}""";
+                       {"ORDER_ID":"1001","QUANTITY":"3.5","ORDER_DAY":"2026-01-01","SOLD":"March 22,2025"},
+                       {"ORDER_ID":"1002","QUANTITY":"2","ORDER_DAY":"2026-01-02","SOLD":"April 1,2025"}]}""";
             HttpResponse<String> r = post(c.port, "/config/suggest/schema", body);
             assertEquals(200, r.statusCode(), r.body());
             JsonNode out = V1Body.of(r.body());
             assertEquals("ORDER_ID", out.get("fields").get(0).get("name").asText());
             assertEquals("BIGINT", out.get("fields").get(0).get("type").asText());
+            assertNull(out.get("fields").get(0).get("format"), "only a proven DATE carries a format");
             assertEquals("DOUBLE", out.get("fields").get(1).get("type").asText());
             assertEquals("DATE", out.get("fields").get(2).get("type").asText(),
                     "date-only strings demote from TIMESTAMP to DATE");
+            assertEquals("%Y-%m-%d", out.get("fields").get(2).get("format").asText());
+            assertEquals("DATE", out.get("fields").get(3).get("type").asText(), "a human date is a DATE");
+            assertEquals("%B %d,%Y", out.get("fields").get(3).get("format").asText(),
+                    "…with the strptime format the engine needs to land it");
             // MAPPING-GEN-1: both generators speak the Record Transformer field list; the legacy rules[]
             // (and the transformType this route alone used to stamp) are read-only history.
             assertNull(out.get("mapping").get("rules"), "no legacy rules[] in a generated mapping");

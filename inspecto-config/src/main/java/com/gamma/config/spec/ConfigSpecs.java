@@ -1046,7 +1046,9 @@ public final class ConfigSpecs {
                 FieldSpec.of("partitionKey", "Partition key", FieldType.STRING,
                         "Column whose value drives Hive partitioning (or use fields[].partitions)."),
                 FieldSpec.of("raw.fields", "Field definitions", FieldType.LIST,
-                        "Tabular array of {name,selector,type[,description,unit,classification]}."),
+                        "Tabular array of {name,selector,type[,format,description,unit,classification]}. "
+                                + "format is a strptime pattern (e.g. %B %d,%Y) for a DATE/TIMESTAMP field "
+                                + "and replaces the pipeline's date/timestamp format list for it."),
                 FieldSpec.of("mapping.canonicalName", "Canonical name", FieldType.STRING,
                         "Canonical table name the raw source maps to.")
         );

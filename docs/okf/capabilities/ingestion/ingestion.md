@@ -271,6 +271,20 @@ count. ⚠ **No UI exists** (§2).
 **refused at config load**; `FILENAME_DATE` and `DATE` are zone-exempt (a date has no instant to shift). The
 DuckDB session's own zone is the host's and is a different rule (`DAT` §3.7).
 
+**Per-field date format (2026-09-25).** `raw.fields[].format` is a DATE/TIMESTAMP/TIMESTAMPTZ field's own
+strptime pattern (`%B %d,%Y` for `March 22,2025`). When set it **replaces** — never joins — the pipeline's
+`date_formats`/`timestamp_formats` for that field (`SchemaFieldTypes.formatsOf/formatsFor`), in the data
+column (`RecordTransform.compile`), its `DATE_*` partition and event time (`TransformCompiler.dateExpr`) and
+the cast-failure audit alike: a shared list trying other patterns first is how `%d/%m/%Y` silently reads as
+`%m/%d/%Y`. A value the format does not match follows the existing coercion policy — NULL, row kept, counted
+by `countCastFailures` (there is no reject/quarantine for coercion failures). `Identifiers.validateSchema`
+refuses a format on a non-date (or absent) type, one with no `%` directive or a single quote (it is inlined
+into a SQL literal), and a zone directive. `POST /config/suggest/schema` emits it: `SchemaSuggest` tries
+`DATE_FORMATS` on a column no bare cast accepts, and a DATE carries the format it was proven with; a sample
+under which two formats give different dates (`03/04/2025`) gets **no** format and stays VARCHAR. ⚠ DuckDB
+strptime matches whitespace exactly, so a column mixing `March 22,2025` and `March 22, 2025` fits no single
+format and is suggested VARCHAR. `SchemaExtractor` regeneration does not preserve `format` (it re-infers).
+
 ### 3.9 Authoring: the Parse pane, the grammar drawer, Grammar Templates
 
 The **sectioned Parse pane** (`pipeline-parse-definition.component.ts`, redesign shipped `d012f721`

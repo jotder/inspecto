@@ -103,6 +103,35 @@ public final class Identifiers {
         }
     }
 
+    /**
+     * Validate a field's strptime {@code format} ({@link SchemaFieldTypes#formatsOf}). Fail closed on
+     * every shape that would otherwise load and then mislead:
+     * <ul>
+     *   <li>on a type that is not date-like — nothing reads it there, so it would be dead config that
+     *       reads as if it were in force;</li>
+     *   <li>with no {@code %} directive, or with a single quote — the format is inlined into a SQL
+     *       string literal;</li>
+     *   <li>with a zone directive — the same refusal {@code date_formats} gets
+     *       ({@link SourceZones#assertNoZoneDirective}).</li>
+     * </ul>
+     */
+    private static void validateFieldFormat(Map<?, ?> field, String origin) {
+        String fmt = blankToNull(field.get("format"));
+        if (fmt == null) return;
+        String name = String.valueOf(field.get("name"));
+        String where = origin + ".raw.fields[" + name + "].format";
+        Object type = field.get("type");
+        if (!(type instanceof String t) || !SchemaFieldTypes.isDateLike(t))
+            throw new IllegalArgumentException("Schema field '" + name + "' at " + origin + " sets format '"
+                    + fmt + "' but its type is " + (type == null ? "absent (VARCHAR)" : "'" + type + "'")
+                    + ". A format is honoured only on DATE, TIMESTAMP or TIMESTAMPTZ — set the type or "
+                    + "drop the format.");
+        if (fmt.indexOf('%') < 0 || fmt.indexOf('\'') >= 0)
+            throw new IllegalArgumentException("Schema field format at " + where + " is invalid: '" + fmt
+                    + "'. It must be a strptime pattern such as %B %d,%Y, with no single quote.");
+        SourceZones.assertNoZoneDirective(List.of(fmt), where);
+    }
+
     /** Trimmed text, or {@code null} for absent/blank — see {@link #validateFieldZone}. */
     static String blankToNull(Object o) {
         if (!(o instanceof String s)) return null;
@@ -135,6 +164,7 @@ public final class Identifiers {
                         validate((String) fm.get("name"), origin + ".raw.fields[].name");
                         validateFieldType((String) fm.get("type"), (String) fm.get("name"), origin);
                         validateFieldZone(fm, declared, origin);
+                        validateFieldFormat(fm, origin);
                     }
                 }
             }

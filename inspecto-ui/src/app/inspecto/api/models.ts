@@ -570,7 +570,8 @@ export interface DerivedSchemaResult {
  *  already-parsed sample rows (TRY_CAST voting); seeds a human edit, never auto-applied.
  *  `drift` (B3) is present only when the caller posted the draft it holds. */
 export interface SchemaSuggestion {
-    fields: { name: string; selector: string; type: string }[];
+    /** `format` — the strptime pattern a suggested DATE was proven with; absent otherwise. */
+    fields: { name: string; selector: string; type: string; format?: string }[];
     /** The Record Transformer field list (MAPPING-GEN-1, 2026-09-10) — one `keep` per inferred field;
      *  the legacy `rules[]` is no longer emitted by any generator. */
     mapping: { fields: { name: string; from: string; fn: string }[] };

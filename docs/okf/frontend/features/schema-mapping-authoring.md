@@ -165,7 +165,9 @@ catalog and by persisting `fields[]`.
 - **Both hand-typed and inferred**: rows can be typed directly, or "Suggest from sample" (`:102-107`) calls
   `ConfigService.suggestSchema()` (`POST /config/suggest/schema`, TRY_CAST voting) against `data.sampleRows`
   captured by an earlier Test-Parse (`:20-21,175-204`). Inference only fills the grid as a draft — nothing
-  persists until Save (`:181-183`).
+  persists until Save (`:181-183`). A suggested DATE fills the **Date format** column (`raw.fields[].format`,
+  a strptime pattern such as `%B %d,%Y`) — without it a non-ISO date lands NULL; see
+  [ingestion §3.8](../../capabilities/ingestion/ingestion.md).
 - **Inference (a separate, upstream endpoint):** `POST /parsers/{id}/preview` (`ParserRoutes.java:34,58-71`)
   runs a DuckDB `auto_detect` sniff and returns per-column types (`ParserRoutes.java:111-113`). Stateless —
   writes nothing.

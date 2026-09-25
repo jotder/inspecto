@@ -350,6 +350,8 @@ final class ConfigPreviewRoutes implements RouteModule {
                 field.put("name", f.name());
                 field.put("selector", f.name());
                 field.put("type", f.type());
+                // The strptime pattern a DATE was proven with — without it a non-ISO date lands NULL.
+                if (f.format() != null) field.put("format", f.format());
                 fields.add(field);
                 // MAPPING-GEN-1: the same field-list spelling the CLI generator writes (SchemaExtractor) —
                 // this route used to say `transformType: DIRECT` where the CLI omitted it; now neither

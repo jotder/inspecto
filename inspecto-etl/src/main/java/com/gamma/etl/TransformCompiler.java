@@ -64,6 +64,17 @@ public final class TransformCompiler {
     public static String partitionColumn(PartitionDef pd, String sourceTable,
                                          Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv,
                                          SourceZones zones) {
+        return partitionColumn(pd, sourceTable, fieldTypes, Map.of(), csv, zones);
+    }
+
+    /**
+     * As {@link #partitionColumn(PartitionDef, String, Map, PipelineConfig.CsvSettings, SourceZones)},
+     * with the source fields' own strptime formats ({@link SchemaFieldTypes#formatsOf}) — so a
+     * {@code DATE_*} partition is cut from the same parse the stored column holds.
+     */
+    public static String partitionColumn(PartitionDef pd, String sourceTable,
+                                         Map<String, String> fieldTypes, Map<String, String> fieldFormats,
+                                         PipelineConfig.CsvSettings csv, SourceZones zones) {
         String col = "\"" + sourceTable + "\".\"" + pd.source() + "\"";
         StringBuilder sb = new StringBuilder();
         switch (pd.type()) {
@@ -71,7 +82,7 @@ public final class TransformCompiler {
             case DOUBLE  -> sb.append("TRY_CAST(").append(col).append(" AS DOUBLE)");
             case INTEGER -> sb.append("TRY_CAST(").append(col).append(" AS INTEGER)");
             case DATE_YEAR, DATE_MONTH, DATE_DAY -> {
-                String dateExpr = dateExpr(pd, sourceTable, fieldTypes, csv, zones);
+                String dateExpr = dateExpr(pd, sourceTable, fieldTypes, fieldFormats, csv, zones);
                 switch (pd.type()) {
                     case DATE_YEAR  -> sb.append("YEAR(").append(dateExpr).append(")::VARCHAR");
                     case DATE_MONTH -> sb.append("LPAD(MONTH(").append(dateExpr)
@@ -95,15 +106,17 @@ public final class TransformCompiler {
      * {@code __HIVE_DEFAULT_PARTITION__} (NULL) partition.
      */
     private static String dateExpr(PartitionDef pd, String sourceTable,
-                                   Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv,
-                                   SourceZones zones) {
+                                   Map<String, String> fieldTypes, Map<String, String> fieldFormats,
+                                   PipelineConfig.CsvSettings csv, SourceZones zones) {
         String col         = "\"" + sourceTable + "\".\"" + pd.source() + "\"";
         String srcType     = SchemaFieldTypes.normalize(fieldTypes.getOrDefault(pd.source(), SchemaFieldTypes.VARCHAR));
         // A TIMESTAMPTZ source carries a time component exactly like TIMESTAMP, so it must parse
         // with timestamp_formats too — a date-only parse would NULL every row into the sentinel.
         String castType    = ("TIMESTAMP".equals(srcType) || "TIMESTAMPTZ".equals(srcType)) ? "TIMESTAMP" : "DATE";
         String varcharExpr = "CAST(" + col + " AS VARCHAR)";
-        String parsed      = SqlBuilder.buildCastExpr(varcharExpr, castType, csv.dateFormats(), csv.tsFormats());
+        String fmt         = fieldFormats.get(pd.source());
+        String parsed      = SqlBuilder.buildCastExpr(varcharExpr, castType,
+                SchemaFieldTypes.formatsFor(fmt, csv.dateFormats()), SchemaFieldTypes.formatsFor(fmt, csv.tsFormats()));
         // A DATE partition source has no instant to shift; only the timestamp branch takes a zone.
         // Both a TIMESTAMP and a TIMESTAMPTZ source normalise to naive UTC here — deliberately, even
         // though the stored TIMESTAMPTZ column keeps its offset: a partition cut from an instant
@@ -139,6 +152,13 @@ public final class TransformCompiler {
     public static String eventTimeColumn(PartitionDef pd, String sourceTable,
                                          Map<String, String> fieldTypes, PipelineConfig.CsvSettings csv,
                                          SourceZones zones) {
-        return "CAST(" + dateExpr(pd, sourceTable, fieldTypes, csv, zones) + " AS TIMESTAMP)";
+        return eventTimeColumn(pd, sourceTable, fieldTypes, Map.of(), csv, zones);
+    }
+
+    /** As the five-argument form, with the source fields' own strptime formats (see {@link #partitionColumn}). */
+    public static String eventTimeColumn(PartitionDef pd, String sourceTable,
+                                         Map<String, String> fieldTypes, Map<String, String> fieldFormats,
+                                         PipelineConfig.CsvSettings csv, SourceZones zones) {
+        return "CAST(" + dateExpr(pd, sourceTable, fieldTypes, fieldFormats, csv, zones) + " AS TIMESTAMP)";
     }
 }

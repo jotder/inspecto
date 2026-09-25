@@ -97,6 +97,7 @@ function create(
                 fields: [
                     { name: 'ID', selector: 'ID', type: 'BIGINT' },
                     { name: 'AMT', selector: 'AMT', type: 'DOUBLE' },
+                    { name: 'SOLD', selector: 'SOLD', type: 'DATE', format: '%B %d,%Y' },
                 ],
                 mapping: { fields: [] },
             }),
@@ -231,8 +232,18 @@ describe('SchemaEditorDialog', () => {
         await c.suggestFromSample();
         expect(api.suggestSchema).toHaveBeenCalledWith(sample);
         expect(c.rows()).toEqual([
-            { name: 'ID', selector: 'ID', type: 'BIGINT', description: '', unit: '', classification: '' },
-            { name: 'AMT', selector: 'AMT', type: 'DOUBLE', description: '', unit: '', classification: '' },
+            { name: 'ID', selector: 'ID', type: 'BIGINT', format: '', description: '', unit: '', classification: '' },
+            { name: 'AMT', selector: 'AMT', type: 'DOUBLE', format: '', description: '', unit: '', classification: '' },
+            // A suggested human date carries the strptime format it needs to land as DATE.
+            {
+                name: 'SOLD',
+                selector: 'SOLD',
+                type: 'DATE',
+                format: '%B %d,%Y',
+                description: '',
+                unit: '',
+                classification: '',
+            },
         ]);
         expect(api.write).not.toHaveBeenCalled(); // a draft seeds the grid; the human still saves
         // Flush the row update into the grid before axe runs — an un-flushed ag-grid sits in a

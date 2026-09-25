@@ -76,6 +76,10 @@ const COLUMNS: EditableGridColumn[] = [
     // Free-text DuckDB SQL type — the server enforces no enum, only the BACKWARD widening lattice
     // on EDIT, so a select here would refuse types the server accepts (mock-strictness, inverted).
     { key: 'type', label: 'Type' },
+    // strptime pattern for a DATE/TIMESTAMP written in a non-ISO spelling (`%B %d,%Y` for
+    // `March 22,2025`) — it replaces the pipeline's format list for this field. "Suggest from sample"
+    // fills it; without it such a column lands NULL. The server refuses it on any other type.
+    { key: 'format', label: 'Date format' },
     { key: 'description', label: 'Description' },
     { key: 'unit', label: 'Unit' },
     { key: 'classification', label: 'Classification' },

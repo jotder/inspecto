@@ -122,6 +122,7 @@ public final class DataTransformer {
         for (Map<String, Object> f : fields)
             fieldTypes.put((String) f.get("name"), (String) f.get("type"));
         SourceZones zones = SourceZones.of(schemaConfig, cfg.csv().sourceTimezone());
+        Map<String, String> fieldFormats = SchemaFieldTypes.formatsOf(schemaConfig);
 
         StringBuilder select = new StringBuilder("SELECT ");
 
@@ -149,7 +150,8 @@ public final class DataTransformer {
         } else {
             for (PartitionDef pd : partDefs) {
                 select.append(", ");
-                select.append(TransformCompiler.partitionColumn(pd, sourceTable, fieldTypes, cfg.csv(), zones));
+                select.append(TransformCompiler.partitionColumn(pd, sourceTable, fieldTypes, fieldFormats,
+                        cfg.csv(), zones));
                 select.append(" AS \"").append(pd.column()).append('"');
             }
         }
@@ -160,7 +162,8 @@ public final class DataTransformer {
         // when its date defs disagree on a source column — so PartitionWriter's EXCLUDE can be unconditional
         // and the written output schema never depends on the schema's partition shape.
         select.append(", ").append(PartitionDef.eventTimeDef(partDefs)
-                        .map(pd -> TransformCompiler.eventTimeColumn(pd, sourceTable, fieldTypes, cfg.csv(), zones))
+                        .map(pd -> TransformCompiler.eventTimeColumn(pd, sourceTable, fieldTypes, fieldFormats,
+                                cfg.csv(), zones))
                         .orElse("CAST(NULL AS TIMESTAMP)"))
                 .append(" AS ").append(TransformCompiler.EVENT_TIME_COL);
 
@@ -199,6 +202,7 @@ public final class DataTransformer {
                 ((Map<String, Object>) schemaConfig.get("raw")).get("fields"))
             fieldTypes.put((String) f.get("name"), (String) f.get("type"));
         SourceZones zones = SourceZones.of(schemaConfig, cfg.csv().sourceTimezone());
+        Map<String, String> fieldFormats = SchemaFieldTypes.formatsOf(schemaConfig);
 
         // 🔴 This method reads the mapping DIRECTLY — it does not go through selectFor — so it must
         // read the same fields[] the SELECT was compiled from. A mapping with no fields (nor rules to
@@ -211,7 +215,7 @@ public final class DataTransformer {
             for (Map<String, Object> field : fieldRows) {
                 List<String> inputs = RecordTransform.auditedSourceColumns(field, fieldTypes);
                 if (inputs.isEmpty()) continue;   // custom / no source / VARCHAR pass-through — see that method
-                String expr = RecordTransform.compile(List.of(field), fieldTypes, cfg.csv(), zones,
+                String expr = RecordTransform.compile(List.of(field), fieldTypes, fieldFormats, cfg.csv(), zones,
                         sourceTable, false).get(0).get("expr").toString();
                 if (!targets.isEmpty()) select.append(", ");
                 // every column input non-blank AND the expression NULL — a blank second input is not a
@@ -278,7 +282,8 @@ public final class DataTransformer {
         if (fieldRows == null)
             throw new IllegalArgumentException("schema '" + schemaConfig.get("name")
                     + "' has a mapping with neither fields[] nor rules[] — nothing to project");
-        return RecordTransform.compile(fieldRows, fieldTypes, csv, zones, sourceTable, false);
+        return RecordTransform.compile(fieldRows, fieldTypes, SchemaFieldTypes.formatsOf(schemaConfig),
+                csv, zones, sourceTable, false);
     }
 
     /**

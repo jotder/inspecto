@@ -1872,7 +1872,7 @@ export class PipelineParseDefinitionComponent {
 }
 
 /** The `raw.fields[]` keys the columns table's form does not model — see `withMetadata`. */
-const CARRIED_FIELD_KEYS = ['description', 'unit', 'classification', 'timezone_column'] as const;
+const CARRIED_FIELD_KEYS = ['description', 'unit', 'classification', 'timezone_column', 'format'] as const;
 
 /**
  * The schema BACKWARD save-gate's 422, told apart from every other write failure. Matched on the

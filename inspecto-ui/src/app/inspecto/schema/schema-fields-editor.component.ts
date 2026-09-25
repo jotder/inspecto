@@ -159,6 +159,9 @@ export interface SchemaFieldRow {
      * a save, and shown read-only on its row so the fixed-zone box cannot silently contradict it.
      */
     timezone_column?: string;
+    /** `raw.fields[].format` — a DATE/TIMESTAMP field's own strptime pattern. Not edited here; carried so
+     *  a drafted or hand-authored one survives an Apply (without it a non-ISO date lands NULL). */
+    format?: string;
 }
 
 type SortKey = 'source' | 'name' | 'selector' | 'type';

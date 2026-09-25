@@ -1,8 +1,10 @@
 package com.gamma.etl;
 
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -121,6 +123,36 @@ public final class SchemaFieldTypes {
      */
     public static boolean isDateLike(String type) {
         return DATE_LIKE.contains(normalize(type));
+    }
+
+    /**
+     * The per-field {@code raw.fields[].format} declarations of a schema, keyed by field name — blank
+     * rows omitted (TOON's tabular form writes {@code ""} for every field that has none).
+     *
+     * <p><b>What a field format means.</b> A strptime pattern saying exactly how THIS column's text is
+     * written — {@code %B %d,%Y} for {@code March 22,2025}. When present it <b>replaces</b> the
+     * pipeline's {@code date_formats}/{@code timestamp_formats} list for that field rather than joining
+     * it: a column is written one way, and letting a shared list try other patterns first is how a
+     * {@code %d/%m/%Y} column silently parses as {@code %m/%d/%Y}. A value the format does not match is
+     * a coercion failure like any other — NULL, and counted by the cast-failure audit
+     * ({@link DataTransformer#countCastFailures}). Honoured on date-like types only;
+     * {@link Identifiers#validateSchema} refuses it anywhere else.
+     */
+    public static Map<String, String> formatsOf(Map<String, Object> schemaConfig) {
+        Map<String, String> out = new LinkedHashMap<>();
+        Object raw = schemaConfig == null ? null : schemaConfig.get("raw");
+        if (raw instanceof Map<?, ?> rawMap && rawMap.get("fields") instanceof List<?> fields) {
+            for (Object f : fields) {
+                if (!(f instanceof Map<?, ?> fm) || !(fm.get("name") instanceof String name)) continue;
+                if (fm.get("format") instanceof String fmt && !fmt.isBlank()) out.put(name, fmt.trim());
+            }
+        }
+        return out;
+    }
+
+    /** The format list a field parses with: its own {@code format} alone when set, else the pipeline's. */
+    public static List<String> formatsFor(String fieldFormat, List<String> pipelineFormats) {
+        return fieldFormat == null || fieldFormat.isBlank() ? pipelineFormats : List.of(fieldFormat.trim());
     }
 
     /**
