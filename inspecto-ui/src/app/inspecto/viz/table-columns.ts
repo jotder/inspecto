@@ -13,10 +13,6 @@ export function isBadgeColumn(column: string, opts?: VizRenderOptions): boolean 
     return /(^|_)(status|severity|rag)$/i.test(column);
 }
 
-function escapeHtml(s: string): string {
-    return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
-}
-
 /** ag-Grid column definitions for the table plugin: readable headers + status badges. */
 export function tableColDefs(columns: string[], opts?: VizRenderOptions): ColDef[] {
     return columns.map((field) => {
@@ -31,7 +27,7 @@ export function tableColDefs(columns: string[], opts?: VizRenderOptions): ColDef
         if (isBadgeColumn(field, opts)) {
             def.cellRenderer = (p: { value: unknown }) => {
                 if (p.value == null || p.value === '') return '';
-                const text = escapeHtml(String(p.value));
+                const text = String(p.value);
                 return statusBadgeHtml(text, text);
             };
         }

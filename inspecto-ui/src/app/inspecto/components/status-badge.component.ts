@@ -135,6 +135,11 @@ export function statusToneSchemeClasses(tone: StatusTone, scheme: 'light' | 'dar
     return TONE_SCHEME_CLASSES[tone][scheme];
 }
 
+/** HTML-escape text for an HTML-string cell renderer. */
+export function escapeHtml(s: string): string {
+    return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
+}
+
 /**
  * Full markup (geometry + color) for a status token — for raw HTML renderers. Pass `label` to show
  * custom text under a chosen tone (e.g. `statusBadgeHtml('warning', 'Behind')`), mirroring the
@@ -145,7 +150,9 @@ export function statusBadgeHtml(
     label?: string,
     variant: StatusBadgeVariant = 'pill',
 ): string {
-    const text = label ?? value ?? '';
+    // The text is ESCAPED here: callers hand over raw cell values (alert names, statuses read off data), and this
+    // string goes into the grid as HTML.
+    const text = escapeHtml(label ?? value ?? '');
     if (variant === 'dot') {
         const dot = `<span aria-hidden="true" class="${DOT} ${DOT_CLASSES[statusTone(value)]}"></span>`;
         return `<span class="${STATUS_DOT_BASE}">${dot}${text}</span>`;

@@ -42,6 +42,16 @@ describe('StatusBadgeComponent', () => {
         expect(span.textContent).toBe('FAIL');
     });
 
+    it('the string renderer escapes its text, so a cell value can never inject markup', () => {
+        const html = document.createElement('div');
+        html.innerHTML = statusBadgeHtml('<img src=x onerror=alert(1)>');
+        expect(html.querySelector('img')).toBeNull();
+        expect(html.textContent).toBe('<img src=x onerror=alert(1)>');
+        html.innerHTML = statusBadgeHtml('failed', 'A & <b>B</b>', 'dot');
+        expect(html.querySelector('b')).toBeNull();
+        expect(html.textContent).toBe('A & <b>B</b>');
+    });
+
     it('keeps the per-scheme table in step with the dark:-prefixed one', () => {
         for (const tone of STATUS_TONES) {
             const light = statusToneSchemeClasses(tone, 'light');
