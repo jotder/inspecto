@@ -48,6 +48,13 @@ final class SpiSlot<T> {
      * registered</b>, and it has to be: Personal ships no {@code META-INF/services} entry at all, and that
      * absence is legitimate and must stay empty. Only a provider that announced itself and then failed to
      * construct propagates.
+     *
+     * <p>🔴 <b>Fail-closed also refuses MORE THAN ONE provider.</b> "First found wins" means classpath order
+     * picks the Authenticator, so a hand-assembled classpath carrying both {@code inspecto-security.jar} and
+     * the demo build's {@code inspecto-demo-auth.jar} (a permit-by-picker sign-in) would silently serve
+     * whichever came first. Two registrations of a safety SPI are a packaging error, not a choice to make at
+     * runtime: throw, naming both, before either is constructed. (The build-side half is
+     * {@code tools/check-demo-auth-isolation.mjs}.)
      */
     Optional<T> active() {
         Optional<T> c = cached;
@@ -55,9 +62,14 @@ final class SpiSlot<T> {
         if (!failClosed) return cached = com.gamma.service.OptionalSpi.first(spi);
         // Deliberately NOT OptionalSpi: it catches ServiceConfigurationError, which is exactly what
         // ServiceLoader wraps a provider constructor's throw in.
-        var it = ServiceLoader.load(spi).iterator();
-        if (!it.hasNext()) return cached = Optional.empty();   // nothing registered — a real absence
-        return cached = Optional.of(it.next());                // registered: let a failure propagate
+        var providers = ServiceLoader.load(spi).stream().toList();
+        if (providers.isEmpty()) return cached = Optional.empty();   // nothing registered — a real absence
+        if (providers.size() > 1) {
+            throw new IllegalStateException(providers.size() + " providers of " + spi.getName() + " are registered ("
+                    + providers.stream().map(p -> p.type().getName()).toList()
+                    + ") — exactly one may be on the classpath; refusing to pick one by classpath order");
+        }
+        return cached = Optional.of(providers.get(0).get());          // registered: let a failure propagate
     }
 
     /**

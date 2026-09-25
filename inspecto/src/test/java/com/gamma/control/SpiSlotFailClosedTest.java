@@ -49,6 +49,21 @@ class SpiSlotFailClosedTest {
 
     public static final class WorkingProvider implements Working {}
 
+    /** An SPI with TWO registered providers (see its services file) — the security + demo-auth collision. */
+    public interface Doubled {}
+
+    public abstract static class DoubledProvider implements Doubled {
+        static final java.util.concurrent.atomic.AtomicInteger constructed = new java.util.concurrent.atomic.AtomicInteger();
+
+        DoubledProvider() {
+            constructed.incrementAndGet();
+        }
+    }
+
+    public static final class FirstDoubled extends DoubledProvider {}
+
+    public static final class SecondDoubled extends DoubledProvider {}
+
     // ── fail-soft (the default, every slot but the Authenticator) ──────────────────────────────
 
     @Test
@@ -88,6 +103,27 @@ class SpiSlotFailClosedTest {
         Optional<Working> resolved = new SpiSlot<>(Working.class, true).active();
         assertTrue(resolved.isPresent());
         assertInstanceOf(WorkingProvider.class, resolved.get());
+    }
+
+    /**
+     * 🔴 Two registrations of a fail-closed SPI refuse, naming both — the shape of a classpath carrying
+     * inspecto-security.jar AND the demo build's inspecto-demo-auth.jar, where "first found wins" would let
+     * classpath order choose between real authentication and a password-less picker. Neither provider is
+     * constructed: the refusal happens before either could run side effects (the demo one checks loopback).
+     */
+    @Test
+    void failClosedRefusesTwoRegisteredProviders() {
+        DoubledProvider.constructed.set(0);
+        IllegalStateException e = assertThrows(IllegalStateException.class, new SpiSlot<>(Doubled.class, true)::active);
+        assertTrue(e.getMessage().contains(FirstDoubled.class.getName()) && e.getMessage().contains(SecondDoubled.class.getName()),
+                "the operator must be told which two jars collide: " + e.getMessage());
+        assertEquals(0, DoubledProvider.constructed.get(), "neither provider may be constructed");
+    }
+
+    /** ⚠ Fail-soft keeps first-wins: a doubled FEATURE module is not a safety hole, and PKG-5 relies on it booting. */
+    @Test
+    void failSoftStillTakesTheFirstOfTwoProviders() {
+        assertTrue(new SpiSlot<>(Doubled.class).active().isPresent());
     }
 
     // ── caching, which must not be lost by either posture ─────────────────────────────────────
