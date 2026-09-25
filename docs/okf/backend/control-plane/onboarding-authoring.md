@@ -20,6 +20,18 @@ indexed, catalog-visible, never executed; D3 of the design). Shipped P0–P3, 20
   enforced**: pipelines → `<name>_pipeline.toon` (`MultiCollectorProcessor.resolveConfigs`),
   enrichments → `<name>_enrich.toon` (`ServiceBootstrap.resolveBySuffix`) — a bare name silently
   drops out of the registry on the next restart (found live, P2/P3).
+- 🔴 **A schema's FILE is not its identity** (`SCHEMA-FILE-NAME-1`, 2026-09-25). A schema self-names via
+  `raw.name`, but `raw.name` is the raw/source identity (the pipeline name, or `ORDERS`/`CALL`) while a
+  Pipeline references its schema as **`<pipeline>_schema.toon`** — the one convention the scaffold, the
+  Parse pane, stream transfer and the delete cascade share (`companionSchemaName(id, 'schema')`). So a
+  `type=schema` write may carry **`file`** (a bare safe name, no extension): the file lands at
+  `<file>.toon` with `raw.name` untouched, and the response `name` is that file name (what
+  `GET /config/schema/{name}` reads it by). Absent ⇒ named by `raw.name`, as before. `file` on any
+  other type is **400** (their filename IS their identity); an unsafe one 422s. ⚠ Before this the Parse
+  pane wrote `<pipeline>.toon` on every Apply — `SCHEMA-NAME-1` rightly stopped rebuilding `raw.name` from
+  the file name, and the server then named the file from `raw.name` — while the node it Applied named
+  `<pipeline>_schema.toon`: a pipeline that saved, validated and activated clean and never loaded.
+  Pinned by `ControlApiSchemaFileRefTest`.
 - `GET|DELETE /config/{type}/{name}` — suffix-first resolution with bare-name fallback; DELETE
   refuses an `active: true` pipeline (409).
 - **Write alone does not index a NEW file** — the register pair below completes a create; later

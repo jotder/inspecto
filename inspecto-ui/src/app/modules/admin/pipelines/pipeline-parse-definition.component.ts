@@ -1812,6 +1812,12 @@ export class PipelineParseDefinitionComponent {
             this.configApi
                 .write('schema', draft, {
                     overwrite: true,
+                    // 🔴 SCHEMA-FILE-NAME-1: the FILE is the one this node's `schema_file` will name. The server
+                    // otherwise names a schema's file by `raw.name` — which SCHEMA-NAME-1 rightly keeps as the
+                    // pipeline/source identity — so every Apply wrote `<pipeline>.toon` while the node it
+                    // Applied referenced `<pipeline>_schema.toon`: a pipeline that saved, validated and
+                    // activated clean, then never loaded ("Schema file not found").
+                    file: name,
                     subdir: this.satelliteSubdir(),
                     ...(replace ? { compatibility: 'none' as const } : {}),
                     // Only when the handle belongs to THIS schema — see `schemaRead`.

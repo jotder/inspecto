@@ -939,6 +939,25 @@ describe('PipelineParseDefinitionComponent', () => {
         });
 
         /**
+         * 🔴 SCHEMA-FILE-NAME-1, found by driving the UI on a new pipeline `shop_orders`: the declared names
+         * are the PIPELINE's (SCHEMA-NAME-1), and the server names a schema's file by `raw.name` — so the
+         * write landed at `shop_orders.toon` while the node was Applied naming `shop_orders_schema.toon`.
+         * The spec above cannot see it: with no pipeline name the two names coincide.
+         */
+        it('writes the schema under the very file the node then names, not under raw.name', async () => {
+            const fixture = await create(unschemadNode(), [], 0, null, 'shop_orders');
+            pane(fixture).onPreviewed(TABLE_PREVIEW);
+            fixture.detectChanges();
+            pane(fixture).submit();
+            fixture.detectChanges();
+
+            expect(schemaWrites).toHaveLength(1);
+            expect((schemaWrites[0].config['raw'] as Record<string, unknown>)['name']).toBe('shop_orders');
+            expect(schemaWrites[0].opts?.['file']).toBe('shop_orders_schema');
+            expect(fixture.componentInstance.applied!.config!['schema_file']).toBe('shop_orders_schema.toon');
+        });
+
+        /**
          * 🔴 BUILDER-1b, found by driving the real UI: one pipeline has ONE output schema
          * (`<pipeline>_schema`), so changing its parse FORMAT legitimately drops columns and the
          * BACKWARD save-gate refuses — leaving the builder with a raw 422 and no way forward. The

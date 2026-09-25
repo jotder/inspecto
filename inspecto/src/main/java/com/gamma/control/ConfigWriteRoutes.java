@@ -54,6 +54,18 @@ final class ConfigWriteRoutes implements RouteModule {
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
         Map<String, Object> draft = mapAt(body, "config");
+        // SCHEMA-FILE-NAME-1: a SCHEMA's file may be named apart from its content. A schema self-names via
+        // `raw.name`, but `raw.name` is the raw/source identity (`ORDERS`, `CALL`) and a Pipeline references
+        // its schema as `<pipeline>_schema.toon` — two names that differ in every committed schema. Deriving
+        // the file from `raw.name` alone meant the Parse pane (which keeps the declared names, SCHEMA-NAME-1)
+        // wrote `<pipeline>.toon` while the node it Applied named `<pipeline>_schema.toon`: a reference that
+        // never resolved. ⛔ Schema only — every other type's filename IS its identity, and a second way to
+        // name it would let one config be written under two names.
+        String fileKey = ApiContext.str(body, "file");
+        boolean namedFile = fileKey != null && !fileKey.isBlank();
+        if (namedFile && !"schema".equals(type))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST,
+                    "'file' names a schema's file only; a " + type + " is named by its identity field");
 
         // The one content gate every save path runs (SaveGate) — BEFORE any path is resolved, so an
         // invalid payload is refused 422 ahead of the subdir jail 403 (house gate order, pinned by
@@ -88,8 +100,11 @@ final class ConfigWriteRoutes implements RouteModule {
         if (identity == null)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "config is missing its identity field '" + idFields.getFirst() + "'");
         String safeIdentity = WriteGates.safeName(identity, "config name");
+        // The file's base name — the caller's `file` for a schema (validated like any name: no separators,
+        // so it cannot traverse), else derived from the identity. It is also the name a read addresses.
+        String fileName = namedFile ? WriteGates.safeName(fileKey, "file name") : safeIdentity;
         Path target = WriteGates.jail(writeRoot,
-                dir.resolve(ConfigFileSupport.fileBase(type, safeIdentity) + ".toon"), "resolved path");
+                dir.resolve(ConfigFileSupport.fileBase(type, fileName) + ".toon"), "resolved path");
 
         // A pipeline written before its `id` was stamped at birth lives under a name-derived filename.
         // Keep editing THAT file rather than forking a second config beside it under the id.
@@ -222,7 +237,7 @@ final class ConfigWriteRoutes implements RouteModule {
         r.put("path", rel);
         if (mappingRel != null) r.put("mappingPath", mappingRel);
         if (structureRel != null) r.put("structurePath", structureRel);
-        r.put("name", safeIdentity);
+        r.put("name", fileName);   // the name GET /config/{type}/{name} reads it back by
         r.put("bytes", bytes.length);
         r.put("overwritten", exists);
         r.put("findings", findings);   // warnings only at this point (errors would have 422'd)

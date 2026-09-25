@@ -63,11 +63,15 @@ export class ConfigService {
      * file changed underneath. ⚠ **Only ever pass an etag from a read of THIS SAME config.** A stale or
      * foreign handle refuses a perfectly good save, which is worse than not sending one — and omitting it
      * is always safe, because the server honours the precondition without requiring it.
+     *
+     * `file` (type `schema` only) names the schema's FILE apart from its `raw.name` (SCHEMA-FILE-NAME-1): a
+     * pipeline references `<pipeline>_schema.toon` while `raw.name` keeps the declared source identity, and
+     * without it the file lands at `<raw.name>.toon` — a file nothing references.
      */
     write(
         type: ConfigType,
         config: Record<string, unknown>,
-        opts?: { subdir?: string; overwrite?: boolean; compatibility?: 'none'; ifMatch?: string },
+        opts?: { subdir?: string; overwrite?: boolean; compatibility?: 'none'; ifMatch?: string; file?: string },
     ): Observable<ConfigWriteResult> {
         // ⚠ ifMatch is a HEADER and must not reach the body: the rest of `opts` is spread into the JSON
         // payload, and the server sweeps an unrecognised top-level key into the config rather than

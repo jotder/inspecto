@@ -263,6 +263,10 @@
                     "type" : "string",
                     "description" : "Optional subdirectory under the write root (must stay inside — path jail)."
                   },
+                  "file" : {
+                    "type" : "string",
+                    "description" : "type=schema only: the file's base name (no extension, no separators — an unsafe name 422s), decoupled from the schema's raw.name so the file written is the <pipeline>_schema.toon a Pipeline references (SCHEMA-FILE-NAME-1). Absent ⇒ named by raw.name. Any other type sending it is 400."
+                  },
                   "overwrite" : {
                     "type" : "boolean",
                     "default" : false
