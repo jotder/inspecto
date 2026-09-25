@@ -109,6 +109,18 @@ class SpaceManagerTest {
     }
 
     @Test
+    void withoutADefaultTheUnscopedSpaceIsTheSmallestIdNotHashOrder(@TempDir Path root) throws Exception {
+        // The SPA falls back to the first space of the id-sorted GET /spaces; the server must pick the same one.
+        // Enough ids that ConcurrentHashMap's iteration order differs from the sorted order.
+        for (String id : List.of("zeta", "telco-assurance", "ucc", "mu", "kappa", "demo", "omega", "beta", "xi", "cricket"))
+            Files.createDirectories(root.resolve(id).resolve("config"));
+        try (SpaceManager mgr = SpaceManager.discover(root)) {
+            assertEquals(10, mgr.size());
+            assertEquals("beta", mgr.current().id().value(), "no default space → the smallest id, as the SPA picks");
+        }
+    }
+
+    @Test
     void discoverBootsEachSpaceDirAndSkipsNonSpaces(@TempDir Path root) throws Exception {
         Files.createDirectories(root.resolve("space-a").resolve("config"));
         Files.createDirectories(root.resolve("space-b").resolve("config"));

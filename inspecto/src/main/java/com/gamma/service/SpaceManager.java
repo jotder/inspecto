@@ -580,14 +580,20 @@ public final class SpaceManager implements AutoCloseable {
 
     /**
      * The space served for an un-scoped request: the {@code default} space, or — when discovery booted no
-     * {@code default} — the first registered space. The {@code /spaces/{id}} seam (later stage) supersedes this.
+     * {@code default} — the space with the smallest id. The {@code /spaces/{id}} seam (later stage) supersedes this.
+     *
+     * <p>⚠ Smallest id, not "first registered": {@code spaces} is a {@link ConcurrentHashMap}, whose iteration order is
+     * hash order, while the SPA falls back to the first space of the id-sorted {@code GET /spaces} list. With several
+     * spaces and no {@code default}, a fresh browser's first un-scoped read (the landing guard's Menu read) could hit
+     * a different space from the one the SPA then selects.
      *
      * @throws IllegalStateException when no spaces are hosted
      */
     public SpaceContext current() {
         SpaceContext c = spaces.get(DEFAULT);
         if (c != null) return c;
-        return spaces.values().stream().findFirst()
+        return spaces.entrySet().stream().min(java.util.Map.Entry.comparingByKey(java.util.Comparator.comparing(SpaceId::value)))
+                .map(java.util.Map.Entry::getValue)
                 .orElseThrow(() -> new IllegalStateException("No spaces are hosted"));
     }
 
