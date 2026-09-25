@@ -30,8 +30,7 @@ import {
     StaleMark,
     staleWidgets,
 } from 'app/inspecto/signal/stale-tiles';
-import { getViz } from 'app/inspecto/viz';
-import { Condition, ColumnMeta, ConditionGroup, QueryConditionGroupComponent, emptyGroup } from 'app/inspecto/query';
+import { ColumnMeta, ConditionGroup, QueryConditionGroupComponent } from 'app/inspecto/query';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ComponentHistoryDialog } from 'app/inspecto/components/component-history.dialog';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -52,8 +51,8 @@ import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { concatMap, from, map, of, tap } from 'rxjs';
 import { Dataset } from '../datasets/dataset-types';
-import { DatasetsService } from '../datasets/datasets.service';
 import { DatasetRowsService, RowSourceRef } from 'app/inspecto/viz/dataset-rows.service';
+import { DashboardViewStore } from './dashboard-view.store';
 import { Dashboard, DashboardTile, buildDashboard } from './dashboard-types';
 import { DashboardsService } from './dashboards.service';
 import { ShareDashboardDialog } from './share-dashboard.dialog';
@@ -118,6 +117,7 @@ function splitStores(v: string | undefined): string[] | undefined {
         AiAssistComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
+    providers: [DashboardViewStore],
     templateUrl: './dashboard-editor.component.html',
 })
 export class DashboardEditorComponent implements OnInit {
@@ -128,7 +128,8 @@ export class DashboardEditorComponent implements OnInit {
     private fb = inject(FormBuilder);
     private dashboardsApi = inject(DashboardsService);
     private widgetsApi = inject(WidgetsService);
-    private datasetsApi = inject(DatasetsService);
+    /** The viewer-facing state (lookups, tiles, cross-filter, quick filters, drill) — shared with the Menu viewer. */
+    private view = inject(DashboardViewStore);
     private datasetRows = inject(DatasetRowsService);
     private events = inject(EventsService);
     private pipelinesApi = inject(PipelinesService);
@@ -166,8 +167,8 @@ export class DashboardEditorComponent implements OnInit {
             });
     }
 
-    readonly widgets = signal<Widget[]>([]);
-    readonly datasets = signal<Dataset[]>([]);
+    readonly widgets = this.view.widgets;
+    readonly datasets = this.view.datasets;
     readonly widgetOptions = computed<PickerOption[]>(() =>
         this.widgets().map((w) => ({ value: w.id, label: w.name, hint: w.vizType })),
     );
@@ -176,9 +177,9 @@ export class DashboardEditorComponent implements OnInit {
     private readonly disruptions = signal<DisruptionEvent[]>([]);
     private readonly commits = signal<CommitEvent[]>([]);
     private readonly pipelines = signal<ProducingPipeline[]>([]);
-    readonly tiles = signal<DashboardTile[]>([]);
-    readonly filter = signal<ConditionGroup>(emptyGroup('AND'));
-    readonly exposedFields = signal<string[]>([]);
+    readonly tiles = this.view.tiles;
+    readonly filter = this.view.filter;
+    readonly exposedFields = this.view.exposedFields;
     /** Index of the tile whose underlying rows are open in the drill-through drawer (null = closed). */
     readonly drillTileIndex = signal<number | null>(null);
     readonly editing = signal(false);
@@ -195,9 +196,6 @@ export class DashboardEditorComponent implements OnInit {
     readonly form = this.fb.group({
         name: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9][A-Za-z0-9._-]*$/)]],
     });
-
-    private readonly widgetsById = computed(() => new Map(this.widgets().map((w) => [w.id, w])));
-    private readonly datasetsById = computed(() => new Map(this.datasets().map((d) => [d.id, d])));
 
     /**
      * `SIGNAL-STALE-TILES-1` — widget id → why its data is stale, resolved ONCE for the whole dashboard.
@@ -228,31 +226,13 @@ export class DashboardEditorComponent implements OnInit {
         return [...seen.values()];
     });
 
-    /** Value suggestions per exposed field — the quick-filter pickers' choices, read off one PAGE of each
-     *  tiled dataset (so they are offers, not the column's full domain) and capped so a high-cardinality
-     *  column doesn't flood the select. */
-    readonly exposedValues = signal<Record<string, string[]>>({});
+    /** Value suggestions per exposed field (see {@link DashboardViewStore.exposedValues}). */
+    readonly exposedValues = this.view.exposedValues;
 
     /** The drill-through drawer's contents — the open tile's rows with the live cross-filter applied. */
     readonly drillView = signal<DrillView | null>(null);
 
     constructor() {
-        // Value suggestions: one page per distinct tiled store, re-read when the tiles or the exposed
-        // field list change. The pickers offer what the page holds — never a claim about the column.
-        effect(() => {
-            const exposed = this.exposedFields();
-            const sources = new Map<string, Dataset>();
-            for (const tile of this.tiles()) {
-                const ds = this.datasetOf(tile);
-                if (ds && !sources.has(ds.sourceName)) sources.set(ds.sourceName, ds);
-            }
-            if (!exposed.length || !sources.size) {
-                this.exposedValues.set({});
-                return;
-            }
-            void this.loadExposedValues(exposed, [...sources.values()]);
-        });
-
         // Drill-through: the open tile's rows. The cross-filter travels IN the request (composed with the
         // dataset's own model), so the server filters — a page filtered afterwards would be the wrong rows.
         effect(() => {
@@ -269,20 +249,6 @@ export class DashboardEditorComponent implements OnInit {
         });
     }
 
-    private async loadExposedValues(exposed: string[], datasets: Dataset[]): Promise<void> {
-        const out: Record<string, Set<string>> = Object.fromEntries(exposed.map((f) => [f, new Set<string>()]));
-        for (const ds of datasets) {
-            const page = await this.datasetRows.rows(ds);
-            for (const row of page.rows) {
-                for (const f of exposed) {
-                    const v = row[f];
-                    if (v != null && out[f].size < 20) out[f].add(String(v));
-                }
-            }
-        }
-        this.exposedValues.set(Object.fromEntries(Object.entries(out).map(([f, set]) => [f, [...set].sort()])));
-    }
-
     private async loadDrillView(dataset: Dataset, filter: ConditionGroup, title: string): Promise<void> {
         const page = await this.datasetRows.rows(filtered(dataset, filter));
         this.drillView.set({
@@ -294,23 +260,17 @@ export class DashboardEditorComponent implements OnInit {
     }
 
     widgetOf(tile: DashboardTile): Widget | undefined {
-        return this.widgetsById().get(tile.widgetId);
+        return this.view.widgetOf(tile);
     }
     datasetOf(tile: DashboardTile): Dataset | undefined {
-        const widget = this.widgetOf(tile);
-        return widget ? this.datasetsById().get(widget.datasetId) : undefined;
+        return this.view.datasetOf(tile);
     }
-    /** View-bound widget (geo-map / link-analysis) — no dataset; the cross-filter/drill don't apply. */
     isViewBound(widget: Widget): boolean {
-        return !!getViz(widget.vizType)?.meta.viewKind;
+        return this.view.isViewBound(widget);
     }
 
     ngOnInit(): void {
-        this.widgetsApi.list().subscribe({
-            next: (w) => this.widgets.set(w),
-            error: () => this.toastr.warning('Could not load widgets.'),
-        });
-        this.datasetsApi.list().subscribe({ next: (d) => this.datasets.set(d), error: () => undefined });
+        this.view.loadLookups(() => this.toastr.warning('Could not load widgets.'));
         this.loadStaleness();
         // A draft routed here from another editor (Import as draft). Taking it replaces the stored load,
         // so the stored copy can never land AFTER the draft and silently overwrite it.
@@ -374,9 +334,7 @@ export class DashboardEditorComponent implements OnInit {
     }
 
     private seed(d: Dashboard): void {
-        this.tiles.set(d.tiles);
-        this.filter.set(d.filter ?? emptyGroup('AND'));
-        this.exposedFields.set(d.exposedFields ?? []);
+        this.view.seed(d);
     }
 
     // ── Import as draft (operator decisions 2026-09-25) ──────────────────────────────────────────
@@ -537,18 +495,9 @@ export class DashboardEditorComponent implements OnInit {
         this.filter.update((f) => ({ ...f }));
     }
 
-    /** A tile's drill-down click — toggle `field = value` in the cross-filter: add it if absent, remove it
-     *  if the same value is clicked again. */
-    onDrill({ field, value }: DrillEvent): void {
-        const current = this.filter();
-        const matches = (item: Condition | ConditionGroup): boolean =>
-            item.kind === 'condition' && item.field === field && item.operator === '=' && item.value === value;
-        const idx = current.items.findIndex(matches);
-        const items =
-            idx >= 0
-                ? current.items.filter((_, i) => i !== idx)
-                : [...current.items, { kind: 'condition', field, operator: '=', value } as Condition];
-        this.filter.set({ ...current, items });
+    /** A tile's drill-down click — toggle `field = value` in the cross-filter (the shared viewer rule). */
+    onDrill(event: DrillEvent): void {
+        this.view.onDrill(event);
     }
 
     /** Download every rendered tile canvas as a PNG — the offline "export dashboard" (chart tiles only;

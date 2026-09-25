@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input } from '@angular/core';
 import { tileBasis } from 'app/inspecto/viz/dashboard-grid';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { of, switchMap } from 'rxjs';
@@ -8,6 +8,9 @@ import { MenuBinding } from 'app/inspecto/menu';
 // dashboard tiles use. They live under studio/ but are render components meant to be embedded.
 import { Dashboard } from 'app/modules/admin/studio/dashboards/dashboard-types';
 import { DashboardsService } from 'app/modules/admin/studio/dashboards/dashboards.service';
+import { DashboardFilterBarComponent } from 'app/modules/admin/studio/dashboards/dashboard-filter-bar.component';
+import { DashboardTileComponent } from 'app/modules/admin/studio/dashboards/dashboard-tile.component';
+import { DashboardViewStore } from 'app/modules/admin/studio/dashboards/dashboard-view.store';
 import { GeoViewWidgetComponent } from 'app/modules/admin/studio/geo-map/geo-view-widget.component';
 import { LinkViewWidgetComponent } from 'app/modules/admin/studio/link-analysis/link-view-widget.component';
 import { WidgetHostComponent } from 'app/modules/admin/studio/widgets/widget-host.component';
@@ -16,13 +19,24 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
 /**
  * Presentational renderer for a Menu item's {@link MenuBinding} — the shared render surface for both the
  * dynamic `/w/:nodeId` host and the Menu Builder's live preview. A Widget / saved view renders through its
- * canonical by-id host; a Dashboard lays its tiles out as widget hosts. No binding → the shared empty state.
+ * canonical by-id host; a Dashboard lays its tiles out as widget hosts with the same viewer behaviour as the
+ * Dashboard editor (quick-filter bar, saved filter as the base cross-filter, click-a-category drill) through the
+ * shared {@link DashboardViewStore}. The viewer's filter is transient — never saved. No binding → the shared
+ * empty state.
  */
 @Component({
     selector: 'app-menu-artifact',
     standalone: true,
-    imports: [InspectoEmptyStateComponent, WidgetHostComponent, GeoViewWidgetComponent, LinkViewWidgetComponent],
+    imports: [
+        InspectoEmptyStateComponent,
+        WidgetHostComponent,
+        GeoViewWidgetComponent,
+        LinkViewWidgetComponent,
+        DashboardFilterBarComponent,
+        DashboardTileComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
+    providers: [DashboardViewStore],
     template: `
         @if (binding(); as b) {
             @switch (b.kind) {
@@ -36,11 +50,37 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
                     <div class="h-[70vh] min-h-0"><app-link-view-widget [viewId]="b.componentId" /></div>
                 }
                 @case ('dashboard') {
-                    @if (dashboard(); as d) {
+                    @if (dashboard()) {
+                        @if (view.exposedFields().length) {
+                            <div class="bg-card mb-4 rounded-2xl p-4 shadow">
+                                <app-dashboard-filter-bar
+                                    [fields]="view.exposedFields()"
+                                    [values]="view.exposedValues()"
+                                    [filter]="view.filter()"
+                                    (drillToggle)="view.onDrill($event)"
+                                />
+                            </div>
+                        }
                         <div class="flex flex-wrap gap-4">
-                            @for (tile of d.tiles; track tile.widgetId) {
+                            @for (tile of view.tiles(); track $index) {
                                 <div class="min-w-0" [style.flex-basis]="tileBasis(tile.span)">
-                                    <app-widget-host [widgetId]="tile.widgetId" />
+                                    @if (view.widgetOf(tile); as widget) {
+                                        @if (view.isViewBound(widget)) {
+                                            <app-dashboard-tile [widget]="widget" />
+                                        } @else if (view.datasetOf(tile); as dataset) {
+                                            <app-dashboard-tile
+                                                [widget]="widget"
+                                                [dataset]="dataset"
+                                                [filter]="view.filter()"
+                                                (drill)="view.onDrill($event)"
+                                            />
+                                        } @else {
+                                            <app-widget-host [widgetId]="tile.widgetId" />
+                                        }
+                                    } @else {
+                                        <!-- Lookups not (yet) resolved: the by-id host still renders the tile, unfiltered. -->
+                                        <app-widget-host [widgetId]="tile.widgetId" />
+                                    }
                                 </div>
                             }
                         </div>
@@ -63,6 +103,8 @@ export class MenuArtifactComponent {
     readonly tileBasis = tileBasis;
 
     private readonly dashboards = inject(DashboardsService);
+    readonly view = inject(DashboardViewStore);
+    private lookupsLoaded = false;
 
     readonly binding = input<MenuBinding | undefined>(undefined);
     readonly emptyMessage = input('This item isn’t linked to a report yet.');
@@ -74,4 +116,18 @@ export class MenuArtifactComponent {
         ),
         { initialValue: null },
     );
+
+    constructor() {
+        // A (new) Dashboard resets the viewer state to its saved tiles / filter / exposed fields. The widget +
+        // dataset lookups are fetched once, and only when a Dashboard is actually shown.
+        effect(() => {
+            const d = this.dashboard();
+            if (!d) return;
+            if (!this.lookupsLoaded) {
+                this.lookupsLoaded = true;
+                this.view.loadLookups();
+            }
+            this.view.seed(d);
+        });
+    }
 }
