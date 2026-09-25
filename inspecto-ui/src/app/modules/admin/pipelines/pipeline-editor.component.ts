@@ -293,6 +293,18 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     readonly flows = signal<PipelineSummary[]>([]);
     /** Registered files that did not load — listed (broken) in the Open dialog, never openable. */
     readonly brokenPipelines = signal<BrokenPipeline[]>([]);
+    /** The empty canvas's message when EVERY registered Pipeline fails to load — how many, and where to look. */
+    readonly brokenOnlyMessage = computed(() => {
+        const n = this.brokenPipelines().length;
+        return n === 1
+            ? 'This Space has 1 pipeline, but it does not load. Open the list to see why.'
+            : `This Space has ${n} pipelines, but none of them load. Open the list to see why.`;
+    });
+    /** Appended to the "No pipeline open" message when some Pipelines load and others do not. */
+    readonly brokenNote = computed(() => {
+        const n = this.brokenPipelines().length;
+        return n ? ` ${n} more ${n === 1 ? 'does' : 'do'} not load — the list shows why.` : '';
+    });
 
     // ── open set (tabs) ───────────────────────────────────────────────────────────────────────────
     /** The open tabs, in strip order. Nothing is open until the user opens something. */

@@ -2097,6 +2097,43 @@ describe('PipelineEditorComponent', () => {
         return { fixture, c };
     }
 
+    /**
+     * EMPTY-STATE-HIDES-BROKEN (driven 2026-09-25): a Space whose every Pipeline fails to load said
+     * "No authored pipelines — Create a pipeline…" while the Open dialog listed them all as "Does not load".
+     */
+    describe('empty canvas with pipelines that do not load', () => {
+        const broken = (name: string) => ({ name, path: `/cfg/${name}_pipeline.toon`, loadError: { file: 'x', message: 'bad' } });
+        const healthy = { name: 'a', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] };
+
+        it('says how many exist and that they do not load, with a way to open the list', () => {
+            api.listWithBroken.mockReturnValue(of([broken('b1'), broken('b2')]));
+            const { fixture, c } = makeRendered();
+            const el = fixture.nativeElement as HTMLElement;
+            expect(el.textContent).not.toContain('No authored pipelines');
+            expect(el.textContent).toContain('No pipeline loads');
+            expect(el.textContent).toContain('This Space has 2 pipelines, but none of them load.');
+            const open = vi.spyOn(c, 'openPipelines').mockImplementation(() => {});
+            Array.from(el.querySelectorAll('button'))
+                .find((b) => b.textContent?.includes('Show pipelines'))!
+                .click();
+            expect(open).toHaveBeenCalled();
+        });
+
+        it('names the broken ones beside the loadable count', () => {
+            api.listWithBroken.mockReturnValue(of([healthy, broken('b1')]));
+            const { fixture } = makeRendered();
+            const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+            expect(text).toContain('Open one or more of the 1 available pipelines');
+            expect(text).toContain('1 more does not load');
+        });
+
+        it('keeps "No authored pipelines" for a Space that genuinely has none', () => {
+            api.listWithBroken.mockReturnValue(of([]));
+            const { fixture } = makeRendered();
+            expect((fixture.nativeElement as HTMLElement).textContent).toContain('No authored pipelines');
+        });
+    });
+
     /** Item 1 (2026-09-01 batch) — the browser must warn before discarding ANY tab's unsaved edits. */
     describe('beforeunload guard', () => {
         function fireBeforeUnload(): Event {

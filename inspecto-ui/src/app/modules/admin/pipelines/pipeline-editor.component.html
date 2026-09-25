@@ -476,9 +476,23 @@
                     icon="heroicons_outline:folder-open"
                     title="No pipeline open"
                     [message]="
-                        'Open one or more of the ' + flows().length + ' available pipelines to see them on the canvas.'
+                        'Open one or more of the ' +
+                        flows().length +
+                        ' available pipelines to see them on the canvas.' +
+                        brokenNote()
                     "
                     actionLabel="Open a pipeline…"
+                    (action)="openPipelines()"
+                >
+                </inspecto-empty-state>
+            } @else if (brokenPipelines().length) {
+                <!-- Every registered Pipeline failed to load: "No authored pipelines" would be false —
+                     they exist, the Open dialog lists them as "Does not load" with the loader's reason. -->
+                <inspecto-empty-state
+                    icon="heroicons_outline:exclamation-triangle"
+                    title="No pipeline loads"
+                    [message]="brokenOnlyMessage()"
+                    actionLabel="Show pipelines…"
                     (action)="openPipelines()"
                 >
                 </inspecto-empty-state>
