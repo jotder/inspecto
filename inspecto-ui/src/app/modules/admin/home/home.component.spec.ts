@@ -30,6 +30,7 @@ interface Stubs {
     authMode?: 'none' | 'oidc';
     loopbackOnly?: boolean;
     actor?: string | null;
+    actorName?: string | null;
     opsEnabled?: boolean;
     eventsEnabled?: boolean;
     capabilities?: string[];
@@ -64,6 +65,7 @@ function create(s: Stubs = {}) {
     };
     const session = {
         actor: signal(s.actor ?? null),
+        actorName: signal(s.actorName ?? s.actor ?? null),
         authMode: signal(s.authMode ?? 'none'),
         loopbackOnly: signal(s.loopbackOnly ?? false),
         opsEnabled: signal(s.opsEnabled ?? false),
@@ -142,6 +144,12 @@ describe('HomeComponent', () => {
     it('names the signed-in actor when there is one', () => {
         const { el } = create({ runs: [RUN()], authMode: 'oidc', actor: 'priya.n' });
         expect(el.querySelector('h1')?.textContent).toContain('priya.n');
+    });
+
+    // R2-16: "Welcome back, admin." named the account id; a Demo User is greeted by its display name.
+    it('greets the signed-in subject by display name when the session has one', () => {
+        const { el } = create({ runs: [RUN()], authMode: 'oidc', actor: 'demo.manager', actorName: 'Demo Manager' });
+        expect(el.querySelector('h1')?.textContent?.trim()).toBe('Welcome back, Demo Manager.');
     });
 
     it('lists failed Runs, open Incidents and waiting approvals together, newest first', () => {

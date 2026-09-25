@@ -90,8 +90,9 @@ export class HomeComponent implements OnInit {
     readonly lens = inject(LensService);
 
     // ── Identity + shell context ────────────────────────────────────────────────────────────────
-    /** Only ever a real principal: `SessionService.actor` is null on Personal and while signed out. */
-    readonly actor = this.session.actor;
+    /** Only ever a real principal: `SessionService.actor` is null on Personal and while signed out. Named by
+     *  its display name when the session has one, else its id (R2-16 — `SessionService.actorName`). */
+    readonly actorName = this.session.actorName;
     /** Only worth naming where there is more than one — in a single-Space install it is noise, and the
      *  seeded name is literally "default". */
     readonly spaceName = computed(
@@ -100,7 +101,7 @@ export class HomeComponent implements OnInit {
     readonly multiSpace = this.spaces.multiSpace;
 
     readonly greeting = computed(() => {
-        const who = this.actor();
+        const who = this.actorName();
         return who ? `Welcome back, ${who}.` : 'Welcome to Inspecto.';
     });
 

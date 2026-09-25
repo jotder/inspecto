@@ -166,6 +166,21 @@ export class SessionService {
         return actor ? this.demoUsers().find((u) => u.id === actor)?.landing : undefined;
     }
 
+    /**
+     * R2-16: what to CALL the signed-in subject — the Demo User's `displayName` when the picker entry has one,
+     * else the {@link actor} id itself (a real OIDC session carries no display name in `/bootstrap`). Null
+     * exactly when {@link actor} is. The user menu and the Home greeting both read this; never re-derive it.
+     */
+    readonly actorName = computed(() => {
+        const actor = this.actor();
+        if (!actor) return null;
+        return (
+            this.demoUsers()
+                .find((u) => u.id === actor)
+                ?.displayName?.trim() || actor
+        );
+    });
+
     /** True only on Standard when there is no live session yet — the sole condition that shows sign-in. */
     readonly loginRequired = computed(() => this.authMode() === 'oidc' && !this.authenticated());
 

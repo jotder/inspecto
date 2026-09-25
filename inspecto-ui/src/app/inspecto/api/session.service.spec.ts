@@ -308,6 +308,17 @@ describe('SessionService (W6d edition switch)', () => {
         expect(svc.demoUserLanding()).toBe('cases');
     });
 
+    // R2-16: the user menu and Home greeting name the subject by its Demo User displayName, never its id —
+    // and fall back to the id when the actor is not a Demo User (a real OIDC session carries no name).
+    it('actorName is the Demo User displayName, else the actor id, else null', async () => {
+        expect(svc.actorName()).toBeNull();
+        svc.demoUsers.set([{ id: 'demo.manager', displayName: 'Demo Manager', title: 'Manager' }]);
+        svc.actor.set('demo.manager');
+        expect(svc.actorName()).toBe('Demo Manager');
+        svc.actor.set('priya.n');
+        expect(svc.actorName()).toBe('priya.n');
+    });
+
     // RP-Initiated Logout 1.0. Without this the Inspecto session ends but the IdP's SSO session does
     // not, so the next sign-in completes with no credential prompt (BACKLOG §5).
     it('logout redirects to the provider end_session_endpoint when one is configured', async () => {
