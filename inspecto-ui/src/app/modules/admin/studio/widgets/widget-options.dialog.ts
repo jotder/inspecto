@@ -93,6 +93,7 @@ export class WidgetOptionsDialog {
         format2Decimals: this.data.format2?.decimals ?? null,
         gaugeMin: this.data.gauge?.min ?? null,
         gaugeMax: this.data.gauge?.max ?? null,
+        rowLinkLabelField: this.data.rowLink?.labelField ?? '', // UIE-6 link text column
     };
 
     save(): void {
@@ -133,6 +134,7 @@ export class WidgetOptionsDialog {
         // Legend: Auto writes no `show` (the chart theme decides); the default top position alone writes no block.
         const legendMode = str(v['legendShow']) || 'auto';
         const legendPosition = (str(v['legendPosition']) || 'top') as 'top' | 'right' | 'bottom' | 'left';
+        const linkLabel = str(v['rowLinkLabelField']); // UIE-6: optional; blank = link on the id cell
         const options: WidgetOptions = {
             // Keep what this dialog does not model (columnLabels, badgeColumns, columnFormats…): rebuilding the
             // object from the form alone silently wiped them on every save.
@@ -163,7 +165,10 @@ export class WidgetOptionsDialog {
                 heatScale !== 'sequential' || heatMid != null
                     ? { scale: heatScale, ...(heatMid == null ? {} : { midpoint: heatMid }) }
                     : undefined,
-            rowLink: linkKind && linkField ? { kind: linkKind, idField: linkField } : undefined,
+            rowLink:
+                linkKind && linkField
+                    ? { kind: linkKind, idField: linkField, ...(linkLabel ? { labelField: linkLabel } : {}) }
+                    : undefined,
         };
         this.applyPerTypeOptions(v, options);
         this.ref.close(options);

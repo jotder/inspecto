@@ -15,7 +15,16 @@ export function isBadgeColumn(column: string, opts?: VizRenderOptions): boolean 
 
 /** ag-Grid column definitions for the table plugin: readable headers + status badges. */
 export function tableColDefs(columns: string[], opts?: VizRenderOptions): ColDef[] {
-    return columns.map((field) => {
+    // UIE-6: with a `labelField`, the link rides on that readable column and the raw id column is not shown. It stays
+    // in the query and the row data — the link reads the id from it. A label the result lacks falls back to the id cell.
+    const link = opts?.rowLink;
+    const label =
+        link?.labelField && link.labelField !== link.idField && columns.includes(link.labelField)
+            ? link.labelField
+            : undefined;
+    const linkField = label ?? link?.idField;
+    const shown = label ? columns.filter((c) => c !== link?.idField) : columns;
+    return shown.map((field) => {
         const def: ColDef = { field, headerName: opts?.columnLabels?.[field] ?? humanizeColumn(field) };
         // UIE-4: numbers read grouped and to at most two decimals (or the column's / widget's own format); ids and
         // calendar parts stay raw. Non-numeric values pass through untouched.
@@ -30,10 +39,10 @@ export function tableColDefs(columns: string[], opts?: VizRenderOptions): ColDef
                 return statusBadgeHtml(String(p.value));
             };
         }
-        // UIE-6: the row's id cell links to the object it describes (wins over a badge on the same column).
-        if (opts?.rowLink?.idField === field) {
+        // UIE-6: the row's label (else id) cell links to the object it describes (wins over a badge on the same column).
+        if (link && linkField === field) {
             def.cellRenderer = RowLinkCell;
-            def.cellRendererParams = { kind: opts.rowLink.kind };
+            def.cellRendererParams = label ? { kind: link.kind, idField: link.idField } : { kind: link.kind };
             def.suppressKeyboardEvent = followRowLinkOnEnter;
         }
         return def;

@@ -33,7 +33,11 @@ export function followRowLinkOnEnter(p: SuppressKeyboardEventParams): boolean {
     return true;
 }
 
-/** Table cell rendering a row's id as a real link to the Case / Incident / Reconciliation it names (UIE-6). */
+/**
+ * Table cell rendering a real link to the Case / Incident / Reconciliation a row names (UIE-6). On the id cell itself
+ * the id is both text and target; given `idField`, the cell is a readable label and the target id is read from that
+ * column of the same row.
+ */
 @Component({
     selector: 'inspecto-row-link-cell',
     standalone: true,
@@ -59,8 +63,11 @@ export class RowLinkCell implements ICellRendererAngularComp {
     label = '';
     text = '';
 
-    agInit(params: ICellRendererParams & { kind: RowLinkKind }): void {
-        this.commands = rowLinkCommands(params.kind, params.value);
+    agInit(params: ICellRendererParams & { kind: RowLinkKind; idField?: string }): void {
+        const id = params.idField
+            ? (params.data as Record<string, unknown> | undefined)?.[params.idField]
+            : params.value;
+        this.commands = rowLinkCommands(params.kind, id);
         this.label = TARGETS[params.kind]?.label ?? '';
         this.text = params.valueFormatted ?? (params.value == null ? '' : String(params.value));
     }

@@ -186,6 +186,12 @@ src/app/
     `[kpiSize]` to `<inspecto-viz-render>` and the KPI drops its own card and button. A host adds its own
     controls with `<app-dashboard-tile><ng-container tileActions [ngTemplateOutlet]="controls" /></app-dashboard-tile>`.
     The card fills its flex cell, so tiles in one row share a height.
+  - **Table Widget row link → `options.rowLink: {kind, idField, labelField?}`** (UIE-6,
+    `inspecto/viz/row-link-cell.component.ts` + `tableColDefs`). `kind` = `case | incident | reconciliation`
+    (each opens its detail route with the row's id). Prefer **`labelField`**: that readable cell becomes the link
+    (named "Open Reconciliation <label>") and the raw `idField` column is HIDDEN from the grid but stays a queried
+    dimension, because the link reads the id from the same row — ⛔ never drop the id from `controls.x`. Without
+    `labelField` the id cell itself is the link. A blank id renders plain text; the link wins over a status badge.
   - **`<inspecto-section-tabs [tabs] [selected] (selectedChange)>`** — a label strip with a count pill
     per section; the **host** renders the content under it (`@switch`), so nothing hides inside a lazily
     mounted tab body (the R9 rule). 🔴 It holds the active index in its OWN signal: binding

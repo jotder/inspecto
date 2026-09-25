@@ -114,6 +114,21 @@ describe('WidgetOptionsDialog', () => {
         expect((ref.close.mock.calls[2][0] as WidgetOptions).rowLink).toBeUndefined();
     });
 
+    it('round-trips the row link text column, and a blank one leaves the link on the id cell (UIE-6)', () => {
+        const link = { kind: 'reconciliation' as const, idField: 'recon_id', labelField: 'control' };
+        const { c, ref } = create({ rowLink: link });
+        const form = c.schemaForm.form;
+        expect(form.value['rowLinkLabelField']).toBe('control');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).rowLink).toEqual(link);
+        form.patchValue({ rowLinkLabelField: '  ' });
+        c.save();
+        expect((ref.close.mock.calls[1][0] as WidgetOptions).rowLink).toEqual({
+            kind: 'reconciliation',
+            idField: 'recon_id',
+        });
+    });
+
     it('round-trips the Waterfall and Combo options, a hidden total included; defaults save no block at all', () => {
         const { c, ref } = create({
             waterfall: { start: 'Opening exposure', totalLabel: '', order: 'desc' },

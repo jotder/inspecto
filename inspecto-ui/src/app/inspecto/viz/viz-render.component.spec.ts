@@ -127,6 +127,36 @@ describe('VizRenderComponent', () => {
         expect(links.map((a) => a.getAttribute('href'))).toEqual(['/reconciliation/ra_c02_offer_fee']);
     });
 
+    it('UIE-6: a labelField links the readable cell; the id column is hidden yet still in the queried columns', async () => {
+        const rows = [
+            { control: 'RA-C02 Offer fee CRM vs CBS', recon_id: 'ra_c02_offer_fee' },
+            { control: 'RA-C07 Roaming', recon_id: null },
+        ];
+        // The id stays a queried dimension: the table's query knows nothing of render options.
+        const query = TABLE_PLUGIN.buildQuery(
+            { x: [{ field: 'control' }, { field: 'recon_id' }] },
+            { datasetId: 'control_runs_today', sourceName: 'control_runs_today' },
+        );
+        expect(query.groupBy).toEqual(['control', 'recon_id']);
+        const props = TABLE_PLUGIN.transformProps(rows, {});
+        expect(props.columns).toEqual(['control', 'recon_id']);
+        const fixture = create(TABLE_PLUGIN, props);
+        fixture.componentRef.setInput('renderOptions', {
+            rowLink: { kind: 'reconciliation', idField: 'recon_id', labelField: 'control' },
+        });
+        fixture.detectChanges();
+        await new Promise((r) => setTimeout(r, 50));
+        fixture.detectChanges();
+        expect(fixture.componentInstance.colDefs()?.map((d) => d.field)).toEqual(['control']);
+        const links = Array.from(fixture.nativeElement.querySelectorAll('.ag-cell a')) as HTMLAnchorElement[];
+        expect(links.map((a) => [a.getAttribute('href'), a.textContent?.trim()])).toEqual([
+            ['/reconciliation/ra_c02_offer_fee', 'RA-C02 Offer fee CRM vs CBS'],
+        ]);
+        const cells = Array.from(fixture.nativeElement.querySelectorAll('.ag-cell')) as HTMLElement[];
+        expect(cells.map((c) => c.textContent?.trim())).not.toContain('ra_c02_offer_fee');
+        expect(cells.map((c) => c.textContent?.trim())).toContain('RA-C07 Roaming');
+    });
+
     it('resolves the KPI component for a component-render plugin and passes inputs', () => {
         const props: VizProps = { labels: [], series: [], value: 99 };
         const fixture = create(KPI_PLUGIN, props);

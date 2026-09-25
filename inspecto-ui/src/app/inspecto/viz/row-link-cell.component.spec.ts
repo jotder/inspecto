@@ -6,10 +6,13 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { followRowLinkOnEnter, RowLinkCell, rowLinkCommands } from './row-link-cell.component';
 import { RowLinkKind } from './viz-types';
 
-function render(kind: RowLinkKind, value: unknown) {
+function render(kind: RowLinkKind, value: unknown, idField?: string, data?: Record<string, unknown>) {
     TestBed.configureTestingModule({ imports: [RowLinkCell], providers: [provideRouter([])] });
     const fixture = TestBed.createComponent(RowLinkCell);
-    fixture.componentInstance.agInit({ kind, value } as ICellRendererParams & { kind: RowLinkKind });
+    fixture.componentInstance.agInit({ kind, value, idField, data } as ICellRendererParams & {
+        kind: RowLinkKind;
+        idField?: string;
+    });
     fixture.detectChanges();
     return fixture;
 }
@@ -79,5 +82,24 @@ describe('UIE-6 row link — keyboard', () => {
         expect(followRowLinkOnEnter(keyParams('Enter', cell, 'keyup'))).toBe(false);
         expect(followRowLinkOnEnter(keyParams('Enter', document.createElement('div')))).toBe(false);
         expect(click).not.toHaveBeenCalled();
+    });
+});
+
+describe('UIE-6 row link — labelled cell (labelField)', () => {
+    const label = 'RA-C02 Offer fee CRM vs CBS';
+
+    it('renders the label as the link, targeting the id from the same row, named by the label', async () => {
+        const fixture = render('reconciliation', label, 'recon_id', { control: label, recon_id: 'ra_c02_offer_fee' });
+        const a = fixture.nativeElement.querySelector('a') as HTMLAnchorElement;
+        expect(a.getAttribute('href')).toBe('/reconciliation/ra_c02_offer_fee');
+        expect(a.textContent?.trim()).toBe(label);
+        expect(a.getAttribute('aria-label')).toBe(`Open Reconciliation ${label}`);
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('a row with a blank id renders the label as plain text', () => {
+        const fixture = render('reconciliation', label, 'recon_id', { control: label, recon_id: null });
+        expect(fixture.nativeElement.querySelector('a')).toBeNull();
+        expect(fixture.nativeElement.textContent.trim()).toBe(label);
     });
 });

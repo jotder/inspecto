@@ -90,6 +90,31 @@ describe('table columns — UIE-6 row link', () => {
         expect(status.cellRenderer).toBe(RowLinkCell);
     });
 
+    it('a labelField carries the link and hides the id column', () => {
+        const opts = { rowLink: { kind: 'reconciliation' as const, idField: 'recon_id', labelField: 'control' } };
+        const defs = tableColDefs(['control', 'status', 'recon_id'], opts);
+        expect(defs.map((d) => d.field)).toEqual(['control', 'status']);
+        expect(defs[0].cellRenderer).toBe(RowLinkCell);
+        expect(defs[0].cellRendererParams).toEqual({ kind: 'reconciliation', idField: 'recon_id' });
+        expect(defs[0].suppressKeyboardEvent).toBe(followRowLinkOnEnter);
+        expect(defs[1].cellRenderer).not.toBe(RowLinkCell);
+    });
+
+    it('a labelled link wins over a status badge on the label column', () => {
+        const [status] = tableColDefs(['status', 'case_id'], {
+            rowLink: { kind: 'case', idField: 'case_id', labelField: 'status' },
+        });
+        expect(status.cellRenderer).toBe(RowLinkCell);
+    });
+
+    it('a labelField the result lacks falls back to the id cell and keeps it shown', () => {
+        const defs = tableColDefs(['recon_id'], {
+            rowLink: { kind: 'reconciliation', idField: 'recon_id', labelField: 'control' },
+        });
+        expect(defs.map((d) => d.field)).toEqual(['recon_id']);
+        expect(defs[0].cellRendererParams).toEqual({ kind: 'reconciliation' });
+    });
+
     it('no rowLink, no link', () => {
         const [id] = tableColDefs(['recon_id']);
         expect(id.cellRenderer).toBeUndefined();

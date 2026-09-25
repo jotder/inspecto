@@ -282,6 +282,15 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     // Gauge: the scale the arc spans (`options.gauge`); a blank end keeps its default (0 / 100) and writes nothing.
     { key: 'gaugeMin', label: 'Gauge: minimum', type: 'number', tier: 'required', required: false, placeholder: '0' },
     { key: 'gaugeMax', label: 'Gauge: maximum', type: 'number', tier: 'required', required: false, placeholder: '100' },
+    // UIE-6: optional readable column carrying the link instead of the id; the id column is then hidden (still queried).
+    {
+        key: 'rowLinkLabelField',
+        label: 'Table: link text column',
+        type: 'string',
+        tier: 'required',
+        required: false,
+        placeholder: 'Optional readable dimension, e.g. control — hides the id column',
+    },
 ];
 
 /**

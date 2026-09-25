@@ -178,8 +178,8 @@ export interface VizRenderOptions {
     combo?: { secondaryAxis?: boolean };
     /** UIE-4, table only: a per-column format, keyed by result column id (`sum_exposure_sar`). */
     columnFormats?: Record<string, NumberFormat>;
-    /** UIE-6, table only: the operational object each row describes. The `idField` cell becomes a link to it; a row
-     *  with no id stays plain text. `idField` must be a result column (a chosen dimension). */
+    /** UIE-6, table only: the operational object each row describes. The `labelField` cell (else the `idField` cell)
+     *  becomes a link to it; a row with no id stays plain text. `idField` must be a result column (a chosen dimension). */
     rowLink?: RowLink;
     /** Treemap only: how many level-1 groups to draw before the rest fold into one "Other" (default 20). */
     treemap?: { limit?: number };
@@ -196,6 +196,9 @@ export type RowLinkKind = 'case' | 'incident' | 'reconciliation';
 export interface RowLink {
     kind: RowLinkKind;
     idField: string;
+    /** The readable column carrying the link (e.g. `control`). When set, the `idField` column is hidden from the grid —
+     *  still queried, since the link reads the id from the same row. */
+    labelField?: string;
 }
 
 /** The render-ready props a plugin produces from result rows (labels + series, or raw rows for the table). */
