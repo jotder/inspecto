@@ -98,11 +98,18 @@ users[2]{id,displayName,title,roles}:
   fail-closed and `ControlApi`'s constructor resolves it eagerly, so a demo build bound anywhere else
   **fails to boot** rather than serving an open sign-in.
 - **Never in a real bundle.** The jar is outside the jar enumerations `tools/check-sbom-modules.mjs`
-  parses, and only `package.ps1 -DemoAuth` stages it. There is no dedicated guard test that fails
-  when the jar is added to an edition, and no `tools/bundle-modules.mjs` entry.
-- **Not with `inspecto-security`.** `-DemoAuth` removes `inspecto-security.jar`. The `Authenticator`
-  slot takes the **first** provider it finds, so a hand-assembled classpath carrying both jars would
-  not refuse to boot — keep them apart by construction.
+  parses, has no `tools/bundle-modules.mjs` entry, and only `package.ps1 -DemoAuth` stages it.
+  **`tools/check-demo-auth-isolation.mjs`** (CI, beside the SBOM guard) holds that: it fails if
+  `inspecto-demo-auth` enters any edition's module set (Preview included), is named in `package.ps1`
+  outside an `if ($DemoAuth)` block (the `$modules` list, staging steps, boot-smoke `$cp`, `serve.*`),
+  is a dependency of any other module or a module of an edition profile, or is named — or
+  `-DemoAuth` passed — by any other launcher, script or workflow. Its fixture test
+  `tools/check-demo-auth-isolation.test.mjs` plants each violation and requires red.
+- **Not with `inspecto-security`.** `-DemoAuth` removes `inspecto-security.jar` (the guard above
+  fails if that removal goes, or if the demo launcher's classpath names the security jar). At runtime
+  the fail-closed `Authenticator` slot (`SpiSlot`) **refuses to boot when more than one provider is
+  registered**, naming both, before constructing either — so a hand-assembled classpath carrying both
+  jars fails loudly instead of letting classpath order choose (`SpiSlotFailClosedTest`).
 
 ### How to run it
 

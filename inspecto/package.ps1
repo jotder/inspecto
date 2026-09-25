@@ -86,6 +86,8 @@ param(
     # jar they would boot an auth-free server on every interface), and zips as inspecto-demo-<platform>.zip.
     # The demo jar is deliberately outside the three jar enumerations tools/check-sbom-modules.mjs parses,
     # because no edition ships it; the SBOM therefore still describes the Enterprise module set.
+    # tools/check-demo-auth-isolation.mjs (CI) fails if the demo jar is named anywhere here outside an
+    # `if ($DemoAuth)` block, or if the demo branch stops removing inspecto-security.jar.
     [switch]$DemoAuth,
     # ── release integrity (SOC 2 CC8-04) ──
     # SHA-256 checksums are ALWAYS written next to each artifact (no key needed). -Sign additionally

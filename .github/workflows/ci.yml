@@ -231,6 +231,14 @@ jobs:
       - name: Guard — the shipped SBOM declares the jars the bundle stages
         run: node tools/check-sbom-modules.mjs
 
+      # Demo sign-in isolation guard (DEMO-AUTH-1, 2026-09-25). The Demo User sign-in module signs anyone in
+      # with no password; only `package.ps1 -DemoAuth` may stage it, in place of the security jar. This fails
+      # if it enters any edition's module table, is named in package.ps1 outside an if-($DemoAuth) block, is a
+      # dependency of any other module or a module of an edition profile, or is named by any other launcher
+      # or workflow. The fixture test plants each of those and requires the guard to go red.
+      - name: Guard — the demo sign-in module reaches no real bundle
+        run: node tools/check-demo-auth-isolation.mjs && node --test tools/check-demo-auth-isolation.test.mjs
+
       # DuckDB extension guard (AIRGAP-EXTENSIONS-CI-1, 2026-09-14). Sibling of the guard above, and filed
       # for the same reason one layer down: package.ps1 stages extensions best-effort from a local cache and
       # only WARNS when it finds none, and nothing in CI populated one — so every released bundle, on every
