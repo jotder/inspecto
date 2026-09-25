@@ -206,4 +206,76 @@ class ControlApiSchemaFileRefTest {
             assertEquals(200, ok.statusCode(), ok.body());
         }
     }
+    // ── (d) a pipeline that does not load still opens, so its reference can be repaired ─────────────────
+
+    /** A registered pipeline file whose schema_file names a file that does not exist — the UI's end state. */
+    private static Path brokenPipeline(Path dir) throws Exception {
+        Files.createDirectories(dir);
+        return Files.writeString(dir.resolve("shop_orders_pipeline.toon"), """
+                name: shop_orders
+                id: shop_orders
+                active: true
+                dirs:
+                  poll: in
+                  database: out
+                processing:
+                  threads: 1
+                  schema_file: shop_orders_schema.toon
+                parsing:
+                  frontend: delimited
+                  delimited:
+                    delimiter: ","
+                    has_header: true
+                """);
+    }
+
+    @Test
+    void aPipelineThatDoesNotLoadOpensForRepairAndItsSaveTargetsTheSameFile(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        // In a SUBDIRECTORY on purpose: a repair save that guessed <root>/<name>_pipeline.toon would write a
+        // shadow file beside the broken one instead of fixing it.
+        Path broken = brokenPipeline(root.resolve("shop"));
+        try (Ctx c = open(root, List.of(PipelineConfigBatchTest.writePipeline(cfg, ""), broken))) {
+            HttpResponse<String> list = send(c.port, "GET", "/pipelines", null);
+            assertTrue(list.body().contains("loadError"), "precondition: the file is a Does-not-load row: " + list.body());
+
+            HttpResponse<String> g = send(c.port, "GET", "/pipelines/shop_orders/graph/raw", null);
+            assertEquals(200, g.statusCode(), "an unloadable pipeline must still open: " + g.body());
+            JsonNode graph = V1Body.of(g.body());
+            assertTrue(graph.path("loadError").path("message").asText().contains("shop_orders_schema.toon"),
+                    "the editor is told why it does not load: " + graph);
+            assertTrue(graph.path("active").asBoolean(), "active is the FILE's, not the repair lift's");
+            JsonNode parse = null;
+            for (JsonNode n : graph.get("nodes")) if (n.path("type").asText().startsWith("parser")) parse = n;
+            assertNotNull(parse, "the parse node is there to repair: " + graph);
+            assertEquals("shop_orders_schema.toon", parse.path("config").path("schema_file").asText(),
+                    "the dangling reference is shown as written");
+            String etag = g.headers().firstValue("ETag").orElse(null);
+            assertNotNull(etag, "the repair save is concurrency-checked like any other");
+
+            // Repair: write the schema it names (the Parse Apply), then save the graph back.
+            HttpResponse<String> s = send(c.port, "POST", "/config/write",
+                    parseSchemaDraft("shop_orders_schema").replace("\"type\":\"schema\",", "\"type\":\"schema\",\"subdir\":\"shop\","));
+            assertEquals(200, s.statusCode(), s.body());
+            com.fasterxml.jackson.databind.node.ObjectNode body = (com.fasterxml.jackson.databind.node.ObjectNode) graph.deepCopy();
+            body.remove("loadError");
+            HttpRequest put = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/pipelines/shop_orders/graph"))
+                    .header("If-Match", etag).method("PUT", BodyPublishers.ofString(body.toString())).build();
+            HttpResponse<String> saved = client.send(put, BodyHandlers.ofString());
+            assertEquals(200, saved.statusCode(), saved.body());
+            assertEquals("shop/shop_orders_pipeline.toon", V1Body.of(saved.body()).get("path").asText(),
+                    "the repair overwrites the broken file in place");
+            assertFalse(Files.exists(root.resolve("shop_orders_pipeline.toon")), "no shadow file at the root");
+            assertEquals("shop_orders",
+                    PipelineConfig.loadForValidation(broken.toString()).identity().pipelineName(), "and now it loads");
+        }
+    }
+
+    /** A name that is neither loaded nor a registered failure is still a 404. */
+    @Test
+    void anUnknownPipelineIsStillA404(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(404, send(c.port, "GET", "/pipelines/no_such/graph/raw", null).statusCode());
+        }
+    }
 }

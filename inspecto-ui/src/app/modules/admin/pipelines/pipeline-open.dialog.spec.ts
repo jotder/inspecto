@@ -214,7 +214,12 @@ describe('PipelineOpenDialog', () => {
             },
         };
 
-        it('is listed with a status badge, the message and the file — and cannot be ticked open', async () => {
+        /**
+         * SCHEMA-FILE-NAME-1 (d): it used to be un-tickable ("no graph to open"), so choosing it and
+         * pressing Open did nothing — the operator could not reach the reference that broke it. The
+         * server now serves a repair graph, so the row opens like any other.
+         */
+        it('is listed with a status badge, the message and the file — and can be ticked open to repair', async () => {
             const { fixture, c, ref } = make({ broken: [BROKEN] });
             const el = fixture.nativeElement as HTMLElement;
             const rows = Array.from(el.querySelectorAll('[data-testid="broken-pipeline"]'));
@@ -224,10 +229,14 @@ describe('PipelineOpenDialog', () => {
             expect(row.querySelector('inspecto-status-badge')?.textContent).toContain('Does not load');
             expect(row.textContent).toContain('line 7');
             expect(row.textContent).toContain('/space/config/orders_pipeline.toon');
-            // Not openable: no checkbox, no pin/export buttons in the broken row, and never in the result.
-            expect(row.querySelector('mat-checkbox, button')).toBeNull();
+            // No pin/export (there is no saved graph to export), but a checkbox that opens it.
+            expect(row.querySelector('button')).toBeNull();
+            expect(row.querySelector('mat-checkbox')).not.toBeNull();
             c.confirm();
-            expect(ref.close).toHaveBeenCalledWith(['b']);
+            expect(ref.close).toHaveBeenCalledWith(['b']); // unticked: not opened
+            c.toggle('orders');
+            c.confirm();
+            expect(ref.close).toHaveBeenLastCalledWith(['b', 'orders']);
             await expectNoA11yViolations(fixture.nativeElement);
         });
 

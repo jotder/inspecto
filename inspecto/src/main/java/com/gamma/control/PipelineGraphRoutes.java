@@ -3,6 +3,7 @@ package com.gamma.control;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.Severity;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -26,6 +27,7 @@ import com.gamma.inspector.PipelineTestRun;
 import com.gamma.pipeline.exec.PipelineDryRun;
 import com.gamma.pipeline.exec.RowShaper;
 import com.gamma.service.CollectorService;
+import com.gamma.service.ConfigRegistry;
 import com.gamma.service.SpaceRoot;
 import com.gamma.util.AtomicFiles;
 import com.gamma.util.DuckDbUtil;
@@ -250,7 +252,12 @@ final class PipelineGraphRoutes implements RouteModule {
      * edit exactly like {@code ComponentRoutes}' component CRUD (W3 optimistic locking).
      */
     private Object editableGraph(ApiContext api, HttpExchange ex, String name) throws IOException {
-        PipelineConfig cfg = api.service().configFor(name)
+        Optional<PipelineConfig> loaded = api.service().configFor(name);
+        if (loaded.isEmpty()) {
+            Optional<ConfigRegistry.LoadFailure> broken = loadFailure(api, name);
+            if (broken.isPresent()) return repairGraph(ex, name, broken.get());
+        }
+        PipelineConfig cfg = loaded
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
         Path file = api.service().pathFor(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no config file for pipeline '" + name + "'"));
@@ -259,6 +266,73 @@ final class PipelineGraphRoutes implements RouteModule {
         Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
         attachCompanionEnrichments(api, cfg.identity().pipelineName(), editable);
         return editable;
+    }
+
+    /** The registered file named {@code name} that did NOT load ({@code GET /pipelines} lists it by this stem). */
+    private static Optional<ConfigRegistry.LoadFailure> loadFailure(ApiContext api, String name) {
+        return api.service().pipelineLoadFailures().stream().filter(f -> f.name().equals(name)).findFirst();
+    }
+
+    /**
+     * {@code GET …/graph/raw} for a registered pipeline that does not load — the <b>repair</b> view
+     * (SCHEMA-FILE-NAME-1 (d), 2026-09-25). Before this the route answered 404 ("no pipeline named"), and
+     * the SPA's picker listed the row as "Does not load" with nothing to tick: a pipeline broken by a
+     * dangling {@code schema_file} could not be opened to fix the very reference that broke it.
+     *
+     * <p>The topology is lifted from the file with its <b>unresolvable</b> schema references set aside
+     * (and inactive — the loader refuses an armed pipeline with no schema), because that is exactly what
+     * fails the load. Every node's config is still the RAW file's, so the parse node shows the dangling
+     * {@code schema_file} as written, and {@code active} is the file's own. {@code loadError} carries the
+     * loader's message so the editor can say why. A file that still cannot be lifted is a 422 naming the
+     * load failure — never a half graph. The ETag is over the raw file, as for a loaded pipeline, so the
+     * repairing {@code PUT} is concurrency-checked the same way (it targets this same file,
+     * {@link #registeredFile}).
+     */
+    private Object repairGraph(HttpExchange ex, String name, ConfigRegistry.LoadFailure broken) throws IOException {
+        Map<String, Object> raw = ConfigLoader.filesystem().decode(broken.path().toString());
+        ETags.set(ex, ETags.of(ContentHash.of(raw)));
+        Path dir = broken.path().toAbsolutePath().getParent();
+        PipelineConfig lifted;
+        try {
+            lifted = PipelineConfig.fromMap(withoutUnresolvedSchemas(raw, dir), dir);
+        } catch (IOException | RuntimeException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "pipeline '" + name + "' does not load and cannot be opened for repair: " + broken.message());
+        }
+        Map<String, Object> editable = PipelineEditable.toMap(lifted, raw);
+        editable.put("active", Boolean.parseBoolean(String.valueOf(raw.getOrDefault("active", "false"))));
+        Map<String, Object> loadError = new LinkedHashMap<>();
+        loadError.put("file", broken.file());
+        if (broken.line() != null) loadError.put("line", broken.line());
+        loadError.put("message", broken.message());
+        editable.put("loadError", loadError);
+        return editable;
+    }
+
+    /**
+     * A copy of {@code raw} that can be lifted: inactive, and without the schema references that resolve
+     * nowhere beside {@code dir} — found by the save gate's own resolver ({@link ConfigRoutes#schemaFileFindings}),
+     * so "unresolved" means the same thing here as at the save. {@code raw} itself is untouched.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> withoutUnresolvedSchemas(Map<String, Object> raw, Path dir) {
+        Map<String, Object> copy = new LinkedHashMap<>(raw);
+        copy.put("active", false);
+        if (!(raw.get("processing") instanceof Map<?, ?> proc)) return copy;
+        Map<String, Object> processing = new LinkedHashMap<>((Map<String, Object>) proc);
+        List<Finding> unresolved = ConfigRoutes.schemaFileFindings("pipeline", raw, Severity.ERROR, dir);
+        Set<String> gone = new java.util.HashSet<>();
+        for (Finding f : unresolved) gone.add(f.fieldPath());
+        if (gone.contains("processing.schema_file")) processing.remove("schema_file");
+        if (processing.get("schemas") instanceof List<?> defs) {
+            List<Object> kept = new ArrayList<>();
+            for (int i = 0; i < defs.size(); i++)
+                if (!gone.contains("processing.schemas[" + i + "].schema_file")) kept.add(defs.get(i));
+            if (kept.isEmpty()) processing.remove("schemas");
+            else processing.put("schemas", kept);
+        }
+        copy.put("processing", processing);
+        return copy;
     }
 
     /**
@@ -296,7 +370,7 @@ final class PipelineGraphRoutes implements RouteModule {
         withId.put("name", name);   // the URL name wins over any name in the body
         PipelineGraph g = parseAndValidateFlow(api, withId);
 
-        Optional<Path> registered = api.service().pathFor(name).map(Path::normalize)
+        Optional<Path> registered = registeredFile(api, name).map(Path::normalize)
                 .filter(p -> p.startsWith(writeRoot));
         Path target = WriteGates.jail(writeRoot,
                 registered.orElseGet(() -> writeRoot.resolve(WriteGates.safeName(name, "pipeline name") + "_pipeline.toon")),
@@ -347,6 +421,16 @@ final class PipelineGraphRoutes implements RouteModule {
         r.put("name", name);
         r.put("findings", findings);
         return r;
+    }
+
+    /**
+     * The file a save for {@code name} overwrites: the loaded pipeline's registered path, else — for the
+     * repair of one that did NOT load — the registered file that failed. ⚠ Without the second arm a repair
+     * of a pipeline living anywhere but {@code <root>/<name>_pipeline.toon} would write a SHADOW file
+     * beside the broken one, the exact second-file defect the registered-path rule above exists to prevent.
+     */
+    private static Optional<Path> registeredFile(ApiContext api, String name) {
+        return api.service().pathFor(name).or(() -> loadFailure(api, name).map(ConfigRegistry.LoadFailure::path));
     }
 
     /**

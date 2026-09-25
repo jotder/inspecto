@@ -94,12 +94,18 @@ backend on :4204.
   and splits it with `splitPipelineRows`: healthy rows feed `flows()` (tabs, restore, name checks) as
   before, broken rows feed `brokenPipelines()` → the dialog's `broken` data, rendered after the list with an
   error `<inspecto-status-badge label="Does not load">`, the loader's message verbatim and the pipeline
-  file path — and **no checkbox, pin or export**, since there is no graph to open. A stored open tab
-  naming a broken file is dropped on restore like any other unlisted id. The **empty canvas counts them
-  too** (2026-09-25): when every registered Pipeline is broken it reads *"No pipeline loads — This Space
-  has N pipelines, but none of them load"* with a **Show pipelines…** action opening this dialog, and
-  *"No pipeline open"* appends *"M more do not load"*; *"No authored pipelines"* is kept for a Space that
-  genuinely has none (it used to show over 16 broken ones). ⛔ Every OTHER consumer
+  file path, and **a checkbox — it opens in REPAIR mode** (no pin or export: there is no loaded graph to
+  export). ⚠ Until 2026-09-25 (`SCHEMA-FILE-NAME-1` (d)) the row had no checkbox "since there is no graph
+  to open", so choosing it and pressing Open did nothing and a pipeline broken by a dangling
+  `schema_file` could not be opened to fix that reference. `GET …/graph/raw` now serves such a file (see
+  [TOON config](../../backend/config/toon-config.md)) with a `loadError`, which `select()` keeps OFF the
+  model (it must never ride a save) in a per-tab map → `selectedLoadError()` → an error banner over the
+  canvas ("This pipeline does not load — fix it here and Save"); a successful save clears it. A stored
+  open tab naming a broken file is restored like a healthy one, and a re-list keeps it. The **empty canvas
+  counts them too** (2026-09-25): when every registered Pipeline is broken it reads *"No pipeline loads —
+  This Space has N pipelines, but none of them load"* with a **Show pipelines…** action opening this
+  dialog, and *"No pipeline open"* appends *"M more do not load"*; *"No authored pipelines"* is kept for a
+  Space that genuinely has none (it used to show over 16 broken ones). ⛔ Every OTHER consumer
   (Catalog registry, Link Analysis, the dashboard editor's stale-widget check) calls `list()`, which
   drops broken rows — do not switch one to `listWithBroken()` without deciding what it should do with a
   Pipeline that cannot run.

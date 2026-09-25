@@ -243,6 +243,12 @@ export interface AuthoredPipeline {
     active: boolean;
     nodes: AuthoredNode[];
     edges: AuthoredEdge[];
+    /**
+     * Set ONLY on `GET …/graph/raw` for a registered file that did not load — the repair view
+     * (SCHEMA-FILE-NAME-1 (d)): the graph is lifted with its unresolvable schema references set aside so
+     * the operator can fix them, and this says why the file does not load. Never sent back on a save.
+     */
+    loadError?: PipelineLoadError;
 }
 
 /** One named reason a graph cannot lower to the flat config (W5; `nodeId` absent for graph-level). */

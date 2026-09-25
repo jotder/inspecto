@@ -16,7 +16,8 @@ export interface PipelineOpenData {
     pipelines: PipelineSummary[];
     /**
      * Registered files that did not load (PIPELINE-LOAD-FAILURE-INVISIBLE-1) — listed after the rest as
-     * broken entries: the loader's message and the file, but no checkbox, since there is no graph to open.
+     * broken entries with the loader's message and the file. Tickable since SCHEMA-FILE-NAME-1 (d): the
+     * server serves a REPAIR graph for them, and a row that cannot be opened cannot be fixed.
      */
     broken?: BrokenPipeline[];
     /** Already-open ids, pre-ticked so the dialog reads as "what is open" rather than "what to add". */
@@ -155,18 +156,30 @@ export interface PipelineOpenData {
                         </p>
                     }
                 }
-                <!-- Broken rows: a file that did not load has no graph, so there is nothing to tick. The
-                     message is the loader's own (it names the refused file + line); the path is the
-                     registered Pipeline file. -->
+                <!-- Broken rows: a file that did not load opens in REPAIR mode (the server lifts it with its
+                     unresolvable schema references set aside) — so the reference that broke it can be fixed
+                     from here. The message is the loader's own (it names the refused file + line); the path
+                     is the registered Pipeline file. -->
                 @for (b of brokenRows(); track b.path) {
-                    <div class="flex items-start gap-2 rounded px-1 py-1 text-sm" data-testid="broken-pipeline">
+                    <label
+                        class="flex cursor-pointer items-start gap-2 rounded px-1 py-1 text-sm"
+                        data-testid="broken-pipeline"
+                        [for]="brokenCb.inputId"
+                    >
+                        <mat-checkbox
+                            #brokenCb
+                            [checked]="picked().has(b.name)"
+                            (change)="toggle(b.name)"
+                            [aria-label]="'Open ' + b.name + ' to repair it'"
+                        >
+                        </mat-checkbox>
                         <span class="flex min-w-0 flex-auto flex-col">
                             <span class="truncate">{{ b.name }}</span>
                             <span class="text-secondary break-all text-xs">{{ b.loadError.message }}</span>
                             <span class="text-secondary break-all font-mono text-xs">{{ b.path }}</span>
                         </span>
                         <inspecto-status-badge value="error" label="Does not load" />
-                    </div>
+                    </label>
                 }
             </div>
         </mat-dialog-content>
@@ -342,7 +355,9 @@ export class PipelineOpenDialog {
     /** Returns the full desired open set, in the listed order so tabs are stable across re-opens. */
     confirm(): void {
         const picked = this.picked();
-        const result = this.data.pipelines.filter((p) => picked.has(p.name)).map((p) => p.name);
+        const result = [...this.data.pipelines.map((p) => p.name), ...this.broken.map((b) => b.name)].filter((n) =>
+            picked.has(n),
+        );
         // MRU records what this confirm NEWLY opened (recorded here, from the dialog's own result —
         // the editor is not involved). Newly-ticked ids go to the front, then the prior entries
         // minus duplicates, capped — most-recent-first.

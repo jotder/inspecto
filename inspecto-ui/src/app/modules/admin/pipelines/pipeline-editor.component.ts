@@ -39,6 +39,7 @@ import {
     PipelinesService,
     PipelineSummary,
     BrokenPipeline,
+    PipelineLoadError,
     splitPipelineRows,
     ProvenanceBatch,
     IconMap,
@@ -722,8 +723,10 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 // Re-listing (after a save/import) must not disturb tabs already open.
                 // An imported draft for an id this Space does not hold yet is not listed until its Save.
                 const draftId = this.importDraft()?.id;
-                this.openIds.update((ids) => ids.filter((id) => id === draftId || fs.some((f) => f.name === id)));
-                this.restoreOpenTabs(new Set(fs.map((f) => f.name)));
+                // A broken row stays openable — it opens in repair mode (SCHEMA-FILE-NAME-1 (d)).
+                const known = new Set([...fs.map((f) => f.name), ...broken.map((b) => b.name)]);
+                this.openIds.update((ids) => ids.filter((id) => id === draftId || known.has(id)));
+                this.restoreOpenTabs(known);
             },
             error: () => {
                 this.flows.set([]);
@@ -1108,6 +1111,29 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     /** Stamp the tab's dirty baseline — at load and after each successful save (see {@link historyBaselines}). */
+    /**
+     * Why each open tab's file does not load, when the server opened it in REPAIR mode — keyed by id and
+     * shown as the canvas banner. Cleared by a successful save: the fixed file reloads on the server's
+     * next cycle, and a banner still claiming it is broken would contradict the save that fixed it.
+     */
+    private readonly loadErrors = signal<ReadonlyMap<string, PipelineLoadError>>(new Map());
+
+    /** The open tab's load failure, or null for a pipeline that loaded. */
+    readonly selectedLoadError = computed<PipelineLoadError | null>(() => {
+        const id = this.selectedId();
+        return id ? (this.loadErrors().get(id) ?? null) : null;
+    });
+
+    private setLoadError(id: string, err: PipelineLoadError | undefined): void {
+        if (!err && !this.loadErrors().has(id)) return;
+        this.loadErrors.update((m) => {
+            const next = new Map(m);
+            if (err) next.set(id, err);
+            else next.delete(id);
+            return next;
+        });
+    }
+
     private stampBaseline(id: string, m: AuthoredPipeline): void {
         this.historyBaselines.set(id, JSON.stringify(m));
     }
@@ -1191,8 +1217,11 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         this.pendingSelect = id;
         // W5: the editor edits the CANONICAL *_pipeline.toon — lift it to the editable graph.
         this.api.pipelineGraphRaw(id).subscribe({
-            next: (pipeline) => {
+            next: ({ loadError, ...pipeline }) => {
                 if (this.pendingSelect !== id) return; // superseded — the operator moved on
+                // Kept OFF the model: it is the server's verdict on the file, not part of the graph, and
+                // must never ride a save back.
+                this.setLoadError(id, loadError);
                 this.model.set(pipeline);
                 this.selectedId.set(id); // drives the host rebuild (graphKey)
                 this.dirty.set(false);
@@ -1610,6 +1639,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 this.dirty.set(false);
                 // The stack SURVIVES a save (undoing past it re-arms dirty against this new baseline).
                 this.stampBaseline(id, m);
+                this.setLoadError(id, undefined); // repaired and saved — it reloads on the next cycle
                 if (draft) this.clearImportDraft(); // saved: it is this Space's pipeline now, not a draft
                 this.toast.success(`Saved pipeline '${id}'`);
             },

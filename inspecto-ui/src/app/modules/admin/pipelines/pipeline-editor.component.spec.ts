@@ -2126,6 +2126,36 @@ describe('PipelineEditorComponent', () => {
             expect(api.pipelineGraphRaw).not.toHaveBeenCalled();
         });
 
+        /**
+         * SCHEMA-FILE-NAME-1 (d): a registered file that does not load opens in REPAIR mode. The server's
+         * `loadError` becomes the canvas banner and never rides the model into a save; a save clears it.
+         */
+        it('opens a pipeline that does not load for repair, and keeps its broken row across a re-list', async () => {
+            const broken = {
+                name: 'shop_orders',
+                path: '/space/config/shop_orders_pipeline.toon',
+                loadError: { file: '/space/config/shop_orders_pipeline.toon', message: 'Schema file not found: x' },
+            };
+            api.listWithBroken.mockReturnValue(of([broken]));
+            api.pipelineGraphRaw.mockReturnValue(
+                of({ name: 'shop_orders', active: true, nodes: [], edges: [], loadError: broken.loadError }),
+            );
+            const c = make();
+            c.select('shop_orders');
+            expect(c.selectedLoadError()?.message).toBe('Schema file not found: x');
+            expect('loadError' in c.model()!, 'the verdict is not part of the graph').toBe(false);
+
+            c.load(); // a re-list must not drop the tab just because the row is a broken one
+            expect(c.openIds()).toContain('shop_orders');
+
+            await c.save();
+            expect(api.savePipelineGraph).toHaveBeenCalledWith(
+                'shop_orders',
+                expect.not.objectContaining({ loadError: expect.anything() }),
+            );
+            expect(c.selectedLoadError(), 'saved — the banner no longer claims it is broken').toBeNull();
+        });
+
         it('select opens a tab and makes it active', () => {
             const c = make();
             c.select('demo');
@@ -2416,8 +2446,12 @@ describe('PipelineEditorComponent', () => {
             expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({ open: ['demo'], selected: 'demo' });
         });
 
-        /** PIPELINE-LOAD-FAILURE-INVISIBLE-1: a broken row reaches the Open dialog, never the open set. */
-        it('hands a Pipeline that does not load to the Open dialog as broken, and never restores it as a tab', () => {
+        /**
+         * PIPELINE-LOAD-FAILURE-INVISIBLE-1: a broken row reaches the Open dialog as broken. ⚠ It used to be
+         * kept out of the open set too; since SCHEMA-FILE-NAME-1 (d) it opens in REPAIR mode, so a stored
+         * tab for it is restored like any other — dropping it hid the one pipeline the operator was fixing.
+         */
+        it('hands a Pipeline that does not load to the Open dialog as broken, and restores its tab for repair', () => {
             localStorage.setItem(KEY, JSON.stringify({ open: ['a', 'orders'], selected: 'orders' }));
             const broken = {
                 name: 'orders',
@@ -2427,7 +2461,7 @@ describe('PipelineEditorComponent', () => {
             api.listWithBroken.mockReturnValue(of([row('a'), broken]));
             const c = make();
             expect(c.flows().map((f) => f.name)).toEqual(['a']);
-            expect(c.openIds()).toEqual(['a']);
+            expect(c.openIds()).toEqual(['a', 'orders']);
             dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
             c.openPipelines();
             const data = dialog.open.mock.calls[0][1].data;

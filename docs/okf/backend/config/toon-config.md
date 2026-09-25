@@ -58,6 +58,15 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   (`orders_pipeline.toon` → `orders`, since the declared name never parsed), `message` is the loader's own
   text verbatim, and `file`/`line` are parsed out of its `<file>.toon: line N:` prefix — so `file` is the
   **schema** when the bad row is in the schema — falling back to the pipeline file with no `line`.
+  **It can be opened for repair** (`SCHEMA-FILE-NAME-1` (d), 2026-09-25): `GET /pipelines/{name}/graph/raw`
+  for a name that is not loaded but IS a recorded failure answers the file's editable graph instead of
+  404 — lifted from a copy with its UNRESOLVABLE schema references set aside (the save gate's own
+  resolver, `ConfigRoutes.schemaFileFindings`) and `active: false`, which is exactly what fails the load;
+  every node config is still the raw file's (the parse node shows the dangling `schema_file`), `active` is
+  the file's own, a `loadError {file, line?, message}` rides along, and the ETag is over the raw file. A
+  file that still cannot be lifted is a 422 naming the load failure. `PUT …/graph` targets the failed
+  file's path when the name is not loaded (`registeredFile`) — without that a repair of a pipeline in a
+  subdirectory wrote a shadow `<root>/<name>_pipeline.toon`. Pinned by `ControlApiSchemaFileRefTest`.
   🔴 **Decision: broken rows exist on that ONE route only.** `CollectorService.pipelines()`, `configs()`,
   `all()`, `configForPath()` — everything the scheduler, the run/trigger routes, `/runs`, `/ready` and
   `/health` counts, `/pipelines/combined`, lineage, metrics and the catalog read — are unchanged and never
