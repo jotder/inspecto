@@ -13,7 +13,7 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **35<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 19<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** —
+> **34<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 18<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -24,9 +24,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 19<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 18<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 16<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 35<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 34<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -58,7 +58,7 @@ rank.
 
 | State | P2 rows |
 |---|---|
-| **Startable now** — no gate, no owed decision | — none unclaimed: every 2026-09-25 decision is built or in flight (per-user notification preferences §3.5 · the `pipeline` bundle kind for `BUNDLE-AUTHORED-PIPELINE-STORE-1` §3.7) |
+| **Startable now** — no gate, no owed decision | — none unclaimed: every 2026-09-25 decision is built or in flight (per-user notification preferences §3.5) |
 | **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | Platform Services Stage 2/3 (§3.2) · `findings-spec` acceptance session with a Case-desk lead (§3.9) · cross-Space consequence (§3.5, ⏸ on hold until D10 is named) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residuals (a `package.ps1` run + the Linux binary) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · Deployment topology GAP-4 · `D8-SES-SNS-1` (SES/SNS adapter ON HOLD by operator 2026-09-25; per-user preferences need a call) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) · `DUCKLE-C1-DATASET-FRESHNESS-1` residual (2) (needs a design pass, §3.5) |
 
@@ -105,7 +105,6 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | 3.8 | policy-authoring UX | none — D1 answered 2026-09-25: guard ALL nine failure modes F1–F9 at save time rather than wait for the incident report; D2–D9 take the design's recommendations |
 | 3.8 | `DUCKLE-C6-POLICY-NARROWING-1` | 16 calls in `superpower/policy-narrowing-design.md` (Decisions owed) |
 | 3.9 | D6 `findings-spec` UI | 5 calls (D5 advanced tier · D6 technical properties · D7 removal impact · D8 Components pane · D10 acceptance) in `superpower/findings-spec-authoring-ui-design.md`; decided 2026-09-25: D1 `canManageIncidents` (BUILT) · D2 Case only · D3 validate the existing `attributes.findings` blob · D4 a dialog in the Cases toolbar · D9 the UI word is **Findings field** |
-| 3.7 | `BUNDLE-AUTHORED-PIPELINE-STORE-1` | A re-point `authored-pipeline` at registered files · B add a `pipeline` kind over `PipelineBundleRoutes` and keep `authored-pipeline` for grandfathered graphs · C retire the kind (Pipelines move only through §21 routes) |
 
 **Decided 2026-09-25, not tied to a row** (operator; each lands in its owning OKF concept when built):
 
@@ -218,7 +217,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 #### Exchange & jobs
 
 - **P3** · **Bundle / Exchange — "load as draft" residuals** — ✅ **every slice SHIPPED 2026-09-25** (all eight calls answered that day): **Import as draft…** beside **Import…** in the Dashboard, Widget, Dataset, authored Pipeline, Link Analysis view and Geo map view editors — prerequisites write-through imported first, the target held unsaved in memory under a shared banner, Save through the editor's own route (`If-Match` + a diff for an existing id), advisory integrity findings from `POST /bundle/preview` re-checked just before Save. As-built: `okf/backend/control-plane/metadata-bundle.md`; design archived. Re-ranked P2 → P3. Left: `/bundle/preview` checks no references for Pipelines or LA/Geo views, so their banner says "not checked" (nothing checks a view's `datasetId`); a browser pass over the six editors. → `okf/backend/control-plane/metadata-bundle.md`
-- **P2** · `BUNDLE-AUTHORED-PIPELINE-STORE-1` — **the `authored-pipeline` bundle kind writes `PipelineStore`, the pre-W5 store the editor and the poll cycle never read.** Grounded 2026-09-25: both stores are live — registered `*_pipeline.toon` files are what the editor saves and the poll runs (with their own gated transfer, `GET /pipelines/{name}/bundle` + `POST /pipelines/import`); `PipelineStore` (`*_flow.toon`) holds grandfathered graphs the flat config cannot express, still run by a pipeline job's `pipeline:` param and `POST /pipelines/authored/{id}/trigger` (and `inspecto/examples/06-serve/pipeline-job` depends on one). The bundle kind is `PipelineStore`'s only remaining writer — against W5's "never newly written" — and the UI fills it with registered Pipelines, so a round-trip does not come back. 🔴 **Worse than filed:** *Run to here* (`PipelineGraphRoutes.graphFor`) reads `PipelineStore` BEFORE the registered config, so an imported `orders` shadows a registered `orders_pipeline.toon` (read from the code; no test yet). **Operator's call** (§1): A re-point the kind at registered files · B a new `pipeline` kind over `PipelineBundleRoutes`' import, `authored-pipeline` kept for grandfathered graphs only · C retire the kind. Whichever: stop the `PipelineStore` write, or refuse an id a registered Pipeline has. → `okf/backend/control-plane/metadata-bundle.md`
 - **P3** · **Job framework — space-to-space comparison (residuals)** — ✅ the comparison SHIPPED 2026-09-24 (`space.comparison` Job Type + `POST /space-comparisons` on `canAdminister`; all four design decisions taken "go with recommendations", each recorded with how to reverse it in `archived-documents/plans-archive/space-comparison-design.md` §5). Left, each waiting for a real ask: (a) **a scheduled / authored cross-Space comparison** — refused by design today (no Subject ⇒ own-Space-only grant); needs a persisted, attributable, revocable grant, which is a new operator decision, not plumbing · (b) *compare every registered Space* — only with a `SpaceConfigRoot` enumeration decision (design Q1 (b) / Q4) · (c) persisting comparison rows — the data-residency call (Q3) · (d) no UI surface; API only. Predictive maintenance stays deferred to AGT-5 regardless. → `okf/backend/control-plane/jobs.md` § *Space comparison*
 
 #### API contract & vocabulary
