@@ -97,9 +97,13 @@ public final class ReconService {
         public String wire() { return name().toLowerCase(java.util.Locale.ROOT); }
     }
 
-    /** A validated reconciliation spec — construct via {@link #of}. Side 0 is the anchor ("a"). */
+    /**
+     * A validated reconciliation spec — construct via {@link #of}. Side 0 is the anchor ("a").
+     * {@code carriedImpact} is the Break impact column when it is NOT compared (set via {@link #withImpact}):
+     * its per-side value rides on every Break row and never takes part in any comparison.
+     */
     public record Spec(List<Side> sides, List<String> keyColumns, List<Measure> measures,
-                       boolean includeRecordCount, Cardinality cardinality) {
+                       boolean includeRecordCount, Cardinality cardinality, String carriedImpact) {
 
         /** As {@link #of(List, List, List, boolean, Cardinality)} asserting nothing about cardinality. */
         public static Spec of(List<Side> sides, List<String> keyColumns, List<Measure> measures,
@@ -145,7 +149,24 @@ public final class ReconService {
                 if (s.filter() != null) ExpressionGuard.check(s.filter());
             }
             return new Spec(List.copyOf(sides), List.copyOf(keyColumns), List.copyOf(ms), includeRecordCount,
-                    cardinality == null ? Cardinality.MANY_TO_MANY : cardinality);
+                    cardinality == null ? Cardinality.MANY_TO_MANY : cardinality, null);
+        }
+
+        /**
+         * This spec with {@code column} as the Break impact (config {@code impact.column}; operator decision
+         * 2026-09-25). A compared column needs nothing — its values are already on every Break — so the spec
+         * is returned unchanged; any other column is <em>carried</em>: summed per key and side like a
+         * {@code sum} measure and put on each Break row as {@code impact:{a,b}}, but never compared, so it
+         * cannot create or suppress a Break. {@code null} = no impact declared.
+         */
+        public Spec withImpact(String column) {
+            if (column == null) return this;
+            safeIdent(column, "impact column");
+            if (RECORDS.equals(column) || keyColumns.contains(column))
+                throw new IllegalArgumentException("impact column '" + column + "' must not be a key column or '"
+                        + RECORDS + "'");
+            for (Measure m : measures) if (m.name().equals(column)) return this;
+            return new Spec(sides, keyColumns, measures, includeRecordCount, cardinality, column);
         }
 
         /** This side's physical column for a unified column name. */
@@ -244,6 +265,7 @@ public final class ReconService {
 
         try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {
             Connection conn = registerSides(sandbox, spec);
+            if (spec.carriedImpact() != null) padAbsentImpact(conn, spec);
             Map<String, BreakSet> out = new LinkedHashMap<>();
             if (type == null || type.equals("missing_right"))
                 out.put("missing_right", breakSet(conn, spec, missingSql(spec, other, true, path, limit, offset), 'a', limit, false));
@@ -407,12 +429,24 @@ public final class ReconService {
 
     /** One side's grouped CTE body: unified keys aliased k0…, measures m0…, COUNT(*) as mr (presence marker). */
     static String sideSql(Spec spec, int side) {
+        return sideSql(spec, side, false);
+    }
+
+    /**
+     * As {@link #sideSql(Spec, int)}; {@code carry} adds the carried impact column as {@code mi}
+     * ({@code SUM(TRY_CAST(… AS DOUBLE))} — a non-numeric value reads as NULL rather than failing the run).
+     * Only the Break queries ask for it, so {@link #run} builds byte-identical SQL with or without an impact.
+     */
+    static String sideSql(Spec spec, int side, boolean carry) {
         StringBuilder sb = new StringBuilder("SELECT ");
         List<String> keys = spec.keyColumns();
         for (int i = 0; i < keys.size(); i++)
             sb.append(q(spec.physical(side, keys.get(i)))).append(" AS ").append(q("k" + i)).append(", ");
         for (int i = 0; i < spec.measures().size(); i++)
             sb.append(aggExpr(spec, side, i)).append(", ");
+        if (carry && spec.carriedImpact() != null)
+            sb.append("SUM(TRY_CAST(").append(q(spec.physical(side, spec.carriedImpact()))).append(" AS DOUBLE)) AS ")
+              .append(q("mi")).append(", ");
         sb.append("COUNT(*) AS ").append(q("mr"))
           .append(" FROM ").append(VIEWS[side]).append(whereFilter(spec, side))
           .append(" GROUP BY ");
@@ -521,11 +555,13 @@ public final class ReconService {
         String present = anchorOnly ? "__s0" : "__s" + other;
         String absent = anchorOnly ? "__s" + other : "__s0";
         String prefix = anchorOnly ? "sa_" : "sb_";
-        StringBuilder sb = new StringBuilder(with(spec)).append("SELECT ");
+        StringBuilder sb = new StringBuilder(with(spec, true)).append("SELECT ");
         for (int i = 0; i < spec.keyColumns().size(); i++)
             sb.append(present).append('.').append(q("k" + i)).append(", ");
         for (int i = 0; i < spec.measures().size(); i++)
             sb.append(present).append('.').append(q("m" + i)).append(" AS ").append(q(prefix + "m" + i)).append(", ");
+        if (spec.carriedImpact() != null)
+            sb.append(present).append('.').append(q("mi")).append(" AS ").append(q(prefix + "mi")).append(", ");
         sb.append(present).append('.').append(q("mr")).append(" AS ").append(q(prefix + "mr"))
           .append(" FROM ").append(present).append(" LEFT JOIN ").append(absent).append(" ON ").append(keyJoin(spec, 0, other))
           .append(" WHERE ").append(absent).append(".\"mr\" IS NULL").append(pathPredicate(spec, path, present + "."))
@@ -549,12 +585,13 @@ public final class ReconService {
     static String cardinalityBreaksSql(Spec spec, int other, Map<String, String> path, int limit, int offset) {
         String o = "__s" + other;
         String violates = cardinalityViolation(spec, o);
-        StringBuilder sb = new StringBuilder(with(spec)).append("SELECT ");
+        StringBuilder sb = new StringBuilder(with(spec, true)).append("SELECT ");
         for (int i = 0; i < spec.keyColumns().size(); i++)
             sb.append("__s0.").append(q("k" + i)).append(", ");
         for (int i = 0; i < spec.measures().size(); i++)
             sb.append("__s0.").append(q("m" + i)).append(" AS ").append(q("sa_m" + i)).append(", ")
               .append(o).append('.').append(q("m" + i)).append(" AS ").append(q("sb_m" + i)).append(", ");
+        carriedImpact(sb, spec, o);
         sb.append("__s0.").append(q("mr")).append(" AS ").append(q("sa_mr")).append(", ")
           .append(o).append('.').append(q("mr")).append(" AS ").append(q("sb_mr"))
           .append(" FROM __s0 JOIN ").append(o).append(" ON ").append(keyJoin(spec, 0, other))
@@ -586,12 +623,13 @@ public final class ReconService {
     /** Matched keys of the anchor↔{@code other} pair where any compare column is outside its tolerance. */
     static String valueBreaksSql(Spec spec, int other, Map<String, String> path, int limit, int offset) {
         String o = "__s" + other;
-        StringBuilder sb = new StringBuilder(with(spec)).append("SELECT ");
+        StringBuilder sb = new StringBuilder(with(spec, true)).append("SELECT ");
         for (int i = 0; i < spec.keyColumns().size(); i++)
             sb.append("__s0.").append(q("k" + i)).append(", ");
         for (int i = 0; i < spec.measures().size(); i++)
             sb.append("__s0.").append(q("m" + i)).append(" AS ").append(q("sa_m" + i)).append(", ")
               .append(o).append('.').append(q("m" + i)).append(" AS ").append(q("sb_m" + i)).append(", ");
+        carriedImpact(sb, spec, o);
         sb.append("__s0.").append(q("mr")).append(" AS ").append(q("sa_mr")).append(", ")
           .append(o).append('.').append(q("mr")).append(" AS ").append(q("sb_mr"));
         List<String> broken = IntStream.range(0, spec.measures().size())
@@ -603,6 +641,13 @@ public final class ReconService {
           .append(" ORDER BY ").append(orderByKeys(spec, "__s0."))
           .append(" LIMIT ").append(Math.max(0, limit) + 1).append(" OFFSET ").append(Math.max(0, offset));
         return sb.toString();
+    }
+
+    /** The carried impact column of both pair sides ({@code sa_mi}, {@code sb_mi}) — selected, never compared. */
+    private static void carriedImpact(StringBuilder sb, Spec spec, String o) {
+        if (spec.carriedImpact() == null) return;
+        sb.append("__s0.").append(q("mi")).append(" AS ").append(q("sa_mi")).append(", ")
+          .append(o).append('.').append(q("mi")).append(" AS ").append(q("sb_mi")).append(", ");
     }
 
     /**
@@ -622,8 +667,13 @@ public final class ReconService {
     }
 
     private static String with(Spec spec) {
+        return with(spec, false);
+    }
+
+    /** The side CTEs; {@code carry} = a Break query, which also selects the carried impact column. */
+    private static String with(Spec spec, boolean carry) {
         List<String> ctes = new ArrayList<>();
-        for (int i = 0; i < spec.sides().size(); i++) ctes.add("__s" + i + " AS (" + sideSql(spec, i) + ")");
+        for (int i = 0; i < spec.sides().size(); i++) ctes.add("__s" + i + " AS (" + sideSql(spec, i, carry) + ")");
         return "WITH " + String.join(", ", ctes) + " ";
     }
 
@@ -646,6 +696,33 @@ public final class ReconService {
     }
 
     /**
+     * A carried impact column may exist on only some of the reconciled Datasets (e.g. a fee known to CRM and
+     * billing but not to the HLR): a side without it is re-registered with a NULL column of that name, so it
+     * carries {@code null}. On NO side is a config error (→ 422) — almost certainly a misspelt column.
+     */
+    private static void padAbsentImpact(Connection conn, Spec spec) throws SQLException {
+        boolean anywhere = false;
+        for (int i = 0; i < spec.sides().size(); i++) {
+            String phys = spec.physical(i, spec.carriedImpact());
+            boolean has = false;
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT * FROM " + VIEWS[i] + " LIMIT 0")) {
+                ResultSetMetaData md = rs.getMetaData();
+                for (int c = 1; c <= md.getColumnCount(); c++) has |= md.getColumnLabel(c).equalsIgnoreCase(phys);
+            }
+            anywhere |= has;
+            if (!has)
+                try (Statement st = conn.createStatement()) {
+                    st.execute("CREATE OR REPLACE VIEW " + VIEWS[i] + " AS SELECT *, CAST(NULL AS DOUBLE) AS " + q(phys)
+                            + " FROM (" + spec.sides().get(i).relationSql() + ") AS __r");
+                }
+        }
+        if (!anywhere)
+            throw new IllegalArgumentException("impact column '" + spec.carriedImpact()
+                    + "' is not a column of any reconciled dataset");
+    }
+
+    /**
      * Shape a pair-scoped break query: {@code roles} 'a' = anchor only, 'b' = compared side only, 'x' = both.
      *
      * <p>{@code alwaysCounts} forces the per-side row count into the payload even when
@@ -664,6 +741,12 @@ public final class ReconService {
             row.put("key", keysOf(spec, r));
             if (roles != 'b') row.put("a", withCount(spec, measuresOf(spec, r, "sa_"), r, "sa_", alwaysCounts));
             if (roles != 'a') row.put("b", withCount(spec, measuresOf(spec, r, "sb_"), r, "sb_", alwaysCounts));
+            if (spec.carriedImpact() != null) {   // both roles always present; a side absent at the key = null
+                Map<String, Object> impact = new LinkedHashMap<>();
+                impact.put("a", r.get("sa_mi"));
+                impact.put("b", r.get("sb_mi"));
+                row.put("impact", impact);
+            }
             rows.add(row);
         }
         return new BreakSet(rows, rows.size(), truncated);

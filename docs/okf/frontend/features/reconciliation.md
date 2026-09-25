@@ -95,6 +95,24 @@ compared row for an N:M key is undefined until a pairing rule is chosen (the arc
 the two row sets are shown and nothing is claimed about pairs. ⛔ The key must name every key column — a partial
 key is a 422, never a guess. Read-shaped (recorded in `CapabilityManifest.EXEMPTIONS`).
 
+**Break impact** (UIE-10, 2026-09-25; carried column by operator decision the same day). A Reconciliation may declare
+`impact: {column, currency}`; the Breaks page shows an *Impact (SAR)* column and the selected Break's impact,
+through the shared `formatNumber`. `column` is **any** column of the reconciled Datasets:
+* **Compared column** → impact is |A − B| at the Break's key, an absent side counting 0 (`breakImpacts` in
+  `recon-board.ts`). Nothing new on the wire — the compared values are already on the Break.
+* **Non-compared column → CARRIED.** `ReconConfigLoader` passes it to `Spec.withImpact`; the Break queries (only
+  them — `/recon/run` builds byte-identical SQL) add `SUM(TRY_CAST(col AS DOUBLE)) AS mi` per side, and each
+  `/recon/breaks` row gains `impact: {a, b}` (roles as the row: `b` is side C when `side: c`). A side absent at the
+  key is `null`; a Dataset **without** the column is re-registered with a NULL column so its side carries `null`;
+  on **no** Dataset → 422 (a misspelt column). The SPA's impact for a carried column is the value on the side that
+  has it, **anchor first** — a carried column says what the key is *worth*, not how far apart the sides are (a
+  subscriber active in the HLR but not billed → that subscriber's monthly fee).
+* 🔴 **A carried column is never compared**, so it cannot create or suppress a Break —
+  `ControlApiReconTest.aCarriedImpactColumnRidesOnEveryBreakAndNeverChangesTheBreakSet` asserts the same Breaks
+  with and without it. ⚠ `serverConfig` (`recon-exec.service.ts`) must forward `impact`, or the server has
+  nothing to carry and every carried impact reads `—`. ⚠ A key with no value (null both sides) shows `—`,
+  never an invented 0.
+
 As-built design (archived):
 [`reconciliation-board-design.md`](../../../archived-documents/plans-archive/reconciliation-board-design.md) ·
 review sheet: [`reviews/reconciliation.md`](../../../archived-documents/superpower-reviews/reconciliation.md).

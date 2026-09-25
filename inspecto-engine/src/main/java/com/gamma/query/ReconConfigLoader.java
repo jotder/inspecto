@@ -10,7 +10,8 @@ import java.util.function.Function;
 /**
  * Assembles a validated {@link ReconService.Spec} from a persisted/inline {@code reconciliation} config map
  * — the single place the {@code datasets} (with v1 {@code leftDataset}/{@code rightDataset} compatibility),
- * {@code keyColumns}, {@code compareColumns} (agg/tolerance), {@code columnMap} and {@code filters} are read.
+ * {@code keyColumns}, {@code compareColumns} (agg/tolerance), {@code columnMap}, {@code filters} and
+ * {@code impact.column} (a carried, never-compared Break impact column) are read.
  * Shared by the interactive {@code POST /recon/run} route ({@code ReconRoutes}) and the scheduled
  * {@code recon.run} Job so both build the <em>identical</em> spec — a reconciliation must reconcile the same
  * way whoever runs it. Relation-SQL resolution is injected ({@code relationSqlFor}) because the two callers
@@ -58,8 +59,9 @@ public final class ReconConfigLoader {
         ReconService.Cardinality cardinality =
                 ReconService.Cardinality.fromConfig(Values.blankToNull(config.get("cardinality")));
 
+        // impact.column may name a non-compared column: it is then carried on each Break, never compared.
         return ReconService.Spec.of(sides, strings(config.get("keyColumns")), measures, includeRecordCount,
-                cardinality);
+                cardinality).withImpact(Values.blankToNull(mapOf(config.get("impact")).get("column")));
     }
 
     // ── config-map parsing helpers ────────────────────────────────────────────────

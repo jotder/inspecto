@@ -3579,15 +3579,91 @@
     "/recon/breaks" : {
       "post" : {
         "tags" : [ "recon" ],
-        "summary" : "POST /recon/breaks (generated skeleton)",
+        "summary" : "The paged Break sets of one anchor-relative pair",
         "operationId" : "postReconBreaks",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+        "description" : "Stateless compute over a saved reconciliation (`id`) or an inline draft (`config`). Rows always carry the anchor as role `a` and the compared side (`side`: b|c) as role `b`. When the config declares `impact.column` naming a column that is NOT compared, each Break row also carries that column's per-side value as `impact` — summed per key, never compared, so it cannot create or suppress a Break (operator decision 2026-09-25).",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "id" : {
+                    "type" : "string",
+                    "description" : "A saved reconciliation component."
+                  },
+                  "config" : {
+                    "type" : "object",
+                    "description" : "An inline reconciliation config (datasets, keyColumns, compareColumns, impact:{column, currency}, ...)."
+                  },
+                  "side" : {
+                    "type" : "string",
+                    "enum" : [ "b", "c" ],
+                    "default" : "b"
+                  },
+                  "path" : {
+                    "type" : "object",
+                    "additionalProperties" : {
+                      "type" : "string"
+                    },
+                    "description" : "Board dimension path: key column -> value."
+                  },
+                  "type" : {
+                    "type" : "string",
+                    "enum" : [ "missing_left", "missing_right", "value_break", "cardinality_break" ]
+                  },
+                  "limit" : {
+                    "type" : "integer"
+                  },
+                  "offset" : {
+                    "type" : "integer"
+                  }
+                }
+              }
+            }
           }
         },
-        "x-generated" : true
+        "responses" : {
+          "200" : {
+            "description" : "One ReconBreakSet per Break type (all of them unless `type` narrows it).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "properties" : {
+                          "missing_right" : {
+                            "$ref" : "#/components/schemas/ReconBreakSet"
+                          },
+                          "missing_left" : {
+                            "$ref" : "#/components/schemas/ReconBreakSet"
+                          },
+                          "value_break" : {
+                            "$ref" : "#/components/schemas/ReconBreakSet"
+                          },
+                          "cardinality_break" : {
+                            "$ref" : "#/components/schemas/ReconBreakSet"
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "422" : {
+            "$ref" : "#/components/responses/ValidationFailed"
+          }
+        }
       }
     },
     "/recon/promote" : {
@@ -9329,6 +9405,55 @@
           },
           "message" : {
             "type" : [ "string", "null" ]
+          }
+        }
+      },
+      "ReconBreakSet" : {
+        "type" : "object",
+        "description" : "One paged Break set of POST /recon/breaks.",
+        "properties" : {
+          "rows" : {
+            "type" : "array",
+            "items" : {
+              "$ref" : "#/components/schemas/ReconBreak"
+            }
+          },
+          "rowCount" : {
+            "type" : "integer"
+          },
+          "truncated" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "ReconBreak" : {
+        "type" : "object",
+        "description" : "One Break at the key-column grain. `a` = anchor, `b` = compared side; a missing_right row carries `a` only, a missing_left row `b` only.",
+        "required" : [ "key" ],
+        "properties" : {
+          "key" : {
+            "type" : "object",
+            "description" : "Key column -> value."
+          },
+          "a" : {
+            "type" : "object",
+            "description" : "The anchor's compared values by column (plus `__records` when the record count is compared)."
+          },
+          "b" : {
+            "type" : "object",
+            "description" : "The compared side's values, shaped like `a`."
+          },
+          "impact" : {
+            "type" : "object",
+            "description" : "Present only when `impact.column` is NOT a compare column: that column's per-side value (SUM per key, cast to DOUBLE), carried and never compared. A side absent at the key, or whose Dataset lacks the column, is null.",
+            "properties" : {
+              "a" : {
+                "type" : [ "number", "null" ]
+              },
+              "b" : {
+                "type" : [ "number", "null" ]
+              }
+            }
           }
         }
       }

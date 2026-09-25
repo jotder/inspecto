@@ -76,7 +76,18 @@ class ControlApiReconTest {
         seedStore(dataDir, "orders_c", "VALUES ('EU','voice',195.0),('EU','data',118.0),"
                 + "('US','voice',50.0),('LATAM','voice',5.0)");
 
+        // Subscriber status (RA-C01 shape): fee is never compared, only carried as the Break impact.
+        // m2 active 1 vs 0 in B · m3 only in A · m5 only in B · C has no fee column at all; m4 0 vs 1 in C.
+        seedStore(dataDir, "subs_a", "msisdn, active_flag, fee",
+                "VALUES ('m1',1,199.0),('m2',1,149.0),('m3',1,99.0),('m4',0,50.0)");
+        seedStore(dataDir, "subs_b", "msisdn, active_flag, fee",
+                "VALUES ('m1',1,199.0),('m2',0,149.0),('m4',0,50.0),('m5',1,30.0)");
+        seedStore(dataDir, "subs_c", "msisdn, active_flag", "VALUES ('m1',1),('m2',1),('m4',1)");
+
         ComponentStore store = new ComponentStore(config.resolve("registry"));
+        store.write("dataset", "subs_a_ds", Map.of("physicalRef", "subs_a"));
+        store.write("dataset", "subs_b_ds", Map.of("physicalRef", "subs_b"));
+        store.write("dataset", "subs_c_ds", Map.of("physicalRef", "subs_c"));
         store.write("dataset", "a_ds", Map.of("physicalRef", "orders_a"));
         store.write("dataset", "b_ds", Map.of("physicalRef", "orders_b"));
         store.write("dataset", "c_ds", Map.of("physicalRef", "orders_c"));
@@ -91,13 +102,17 @@ class ControlApiReconTest {
     }
 
     private static void seedStore(Path dataDir, String name, String values) throws Exception {
+        seedStore(dataDir, name, "region, product, amount", values);
+    }
+
+    private static void seedStore(Path dataDir, String name, String columns, String values) throws Exception {
         Path partition = dataDir.resolve(name).resolve("dt=2026");
         Files.createDirectories(partition);
         String parquet = partition.resolve("data.parquet").toString().replace("\\", "/");
         DuckDbUtil.loadDriver();
         File db = DuckDbUtil.tempDbFile("recon_seed_");
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
-            st.execute("COPY (SELECT * FROM (" + values + ") t(region, product, amount)) TO '"
+            st.execute("COPY (SELECT * FROM (" + values + ") t(" + columns + ")) TO '"
                     + parquet + "' (FORMAT PARQUET)");
         } finally {
             DuckDbUtil.deleteTempDb(db);
@@ -205,6 +220,76 @@ class ControlApiReconTest {
                     "{\"id\":\"orders_recon\",\"type\":\"missing_left\"}"));
             assertNotNull(one.get("missing_left"));
             assertNull(one.get("missing_right"));
+        }
+    }
+
+    /**
+     * Operator decision 2026-09-25: {@code impact.column} may name a column that is NOT compared. Its per-side
+     * value rides on every Break as {@code impact:{a,b}} (a side absent at the key, or without the column,
+     * = null) and never changes which Breaks exist.
+     */
+    @Test
+    void aCarriedImpactColumnRidesOnEveryBreakAndNeverChangesTheBreakSet(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String base = "\"datasets\":[\"subs_a_ds\",\"subs_b_ds\",\"subs_c_ds\"],\"keyColumns\":[\"msisdn\"],"
+                    + "\"compareColumns\":[{\"column\":\"active_flag\",\"toleranceType\":\"exact\"}]";
+            String carried = base + ",\"impact\":{\"column\":\"fee\",\"currency\":\"SAR\"}";
+            for (String side : List.of("b", "c")) {
+                HttpResponse<String> plainR = postJson(c.port, "/spaces/s1/recon/breaks",
+                        "{\"config\":{" + base + "},\"side\":\"" + side + "\"}");
+                HttpResponse<String> withR = postJson(c.port, "/spaces/s1/recon/breaks",
+                        "{\"config\":{" + carried + "},\"side\":\"" + side + "\"}");
+                assertEquals(200, withR.statusCode(), withR.body());
+                JsonNode plain = data(plainR);
+                JsonNode with = data(withR);
+                // same Breaks — keys, compared values, counts — once the carried field is set aside
+                for (String type : List.of("missing_right", "missing_left", "value_break")) {
+                    assertEquals(plain.get(type).get("rowCount"), with.get(type).get("rowCount"), side + " " + type);
+                    for (int i = 0; i < plain.get(type).get("rows").size(); i++) {
+                        JsonNode w = with.get(type).get("rows").get(i).deepCopy();
+                        assertNotNull(w.get("impact"), side + " " + type + " row " + i + " carries impact");
+                        ((com.fasterxml.jackson.databind.node.ObjectNode) w).remove("impact");
+                        assertEquals(plain.get(type).get("rows").get(i), w, side + " " + type + " row " + i);
+                        assertNull(plain.get(type).get("rows").get(i).get("impact"), "no impact declared, none carried");
+                    }
+                }
+            }
+            JsonNode ab = data(postJson(c.port, "/spaces/s1/recon/breaks", "{\"config\":{" + carried + "}}"));
+            assertEquals(1, ab.get("value_break").get("rowCount").asInt(), "only m2's status differs A↔B");
+            JsonNode m2 = ab.get("value_break").get("rows").get(0);
+            assertEquals("m2", m2.get("key").get("msisdn").asText());
+            assertEquals(149.0, m2.get("impact").get("a").asDouble());
+            assertEquals(149.0, m2.get("impact").get("b").asDouble());
+            assertNull(m2.get("a").get("fee"), "carried, not compared: fee is not a measure on the side payload");
+            JsonNode m3 = ab.get("missing_right").get("rows").get(0);
+            assertEquals(99.0, m3.get("impact").get("a").asDouble());
+            assertTrue(m3.get("impact").get("b").isNull(), "the side absent at the key carries null");
+            JsonNode m5 = ab.get("missing_left").get("rows").get(0);
+            assertTrue(m5.get("impact").get("a").isNull());
+            assertEquals(30.0, m5.get("impact").get("b").asDouble());
+
+            // pair A↔C: C has no fee column — its side carries null, the Break still stands
+            JsonNode ac = data(postJson(c.port, "/spaces/s1/recon/breaks",
+                    "{\"config\":{" + carried + "},\"side\":\"c\"}"));
+            JsonNode m4 = ac.get("value_break").get("rows").get(0);
+            assertEquals("m4", m4.get("key").get("msisdn").asText());
+            assertEquals(50.0, m4.get("impact").get("a").asDouble());
+            assertTrue(m4.get("impact").get("b").isNull());
+
+            // the run summary is unchanged by a carried column
+            JsonNode runPlain = data(postJson(c.port, "/spaces/s1/recon/run", "{\"config\":{" + base + "}}"));
+            JsonNode runWith = data(postJson(c.port, "/spaces/s1/recon/run", "{\"config\":{" + carried + "}}"));
+            assertEquals(runPlain.get("summary"), runWith.get("summary"));
+            assertEquals(runPlain.get("rows"), runWith.get("rows"));
+
+            // an impact that IS compared adds nothing (its values are already on a/b); on no dataset → 422
+            JsonNode compared = data(postJson(c.port, "/spaces/s1/recon/breaks", "{\"config\":{" + base
+                    + ",\"impact\":{\"column\":\"active_flag\"}}}"));
+            assertNull(compared.get("value_break").get("rows").get(0).get("impact"));
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/breaks", "{\"config\":{" + base
+                    + ",\"impact\":{\"column\":\"nope\"}}}").statusCode());
+            assertEquals(422, postJson(c.port, "/spaces/s1/recon/breaks", "{\"config\":{" + base
+                    + ",\"impact\":{\"column\":\"msisdn\"}}}").statusCode(), "a key column is not an impact");
         }
     }
 
