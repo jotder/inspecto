@@ -87,6 +87,39 @@ export function generateSql(fields: readonly SqlField[]): string {
     return `SELECT\n${cols.join(',\n')}\nFROM input`;
 }
 
+/** One declared field of the parse Step's companion schema, as the downstream panes read it. */
+export interface ParserSchemaField {
+    name: string;
+    type: string;
+    /** `raw.fields[].selector` — a 0-based POSITION for delimited/fixed width, a key name otherwise. */
+    selector: string;
+}
+
+/**
+ * The parsed sample rows re-keyed to the schema's field names — the relation the parse Step actually
+ * emits. A test parse returns rows under the RAW header (`order_id`), while the run renames each column
+ * to its declared field by selector (`ORDER_ID`), so a downstream pane matching sample values by field
+ * name found none. A positional selector takes the row's i-th column; a name selector takes that key; a
+ * field neither resolves falls back to its own name. No declared fields ⇒ the rows as they came.
+ */
+export function schemaNamedRows(
+    rows: readonly Record<string, unknown>[] | null | undefined,
+    fields: readonly ParserSchemaField[],
+): Record<string, unknown>[] | undefined {
+    if (!rows) return undefined;
+    if (!fields.length) return [...rows];
+    return rows.map((row) => {
+        const keys = Object.keys(row);
+        const out: Record<string, unknown> = {};
+        for (const f of fields) {
+            const sel = f.selector.trim();
+            const key = /^\d+$/.test(sel) ? keys[Number(sel)] : sel && sel in row ? sel : f.name;
+            out[f.name] = key !== undefined ? row[key] : undefined;
+        }
+        return out;
+    });
+}
+
 /** Seed for a NEW Step: one "Keep as it is" row per upstream column, in upstream order. */
 export function seedFields(upstreamColumns: readonly string[]): SqlField[] {
     return upstreamColumns.map((col, i) => ({

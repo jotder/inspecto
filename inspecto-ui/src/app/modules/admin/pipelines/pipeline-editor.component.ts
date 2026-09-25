@@ -127,6 +127,7 @@ import {
     ProcessorGroup,
 } from './pipeline-graph';
 import { PipelineChecklistComponent } from './pipeline-checklist.component';
+import { ParserSchemaField, schemaNamedRows } from './pipeline-transform-sql';
 import { inputRelations } from './step-workbench-inputs';
 import { incompleteStages, pipelineLifecycle, PipelineStageId, StageChip, stageChecklist } from './pipeline-stages';
 
@@ -2521,10 +2522,18 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         return String(parser?.config?.['schema_file'] ?? '').trim();
     });
 
-    /** The parser companion schema's declared fields — `{name, type}`, the types the ETL really produces. */
-    private readonly parserSchemaFields = signal<{ name: string; type: string }[]>([]);
+    /** The parser companion schema's declared fields — `{name, type, selector}`, what the ETL really produces. */
+    private readonly parserSchemaFields = signal<ParserSchemaField[]>([]);
+    /**
+     * Bumped when a parse node is Applied, so the companion schema is RE-READ. ⚠ The reference alone is
+     * not a trigger: a scaffolded pipeline names `<id>_schema.toon` before the file exists, so the first
+     * read 404s and the Apply that then writes the file leaves `schema_file` unchanged — without this the
+     * downstream Steps kept the pre-Apply empty read (every field VARCHAR) until the tab was reopened.
+     */
+    private readonly parserSchemaRevision = signal(0);
 
     private readonly loadParserSchemaColumns = effect(() => {
+        this.parserSchemaRevision();
         const path = this.parserSchemaFile();
         if (!path) {
             this.parserSchemaFields.set([]);
@@ -2541,7 +2550,11 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 const fields = Array.isArray(raw['fields']) ? (raw['fields'] as Record<string, unknown>[]) : [];
                 this.parserSchemaFields.set(
                     fields
-                        .map((f) => ({ name: String(f['name'] ?? ''), type: String(f['type'] ?? '') }))
+                        .map((f) => ({
+                            name: String(f['name'] ?? ''),
+                            type: String(f['type'] ?? ''),
+                            selector: String(f['selector'] ?? ''),
+                        }))
                         .filter((f) => f.name !== ''),
                 );
             },
@@ -2549,12 +2562,27 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         });
     });
 
-    /** Upstream columns for the SQL Transform pane: from the parsed sample rows if available, or companion schema. */
+    /**
+     * Upstream columns for the SQL Transform pane — the companion schema's field names when it declares
+     * any, else the parsed sample's keys.
+     *
+     * 🔴 The SCHEMA wins because it is what the run emits: the parse Step renames each raw column to its
+     * declared field (`ORDER_ID`, by selector), so the raw sample header (`order_id`) names columns the
+     * Step downstream never receives. Preferring the sample listed every field in the header's case, and
+     * — since the declared types are keyed by schema name — matched none of them, so every field read
+     * VARCHAR however the parse typed it (found by driving the UI, 2026-09-25).
+     */
     readonly upstreamSchemaColumns = computed<string[]>(() => {
+        const declared = this.parserSchemaFields();
+        if (declared.length) return declared.map((f) => f.name);
         const rows = this.sampleThread()?.parsedRows();
-        if (rows && rows.length > 0) return Object.keys(rows[0]);
-        return this.parserSchemaFields().map((f) => f.name);
+        return rows && rows.length > 0 ? Object.keys(rows[0]) : [];
     });
+
+    /** The parsed sample rows under the schema's field names (see {@link schemaNamedRows}) — what the Step sees. */
+    readonly upstreamSampleRows = computed(() =>
+        schemaNamedRows(this.sampleThread()?.parsedRows(), this.parserSchemaFields()),
+    );
 
     /**
      * The DECLARED type per upstream column, for the SQL pane's zero-row `DESCRIBE`.
@@ -2628,6 +2656,8 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     /** The pane's rebuilt node — an in-memory patch (D2), persisted only by the toolbar Save. */
     onDefinitionApplied(node: AuthoredNode): void {
         this.applyNodePatch(node);
+        // A parse Apply has just (re)written the companion schema — re-read it for the downstream Steps.
+        if (isParseNodeType(node.type)) this.parserSchemaRevision.update((r) => r + 1);
         this.definitionNode.set(node);
         this.definitionDirty.set(false);
     }

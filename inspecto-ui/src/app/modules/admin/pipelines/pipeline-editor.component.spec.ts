@@ -1823,6 +1823,72 @@ describe('PipelineEditorComponent', () => {
          * The sample thread is PER TAB (the reason it is a Map and not a `providers:` entry — a single
          * provider on this one-instance-hosts-every-tab component would leak one sample everywhere).
          */
+        /**
+         * 🔴 Found by driving the UI (2026-09-25): the Record Transformer listed every field in the raw
+         * sample header's case (`order_id`) and as VARCHAR, while the parse Step emits the SCHEMA's names
+         * (`ORDER_ID`, by selector) with the types the test parse inferred. The downstream Steps must see
+         * the relation the run produces.
+         */
+        describe('downstream of Parse', () => {
+            const SCHEMA = {
+                config: {
+                    raw: {
+                        name: 'demo',
+                        fields: [
+                            { name: 'ORDER_ID', selector: '0', type: 'BIGINT' },
+                            { name: 'AMOUNT', selector: '1', type: 'DOUBLE' },
+                        ],
+                    },
+                },
+            };
+            const withParse = (c: PipelineEditorComponent): void =>
+                c.model.update((m) => ({
+                    ...m!,
+                    nodes: [
+                        ...m!.nodes,
+                        { id: 'parse', type: 'parser.delimited', config: { schema_file: 'demo_schema.toon' } },
+                    ],
+                }));
+
+            it('names and types the upstream columns from the schema, and re-keys the sample to match', () => {
+                config.read.mockImplementation((type: string) =>
+                    of(type === 'schema' ? SCHEMA : { config: { name: 'demo' }, path: 'demo_pipeline.toon' }),
+                );
+                const c = make();
+                c.select('demo');
+                withParse(c);
+                TestBed.tick();
+                c.sampleThread()!.parsePreview.set({
+                    rows: [{ order_id: '7', amount: '1.5' }],
+                } as never);
+
+                expect(c.upstreamSchemaColumns()).toEqual(['ORDER_ID', 'AMOUNT']);
+                expect(c.upstreamColumnTypes()).toEqual({ ORDER_ID: 'BIGINT', AMOUNT: 'DOUBLE' });
+                expect(c.upstreamSampleRows()).toEqual([{ ORDER_ID: '7', AMOUNT: '1.5' }]);
+            });
+
+            it('re-reads the schema after a parse Apply writes the file its unchanged reference names', () => {
+                let exists = false;
+                config.read.mockImplementation((type: string) =>
+                    type === 'schema'
+                        ? exists
+                            ? of(SCHEMA)
+                            : throwError(() => ({ status: 404 }))
+                        : of({ config: { name: 'demo' }, path: 'demo_pipeline.toon' }),
+                );
+                const c = make();
+                c.select('demo');
+                withParse(c);
+                TestBed.tick();
+                expect(c.upstreamColumnTypes()).toEqual({}); // the scaffold's reference, no file yet
+
+                exists = true; // the parse pane's Apply wrote it — `schema_file` itself did not change
+                c.onDefinitionApplied(c.model()!.nodes.find((n) => n.id === 'parse')!);
+                TestBed.tick();
+                expect(c.upstreamColumnTypes()).toEqual({ ORDER_ID: 'BIGINT', AMOUNT: 'DOUBLE' });
+            });
+        });
+
         describe('sample thread', () => {
             it('gives each tab its own, and never shares a captured sample', async () => {
                 const c = make();

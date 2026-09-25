@@ -6,6 +6,7 @@ import {
     compileFields,
     generateSql,
     readFields,
+    schemaNamedRows,
     seedFields,
 } from './pipeline-transform-sql';
 import { SQL_FUNCTIONS, renderExpression, sqlFunction, sqlFunctionsByCategory } from './sql-functions';
@@ -217,5 +218,30 @@ describe('pipeline-transform-sql: reading persisted fields', () => {
         const compiled = compileFields(fields);
         expect(compiled[0].problem).toContain('Duplicate field name “dup”');
         expect(compiled[1].problem).toContain('Duplicate field name “dup”');
+    });
+});
+
+/** The parse Step renames raw columns to the schema's fields — the sample a downstream pane shows must too. */
+describe('schemaNamedRows', () => {
+    const fields = [
+        { name: 'ORDER_ID', type: 'BIGINT', selector: '0' },
+        { name: 'AMOUNT', type: 'DOUBLE', selector: '1' },
+    ];
+
+    it('re-keys a positional (delimited) row to the declared field names', () => {
+        expect(schemaNamedRows([{ order_id: '7', amount: '1.5' }], fields)).toEqual([{ ORDER_ID: '7', AMOUNT: '1.5' }]);
+    });
+
+    it('takes a name selector by key, and falls back to the field name', () => {
+        const byName = [
+            { name: 'ID', type: 'VARCHAR', selector: 'id' },
+            { name: 'NOTE', type: 'VARCHAR', selector: '' },
+        ];
+        expect(schemaNamedRows([{ id: 'a', NOTE: 'n' }], byName)).toEqual([{ ID: 'a', NOTE: 'n' }]);
+    });
+
+    it('passes rows through when no schema is declared, and absent stays absent', () => {
+        expect(schemaNamedRows([{ a: 1 }], [])).toEqual([{ a: 1 }]);
+        expect(schemaNamedRows(undefined, fields)).toBeUndefined();
     });
 });

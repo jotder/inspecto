@@ -712,7 +712,7 @@
                                         -->
                                         <app-pipeline-transform-sql-definition
                                             [node]="dn"
-                                            [sampleRows]="sampleThread()?.parsedRows()"
+                                            [sampleRows]="upstreamSampleRows()"
                                             [upstreamColumns]="upstreamSchemaColumns()"
                                             [upstreamColumnTypes]="upstreamColumnTypes()"
                                             [inputs]="definitionInputs()"

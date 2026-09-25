@@ -118,9 +118,19 @@ catalog and by persisting `fields[]`.
   that locks the author out because the backend is unreachable is worse than one that saves unverified
   SQL (three specs in `Transform pane: live schema derivation` pin all three arms).
 - **Authoring without sample rows.** The grid seeds from `[upstreamColumns]`, passed by the editor
-  (`upstreamSchemaColumns()`): the parsed sample's keys when a Test-Parse has run, else the field names
-  read from the parser's companion schema. Before this, a Step opened with an empty grid until the
-  operator ran a parse.
+  (`upstreamSchemaColumns()`): the field names of the parser's companion schema when it declares any,
+  else the parsed sample's keys. Before this, a Step opened with an empty grid until the operator ran a
+  parse.
+- 🔴 **The SCHEMA's names win over the sample header** (2026-09-25, found by driving the UI). The parse
+  Step renames every raw column to its declared field by selector, so the run hands the next Step
+  `ORDER_ID`, never the header's `order_id`. The editor used to prefer the sample's keys, which listed
+  every field in the header's case AND — because `[upstreamColumnTypes]` is keyed by schema name — matched
+  no declared type, so every field read VARCHAR however the test parse typed it. The sample rows the pane
+  shows are re-keyed the same way (`schemaNamedRows`, `pipeline-transform-sql.ts`: a positional selector
+  takes the i-th column, a name selector that key). ⚠ The companion is **re-read after every parse
+  Apply** (`parserSchemaRevision`): a scaffolded pipeline names `<id>_schema.toon` before the file
+  exists, so the first read 404s and the Apply that writes it leaves `schema_file` unchanged — tracking
+  the reference alone kept the empty pre-Apply read.
 - **Duplicate output names refuse.** `compileFields` marks every row sharing a trimmed name with a
   problem ("Output column names must be unique"), which blocks Apply — DuckDB would otherwise accept the
   SELECT and hand the sink two columns of the same name.
