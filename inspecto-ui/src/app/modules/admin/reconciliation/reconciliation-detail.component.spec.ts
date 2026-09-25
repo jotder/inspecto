@@ -11,6 +11,7 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import {
     breakId,
     Reconciliation,
+    buildReconciliation,
     ReconciliationsService,
     ReconBreak,
     ReconBreakSets,
@@ -404,6 +405,28 @@ describe('Breaks page for an analyst (UIE-10)', () => {
             column: 'fee',
             currency: 'SAR',
         });
+    });
+
+    it('sends the stored cardinality, column map and filters to the server (they were dropped)', () => {
+        const recon = {
+            ...buildReconciliation('r1', 'hlr', 'cbs', ['msisdn'], []),
+            raw: {
+                cardinality: 'one-to-one',
+                columnMap: { cbs: { msisdn: 'MSISDN' } },
+                filters: { hlr: "status <> 'X'" },
+                includeRecordCount: false,
+            },
+        } as Reconciliation;
+        expect(serverConfig(recon)).toMatchObject({
+            cardinality: 'one-to-one',
+            columnMap: { cbs: { msisdn: 'MSISDN' } },
+            filters: { hlr: "status <> 'X'" },
+            includeRecordCount: false,
+        });
+        const plain = serverConfig(buildReconciliation('r2', 'a', 'b', ['id'], []));
+        expect(plain.includeRecordCount).toBe(true);
+        expect(plain).not.toHaveProperty('cardinality');
+        expect(plain).not.toHaveProperty('columnMap');
     });
 
     it('carries no impact column when none is declared', async () => {

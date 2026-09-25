@@ -30,6 +30,8 @@ export interface ReconServerConfig {
     includeRecordCount?: boolean;
     columnMap?: Record<string, Record<string, string>>;
     filters?: Record<string, string>;
+    /** `one-to-one` (default) or a declared fan-out; a key seen more than once on a one-to-one side is a Break. */
+    cardinality?: string;
     /** Break impact; a non-compared `column` is carried on each Break as `impact: {a, b}`, never compared. */
     impact?: { column: string; currency?: string };
 }

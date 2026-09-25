@@ -39,6 +39,7 @@ export class ReconExecService {
 
 /** Map the UI model to the server config (`/recon/*` accepts the v1 left/right form too — send v2). */
 export function serverConfig(recon: Reconciliation): ReconServerConfig {
+    const raw = recon.raw ?? {};
     return {
         datasets: recon.thirdDataset
             ? [recon.leftDataset, recon.rightDataset, recon.thirdDataset]
@@ -50,8 +51,17 @@ export function serverConfig(recon: Reconciliation): ReconServerConfig {
             toleranceType: c.toleranceType,
             tolerance: c.tolerance,
         })),
-        includeRecordCount: true,
+        // An authored recon's stored settings the SPA does not model travel as stored (`raw`): dropping them here
+        // hid a declared cardinality's duplicate-key Breaks and ignored column maps / filters on the Board + Breaks.
+        includeRecordCount: typeof raw['includeRecordCount'] === 'boolean' ? raw['includeRecordCount'] : true,
+        ...(isRecord(raw['columnMap']) ? { columnMap: raw['columnMap'] as ReconServerConfig['columnMap'] } : {}),
+        ...(isRecord(raw['filters']) ? { filters: raw['filters'] as ReconServerConfig['filters'] } : {}),
+        ...(typeof raw['cardinality'] === 'string' && raw['cardinality'] ? { cardinality: raw['cardinality'] } : {}),
         // A non-compared impact column is carried on each Break only if the server is told about it.
         ...(recon.impact ? { impact: recon.impact } : {}),
     };
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+    return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
