@@ -11,10 +11,14 @@ import {
     AuthoredNode,
     ComponentDef,
     ComponentsService,
+    ConfigService,
     ParserDef,
     ParserPreview,
+    ParserTablePreview,
     ParsersService,
+    STALE_WRITE_MESSAGE,
     apiErrorMessage,
+    isStaleVersionError,
 } from 'app/inspecto/api';
 import { flattenBlock, nestKeys, parseUseRef } from 'app/inspecto/component-model';
 import { downloadCsv } from 'app/inspecto/data-table/core/csv';
@@ -40,6 +44,8 @@ import {
     PickerOption,
     pickerOptions,
 } from 'app/inspecto/components/option-picker.component';
+import { companionSchemaName, portableConfigRef } from 'app/inspecto/segments';
+import { ParseSchemaWrite, derivedSchemaRows, inferredSchemaTypes, writeParseSchema } from './parse-output-schema';
 
 /**
  * Dialog close payload: the edited node (absent ⇒ the user cancelled). Re-homed here from the retired
@@ -125,6 +131,7 @@ export class GrammarEditorDialog {
     private ref = inject(MatDialogRef<GrammarEditorDialog, NodeConfigResult>);
     private dialog = inject(MatDialog);
     private parsers = inject(ParsersService);
+    private configApi = inject(ConfigService);
     readonly data = inject<GrammarEditorDialogData>(MAT_DIALOG_DATA);
 
     /** The thread's sample when the dialog opened — seeds the editor's own sample box. */
@@ -151,12 +158,14 @@ export class GrammarEditorDialog {
                           rows: p.rows,
                           rowCount: p.rowCount,
                           rejectedRows: p.rejectedRows,
+                          columnTypes: p.columnTypes,
                       });
                       // Re-parsing invalidates any cast checked against the old rows.
                       thread.schemaPreview.set(null);
                       thread.schemaError.set(null);
                   }),
                   catchError((e) => {
+                      this.lastTable.set(null); // a Grammar that no longer parses derives no schema
                       thread.parsePreview.set(null);
                       thread.parseError.set(apiErrorMessage(e, 'The sample does not parse with these settings.'));
                       return throwError(() => e);
@@ -191,6 +200,17 @@ export class GrammarEditorDialog {
     /** The last test-parse's table rows, mirrored from `(previewed)` — they arm the Schema
      *  editor's "Suggest from sample" when the user follows the Draft Schema link. */
     readonly previewRows = signal<Record<string, unknown>[]>([]);
+
+    /**
+     * The last TABLE parse — what Save derives the output schema from. Seeded from the thread's parse
+     * when the dialog opens over one (its sample is the one in the box), so re-saving without re-parsing
+     * still creates the schema.
+     */
+    readonly lastTable = signal<ParserTablePreview | null>(threadTable(this.data.sampleThread));
+    /** Save is writing the output schema; the dialog closes only once it lands. */
+    readonly writing = signal(false);
+    /** Why the output-schema write failed — the dialog stays open so nothing the builder did is lost. */
+    readonly saveError = signal<string | null>(null);
 
     /** The `use: grammar/<id>` this node names but which the registry does not return — see the ctor. */
     readonly missingBinding = signal<string | null>(null);
@@ -255,6 +275,7 @@ export class GrammarEditorDialog {
 
     onPreviewed(p: ParserPreview): void {
         this.previewRows.set(p.kind === 'table' ? p.rows : []);
+        this.lastTable.set(p.kind === 'table' ? p : null);
     }
 
     /** Onward link: author the Schema this parse feeds — seeded with the test-parsed rows, so
@@ -366,20 +387,86 @@ export class GrammarEditorDialog {
         else thread.captureSample(GRAMMAR_DIALOG_SAMPLE_NAME, text);
     }
 
+    /**
+     * Save = the Parse drawer's Apply: with a table Test parse and no schema named yet, the output schema
+     * is WRITTEN (the same `writeParseSchema`, the same `<pipeline>_schema` file) and the node leaves
+     * naming it in `schema_file`. 🔴 Before 2026-09-25 Save patched the node in memory only, so a new
+     * Pipeline configured here showed "Schema: Not configured", Activate was refused on Schema, and the
+     * drawer's Apply was disabled — no visible way to create the schema. Write first, then close: the
+     * node must never name a file that does not exist.
+     */
     save(): void {
-        if (this.pluginBlocked() || !this.editor?.validate()) return;
+        if (this.writing() || this.pluginBlocked() || !this.editor?.validate()) return;
         // The sample follows the builder out of the dialog, parsed or not.
         this.shareSample();
         // Always inline — a bound node MIGRATES to an independent copy rather than writing back to the
         // shared component (D4). `closeInline` already drops the `use:`, so both cases are one path.
-        this.closeInline(this.editor.value());
+        const block = this.editor.value();
+        const schema = this.outputSchemaWrite(block);
+        if (!schema) return this.closeInline(block);
+        this.writing.set(true);
+        this.saveError.set(null);
+        writeParseSchema(this.configApi, schema).subscribe({
+            next: () => {
+                this.writing.set(false);
+                this.closeInline(block, portableConfigRef(schema.name));
+            },
+            error: (e) => {
+                this.writing.set(false);
+                this.saveError.set(
+                    isStaleVersionError(e)
+                        ? STALE_WRITE_MESSAGE
+                        : apiErrorMessage(e, 'Could not save the output schema.'),
+                );
+            },
+        });
+    }
+
+    /**
+     * The output schema Save writes, or null to save the Grammar alone: a plugin/ASN.1 Grammar carries
+     * per-segment schemas (authored elsewhere), a node that already names a schema keeps it — the drawer
+     * re-reads and never re-derives over a saved one — and without a table parse there is nothing to
+     * derive from (a parser may be defined before its schema). Names exactly as the drawer does: the
+     * pipeline's registered id is both the file stem and the declared identity.
+     */
+    private outputSchemaWrite(block: Record<string, unknown>): ParseSchemaWrite | null {
+        const table = this.lastTable();
+        const frontend = String(block['frontend'] ?? '');
+        if (!table || !frontend || frontend === 'asn1' || frontend === 'plugin') return null;
+        if (String(this.data.node.config?.['schema_file'] ?? '').trim()) return null;
+        const pipeline = this.data.pipeline?.trim() ?? '';
+        const name = companionSchemaName(pipeline || this.data.node.id, 'schema');
+        const identity = pipeline || name;
+        return {
+            name,
+            subdir: this.data.configSubdir?.trim() || undefined,
+            fields: derivedSchemaRows(frontend, table.columns, inferredSchemaTypes(table)),
+            rawName: identity,
+            canonicalName: identity,
+            mappingRawName: identity,
+            // D2: Auto is the default for a new parse step — the written types ARE the inferred snapshot.
+            typesMode: 'auto',
+            partitions: [],
+            extras: {},
+        };
     }
 
     /** The default: the block lives on the node itself, and any previous binding is dropped. */
-    private closeInline(block: Record<string, unknown>): void {
+    private closeInline(block: Record<string, unknown>, schemaFile?: string): void {
         const { use: _unbound, ...node } = this.data.node;
-        this.ref.close({ node: { ...node, config: { ...(this.data.node.config ?? {}), parsing: block } } });
+        const config = {
+            ...(this.data.node.config ?? {}),
+            parsing: block,
+            ...(schemaFile ? { schema_file: schemaFile } : {}),
+        };
+        this.ref.close({ node: { ...node, config } });
     }
+}
+
+/** The thread's parse as a table preview — what a dialog opened over an already-parsed sample derives from. */
+function threadTable(thread: DefinitionStateService | null | undefined): ParserTablePreview | null {
+    const p = thread?.parsePreview();
+    return p ? { kind: 'table', ...p } : null;
 }
 
 /** The node's own `parsing:` block — the inline home a parse node has owned since slice 2. */

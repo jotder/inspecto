@@ -882,11 +882,39 @@
                             [capturedRows]="sampleThread()?.parsedRows() ?? null"
                         ></app-pipeline-dry-run-panel>
                     } @else {
+                        <!-- A refused go-live says what to DO and opens the Step that does it — a missing
+                             Schema has no node of its own, so "still needs work" alone was a dead end. -->
+                        @if (goLiveBlock(); as block) {
+                            <inspecto-alert
+                                data-go-live-block
+                                class="mb-2 block"
+                                variant="warning"
+                                title="Not ready to go live"
+                            >
+                                {{ block.summary }}
+                                @if (block.remedy) {
+                                    {{ block.remedy }}
+                                }
+                                @if (block.open; as chip) {
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        class="ml-2"
+                                        data-go-live-open
+                                        (click)="openStage(chip)"
+                                    >
+                                        {{ block.openLabel }}
+                                    </button>
+                                }
+                            </inspecto-alert>
+                        }
                         @if (!findings().length) {
-                            <p class="inline-flex items-center gap-1 text-sm" style="color: var(--gamma-primary)">
-                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:check-circle"></mat-icon>
-                                No issues — ready to activate.
-                            </p>
+                            @if (!goLiveBlock()) {
+                                <p class="inline-flex items-center gap-1 text-sm" style="color: var(--gamma-primary)">
+                                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:check-circle"></mat-icon>
+                                    No issues — ready to activate.
+                                </p>
+                            }
                         } @else {
                             <mat-button-toggle-group
                                 class="mb-2"

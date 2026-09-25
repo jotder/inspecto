@@ -798,6 +798,103 @@ describe('PipelineEditorComponent', () => {
             expect(api.savePipelineGraph).toHaveBeenCalled();
         });
 
+        /** A guided editor over collect → parse → sink, the parse node naming a schema or not. */
+        function renderedGuided(parseConfig: Record<string, unknown>) {
+            const t = (type: string, category: string) => ({
+                type,
+                category,
+                label: type,
+                description: '',
+                accepts: category === 'SOURCE' ? [] : ['data'],
+                emits: category === 'SINK' ? [] : ['data'],
+                emitsNamedRoutes: false,
+                lowerable: true,
+            });
+            api.nodeTypes.mockReturnValue(
+                of([t('acquisition', 'SOURCE'), t('parser.delimited', 'PARSE'), t('sink.persistent', 'SINK')]),
+            );
+            api.pipelineGraphRaw.mockReturnValue(
+                of({
+                    name: 'demo',
+                    active: false,
+                    nodes: [
+                        { id: 'src', type: 'acquisition', config: { poll: 'in/' } },
+                        { id: 'parse', type: 'parser.delimited', config: parseConfig },
+                        { id: 'out', type: 'sink.persistent', config: { database: 'd/db' } },
+                    ],
+                    edges: [
+                        { from: 'src', rel: 'data', to: 'parse' },
+                        { from: 'parse', rel: 'data', to: 'out' },
+                    ],
+                }),
+            );
+            const fixture = TestBed.createComponent(PipelineEditorComponent);
+            fixture.componentRef.setInput('guided', true);
+            const c = fixture.componentInstance;
+            (c as unknown as { canvas: unknown }).canvas = canvasMock();
+            fixture.detectChanges();
+            c.select('demo');
+            fixture.detectChanges();
+            return { fixture, c };
+        }
+
+        /**
+         * 🔴 SCHEMA DEAD END (driving a new Pipeline `web_orders`, 2026-09-25): "Not ready to go live —
+         * Schema still needs work" named no way out. The Schema chip is empty — it has no node to open —
+         * and nothing said the schema is created by applying the Parse step.
+         */
+        it('a missing Schema refusal says to Apply the Parse step, and the dock opens it', async () => {
+            const { fixture, c } = renderedGuided({ parsing: { frontend: 'delimited' } });
+            await c.activate();
+
+            expect(confirmOf().confirm).not.toHaveBeenCalled();
+            expect(toast.error).toHaveBeenCalledWith(
+                'Not ready to go live — Schema still needs work. Apply the Parse step to create its schema.',
+            );
+            fixture.detectChanges();
+            const el = fixture.nativeElement as HTMLElement;
+            expect(el.querySelector('[data-go-live-block]')?.textContent).toContain(
+                'Apply the Parse step to create its schema.',
+            );
+            const open = vi.spyOn(c, 'openNodeConfig').mockImplementation(() => {});
+            el.querySelector<HTMLButtonElement>('[data-go-live-open]')!.click();
+            expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 'parse' }));
+
+            // Live, not a snapshot: once the Parse step names its schema the refusal is gone.
+            c.model.update((m) => ({
+                ...m!,
+                nodes: m!.nodes.map((n) =>
+                    n.id === 'parse' ? { ...n, config: { ...n.config, schema_file: 'demo_schema.toon' } } : n,
+                ),
+            }));
+            fixture.detectChanges();
+            expect(el.querySelector('[data-go-live-block]')).toBeNull();
+        });
+
+        /**
+         * (4) from the same drive: the first toolbar Activate was reported to open only the Validation dock
+         * (four "not yet tested" infos), the confirm appearing on the second click. Infos never block:
+         * ONE click on the rendered button must reach the confirm. (Pinned through the DOM, not by calling
+         * `activate()`, so a handler that swallowed the first click would fail here.)
+         */
+        it('the FIRST click on the toolbar Activate reaches the confirm when the only findings are infos', async () => {
+            const { fixture, c } = renderedGuided({
+                parsing: { frontend: 'delimited' },
+                schema_file: 'demo_schema.toon',
+            });
+            expect(c.bottomTab()).toBeNull();
+            const button = (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>(
+                'button[aria-label="Activate"]',
+            )!;
+            button.click();
+            await Promise.resolve();
+
+            expect(confirmOf().confirm).toHaveBeenCalledTimes(1);
+            expect(c.findings().length).toBeGreaterThan(0);
+            expect(c.findings().every((f) => f.severity === 'info')).toBe(true);
+            expect(toast.error).not.toHaveBeenCalled();
+        });
+
         it('leaves an UNGUIDED pipeline on the old validator gate alone', async () => {
             const c = make();
             c.select('demo'); // the fixture has no parse or sink node at all

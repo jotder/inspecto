@@ -9,6 +9,7 @@ import {
     AuthoredNode,
     ComponentDef,
     ComponentsService,
+    ConfigService,
     ParserDef,
     ParserPreview,
     ParsersService,
@@ -58,6 +59,8 @@ async function create(
         dialogOpen?: ReturnType<typeof vi.fn>;
         thread?: DefinitionStateService;
         preview?: ReturnType<typeof vi.fn>;
+        pipeline?: string;
+        write?: ReturnType<typeof vi.fn>;
     } = {},
 ) {
     const close = vi.fn();
@@ -72,6 +75,12 @@ async function create(
         typeLabel: 'parser.dsv',
         categoryLabel: 'Parser',
         sampleThread: opts.thread,
+        pipeline: opts.pipeline,
+    };
+    // The output-schema write Save makes: the re-read 404s (a new schema), then the write lands.
+    const config = {
+        read: vi.fn(() => throwError(() => ({ status: 404 }))),
+        write: opts.write ?? vi.fn(() => of({ written: true, path: 'x.toon', name: 'x', etag: '"1"' })),
     };
     TestBed.configureTestingModule({
         imports: [GrammarEditorDialog],
@@ -81,6 +90,7 @@ async function create(
             { provide: MAT_DIALOG_DATA, useValue: data },
             { provide: ComponentsService, useValue: components },
             { provide: ParsersService, useValue: parsers },
+            { provide: ConfigService, useValue: config },
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn(() => Promise.resolve(true)) } },
             { provide: ToastrService, useValue: { success: () => {}, error: () => {} } },
@@ -94,7 +104,7 @@ async function create(
     fixture.detectChanges();
     const editor = fixture.debugElement.query(By.directive(GrammarEditorComponent))
         .componentInstance as GrammarEditorComponent;
-    return { fixture, c: fixture.componentInstance, close, components, parsers, editor };
+    return { fixture, c: fixture.componentInstance, close, components, parsers, editor, config };
 }
 
 describe('GrammarEditorDialog', () => {
@@ -276,6 +286,91 @@ describe('GrammarEditorDialog', () => {
             editor.test();
             expect(thread.parsePreview()).toBeNull();
             expect(thread.parseError()).toBeTruthy();
+        });
+    });
+
+    /**
+     * 🔴 SCHEMA DEAD END (driving a new Pipeline `web_orders`, 2026-09-25): Test parse (6 cols) → Save
+     * patched the node in memory ONLY. The stage strip kept "Schema: Not configured", Activate was
+     * refused on Schema, and the drawer's Apply was disabled — no visible way to create the schema.
+     * Save must now do what the drawer's Apply does: write `<pipeline>_schema` FIRST, then name it.
+     */
+    describe('Save writes the output schema (the same write as the Parse drawer Apply)', () => {
+        const TYPED: ParserPreview = {
+            kind: 'table',
+            columns: ['order_id', 'amount'],
+            rows: [{ order_id: '1', amount: '12.5' }],
+            rowCount: 1,
+            rejectedRows: 0,
+            columnTypes: [
+                { name: 'order_id', type: 'BIGINT' },
+                { name: 'amount', type: 'DOUBLE' },
+            ],
+        };
+        const NEW_NODE: AuthoredNode = { id: 'parse', type: 'parser', config: { parsing: { frontend: 'delimited' } } };
+
+        it('after a table Test parse: writes <pipeline>_schema, then closes naming it in schema_file', async () => {
+            const { c, editor, close, config } = await create({
+                node: NEW_NODE,
+                pipeline: 'web_orders',
+                preview: vi.fn(() => of(TYPED)),
+            });
+            editor.onSampleText('order_id,amount\n1,12.5\n');
+            editor.test();
+            c.save();
+
+            expect(config.write).toHaveBeenCalledTimes(1);
+            const [type, draft, opts] = config.write.mock.calls[0] as unknown as [
+                string,
+                Record<string, Record<string, unknown>>,
+                Record<string, unknown>,
+            ];
+            expect(type).toBe('schema');
+            // SCHEMA-FILE-NAME-1: the FILE is the one the node will name; the declared names are the pipeline's.
+            expect(opts).toMatchObject({ overwrite: true, file: 'web_orders_schema' });
+            expect(draft['raw']['name']).toBe('web_orders');
+            expect(draft['raw']['types']).toBe('auto');
+            expect(draft['raw']['fields']).toEqual([
+                { name: 'ORDER_ID', selector: '0', type: 'BIGINT' },
+                { name: 'AMOUNT', selector: '1', type: 'DOUBLE' },
+            ]);
+            expect(draft['mapping']['canonicalName']).toBe('web_orders');
+            const closed = close.mock.calls[0][0];
+            expect(closed.node.config['schema_file']).toBe('web_orders_schema.toon');
+        });
+
+        it('a failed schema write keeps the dialog open and says why — the node never names a missing file', async () => {
+            const write = vi.fn(() => throwError(() => ({ status: 500, error: { error: { message: 'disk full' } } })));
+            const { c, editor, close, fixture } = await create({
+                node: NEW_NODE,
+                pipeline: 'web_orders',
+                preview: vi.fn(() => of(TYPED)),
+                write,
+            });
+            editor.onSampleText('order_id,amount\n1,12.5\n');
+            editor.test();
+            c.save();
+            fixture.detectChanges();
+
+            expect(close).not.toHaveBeenCalled();
+            expect((fixture.nativeElement as HTMLElement).textContent).toContain('The output schema was not saved');
+        });
+
+        it('a node that already names a schema keeps it: no write, even after a Test parse', async () => {
+            const node: AuthoredNode = { ...NEW_NODE, config: { ...NEW_NODE.config, schema_file: 'web_orders_schema.toon' } };
+            const { c, editor, close, config } = await create({ node, pipeline: 'web_orders', preview: vi.fn(() => of(TYPED)) });
+            editor.onSampleText('order_id,amount\n1,12.5\n');
+            editor.test();
+            c.save();
+            expect(config.write).not.toHaveBeenCalled();
+            expect(close.mock.calls[0][0].node.config['schema_file']).toBe('web_orders_schema.toon');
+        });
+
+        it('with no Test parse there is nothing to derive from — the Grammar saves alone', async () => {
+            const { c, close, config } = await create({ node: NEW_NODE, pipeline: 'web_orders' });
+            c.save();
+            expect(config.write).not.toHaveBeenCalled();
+            expect(close.mock.calls[0][0].node.config['schema_file']).toBeUndefined();
         });
     });
 

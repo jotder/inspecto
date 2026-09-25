@@ -420,6 +420,24 @@ The Parse surface itself — tabs, options, columns grid, Grammar CSV round-trip
   thread already holds — re-capturing resets every downstream result), and its `previewFn` writes the
   parsed rows exactly as the drawer's does, **clearing them on a failed re-parse**. The captured sample is
   named *"sample from Edit Grammar"* on the Sample card.
+- 🔴 **The Grammar dialog's Save writes the Schema, exactly as the drawer's Apply does** (2026-09-25,
+  found driving a new Pipeline `web_orders`). Save used to patch the node in memory only, so after Test
+  parse (6 cols) → Save the strip still read *Schema: Not configured*, Activate was refused on Schema,
+  and the drawer then opened over the carried sample with **Apply disabled** — no visible way to create
+  the schema. Now, with a table Test parse (or the thread's parse it opened over), a flat format, and no
+  `schema_file` on the node yet, Save writes `<pipeline>_schema` FIRST and closes naming it in
+  `schema_file`; a failed write keeps the dialog open with an error alert (the node never names a missing
+  file). ONE write, not two: `parse-output-schema.ts` holds the derivation (`derivedSchemaRows`,
+  `inferredSchemaTypes`) and the re-read-then-write (`writeParseSchema`, with the SCHEMA-FILE-NAME-1
+  `file:` naming and the partitions/extras carry-through) that `PipelineParseDefinitionComponent.submitWithSchema`
+  also calls. A node that already names a schema is left alone (the drawer re-reads, never re-derives
+  over a saved one). The thread's `ParsingPreview` now carries the parse's `columnTypes`, so a surface
+  opening on it derives the same typed schema.
+- **The Parse drawer arms Apply over a carried parse.** Opened on a node with no `schema_file` while the
+  thread holds a table parse of the pane's own frontend (the dialog's, or its own before a Discard), the
+  pane derives the schema from it through `onPreviewed` — the one derivation — so it reads *unapplied*
+  and Apply writes it. Before, the thread's parse was not a form edit, nothing was dirty, and Apply stayed
+  greyed out over "parsed · 6 cols · 4 rows".
 - The strip mounts in the **parse drawer** (where the sample is consumed) and supplies the grammar
   editor's `previewFn` — a function because `previewed` fires on SUCCESS only, and a failing
   re-parse must not leave a stale "parsed · N cols" chip standing. Only a **table** result feeds
@@ -856,6 +874,18 @@ Enrich → Publish — each with a status word and finding count, each click ope
 - ⛔ **The go-live readiness gate is guided-only**: `validatePipeline` does not require a parse
   Step; a hand-built collect→sink graph is legitimate. ⚠ Every stage resolves through the served
   catalog — unresolved catalog reads as five empty stages.
+- 🔴 **A refused go-live says what to DO** (`goLiveRefusal`, `pipeline-stages.ts`, 2026-09-25). A missing
+  Schema has no node of its own (its chip is `empty`), so *"Schema still needs work"* was a dead end. The
+  toast now adds *"Apply the Parse step to create its schema."*, and the Validation dock shows the refusal
+  as an alert with an **Open the Parse step** button (`openStage` on the Parse chip — the drawer, or the
+  Grammar dialog for a generic `parser`). The alert is LIVE over the checklist (`goLiveBlock`): it goes
+  the moment the stage is ready, and the dock never prints "ready to activate" beside it.
+- **Infos never block Activate.** From the same drive: the first toolbar Activate was reported to open
+  only the Validation dock (four *"not yet tested"* infos), the confirm arriving on the second click.
+  ⚠ **Not reproduced**: `activate()` returns after `validate()` only on the guided refusal or an
+  error-severity finding, each with its own toast; the live preview reached the confirm on the first click
+  with the dock closed/open and the drawer closed/open, after both the dialog and the drawer paths. A DOM
+  spec pins it (one click on the rendered button → one confirm, infos only).
 - 🔴 A chip **selects** its Step before opening it (selecting is ungated; the editing half is
   withheld by `canAuthor()`), so the strip works in every mode.
 - `rejects` never promotes a stage to ✓; the Schema stage tops out at `configured` (the editor

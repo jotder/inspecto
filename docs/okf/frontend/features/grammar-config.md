@@ -274,7 +274,10 @@ drift from the map that actually decides it. Adding a format is now a `PARSE_NOD
 nothing else on the template side.
 
 `GrammarEditorDialog` is left with two jobs: a **dangling** `use: grammar/<id>` whose component does not
-exist, and **binary fixed width**. The plain `parser` type still has no drawer pane either — the plugin
+exist, and **binary fixed width** — plus a new Pipeline's generic placeholder `parser`, whose first
+configuration it hosts. Since 2026-09-25 its **Save writes the output schema** after a table Test parse
+when the node names none — the same `writeParseSchema` the drawer's Apply calls — so the placeholder's
+first Save leaves a Schema behind ([Pipelines](pipeline-editor.md) § the Grammar dialog). The plain `parser` type still has no drawer pane either — the plugin
 subtype covers only nodes with an *authored* `parsing.plugin` block, not the unbound generic type.
 ⚠ "P3d retires the dialog entirely" was always false and stays false:
 the dangling and binary cases are deliberate keeps. The dangling case is deliberate: with nothing to resolve there is no faithful copy

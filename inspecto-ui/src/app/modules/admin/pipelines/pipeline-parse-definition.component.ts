@@ -47,9 +47,9 @@ import {
     SchemaFieldRow,
     SchemaPartitionRow,
     deriveSelector,
-    narrowToSchemaType,
     sanitizeIdentifier,
 } from 'app/inspecto/schema';
+import { derivedSchemaRows, inferredSchemaTypes, writeParseSchema } from './parse-output-schema';
 import {
     GrammarEditorComponent,
     ParsingFrontend,
@@ -1015,6 +1015,7 @@ export class PipelineParseDefinitionComponent {
                     rows: p.rows,
                     rowCount: p.rowCount,
                     rejectedRows: p.rejectedRows,
+                    columnTypes: p.columnTypes,
                 });
                 // Re-parsing invalidates any cast checked against the old rows.
                 thread.schemaPreview.set(null);
@@ -1046,7 +1047,7 @@ export class PipelineParseDefinitionComponent {
         this.previewTable.set(p);
         // U3: keep the parse's inferred types (narrowed to the grid vocabulary), by position.
         // Backward-compatible: an old server serves no columnTypes and everything reads as before.
-        this.inferredTypes.set(p.columnTypes ? p.columnTypes.map((ct) => narrowToSchemaType(ct.type)) : null);
+        this.inferredTypes.set(inferredSchemaTypes(p));
         // ⛔ Never re-derive over a schema read back from disk: the operator's saved names, types and
         // include flags are the truth, and a fresh sample would silently replace them on Apply.
         // Instead, ASK what changed — that is exactly the drift question (B3).
@@ -1068,15 +1069,7 @@ export class PipelineParseDefinitionComponent {
         }
         // R11: the detected types seed the rows in BOTH modes — Auto keeps them read-only, Declared
         // unlocks the menu over the same starting point (what "Apply suggested types" used to do).
-        const inferred = this.inferredTypes();
-        this.schemaSeed.set(
-            p.columns.map((col, i) => ({
-                include: true,
-                name: sanitizeIdentifier(col, i),
-                selector: deriveSelector(this.frontend(), i, col),
-                type: inferred?.[i] ?? 'VARCHAR',
-            })),
-        );
+        this.schemaSeed.set(derivedSchemaRows(this.frontend(), p.columns, this.inferredTypes()));
     }
 
     /**
@@ -1261,8 +1254,34 @@ export class PipelineParseDefinitionComponent {
             this.emitDirty();
             this.loadSavedSegments();
             this.loadSavedSchema();
+            this.deriveFromCarriedParse();
             this.loadDecodeProfile();
         }
+    }
+
+    /**
+     * A node with NO schema yet, opened over a table parse the tab's thread already holds (the Grammar
+     * dialog's Test parse, or this pane's own before a Discard): derive the output schema from it exactly
+     * as a fresh parse would — through {@link onPreviewed}, the ONE derivation — so Apply is live and
+     * writes it. 🔴 Without this the Sample card read "parsed · 6 cols · 4 rows" over a DISABLED Apply:
+     * the thread's parse is not a form edit, so nothing was dirty and the schema had no way to be created
+     * short of pressing Parse sample again (found driving a new Pipeline, 2026-09-25).
+     *
+     * <p>Only when this pane authors the schema and none is named — a saved schema is re-read instead and
+     * never re-derived over — and only for a parse of THIS pane's frontend.
+     */
+    private deriveFromCarriedParse(): void {
+        if (!this.authorsSchema() || this.existingSchemaFile()) return;
+        const p = this.sample()?.parsePreview();
+        if (!p || p.frontend !== this.frontend()) return;
+        this.onPreviewed({
+            kind: 'table',
+            columns: p.columns,
+            rows: p.rows,
+            rowCount: p.rowCount,
+            rejectedRows: p.rejectedRows,
+            columnTypes: p.columnTypes,
+        });
     }
 
     /** The rows the grid currently holds — ALL of them, excluded ones included, so a merge never drops. */
@@ -1775,107 +1794,52 @@ export class PipelineParseDefinitionComponent {
 
         this.writing.set(true);
         this.schemaReplaceNeeded.set(false);
-
-        const performWrite = (partitionsToWrite: unknown[], extrasToWrite: Record<string, unknown>) => {
-            const draft = {
-                ...extrasToWrite,
-                ...(Array.isArray(partitionsToWrite) && partitionsToWrite.length
-                    ? { partitions: partitionsToWrite }
-                    : {}),
-                raw: {
-                    name: rawBlockName,
-                    format: 'CSV',
-                    // §4.4: the Auto/Declared marker rides the schema companion (additive, ETL-ignored);
-                    // in Auto the written types ARE the inferred snapshot — declared = inferred by
-                    // construction, so downstream stays deterministic.
-                    types: this.typesMode(),
-                    fields: fields.map((f) => ({
-                        name: f.name,
-                        selector: f.selector,
-                        type: f.type,
-                        ...(f.synonym ? { synonym: f.synonym } : {}),
-                        ...(f.description ? { description: f.description } : {}),
-                        ...(f.unit ? { unit: f.unit } : {}),
-                        ...(f.classification ? { classification: f.classification } : {}),
-                    })),
-                },
-                mapping: {
-                    canonicalName,
-                    rawName: mappingRawName,
-                    // MAPPING-GEN-1 (2026-09-10): the Record Transformer field list, like every committed
-                    // schema and the two server generators — never the legacy rules[] the engine reads only
-                    // through a bridge. `fn: keep` is the marker RecordTransform.isFieldList keys on.
-                    fields: fields.map((f) => ({ name: f.name, from: f.name, fn: 'keep' })),
-                },
-            };
-
-            this.configApi
-                .write('schema', draft, {
-                    overwrite: true,
-                    // 🔴 SCHEMA-FILE-NAME-1: the FILE is the one this node's `schema_file` will name. The server
-                    // otherwise names a schema's file by `raw.name` — which SCHEMA-NAME-1 rightly keeps as the
-                    // pipeline/source identity — so every Apply wrote `<pipeline>.toon` while the node it
-                    // Applied referenced `<pipeline>_schema.toon`: a pipeline that saved, validated and
-                    // activated clean, then never loaded ("Schema file not found").
-                    file: name,
-                    subdir: this.satelliteSubdir(),
-                    ...(replace ? { compatibility: 'none' as const } : {}),
-                    // Only when the handle belongs to THIS schema — see `schemaRead`.
-                    ...(this.schemaRead?.name === name ? { ifMatch: this.schemaRead.etag } : {}),
-                })
-                .subscribe({
-                    next: (written) => {
-                        this.writing.set(false);
-                        // The handle moved with the content; keep it or the next Apply is refused as stale.
-                        this.schemaRead = { name, etag: written.etag };
-                        // ⚠ Clear the refusal this write just answered. Without it the BACKWARD message
-                        // ("schema edit is not BACKWARD-compatible; not written") stayed on screen after
-                        // the operator took the override and the write SUCCEEDED — the pane reporting a
-                        // failure for a schema it had just replaced.
-                        this.editor?.error.set('');
-                        grid.markPristine();
-                        this.applyWith(this.parsingValue(), portableConfigRef(name));
-                    },
-                    error: (e) => {
-                        this.writing.set(false);
-                        // Nothing is applied: a node naming a schema that failed to write is the state this
-                        // ordering exists to prevent, and the pane stays dirty so the edits survive.
-                        // A lost race is neither a bad draft nor a BACKWARD refusal: this write would have
-                        // replaced the whole file, including the unmodeled keys it carried from a now-stale
-                        // read, so the only safe advice is to reload first.
-                        this.editor?.error.set(
-                            isStaleVersionError(e)
-                                ? STALE_WRITE_MESSAGE
-                                : apiErrorMessage(e, 'Could not save the output schema.'),
-                        );
-                        // …but a BACKWARD refusal is recoverable, so offer the override instead of a dead end.
-                        if (isBackwardRefusal(e)) this.schemaReplaceNeeded.set(true);
-                    },
-                });
-        };
-
-        this.configApi
-            .read('schema', name, this.satelliteSubdir())
-            .pipe(catchError(() => of(null)))
-            .subscribe({
-                next: (r) => {
-                    let latestPartitions: unknown[] = this.partitionSeed();
-                    let latestExtras = this.schemaExtras;
-                    if (r?.config) {
-                        const cfg = r.config as Record<string, unknown>;
-                        if (Array.isArray(cfg['partitions'])) {
-                            latestPartitions = cfg['partitions'];
-                        }
-                        const extras = { ...cfg };
-                        delete extras['raw'];
-                        delete extras['mapping'];
-                        delete extras['partitions'];
-                        delete extras['partitionKey'];
-                        latestExtras = extras;
-                    }
-                    performWrite(latestPartitions, latestExtras);
-                },
-            });
+        // The ONE output-schema write, shared with the Grammar dialog's Save (`parse-output-schema.ts`).
+        // It re-reads the schema immediately before writing (the stale-Apply race fix), so partitions[]
+        // or top-level extras written concurrently by the Sink pane survive — the editing CONTROL moved
+        // to the Sink pane (redesign S5, D4), but the rows still travel through this SAME write.
+        writeParseSchema(this.configApi, {
+            name,
+            subdir: this.satelliteSubdir(),
+            fields,
+            rawName: rawBlockName,
+            canonicalName,
+            mappingRawName,
+            typesMode: this.typesMode(),
+            partitions: this.partitionSeed(),
+            extras: this.schemaExtras,
+            replace,
+            // Only when the handle belongs to THIS schema — see `schemaRead`.
+            ifMatch: this.schemaRead?.name === name ? this.schemaRead.etag : undefined,
+        }).subscribe({
+            next: (written) => {
+                this.writing.set(false);
+                // The handle moved with the content; keep it or the next Apply is refused as stale.
+                this.schemaRead = { name, etag: written.etag };
+                // ⚠ Clear the refusal this write just answered. Without it the BACKWARD message
+                // ("schema edit is not BACKWARD-compatible; not written") stayed on screen after
+                // the operator took the override and the write SUCCEEDED — the pane reporting a
+                // failure for a schema it had just replaced.
+                this.editor?.error.set('');
+                grid.markPristine();
+                this.applyWith(this.parsingValue(), portableConfigRef(name));
+            },
+            error: (e) => {
+                this.writing.set(false);
+                // Nothing is applied: a node naming a schema that failed to write is the state this
+                // ordering exists to prevent, and the pane stays dirty so the edits survive.
+                // A lost race is neither a bad draft nor a BACKWARD refusal: this write would have
+                // replaced the whole file, including the unmodeled keys it carried from a now-stale
+                // read, so the only safe advice is to reload first.
+                this.editor?.error.set(
+                    isStaleVersionError(e)
+                        ? STALE_WRITE_MESSAGE
+                        : apiErrorMessage(e, 'Could not save the output schema.'),
+                );
+                // …but a BACKWARD refusal is recoverable, so offer the override instead of a dead end.
+                if (isBackwardRefusal(e)) this.schemaReplaceNeeded.set(true);
+            },
+        });
     }
 
     /**

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { AuthoredNode, AuthoredPipeline } from 'app/inspecto/api';
 import { NodeStatus, PipelineFinding } from './pipeline-graph';
-import { incompleteStages, pipelineLifecycle, StageChip, stageChecklist } from './pipeline-stages';
+import { goLiveRefusal, incompleteStages, pipelineLifecycle, StageChip, stageChecklist } from './pipeline-stages';
 
 const TYPE_CAT = new Map<string, string>([
     ['acquisition', 'SOURCE'],
@@ -167,5 +167,38 @@ describe('pipelineLifecycle / incompleteStages', () => {
 
     it('an ACTIVE pipeline reads Live even when a stage regressed — the deployment is the fact', () => {
         expect(pipelineLifecycle(stageChecklist(pipeline([]), TYPE_CAT, CONFIGURED, []), true)).toBe('Live');
+    });
+});
+
+/**
+ * 🔴 SCHEMA DEAD END (driving a new Pipeline, 2026-09-25): "Schema still needs work" named no way out —
+ * the Schema chip is empty, so it carries no node, and nothing said the schema is CREATED by applying
+ * the Parse step.
+ */
+describe('goLiveRefusal', () => {
+    const noSchema = (): AuthoredNode[] => [
+        FULL[0],
+        { id: 'parse', type: 'parser.delimited', config: { parsing: { frontend: 'delimited' } } },
+        FULL[3],
+    ];
+
+    it('is null when every required stage is ready', () => {
+        expect(goLiveRefusal(stageChecklist(pipeline(FULL), TYPE_CAT, CONFIGURED, []))).toBeNull();
+    });
+
+    it('a missing Schema says to Apply the Parse step, and points at the Parse node', () => {
+        const r = goLiveRefusal(stageChecklist(pipeline(noSchema()), TYPE_CAT, CONFIGURED, []))!;
+        expect(r.message).toBe('Not ready to go live — Schema still needs work.');
+        expect(r.remedy).toBe('Apply the Parse step to create its schema.');
+        expect(r.open?.id).toBe('parse');
+        expect(r.open?.nodeId).toBe('parse');
+        expect(r.openLabel).toBe('Open the Parse step');
+    });
+
+    it('offers no Parse action when there is no Parse node to open', () => {
+        const r = goLiveRefusal(stageChecklist(pipeline([FULL[0], FULL[3]]), TYPE_CAT, CONFIGURED, []))!;
+        expect(r.message).toBe('Not ready to go live — Parse, Schema still needs work.');
+        expect(r.remedy).toBeNull();
+        expect(r.open).toBeNull();
     });
 });

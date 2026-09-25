@@ -111,12 +111,24 @@
         {{ warn }}
     </inspecto-alert>
     }
+
+    @if (saveError(); as err) {
+    <inspecto-alert class="mt-3 block" variant="error" title="The output schema was not saved">
+        {{ err }}
+    </inspecto-alert>
+    }
 </mat-dialog-content>
 
 <mat-dialog-actions align="end">
     <!-- S3: Import/Export moved into the Sample tab's action row (above), beside Upload/Paste. -->
     <button type="button" mat-button (click)="requestClose()">Cancel</button>
-    <button type="button" mat-flat-button color="primary" (click)="save()" [disabled]="pluginBlocked()">
+    <button
+        type="button"
+        mat-flat-button
+        color="primary"
+        (click)="save()"
+        [disabled]="pluginBlocked() || writing()"
+    >
         <span>Save</span>
     </button>
 </mat-dialog-actions>

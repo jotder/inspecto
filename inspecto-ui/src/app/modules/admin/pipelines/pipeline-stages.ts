@@ -132,3 +132,42 @@ export function pipelineLifecycle(chips: readonly StageChip[], active: boolean):
 export function incompleteStages(chips: readonly StageChip[]): string[] {
     return chips.filter((c) => !c.optional && (c.status === 'empty' || c.status === 'blocked')).map((c) => c.label);
 }
+
+/** A refused go-live: what is not ready, what to DO about it, and the stage whose Step does it. */
+export interface GoLiveRefusal {
+    /** "Not ready to go live — Schema still needs work." — the toast. */
+    message: string;
+    /** "Schema still needs work." — the same, under a heading that already says "Not ready to go live". */
+    summary: string;
+    /** The next step, when the refusal knows one — e.g. how a missing Schema gets created. */
+    remedy: string | null;
+    /** The stage chip to open for that step (it carries the Step's node id), with its button label. */
+    open: StageChip | null;
+    openLabel: string | null;
+}
+
+/**
+ * The go-live refusal for a checklist, or null when every required stage is ready.
+ *
+ * <p>🔴 A missing **Schema** has no node of its own to open — its chip is `empty`, so it carries no node
+ * id — and "Schema still needs work" alone was a dead end (found driving a new Pipeline, 2026-09-25):
+ * nothing said the schema is CREATED by applying the Parse step. So the refusal names that step and
+ * points at the Parse stage's node.
+ */
+export function goLiveRefusal(chips: readonly StageChip[]): GoLiveRefusal | null {
+    const incomplete = incompleteStages(chips);
+    if (!incomplete.length) return null;
+    const summary = `${incomplete.join(', ')} still needs work.`;
+    const message = `Not ready to go live — ${summary}`;
+    const parse = chips.find((c) => c.id === 'parse');
+    if (incomplete.includes(LABELS.schema) && parse?.nodeId) {
+        return {
+            message,
+            summary,
+            remedy: 'Apply the Parse step to create its schema.',
+            open: parse,
+            openLabel: 'Open the Parse step',
+        };
+    }
+    return { message, summary, remedy: null, open: null, openLabel: null };
+}

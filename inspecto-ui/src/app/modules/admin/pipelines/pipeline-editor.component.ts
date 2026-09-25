@@ -130,7 +130,7 @@ import {
 import { PipelineChecklistComponent } from './pipeline-checklist.component';
 import { ParserSchemaField, schemaNamedRows } from './pipeline-transform-sql';
 import { inputRelations } from './step-workbench-inputs';
-import { incompleteStages, pipelineLifecycle, PipelineStageId, StageChip, stageChecklist } from './pipeline-stages';
+import { goLiveRefusal, pipelineLifecycle, PipelineStageId, StageChip, stageChecklist } from './pipeline-stages';
 
 /** The `use:` prefix a Grammar component is referenced by — also how its ref is keyed in `validRefs`. */
 const GRAMMAR_REF_PREFIX = 'grammar/';
@@ -3270,6 +3270,25 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
      * flag write did not do, all of them the wizard's: the validate gate stays, a confirm names the
      * consequence, and going live registers the Dataset over the landed store.
      */
+    /** Whether the guided readiness gate applies — see the note in {@link activate}. */
+    private goLiveGated(): boolean {
+        return this.guided() && this.typeCat().size > 0;
+    }
+
+    /** The tab whose last go-live was refused — the dock shows the refusal only there. */
+    private readonly goLiveRefusedTab = signal<string | null>(null);
+
+    /**
+     * The refused go-live the Validation dock shows, with its way out — LIVE over the checklist, so it
+     * disappears the moment the stage it names is ready, and the dock never says "ready to activate"
+     * beside it. Null until an Activate is refused on this tab.
+     */
+    readonly goLiveBlock = computed(() => {
+        const id = this.selectedId();
+        if (!id || this.goLiveRefusedTab() !== id || !this.goLiveGated()) return null;
+        return goLiveRefusal(this.checklist());
+    });
+
     async activate(): Promise<void> {
         const m = this.model();
         const id = this.selectedId();
@@ -3282,11 +3301,12 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         // ⚠ And only once the node-type catalog is in: every stage is derived through `typeCat`, so an
         // unresolved catalog reads as five empty stages — the gate would refuse a perfectly ready
         // pipeline and name every stage as missing. Same "don't cry wolf" posture as `unsupportedNodes`.
-        const gated = this.guided() && this.typeCat().size > 0;
-        const incomplete = gated ? incompleteStages(this.checklist()) : [];
-        if (incomplete.length) {
+        const refusal = this.goLiveGated() ? goLiveRefusal(this.checklist()) : null;
+        if (refusal) {
+            // The Validation dock then carries the refusal with its way out (see goLiveBlock).
+            this.goLiveRefusedTab.set(id);
             this.validate();
-            this.toast.error(`Not ready to go live — ${incomplete.join(', ')} still needs work.`);
+            this.toast.error(refusal.remedy ? `${refusal.message} ${refusal.remedy}` : refusal.message);
             return;
         }
         if (this.validate().some((f) => f.severity === 'error')) {

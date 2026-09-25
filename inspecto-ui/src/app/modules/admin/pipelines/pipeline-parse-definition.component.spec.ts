@@ -939,6 +939,55 @@ describe('PipelineParseDefinitionComponent', () => {
         });
 
         /**
+         * 🔴 SCHEMA DEAD END (driving a new Pipeline `web_orders`, 2026-09-25): the Grammar dialog
+         * test-parsed and saved, and the drawer then opened over the thread's parse — its Sample card read
+         * "parsed · 6 cols · 4 rows" — with Apply DISABLED: the thread's parse is not a form edit, so
+         * nothing was dirty and no schema could be created short of pressing Parse sample again.
+         */
+        it('opened over the thread’s parse with no schema yet: derives it, arms Apply, and Apply writes it', async () => {
+            const thread = new DefinitionStateService();
+            thread.captureSample('sample from Edit Grammar', 'a number,DURATION\n55,30\n');
+            thread.parsePreview.set({
+                frontend: 'delimited',
+                columns: TABLE_PREVIEW.columns,
+                rows: TABLE_PREVIEW.rows,
+                rowCount: 1,
+                rejectedRows: 0,
+                columnTypes: [
+                    { name: 'a number', type: 'BIGINT' },
+                    { name: 'DURATION', type: 'DOUBLE' },
+                ],
+            });
+            const fixture = await create(unschemadNode(), [], 0, thread, 'web_orders');
+            fixture.detectChanges();
+
+            expect(fixture.componentInstance.dirty).toBe(true);
+            expect(
+                pane(fixture)
+                    .schemaSeed()
+                    .map((r) => [r.name, r.type]),
+            ).toEqual([
+                ['A_NUMBER', 'BIGINT'],
+                ['DURATION', 'DOUBLE'],
+            ]);
+
+            pane(fixture).submit();
+            fixture.detectChanges();
+            expect(schemaWrites).toHaveLength(1);
+            expect(schemaWrites[0].opts?.['file']).toBe('web_orders_schema');
+            expect(fixture.componentInstance.applied!.config!['schema_file']).toBe('web_orders_schema.toon');
+        });
+
+        it('never derives from the thread’s parse over a schema the node already names', async () => {
+            const thread = new DefinitionStateService();
+            thread.captureSample('orders.csv', 'a number,DURATION\n55,30\n');
+            thread.parsePreview.set({ frontend: 'delimited', ...TABLE_PREVIEW });
+            const fixture = await create(delimitedNode(), [], 0, thread);
+            fixture.detectChanges();
+            expect(fixture.componentInstance.dirty).toBe(false);
+        });
+
+        /**
          * 🔴 SCHEMA-FILE-NAME-1, found by driving the UI on a new pipeline `shop_orders`: the declared names
          * are the PIPELINE's (SCHEMA-NAME-1), and the server names a schema's file by `raw.name` — so the
          * write landed at `shop_orders.toon` while the node was Applied naming `shop_orders_schema.toon`.

@@ -173,7 +173,9 @@ catalog and by persisting `fields[]`.
   `POST /config/write type=schema`, persisted as `<name>.toon` (the typed Name — ⚠ **not** `<name>_schema.toon`,
   and nothing points the parse node's `schema_file` at it: this onward link "saves itself, node untouched",
   so a Draft Schema… named anything but the node's referenced file is a file no pipeline loads; the Parse
-  pane's own Apply is the write that keeps the two together, `SCHEMA-FILE-NAME-1`) beside `<name>_mapping.csv` and — since
+  pane's own Apply — and, since 2026-09-25, the Grammar dialog's own Save after a Test parse, through the
+  same `writeParseSchema` (`pipelines/parse-output-schema.ts`) — is the write that keeps the two together,
+  `SCHEMA-FILE-NAME-1`) beside `<name>_mapping.csv` and — since
   STRUCTURE-CSV-1 (2026-09-06) — `<name>_structure.csv` for `raw.fields` (`StructureCsv`, `ConfigFileSupport`),
   both merged back on read so the UI always sees the conflated document. A field with a key the CSV cannot hold
   (`timezone`, `partitions`, …) keeps the whole list inline; the sibling is then removed.
