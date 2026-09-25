@@ -123,6 +123,12 @@ describe('MenuArtifactComponent', () => {
         expect(tile(f).dataset()).toEqual(DS);
     });
 
+    it('treats a stored empty filter (`filter:` → `{}`) as no filter, so tiles still get a valid group', async () => {
+        const f = create({ ...dashboard([]), filter: {} as ConditionGroup });
+        await settle(f);
+        expect(tile(f).filter()).toEqual({ kind: 'group', op: 'AND', items: [] });
+    });
+
     it('renders the quick-filter bar when fields are exposed, and a drill toggles the filter every tile gets', async () => {
         const f = create(dashboard(['STAGE']));
         await settle(f);

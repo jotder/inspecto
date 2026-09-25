@@ -66,7 +66,8 @@ export class DashboardViewStore {
     /** Show a Dashboard: its tiles, its saved filter as the base cross-filter, and its exposed fields. */
     seed(d: Dashboard): void {
         this.tiles.set(d.tiles);
-        this.filter.set(d.filter ?? emptyGroup('AND'));
+        // A stored empty `filter:` key arrives as `{}` — not nullish, but no group either.
+        this.filter.set(d.filter?.items ? d.filter : emptyGroup('AND'));
         this.exposedFields.set(d.exposedFields ?? []);
     }
 
