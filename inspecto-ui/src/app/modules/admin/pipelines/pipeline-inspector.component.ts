@@ -230,9 +230,12 @@ import {
                  cluster — they act on the selection, and Delete rendered TWICE on screen at once. What
                  stays here is the one verb that opens this panel's own successor surface. -->
             @if (!readOnly && !compact) {
+                @if (configureHint) {
+                    <p class="mt-2 text-xs opacity-70" data-testid="configure-hint">{{ configureHint }}</p>
+                }
                 <div class="mt-3 flex flex-wrap gap-2">
                     <button mat-flat-button color="primary" type="button" (click)="configure.emit(node)">
-                        <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon> Configure
+                        <mat-icon svgIcon="heroicons_outline:cog-6-tooth"></mat-icon> {{ configureLabel }}
                     </button>
                 </div>
             }
@@ -295,6 +298,10 @@ export class PipelineInspectorComponent implements OnChanges {
      * here from the node alone would mean mirroring `StepDisableArming`'s sink-id grammar.
      */
     @Input() parkable = false;
+    /** The summary's Configure button text — the host names the surface it opens (e.g. the Grammar editor). */
+    @Input() configureLabel = 'Configure';
+    /** Why this Step is configured elsewhere than this panel, shown above the Configure button. */
+    @Input() configureHint: string | null = null;
 
     @Output() configure = new EventEmitter<AuthoredNode>();
     @Output() edgeRelChange = new EventEmitter<string>();

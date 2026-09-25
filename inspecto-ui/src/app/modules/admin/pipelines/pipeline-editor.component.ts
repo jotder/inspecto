@@ -2220,11 +2220,18 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * The node the INSPECTOR SUMMARY should render, or null for the idle hint.
-     * All step configurations are served directly in the definition drawer, so the summary
-     * is retired and returns null so only edge properties or the idle hint render when no pane is open.
+     * The node the INSPECTOR SUMMARY should render, or null for the idle hint / edge properties.
+     * Drawer kinds never get one — selecting them opens their pane ({@link followSelectionIntoDefinition}),
+     * which the template prefers. The summary is for the Steps the drawer cannot serve: the Grammar
+     * dialog's custody cases (a format-less generic `parser`, as Catalog ▸ Onboard Stream scaffolds, or
+     * binary fixed-width). ⚠ This returned `null` unconditionally from 57b8e4b67 until 2026-09-25, so a
+     * click on such a Step left the idle hint up and its Grammar editor was reachable only from the
+     * stage chips (PIPE-PROPS-CUSTODY-1).
      */
-    readonly inspectorSummaryNode = computed<AuthoredNode | null>(() => null);
+    readonly inspectorSummaryNode = computed<AuthoredNode | null>(() => {
+        const n = this.selectedNode();
+        return n && !this.isDrawerKind(n) ? n : null;
+    });
 
     /** Double-click a node (or the inspector's Configure button) → open the per-processor config popup. */
     onNodeOpen(id: string): void {

@@ -1257,6 +1257,53 @@ describe('PipelineEditorComponent', () => {
             expect(c.definitionNode()).toBeNull();
         });
 
+        /**
+         * PIPE-PROPS-CUSTODY-1 (builder pilot 2026-09-25): Catalog ▸ Onboard Stream scaffolds a format-less
+         * generic `parser`, which the drawer cannot serve. Clicking it left the Properties panel on its
+         * idle hint (the summary computed was hard-wired to null), so the Grammar editor was reachable
+         * only from the stage chips. The click must populate Properties with the Step and the way to
+         * its editor.
+         */
+        it('a click on a dialog-custody parse Step populates Properties with its summary + editor button', async () => {
+            const fixture = TestBed.createComponent(PipelineEditorComponent);
+            const c = fixture.componentInstance;
+            (c as unknown as { canvas: unknown }).canvas = canvasMock();
+            fixture.detectChanges();
+            c.select('demo');
+            dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+            const plain = { id: 'pp', type: 'parser', config: { schema_file: 's.toon' } };
+            c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, plain] }));
+            fixture.detectChanges();
+            const panel = () => (fixture.nativeElement as HTMLElement).querySelector('#pipe-panel-right')!;
+            expect(panel().textContent).toContain('Click a Step to edit its configuration');
+
+            c.onNodeSelected('pp');
+            await Promise.resolve();
+            fixture.detectChanges();
+
+            expect(c.definitionNode()).toBeNull(); // custody: no drawer
+            expect(c.inspectorSummaryNode()?.id).toBe('pp');
+            expect(panel().textContent).not.toContain('Click a Step to edit its configuration');
+            expect(panel().textContent).toContain('Node · pp');
+            expect(panel().querySelector('[data-testid="configure-hint"]')?.textContent).toContain('Grammar editor');
+            const open = Array.from(panel().querySelectorAll('button')).find((b) =>
+                b.textContent?.includes('Open Grammar editor'),
+            ) as HTMLButtonElement;
+            expect(open).toBeTruthy();
+            open.click();
+            expect(dialog.open).toHaveBeenCalledTimes(1);
+        });
+
+        /** A drawer-served Step never gets the summary — its pane is what Properties shows. */
+        it('a drawer-served Step gets no summary (its pane opens instead)', async () => {
+            const c = make();
+            c.select('demo');
+            c.onNodeSelected('flt');
+            await Promise.resolve();
+            expect(c.inspectorSummaryNode()).toBeNull();
+            expect(c.definitionNode()?.id).toBe('flt');
+        });
+
         /** SAMPLE-FLOW: the dialog gets the TAB's thread, so its sample reaches the drawer + downstream. */
         it("hands the Grammar dialog the tab's sample thread", () => {
             const c = make();
@@ -2333,7 +2380,11 @@ describe('PipelineEditorComponent', () => {
      * "No authored pipelines — Create a pipeline…" while the Open dialog listed them all as "Does not load".
      */
     describe('empty canvas with pipelines that do not load', () => {
-        const broken = (name: string) => ({ name, path: `/cfg/${name}_pipeline.toon`, loadError: { file: 'x', message: 'bad' } });
+        const broken = (name: string) => ({
+            name,
+            path: `/cfg/${name}_pipeline.toon`,
+            loadError: { file: 'x', message: 'bad' },
+        });
         const healthy = { name: 'a', active: false, nodeCount: 0, edgeCount: 0, produces: [], consumes: [] };
 
         it('says how many exist and that they do not load, with a way to open the list', () => {
@@ -2650,7 +2701,7 @@ describe('PipelineEditorComponent', () => {
         });
 
         /** VALIDATION-STALE-AFTER-DELETE (driven 2026-09-25): the dock kept a deleted Step's error. */
-        it("deleting a Step drops ITS findings at once, and the debounced pass recomputes the rest", () => {
+        it('deleting a Step drops ITS findings at once, and the debounced pass recomputes the rest', () => {
             const c = make();
             const timer = captureTimer(c);
             c.select('demo');

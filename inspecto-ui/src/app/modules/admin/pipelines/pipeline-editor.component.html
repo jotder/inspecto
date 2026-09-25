@@ -796,6 +796,8 @@
                                     [selectedEdgeRel]="selectedEdgeRel()"
                                     [candidateRels]="candidateRels()"
                                     [readOnly]="!canAuthor()"
+                                    configureLabel="Open Grammar editor"
+                                    configureHint="This Step's Grammar is edited in the Grammar editor, not in this panel."
                                     (configure)="openNodeConfig($event)"
                                     (edgeRelChange)="setEdgeRel($event)"
                                     (rename)="renameSelected($event)"

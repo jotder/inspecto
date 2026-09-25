@@ -287,7 +287,10 @@ definition drawer via `pipeline-config-definition.component.ts`. (`NodeConfigDia
   (`followSelectionIntoDefinition`); a DIRTY pane confirms before following. The slim summary
   survives only where the pane cannot serve: the read-only lens and dialog-custody parse Steps
   (auto-popping a modal stays obnoxious — those keep select-then-Configure). Palette add opens the
-  new Step's pane.
+  new Step's pane. ⚠ `inspectorSummaryNode` was hard-wired to `null` from `57b8e4b67` until
+  2026-09-25, so clicking a custody Step (e.g. the format-less `parser` Catalog ▸ Onboard Stream
+  scaffolds) left the idle hint up; it now summarises exactly the non-drawer kinds, with an
+  **Open Grammar editor** button (PIPE-PROPS-CUSTODY-1).
 - **Identity is on the page**: the inspector's `compact` identity strip renders above all definition
   panes — Name + Description as always-visible inputs seeded from the Step, committed on blur via
   `rename` (a no-op blur emits nothing). ⚠ All panes pass the Step's own `name`/`description`
