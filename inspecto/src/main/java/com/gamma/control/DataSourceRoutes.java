@@ -91,7 +91,7 @@ final class DataSourceRoutes implements RouteModule {
         try {
             bundle = BundleImporter.parse(e.getRequestBody().readAllBytes());
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(400, bad.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
         }
 
         Set<String> existing = api.service().pipelines().stream()
@@ -224,7 +224,7 @@ final class DataSourceRoutes implements RouteModule {
         try {
             bundle = BundleImporter.parse(e.getRequestBody().readAllBytes());
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(400, bad.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
         }
 
         // Conflict = a bundle pipeline id that already exists in this space's registry.
@@ -255,7 +255,7 @@ final class DataSourceRoutes implements RouteModule {
         try {
             unpacked = BundleImporter.writeConfig(bundle, config);
         } catch (IllegalArgumentException jail) {
-            throw new ApiException(400, jail.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, jail.getMessage());
         }
         List<String> written = unpacked.paths();
 
@@ -282,9 +282,9 @@ final class DataSourceRoutes implements RouteModule {
             try {
                 pipelines.add(api.service().registerPipeline(config.resolve(rel)));
             } catch (IllegalArgumentException invalid) {
-                throw new ApiException(422, "invalid pipeline " + rel + ": " + invalid.getMessage());
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "invalid pipeline " + rel + ": " + invalid.getMessage());
             } catch (IllegalStateException clash) {
-                throw new ApiException(409, clash.getMessage());
+                throw new ApiException(409, ErrorCodes.CONFLICT, clash.getMessage());
             }
         }
 
@@ -304,7 +304,7 @@ final class DataSourceRoutes implements RouteModule {
         try {
             bundle = new DataSourceBundleResolver(api.service(), config).resolve(ds);
         } catch (NoSuchElementException notFound) {
-            throw new ApiException(404, notFound.getMessage());
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
         return download(e, BundleExporter.exportDataSource(bundle, config, EventLog.currentSpaceId()),
                 ds + ".bundle.zip");
@@ -324,7 +324,7 @@ final class DataSourceRoutes implements RouteModule {
     /** The bound space's config dir, or {@code 503} when filesystem writes are disabled (no write root). */
     private static Path requireConfig(ApiContext api) {
         Path config = api.writeRoot();
-        if (config == null) throw new ApiException(503, "filesystem access is disabled (no write root configured)");
+        if (config == null) throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY, "filesystem access is disabled (no write root configured)");
         return config;
     }
 

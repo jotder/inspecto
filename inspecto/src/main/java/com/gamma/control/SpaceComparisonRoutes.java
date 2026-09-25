@@ -47,11 +47,11 @@ final class SpaceComparisonRoutes implements RouteModule {
         Map<String, Object> body = api.body(ex);
         List<String> ids = ids(body.get("spaces"));
         if (ids.size() < 2)
-            throw new ApiException(422, "a comparison needs 'spaces': an array of at least two Space ids");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a comparison needs 'spaces': an array of at least two Space ids");
         if (new LinkedHashSet<>(ids).size() != ids.size())
-            throw new ApiException(422, "'spaces' names a Space twice: " + ids);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'spaces' names a Space twice: " + ids);
         for (String id : ids)
-            if (!SpaceId.isValid(id)) throw new ApiException(422, "'" + id + "' is not a valid Space id");
+            if (!SpaceId.isValid(id)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + id + "' is not a valid Space id");
 
         Map<String, String> params = new LinkedHashMap<>();
         params.put("spaces", String.join(",", ids));
@@ -62,9 +62,9 @@ final class SpaceComparisonRoutes implements RouteModule {
             try {
                 n = Integer.parseInt(v.trim());
             } catch (NumberFormatException nfe) {
-                throw new ApiException(422, "'" + key + "' must be a positive integer, got '" + v + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "' must be a positive integer, got '" + v + "'");
             }
-            if (n < 1) throw new ApiException(422, "'" + key + "' must be a positive integer, got " + n);
+            if (n < 1) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "' must be a positive integer, got " + n);
             params.put(key, Integer.toString(n));
         }
         List<String> axes = ids(body.get("axes"));
@@ -74,9 +74,9 @@ final class SpaceComparisonRoutes implements RouteModule {
         Map<String, Path> roots = new LinkedHashMap<>();
         for (String id : ids) {
             SpaceContext space = api.spaces().space(SpaceId.of(id))
-                    .orElseThrow(() -> new ApiException(404, "no hosted Space '" + id + "'"));
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no hosted Space '" + id + "'"));
             Path root = space.service().dataRoot();
-            if (root == null) throw new ApiException(422, "Space '" + id + "' has no data root to compare");
+            if (root == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "Space '" + id + "' has no data root to compare");
             roots.put(id, root);
         }
 

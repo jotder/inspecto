@@ -108,6 +108,10 @@ above the generated commit list.
 - `POST /rule-templates/{id}/simulate` with no write root bound now answers 503 with `errorCode`
   **`CONTROL_PLANE_READ_ONLY`** (was the 503 default `CAPABILITY_UNAVAILABLE`), matching every other
   write-root refusal. Status and message are unchanged; a client keying on the old code must switch.
+- The per-Space data-source bundle routes (`GET /datasources`, `GET /datasources/{ds}/export`,
+  `GET /export`, `POST /import`, `POST /import/preview`) with no write root bound now answer 503 with
+  `errorCode` **`CONTROL_PLANE_READ_ONLY`** (was `CAPABILITY_UNAVAILABLE`), for the same reason. Status and
+  message are unchanged.
 
 **Breaking — Job Packs need a SHA-256 allowlist (2026-09-25, parser-plugins trust design slice P1)**
 - With `-Djobs.packs.dir` set, a pack jar loads **only** when the SHA-256 of its bytes is listed in the

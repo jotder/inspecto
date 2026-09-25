@@ -52,7 +52,7 @@ final class CatalogRoutes implements RouteModule {
      */
     private Map<String, Object> resolveTable(ApiContext api, String table) {
         MetadataNode node = api.service().catalog().nodeByTable(table);
-        if (node == null) throw new ApiException(404, "no unique catalog node for table '" + table + "'");
+        if (node == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no unique catalog node for table '" + table + "'");
         return Map.of("id", node.id(), "label", node.label(), "kind", node.kind().name());
     }
 
@@ -65,9 +65,9 @@ final class CatalogRoutes implements RouteModule {
     private Map<String, Object> resolve(ApiContext api, String table, String pipeline) {
         if (table != null && !table.isBlank()) return resolveTable(api, table);
         if (pipeline == null || pipeline.isBlank())
-            throw new ApiException(404, "no unique catalog node for table '" + table + "'");   // the pre-existing contract: nothing named ⇒ 404, never a guess
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no unique catalog node for table '" + table + "'");   // the pre-existing contract: nothing named ⇒ 404, never a guess
         MetadataNode node = api.service().catalog().nodeByPipeline(pipeline);
-        if (node == null) throw new ApiException(404, "no catalog node for pipeline '" + pipeline + "'");
+        if (node == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no catalog node for pipeline '" + pipeline + "'");
         return Map.of("id", node.id(), "label", node.label(), "kind", node.kind().name());
     }
 
@@ -105,7 +105,7 @@ final class CatalogRoutes implements RouteModule {
     private Map<String, Object> catalogNodeDetail(ApiContext api, String id) {
         MetadataGraphService catalog = api.service().catalog();
         MetadataNode node = catalog.hydrated(id);
-        if (node == null) throw new ApiException(404, "no catalog node '" + id + "'");
+        if (node == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no catalog node '" + id + "'");
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("node", node);
         // depth 2 reaches an event table's schema (1) and its columns (2), plus lineage neighbours
@@ -143,7 +143,7 @@ final class CatalogRoutes implements RouteModule {
         try {
             return MetadataGraphService.Direction.valueOf(s.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, "invalid direction '" + s + "' (out|in|both)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid direction '" + s + "' (out|in|both)");
         }
     }
 
@@ -155,7 +155,7 @@ final class CatalogRoutes implements RouteModule {
             try {
                 set.add(NodeKind.valueOf(t.trim().toUpperCase()));
             } catch (IllegalArgumentException e) {
-                throw new ApiException(400, "invalid node kind '" + t.trim() + "'");
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid node kind '" + t.trim() + "'");
             }
         }
         return set;
@@ -169,7 +169,7 @@ final class CatalogRoutes implements RouteModule {
             try {
                 set.add(EdgeKind.valueOf(t.trim().toUpperCase()));
             } catch (IllegalArgumentException e) {
-                throw new ApiException(400, "invalid edge kind '" + t.trim() + "'");
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid edge kind '" + t.trim() + "'");
             }
         }
         return set;

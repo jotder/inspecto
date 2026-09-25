@@ -81,7 +81,7 @@ final class DecisionRoutes implements RouteModule {
         Map<String, Object> rule = normalize(body);
         String name = requireName(rule);
         if (RouteErrors.exists(store, TYPE, name))
-            throw new ApiException(409, "decision rule '" + name + "' already exists (use PUT to update)");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "decision rule '" + name + "' already exists (use PUT to update)");
         long now = System.currentTimeMillis();
         rule.put("lastSimulation", null);
         rule.put("createdAt", now);
@@ -120,7 +120,7 @@ final class DecisionRoutes implements RouteModule {
         try {
             sim.put("matched", ConditionTree.matched(rule.get("when"), sample));
         } catch (IllegalArgumentException e) {   // a rule stored before the save guard — never "matches all"
-            throw new ApiException(422, "decision rule 'when': " + e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule 'when': " + e.getMessage());
         }
         sim.put("total", sample.size());
         sim.put("checkedAt", System.currentTimeMillis());
@@ -324,7 +324,7 @@ final class DecisionRoutes implements RouteModule {
     private static String requireName(Map<String, Object> rule) {
         Object n = rule.get("name");
         if (n == null || String.valueOf(n).isBlank())
-            throw new ApiException(422, "decision rule requires a 'name'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule requires a 'name'");
         return String.valueOf(n);
     }
 
@@ -336,7 +336,7 @@ final class DecisionRoutes implements RouteModule {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> normalize(Map<String, Object> body) {
         if (!(body.get("consequences") instanceof List<?> cs) || cs.isEmpty())
-            throw new ApiException(422, "decision rule requires at least one consequence");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule requires at least one consequence");
         Map<String, Object> rule = new LinkedHashMap<>(body);
         String targetType = String.valueOf(rule.getOrDefault("targetType", "pipeline"));
         rule.put("targetType", "job".equals(targetType) ? "job" : "pipeline");
@@ -346,7 +346,7 @@ final class DecisionRoutes implements RouteModule {
         try {
             ConditionTree.requireGroupRoot(rule.get("when"));   // a bare root would match EVERY row
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, "decision rule 'when': " + e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule 'when': " + e.getMessage());
         }
         Object priority = rule.get("priority");
         rule.put("priority", priority instanceof Number num ? num.intValue() : 100);
@@ -359,7 +359,7 @@ final class DecisionRoutes implements RouteModule {
             ComponentRegistry.Component c = store.write(TYPE, name, content);
             return c.content();
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 

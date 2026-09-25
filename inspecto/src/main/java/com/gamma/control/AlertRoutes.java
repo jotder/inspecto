@@ -46,7 +46,7 @@ final class AlertRoutes implements RouteModule {
         // email/webhook — this route can page people, so it is an operate action, not a read.
         api.post("/alerts/evaluate", ApiContext.withCapability("canOperateRuns", (e, m) -> api.service().alertService()
                 .map(a -> (Object) a.evaluateAll())
-                .orElseThrow(() -> new ApiException(503,
+                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                         "alert engine not armed (no alert-rule components loaded)"))));
         api.post("/alerts/rules", ApiContext.withCapability("canAuthorAlertRules",
                 (e, m) -> editionRefused(e) ? ApiContext.HANDLED : single(e, create(api, api.body(e)))));
@@ -69,7 +69,7 @@ final class AlertRoutes implements RouteModule {
         ComponentStore store = store(api);
         AlertRule rule = parse(body);                                   // 422 on an invalid rule
         if (RouteErrors.exists(store, TYPE, rule.name()))
-            throw new ApiException(409, "alert rule '" + rule.name() + "' already exists (use PUT to update)");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists (use PUT to update)");
         Map<String, Object> content = write(store, rule.name(), rule.toMap());
         alerts(api).upsert(rule);                                       // arm in the running engine
         return content;
@@ -122,7 +122,7 @@ final class AlertRoutes implements RouteModule {
         try {
             return store.write(TYPE, name, content).content();
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 
@@ -142,23 +142,23 @@ final class AlertRoutes implements RouteModule {
 
     private static AlertService alerts(ApiContext api) {
         return api.service().alertService()
-                .orElseThrow(() -> new ApiException(503, "alert engine unavailable"));
+                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
     }
 
     private static AlertRule parse(Map<String, Object> body) {
         if (!EditionFeatures.present(EditionFeatures.ALERT_DISPATCH))   // the consequence's door (G9)
-            throw new ApiException(422, EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH));
         AlertRule rule;
         try {
             rule = AlertRule.fromMap(body);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
         // LA-23: a rule over an Investigation's Working Set must pass that Investigation's owner-only / PDP gate,
         // which only the Link Analysis module can apply — and only its route records the binding the evaluator
         // requires, so a rule written here would be armed yet never evaluate. Refused loudly, with the way in.
         if (rule.isInvestigationRule())
-            throw new ApiException(422, "an Alert Rule over an Investigation (investigation:) is authored through "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an Alert Rule over an Investigation (investigation:) is authored through "
                     + "POST /inv/investigations/{id}/alert-rules, which checks that you own the Investigation");
         return rule;
     }

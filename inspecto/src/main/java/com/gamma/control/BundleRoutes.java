@@ -138,7 +138,7 @@ final class BundleRoutes implements RouteModule {
      */
     private Object exportBundle(ApiContext api, Map<String, Object> body) {
         List<Map<String, Object>> requested = asMapList(body.get("items"));
-        if (requested.isEmpty()) throw new ApiException(422, "export body must include a non-empty 'items' array");
+        if (requested.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "export body must include a non-empty 'items' array");
         rejectUnsupported(requested);
 
         String sourceSpace = ApiContext.str(body, "sourceSpace");
@@ -292,7 +292,7 @@ final class BundleRoutes implements RouteModule {
         // connection don't participate in ComponentIntegrity's ref graph.)
         List<String> introduced = introducedIntegrityFindings(store, ordered);
         if (!introduced.isEmpty())
-            throw new ApiException(422, "bundle fails referential integrity — import would introduce: " + introduced);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bundle fails referential integrity — import would introduce: " + introduced);
 
         List<Map<String, Object>> results = new ArrayList<>();
         int imported = 0, overwritten = 0, skipped = 0, unchanged = 0, failed = 0;
@@ -709,13 +709,13 @@ final class BundleRoutes implements RouteModule {
     /** Structural envelope validation (§4 step 1): format + version + a non-empty items array → 422 otherwise. */
     private static void validateEnvelope(Map<String, Object> env) {
         if (!FORMAT.equals(ApiContext.str(env, "format")))
-            throw new ApiException(422, "not an Inspecto metadata bundle (format must be '" + FORMAT + "')");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "not an Inspecto metadata bundle (format must be '" + FORMAT + "')");
         Object v = env.get("version");
         int version = v instanceof Number n ? n.intValue() : -1;
         if (version != 1 && version != 2)
-            throw new ApiException(422, "unsupported bundle version (expected 1 or 2)");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsupported bundle version (expected 1 or 2)");
         if (asMapList(env.get("items")).isEmpty())
-            throw new ApiException(422, "bundle has no items");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bundle has no items");
     }
 
     /** Reject a request naming any kind outside the backend's supported set → 422 (the honest boundary). */
@@ -723,7 +723,7 @@ final class BundleRoutes implements RouteModule {
         List<String> bad = items.stream().map(i -> ApiContext.str(i, "kind"))
                 .filter(k -> k != null && !supported(k)).distinct().toList();
         if (!bad.isEmpty())
-            throw new ApiException(422, "unsupported kind(s) " + bad + " — backend bundle covers "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unsupported kind(s) " + bad + " — backend bundle covers "
                     + APPLY_ORDER + " (connection travels reference-only: literal secrets are stripped)");
     }
 

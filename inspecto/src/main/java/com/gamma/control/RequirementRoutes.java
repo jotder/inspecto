@@ -69,13 +69,13 @@ final class RequirementRoutes implements RouteModule {
         ComponentStore store = store(api);
         String id = ApiContext.str(body, "id");
         if (id == null) id = ApiContext.str(body, "name");
-        if (id == null) throw new ApiException(422, "requirement 'id' is required");
+        if (id == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "requirement 'id' is required");
         String title = ApiContext.str(body, "title");
-        if (title == null) throw new ApiException(422, "requirement 'title' is required");
+        if (title == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "requirement 'title' is required");
         String kind = ApiContext.str(body, "kind");
-        if (kind == null || !KINDS.contains(kind.toLowerCase())) throw new ApiException(422, "requirement 'kind' must be one of " + KINDS);
+        if (kind == null || !KINDS.contains(kind.toLowerCase())) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "requirement 'kind' must be one of " + KINDS);
         if (RouteErrors.exists(store, TYPE, id))
-            throw new ApiException(409, "requirement '" + id + "' already exists");
+            throw new ApiException(409, ErrorCodes.CONFLICT, "requirement '" + id + "' already exists");
 
         Map<String, Object> content = new LinkedHashMap<>();
         content.put("title", title);
@@ -106,7 +106,7 @@ final class RequirementRoutes implements RouteModule {
         ComponentStore store = store(api);
         Map<String, Object> content = RouteErrors.existing(store, TYPE, "requirement", id);
         if (!"submitted".equals(content.get("status")))
-            throw new ApiException(409, "requirement '" + id + "' is not awaiting a decision (status "
+            throw new ApiException(409, ErrorCodes.CONFLICT, "requirement '" + id + "' is not awaiting a decision (status "
                     + content.get("status") + ")");
         boolean accept = Boolean.parseBoolean(String.valueOf(body.get("accept")))
                 || Boolean.TRUE.equals(body.get("accept"));
@@ -120,7 +120,7 @@ final class RequirementRoutes implements RouteModule {
         ComponentStore store = store(api);
         Map<String, Object> content = RouteErrors.existing(store, TYPE, "requirement", id);
         if (!"accepted".equals(content.get("status")))
-            throw new ApiException(409, "only an accepted requirement can be delivered (status "
+            throw new ApiException(409, ErrorCodes.CONFLICT, "only an accepted requirement can be delivered (status "
                     + content.get("status") + ")");
         content.put("status", "delivered");
         content.put("deliveredNote", ApiContext.str(body, "note"));
@@ -146,7 +146,7 @@ final class RequirementRoutes implements RouteModule {
         try {
             return view(store.write(TYPE, id, content).content());
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 }

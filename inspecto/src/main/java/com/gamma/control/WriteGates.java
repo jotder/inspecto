@@ -27,7 +27,7 @@ public final class WriteGates {
     /** Gate 2 — a name/id unusable as a jailed filename → 422. Returns the trimmed name. */
     public static String safeName(String raw, String what) {
         if (!isSafeName(raw))
-            throw new ApiException(422,
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
                     "unsafe " + what + " '" + raw + "' (allowed: letters, digits, '.', '_', '-')");
         return raw.trim();
     }
@@ -74,6 +74,6 @@ public final class WriteGates {
 
     /** Gate 4 — resource conflict → 409. */
     public static void conflictIf(boolean conflict, String message) {
-        if (conflict) throw new ApiException(409, message);
+        if (conflict) throw new ApiException(409, ErrorCodes.CONFLICT, message);
     }
 }

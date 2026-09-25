@@ -91,7 +91,7 @@ final class PipelineHistoryRoutes implements RouteModule {
         Resolved p = resolve(api, name);
         PipelineHistory.Version v = version(p, version, "version");
         Path registered = api.service().pathFor(p.id()).map(Path::normalize)
-                .orElseThrow(() -> new ApiException(404, "pipeline '" + p.id() + "' is not registered; nothing to restore over"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "pipeline '" + p.id() + "' is not registered; nothing to restore over"));
         byte[] bytes = Files.readAllBytes(v.file());
         Map<String, Object> config = ConfigCodec.toMap(new String(bytes, StandardCharsets.UTF_8));
 
@@ -131,7 +131,7 @@ final class PipelineHistoryRoutes implements RouteModule {
     private Object diff(ApiContext api, HttpExchange ex, String name) throws IOException {
         Resolved p = resolve(api, name);
         String fromArg = ApiContext.query(ex, "from");
-        if (fromArg == null || fromArg.isBlank()) throw new ApiException(400, "query parameter 'from' (a version) is required");
+        if (fromArg == null || fromArg.isBlank()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "query parameter 'from' (a version) is required");
         String toArg = ApiContext.query(ex, "to");
         boolean toCurrent = toArg == null || toArg.isBlank() || "current".equals(toArg.trim());
 
@@ -139,7 +139,7 @@ final class PipelineHistoryRoutes implements RouteModule {
         Path toFile;
         if (toCurrent) {
             toFile = api.service().pathFor(p.id()).filter(Files::isRegularFile)
-                    .orElseThrow(() -> new ApiException(404, "pipeline '" + p.id() + "' has no current config file"));
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "pipeline '" + p.id() + "' has no current config file"));
         } else {
             toFile = version(p, toArg, "to").file();
         }
@@ -160,11 +160,11 @@ final class PipelineHistoryRoutes implements RouteModule {
                 .map(PipelineConfig.Identity::pipelineName).orElse(null);
         boolean registered = id != null;
         if (id == null) id = name;
-        if (!WriteGates.isSafeName(id)) throw new ApiException(404, "no pipeline named '" + name + "'");
+        if (!WriteGates.isSafeName(id)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'");
         Path root = api.writeRoot();
         Path dir = root == null ? null : WriteGates.jail(root, PipelineHistory.dirFor(root, id.trim()), "history path");
         if (!registered && (dir == null || !Files.isDirectory(dir)))
-            throw new ApiException(404, "no pipeline named '" + name + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'");
         return new Resolved(id.trim(), dir);   // dir null ⇔ no write root ⇔ no history
     }
 
@@ -173,10 +173,10 @@ final class PipelineHistoryRoutes implements RouteModule {
         try {
             n = Integer.parseInt(raw.trim());
         } catch (NumberFormatException e) {
-            throw new ApiException(400, what + " must be a version number, got '" + raw + "'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, what + " must be a version number, got '" + raw + "'");
         }
         return PipelineHistory.versions(p.dir()).stream().filter(v -> v.version() == n).findFirst()
-                .orElseThrow(() -> new ApiException(404, "pipeline '" + p.id() + "' has no kept version " + n));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "pipeline '" + p.id() + "' has no kept version " + n));
     }
 
     private static Map<String, Object> meta(PipelineHistory.Version v) {

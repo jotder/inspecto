@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.metrics.MetricRegistry;
+import com.gamma.service.CollectorService;
 import com.gamma.service.SpaceManager;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -19,6 +20,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -94,6 +96,34 @@ class ControlApiDataSourceExportTest {
             assertTrue(whole.containsKey("bundle.toon"));
             assertTrue(whole.containsKey("space.toon"), "the whole-space zip carries the space manifest");
             assertEquals("space", manifest(whole.get("bundle.toon"), root).get("kind").asText());
+        }
+    }
+
+    /** ERRORCODE-DEFAULTED-1: an unbound write root is the read-only contract code, not the 503 default. */
+    @Test
+    void noWriteRootIs503ReadOnly(@TempDir Path cfg) throws Exception {
+        Path toon = TestConfigs.csv(cfg, PipelineConfigBatchTest.miniSchema()).write();
+        String prior = System.getProperty("assist.write.root");
+        System.clearProperty("assist.write.root");
+        CollectorService svc;
+        ControlApi api;
+        try {
+            svc = new CollectorService(List.of(toon), 3600, 1);
+            api = new ControlApi(svc, 0);
+            api.start();
+        } finally {
+            if (prior != null) System.setProperty("assist.write.root", prior);
+        }
+        try {
+            for (String path : List.of("/datasources", "/export")) {
+                HttpResponse<String> res = sendText(api.port(), path);
+                assertEquals(503, res.statusCode(), path + ": " + res.body());
+                assertEquals("CONTROL_PLANE_READ_ONLY",
+                        V1Body.of(res.body()).get("error").get("errorCode").asText(), path);
+            }
+        } finally {
+            api.close();
+            svc.close();
         }
     }
 
