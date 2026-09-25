@@ -9,6 +9,7 @@ import {
     inject,
     signal,
 } from '@angular/core';
+import { nextSpan, spanLabel, tileBasis } from 'app/inspecto/viz/dashboard-grid';
 import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
@@ -120,6 +121,10 @@ function splitStores(v: string | undefined): string[] | undefined {
     templateUrl: './dashboard-editor.component.html',
 })
 export class DashboardEditorComponent implements OnInit {
+    /** UIE-3: tile width on the four-column grid, and how it is said. */
+    readonly tileBasis = tileBasis;
+    readonly spanLabel = spanLabel;
+
     private fb = inject(FormBuilder);
     private dashboardsApi = inject(DashboardsService);
     private widgetsApi = inject(WidgetsService);
@@ -511,13 +516,13 @@ export class DashboardEditorComponent implements OnInit {
 
     addWidget(widgetId: string): void {
         if (!widgetId) return;
-        this.tiles.update((t) => [...t, { widgetId, span: 1 }]);
+        this.tiles.update((t) => [...t, { widgetId, span: 2 }]);
     }
     removeTile(index: number): void {
         this.tiles.update((t) => t.filter((_, i) => i !== index));
     }
     toggleSpan(index: number): void {
-        this.tiles.update((t) => t.map((tile, i) => (i === index ? { ...tile, span: tile.span === 1 ? 2 : 1 } : tile)));
+        this.tiles.update((t) => t.map((tile, i) => (i === index ? { ...tile, span: nextSpan(tile.span) } : tile)));
     }
     drop(event: CdkDragDrop<DashboardTile[]>): void {
         this.tiles.update((t) => {

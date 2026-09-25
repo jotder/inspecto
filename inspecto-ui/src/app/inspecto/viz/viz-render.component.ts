@@ -5,6 +5,9 @@ import { ChartData, ChartOptions, ChartType } from 'chart.js';
 import { InspectoChartComponent } from 'app/inspecto/components/chart.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { tableColDefs } from './table-columns';
+import { words } from './column-label';
+import { formatAxisTick, formatNumber } from './number-format';
+import { seriesColors } from './series-colors';
 import { CHART_CATEGORICAL, CHART_PALETTES, GAUGE_TRACK } from 'app/inspecto/theme/chart-tokens';
 import { KpiComponent } from './plugins/kpi.component';
 import { getVizComponentLoader } from './viz-components';
@@ -48,7 +51,8 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = { kpi: KpiComponent };
             }
             @case ('component') {
                 @if (outletComponent(); as cmp) {
-                    <div class="h-64">
+                    <!-- UIE-1: a KPI is a number, not a canvas - it gets a compact box; maps and graphs keep h-64. -->
+                    <div [class.h-36]="isKpi()" [class.h-64]="!isKpi()">
                         <ng-container *ngComponentOutlet="cmp; inputs: outletInputs()" />
                     </div>
                 }
@@ -76,6 +80,11 @@ export class VizRenderComponent {
     readonly categoryClick = output<string>();
 
     readonly renderKind = computed(() => this.plugin().render.kind);
+
+    readonly isKpi = computed(() => {
+        const r = this.plugin().render;
+        return r.kind === 'component' && r.componentKey === 'kpi';
+    });
 
     /** A lazily-loaded component-render host (from a registered loader), once its import resolves. */
     private readonly loadedComponent = signal<Type<unknown> | null>(null);
@@ -135,6 +144,10 @@ export class VizRenderComponent {
         const p = this.sortedProps();
         const palette = CHART_PALETTES[this.renderOptions()?.palette ?? ''] ?? CHART_CATEGORICAL;
         const color = (i: number): string => palette[i % palette.length];
+        // UIE-2: colour by meaning (status tones) then by name, so "Fail" is red everywhere and a series keeps its
+        // colour across widgets. An explicitly chosen non-default palette (monochrome) keeps positional colours.
+        const positional = !!this.renderOptions()?.palette && this.renderOptions()?.palette !== 'categorical';
+        const colorsFor = (labels: readonly string[]): string[] => (positional ? labels.map((_, i) => color(i)) : seriesColors(labels));
 
         if (plugin.meta.type === 'gauge') {
             const value = Math.max(0, Math.min(100, this.props().value ?? 0));
@@ -148,7 +161,7 @@ export class VizRenderComponent {
             const points = (xs?.data ?? []).map((x, i) => ({ x, y: ys?.data[i] ?? 0 }));
             return {
                 labels: p.labels,
-                datasets: [{ label: 'Scatter', data: points, backgroundColor: p.labels.map((_, i) => color(i)) }],
+                datasets: [{ label: 'Scatter', data: points, backgroundColor: colorsFor(p.labels) }],
             };
         }
         if (plugin.meta.type === 'bubble') {
@@ -162,7 +175,7 @@ export class VizRenderComponent {
             }));
             return {
                 labels: p.labels,
-                datasets: [{ label: 'Bubble', data: points, backgroundColor: p.labels.map((_, i) => color(i)) }],
+                datasets: [{ label: 'Bubble', data: points, backgroundColor: colorsFor(p.labels) }],
             };
         }
 
@@ -170,16 +183,17 @@ export class VizRenderComponent {
         if (isPie) {
             return {
                 labels: p.labels,
-                datasets: [{ data: p.series[0]?.data ?? [], backgroundColor: p.labels.map((_, i) => color(i)) }],
+                datasets: [{ data: p.series[0]?.data ?? [], backgroundColor: colorsFor(p.labels) }],
             };
         }
+        const colors = colorsFor(p.series.map((s) => s.label));
         return {
             labels: p.labels,
             datasets: p.series.map((s, i) => ({
-                label: s.label,
+                label: seriesLabel(s.label),
                 data: s.data,
-                backgroundColor: color(i),
-                borderColor: color(i),
+                backgroundColor: colors[i],
+                borderColor: colors[i],
                 fill: (s['fill'] as boolean) ?? false,
                 stack: this.renderOptions()?.stacked ? 'stack' : undefined,
             })),
@@ -201,25 +215,50 @@ export class VizRenderComponent {
               : undefined;
         const axis = opts?.axis;
         const stacked = opts?.stacked;
-        const isFunnel = this.plugin().meta.type === 'funnel';
+        const type = this.plugin().meta.type;
+        const isFunnel = type === 'funnel';
+        const r = this.plugin().render;
+        const isPie = r.kind === 'chartjs' && (r.chartType === 'pie' || r.chartType === 'doughnut');
+        // UIE-4: the value axis reads compact ("2.5M") and tooltips read the widget's format, not raw floats.
+        const fmt = opts?.format;
+        const cartesian = !isGauge && !isPie && type !== 'scatter' && type !== 'bubble';
+        const valueTicks = cartesian ? { ticks: { callback: (v: string | number) => formatAxisTick(Number(v), fmt) } } : {};
+        const tooltip = isGauge
+            ? undefined
+            : {
+                  callbacks: {
+                      label: (ctx: { dataset: { label?: string }; parsed: unknown; label?: string }) => {
+                          const parsed = ctx.parsed as number | { x?: number; y?: number } | null;
+                          const n = typeof parsed === 'number' ? parsed : isFunnel ? parsed?.x : parsed?.y;
+                          const name = isPie ? ctx.label : ctx.dataset.label;
+                          const value = n == null ? '' : formatNumber(n, fmt);
+                          return name ? `${name}: ${value}` : value;
+                      },
+                  },
+              };
+        const plugins = pluginsOverride ?? (tooltip ? {} : undefined);
+        if (plugins && tooltip && !isGauge) (plugins as Record<string, unknown>)['tooltip'] = tooltip;
+        const valueAxis = isFunnel ? 'x' : 'y';
         return {
             ...(isGauge ? { circumference: 180, rotation: 270, cutout: '70%' } : {}),
             ...(isFunnel ? { indexAxis: 'y' as const } : {}),
-            plugins: pluginsOverride,
+            plugins,
             scales:
-                axis?.xTitle || axis?.yTitle || stacked
+                axis?.xTitle || axis?.yTitle || stacked || cartesian
                     ? {
                           x: {
+                              ...(valueAxis === 'x' ? valueTicks : {}),
                               stacked: !!stacked,
                               title: axis?.xTitle ? { display: true, text: axis.xTitle } : undefined,
                           },
                           y: {
+                              ...(valueAxis === 'y' ? valueTicks : {}),
                               stacked: !!stacked,
                               title: axis?.yTitle ? { display: true, text: axis.yTitle } : undefined,
                           },
                       }
                     : undefined,
-        };
+        } as ChartOptions;
     });
 
     /** Table columns: readable headers (or the widget's `columnLabels`) and status columns as badges. */
@@ -232,7 +271,13 @@ export class VizRenderComponent {
     readonly outletInputs = computed<Record<string, unknown>>(() => {
         const r = this.plugin().render;
         return r.kind === 'component' && r.componentKey === 'kpi'
-            ? { value: this.props().value ?? 0, label: this.title() }
+            ? {
+                  value: this.props().value ?? 0,
+                  compare: this.props().compare,
+                  format: this.renderOptions()?.format,
+                  target: this.renderOptions()?.kpi?.target,
+                  better: this.renderOptions()?.kpi?.better ?? 'higher',
+              }
             : this.viewBinding() === undefined
               ? { viewId: this.viewId() }
               : { viewId: this.viewId(), binding: this.viewBinding() };
@@ -245,4 +290,12 @@ export class VizRenderComponent {
         const label = this.sortedProps().labels[index];
         if (label != null) this.categoryClick.emit(label);
     }
+}
+
+/** UIE-4: a measure's generated label (`sum(value_at_risk_sar)`) as a reader says it ("Value at risk (SAR)"). A
+ *  series named by a data value (a `series` field) is already readable and passes through. */
+export function seriesLabel(label: string): string {
+    if (label === 'count' || label === 'count(*)') return 'Count';
+    const m = /^(\w+)\((\w+)\)$/.exec(label);
+    return m ? words(m[2]) : label;
 }

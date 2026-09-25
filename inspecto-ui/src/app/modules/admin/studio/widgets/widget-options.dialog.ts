@@ -55,6 +55,12 @@ export class WidgetOptionsDialog {
         sort: this.data.sort ?? '',
         limit: this.data.limit ?? null,
         stacked: this.data.stacked ?? false,
+        numberStyle: this.data.format?.style === 'number' ? '' : (this.data.format?.style ?? ''),
+        currency: this.data.format?.currency ?? '',
+        compact: this.data.format?.compact ?? false,
+        decimals: this.data.format?.decimals ?? null,
+        kpiTarget: this.data.kpi?.target ?? null,
+        kpiBetter: this.data.kpi?.better ?? 'higher',
     };
 
     save(): void {
@@ -62,7 +68,20 @@ export class WidgetOptionsDialog {
         const str = (x: unknown) => (typeof x === 'string' ? x.trim() : '');
         const xTitle = str(v['xTitle']);
         const yTitle = str(v['yTitle']);
+        const style = str(v['numberStyle']) as '' | 'currency' | 'percent';
+        const currency = str(v['currency']).toUpperCase();
+        const decimals = typeof v['decimals'] === 'number' ? (v['decimals'] as number) : undefined;
+        const compact = (v['compact'] as boolean) ?? false;
+        const format =
+            style || currency || compact || decimals != null
+                ? { style: style || undefined, currency: currency || undefined, compact: compact || undefined, decimals }
+                : undefined;
+        const target = typeof v['kpiTarget'] === 'number' ? (v['kpiTarget'] as number) : undefined;
+        const better = (str(v['kpiBetter']) || 'higher') as 'higher' | 'lower';
         const options: WidgetOptions = {
+            // Keep what this dialog does not model (columnLabels, badgeColumns, columnFormats…): rebuilding the
+            // object from the form alone silently wiped them on every save.
+            ...this.data,
             title: str(v['title']) || undefined,
             subtitle: str(v['subtitle']) || undefined,
             axis: xTitle || yTitle ? { xTitle: xTitle || undefined, yTitle: yTitle || undefined } : undefined,
@@ -74,6 +93,8 @@ export class WidgetOptionsDialog {
             sort: (str(v['sort']) || undefined) as WidgetOptions['sort'],
             limit: (v['limit'] as number) ?? undefined,
             stacked: (v['stacked'] as boolean) ?? false,
+            format,
+            kpi: target != null || better === 'lower' ? { target, better } : undefined,
         };
         this.ref.close(options);
     }

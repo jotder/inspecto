@@ -99,6 +99,9 @@ export function transformXy(rows: Record<string, unknown>[], values: ControlValu
 export function buildValueQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
     const cv = values.value?.[0] ?? values.y?.[0];
     const measures = cv ? [channelMeasure(cv)] : [];
+    // UIE-1: a KPI's optional prior-period measure rides the same one-row query.
+    const cmp = values.compare?.[0];
+    if (cmp && !measures.some((m) => m.id === channelMeasure(cmp).id)) measures.push(channelMeasure(cmp));
     return {
         datasetId: ctx.datasetId,
         sourceName: ctx.sourceName,
@@ -112,5 +115,7 @@ export function transformValue(rows: Record<string, unknown>[], values: ControlV
     const cv = values.value?.[0] ?? values.y?.[0];
     if (!cv) return { labels: [], series: [], value: 0 };
     const mId = channelMeasureId(cv);
-    return { labels: [], series: [], value: num(rows[0]?.[mId]) };
+    const cmp = values.compare?.[0];
+    const compare = cmp && rows[0]?.[channelMeasureId(cmp)] != null ? num(rows[0][channelMeasureId(cmp)]) : undefined;
+    return { labels: [], series: [], value: num(rows[0]?.[mId]), ...(compare === undefined ? {} : { compare }) };
 }

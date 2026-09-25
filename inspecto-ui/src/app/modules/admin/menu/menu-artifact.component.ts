@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { tileBasis } from 'app/inspecto/viz/dashboard-grid';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { of, switchMap } from 'rxjs';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -38,10 +39,7 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
                     @if (dashboard(); as d) {
                         <div class="flex flex-wrap gap-4">
                             @for (tile of d.tiles; track tile.widgetId) {
-                                <div
-                                    class="min-w-0 flex-grow"
-                                    [style.flex-basis]="tile.span === 2 ? '100%' : 'calc(50% - 0.5rem)'"
-                                >
+                                <div class="min-w-0" [style.flex-basis]="tileBasis(tile.span)">
                                     <app-widget-host [widgetId]="tile.widgetId" />
                                 </div>
                             }
@@ -61,6 +59,9 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
     `,
 })
 export class MenuArtifactComponent {
+    /** UIE-3: a tile's width on the four-column grid. */
+    readonly tileBasis = tileBasis;
+
     private readonly dashboards = inject(DashboardsService);
 
     readonly binding = input<MenuBinding | undefined>(undefined);

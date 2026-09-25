@@ -46,8 +46,8 @@ final class BiTemplates {
                                     Map.of("x", List.of(dimension("region")),
                                             "y", List.of(measure("sum", "amount")))),
                             dashboard(P_PREFIX + "kpi_board", "KPI overview",
-                                    tile(P_PREFIX + "kpi_total", 1), tile(P_PREFIX + "sum_by_dim", 2),
-                                    tile(P_PREFIX + "raw_table", 1)))),
+                                    tile(P_PREFIX + "kpi_total", 2), tile(P_PREFIX + "sum_by_dim", 4),
+                                    tile(P_PREFIX + "raw_table", 2)))),
             new Template("quality-monitor", "Data quality monitor",
                     "Row volume by dimension plus a distinct-key count — a starting point for watching a "
                             + "feed's health.",
@@ -58,7 +58,7 @@ final class BiTemplates {
                             widget(P_PREFIX + "distincts", "kpi", "Distinct keys",
                                     Map.of("value", List.of(measure("countDistinct", "id")))),
                             dashboard(P_PREFIX + "quality_board", "Data quality",
-                                    tile(P_PREFIX + "volume", 2), tile(P_PREFIX + "distincts", 1)))),
+                                    tile(P_PREFIX + "volume", 4), tile(P_PREFIX + "distincts", 2)))),
             // Seed-pack enrichment (BACKLOG §7 C7, 2026-09-02): the first TEMPORAL starter. `line` is the
             // Studio's temporal plugin and a dimension channel may carry a `grain` (day|week|month —
             // viz-types.ts TimeGrain), which the widget compiles into QuerySpec.grains. Curated over the
@@ -76,8 +76,8 @@ final class BiTemplates {
                             widget(P_PREFIX + "amount_total", "kpi", "Total amount",
                                     Map.of("value", List.of(measure("sum", "amount")))),
                             dashboard(P_PREFIX + "trend_board", "Trend monitor",
-                                    tile(P_PREFIX + "records_over_time", 2), tile(P_PREFIX + "amount_total", 1),
-                                    tile(P_PREFIX + "amount_over_time", 2)))));
+                                    tile(P_PREFIX + "records_over_time", 4), tile(P_PREFIX + "amount_total", 2),
+                                    tile(P_PREFIX + "amount_over_time", 4)))));
 
     private BiTemplates() {}
 
@@ -180,6 +180,7 @@ final class BiTemplates {
         return component("dashboard", id, Map.of("name", name, "tiles", List.of(tiles), "filter", Map.of()));
     }
 
+    /** {@code span} = columns of the FOUR-column dashboard grid (UIE-3): 2 = half, 4 = the full row. */
     private static Map<String, Object> tile(String widgetId, int span) {
         return Map.of("widgetId", widgetId, "span", span);
     }

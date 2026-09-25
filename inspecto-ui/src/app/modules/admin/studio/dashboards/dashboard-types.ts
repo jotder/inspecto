@@ -1,4 +1,5 @@
 import { ConditionGroup, emptyGroup } from 'app/inspecto/query';
+import { TileSpan } from 'app/inspecto/viz/dashboard-grid';
 
 /**
  * Studio **Dashboard** model — a composite of saved widgets laid out in a grid, with an optional dashboard-level
@@ -7,10 +8,11 @@ import { ConditionGroup, emptyGroup } from 'app/inspecto/query';
  * in component-model terms. Mirrors `widget-types.ts`.
  */
 
-/** One placed tile: which saved widget + how wide (1 or 2 grid columns). Order in the array = layout order. */
+/** One placed tile: which saved widget + how many of the grid's FOUR columns it takes (UIE-3, `inspecto/viz/dashboard-grid`).
+ *  Order in the array = layout order. */
 export interface DashboardTile {
     widgetId: string;
-    span: 1 | 2;
+    span: TileSpan;
 }
 
 export interface DashboardConfig {

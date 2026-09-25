@@ -1010,13 +1010,13 @@ public final class ConfigSpecs {
     // ── dashboard ─────────────────────────────────────────────────────────────────
 
     /** A composite of saved widgets laid out in a grid, with an optional dashboard-level cross-filter
-     *  injected into every tile's query. Each tile references a widget by id + a 1|2 column span; deep
+     *  injected into every tile's query. Each tile references a widget by id + a 1–4 column span; deep
      *  per-tile validation and widget-existence checks belong in the caller, not this envelope spec.
      *  Mirrors {@code dashboard-types.ts}. */
     public static ConfigSpec dashboard() {
         List<FieldSpec> fields = List.of(
                 FieldSpec.required("tiles", "Tiles", FieldType.LIST,
-                        "Placed widgets — each {widgetId, span:1|2}; array order is the layout order."),
+                        "Placed widgets — each {widgetId, span:1-4} on a four-column grid (1 = quarter, 4 = full row); array order is the layout order."),
                 FieldSpec.of("filter", "Cross-filter", FieldType.MAP,
                         "A Query Core condition group injected into every tile's query."),
                 FieldSpec.of("exposedFields", "Exposed filter fields", FieldType.LIST,

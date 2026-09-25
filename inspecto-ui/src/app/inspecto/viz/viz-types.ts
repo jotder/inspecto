@@ -1,3 +1,4 @@
+import { NumberFormat } from './number-format';
 import { ColumnType, ConditionGroup } from 'app/inspecto/query';
 
 /**
@@ -59,7 +60,7 @@ export interface QuerySpec {
 }
 
 /** The channels a plugin can map fields onto (Tableau-style). */
-export type ChannelId = 'x' | 'y' | 'series' | 'size' | 'color' | 'value';
+export type ChannelId = 'x' | 'y' | 'series' | 'size' | 'color' | 'value' | 'compare';
 
 /** A field-mapper control: one channel, the roles it accepts, and whether it's multi/required. */
 export interface ControlSpec {
@@ -149,6 +150,14 @@ export interface VizRenderOptions {
     columnLabels?: Record<string, string>;
     /** Table only: columns rendered as status badges. Default: columns named status / severity / rag. */
     badgeColumns?: string[];
+    /** UIE-1, KPI only: the target, and which direction is good. The tile states on / off target in words and tone,
+     *  and colours the delta the same way. `better` defaults to `higher`. */
+    kpi?: { target?: number; better?: 'higher' | 'lower' };
+    /** UIE-4: how this widget's numbers read — KPI value, chart axes and tooltips, and every table column not named in
+     *  {@link columnFormats}. Absent: grouped, up to two decimals (axes compact). */
+    format?: NumberFormat;
+    /** UIE-4, table only: a per-column format, keyed by result column id (`sum_exposure_sar`). */
+    columnFormats?: Record<string, NumberFormat>;
 }
 
 /** The render-ready props a plugin produces from result rows (labels + series, or raw rows for the table). */
@@ -160,6 +169,8 @@ export interface VizProps {
     columns?: string[];
     /** For KPI: the single headline value (+ optional comparison). */
     value?: number;
+    /** UIE-1, KPI: the prior-period value from the optional `compare` channel — the delta's baseline. */
+    compare?: number;
 }
 
 /**

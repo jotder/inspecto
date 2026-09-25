@@ -35,7 +35,7 @@ const AGG_LABEL: Record<string, string> = {
     count_distinct: 'distinct',
 };
 
-function words(field: string): string {
+export function words(field: string): string {
     // An all-caps column (`FIRST_INGS_SCORE`, common in warehouse-style stores) is shouted, not cased on
     // purpose — sentence-case it like any other; acronyms still come back through TOKENS.
     const cased = /[a-z]/.test(field) ? field : field.toLowerCase();
@@ -51,13 +51,15 @@ function words(field: string): string {
 
 /**
  * Header text for a result column when the widget names none: `outstanding_sar` → "Outstanding (SAR)",
- * `sum_breaks` → "Breaks (total)", `tmf_dimension` → "TM Forum dimension". A bare `count` (the
+ * `sum_breaks` → "Breaks" (a sum carries no suffix), `tmf_dimension` → "TM Forum dimension". A bare `count` (the
  * field-less measure) reads "Count". An all-caps id reads the same: `sum_FIRST_INGS_SCORE` → "First ings
- * score (total)", `MATCH_ID` → "Match ID".
+ * score", `MATCH_ID` → "Match ID".
  */
 export function humanizeColumn(column: string): string {
     if (column === 'count') return 'Count';
     const m = AGG_PREFIX.exec(column);
     if (!m) return words(column);
-    return `${words(m[2])} (${AGG_LABEL[m[1]]})`;
+    // UIE-4: a sum is how a reader already takes a column of totals, so it carries no suffix; the others change
+    // what the number means and keep theirs ("Age (days) (max)").
+    return m[1] === 'sum' ? words(m[2]) : `${words(m[2])} (${AGG_LABEL[m[1]]})`;
 }

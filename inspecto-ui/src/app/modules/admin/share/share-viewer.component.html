@@ -14,9 +14,9 @@
                 <h1 class="text-2xl font-semibold">{{ name() }}</h1>
                 <p class="text-secondary mt-1 text-sm">Shared read-only view · link expires {{ expiresAt() }}</p>
             </header>
-            <main class="mx-auto grid max-w-6xl grid-cols-1 gap-4 sm:grid-cols-2">
+            <main class="mx-auto flex max-w-6xl flex-wrap gap-4">
                 @for (tile of tiles(); track $index) {
-                    <section class="rounded-lg border p-4" [class.sm:col-span-2]="tile.span === 2">
+                    <section class="min-w-0 rounded-lg border p-4" [style.flex-basis]="tileBasis(tile.span)">
                         <h2 class="mb-3 truncate text-base font-medium">{{ tile.title }}</h2>
                         @switch (tile.state) {
                             @case ('loading') {

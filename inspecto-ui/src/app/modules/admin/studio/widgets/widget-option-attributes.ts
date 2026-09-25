@@ -59,4 +59,35 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
     },
     { key: 'limit', label: 'Limit (top N)', type: 'number', tier: 'required', required: false, min: 1 },
     { key: 'stacked', label: 'Stack series', type: 'boolean', tier: 'required', required: false, default: false },
+    // UIE-4: how the widget's numbers read (KPI value, axes, tooltips, table cells).
+    {
+        key: 'numberStyle',
+        label: 'Number style',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: '',
+        options: [
+            { value: '', label: 'Number' },
+            { value: 'currency', label: 'Currency' },
+            { value: 'percent', label: 'Percent (value is already in points)' },
+        ],
+    },
+    { key: 'currency', label: 'Currency code (e.g. SAR)', type: 'string', tier: 'required', required: false },
+    { key: 'compact', label: 'Compact (7.7M)', type: 'boolean', tier: 'required', required: false, default: false },
+    { key: 'decimals', label: 'Decimals', type: 'number', tier: 'required', required: false, min: 0 },
+    // UIE-1: a KPI's target and which direction is good.
+    { key: 'kpiTarget', label: 'KPI target', type: 'number', tier: 'required', required: false },
+    {
+        key: 'kpiBetter',
+        label: 'KPI: better when',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: 'higher',
+        options: [
+            { value: 'higher', label: 'Higher' },
+            { value: 'lower', label: 'Lower' },
+        ],
+    },
 ];

@@ -160,7 +160,7 @@
             class="mt-6 flex flex-wrap gap-4"
         >
             @for (tile of tiles(); track $index) {
-                <div cdkDrag class="min-w-0 grow" [style.flex-basis]="tile.span === 2 ? '100%' : 'calc(50% - 0.5rem)'">
+                <div cdkDrag class="min-w-0" [style.flex-basis]="tileBasis(tile.span)">
                     <div class="relative">
                         <div class="absolute right-2 top-2 z-10 flex items-center gap-1">
                             <button
@@ -192,8 +192,8 @@
                             <button
                                 mat-icon-button
                                 (click)="toggleSpan($index)"
-                                [matTooltip]="tile.span === 1 ? 'Widen' : 'Narrow'"
-                                aria-label="Toggle width"
+                                [matTooltip]="'Width: ' + spanLabel(tile.span) + ' — click to change'"
+                                [attr.aria-label]="'Change width (now ' + spanLabel(tile.span) + ')'"
                             >
                                 <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrows-right-left"></mat-icon>
                             </button>

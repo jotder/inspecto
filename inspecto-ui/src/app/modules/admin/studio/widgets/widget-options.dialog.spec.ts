@@ -54,6 +54,32 @@ describe('WidgetOptionsDialog', () => {
         expect(saved.stacked).toBe(false);
     });
 
+    // The dialog rebuilt the options from its own form alone, so a save wiped every key it does not model —
+    // a table's columnLabels and badgeColumns included.
+    it('keeps the options it does not model (columnLabels, badgeColumns, columnFormats) through a save', () => {
+        const { c, ref } = create({
+            columnLabels: { sum_exposure_sar: 'Exposure (SAR)' },
+            badgeColumns: ['disposition'],
+            columnFormats: { sum_exposure_sar: { style: 'currency', currency: 'SAR' } },
+        });
+        c.save();
+        const saved = ref.close.mock.calls[0][0] as WidgetOptions;
+        expect(saved.columnLabels).toEqual({ sum_exposure_sar: 'Exposure (SAR)' });
+        expect(saved.badgeColumns).toEqual(['disposition']);
+        expect(saved.columnFormats?.['sum_exposure_sar']?.currency).toBe('SAR');
+    });
+
+    it('round-trips the number format and the KPI target (UIE-1, UIE-4)', () => {
+        const { c, ref } = create({
+            format: { style: 'currency', currency: 'SAR', compact: true, decimals: 1 },
+            kpi: { target: 0.3, better: 'lower' },
+        });
+        c.save();
+        const saved = ref.close.mock.calls[0][0] as WidgetOptions;
+        expect(saved.format).toEqual({ style: 'currency', currency: 'SAR', compact: true, decimals: 1 });
+        expect(saved.kpi).toEqual({ target: 0.3, better: 'lower' });
+    });
+
     it('renders with no a11y violations', async () => {
         const { fixture } = create({});
         await expectNoA11yViolations(fixture.nativeElement);

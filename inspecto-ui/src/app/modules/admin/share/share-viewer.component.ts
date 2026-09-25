@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, input, signal } from '@angular/core';
+import { TileSpan, tileBasis, tileSpan } from 'app/inspecto/viz/dashboard-grid';
 import { PublicMeasure, PublicQueryBody, ShareService, SharedDashboard, apiErrorMessage } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
@@ -23,7 +24,7 @@ interface EmbedWidget {
 /** One rendered tile's view-model; `state` drives the per-tile skeleton/alert/viz switch. */
 interface TileVm {
     title: string;
-    span: 1 | 2;
+    span: TileSpan;
     state: 'loading' | 'ready' | 'unsupported' | 'error';
     detail?: string;
     plugin?: VizPlugin;
@@ -79,6 +80,9 @@ export function embedQueryBody(widget: EmbedWidget): PublicQueryBody | null {
     templateUrl: './share-viewer.component.html',
 })
 export class ShareViewerComponent implements OnInit {
+    /** UIE-3: a tile's width on the four-column grid. */
+    readonly tileBasis = tileBasis;
+
     /** The share token, bound from the `:token` route param (`withComponentInputBinding`). */
     readonly token = input.required<string>();
 
@@ -108,7 +112,7 @@ export class ShareViewerComponent implements OnInit {
 
         const vms: TileVm[] = (content.tiles ?? []).map((tile) => {
             const widget = widgets.get(tile.widgetId);
-            const span: 1 | 2 = tile.span === 2 ? 2 : 1;
+            const span = tileSpan(tile.span);
             if (!widget)
                 return {
                     title: tile.widgetId,

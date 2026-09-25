@@ -45,6 +45,22 @@ export const CHART_CATEGORICAL: readonly string[] = [
 
 /** A muted single-hue ramp (indigo) — the curated alternative to {@link CHART_CATEGORICAL} for widgets that
  *  want a calmer look (e.g. a single dominant series). */
+/**
+ * UIE-2: the chart colour of each status tone (`statusTone()` in the status badge), so a series named "Fail" or
+ * "Red" is drawn in the same meaning a table's badge gives it. `neutral` has none: such a series takes a
+ * {@link CHART_CATEGORICAL_NEUTRAL} colour instead.
+ */
+export const CHART_TONE: Readonly<Record<'error' | 'warning' | 'info' | 'success', string>> = {
+    error: CHART_SERIES.error,
+    warning: WARN,
+    info: '#5B8FF9',
+    success: CHART_SERIES.success,
+};
+
+/** UIE-2: the categorical palette minus its red and green, for series that carry no status meaning — a neutral
+ *  series must never look like a failure or a pass. */
+export const CHART_CATEGORICAL_NEUTRAL: readonly string[] = CHART_CATEGORICAL.filter((c) => c !== '#EF4444' && c !== '#22C55E');
+
 const CHART_MONOCHROME: readonly string[] = ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff'];
 
 /** Named, curated widget color palettes (`WidgetOptions.palette`) — never a free-form color list, so widgets

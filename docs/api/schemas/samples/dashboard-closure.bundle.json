@@ -82,7 +82,7 @@
       "id": "investigation_overview",
       "content": {
         "name": "investigation_overview",
-        "tiles": [{ "widgetId": "dhaka_network_map", "span": 2 }],
+        "tiles": [{ "widgetId": "dhaka_network_map", "span": 4 }],
         "filter": null,
         "exposedFields": []
       },

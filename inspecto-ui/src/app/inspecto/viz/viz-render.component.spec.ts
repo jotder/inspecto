@@ -70,9 +70,10 @@ describe('VizRenderComponent', () => {
         };
         const c = create(TABLE_PLUGIN, props).componentInstance;
         expect(c.renderKind()).toBe('aggrid');
+        // UIE-4: every non-id column also carries the shared number formatter.
         expect(c.colDefs()).toEqual([
-            { field: 'a', headerName: 'A' },
-            { field: 'b', headerName: 'B' },
+            expect.objectContaining({ field: 'a', headerName: 'A', valueFormatter: expect.any(Function) }),
+            expect.objectContaining({ field: 'b', headerName: 'B', valueFormatter: expect.any(Function) }),
         ]);
     });
 
@@ -83,7 +84,8 @@ describe('VizRenderComponent', () => {
         const c = fixture.componentInstance;
         expect(c.renderKind()).toBe('component');
         expect(c.outletComponent()).toBeTruthy();
-        expect(c.outletInputs()).toEqual({ value: 99, label: 'Revenue' });
+        // UIE-1: the widget card carries the title, so the tile gets the value and what it means — no source-name label.
+        expect(c.outletInputs()).toEqual({ value: 99, compare: undefined, format: undefined, target: undefined, better: 'higher' });
     });
 
     it('resolves a view-bound plugin through the async loader registry and passes the viewId', async () => {

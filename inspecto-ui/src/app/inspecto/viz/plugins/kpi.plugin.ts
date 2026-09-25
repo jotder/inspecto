@@ -8,7 +8,11 @@ import { buildValueQuery, transformValue } from './plugin-helpers';
  */
 export const KPI_PLUGIN: VizPlugin = {
     meta: { type: 'kpi', label: 'KPI', icon: 'heroicons_outline:variable', fit: { minMeasure: 1, maxDim: 0 } },
-    controls: [{ channel: 'value', label: 'Value', acceptRoles: ['measure'], isMeasure: true, required: true }],
+    controls: [
+        { channel: 'value', label: 'Value', acceptRoles: ['measure'], isMeasure: true, required: true },
+        // UIE-1: the prior-period value the delta is measured against (a Dataset column such as `previous`).
+        { channel: 'compare', label: 'Compare with (prior period)', acceptRoles: ['measure'], isMeasure: true },
+    ],
     buildQuery: buildValueQuery,
     transformProps: transformValue,
     render: { kind: 'component', componentKey: 'kpi' },

@@ -48,7 +48,7 @@ describe('transformXy', () => {
         expect(props.labels).toEqual(['premium', 'standard']);
         expect(props.series).toHaveLength(1);
         expect(props.series[0].data).toEqual([30, 12]);
-        expect(props.series[0].label).toBe('Duration s (total)');
+        expect(props.series[0].label).toBe('Duration s');
     });
 
     it("labels the measure series in a reader's words, not `agg(FIELD)`", () => {
@@ -57,7 +57,7 @@ describe('transformXy', () => {
                 x: [{ field: 'VENUE' }],
                 y: [{ field: 'FIRST_INGS_SCORE', agg }],
             }).series[0].label;
-        expect(label('sum')).toBe('First ings score (total)');
+        expect(label('sum')).toBe('First ings score');
         expect(label('avg')).toBe('First ings score (average)');
         expect(label('count')).toBe('Count'); // count is field-less (`COUNT(*)`), so it names no column
     });

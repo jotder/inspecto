@@ -1164,7 +1164,7 @@ final class InspectoTools {
                 controls.put("y", norm);
                 if (groupBy.size() > 1) controls.put("series", List.of(Map.of("field", groupBy.get(1))));
                 widgets.add(widgetEntry(wid, widgetDraft(dataset, "bar", controls, title.trim())));
-                tiles.add(tile(wid, 2));   // a chart reads better across the full 2-column span
+                tiles.add(tile(wid, 4));   // a chart reads better across the full row of the 4-column grid (UIE-3)
             }
 
             Map<String, Object> dashboard = new LinkedHashMap<>();

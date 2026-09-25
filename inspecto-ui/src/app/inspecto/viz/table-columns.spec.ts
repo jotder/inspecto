@@ -4,7 +4,7 @@ import { humanizeColumn, isBadgeColumn, tableColDefs } from './table-columns';
 
 describe('table columns — readable headers', () => {
     it('turns measure ids into "<Field> (<agg>)"', () => {
-        expect(humanizeColumn('sum_breaks')).toBe('Breaks (total)');
+        expect(humanizeColumn('sum_breaks')).toBe('Breaks');
         expect(humanizeColumn('avg_detect_minutes')).toBe('Detect minutes (average)');
         expect(humanizeColumn('max_value')).toBe('Value (max)');
         expect(humanizeColumn('count_distinct_msisdn')).toBe('MSISDN (distinct)');
@@ -20,7 +20,7 @@ describe('table columns — readable headers', () => {
     });
 
     it('sentence-cases an all-caps column instead of shouting it', () => {
-        expect(humanizeColumn('sum_FIRST_INGS_SCORE')).toBe('First ings score (total)');
+        expect(humanizeColumn('sum_FIRST_INGS_SCORE')).toBe('First ings score');
         expect(humanizeColumn('MATCH_ID')).toBe('Match ID');
         expect(humanizeColumn('PLAYER_OF_THE_MATCH')).toBe('Player of the match');
     });

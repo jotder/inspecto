@@ -157,9 +157,14 @@ describe('DashboardEditorComponent', () => {
     it('adds, spans and removes tiles', () => {
         const c = create().componentInstance;
         c.addWidget('bar1');
-        expect(c.tiles()).toEqual([{ widgetId: 'bar1', span: 1 }]);
+        // UIE-3: a new tile starts at half of the four-column grid, and the width button cycles quarter → full.
+        expect(c.tiles()).toEqual([{ widgetId: 'bar1', span: 2 }]);
         c.toggleSpan(0);
-        expect(c.tiles()[0].span).toBe(2);
+        expect(c.tiles()[0].span).toBe(3);
+        c.toggleSpan(0);
+        expect(c.tiles()[0].span).toBe(4);
+        c.toggleSpan(0);
+        expect(c.tiles()[0].span).toBe(1);
         c.removeTile(0);
         expect(c.tiles()).toHaveLength(0);
     });
@@ -181,7 +186,7 @@ describe('DashboardEditorComponent', () => {
         fixture.componentInstance.addWidget('bar1');
         fixture.componentInstance.save();
         expect(save).toHaveBeenCalledWith(
-            expect.objectContaining({ id: 'cdr_overview', tiles: [{ widgetId: 'bar1', span: 1 }] }),
+            expect.objectContaining({ id: 'cdr_overview', tiles: [{ widgetId: 'bar1', span: 2 }] }),
             { update: false }, // create mode — edits go through PUT (the backend 409s a re-create)
         );
         expect(nav).toHaveBeenCalledWith(['/studio/dashboards']);
