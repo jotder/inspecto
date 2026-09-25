@@ -10,7 +10,7 @@ import { apiErrorMessage, LensService, Space, SpacesService } from 'app/inspecto
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
-import { SpaceFormDialog } from './space-form.dialog';
+import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
 import { SpaceTemplateGalleryData, SpaceTemplateGalleryDialog } from './space-template-gallery.dialog';
 import { ImportBundleData, ImportBundleDialog } from './import-bundle.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';

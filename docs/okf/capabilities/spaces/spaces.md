@@ -280,7 +280,10 @@ Spaces on one pod.
 
 `SpacesService` holds the active id (restored from `localStorage`), probes `GET /spaces/_meta` and lists
 `GET /spaces` in parallel; the header **space-switcher** appears only when `multiSpace` and Spaces exist, and
-switching **hard-reloads** at the lens home. The `spaceInterceptor` rewrites `/api/v1/<path>` →
+switching **hard-reloads** at the lens home. The switcher menu ends with **New space…** (after a divider, only with `canAdminister` — the grant
+`POST /spaces` enforces once any Space is hosted): it opens the same `SpaceFormDialog` as Settings → Spaces
+(`inspecto/spaces/`, shared since 2026-09-25) and on create **switches to the new Space**, while a create from
+Settings leaves the active Space unchanged. The `spaceInterceptor` rewrites `/api/v1/<path>` →
 `/api/v1/spaces/<id>/<path>` for every feature call, no-ops with no active Space, and exempts the eight
 `SERVER_GLOBAL` paths — so **every other feature stays space-agnostic**; the Spaces admin view and the
 switcher are the only space-aware UI. Per-Space branding is edited in the Space form (`BrandingService`

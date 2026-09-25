@@ -1,11 +1,14 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
+import { MatDividerModule } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { LensService, Space, SpacesService } from 'app/inspecto/api';
 import { LENS_HOME } from 'app/app.routes';
+import { SpaceFormDialog } from 'app/inspecto/spaces/space-form.dialog';
 
 /**
  * Header control that shows the active space and switches between them. Only rendered on a
@@ -15,12 +18,18 @@ import { LENS_HOME } from 'app/app.routes';
  * current lens's home route ({@link LENS_HOME}): every feature component fetches on init and holds
  * its own state, so a reload is the simplest correct way to re-scope the whole app to the new space
  * (and a deep link valid in the old space may not exist in the new one).
+ *
+ * "New space…" at the bottom of the menu opens the same {@link SpaceFormDialog} as Settings → Spaces and,
+ * on a successful create, switches straight to the new Space (builder pilot 2026-09-25: a Space created
+ * from Settings was not obviously something you then had to activate). Offered only with
+ * {@link LensService.canAdminister} — `POST /spaces` refuses anyone else once a Space is hosted, and the
+ * switcher only renders when Spaces are hosted.
  */
 @Component({
     selector: 'inspecto-space-switcher',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, MatIconModule, MatMenuModule, MatTooltipModule],
+    imports: [MatButtonModule, MatDividerModule, MatIconModule, MatMenuModule, MatTooltipModule],
     template: `
         @if (spaces.showSwitcher()) {
             <button
@@ -52,14 +61,22 @@ import { LENS_HOME } from 'app/app.routes';
                         <span>{{ s.displayName || s.id }}</span>
                     </button>
                 }
+                @if (lens.canAdminister()) {
+                    <mat-divider></mat-divider>
+                    <button mat-menu-item (click)="newSpace()">
+                        <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                        <span>New space…</span>
+                    </button>
+                }
             </mat-menu>
         }
     `,
 })
 export class SpaceSwitcherComponent implements OnInit {
     readonly spaces = inject(SpacesService);
-    private lens = inject(LensService);
+    protected lens = inject(LensService);
     private router = inject(Router);
+    private dialog = inject(MatDialog);
 
     ngOnInit(): void {
         this.spaces.refresh().subscribe();
@@ -76,5 +93,15 @@ export class SpaceSwitcherComponent implements OnInit {
         this.spaces.selectSpace(s.id);
         const home = LENS_HOME[this.lens.currentLens()];
         this.router.navigateByUrl('/' + home).then(() => window.location.reload());
+    }
+
+    /** Create a Space through the shared form, then make it the active one. */
+    newSpace(): void {
+        this.dialog
+            .open(SpaceFormDialog, { width: '520px', maxHeight: '90vh' })
+            .afterClosed()
+            .subscribe((created?: Space) => {
+                if (created) this.switch(created);
+            });
     }
 }
