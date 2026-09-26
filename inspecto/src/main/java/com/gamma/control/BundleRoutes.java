@@ -315,6 +315,27 @@ final class BundleRoutes implements RouteModule {
         // (Integrity checking only covers the ComponentStore kinds — authored-pipeline/job/saved-view/
         // connection don't participate in ComponentIntegrity's ref graph.)
         List<String> introduced = introducedIntegrityFindings(store, ordered);
+        // SEC-IMPORT-ROLES-ESCALATION-1: the access config is canConfigureAccess's, never a bundle's (this route is
+        // canAuthorWorkbench) — refused whatever the policy, before any write.
+        List<String> reservedItems = ordered.stream().map(i -> ApiContext.str(i, "kind"))
+                .filter(com.gamma.service.ReservedConfigPaths.KINDS::contains).distinct().toList();
+        if (!reservedItems.isEmpty())
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "a bundle may not carry " + reservedItems
+                    + " — the access config is written through /access/* only");
+        // …and a `pipeline` item's closure files meet the import judge (ImportPaths) BEFORE any item is written:
+        // a satellite no import may write refuses the whole bundle, not one item after the others landed.
+        for (Map<String, Object> item : ordered) {
+            if (!"pipeline".equals(ApiContext.str(item, "kind")) || !(item.get("content") instanceof Map<?, ?> content)
+                    || !(content.get("closure") instanceof Map<?, ?> closure) || !(closure.get("manifest") instanceof Map<?, ?> m)
+                    || !(closure.get("files") instanceof Map<?, ?> files) || ApiContext.str(item, "id") == null) continue;
+            LinkedHashMap<String, byte[]> entries = new LinkedHashMap<>();
+            try {
+                files.forEach((name, v) -> entries.put(String.valueOf(name), decodeFile(String.valueOf(name), v)));
+            } catch (IllegalArgumentException undecodable) {
+                continue;   // the item fails on its own when it is written
+            }
+            PipelineBundleRoutes.judgeClosure(api, api.writeRoot(), cast(m), entries, ApiContext.str(item, "id"));
+        }
         if (!introduced.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bundle fails referential integrity — import would introduce: " + introduced);
 

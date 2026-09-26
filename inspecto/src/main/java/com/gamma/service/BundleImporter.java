@@ -1,7 +1,6 @@
 package com.gamma.service;
 
 import com.gamma.config.io.ConfigCodec;
-import com.gamma.util.AtomicFiles;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -195,18 +194,48 @@ public final class BundleImporter {
     public record Unpacked(List<String> paths) {}
 
     /**
-     * Write the bundle's config entries under {@code configDir}, verbatim, jailed against zip-slip (each
-     * resolved target must stay within {@code configDir}).
+     * Write the bundle's config entries under {@code configDir}, verbatim, jailed against zip-slip and judged by
+     * {@link ImportPaths} (segment rules, shape allowlist, {@link ReservedConfigPaths}, real path) — every entry
+     * BEFORE the first byte lands.
      */
     public static Unpacked writeConfig(Bundle bundle, Path configDir) throws IOException {
+        return writeConfig(bundle, configDir, true, new ImportJournal());
+    }
+
+    /**
+     * {@link #writeConfig(Bundle, Path)} with the import judge switchable. {@code refuseReserved=false} is for ONE
+     * caller: {@code SpaceManager.createFromBundle}, which seeds a brand-new Space (a whole-Space clone carries
+     * that Space's settings and role table), under its own {@code canAdminister} gate — there is no existing role
+     * table for it to overwrite, and it still gets the segment rules. Every write goes through {@code journal},
+     * so a caller whose later gate refuses the import can {@link ImportJournal#rollback} all of it; a failure
+     * during the writes themselves rolls back here.
+     */
+    public static Unpacked writeConfig(Bundle bundle, Path configDir, boolean refuseReserved, ImportJournal journal)
+            throws IOException {
         Path root = configDir.toAbsolutePath().normalize();
-        List<String> written = new ArrayList<>();
-        for (Map.Entry<String, byte[]> e : bundle.configEntries().entrySet()) {
-            Path target = root.resolve(e.getKey()).normalize();
+        // Every entry is judged BEFORE the first byte lands, so a refusal leaves nothing half-written.
+        // Backstop: the routes refuse these before calling (403); this refuses them for any other caller.
+        java.util.Set<String> referenced = ImportPaths.referencedEntries(bundle.configEntries());
+        for (String key : bundle.configEntries().keySet()) {
+            Path target = root.resolve(key).normalize();
             if (!target.startsWith(root))
-                throw new IllegalArgumentException("bundle entry escapes the config dir: " + e.getKey());
-            AtomicFiles.write(target, e.getValue(), ".import-");
-            written.add(root.relativize(target).toString().replace('\\', '/'));
+                throw new IllegalArgumentException("bundle entry escapes the config dir: " + key);
+            // judged as WRITTEN in the zip, not normalised: "registry/../roles.toon" and "roles.toon." are refused
+            // by their spelling before any filesystem gets to reinterpret them
+            String raw = key.replace('\\', '/');
+            String why = refuseReserved ? ImportPaths.refusal(root, raw, referenced) : ImportPaths.segmentRefusal(raw);
+            if (why != null) throw new IllegalArgumentException("bundle entry '" + key + "' may not be written: " + why);
+        }
+        List<String> written = new ArrayList<>();
+        try {
+            for (Map.Entry<String, byte[]> e : bundle.configEntries().entrySet()) {
+                Path target = root.resolve(e.getKey()).normalize();
+                journal.write(target, e.getValue(), ".import-");
+                written.add(root.relativize(target).toString().replace('\\', '/'));
+            }
+        } catch (IOException | RuntimeException failed) {
+            journal.rollback();
+            throw failed;
         }
         return new Unpacked(written);
     }

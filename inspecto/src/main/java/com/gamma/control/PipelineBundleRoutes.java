@@ -9,7 +9,6 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.DecodeProfile;
 import com.gamma.etl.PipelineConfig;
 import com.sun.net.httpserver.HttpExchange;
-import com.gamma.util.AtomicFiles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -266,6 +265,11 @@ final class PipelineBundleRoutes implements RouteModule {
             String expected = ApiContext.str(s, "sha256");
             if (expected != null && !expected.equals(sha256(bytes)))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "satellite '" + path + "' does not match its manifest sha256");
+            // SEC-IMPORT-ROLES-ESCALATION-1: the name as spelled, before any Path is built from it ("roles.toon "
+            // does not even parse as a Windows path, "roles.toon." parses and is the real file)
+            String badName = com.gamma.service.ImportPaths.segmentRefusal(path);
+            if (badName != null)
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "bundle entry '" + path + "' may not be written: " + badName);
         }
         Map<String, Object> sourceMap;
         try {
@@ -317,14 +321,17 @@ final class PipelineBundleRoutes implements RouteModule {
                         : writeRoot.resolve(newId).resolve(newId + "_pipeline.toon"),
                 "resolved path");
         Path destDir = target.getParent();
-        Set<String> satelliteNames = new java.util.LinkedHashSet<>();
-        for (Map<String, Object> s : satellites) {
-            String path = ApiContext.str(s, "path");
-            WriteGates.jail(destDir, destDir.resolve(path), "bundle entry '" + path + "'");
-            satelliteNames.add(path);
-        }
-        for (Object en : asStringList(manifest.get("enrichments")))
-            WriteGates.jail(destDir, destDir.resolve(String.valueOf(en)), "bundle entry '" + en + "'");
+        // SEC-IMPORT-ROLES-ESCALATION-1: an overwrite lands in the REGISTERED file's directory, which may be the
+        // config root itself — so every file this import writes is judged by ImportPaths before the first byte.
+        Set<String> satelliteNames = judgeSatellites(writeRoot, destDir, satellites, sourceMap, entries);
+        String targetRel = rel(writeRoot, target);
+        // The pipeline file itself: a fresh one is <id>/<id>_pipeline.toon and meets the whole judge; an overwrite
+        // lands on the file the SERVER registered, whose name need not fit the shape — but it may never be a
+        // reserved file or alias one.
+        String targetWhy = registered != null ? com.gamma.service.ImportPaths.reservedRefusal(writeRoot, targetRel)
+                : com.gamma.service.ImportPaths.refusal(writeRoot, targetRel);
+        if (targetWhy != null)
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "pipeline file '" + targetRel + "' may not be written: " + targetWhy);
 
         // Retarget INSIDE the pipeline body, then run the FULL saveGraph gate over the result.
         Map<String, Object> retargeted = retargetPipeline(sourceMap, sourceId, newId, dataPrefix(writeRoot),
@@ -332,50 +339,11 @@ final class PipelineBundleRoutes implements RouteModule {
         // D6: and inside its Decode Profile satellite (verified against the manifest above as shipped).
         rewriteProfile(retargeted, entries, satelliteNames);
 
-        // Satellites land FIRST (the client bundle's ordering rule — the pipeline never names a file
-        // that does not exist yet). They must also land BEFORE the safety gate: a config ref resolves
-        // config-relative only when the candidate EXISTS (resolveSchemaRef / ConfigSafetyValidator,
-        // both by design), so validating the rewritten bare basenames against an empty directory
-        // would false-422 every bundle. On an ERROR verdict the satellites are removed again, so a
-        // refused import still leaves nothing written.
-        boolean createdDir = !Files.isDirectory(destDir);
-        Files.createDirectories(destDir);
-        List<Path> satellitePaths = new ArrayList<>();
-        List<String> written = new ArrayList<>();
-        for (String s : satelliteNames) {
-            Path st = destDir.resolve(s).normalize();
-            AtomicFiles.write(st, entries.get(s), ".import-");
-            satellitePaths.add(st);
-            written.add(writeRoot.relativize(st).toString().replace('\\', '/'));
-        }
-
-        // The ONE content gate every save path runs (SaveGate). 🔴 Until G3 (2026-09-23) this was a
-        // hand-kept copy lacking the unknown-key census and both TypeFlow checks, so a bundle landed a
-        // config /config/write refuses. MAY_ARRIVE_LATER: a missing Connection is reported, not refused
-        // — a pipeline bundle never carries one (see classifyRequirements and SaveGate.Referents).
-        List<Finding> findings = new ArrayList<>(SaveGate.check(api, "pipeline", retargeted, writeRoot, destDir,
-                SaveGate.Referents.MAY_ARRIVE_LATER));
-        // Import-time referential integrity (W5): resolve the bundle's declared dependencies against
-        // THIS space now, instead of discovering them at the first poll. WARNING-level — see the helper.
-        List<Map<String, Object>> requirements = classifyRequirements(api, manifest, retargeted, findings);
-        if (SaveGate.refuses(findings)) {
-            for (Path st : satellitePaths) Files.deleteIfExists(st);
-            if (createdDir) {
-                try {
-                    Files.deleteIfExists(destDir);   // only when empty — never a recursive delete
-                } catch (IOException notEmpty) {
-                    // someone else's file appeared — leave the directory rather than risk their data
-                }
-            }
-            return new Imported(false, Map.of("written", false,
-                    "error", "config has ERROR-level findings; not written", "findings", findings));
-        }
-
-        // Companion enrichment(s): retargeted inside the body, written before the pipeline too.
-        List<String> notes = new ArrayList<>();
-        List<Path> enrichTargets = new ArrayList<>();
+        // Companion enrichment(s): parsed, retargeted, judged and conflict-checked BEFORE any write, so none of
+        // their refusals can land after the satellites did.
         Object sourceDb = sourceMap.get("dirs") instanceof Map<?, ?> d ? d.get("database") : null;
         Object targetDb = retargeted.get("dirs") instanceof Map<?, ?> d ? d.get("database") : null;
+        Map<Path, Map<String, Object>> companions = new LinkedHashMap<>();
         for (Object en : asStringList(manifest.get("enrichments"))) {
             byte[] bytes = entries.get(String.valueOf(en));
             if (bytes == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "manifest names companion '" + en
@@ -391,50 +359,158 @@ final class PipelineBundleRoutes implements RouteModule {
                     targetDb == null ? null : String.valueOf(targetDb));
             Path et = WriteGates.jail(destDir, destDir.resolve(
                     ConfigFileSupport.fileBase("enrichment", newName.toLowerCase()) + ".toon"), "enrichment name");
+            String etWhy = com.gamma.service.ImportPaths.refusal(writeRoot, rel(writeRoot, et));
+            if (etWhy != null)
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "companion '" + et.getFileName() + "' may not be written: " + etWhy);
             WriteGates.conflictIf(!"overwrite".equals(conflict) && Files.exists(et),
                     "companion file exists: " + et.getFileName());
-            AtomicFiles.write(et, ConfigCodec.toToon(enrich).getBytes(StandardCharsets.UTF_8), ".import-");
-            written.add(writeRoot.relativize(et).toString().replace('\\', '/'));
-            enrichTargets.add(et);
+            companions.put(et, enrich);
         }
 
-        AtomicFiles.write(target, ConfigCodec.toToon(retargeted).getBytes(StandardCharsets.UTF_8), ".import-");
-        written.add(writeRoot.relativize(target).toString().replace('\\', '/'));
-
-        // Make it live: register the (inactive) pipeline, then its companions — the same "a write
-        // registers, it does not merely persist" rule the metadata bundle's enrichment kind follows.
-        String registeredName;
+        // All-or-nothing: every write below goes through the journal, and every refusal after the first write
+        // (a SaveGate ERROR, a registration refusal, an I/O failure) restores the tree byte-for-byte.
+        com.gamma.service.ImportJournal journal = new com.gamma.service.ImportJournal();
+        boolean done = false;
+        boolean registeredHere = false;
         try {
-            registeredName = api.service().registerPipeline(target);
-        } catch (IllegalArgumentException invalid) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "imported pipeline did not register: " + invalid.getMessage());
-        } catch (IllegalStateException clash) {
-            throw new ApiException(409, ErrorCodes.CONFLICT, clash.getMessage());
-        }
-        for (Path et : enrichTargets) {
+            // Satellites land FIRST (the client bundle's ordering rule — the pipeline never names a file
+            // that does not exist yet). They must also land BEFORE the safety gate: a config ref resolves
+            // config-relative only when the candidate EXISTS (resolveSchemaRef / ConfigSafetyValidator,
+            // both by design), so validating the rewritten bare basenames against an empty directory
+            // would false-422 every bundle. On an ERROR verdict the journal restores what was there.
+            List<String> written = new ArrayList<>();
+            for (String s : satelliteNames) {
+                Path st = destDir.resolve(s).normalize();
+                journal.write(st, entries.get(s), ".import-");
+                written.add(rel(writeRoot, st));
+            }
+
+            // The ONE content gate every save path runs (SaveGate). 🔴 Until G3 (2026-09-23) this was a
+            // hand-kept copy lacking the unknown-key census and both TypeFlow checks, so a bundle landed a
+            // config /config/write refuses. MAY_ARRIVE_LATER: a missing Connection is reported, not refused
+            // — a pipeline bundle never carries one (see classifyRequirements and SaveGate.Referents).
+            List<Finding> findings = new ArrayList<>(SaveGate.check(api, "pipeline", retargeted, writeRoot, destDir,
+                    SaveGate.Referents.MAY_ARRIVE_LATER));
+            // Import-time referential integrity (W5): resolve the bundle's declared dependencies against
+            // THIS space now, instead of discovering them at the first poll. WARNING-level — see the helper.
+            List<Map<String, Object>> requirements = classifyRequirements(api, manifest, retargeted, findings);
+            if (SaveGate.refuses(findings)) {
+                journal.rollback();
+                done = true;
+                return new Imported(false, Map.of("written", false,
+                        "error", "config has ERROR-level findings; not written", "findings", findings));
+            }
+
+            // Companion enrichment(s): written before the pipeline too.
+            List<String> notes = new ArrayList<>();
+            for (Map.Entry<Path, Map<String, Object>> c : companions.entrySet()) {
+                journal.write(c.getKey(), ConfigCodec.toToon(c.getValue()).getBytes(StandardCharsets.UTF_8), ".import-");
+                written.add(rel(writeRoot, c.getKey()));
+            }
+
+            boolean wasRegistered = registered != null;
+            journal.write(target, ConfigCodec.toToon(retargeted).getBytes(StandardCharsets.UTF_8), ".import-");
+            written.add(targetRel);
+
+            // Make it live: register the (inactive) pipeline, then its companions — the same "a write
+            // registers, it does not merely persist" rule the metadata bundle's enrichment kind follows.
+            String registeredName;
             try {
-                api.service().registerEnrichment(EnrichmentConfig.load(et.toString()));
-            } catch (RuntimeException invalid) {
-                notes.add("companion " + et.getFileName() + " was written but did not register: "
-                        + invalid.getMessage());
+                registeredName = api.service().registerPipeline(target);
+                registeredHere = !wasRegistered;
+            } catch (IllegalArgumentException invalid) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "imported pipeline did not register: " + invalid.getMessage());
+            } catch (IllegalStateException clash) {
+                throw new ApiException(409, ErrorCodes.CONFLICT, clash.getMessage());
+            }
+            for (Path et : companions.keySet()) {
+                try {
+                    api.service().registerEnrichment(EnrichmentConfig.load(et.toString()));
+                } catch (RuntimeException invalid) {
+                    notes.add("companion " + et.getFileName() + " was written but did not register: "
+                            + invalid.getMessage());
+                }
+            }
+
+            // PIPELINE-CONFIG-HISTORY-1: only once the import has REGISTERED - a registration refusal above
+            // answers 422/409, and a refused save never gets a version.
+            PipelineHistory.record(writeRoot, target);
+            log.info("[PIPELINE-BUNDLE] imported '{}' as '{}' ({} file(s))", sourceId, newId, written.size());
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("written", true);
+            r.put("pipeline", registeredName);
+            r.put("path", targetRel);
+            r.put("files", written);
+            r.put("active", false);
+            if (renamedFrom != null) r.put("renamedFrom", renamedFrom);
+            if (!requirements.isEmpty()) r.put("requirements", requirements);
+            if (!notes.isEmpty()) r.put("notes", notes);
+            r.put("findings", findings);
+            done = true;
+            return new Imported(true, r);
+        } finally {
+            if (!done) {
+                if (registeredHere) api.service().unregisterPipeline(target);
+                journal.rollback();
+                api.service().refreshConfigs();
             }
         }
+    }
 
-        // PIPELINE-CONFIG-HISTORY-1: only once the import has REGISTERED - a registration refusal above
-        // answers 422/409, and a refused save never gets a version.
-        PipelineHistory.record(writeRoot, target);
-        log.info("[PIPELINE-BUNDLE] imported '{}' as '{}' ({} file(s))", sourceId, newId, written.size());
-        Map<String, Object> r = new LinkedHashMap<>();
-        r.put("written", true);
-        r.put("pipeline", registeredName);
-        r.put("path", writeRoot.relativize(target).toString().replace('\\', '/'));
-        r.put("files", written);
-        r.put("active", false);
-        if (renamedFrom != null) r.put("renamedFrom", renamedFrom);
-        if (!requirements.isEmpty()) r.put("requirements", requirements);
-        if (!notes.isEmpty()) r.put("notes", notes);
-        r.put("findings", findings);
-        return new Imported(true, r);
+    private static String rel(Path writeRoot, Path p) {
+        return writeRoot.relativize(p.normalize()).toString().replace('\\', '/');
+    }
+
+    /**
+     * Judge every manifest satellite as it would land in {@code destDir} — the WHOLE {@link
+     * com.gamma.service.ImportPaths} judge, the shape allowlist included (`SEC-IMPORT-ROLES-ESCALATION-1`: a
+     * satellite is not an exemption; before, every satellite counted as "referenced" and skipped the shape rule).
+     * A satellite the pipeline names through a REAL reference key may also be a grammar source or SQL. Returns
+     * the satellite names, in manifest order; throws 403 on the first refusal, before anything is written.
+     */
+    static Set<String> judgeSatellites(Path writeRoot, Path destDir, List<Map<String, Object>> satellites,
+                                       Map<String, Object> sourceMap, Map<String, byte[]> entries) {
+        Set<String> referenced = com.gamma.service.ImportPaths.referencedSatellites(sourceMap, entries);
+        Set<String> names = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> s : satellites) {
+            String path = ApiContext.str(s, "path");
+            // the manifest's own spelling first (a trailing dot survives nowhere past this), then where it lands
+            String why = com.gamma.service.ImportPaths.segmentRefusal(path);
+            if (why == null) {
+                WriteGates.jail(destDir, destDir.resolve(path), "bundle entry '" + path + "'");
+                String satRel = rel(writeRoot, destDir.resolve(path));
+                why = com.gamma.service.ImportPaths.refusal(writeRoot, satRel,
+                        referenced.contains(path) ? Set.of(satRel) : Set.of());
+            }
+            if (why != null)
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "bundle entry '" + path + "' may not be written: " + why);
+            names.add(path);
+        }
+        return names;
+    }
+
+    /**
+     * The import judge of a closure, run ALONE before a caller writes anything else — {@code /bundle/import}
+     * runs it over every {@code pipeline} item first, so a satellite no import may write refuses the whole
+     * bundle (403) instead of failing one item after the others were written. Mirrors {@link #importClosure}'s
+     * destination rule: the registered file's directory when {@code id} is registered, else {@code <root>/<id>/}.
+     */
+    static void judgeClosure(ApiContext api, Path writeRoot, Map<String, Object> manifest,
+                             Map<String, byte[]> entries, String id) {
+        String pipelineEntry = ApiContext.str(manifest, "pipeline_file");
+        byte[] pipelineBytes = pipelineEntry == null ? null : entries.get(pipelineEntry);
+        if (pipelineBytes == null) return;   // importClosure names what is wrong
+        Map<String, Object> sourceMap;
+        try {
+            sourceMap = ConfigCodec.toMap(new String(pipelineBytes, StandardCharsets.UTF_8));
+        } catch (RuntimeException bad) {
+            return;
+        }
+        String newId = WriteGates.safeName(String.valueOf(id).trim().toLowerCase(), "pipeline name");
+        Path registered = api.service().pathFor(newId).map(Path::normalize)
+                .filter(p -> p.startsWith(writeRoot)).orElse(null);
+        Path destDir = registered != null ? registered.getParent() : writeRoot.resolve(newId);
+        judgeSatellites(writeRoot, destDir, asMapList(manifest.get("satellites")), sourceMap, entries);
     }
 
     // ── retargeting (identity travels INSIDE each body) ───────────────────────────

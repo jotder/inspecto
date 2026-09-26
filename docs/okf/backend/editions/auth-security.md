@@ -585,3 +585,76 @@ removing `sealAllowing` turns it red.
 ⚠ `SqlSandbox.open` was not reused for the job: its interactive memory/timeout caps (`assist.sql.*`) do not
 fit a batch job. The two static helpers are the same statements `open`/`seal` now call, so there is still
 one definition of the lockdown.
+
+## No import may write an identity, access or settings file (`SEC-IMPORT-ROLES-ESCALATION-1`, 2026-09-26)
+
+**The escalation it closed.** `POST /import` (gated `canAuthorWorkbench` only) unpacked every zip entry under
+the Space config root (`DataSourceRoutes` → `BundleImporter.writeConfig`). A builder importing a `roles.toon`
+got 200, and `Roles.effective` then gave their `developer` role `canAdminister`. The sibling doors were
+`POST /pipelines/import?conflict=overwrite` (satellites land in the REGISTERED pipeline's directory, which
+may be the config root itself) and `POST /bundle/import` (`access-profile` / `access-catalog` items, and
+`pipeline` items whose closure carries satellites). Two more fixed-name loaders were reachable the same way:
+`demo-users.toon` (`inspecto-demo-auth` `DemoUsers.java:31`, read from every Space's config root, so a
+`roles: super` Demo User) and `agent/` (`AgentWriteRoot` → `agent/policy.json`, `agent/approvals.jsonl`).
+
+**One judge, four layers, every door** — `com.gamma.service.ImportPaths`, called by `/import` (all entries
+up front), `/pipelines/import` (every satellite, every companion, the pipeline file), `/bundle/import`
+(`PipelineBundleRoutes.judgeClosure` over every `pipeline` item BEFORE any item is written) and the
+`BundleImporter.writeConfig` backstop:
+
+1. **Segment rules**, on every platform: each segment matches `[A-Za-z0-9][A-Za-z0-9._-]*`, never ends in
+   `.`, never contains `..`, is never a Windows device name (`CON`, `NUL`, `AUX`, `PRN`, `COM1-9`,
+   `LPT1-9`, with or without an extension). So no `~` (8.3 short names like `ROLES~1.TOO`, `PENDIN~1`),
+   `:`, space, control character or leading dot. The manifest's own spelling is judged before any `Path`
+   is built from it (`roles.toon ` does not even parse as a Windows path).
+2. **A shape allowlist**: a `.toon` / `.csv` config; at the config ROOT only `_pipeline.toon`,
+   `_enrich.toon`, `_schema.toon`, `_job.toon`, `_connection.toon`, `_mapping.csv`, `_structure.csv`,
+   `.grammar.toon`, `_grammar.toon`, `_profile.toon`; under `registry/` exactly `registry/<kind dir>/<name>`
+   for an importable kind (never the access config). A file a carried config names through a **real
+   reference key** may also sit at the root under its own name and may be `.asn` / `.asn1` / `.sql` —
+   that is all a reference buys. The real keys (`ImportPaths.referenceValues`) are the loader's own:
+   `processing.schema_file`, `schemas[].schema_file`, `parsing.grammar` / `processing.grammar`,
+   `processing.mapping_file`, the `segments` values, `ingester_config.grammar`,
+   `parsing.asn1|plugin.grammar_file` / `grammar` / `profile_file` and, inside a Decode Profile,
+   `asn1.grammar_file` / `asn1.segments`; for an Enrichment, `transform_file`. ⚠ Before this, ANY string
+   of a carried pipeline counted, so `notes.r0: "demo-users.toon"` wrote the Demo User table; and every
+   `/pipelines/import` satellite counted as referenced.
+3. **The denylist** `ReservedConfigPaths`: `roles.toon`, `demo-users.toon`, `access-policies.toon`,
+   `approval.toon`, `offers.toon`, `grants.toon`, every settings document (`branding`, `geo`,
+   `link-analysis`, `pipeline-history`, `icon-map`, `scheduler`, `nav-menus`, `notification-preferences`,
+   `partition`, `space`), `rename.journal`, `dataset-publications.tsv`; the directories `pending-changes/`,
+   `recon-state/`, `.history/` (anywhere), `audit/`, `agent/`, `expectation-baselines/`,
+   `registry/access-catalog/`, `registry/access-profiles/`. `approval.toon` and `pending-changes/` are
+   reserved as plain paths ahead of maker-checker, which is not on `master`.
+4. **A real-path check**: the nearest existing parent is resolved with `toRealPath` and compared against
+   every reserved file and directory (`isSameFile` / real-path prefix), failing closed on any I/O error.
+
+⚠ For a DIRECTORY alias on a Space where the directory does not exist yet (`audit./x.toon`,
+`pending-changes./x.toon`), the trailing-dot rule is the only layer that fires: the string is not
+`audit/`, and the real path has nothing to compare against. `ImportPathsTest` pins that the refusal comes
+from that rule.
+
+**All-or-nothing.** Every write goes through `ImportJournal`, which records each target's prior bytes (or
+its absence) and the directories it creates. `/import` runs every refusal it can before the first write
+(the judge, the id conflict, and a pipeline id registered from a different file); a later refusal (the
+integrity gate's 422, a registration's 422/409) unregisters what the import registered, restores the
+connections it replaced, rolls the tree back byte for byte, and re-reads the configs. `/pipelines/import`
+parses, judges and conflict-checks its companions before writing anything, and a SaveGate ERROR now restores
+an overwritten satellite (the old cleanup deleted every satellite, pre-existing ones included).
+
+**The loader guard.** `ImportLoaderInventoryTest` scans every reactor module's `src/main/java` for fixed
+names: literal `.resolve("a").resolve("b")` chains, `AgentWriteRoot.resolve("x")` (as `agent/x`), and any
+string literal naming a `.toon` / `.json` / `.jsonl` / `.tsv` / `.journal` / `.key` file. Each must be
+reserved, be a name the segment rules refuse (a suffix literal), or sit on its `ALLOWED` table with a written
+reason. Un-reserving `demo-users.toon` or `agent/` turns it red.
+
+**Still open, deliberately.** Connections and Jobs stay importable at `canAuthorWorkbench`, although
+`/connections` asks `canOnboardConnections`. That capability gate is a separate P3 row,
+`IMPORT-CONNECTION-JOB-GATE-1` (filed on the maker-checker branch, not yet on `master`).
+Suffix-discovered configs (`*_tagrule.toon`, `*_caserule.toon`, `*_workflow.toon`, `*_rca.toon`,
+`*_meta.toon`, `*_job_template.toon`) are not fixed names and stay importable in a subdirectory.
+`SpaceManager.createFromBundle` (a new Space, `canAdminister`) keeps only the segment rules.
+
+Tests: `ControlApiImportReservedPathsTest` (real HTTP, armed Subject; every alias at all three doors on a
+Space with and without a `roles.toon`, 403 and a byte-identical config tree), `ImportPathsTest`,
+`ImportLoaderInventoryTest`.

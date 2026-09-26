@@ -15,6 +15,7 @@ import com.gamma.service.BundleExporter;
 import com.gamma.service.BundleImporter;
 import com.gamma.service.DataSourceBundle;
 import com.gamma.service.DataSourceBundleResolver;
+import com.gamma.service.ImportJournal;
 import com.gamma.service.PipelineView;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -226,6 +227,14 @@ final class DataSourceRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
         }
+        // SEC-IMPORT-ROLES-ESCALATION-1: an import may never write the files a narrower gate owns — the role
+        // table, the Demo User table, the access config, the assist agent's policy, the settings documents.
+        // Before this, a zip carrying roles.toon rewrote the role table with only canAuthorWorkbench. Judged by
+        // ImportPaths — segment rules + a shape ALLOWLIST + ReservedConfigPaths + the real path — every entry
+        // before anything is written (Windows aliases like "roles.toon." / "PENDIN~1/…" walk around a string list).
+        List<String> refused = com.gamma.service.ImportPaths.refusals(config, bundle.configEntries());
+        if (!refused.isEmpty())
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "an import may not write " + refused);
 
         // Conflict = a bundle pipeline id that already exists in this space's registry.
         Set<String> existing = api.service().pipelines().stream()
@@ -251,49 +260,109 @@ final class DataSourceRoutes implements RouteModule {
                 bundle, api.service().connections().keySet());
         bundle = missing.bundle();
 
-        BundleImporter.Unpacked unpacked;
-        try {
-            unpacked = BundleImporter.writeConfig(bundle, config);
-        } catch (IllegalArgumentException jail) {
-            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, jail.getMessage());
-        }
-        List<String> written = unpacked.paths();
-
-        // Referential integrity BEFORE anything goes live: a bundle whose pipeline names a schema file nobody
-        // has (or one escaping the allowed roots) is rejected as a whole, listing every problem at once. Without
-        // this the registration loop below discovered the same breakage one file at a time and threw mid-walk,
-        // leaving some pipelines live and the rest not — and it could only ever report the first fault.
-        Map<String, List<Finding>> broken = referentialFindings(config, written);
-        if (!broken.isEmpty())
-            return ApiContext.respondJson(e, 422, Map.of(
-                    "error", "bundle references things this space does not have; nothing was registered",
-                    "findings", broken));
-
-        List<String> pipelines = new ArrayList<>();
-        // Connections FIRST, in two passes. Registration used to follow `written` (i.e. manifest) order, so a
-        // pipeline could register before the connection it binds — a 422 that says "unknown connection" about
-        // a connection sitting in the very same bundle, decided by zip entry order.
-        for (String rel : written) {
-            if (rel.endsWith("_connection.toon"))
-                api.service().registerConnection(ConnectionProfile.load(config.resolve(rel)));
-        }
-        for (String rel : written) {
-            if (!rel.endsWith("_pipeline.toon")) continue;
+        // The registration pre-check that CAN run before a write: a bundle pipeline whose id is registered from a
+        // DIFFERENT file would 409 in registerPipeline after the whole bundle had landed.
+        for (Map.Entry<String, byte[]> en : bundle.configEntries().entrySet()) {
+            if (!en.getKey().endsWith("_pipeline.toon")) continue;
+            Object name;
             try {
-                pipelines.add(api.service().registerPipeline(config.resolve(rel)));
-            } catch (IllegalArgumentException invalid) {
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "invalid pipeline " + rel + ": " + invalid.getMessage());
-            } catch (IllegalStateException clash) {
-                throw new ApiException(409, ErrorCodes.CONFLICT, clash.getMessage());
+                name = ConfigCodec.toMap(new String(en.getValue(), StandardCharsets.UTF_8)).get("name");
+            } catch (RuntimeException unparseable) {
+                continue;   // registration names what is wrong — and the journal undoes the write
             }
+            if (name == null) continue;
+            Path lands = config.resolve(en.getKey()).toAbsolutePath().normalize();
+            api.service().pathFor(name.toString().toLowerCase()).map(p -> p.toAbsolutePath().normalize())
+                    .filter(p -> !p.equals(lands)).ifPresent(p -> {
+                        throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline id '" + name
+                                + "' is already registered from " + p + "; nothing was written");
+                    });
         }
 
+        // All-or-nothing: every write goes through the journal, and every refusal below — a 422 on a reference, a
+        // registration that fails — puts the tree back byte-for-byte and forgets what this import registered.
+        ImportJournal journal = new ImportJournal();
+        List<Path> registeredHere = new ArrayList<>();
+        Map<String, java.util.Optional<ConnectionProfile>> connectionsBefore = new LinkedHashMap<>();
+        boolean done = false;
+        try {
+            BundleImporter.Unpacked unpacked;
+            try {
+                unpacked = BundleImporter.writeConfig(bundle, config, true, journal);
+            } catch (IllegalArgumentException jail) {
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, jail.getMessage());
+            }
+            List<String> written = unpacked.paths();
+
+            // Referential integrity BEFORE anything goes live: a bundle whose pipeline names a schema file nobody
+            // has (or one escaping the allowed roots) is rejected as a whole, listing every problem at once. Without
+            // this the registration loop below discovered the same breakage one file at a time and threw mid-walk,
+            // leaving some pipelines live and the rest not — and it could only ever report the first fault.
+            Map<String, List<Finding>> broken = referentialFindings(config, written);
+            if (!broken.isEmpty()) {
+                undo(api, journal, registeredHere, connectionsBefore);   // before the response: the tree is whole
+                done = true;
+                return ApiContext.respondJson(e, 422, Map.of(
+                        "error", "bundle references things this space does not have; nothing was registered",
+                        "findings", broken));
+            }
+
+            List<String> pipelines = new ArrayList<>();
+            // Connections FIRST, in two passes. Registration used to follow `written` (i.e. manifest) order, so a
+            // pipeline could register before the connection it binds — a 422 that says "unknown connection" about
+            // a connection sitting in the very same bundle, decided by zip entry order.
+            for (String rel : written) {
+                if (!rel.endsWith("_connection.toon")) continue;
+                ConnectionProfile profile = ConnectionProfile.load(config.resolve(rel));
+                connectionsBefore.putIfAbsent(profile.id(), api.service().connection(profile.id()));
+                api.service().registerConnection(profile);
+            }
+            Set<Path> registeredBefore = api.service().pipelines().stream()
+                    .flatMap(v -> api.service().pathFor(v.name()).stream())
+                    .map(p -> p.toAbsolutePath().normalize()).collect(Collectors.toSet());
+            for (String rel : written) {
+                if (!rel.endsWith("_pipeline.toon")) continue;
+                Path file = config.resolve(rel).toAbsolutePath().normalize();
+                try {
+                    pipelines.add(api.service().registerPipeline(file));
+                    if (!registeredBefore.contains(file)) registeredHere.add(file);
+                } catch (IllegalArgumentException invalid) {
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "invalid pipeline " + rel + ": " + invalid.getMessage());
+                } catch (IllegalStateException clash) {
+                    throw new ApiException(409, ErrorCodes.CONFLICT, clash.getMessage());
+                }
+            }
+            done = true;
+            return importedBody(bundle, written, pipelines, referencesKept, overwrite && !conflicts.isEmpty(), missing);
+        } finally {
+            if (!done) undo(api, journal, registeredHere, connectionsBefore);
+        }
+    }
+
+    /**
+     * Undo a refused import: unregister the pipelines it registered, put back the connections it replaced, restore
+     * every file it wrote ({@link ImportJournal#rollback}) and re-read the registered configs from the restored tree.
+     */
+    private static void undo(ApiContext api, ImportJournal journal, List<Path> registeredHere,
+                             Map<String, java.util.Optional<ConnectionProfile>> connectionsBefore) throws IOException {
+        for (Path p : registeredHere) api.service().unregisterPipeline(p);
+        connectionsBefore.forEach((id, before) -> {
+            if (before.isPresent()) api.service().registerConnection(before.get());
+            else api.service().unregisterConnection(id);
+        });
+        journal.rollback();
+        api.service().refreshConfigs();
+    }
+
+    private static Map<String, Object> importedBody(BundleImporter.Bundle bundle, List<String> written,
+                                                    List<String> pipelines, List<String> referencesKept,
+                                                    boolean overwritten, BundleImporter.MissingConnections missing) {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("kind", bundle.kind());
         body.put("imported", written);
         body.put("pipelines", pipelines);
         body.put("referencesKept", referencesKept);
-        body.put("overwritten", overwrite && !conflicts.isEmpty());
+        body.put("overwritten", overwritten);
         body.put("connectionWarnings", missing.warnings());
         return body;
     }

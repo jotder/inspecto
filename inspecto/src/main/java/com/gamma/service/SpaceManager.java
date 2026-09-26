@@ -347,7 +347,7 @@ public final class SpaceManager implements AutoCloseable {
             if (Files.exists(base))
                 throw new IllegalStateException("Space directory already exists: " + base);
             for (String sub : SPACE_SUBDIRS) Files.createDirectories(base.resolve(sub));
-            BundleImporter.writeConfig(bundle, base.resolve("config"));
+            BundleImporter.writeConfig(bundle, base.resolve("config"), false, new ImportJournal());   // a NEW Space: nothing to overwrite
             Path manifest = base.resolve("space.toon");
             if (bundle.spaceToon() != null) Files.write(manifest, bundle.spaceToon());
             else new SpaceContext.SpaceManifest(id.value(), "", Instant.now().toString()).write(manifest);
