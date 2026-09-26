@@ -610,9 +610,19 @@ up front), `/pipelines/import` (every satellite, every companion, the pipeline f
 2. **A shape allowlist**: a `.toon` / `.csv` config; at the config ROOT only `_pipeline.toon`,
    `_enrich.toon`, `_schema.toon`, `_job.toon`, `_connection.toon`, `_mapping.csv`, `_structure.csv`,
    `.grammar.toon`, `_grammar.toon`, `_profile.toon`; under `registry/` exactly `registry/<kind dir>/<name>`
-   for an importable kind (never the access config). A file a carried config names through a **real
-   reference key** may also sit at the root under its own name and may be `.asn` / `.asn1` / `.sql` —
-   that is all a reference buys. The real keys (`ImportPaths.referenceValues`) are the loader's own:
+   for an importable kind (never the access config); in any OTHER subdirectory the same data-source
+   suffixes plus `_view.toon` (`ImportPaths.SUBDIR_SUFFIXES`), and never a reserved root-level name one
+   directory down (a `roles.toon` in any subfolder; `registry/` excepted, where a name is a component id). A file a carried
+   config names through a **real reference key** may also carry any plain name at the root or in a
+   subdirectory and may be `.asn` / `.asn1` / `.sql` — that is all a reference buys. ⛔ **No
+   suffix-scanned ops or semantic config, anywhere, referenced or not** (`ImportPaths.REFUSED_SUFFIXES`,
+   `SEC-IMPORT-OPS-CONFIGS-1`, 2026-09-26): `*_workflow.toon`, `*_caserule.toon`, `*_tagrule.toon`,
+   `*_tag.toon` (`OpsEngineProvider.loadConfigs`), `*_meta.toon`, `*_rca.toon`, `*_job_template.toon`
+   (`ServiceBootstrap.buildFrom`), and the loader-less `*_escalation.toon` / `*_queue.toon`. The boot scans
+   (`ServiceBootstrap.resolveBySuffix`, a recursive `Files.walk`) read them from ANY depth, so a directory is
+   no containment: an `incident_workflow.toon` in a zip subfolder returned 200 and the last workflow per object type wins,
+   which replaced the Incident lifecycle the Disposition gate is keyed on. None travels in a data-source or
+   Pipeline bundle; each has its own validated route (`POST /cases/rules`, `/tags*`). The real keys (`ImportPaths.referenceValues`) are the loader's own:
    `processing.schema_file`, `schemas[].schema_file`, `parsing.grammar` / `processing.grammar`,
    `processing.mapping_file`, the `segments` values, `ingester_config.grammar`,
    `parsing.asn1|plugin.grammar_file` / `grammar` / `profile_file` and, inside a Decode Profile,
@@ -646,15 +656,19 @@ an overwritten satellite (the old cleanup deleted every satellite, pre-existing 
 names: literal `.resolve("a").resolve("b")` chains, `AgentWriteRoot.resolve("x")` (as `agent/x`), and any
 string literal naming a `.toon` / `.json` / `.jsonl` / `.tsv` / `.journal` / `.key` file. Each must be
 reserved, be a name the segment rules refuse (a suffix literal), or sit on its `ALLOWED` table with a written
-reason. Un-reserving `demo-users.toon` or `agent/` turns it red.
+reason. Un-reserving `demo-users.toon` or `agent/` turns it red. Its SUFFIX half scans for every suffix
+literal (`"_x.toon"`, `".grammar.toon"`, `"_x.csv"`): each must be refused by `ImportPaths` at the root, in a
+subdirectory and under `registry/`, referenced or not, or sit on `SUFFIX_ALLOWED` (the data-source shapes, and
+the data-dir output sidecars) with a reason. Un-refusing `_workflow.toon` turns it red.
 
 **Still open, deliberately.** Connections and Jobs stay importable at `canAuthorWorkbench`, although
 `/connections` asks `canOnboardConnections`. That capability gate is a separate P3 row,
 `IMPORT-CONNECTION-JOB-GATE-1` (filed on the maker-checker branch, not yet on `master`).
-Suffix-discovered configs (`*_tagrule.toon`, `*_caserule.toon`, `*_workflow.toon`, `*_rca.toon`,
-`*_meta.toon`, `*_job_template.toon`) are not fixed names and stay importable in a subdirectory.
 `SpaceManager.createFromBundle` (a new Space, `canAdminister`) keeps only the segment rules.
 
 Tests: `ControlApiImportReservedPathsTest` (real HTTP, armed Subject; every alias at all three doors on a
-Space with and without a `roles.toon`, 403 and a byte-identical config tree), `ImportPathsTest`,
-`ImportLoaderInventoryTest`.
+Space with and without a `roles.toon`, 403 and a byte-identical config tree; and every ops suffix in a
+subdirectory, under `registry/`, at the root and through a real reference key, at `/import`, as a
+`/pipelines/import` satellite and a `/bundle/import` closure file), `ImportPathsTest`,
+`ImportLoaderInventoryTest`. The Incident gate's own half (a workflow with a `CLOSED` terminal state) is in
+the incidents concept, [`incidents.md`](../../capabilities/incidents/incidents.md).

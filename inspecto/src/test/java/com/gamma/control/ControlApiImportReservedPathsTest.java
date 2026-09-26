@@ -289,6 +289,83 @@ class ControlApiImportReservedPathsTest {
         return proc;
     }
 
+    // ── SEC-IMPORT-OPS-CONFIGS-1: the suffix-scanned ops and semantic configs ──────────────────────
+
+    /** Every suffix the boot scans load from ANYWHERE under config/ — written only through their own routes. */
+    static final List<String> OPS_SUFFIXES = List.of("_workflow.toon", "_caserule.toon", "_tagrule.toon", "_tag.toon",
+            "_meta.toon", "_rca.toon", "_job_template.toon", "_escalation.toon", "_queue.toon");
+
+    /** The verified exploit: an INCIDENT lifecycle whose terminal state is CLOSED — one move, no Disposition. */
+    private static final String CLOSING_WORKFLOW = """
+            workflow:
+              object_type: INCIDENT
+              initial: IDENTIFIED
+              terminal[1]: CLOSED
+              transitions[1]{from,to,action}:
+                IDENTIFIED,CLOSED,close
+            """;
+
+    /**
+     * An {@code ops/incident_workflow.toon} returned 200 at {@code /import}, and the next Space start let the last
+     * workflow per object type win. Each suffix, in a subdirectory, under registry/, at the root, and NAMED by a
+     * real reference key, at every door: 403 and the tree unchanged.
+     */
+    @Test
+    void everyDoorRefusesEverySuffixScannedOpsConfigAnywhere(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, true)) {
+            Map<String, Object> base = ConfigCodec.toMap(Files.readString(c.config.resolve("etl_pipeline.toon")));
+            for (String suffix : OPS_SUFFIXES) {
+                String body = "_workflow.toon".equals(suffix) ? CLOSING_WORKFLOW : "x: 1\n";
+                byte[] bytes = body.getBytes(StandardCharsets.UTF_8);
+                for (String at : List.of("ops/incident" + suffix, "a/b/incident" + suffix, "jobs/incident" + suffix,
+                        "registry/datasets/incident" + suffix, "incident" + suffix)) {
+                    refused(c, "/import", "/import", dataSourceZip(Map.of(at, body)), at);
+                    refused(c, "/import", "/import?on_conflict=overwrite", dataSourceZip(Map.of(at, body)), at + " overwrite");
+                }
+                // named through a REAL reference key: a reference widens nothing for these
+                Map<String, Object> evil = new LinkedHashMap<>(base);
+                evil.put("name", "evil_etl");
+                processing(evil).put("schema_file", "incident" + suffix);
+                refused(c, "/import", "/import", dataSourceZip(Map.of("evil/evil_pipeline.toon", ConfigCodec.toToon(evil),
+                        "evil/incident" + suffix, body)), "a referenced evil/incident" + suffix);
+
+                // the Pipeline door, as a satellite: lands beside the pipeline (the root on this overwrite) — referenced
+                LinkedHashMap<String, byte[]> referenced = withSatellite(c, "incident" + suffix, bytes,
+                        p -> processing(p).put("schema_file", "incident" + suffix));
+                refused(c, "/pipelines/import", "/pipelines/import?name=test_etl&conflict=overwrite", zip(referenced),
+                        "a referenced satellite incident" + suffix);
+                // ...and unreferenced into a fresh Pipeline's own directory (<root>/copy_etl/), where any name passed before
+                LinkedHashMap<String, byte[]> fresh = withSatellite(c, "incident" + suffix, bytes, p -> {});
+                refused(c, "/pipelines/import", "/pipelines/import?name=copy_etl", zip(fresh),
+                        "a satellite incident" + suffix + " in a fresh Pipeline directory");
+                refused(c, "/bundle/import", "/bundle/import", metadataBundle(referenced), "a referenced closure file incident" + suffix);
+                refused(c, "/bundle/import", "/bundle/import", metadataBundle(fresh), "a closure file incident" + suffix);
+            }
+            try (Stream<Path> all = Files.walk(c.config)) {
+                assertTrue(all.noneMatch(f -> f.getFileName().toString().endsWith("_workflow.toon")), "no workflow landed");
+            }
+        }
+    }
+
+    /** A reserved root-level name one directory down is nobody's legitimate file (defence against a later suffix loader). */
+    @Test
+    void aReservedRootNameIsRefusedInAnySubdirectory(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, true)) {
+            String roles = escalatingRoles(root.resolve("scratch"));
+            Map<String, Object> base = ConfigCodec.toMap(Files.readString(c.config.resolve("etl_pipeline.toon")));
+            for (String name : List.of("roles.toon", "demo-users.toon", "branding.toon")) {
+                refused(c, "/import", "/import", dataSourceZip(Map.of("ops/" + name, roles)), "ops/" + name);
+                // NAMED by a real reference key — the shape rule would admit it, so only the reserved-name rule refuses
+                Map<String, Object> evil = new LinkedHashMap<>(base);
+                evil.put("name", "evil_etl");
+                processing(evil).put("schema_file", name);
+                refused(c, "/import", "/import", dataSourceZip(Map.of("evil/evil_pipeline.toon", ConfigCodec.toToon(evil),
+                        "evil/" + name, roles)), "a referenced evil/" + name);
+            }
+            assertNoEscalation(c);
+        }
+    }
+
     // ── what still imports ───────────────────────────────────────────────────────────────────────
 
     private static final String SCHEMA = """

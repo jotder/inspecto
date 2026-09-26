@@ -139,6 +139,53 @@ class ObjectServiceTest {
         assertEquals("RESOLVED", svc.transitionTo(o.id(), "RESOLVED", "alice", "RECOVERED").status());
     }
 
+    /**
+     * SEC-IMPORT-OPS-CONFIGS-1 (defence in depth): the resolution gate is keyed on what DECIDES an Incident, not on
+     * the literal RESOLVED — a replaced workflow whose terminal state is CLOSED cannot finish an Incident without a
+     * Disposition or a postmortem. The default lifecycle's ARCHIVED (the mail Trash, reachable from anywhere) stays
+     * the one ungated terminal move, so a custom workflow buys nothing the default does not already allow.
+     */
+    @Test
+    void aCustomTerminalStateCannotFinishAnIncidentWithoutTheResolutionGate() {
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        svc.registerWorkflow(new com.gamma.ops.workflow.Workflow(ObjectType.INCIDENT, "IDENTIFIED",
+                java.util.Set.of(new com.gamma.ops.workflow.Workflow.Transition("IDENTIFIED", "CLOSED", "close"),
+                        new com.gamma.ops.workflow.Workflow.Transition("CLOSED", "IDENTIFIED", "reopen")),
+                java.util.Set.of("CLOSED")));
+        Map<String, String> noDisposition = new java.util.HashMap<>(completePostmortemAttrs(System.currentTimeMillis() + 60_000));
+        noDisposition.remove(ObjectService.ATTR_DISPOSITION);
+        OperationalObject o = svc.open(ObjectType.INCIDENT, "late feed", "d", "HIGH", "MAJOR", null, null, "c", noDisposition);
+
+        IllegalStateException missing = assertThrows(IllegalStateException.class,
+                () -> svc.transition(o.id(), "close", "mallory"));
+        assertTrue(missing.getMessage().contains("disposition"), missing.getMessage());
+        assertThrows(IllegalStateException.class, () -> svc.transitionTo(o.id(), "CLOSED", "mallory"), "the generic move too");
+        assertEquals("IDENTIFIED", svc.get(o.id()).orElseThrow().status(), "a refused close writes nothing");
+
+        OperationalObject bare = svc.open(ObjectType.INCIDENT, "no postmortem", "d", "HIGH", "MAJOR", null, null, "c", Map.of());
+        IllegalStateException gaps = assertThrows(IllegalStateException.class,
+                () -> svc.transition(bare.id(), "close", "mallory", "CONFIRMED"));
+        assertTrue(gaps.getMessage().contains("timeline") && gaps.getMessage().contains("SLA"), gaps.getMessage());
+
+        OperationalObject closed = svc.transition(o.id(), "close", "alice", "CONFIRMED");
+        assertEquals("CLOSED", closed.status());
+        assertTrue(closed.isClosed());
+        assertEquals("CONFIRMED", closed.attributes().get(ObjectService.ATTR_DISPOSITION));
+        // leaving the custom terminal state un-decides the outcome, as a reopen from RESOLVED does
+        assertEquals("", svc.transition(o.id(), "reopen", "alice").attributes().get(ObjectService.ATTR_DISPOSITION));
+    }
+
+    /** ...and the default lifecycle is unchanged: archive-from-anywhere records no outcome and is not gated. */
+    @Test
+    void archivingAnUndecidedIncidentStaysUngated() {
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        OperationalObject o = svc.open(ObjectType.INCIDENT, "noise", "d", "HIGH", "MAJOR", null, null, "c", Map.of());
+        assertEquals("ARCHIVED", svc.transition(o.id(), "archive", "alice").status());
+        assertThrows(IllegalArgumentException.class, () -> svc.transition(
+                svc.open(ObjectType.INCIDENT, "n2", "d", "HIGH", "MAJOR", null, null, "c", Map.of()).id(),
+                "archive", "alice", "CONFIRMED"), "a Disposition still rides only a deciding move");
+    }
+
     /** A Disposition rides only an Incident's resolve: a Case keeps its Disposition in its Findings. */
     @Test
     void aDispositionIsRefusedOnAnyOtherMove() {

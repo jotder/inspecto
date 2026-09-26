@@ -151,6 +151,88 @@ class ImportLoaderInventoryTest {
                 + "ReservedConfigPaths, or add a reason to ALLOWED: " + open);
     }
 
+    // ── SUFFIX scans (SEC-IMPORT-OPS-CONFIGS-1) ────────────────────────────────────────────────────
+
+    /** A suffix literal ({@code "_workflow.toon"}, {@code ".grammar.toon"}) anywhere in main code. */
+    private static final Pattern SUFFIX = Pattern.compile("\"([._][A-Za-z0-9_]+\\.(?:toon|csv))\"");
+
+    private static final String DATA_SHAPE = "a data-source shape an import is MEANT to carry (ImportPaths.ROOT_SUFFIXES "
+            + "/ SUBDIR_SUFFIXES) — Pipelines, Enrichments, Schemas, Jobs, Connections, Mappings, Structures, "
+            + "Grammars, Decode Profiles, Views, all written at the same canAuthorWorkbench gate";
+    private static final String OUTPUT = "an output sidecar the engine writes under the DATA dir (errors, status, "
+            + "measures, enrichment runs/lineage) — no loader reads it from a config root";
+
+    /**
+     * Suffixes an import may land, each with why. Every other suffix literal in main code must be refused by
+     * {@link ImportPaths} EVERYWHERE — at the root even when referenced, in a subdirectory even when referenced,
+     * and under {@code registry/} — because the boot-time scans ({@code ServiceBootstrap.resolveBySuffix},
+     * {@code OpsEngineProvider.loadConfigs}) walk the WHOLE config tree: a directory is no containment.
+     */
+    static final Map<String, String> SUFFIX_ALLOWED = new TreeMap<>();
+
+    static {
+        for (String s : List.of("_pipeline.toon", "_enrich.toon", "_schema.toon", "_job.toon", "_connection.toon",
+                "_mapping.csv", "_structure.csv", ".grammar.toon", "_grammar.toon", "_profile.toon", "_view.toon"))
+            SUFFIX_ALLOWED.put(s, DATA_SHAPE);
+        for (String s : List.of("_errors.csv", "_status.csv", "_measures.csv", "_enrich_runs.csv", "_enrich_lineage.csv"))
+            SUFFIX_ALLOWED.put(s, OUTPUT);
+    }
+
+    private static Map<String, List<String>> suffixScan() throws IOException {
+        Map<String, List<String>> where = new TreeMap<>();
+        Path reactor = Path.of("..").toAbsolutePath().normalize();
+        try (Stream<Path> siblings = Files.list(reactor)) {
+            for (Path sibling : siblings.filter(Files::isDirectory).sorted().toList()) {
+                Path src = sibling.resolve(Path.of("src", "main", "java"));
+                if (!Files.isDirectory(src)) continue;
+                try (Stream<Path> files = Files.walk(src)) {
+                    for (Path f : files.filter(p -> p.toString().endsWith(".java")).sorted().toList()) {
+                        Matcher m = SUFFIX.matcher(Files.readString(f));
+                        String at = reactor.relativize(f).toString().replace('\\', '/');
+                        while (m.find()) where.computeIfAbsent(m.group(1), k -> new ArrayList<>()).add(at);
+                    }
+                }
+            }
+        }
+        return where;
+    }
+
+    /** Whether no import can land a {@code *<suffix>} file anywhere, referenced or not. */
+    private static boolean refusedEverywhere(String suffix) {
+        String name = "x" + suffix;
+        return ImportPaths.shapeRefusal(name, true) != null
+                && ImportPaths.shapeRefusal("orders/" + name, true) != null
+                && ImportPaths.shapeRefusal("registry/datasets/" + name, false) != null;
+    }
+
+    @Test
+    void everySuffixALoaderScansForIsRefusedEverywhereOrAllowedWithAReason() throws IOException {
+        Map<String, List<String>> found = suffixScan();
+        for (String must : List.of("_workflow.toon", "_caserule.toon", "_tagrule.toon", "_tag.toon", "_meta.toon",
+                "_rca.toon", "_job_template.toon", "_pipeline.toon"))
+            assertTrue(found.containsKey(must), "the suffix scan went blind — it must at least see " + must + ": " + found.keySet());
+        Map<String, List<String>> open = new TreeMap<>();
+        for (var e : found.entrySet())
+            if (!SUFFIX_ALLOWED.containsKey(e.getKey()) && !refusedEverywhere(e.getKey())) open.put(e.getKey(), e.getValue());
+        assertTrue(open.isEmpty(), () -> "suffixes a loader scans for that an import could plant — refuse them in "
+                + "ImportPaths.REFUSED_SUFFIXES, or add a reason to SUFFIX_ALLOWED: " + open);
+    }
+
+    @Test
+    void theSuffixAllowListHasNoStaleOrDoubleRows() throws IOException {
+        Map<String, List<String>> found = suffixScan();
+        Set<String> stale = new LinkedHashSet<>(SUFFIX_ALLOWED.keySet());
+        stale.removeAll(found.keySet());
+        assertTrue(stale.isEmpty(), () -> "SUFFIX_ALLOWED rows no code names any more: " + stale);
+        Set<String> both = new LinkedHashSet<>();
+        for (String s : SUFFIX_ALLOWED.keySet()) if (refusedEverywhere(s)) both.add(s);
+        assertTrue(both.isEmpty(), () -> "refused AND allowed — drop the allow row: " + both);
+        // an allowed DATA shape must really be importable where a bundle puts it (else the row is a lie)
+        for (String s : SUFFIX_ALLOWED.keySet())
+            if (DATA_SHAPE.equals(SUFFIX_ALLOWED.get(s)))
+                assertTrue(ImportPaths.shapeRefusal("orders/x" + s, false) == null, s + " is allowed but refused in a subdirectory");
+    }
+
     @Test
     void theAllowReasonsThatPointAtAReservedDirectoryAreTrue() {
         assertTrue(ReservedConfigPaths.reserved("registry/access-catalog/catalog.toon"));

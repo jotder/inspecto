@@ -34,9 +34,13 @@ class ImportPathsTest {
     @Test
     void theAllowlistAdmitsTheShapesABundleCarriesAndNothingElse(@TempDir Path root) {
         for (String ok : List.of("orders_pipeline.toon", "orders/orders_pipeline.toon", "orders/orders_schema.toon",
-                "orders/voucher_76.toon", "orders/orders_mapping.csv", "jobs/nightly_job.toon", "orders_enrich.toon",
-                "sftp_connection.toon", "registry/datasets/sales.toon", "registry/widgets/kpi.toon", "sites.grammar.toon"))
+                "orders/orders_mapping.csv", "jobs/nightly_job.toon", "orders_enrich.toon", "views/daily_view.toon",
+                "sftp_connection.toon", "registry/datasets/sales.toon", "registry/widgets/kpi.toon", "sites.grammar.toon",
+                "registry/datasets/geo.toon"))
             assertNull(ImportPaths.refusal(root, ok), ok);
+        // SEC-IMPORT-OPS-CONFIGS-1: a subdirectory is an allowlist too — an unsuffixed file must be referenced
+        assertNotNull(ImportPaths.refusal(root, "orders/voucher_76.toon"), "an unreferenced unsuffixed subdirectory file");
+        assertNull(ImportPaths.refusal(root, "orders/voucher_76.toon", Set.of("orders/voucher_76.toon")), "the same, referenced");
         for (String no : List.of("roles.toon", "approval.toon", "branding.toon", "anything.toon", "Roles.Toon",
                 "registry/access-profiles/x.toon", "registry/access-catalog/catalog.toon", "registry/x.toon",
                 "demo-users.toon", "offers.toon", "grants.toon", "agent/policy.json", "agent/x.toon",
@@ -89,6 +93,27 @@ class ImportPathsTest {
         assertNull(ImportPaths.refusal(root, "voucher_116.toon", Set.of("voucher_116.toon")), "a referenced root schema");
         for (String p : List.of("demo-users.toon", "roles.toon", "agent/policy.json", "agent/policy.toon",
                 "registry/access-profiles/x.toon", "orders/x.exe", "offers.toon", "grants.toon"))
+            assertNotNull(ImportPaths.refusal(root, p, Set.of(p)), p + " referenced");
+    }
+
+    /**
+     * SEC-IMPORT-OPS-CONFIGS-1: the suffix-scanned ops / semantic configs are refused anywhere — root, subdirectory,
+     * registry — and a reference buys nothing (the boot scan loads them by suffix, wherever they sit).
+     */
+    @Test
+    void theSuffixScannedOpsConfigsAreRefusedAnywhereReferencedOrNot(@TempDir Path root) {
+        for (String suffix : ImportPaths.REFUSED_SUFFIXES)
+            for (String p : List.of("x" + suffix, "ops/incident" + suffix, "a/b/c" + suffix, "registry/datasets/x" + suffix,
+                    "jobs/x" + suffix, "orders/X" + suffix.toUpperCase(java.util.Locale.ROOT))) {
+                assertNotNull(ImportPaths.refusal(root, p), p);
+                assertNotNull(ImportPaths.refusal(root, p, Set.of(p)), p + " referenced");
+            }
+    }
+
+    /** ...and a reserved root name is refused one level down (outside registry/, where names are component ids). */
+    @Test
+    void aReservedRootNameIsRefusedInAnySubdirectory(@TempDir Path root) {
+        for (String p : List.of("ops/roles.toon", "orders/demo-users.toon", "a/b/branding.toon", "jobs/space.toon"))
             assertNotNull(ImportPaths.refusal(root, p, Set.of(p)), p + " referenced");
     }
 

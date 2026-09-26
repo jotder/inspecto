@@ -32,7 +32,10 @@ import java.util.regex.Pattern;
  *   <li>a <b>shape allowlist</b> — a {@code .toon} / {@code .csv} config; at the config ROOT only the
  *       conventional suffixes ({@link #ROOT_SUFFIXES} — the root is where every settings and identity document
  *       lives); under {@code registry/} exactly {@code registry/<importable kind dir>/<name>}; elsewhere (a
- *       Pipeline's own directory, {@code jobs/}, {@code connections/}) any plain-named config. A file that a
+ *       Pipeline's own directory, {@code jobs/}, {@code views/}) only {@link #SUBDIR_SUFFIXES} — and never a
+ *       reserved root name one level down. No {@link #REFUSED_SUFFIXES} file (the suffix-scanned ops and semantic
+ *       configs: workflows, Case / Tag Rules, Tags, semantic models, RCA and Job templates) anywhere, referenced
+ *       or not (`SEC-IMPORT-OPS-CONFIGS-1`). A file that a
  *       carried config names through a REAL reference key ({@link #referenceValues}) may also sit at the root
  *       under its own name (a schema beside a root-level pipeline) and may also be a grammar source or SQL
  *       ({@link #REFERENCE_ONLY_EXTENSIONS}) — and that is ALL a reference buys: never another extension,
@@ -62,6 +65,44 @@ public final class ImportPaths {
     static final List<String> ROOT_SUFFIXES = List.of("_pipeline.toon", "_enrich.toon", "_schema.toon",
             "_job.toon", "_connection.toon", "_mapping.csv", "_structure.csv", ".grammar.toon", "_grammar.toon",
             "_profile.toon");
+
+    /**
+     * The shapes an import may land in a SUBDIRECTORY outside {@code registry/} without a reference: the root's
+     * data-source shapes plus a View ({@code views/<name>_view.toon}, {@code ViewStore.java:31}). Anything else there
+     * must be named by a carried config through a real reference key (`SEC-IMPORT-OPS-CONFIGS-1`: "any plain-named
+     * config" used to be enough, which is how {@code ops/incident_workflow.toon} landed).
+     */
+    static final List<String> SUBDIR_SUFFIXES = subdirSuffixes();
+
+    /**
+     * Suffixes no import may write ANYWHERE — at the root, in a subdirectory, under {@code registry/}, and whether or
+     * not a carried config references the file (`SEC-IMPORT-OPS-CONFIGS-1`). Each is loaded by a boot-time SUFFIX
+     * scan that walks the whole config tree ({@code ServiceBootstrap.resolveBySuffix} is a recursive
+     * {@code Files.walk}, {@code ServiceBootstrap.java:120-135}) and each has its own route, narrower or validated,
+     * that an import would skip:
+     * <ul>
+     *   <li>{@code _workflow.toon}, {@code _caserule.toon}, {@code _tagrule.toon}, {@code _tag.toon} — the ops engine,
+     *       {@code OpsEngineProvider.java:237-241} over {@code ServiceBootstrap.java:84}'s every-{@code .toon} walk;
+     *       the LAST workflow per object type wins, so an imported INCIDENT workflow replaced the lifecycle the
+     *       Disposition / postmortem gate is keyed on. Case / Tag Rules and Tags are written by
+     *       {@code POST /cases/rules} and {@code /tags*}, which validate them;</li>
+     *   <li>{@code _meta.toon} (semantic models, {@code ServiceBootstrap.java:65}), {@code _rca.toon} (RCA templates,
+     *       {@code ServiceBootstrap.java:75}) and {@code _job_template.toon} (Job templates, expanded into every Job
+     *       naming them, {@code ServiceBootstrap.java:63}) — none travels in a data-source or Pipeline bundle;</li>
+     *   <li>{@code _escalation.toon} and {@code _queue.toon} — no loader reads them since {@code RETIRE-HALVES-1}
+     *       (2026-09-14); refused so a loader brought back cannot inherit an import door.</li>
+     * </ul>
+     * {@code ImportLoaderInventoryTest} fails when a {@code _x.toon} suffix literal appears in main code that is
+     * neither refused here nor allow-listed there with a reason.
+     */
+    static final List<String> REFUSED_SUFFIXES = List.of("_workflow.toon", "_caserule.toon", "_tagrule.toon",
+            "_tag.toon", "_meta.toon", "_rca.toon", "_job_template.toon", "_escalation.toon", "_queue.toon");
+
+    private static List<String> subdirSuffixes() {
+        List<String> s = new ArrayList<>(ROOT_SUFFIXES);
+        s.add("_view.toon");
+        return List.copyOf(s);
+    }
 
     /** Extensions every import may write (outside the root, and at the root under {@link #ROOT_SUFFIXES}). */
     static final List<String> CONFIG_EXTENSIONS = List.of(".toon", ".csv");
@@ -118,12 +159,26 @@ public final class ImportPaths {
         // A referenced file may sit at the root under its own name (a schema beside a root-level pipeline is how
         // a Space is laid out and exported) — which is why the root's fixed names MUST all be reserved, and
         // ImportLoaderInventoryTest fails when a loader reads one that is not.
+        // SEC-IMPORT-OPS-CONFIGS-1: before any exemption — a reference does not stop a suffix scan from loading it
+        for (String suffix : REFUSED_SUFFIXES)
+            if (file.endsWith(suffix))
+                return "a '*" + suffix + "' is loaded by a config-tree suffix scan and written only through its own "
+                        + "route — no import may carry one, anywhere";
         if (parts.size() == 1 && !referenced && ROOT_SUFFIXES.stream().noneMatch(file::endsWith))
             return "the config root takes only " + ROOT_SUFFIXES + " or a file a carried config names through a "
                     + "reference key — it is where the settings and identity documents live";
-        if ("registry".equalsIgnoreCase(parts.getFirst())
-                && (parts.size() != 3 || !REGISTRY_DIRS.contains(parts.get(1))))
+        boolean registry = "registry".equalsIgnoreCase(parts.getFirst());
+        if (registry && (parts.size() != 3 || !REGISTRY_DIRS.contains(parts.get(1))))
             return "a registry entry must be registry/<kind>/<name> for an importable kind " + REGISTRY_DIRS;
+        if (parts.size() > 1 && !registry) {
+            // a reserved root name one level down is nobody's legitimate file — and a later loader reading it by
+            // suffix or recursively would otherwise inherit the door (registry/ excepted: its names are component ids)
+            if (ReservedConfigPaths.FILES.contains(file))
+                return "'" + file + "' is a reserved config-root name (ReservedConfigPaths) — refused in any directory";
+            if (!referenced && SUBDIR_SUFFIXES.stream().noneMatch(file::endsWith))
+                return "a subdirectory takes only " + SUBDIR_SUFFIXES + " or a file a carried config names through a "
+                        + "reference key";
+        }
         return null;
     }
 

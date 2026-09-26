@@ -346,7 +346,17 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
   `/transition` body `disposition` (case-insensitive, stored in the ladder's spelling); an off-ladder value,
   or a `disposition` on any move but an Incident's resolve (a Case's lives in its Findings) → 422. The resolve's
   `OBJECT_ACTIVITY` event carries the `disposition`. **A reopen clears it** (blanked — the bag merge cannot
-  delete a key), so a re-resolve needs a fresh decision, never a stale one. ⛔ A machine actor never resolves
+  delete a key), so a re-resolve needs a fresh decision, never a stale one. 🔴 **The gate is keyed on what
+  DECIDES an Incident, not on the literal `RESOLVED`** (`SEC-IMPORT-OPS-CONFIGS-1`, 2026-09-26;
+  `ObjectService.decidesIncident`): `RESOLVED` **and every terminal state of the registered workflow except
+  `ARCHIVED`**. Before, a `*_workflow.toon` with a `CLOSED` terminal state (which an import could plant — now
+  refused, see [`auth-security.md`](../../backend/editions/auth-security.md)) finished an Incident in one move
+  with no Disposition and no postmortem. ⚠ `ARCHIVED` stays ungated **on purpose**: the default lifecycle
+  archives from anywhere (`IDENTIFIED|DIAGNOSING → ARCHIVED`, the mail Trash — `WorkflowTest`), a dismissal
+  that records no outcome, and `RESOLVED → ARCHIVED` already passed the gate. So a custom workflow buys nothing
+  the default does not already allow; the Disposition may ride a custom terminal move exactly as it rides a
+  resolve, and leaving that state clears it (`ObjectServiceTest.aCustomTerminalStateCannotFinishAnIncidentWithoutTheResolutionGate`).
+  ⛔ A machine actor never resolves
   an Incident (the per-entity Alert heal, §3.2). The UI's `postmortemGaps` soft-warn
   is a *mirror* of the same four checks, not the gate. ⚠ `objects.md` and the archived design still call
   the backend gate "a follow-up"; it shipped.

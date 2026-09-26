@@ -1516,7 +1516,7 @@ public final class ObjectService {
 
     private OperationalObject commit(OperationalObject obj, Workflow wf, String target,
                                      String action, String actor, String disposition) {
-        boolean resolvingIncident = obj.objectType() == ObjectType.INCIDENT && "RESOLVED".equalsIgnoreCase(target);
+        boolean resolvingIncident = decidesIncident(obj, wf, target);
         if (disposition != null) {
             // WS-10: a Disposition rides the Incident's resolve and nothing else — a Case's lives in its Findings.
             if (!resolvingIncident)
@@ -1539,8 +1539,8 @@ public final class ObjectService {
         // WS-10: leaving RESOLVED/ARCHIVED for a working state (reopen) un-decides the outcome — a stale
         // Disposition must not satisfy the next resolve. Blank, not removed: the bag merge cannot delete a key.
         boolean reopeningIncident = obj.objectType() == ObjectType.INCIDENT
-                && ("RESOLVED".equalsIgnoreCase(obj.status()) || "ARCHIVED".equalsIgnoreCase(obj.status()))
-                && !"RESOLVED".equalsIgnoreCase(target) && !"ARCHIVED".equalsIgnoreCase(target);
+                && (decidesIncident(obj, wf, obj.status()) || "ARCHIVED".equalsIgnoreCase(obj.status()))
+                && !resolvingIncident && !"ARCHIVED".equalsIgnoreCase(target);
         if (reopeningIncident && obj.attributes().get(ATTR_DISPOSITION) != null)
             next = next.withAttributes(Map.of(ATTR_DISPOSITION, ""), now);
         // INCIDENT-KPI-MTTR-1: commit() is the single place every status change lands, so stamping here
@@ -1564,6 +1564,24 @@ public final class ObjectService {
         if (resolvingIncident) event.attr("disposition", obj.attributes().get(ATTR_DISPOSITION));
         EventLog.current().emit(event);
         return updated;
+    }
+
+    /**
+     * Whether moving {@code obj} into {@code state} DECIDES an Incident — the moves the resolution gate
+     * ({@link #incidentResolutionGaps}) and the Disposition ride: {@code RESOLVED}, and every TERMINAL state of the
+     * registered workflow except {@code ARCHIVED} (`SEC-IMPORT-OPS-CONFIGS-1`). Keyed on the literal
+     * {@code RESOLVED} alone, a {@code *_workflow.toon} with a {@code CLOSED} terminal state finished an Incident
+     * with no Disposition and no postmortem.
+     *
+     * <p>⚠ {@code ARCHIVED} is deliberately NOT gated: the default lifecycle archives from anywhere
+     * ({@code IDENTIFIED|DIAGNOSING → ARCHIVED}, the mail Trash — {@code WorkflowTest}), a dismissal that records
+     * no outcome, while the RESOLVED → ARCHIVED path already passed the gate on the way. So a custom workflow buys
+     * nothing the default does not already allow: its only ungated terminal move is the same Trash.
+     */
+    static boolean decidesIncident(OperationalObject obj, Workflow wf, String state) {
+        if (obj.objectType() != ObjectType.INCIDENT || state == null) return false;
+        if ("RESOLVED".equalsIgnoreCase(state)) return true;
+        return wf.isTerminal(state) && !"ARCHIVED".equalsIgnoreCase(state);
     }
 
     /**
