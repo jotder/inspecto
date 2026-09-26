@@ -101,8 +101,20 @@ public final class EgressPolicy {
         return host.startsWith("[") || host.indexOf(':') >= 0 || CANONICAL_V4.matcher(host).matches();
     }
 
-    /** Why {@code a} is denied by default, or {@code null} for a public address. */
+    /**
+     * Why {@code a} is denied by default, or {@code null} for a public address. An IPv6 address that EMBEDS an IPv4
+     * one is also classified by the IPv4 it carries (round-2 finding 2): IPv4-compatible {@code ::/96} (but {@code ::}
+     * and {@code ::1}), IPv4-mapped {@code ::ffff:0:0/96}, NAT64 {@code 64:ff9b::/96}, local-use NAT64
+     * {@code 64:ff9b:1::/48} (both RFC 6052 positions a /48 and a /96 prefix put it at) and 6to4 {@code 2002::/16}
+     * (bits 16–47) — so {@code 64:ff9b::a9fe:a9fe} is the metadata service, not a public address.
+     */
     public static String deniedClass(InetAddress a) {
+        if (a instanceof Inet6Address) {
+            for (InetAddress v4 : embeddedIpv4(a.getAddress())) {
+                String cls = deniedClass(v4);
+                if (cls != null) return cls;
+            }
+        }
         if (a.isAnyLocalAddress()) return "unspecified";
         if (a.isLoopbackAddress()) return "loopback";
         if (a.isLinkLocalAddress()) return "link-local";
@@ -125,6 +137,38 @@ public final class EgressPolicy {
             // cannot enumerate interfaces: the classes above still apply
         }
         return null;
+    }
+
+    /** The IPv4 addresses an IPv6 address carries, by the embeddings {@link #deniedClass} names; empty for none. */
+    static List<InetAddress> embeddedIpv4(byte[] b) {
+        List<InetAddress> out = new ArrayList<>();
+        if (b.length != 16) return out;
+        boolean zero0to9 = true;
+        for (int i = 0; i < 10; i++) zero0to9 &= b[i] == 0;
+        boolean zero10to11 = b[10] == 0 && b[11] == 0;
+        boolean mapped = zero0to9 && (b[10] & 0xff) == 0xff && (b[11] & 0xff) == 0xff;
+        boolean compat = zero0to9 && zero10to11
+                && !(b[12] == 0 && b[13] == 0 && b[14] == 0 && (b[15] == 0 || b[15] == 1));   // not :: or ::1
+        boolean nat64 = b[0] == 0 && (b[1] & 0xff) == 0x64 && (b[2] & 0xff) == 0xff && (b[3] & 0xff) == 0x9b;
+        boolean wellKnown = nat64 && allZero(b, 4, 12);
+        boolean localUse = nat64 && b[4] == 0 && b[5] == 1;
+        if (mapped || compat || wellKnown || localUse) out.add(v4(b[12], b[13], b[14], b[15]));
+        if (localUse) out.add(v4(b[6], b[7], b[9], b[10]));   // RFC 6052 /48: bits 48–63 and 72–87 (u octet skipped)
+        if ((b[0] & 0xff) == 0x20 && (b[1] & 0xff) == 0x02) out.add(v4(b[2], b[3], b[4], b[5]));   // 6to4
+        return out;
+    }
+
+    private static boolean allZero(byte[] b, int from, int to) {
+        for (int i = from; i < to; i++) if (b[i] != 0) return false;
+        return true;
+    }
+
+    private static InetAddress v4(byte a, byte b, byte c, byte d) {
+        try {
+            return InetAddress.getByAddress(new byte[] {a, b, c, d});
+        } catch (UnknownHostException impossible) {
+            throw new IllegalStateException(impossible);
+        }
     }
 
     private static final Set<String> PRIVATE_CLASSES = Set.of("private", "cgnat");

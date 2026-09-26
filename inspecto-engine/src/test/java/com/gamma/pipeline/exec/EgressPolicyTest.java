@@ -50,6 +50,25 @@ class EgressPolicyTest {
         assertNull(cls("2001:4860:4860::8888"));
     }
 
+    /** Round-2 finding 2: an IPv6 address carrying an IPv4 one is classified by the IPv4 it carries. */
+    @Test
+    void anEmbeddedIpv4IsClassifiedByTheAddressItCarries() throws Exception {
+        assertEquals("loopback", cls("::127.0.0.1"), "IPv4-compatible");
+        assertEquals("loopback", cls("2002:7f00:1::"), "6to4");
+        assertEquals("loopback", cls("64:ff9b::7f00:1"), "NAT64");
+        assertEquals("private", cls("64:ff9b::a00:1"), "NAT64 → 10.0.0.1");
+        assertEquals("link-local", cls("64:ff9b::a9fe:a9fe"), "NAT64 → the metadata service");
+        assertNotNull(cls("64:ff9b:1:a9fe:a9:fe00::"), "local-use NAT64, /48 position (169.254.169.254) is denied");
+        assertEquals("link-local", EgressPolicy.deniedClass(EgressPolicy.embeddedIpv4(InetAddress.ofLiteral("64:ff9b:1:a9fe:a9:fe00::").getAddress()).get(1)));
+        assertEquals("loopback", cls("64:ff9b:1::7f00:1"), "local-use NAT64, /96 position");
+        for (String v6 : List.of("::127.0.0.1", "2002:7f00:1::", "64:ff9b::7f00:1", "64:ff9b::a00:1", "64:ff9b::a9fe:a9fe"))
+            assertThrows(EgressPolicy.Refused.class, () -> EgressPolicy.resolve(v6, EgressPolicy.Allowlist.EMPTY), v6);
+        assertEquals("loopback", cls("::1"));
+        assertEquals("unspecified", cls("::"));
+        assertNull(cls("64:ff9b::808:808"), "NAT64 → 8.8.8.8 is public");
+        assertNull(cls("2002:808:808::"), "6to4 of a public address is public");
+    }
+
     @Test
     void aHostEntryLiftsOnlyThePrivateClassesAndACidrLiftsItsRange() {
         EgressPolicy.Allowlist allow = EgressPolicy.Allowlist.of(List.of("pcrf.internal", "127.0.0.1/32", "10.9.0.0/16"));
