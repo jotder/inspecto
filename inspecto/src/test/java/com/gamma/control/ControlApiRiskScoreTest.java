@@ -153,6 +153,18 @@ class ControlApiRiskScoreTest {
     }
 
     @Test
+    void aStoredModelThatNoLongerParsesIsA404Not500(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            score(c, "subs", model(null));
+            Map<String, Object> broken = new java.util.LinkedHashMap<>(model(null));
+            broken.put("highThreshold", "very high");   // written behind the gate, e.g. a hand edit
+            new ComponentStore(c.config.resolve("registry")).write("risk-score", "subs", broken);
+            HttpResponse<String> r = send(c.port, "GET", "/spaces/s1/risk-scores/subs/m1", null, "analyst");
+            assertEquals(404, r.statusCode(), r.body());
+        }
+    }
+
+    @Test
     void withoutTheCapabilityItIs403(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             score(c, "subs", model(null));

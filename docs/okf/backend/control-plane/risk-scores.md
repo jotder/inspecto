@@ -69,8 +69,9 @@ from `SpaceConfigRoot` and writes under the Space `dataDir`. Trigger it on a `cr
 
 The math is in `RiskScorer` and is pure:
 
-- `contribution = weight × indicator`, then **held to at most `cap`**. The cap bounds the contribution, not
-  the raw indicator.
+- `contribution = weight × indicator`, then the cap bounds the **absolute** contribution: at most `cap`, and
+  at least `-cap`. Negative weights are allowed and act as protective factors. The cap never applies to the
+  raw indicator.
 - A **missing** indicator is `0` and is flagged `missing: true`. This covers an entity with no rows for the
   factor, or a NULL aggregate.
 - `score = Σ contribution`, clamped to `[0, 100]`.
@@ -123,6 +124,7 @@ not the history. `RiskScoreAlertTest` proves the flow end to end over real DuckD
 
 - `canWorkIncidents`.
 - Then an **existence-hiding 404** for each of these cases, all indistinguishable: an unknown model; a
+  stored model that no longer parses (a hand edit, or a model written before a rule tightened); a
   model whose `dataScope` the caller's data scopes lack; a `RowScope` DENY on the resource kind
   `risk-score`; or no score for the entity.
 

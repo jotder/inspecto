@@ -59,7 +59,13 @@ final class RiskScoreRoutes implements RouteModule {
         ComponentStore registry = new ComponentStore(writeRoot.resolve("registry"));
         Optional<Map<String, Object>> content = registry.get(TYPE, modelId).map(ComponentRegistry.Component::content);
         if (content.isEmpty()) throw notFound(modelId, entityKey);
-        RiskScoreModel model = RiskScoreModel.fromMap(modelId, content.get());
+        // A stored model that no longer parses (hand-edited, or written before a rule tightened) is no score: 404.
+        RiskScoreModel model;
+        try {
+            model = RiskScoreModel.fromMap(modelId, content.get());
+        } catch (IllegalArgumentException e) {
+            throw notFound(modelId, entityKey);
+        }
 
         // Data scopes (SEC-7d), stricter than objects: a data-scoped caller reads ONLY a model carrying a scope it
         // holds. An unscoped model is readable by unscoped callers alone — its evidence is raw source rows, and a

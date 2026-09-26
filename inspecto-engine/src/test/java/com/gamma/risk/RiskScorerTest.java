@@ -81,6 +81,25 @@ class RiskScorerTest {
     }
 
     @Test
+    void theCapBoundsANegativeContributionToo() throws Exception {
+        RiskScoreModel m = RiskScoreModel.fromMap("prot", Map.of("entityType", "account", "highThreshold", 10,
+                "factors", List.of(
+                        Map.of("id", "risk", "dataset", "a", "key", "k", "measure", "count", "weight", 50),
+                        Map.of("id", "tenure", "dataset", "a", "key", "k", "measure", "max(years)", "weight", -10,
+                                "cap", 15))));
+        RiskScorer.Scored s = RiskScorer.score(m, "k", Map.of("risk", 1.0, "tenure", 4.0), Map.of());
+        RiskScorer.FactorResult tenure = s.factors().get(1);
+        assertTrue(tenure.capped(), "-40 exceeds the cap of 15 in magnitude");
+        assertEquals(-15.0, tenure.contribution(), EPS, "held to -cap, not left at -40 nor flipped to +15");
+        assertEquals(35.0, s.score(), EPS);
+        List<Map<String, Object>> stored = new ObjectMapper().readValue(
+                RiskScoreEvaluator.factorsJson(s.factors()), new TypeReference<>() {});
+        assertEquals(35.0, RiskScorer.recompute(stored), EPS, "recompute applies the same two-sided cap");
+        assertEquals(-5.0, RiskScorer.score(m, "k", Map.of("tenure", 0.5), Map.of()).factors().get(1).contribution(),
+                EPS, "under the cap a negative contribution is exact");
+    }
+
+    @Test
     void everyScoreIsReproducibleFromItsStoredFactors() throws Exception {
         ObjectMapper json = new ObjectMapper();
         for (Map<String, Double> values : List.of(

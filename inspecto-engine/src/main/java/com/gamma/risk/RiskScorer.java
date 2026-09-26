@@ -13,7 +13,7 @@ import java.util.Map;
  * {@code 0} and is flagged {@code missing: true} — never silently dropped. The score is
  * {@code Σ contribution} clamped to {@code [0, 100]}.
  *
- * <p>⚠ The cap bounds the CONTRIBUTION, not the raw indicator: "this factor adds at most 40 points" is the
+ * <p>⚠ The cap bounds the ABSOLUTE CONTRIBUTION (both directions — negative weights are protective factors), not the raw indicator: "this factor adds at most 40 points" is the
  * sentence an author means, and it is independent of the indicator's unit.
  */
 public final class RiskScorer {
@@ -47,8 +47,9 @@ public final class RiskScorer {
         boolean missing = value == null || !Double.isFinite(value);
         double v = missing ? 0.0 : value;
         double raw = f.weight() * v;
-        boolean capped = f.cap() != null && raw > f.cap();
-        double contribution = capped ? f.cap() : raw;
+        // The cap bounds the ABSOLUTE contribution: a protective (negative-weight) factor is held to -cap.
+        boolean capped = f.cap() != null && Math.abs(raw) > f.cap();
+        double contribution = capped ? Math.signum(raw) * f.cap() : raw;
         return new FactorResult(f.id(), f.label(), missing ? null : v, missing, f.weight(), f.cap(), capped,
                 contribution, evidence == null ? List.of() : List.copyOf(evidence));
     }
@@ -81,7 +82,7 @@ public final class RiskScorer {
             double weight = ((Number) f.get("weight")).doubleValue();
             double value = f.get("value") instanceof Number n ? n.doubleValue() : 0.0;
             double raw = weight * value;
-            if (f.get("cap") instanceof Number c && raw > c.doubleValue()) raw = c.doubleValue();
+            if (f.get("cap") instanceof Number c && Math.abs(raw) > c.doubleValue()) raw = Math.signum(raw) * c.doubleValue();
             sum += raw;
         }
         return clamp(sum);
