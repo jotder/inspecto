@@ -123,6 +123,34 @@ class KpiEvaluatorTest {
     }
 
     @Test
+    void theKpisZoneDoesNotLeakIntoALaterQuery() throws Exception {
+        assertEquals(5.0, dayValue("Asia/Kolkata", "2026-03-01"));
+        Object tz = QueryExecutor.run(new QueryExecutor.Request(null, null,
+                "SELECT current_setting('TimeZone') AS tz", 1, 0, java.util.List.of(), java.util.List.of())).rows().get(0).get("tz");
+        assertNotEquals("Asia/Kolkata", tz, "a plain run must not inherit a KPI's session TimeZone");
+    }
+
+    /** New York's 23-hour day (2026-03-08) and 25-hour day (2026-11-01): each column type is cut on local midnight. */
+    @Test
+    void dstDaysInNewYorkAreCutOnLocalMidnightForEveryColumnType() throws Exception {
+        String rel = """
+                SELECT * FROM (VALUES
+                  (DATE '2026-03-08', TIMESTAMP '2026-03-08 00:30:00', TIMESTAMPTZ '2026-03-08 05:30:00+00', 1.0),
+                  (DATE '2026-03-08', TIMESTAMP '2026-03-08 23:30:00', TIMESTAMPTZ '2026-03-09 03:30:00+00', 2.0),
+                  (DATE '2026-03-09', TIMESTAMP '2026-03-09 00:30:00', TIMESTAMPTZ '2026-03-09 04:30:00+00', 4.0),
+                  (DATE '2026-11-01', TIMESTAMP '2026-11-01 00:30:00', TIMESTAMPTZ '2026-11-01 04:30:00+00', 8.0),
+                  (DATE '2026-11-01', TIMESTAMP '2026-11-01 23:30:00', TIMESTAMPTZ '2026-11-02 04:30:00+00', 16.0),
+                  (DATE '2026-11-02', TIMESTAMP '2026-11-02 00:30:00', TIMESTAMPTZ '2026-11-02 05:30:00+00', 32.0)
+                ) AS t(d, ts, tstz, amount)""";
+        for (String col : java.util.List.of("d", "ts", "tstz")) {
+            KpiDefinition k = KpiDefinition.fromMap("k", Map.of("dataset", "orders", "measure", "sum(amount)",
+                    "timeField", col, "grain", "day", "comparison", "none", "timezone", "America/New_York"));
+            assertEquals(3.0, KpiEvaluator.evaluate(k, rel, LocalDate.parse("2026-03-08")).value(), col + " 23-hour day");
+            assertEquals(24.0, KpiEvaluator.evaluate(k, rel, LocalDate.parse("2026-11-01")).value(), col + " 25-hour day");
+        }
+    }
+
+    @Test
     void anOffsetOrUnknownZoneIsRefused() {
         for (String z : java.util.List.of("+05:30", "Mars/Olympus", "UTC+1"))
             assertThrows(IllegalArgumentException.class, () -> KpiDefinition.fromMap("k", Map.of("dataset", "o",
