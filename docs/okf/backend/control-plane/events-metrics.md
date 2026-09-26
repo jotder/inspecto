@@ -208,7 +208,30 @@ timestamp: 2026-07-16T00:00:00Z
     - ⛔ **On-box anchors do not defend against anyone who holds the key** (a local administrator can rewrite
       the store and re-sign every anchor). The defence against that party is the OFF-box copy: export
       `GET /audit/anchors` on a schedule to storage the Space's administrators cannot write, and compare.
-  - **Residuals (not built):** a scheduled off-box anchor export target; a `DbEventStore` shared by several pods gets one chain per process interleaved in
+  - 🔴 **Round 3 (a second verification FAILED round 2, 2026-09-27):**
+    - *The writer lock is checked by identity.* An OS lock guards a file, not a path — the lock file can be
+      deleted while held and a second writer locks a new one. The lock now covers a byte far past a random token
+      written into the file, and before EVERY link the store re-reads the path and compares the token; on a
+      mismatch it stops linking for good (rows marked unlinked, ERROR, metric).
+    - *"Anchoring started" is durable.* `<config root>.secrets/audit-anchoring.json` (owner-only, created
+      first-writer-wins with the first anchor) names the first anchor of the current file and the latest one
+      written. Once it exists, a missing file (`anchor-file-missing`) or one that no longer holds both anchors
+      (`anchor-file-truncated`) always fails and is always refused; the young-install grace applies ONLY before
+      it exists. ⚠ It is exactly as strong as the secrets directory — whoever can write there can read the key.
+    - *Truncation is judged against the configured retention.* `truncated-before-anchor` now compares with the
+      shortest enabled `event_prune` window (`JobService.eventRetentionDays`): an anchored day whose rows are gone
+      is retention only when it is before that cutoff; with no prune configured, any missing anchored day fails.
+  - **Operator runbook — when `/audit/verify` fails.** (1) Read `firstBad`; do NOT delete or edit anything under
+    `data/events/` or `config.secrets/`. (2) Compare the Space's last off-box export of `GET /audit/anchors` with
+    the current one to see what changed, and open an Incident. (3) Only once the cause is understood, record it:
+    `POST /audit/anchors/rebaseline {"reason": "…"}` (`canAdminister`, audited, once a minute). It refuses (409)
+    when nothing fails, repairs nothing, moves the old anchor file aside as `audit-anchors.<ms>.replaced.jsonl`,
+    and starts a new anchor file with a signed `break` anchor holding the reason, the problem verify found, the
+    last good anchor and the new start seq (the head + 1). (4) From then on `/audit/verify` checks the new epoch
+    by default, and any range reaching back before the break fails as `acknowledged-break` naming the reason —
+    never `ok` over the gap. (5) Export the anchors off the box again.
+  - **Residuals (not built):** a scheduled off-box anchor export target; the multi-pod `DbEventStore` has no
+    chain-writer lock (two pods linking one table fork the chain — filed on the board row); a `DbEventStore` shared by several pods gets one chain per process interleaved in
     one table (verifies as duplicates) and serves the chain reads through the `EventStore` keyset-walk defaults
     (linear per page); no offline checker tool ships (the JSON `/audit/export` carries every hashed field);
     per decision D-P8, classification-driven masking of audit rows and read auditing beyond what exists stay
