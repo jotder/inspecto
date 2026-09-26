@@ -1483,8 +1483,9 @@ if (-not $NoRuntime) {
     # Module set = jdeps core for inspecto.jar (java.base, java.compiler, java.desktop,
     # java.naming, java.scripting, java.sql, jdk.httpserver) + runtime-only safety modules that
     # jdeps cannot see in a fat JAR: jdk.crypto.ec (TLS/JDBC ciphers), jdk.unsupported
-    # (sun.misc.Unsafe), java.net.http (HttpClient), jdk.zipfs (.zip via NIO), java.management (JMX).
-    $runtimeModules = 'java.base,java.compiler,java.desktop,java.naming,java.scripting,java.sql,jdk.httpserver,jdk.crypto.ec,jdk.unsupported,java.net.http,jdk.zipfs,java.management'
+    # (sun.misc.Unsafe), java.net.http (HttpClient), jdk.zipfs (.zip via NIO), java.management (JMX),
+    # jdk.management (com.sun.management: the RAM size behind the DuckDB memory_limit default, GAP-4).
+    $runtimeModules = 'java.base,java.compiler,java.desktop,java.naming,java.scripting,java.sql,jdk.httpserver,jdk.crypto.ec,jdk.unsupported,java.net.http,jdk.zipfs,java.management,jdk.management'
 
     # Locate a jlink: prefer the resolved GraalVM cache, then JAVA_HOME, then PATH.
     # 🔴 OPS-07 (2026-09-14): all three probes used to hardcode `jlink.exe`, and the JAVA_HOME one a

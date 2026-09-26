@@ -253,10 +253,23 @@ public final class DuckDbUtil {
         return Math.max(DEFAULT_MEMORY_FLOOR_BYTES, share) / (1024L * 1024L) + "MiB";
     }
 
-    /** Total RAM visible to this JVM (the container limit under a cgroup), or {@code 0} if unknown. */
-    private static long physicalMemoryBytes() {
-        return java.lang.management.ManagementFactory.getOperatingSystemMXBean()
-                instanceof com.sun.management.OperatingSystemMXBean os ? os.getTotalMemorySize() : 0L;
+    /**
+     * Total RAM visible to this JVM (the container limit under a cgroup), or {@code 0} if unknown — which
+     * {@link #defaultMemoryLimit(long)} turns into the 1 GiB floor.
+     *
+     * <p>🔴 {@code com.sun.management} lives in the {@code jdk.management} module, which a jlinked runtime may
+     * not carry: the shipped bundles' runtime had only {@code java.management}, so the first ingest threw
+     * {@code NoClassDefFoundError} — an {@code Error}, past every {@code catch (Exception)} — and EVERY batch
+     * failed (found on the telco demo build, 2026-09-26). A {@link LinkageError} here means "unknown", never
+     * a failed ingest; {@code package.ps1} now also ships {@code jdk.management} so the real size is read.
+     */
+    static long physicalMemoryBytes() {
+        try {
+            return java.lang.management.ManagementFactory.getOperatingSystemMXBean()
+                    instanceof com.sun.management.OperatingSystemMXBean os ? os.getTotalMemorySize() : 0L;
+        } catch (LinkageError absentModule) {
+            return 0L;
+        }
     }
 
     /**
