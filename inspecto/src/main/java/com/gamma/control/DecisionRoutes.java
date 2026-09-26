@@ -83,10 +83,13 @@ final class DecisionRoutes implements RouteModule {
         String name = requireName(rule);
         if (RouteErrors.exists(store, TYPE, name))
             throw new ApiException(409, ErrorCodes.CONFLICT, "decision rule '" + name + "' already exists (use PUT to update)");
+        checkInvokeApi(e, rule);
         long now = System.currentTimeMillis();
         rule.put("lastSimulation", null);
         rule.put("createdAt", now);
         rule.put("updatedAt", now);
+        rule.put("createdBy", ApiContext.actor(e));   // the makers an invoke-api Action Request's four-eyes excludes
+        rule.put("updatedBy", ApiContext.actor(e));
         PendingChanges.hold(api, e, TYPE, name, rule, null);   // maker-checker
         return write(store, name, rule);
     }
@@ -97,8 +100,11 @@ final class DecisionRoutes implements RouteModule {
         Map<String, Object> rule = normalize(body);
         rule.put("name", name);
         rule.put("lastSimulation", prev.get("lastSimulation"));
+        checkInvokeApi(e, rule);
         rule.put("createdAt", prev.getOrDefault("createdAt", System.currentTimeMillis()));
         rule.put("updatedAt", System.currentTimeMillis());
+        rule.put("createdBy", prev.get("createdBy"));
+        rule.put("updatedBy", ApiContext.actor(e));
         PendingChanges.hold(api, e, TYPE, name, rule, prev);   // maker-checker
         return write(store, name, rule);
     }
@@ -109,6 +115,20 @@ final class DecisionRoutes implements RouteModule {
         PendingChanges.hold(api, e, TYPE, name, null, current);   // maker-checker
         store.delete(TYPE, name);
         return Map.of("deleted", name);
+    }
+
+    /**
+     * A rule carrying an {@code invoke-api} consequence raises Action Requests whenever it is applied, so saving one
+     * is proposing outbound calls by proxy (verification finding 3): the saver must hold {@code canWorkIncidents}, the
+     * capability {@code POST /action-requests} demands (403).
+     */
+    @SuppressWarnings("unchecked")
+    private static void checkInvokeApi(com.sun.net.httpserver.HttpExchange e, Map<String, Object> rule) {
+        List<Map<String, Object>> cs = (List<Map<String, Object>>) (List<?>) (rule.get("consequences") instanceof List<?> l ? l : List.of());
+        boolean any = false;
+        for (Object o : cs) if (o instanceof Map<?, ?> c && "invoke-api".equals(String.valueOf(c.get("action")))) any = true;
+        if (!any) return;
+        ApiContext.requireCapability(e, "canWorkIncidents");
     }
 
     // ── simulate / apply ─────────────────────────────────────────────────────────
@@ -160,15 +180,15 @@ final class DecisionRoutes implements RouteModule {
         List<Map<String, Object>> consequences = (List<Map<String, Object>>) (List<?>)
                 (rule.get("consequences") instanceof List<?> l ? l : List.of());
         List<Map<String, Object>> executed = consequences.stream()
-                .map(c -> executeOne(api, name, c, automatic, actor)).toList();
+                .map(c -> executeOne(api, name, rule, c, automatic, actor)).toList();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rule", name);
         result.put("executed", executed);
         return result;
     }
 
-    private static Map<String, Object> executeOne(ApiContext api, String ruleName, Map<String, Object> c,
-                                                  boolean automatic, String actor) {
+    private static Map<String, Object> executeOne(ApiContext api, String ruleName, Map<String, Object> rule,
+                                                  Map<String, Object> c, boolean automatic, String actor) {
         String action = String.valueOf(c.get("action"));
         String status = "skipped";
         String detail;
@@ -292,7 +312,7 @@ final class DecisionRoutes implements RouteModule {
             case "invoke-api" -> {
                 // ASSURE-ACTION-REQUESTS-1: never a direct call — a PENDING Action Request on the rule's Incident,
                 // which a second person approves before ActionDispatcher sends it.
-                String[] made = proposeActionRequest(api, ruleName, c, automatic, actor);
+                String[] made = proposeActionRequest(api, ruleName, rule, c, automatic, actor);
                 status = made[0];
                 detail = made[1];
                 actionRequestId = made[2];
@@ -328,8 +348,8 @@ final class DecisionRoutes implements RouteModule {
     /** The payload an {@code invoke-api} consequence sends when it names none: which Incident, which rule. */
     static final Map<String, Object> DEFAULT_INVOKE_PAYLOAD = Map.of("incident", "{{incident.id}}", "rule", "{{context.rule}}");
 
-    private static String[] proposeActionRequest(ApiContext api, String ruleName, Map<String, Object> c,
-                                                 boolean automatic, String actor) {
+    private static String[] proposeActionRequest(ApiContext api, String ruleName, Map<String, Object> rule,
+                                                 Map<String, Object> c, boolean automatic, String actor) {
         com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
         if (objects == null)
             return new String[] {"skipped", "no Action Request — operational objects are not installed in this "
@@ -337,6 +357,14 @@ final class DecisionRoutes implements RouteModule {
         Path root = api.writeRoot();
         if (root == null)
             return new String[] {"skipped", "no Action Request — set -Dassist.write.root to enable", null};
+        // Verification finding 3: the makers of the rule are co-authors of every request it raises, so neither may
+        // approve one. A rule saved before its editors were recorded cannot say who they were — fail closed.
+        List<String> coAuthors = java.util.stream.Stream.of(rule.get("createdBy"), rule.get("updatedBy"))
+                .filter(java.util.Objects::nonNull).map(String::valueOf).distinct().toList();
+        if (coAuthors.isEmpty())
+            return new String[] {"skipped", "no Action Request — Decision Rule '" + ruleName + "' has no recorded "
+                    + "editor (it was saved before editors were recorded), so four-eyes cannot exclude its maker; "
+                    + "save the rule again", null};
         String corr = "decision-rule:" + ruleName;
         String incident = objects.activeAttributeIndex(ObjectType.INCIDENT, corr, "decisionRule").get(ruleName);
         if (incident == null) {
@@ -361,7 +389,7 @@ final class DecisionRoutes implements RouteModule {
             spec.put("incidentId", incident);
             spec.put("context", Map.of("rule", ruleName));
             Map<String, Object> rec = ActionRequestRoutes.propose(api, root, spec,
-                    automatic ? corr : actor, automatic ? "system" : "user", corr);
+                    automatic ? corr : actor, automatic ? "system" : "user", corr, coAuthors);
             return new String[] {"executed", "proposed Action Request " + rec.get("id") + " on Incident " + incident
                     + " — pending approval, nothing sent yet", String.valueOf(rec.get("id"))};
         } catch (ApiException | IOException refused) {

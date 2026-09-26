@@ -185,7 +185,7 @@ final class ActionRequestRoutes implements RouteModule {
             if (!CREATE_KEYS.contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown key '" + k + "' — an action "
                         + "request takes " + new java.util.TreeSet<>(CREATE_KEYS));
-        return withEgress(root, ActionRequests.detail(propose(api, root, body, ApiContext.actor(ex), ApiContext.actorType(ex), "manual")));
+        return withEgress(root, ActionRequests.detail(propose(api, root, body, ApiContext.actor(ex), ApiContext.actorType(ex), "manual", List.of())));
     }
 
     /**
@@ -194,7 +194,7 @@ final class ActionRequestRoutes implements RouteModule {
      */
     @SuppressWarnings("unchecked")
     static Map<String, Object> propose(ApiContext api, Path root, Map<String, Object> spec, String author,
-                                       String authorType, String origin) throws IOException {
+                                       String authorType, String origin, List<String> coAuthors) throws IOException {
         String connection = ApiContext.str(spec, "connection");
         if (connection == null) throw invalid("'connection' (the id of an https Connection) is required");
         String method = String.valueOf(spec.getOrDefault("method", "POST")).toUpperCase(java.util.Locale.ROOT);
@@ -247,6 +247,7 @@ final class ActionRequestRoutes implements RouteModule {
 
         Map<String, Object> rec = ActionRequests.draft(connection, endpoint.url().toString(), method, payload, key,
                 incident, kase, origin, author, authorType, reason, ApprovalPolicy.forRoot(root).expiresAfterHours());
+        rec.put("coAuthors", List.copyOf(coAuthors));   // the Decision Rule's makers — four-eyes excludes them too
         ActionRequests.transition(rec, ActionRequests.PENDING, author);
         synchronized (ActionRequests.lock()) {
             ActionRequests.save(root, rec);
@@ -302,6 +303,10 @@ final class ActionRequestRoutes implements RouteModule {
             if (by.equals(rec.get("author")))
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "four-eyes: '" + rec.get("author")
                         + "' proposed this action request and cannot " + (approve ? "approve" : "decline")
+                        + " it — a different person must");
+            if (rec.get("coAuthors") instanceof List<?> makers && makers.contains(by))
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "four-eyes: '" + by + "' edited the Decision "
+                        + "Rule that raised this action request and cannot " + (approve ? "approve" : "decline")
                         + " it — a different person must");
             rec.put(approve ? "approver" : "decidedBy", by);
             rec.put(approve ? "approvedAt" : "decidedAt", ActionRequests.now());

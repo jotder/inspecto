@@ -51,7 +51,7 @@ class ControlApiActionRequestsTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String AUTHOR = "Bearer author", CHECKER = "Bearer checker", SELF = "Bearer self",
-            ANALYST2 = "Bearer analyst2", DEV = "Bearer dev";
+            ANALYST2 = "Bearer analyst2", DEV = "Bearer dev", POWER = "Bearer power", EDITOR = "Bearer editor";
     private final HttpClient client = HttpClient.newHttpClient();
 
     private HttpServer target;
@@ -79,6 +79,8 @@ class ControlApiActionRequestsTest {
                 case CHECKER -> new String[] {"checker-1", "admin"};
                 case SELF -> new String[] {"author-1", "admin"};
                 case DEV -> new String[] {"dev-1", "pipeline-developer"};
+                case POWER -> new String[] {"power-1", "power"};
+                case EDITOR -> new String[] {"editor-1", "super"};
                 default -> null;
             };
             if ("Bearer scoped".equals(ex.getRequestHeaders().getFirst("Authorization")))
@@ -321,7 +323,7 @@ class ControlApiActionRequestsTest {
         try (Ctx c = open(cfg, tmp, true)) {
             allowLoopback(c);
             data(send(c, "POST", "/decision-rules", "{\"name\":\"leak\",\"consequences\":[{\"action\":\"invoke-api\","
-                    + "\"params\":{\"connection\":\"hook\"}}]}", DEV), 200);
+                    + "\"params\":{\"connection\":\"hook\"}}]}", POWER), 200);
             JsonNode applied = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200);
             JsonNode one = applied.at("/executed/0");
             assertEquals("executed", one.get("status").asText(), applied.toString());
@@ -446,6 +448,55 @@ class ControlApiActionRequestsTest {
                     443, null, "api", null, null, Map.of(), null, null));
             HttpResponse<String> r = send(c, "POST", "/action-requests", body(incident(c)).replace("\"hook\"", "\"trick\""), AUTHOR);
             assertEquals(422, r.statusCode(), "a Connection that reached the registry some other way is refused at create: " + r.body());
+        }
+    }
+
+    private static final String INVOKE_RULE = "{\"name\":\"leak\",\"consequences\":[{\"action\":\"invoke-api\","
+            + "\"params\":{\"connection\":\"hook\"}}]}";
+
+    /** Verification finding 3: saving an invoke-api rule is proposing outbound calls by proxy. */
+    @Test
+    void savingAnInvokeApiRuleNeedsCanWorkIncidents(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            HttpResponse<String> dev = send(c, "POST", "/decision-rules", INVOKE_RULE, DEV);
+            assertEquals(403, dev.statusCode(), dev.body());
+            data(send(c, "POST", "/decision-rules", INVOKE_RULE, POWER), 200);
+            assertEquals(403, send(c, "PUT", "/decision-rules/leak", INVOKE_RULE, DEV).statusCode(), "the update path too");
+            data(send(c, "POST", "/decision-rules", "{\"name\":\"plain\",\"consequences\":[{\"action\":"
+                    + "\"emit-signal\"}]}", DEV), 200);
+        }
+    }
+
+    /** Verification finding 3: the rule's makers are co-authors of what it raises, so neither may approve it. */
+    @Test
+    void theRulesEditorCannotApproveTheRequestItRaised(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
+            data(send(c, "POST", "/decision-rules", INVOKE_RULE, EDITOR), 200);
+            String id = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200)
+                    .at("/executed/0/actionRequestId").asText();
+            JsonNode rec = data(send(c, "GET", "/action-requests/" + id, null, CHECKER), 200);
+            assertEquals("editor-1", rec.at("/coAuthors/0").asText(), rec.toString());
+            HttpResponse<String> editor = send(c, "POST", "/action-requests/" + id + "/approve", "{}", EDITOR);
+            assertEquals(403, editor.statusCode(), editor.body());
+            assertTrue(editor.body().contains("edited the Decision Rule"), editor.body());
+            assertEquals(403, send(c, "POST", "/action-requests/" + id + "/decline", "{}", EDITOR).statusCode());
+            assertTrue(keys.isEmpty());
+            assertEquals("succeeded", data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200)
+                    .get("status").asText());
+        }
+    }
+
+    @Test
+    void aRuleWithNoRecordedEditorRaisesNothing(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            new com.gamma.pipeline.ComponentStore(c.root.resolve("registry")).write("decision-rule", "legacy",
+                    Map.of("name", "legacy", "enabled", true, "consequences",
+                            List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook")))));
+            JsonNode one = data(send(c, "POST", "/decision-rules/legacy/apply", "{}", AUTHOR), 200).at("/executed/0");
+            assertEquals("skipped", one.get("status").asText(), one.toString());
+            assertTrue(one.get("detail").asText().contains("no recorded editor"), one.toString());
+            assertEquals(0, data(send(c, "GET", "/action-requests", null, CHECKER), 200).get("total").asInt());
         }
     }
 
