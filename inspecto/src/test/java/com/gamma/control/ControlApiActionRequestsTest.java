@@ -423,6 +423,28 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    /**
+     * Verification finding 5: the approved targetUrl is pinned. After an approval, the Connection is re-pointed at
+     * another host; a retry must fail naming the change, and send nothing.
+     */
+    @Test
+    void aRetryAfterTheConnectionMovedFailsAndSendsNothing(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String id = propose(c, incident(c));
+            failFirst = 3;
+            assertEquals("failed", data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200)
+                    .get("status").asText());
+            int sent = keys.size();
+            ConnectionRegistry.register(new ConnectionProfile("hook", "https", "localhost", target.getAddress().getPort(),
+                    null, "api", null, null, Map.of(), null, null));
+            data(send(c, "PUT", "/settings/egress", "{\"allow\":[\"127.0.0.1/32\",\"::1/128\"]}", CHECKER), 200);
+            JsonNode retried = data(send(c, "POST", "/action-requests/" + id + "/retry", "{}", CHECKER), 200);
+            assertEquals("failed", retried.get("status").asText(), retried.toString());
+            assertTrue(retried.at("/lastResponse/error").asText().contains("now resolves to"), retried.toString());
+            assertEquals(sent, keys.size(), "nothing sent to the re-pointed Connection");
+        }
+    }
+
     @Test
     void theEgressAllowlistIsAdministratorOnlyAndValidatedFailClosed(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         try (Ctx c = open(cfg, tmp, true)) {
