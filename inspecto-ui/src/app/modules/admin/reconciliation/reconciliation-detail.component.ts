@@ -41,6 +41,7 @@ import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { formatNumber, NumberFormat } from 'app/inspecto/viz/number-format';
 import { fmtDateTime } from 'app/inspecto/format';
+import { humanizeColumn } from 'app/inspecto/viz/column-label';
 
 /**
  * Breaks page (`/reconciliation/:id/breaks?path=…`) — the record sets behind one Board cell: three
@@ -205,11 +206,16 @@ export class ReconciliationDetailComponent implements OnInit {
         const s = this.selected();
         if (!s) return [];
         if (s.type === 'cardinality_break')
-            return [{ field: 'rows', left: fmtVal(s.leftValue), right: fmtVal(s.rightValue) }];
+            return [{ field: 'rows', label: 'Rows', left: fmtVal(s.leftValue), right: fmtVal(s.rightValue) }];
         if (s.type !== 'value_break') return [];
         return this.valueBreaks()
             .filter((b) => b.key === s.key)
-            .map((b) => ({ field: b.column ?? '—', left: fmtVal(b.leftValue), right: fmtVal(b.rightValue) }));
+            .map((b) => ({
+                field: b.column ?? '—',
+                label: b.column ? humanizeColumn(b.column) : '—',
+                left: fmtVal(b.leftValue),
+                right: fmtVal(b.rightValue),
+            }));
     });
     readonly breakLabel = breakLabel;
 
@@ -337,6 +343,8 @@ export class ReconciliationDetailComponent implements OnInit {
                 flex: 1,
                 minWidth: 220,
                 valueGetter: (p) => (p.data ? fieldDiff(p.data) : ''),
+                // R3-03: the cell reads the humanised field; the stored column name stays one hover away.
+                tooltipValueGetter: (p) => p.data?.column ?? '',
             },
             { field: 'diff', headerName: 'Δ', width: 120, cellRenderer: varianceCell() },
             ...this.impactColumn(),
@@ -732,9 +740,12 @@ function breakLabel(type: string): string {
               ? 'duplicate key'
               : type;
 }
-/** `active_flag: 1 → 0` — one mismatched field of a value break, A side first. */
+/**
+ * `Monthly fee (SAR): 149 → 99` — one mismatched field of a value break, A side first, the column named as the
+ * Board names columns (`humanizeColumn`, R3-03); the raw name is the cell's tooltip.
+ */
 export function fieldDiff(b: ReconBreak): string {
-    return `${b.column ?? '—'}: ${fmtVal(b.leftValue)} → ${fmtVal(b.rightValue)}`;
+    return `${b.column ? humanizeColumn(b.column) : '—'}: ${fmtVal(b.leftValue)} → ${fmtVal(b.rightValue)}`;
 }
 function fmtVal(v: unknown): string {
     if (v == null) return '—';

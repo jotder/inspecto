@@ -310,7 +310,7 @@
                         <tbody>
                             @for (f of selectedFields(); track f.field) {
                                 <tr>
-                                    <td class="pr-6 font-mono">{{ f.field }}</td>
+                                    <td class="pr-6" [title]="f.field">{{ f.label }}</td>
                                     <td class="pr-6">{{ f.left }}</td>
                                     <td class="font-semibold">{{ f.right }}</td>
                                 </tr>

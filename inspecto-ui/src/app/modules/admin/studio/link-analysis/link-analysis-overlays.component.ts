@@ -2,13 +2,40 @@ import { ChangeDetectionStrategy, Component, input, output } from '@angular/core
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { WorkingSetStat } from 'app/inspecto/graph';
+import { NodeKind } from 'app/inspecto/api';
+import { G6GraphData, SUPER_NODE_KIND, WorkingSetStat } from 'app/inspecto/graph';
+import { nodeColor } from 'app/modules/admin/catalog/catalog-graph';
+import { baseEdgeKind } from 'app/modules/admin/catalog/graph-view.component';
 
 /** One swatch row of the legend. */
 export interface LegendItem {
     kind: string;
     color: string;
     count: number;
+}
+
+/**
+ * The legend's node rows for a drawn graph — kind → canvas colour → count, most common first. ONE derivation for
+ * the studio and the saved-view widget (R3-04), so a view reads the same wherever it is shown. The colour is the
+ * view's own per-kind override, else the kind's default canvas colour — what `<inspecto-graph-view>` paints.
+ */
+export function legendItemsFor(g: G6GraphData | null, nodeColors: Record<string, string> = {}): LegendItem[] {
+    if (!g) return [];
+    const counts = new Map<string, number>();
+    // A super-node is a stand-in, not an entity: counting it as a kind would misstate how many of
+    // that kind the analyst is looking at, and it has no real kind to be counted under anyway.
+    for (const n of g.nodes) {
+        if (n.data.kind === SUPER_NODE_KIND) continue;
+        counts.set(n.data.kind, (counts.get(n.data.kind) ?? 0) + 1);
+    }
+    return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([kind, count]) => ({ kind, count, color: nodeColors[kind] ?? nodeColor(kind as NodeKind) }));
+}
+
+/** The link kinds present, without their folded ` · N` count suffix, sorted. */
+export function legendEdgeKindsFor(g: G6GraphData | null): string[] {
+    return g ? [...new Set(g.edges.map((e) => baseEdgeKind(e.data.kind)))].sort() : [];
 }
 
 /**

@@ -205,6 +205,21 @@ TOTAL strip humanise too. The builder's view — side letter, Dataset id, raw co
 back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model reads `description` but
 `toContent` still does not write it back, so a Studio save of a Dataset likely drops it (pre-existing; not verified end-to-end).
 
+**Visual-drive polish** (R3-01…03, R3-05, 2026-09-26).
+* **Dates** — *Last run* (list) and *Last evaluated* (Breaks page) print through the shared `fmtDateTime`,
+  which now writes ONE spelling on every host — `26 Sep 2026, 08:05:09`, viewer's zone, month name from the
+  `viz/number-format` `LOCALE` — instead of `toLocaleString()` (`9/26/2026, 8:05:09 AM` on a US host). The fix is
+  in the formatter, so every `fmtDateTime` grid/detail column in the app changed with it. ⚠ `fmtWhen`'s
+  absolute branch (beyond ±24 h) still uses Luxon's host-locale `toLocaleString()` — not changed here.
+* **The list names its sides** like the Board (`datasetLabels`, read once per load); the row carries
+  `leftLabel`/`rightLabel` so the grid re-renders when the Dataset list lands; the id is the cell tooltip and
+  stays searchable.
+* **Field diff** (Breaks grid and the selected-Break table) names the column through `humanizeColumn`
+  (`monthly_fee_sar` → "Monthly fee (SAR)"), the raw name in the tooltip / `title`.
+* **Authoring is gated on `canAuthorWorkbench`** — the list's *New reconciliation* and *Duplicate* row action,
+  and the Board's edit pencil (and `edit()` itself), because each writes the `reconciliation` Component whose
+  PUT the server gates on that capability. *Run* stays `canOperateRuns`.
+
 As-built design (archived):
 [`reconciliation-board-design.md`](../../../archived-documents/plans-archive/reconciliation-board-design.md) ·
 review sheet: [`reviews/reconciliation.md`](../../../archived-documents/superpower-reviews/reconciliation.md).

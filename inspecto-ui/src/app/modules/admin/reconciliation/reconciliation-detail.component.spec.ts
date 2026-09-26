@@ -463,7 +463,7 @@ describe('Breaks page for an analyst (UIE-10)', () => {
 
     it('renders a value break as `field: A → B`', async () => {
         const { c } = await create();
-        expect(fieldDiff(c.valueBreaks()[0])).toBe('amount: 118 → 114');
+        expect(fieldDiff(c.valueBreaks()[0])).toBe('Amount: 118 → 114');
         const col = c.valueColumns().find((d) => d.colId === 'fieldDiff');
         expect(col?.headerName).toBe('Field diff (mediation_daily → billing_daily)');
     });
@@ -471,7 +471,7 @@ describe('Breaks page for an analyst (UIE-10)', () => {
     it('signs Δ along the Field diff arrow: 118 → 114 is ▼ -4 (B − A)', async () => {
         const { c } = await create();
         const b = c.valueBreaks()[0];
-        expect(fieldDiff(b)).toBe('amount: 118 → 114');
+        expect(fieldDiff(b)).toBe('Amount: 118 → 114');
         expect(b.diff).toBe(-4);
         const col = c.valueColumns().find((d) => d.field === 'diff')!;
         const render = col.cellRenderer as (p: { value: unknown }) => string;
@@ -486,8 +486,8 @@ describe('Breaks page for an analyst (UIE-10)', () => {
         const squash = (t: string) => t.replace(/\s+/g, ' ');
         const text = squash((fixture.nativeElement as HTMLElement).textContent ?? '');
         expect(text).toContain(squash(`Last evaluated: ${fmtDateTime(at)} ·`));
-        expect(fmtDateTime(at)).toContain(at.toLocaleDateString());
-        expect(fmtDateTime(at)).toContain('2026');
+        // R3-01: the app's one spelling, never the host's `9/20/2026, 12:00:48 AM`.
+        expect(text).toContain('Last evaluated: 20 Sep 2026, 00:00:48');
     });
 
     it('shows only the mismatched fields of the selected Break', async () => {
@@ -495,14 +495,26 @@ describe('Breaks page for an analyst (UIE-10)', () => {
         const eu = c.valueBreaks().find((b) => b.key === 'EU · data')!;
         c.select(eu as unknown as Record<string, unknown>);
         fixture.detectChanges();
-        expect(c.selectedFields()).toEqual([{ field: 'amount', left: '118', right: '114' }]);
+        expect(c.selectedFields()).toEqual([{ field: 'amount', label: 'Amount', left: '118', right: '114' }]);
         const table = (fixture.nativeElement as HTMLElement).querySelector('[data-testid="field-diff"]')!;
-        expect(text(table as HTMLElement)).toContain('amount');
-        expect(text(table as HTMLElement)).not.toContain('units');
+        expect(text(table as HTMLElement)).toContain('Amount');
+        expect(text(table as HTMLElement)).not.toContain('Units');
+        // R3-03: the stored column name stays one hover away.
+        expect((table.querySelector('tbody td') as HTMLElement).title).toBe('amount');
 
         const us = c.valueBreaks().find((b) => b.key === 'US · voice')!;
         c.select(us as unknown as Record<string, unknown>);
-        expect(c.selectedFields()).toEqual([{ field: 'units', left: '3', right: '4' }]);
+        expect(c.selectedFields()).toEqual([{ field: 'units', label: 'Units', left: '3', right: '4' }]);
+    });
+
+    // R3-03: the Field diff printed the raw column (`monthly_fee_sar: 149 → 99`); it reads as the Board names
+    // columns, with the raw name in the cell tooltip.
+    it('humanises the Field diff column name and keeps the raw name in the tooltip', async () => {
+        const { c } = await create();
+        const b = { ...c.valueBreaks()[0], column: 'monthly_fee_sar', leftValue: 149, rightValue: 99 };
+        expect(fieldDiff(b)).toBe('Monthly fee (SAR): 149 → 99');
+        const col = c.valueColumns().find((d) => d.colId === 'fieldDiff')!;
+        expect((col.tooltipValueGetter as (p: { data: unknown }) => string)({ data: b })).toBe('monthly_fee_sar');
     });
 
     it('shows the impact per Break in the declared currency', async () => {

@@ -1,17 +1,28 @@
 /**
  * Pure, framework-agnostic display formatters shared across the app — the P4 consolidation of helpers that
  * were duplicated inline in several components. Templates use the thin pipes in `pipes.ts`; TS call sites import
- * these directly. Only Luxon (`DateTime`) is imported besides Angular-free stdlib (still vitest-pure, like
- * `query/`). Only formatters with ≥2 real call sites live here (adoption-plan STOP).
+ * these directly. Only Luxon (`DateTime`) and the one display `LOCALE` are imported besides Angular-free stdlib
+ * (still vitest-pure, like `query/`). Only formatters with ≥2 real call sites live here (adoption-plan STOP).
  */
 
 import { DateTime } from 'luxon';
+import { LOCALE } from 'app/inspecto/viz/number-format';
 
-/** A date-time for grids / detail views — epoch millis or ISO string → locale string ('' for empty/falsy). */
+const MONTH = new Intl.DateTimeFormat(LOCALE, { month: 'short' });
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+/**
+ * A date-time for grids / detail views — a Date, epoch millis or ISO string → `26 Sep 2026, 08:05:09` in the
+ * viewer's zone ('' for empty/falsy; an unparseable value comes back raw). R3-01: ONE spelling on every machine,
+ * the rule `viz/number-format` follows for numbers — `toLocaleString()` wrote `9/26/2026, 8:05:09 AM` on a US
+ * host and `26/09/2026, …` elsewhere, beside Dashboards that already read "26 Sep 2026".
+ */
 export function fmtDateTime(value: unknown): string {
     if (!value) return '';
-    const d = typeof value === 'number' ? new Date(value) : new Date(String(value));
-    return isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+    const d = value instanceof Date ? value : typeof value === 'number' ? new Date(value) : new Date(String(value));
+    if (isNaN(d.getTime())) return String(value);
+    const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    return `${d.getDate()} ${MONTH.format(d)} ${d.getFullYear()}, ${time}`;
 }
 
 /** A whole-number count with thousands separators (rounds first). */

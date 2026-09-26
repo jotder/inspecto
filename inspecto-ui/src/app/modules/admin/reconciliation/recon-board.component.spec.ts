@@ -70,6 +70,7 @@ async function create(
         datasets?: Partial<Dataset>[];
         record?: () => Observable<ReconState>;
         canOperateRuns?: boolean;
+        canAuthor?: boolean;
     } = {},
 ) {
     const recon: Reconciliation = { ...RECON, ...opts.patch };
@@ -89,7 +90,13 @@ async function create(
             },
             { provide: ReconciliationsService, useValue: { get: () => of(recon), save } },
             { provide: ReconApiService, useValue: { record, state } },
-            { provide: LensService, useValue: { canOperateRuns: () => opts.canOperateRuns ?? true } },
+            {
+                provide: LensService,
+                useValue: {
+                    canOperateRuns: () => opts.canOperateRuns ?? true,
+                    canAuthorWorkbench: () => opts.canAuthor ?? true,
+                },
+            },
             { provide: ReconExecService, useValue: { run: vi.fn(async () => opts.result ?? RESULT) } },
             { provide: DatasetsService, useValue: { list: () => of(opts.datasets ?? []) } },
             { provide: MatDialog, useValue: { open: vi.fn() } },
@@ -186,6 +193,20 @@ describe('ReconBoardComponent', () => {
         expect(state).toHaveBeenCalledWith('med_vs_bill');
         expect(toastr.error).not.toHaveBeenCalled();
         expect(c.result()).not.toBeNull();
+    });
+
+    // R3-05: the pencil opened an editor whose save the server refuses (the component PUT needs canAuthorWorkbench).
+    it('shows the edit pencil only to a user who may author', async () => {
+        const editButton = (el: HTMLElement) => el.querySelector('button[aria-label="Edit"]');
+        const viewer = await create({ canAuthor: false });
+        expect(editButton(viewer.fixture.nativeElement)).toBeNull();
+        viewer.c.edit();
+        expect(TestBed.inject(MatDialog).open).not.toHaveBeenCalled();
+    });
+
+    it('shows the edit pencil to an author', async () => {
+        const { fixture } = await create();
+        expect((fixture.nativeElement as HTMLElement).querySelector('button[aria-label="Edit"]')).not.toBeNull();
     });
 
     it('the details action navigates to the Breaks page with the encoded path', async () => {

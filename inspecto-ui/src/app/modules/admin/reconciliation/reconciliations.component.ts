@@ -5,26 +5,36 @@ import { MatIconModule } from '@angular/material/icon';
 import { Router } from '@angular/router';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ReconApiService } from 'app/inspecto/api';
+import { apiErrorMessage, LensService, ReconApiService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { escapeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
 import {
     buildReconciliation,
+    datasetLabels,
     Reconciliation,
     reconciliationTitle,
     ReconciliationsService,
 } from 'app/inspecto/reconciliation';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
+import { DatasetsService } from '../studio/datasets/datasets.service';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
-/** A list row: the Reconciliation plus its last RECORDED run — `null` never run, `undefined` not known. */
-type ReconciliationRow = Reconciliation & { lastRunAt: string | null | undefined };
+/**
+ * A list row: the Reconciliation plus its last RECORDED run — `null` never run, `undefined` not known — and each
+ * side's readable Dataset label (the id until the Dataset list arrives).
+ */
+type ReconciliationRow = Reconciliation & {
+    lastRunAt: string | null | undefined;
+    leftLabel: string;
+    rightLabel: string;
+};
 
 /**
  * Reconciliation (C9) — the list of Dataset-vs-Dataset reconciliations; open one to run it and drill its
- * breaks. Authoring (create) is a Business surface per the plan; open to every lens (no identity model).
+ * breaks. Creating one (New / Duplicate) writes a `reconciliation` Component, which the server gates on
+ * `canAuthorWorkbench` — so both actions show only with that capability (R3-05).
  */
 @Component({
     selector: 'app-reconciliations',
@@ -45,11 +55,15 @@ export class ReconciliationsComponent implements OnInit {
     private dialog = inject(MatDialog);
     private router = inject(Router);
     private toastr = inject(ToastrService);
+    private datasetsApi = inject(DatasetsService);
+    protected lens = inject(LensService);
 
     readonly reconciliations = signal<Reconciliation[]>([]);
     readonly loading = signal(false);
     /** Reconciliation id → its last recorded run (R2-03, server-side state); null until read or on a failed read. */
     private readonly lastRuns = signal<Record<string, string | null> | null>(null);
+    /** Dataset id → readable label (description → name → id), as the Board and Breaks page name sides (R3-02). */
+    private readonly datasetNames = signal<Record<string, string>>({});
 
     /**
      * The rows with their last recorded run. ⚠ A failed state read leaves the column `—`, never "never" —
@@ -57,7 +71,13 @@ export class ReconciliationsComponent implements OnInit {
      */
     readonly rows = computed<ReconciliationRow[]>(() => {
         const runs = this.lastRuns();
-        return this.reconciliations().map((r) => ({ ...r, lastRunAt: runs ? (runs[r.id] ?? null) : undefined }));
+        const names = this.datasetNames();
+        return this.reconciliations().map((r) => ({
+            ...r,
+            lastRunAt: runs ? (runs[r.id] ?? null) : undefined,
+            leftLabel: names[r.leftDataset] || r.leftDataset,
+            rightLabel: names[r.rightDataset] || r.rightDataset,
+        }));
     });
 
     readonly columns: ColDef<ReconciliationRow>[] = [
@@ -79,8 +99,8 @@ export class ReconciliationsComponent implements OnInit {
                 return `<span>${escapeHtml(title)}</span>${id}`;
             },
         },
-        { field: 'leftDataset', headerName: 'Left', flex: 1 },
-        { field: 'rightDataset', headerName: 'Right', flex: 1 },
+        sideColumn('leftDataset', 'leftLabel', 'Left'),
+        sideColumn('rightDataset', 'rightLabel', 'Right'),
         { headerName: 'Keys', width: 140, valueGetter: (p) => (p.data?.keyColumns ?? []).join(', ') },
         {
             field: 'lastRunAt',
@@ -90,10 +110,19 @@ export class ReconciliationsComponent implements OnInit {
         },
     ];
 
-    readonly rowActions: InspectoRowAction<ReconciliationRow>[] = [
+    /** Duplicate creates a Reconciliation, so it is an authoring action like New (R3-05). */
+    readonly rowActions = computed<InspectoRowAction<ReconciliationRow>[]>(() => [
         { icon: 'heroicons_outline:arrow-right', hint: 'Open', onClick: (r) => this.open(r) },
-        { icon: 'heroicons_outline:document-duplicate', hint: 'Duplicate', onClick: (r) => this.duplicate(r) },
-    ];
+        ...(this.lens.canAuthorWorkbench()
+            ? [
+                  {
+                      icon: 'heroicons_outline:document-duplicate',
+                      hint: 'Duplicate',
+                      onClick: (r: ReconciliationRow) => this.duplicate(r),
+                  },
+              ]
+            : []),
+    ]);
 
     ngOnInit(): void {
         this.load();
@@ -101,6 +130,10 @@ export class ReconciliationsComponent implements OnInit {
 
     load(): void {
         this.loading.set(true);
+        // Labels only: a failed read leaves the sides named by their ids.
+        this.datasetsApi
+            .list()
+            .subscribe({ next: (d) => this.datasetNames.set(datasetLabels(d)), error: () => undefined });
         // Independent of the list: a failed state read degrades the "Last run" column only.
         this.reconApi.states().subscribe({
             next: (res) =>
@@ -155,4 +188,19 @@ export class ReconciliationsComponent implements OnInit {
                 });
             });
     }
+}
+
+/** A side named by its Dataset's readable label, the id in the tooltip and the quick search (R3-02). */
+function sideColumn(
+    field: 'leftDataset' | 'rightDataset',
+    label: 'leftLabel' | 'rightLabel',
+    headerName: string,
+): ColDef<ReconciliationRow> {
+    return {
+        field: label,
+        headerName,
+        flex: 1,
+        tooltipValueGetter: (p) => p.data?.[field] ?? '',
+        getQuickFilterText: (p) => (p.data ? `${p.data[label]} ${p.data[field]}` : ''),
+    };
 }

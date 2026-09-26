@@ -5,7 +5,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { ReconApiService } from 'app/inspecto/api';
+import { LensService, ReconApiService } from 'app/inspecto/api';
+import { DatasetsService } from '../studio/datasets/datasets.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { Reconciliation, ReconciliationsService } from 'app/inspecto/reconciliation';
@@ -26,6 +27,7 @@ function create(
     list: Reconciliation[] = [RECON],
     dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) })),
     states: () => Observable<unknown> = NO_RUNS,
+    opts: { canAuthor?: boolean; datasets?: () => Observable<unknown> } = {},
 ) {
     TestBed.configureTestingModule({
         imports: [ReconciliationsComponent],
@@ -34,6 +36,8 @@ function create(
             provideRouter([]),
             { provide: ReconciliationsService, useValue: { list: () => of(list), create: () => of(RECON) } },
             { provide: ReconApiService, useValue: { states } },
+            { provide: DatasetsService, useValue: { list: opts.datasets ?? (() => of([])) } },
+            { provide: LensService, useValue: { canAuthorWorkbench: () => opts.canAuthor !== false } },
             { provide: ToastrService, useValue: { error: () => undefined } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
         ],
@@ -68,7 +72,8 @@ describe('ReconciliationsComponent', () => {
         const fmt = (v: unknown) => (last.valueFormatter as (p: { value: unknown }) => string)({ value: v });
         expect(c.rows().map((r) => r.lastRunAt)).toEqual(['2026-09-26T08:00:00Z', null]);
         expect(fmt(null)).toBe('never');
-        expect(fmt('2026-09-26T08:00:00Z')).not.toBe('never');
+        // R3-01: the app's one date spelling (`26 Sep 2026, …`), never the host's `9/26/2026, …`.
+        expect(fmt('2026-09-26T08:00:00Z')).toMatch(/^2[67] Sep 2026, \d\d:\d\d:\d\d$/);
     });
 
     it('never claims "never" when the recorded state could not be read', () => {
@@ -110,6 +115,49 @@ describe('ReconciliationsComponent', () => {
         expect(col.getQuickFilterText!(params(offerFee))).toBe(
             'Offer fee billed: CRM vs CBS (daily, 0.01 SAR tolerance) ra_c02_offer_fee',
         );
+    });
+
+    // R3-02: the sides were Dataset ids (`crm_subscribers`); they read as the Board names them, id in the tooltip.
+    it('names each side by its Dataset label, keeping the id in the tooltip and the search', async () => {
+        const datasets = () =>
+            of([
+                { id: 'switch_cdr', name: 'switch_cdr', description: 'Switch CDRs (mediation)' },
+                { id: 'billing_cdr', name: 'Billing CDRs' },
+            ]);
+        const { fixture } = create([RECON], undefined, NO_RUNS, { datasets });
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const cell = (col: string) =>
+            (
+                fixture.nativeElement.querySelector(
+                    `.ag-center-cols-container .ag-cell[col-id="${col}"]`,
+                ) as HTMLElement | null
+            )?.textContent?.trim();
+        expect(cell('leftLabel')).toBe('Switch CDRs (mediation)');
+        expect(cell('rightLabel')).toBe('Billing CDRs');
+        const left = fixture.componentInstance.columns.find((c) => c.field === 'leftLabel')!;
+        const row = { data: fixture.componentInstance.rows()[0] } as never;
+        expect((left.tooltipValueGetter as (p: never) => string)(row)).toBe('switch_cdr');
+        expect(left.getQuickFilterText!(row)).toBe('Switch CDRs (mediation) switch_cdr');
+    });
+
+    it('names a side by its id when the Dataset list cannot be read', () => {
+        const c = create([RECON], undefined, NO_RUNS, { datasets: () => throwError(() => ({ status: 500 })) }).fixture
+            .componentInstance;
+        expect(c.rows()[0].leftLabel).toBe('switch_cdr');
+    });
+
+    // R3-05: creating writes a `reconciliation` Component, which the server refuses without canAuthorWorkbench.
+    it('offers New and Duplicate only to a user who may author', () => {
+        const hidden = create([RECON], undefined, NO_RUNS, { canAuthor: false }).fixture;
+        expect(hidden.nativeElement.textContent).not.toContain('New reconciliation');
+        expect(hidden.componentInstance.rowActions().map((a) => a.hint)).toEqual(['Open']);
+    });
+
+    it('offers New and Duplicate to an author', () => {
+        const shown = create().fixture;
+        expect(shown.nativeElement.textContent).toContain('New reconciliation');
+        expect(shown.componentInstance.rowActions().map((a) => a.hint)).toEqual(['Open', 'Duplicate']);
     });
 
     it('renders with no a11y violations', async () => {

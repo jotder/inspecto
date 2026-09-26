@@ -261,9 +261,12 @@ export class ReconBoardComponent implements OnInit {
         });
     }
 
+    /** Editing writes the `reconciliation` Component, which the server gates on `canAuthorWorkbench` (R3-05). */
+    readonly canAuthor = computed(() => this.lens.canAuthorWorkbench());
+
     edit(): void {
         const r = this.recon();
-        if (!r) return;
+        if (!r || !this.canAuthor()) return;
         this.dialog
             .open(ReconciliationFormDialog, { width: '640px', maxHeight: '85vh', data: { recon: r } })
             .afterClosed()

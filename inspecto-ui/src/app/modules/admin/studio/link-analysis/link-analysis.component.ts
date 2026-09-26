@@ -102,11 +102,11 @@ import {
 import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
 import { GraphSnapshot } from 'app/inspecto/graph';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
-import { NodeKind } from 'app/inspecto/api';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
-import { nodeColor } from 'app/modules/admin/catalog/catalog-graph';
 import {
     LegendItem,
+    legendEdgeKindsFor,
+    legendItemsFor,
     LinkAnalysisLegendComponent,
     LinkAnalysisWorkingSetComponent,
 } from './link-analysis-overlays.component';
@@ -538,10 +538,7 @@ export class LinkAnalysisComponent implements OnInit {
         const g = this.graph();
         return g ? [...new Set(g.nodes.map((n) => n.data.kind))].sort() : [];
     });
-    readonly edgeKinds = computed<string[]>(() => {
-        const g = this.graph();
-        return g ? [...new Set(g.edges.map((e) => baseEdgeKind(e.data.kind)))].sort() : [];
-    });
+    readonly edgeKinds = computed<string[]>(() => legendEdgeKindsFor(this.graph()));
     /** Collapsed branch roots — their downstream nodes are hidden until expanded. */
     readonly collapsedRoots = signal<string[]>([]);
 
@@ -734,21 +731,7 @@ export class LinkAnalysisComponent implements OnInit {
     readonly tableMode = signal<'links' | 'nodes'>('links');
 
     // ── canvas overlays: legend (kind → colour → count) and the working set tiles ──
-    readonly legendItems = computed<LegendItem[]>(() => {
-        const g = this.displayed();
-        if (!g) return [];
-        const counts = new Map<string, number>();
-        // A super-node is a stand-in, not an entity: counting it as a kind would misstate how many of
-        // that kind the analyst is looking at, and it has no real kind to be counted under anyway.
-        for (const n of g.nodes) {
-            if (n.data.kind === SUPER_NODE_KIND) continue;
-            counts.set(n.data.kind, (counts.get(n.data.kind) ?? 0) + 1);
-        }
-        const colors = this.nodeColors();
-        return [...counts.entries()]
-            .sort((a, b) => b[1] - a[1])
-            .map(([kind, count]) => ({ kind, count, color: colors[kind] ?? nodeColor(kind as NodeKind) }));
-    });
+    readonly legendItems = computed<LegendItem[]>(() => legendItemsFor(this.displayed(), this.nodeColors()));
     // ── domain profile: what the tiles are called, which columns are measure/time, which tools are suggested ──
     readonly profileControl = new FormControl<DomainProfileId>('generic', { nonNullable: true });
     readonly profileOptions = DOMAIN_PROFILES.map((p) => ({ value: p.id, label: p.label, hint: p.description }));

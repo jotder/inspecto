@@ -28,6 +28,15 @@ describe('format', () => {
         expect(fmtDateTime(0)).toBe(''); // 0 is falsy → '' (preserves the original grid guard)
     });
 
+    // R3-01: one spelling whatever the host locale — never `9/26/2026, 8:05:09 AM`.
+    it('fmtDateTime writes day, short month, year and a 24-hour time in the viewer zone', () => {
+        const at = new Date(2026, 8, 26, 8, 5, 9);
+        expect(fmtDateTime(at)).toBe('26 Sep 2026, 08:05:09');
+        expect(fmtDateTime(at.getTime())).toBe('26 Sep 2026, 08:05:09');
+        expect(fmtDateTime(at.toISOString())).toBe('26 Sep 2026, 08:05:09');
+        expect(fmtDateTime(new Date(2026, 0, 3, 17, 40, 0))).toBe('3 Jan 2026, 17:40:00');
+    });
+
     describe('fmtWhen', () => {
         const now = new Date('2026-08-24T12:00:00Z');
 

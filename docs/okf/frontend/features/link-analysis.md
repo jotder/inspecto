@@ -418,6 +418,23 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   most needed it and the one nobody had listed** — a tile reads as a fixed report and is in fact a live
   re-projection on every render. ⚠ This is a LABEL, not a guarantee: making a view reproducible is LA-03,
   and needs a durable snapshot store that does not exist yet.
+* **The saved-view widget draws the studio's legend and, on a Menu item, the view's description** (R3-04,
+  2026-09-26). `LinkViewWidgetComponent` (dashboard tile + Menu item) mounts `<inspecto-link-analysis-legend>`
+  over the canvas, fed by the SAME `legendItemsFor` / `legendEdgeKindsFor` the studio now calls
+  (`link-analysis-overlays.component.ts` — kind → count, colour = the view's `display.nodeColors[kind]` else
+  `nodeColor(kind)`, super-nodes never counted), open unless the view saved `view.legend: false` (the studio's
+  own restore default); the viewer's toggle is never saved. With `[showDescription]="true"` — set by
+  `MenuArtifactComponent`, whose host owns the page title — the view's `description` renders beneath it through
+  `<app-dashboard-header>`, the line Dashboards use; a tile leaves it off (the tile card has its own title).
+  🔴 **Node kinds are NOT derived by the profile or from id prefixes — nowhere in the SPA.** A single
+  `query.projection` (`projectTriples`) stamps EVERY node `kind: 'entity'`, so a legend over the telco demo's
+  `fraud_entity_graph` / `simbox_ring_jeddah` reads one row, *entity*, in one colour — in the studio too.
+  `profile: telecom` shapes tile labels, measure/time columns and suggested tools only. The only kind-bearing
+  path is an LA-08 multi-projection, `query.multi.nodes[]`: one `MultiNodeMapping {dataset, idColumn,
+  category}` per kind, `category` a CONSTANT stamped on every node that mapping yields (there is no per-row kind
+  column and no per-mapping filter), so the data needs one Dataset (or view) per entity kind — e.g. SIMs, IMEIs,
+  Cells, Dealers — each listing its ids, plus the existing link Dataset as `query.multi.edges[]`. Deriving kind
+  from a value prefix ("SIM …", "IMEI …") would be a new product rule, not built.
 * **"The ops module is absent" and "the Case lookup failed" are two states, and Attach-to-Case now says
   which** (found 2026-09-22 while grounding D-S1). The dialog fills its Case picker from
   `GET /objects?type=CASE` and used to fall back to `LinkAnalysisSnapshotsService.mockCases` on ANY error,

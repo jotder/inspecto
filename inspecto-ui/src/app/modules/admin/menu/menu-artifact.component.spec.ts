@@ -14,6 +14,7 @@ import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.serv
 import { DrillEvent, WidgetHostComponent } from 'app/modules/admin/studio/widgets/widget-host.component';
 import { Widget } from 'app/modules/admin/studio/widgets/widget-types';
 import { WidgetsService } from 'app/modules/admin/studio/widgets/widgets.service';
+import { LinkViewWidgetComponent } from 'app/modules/admin/studio/link-analysis/link-view-widget.component';
 import { MenuArtifactComponent } from './menu-artifact.component';
 
 /** Stands in for the real tile (whose chart host jsdom can't create) and records what the viewer passes it. */
@@ -37,6 +38,16 @@ class StubTileComponent {
 })
 class StubWidgetHostComponent {
     readonly widgetId = input<string>();
+}
+@Component({
+    selector: 'app-link-view-widget',
+    standalone: true,
+    template: '',
+    changeDetection: ChangeDetectionStrategy.Eager,
+})
+class StubLinkViewWidgetComponent {
+    readonly viewId = input<string>();
+    readonly showDescription = input(false);
 }
 
 const DS: Dataset = {
@@ -83,8 +94,8 @@ function create(dashboard: Dashboard | null, widgets: Widget[] = [WIDGET], datas
         ],
     });
     TestBed.overrideComponent(MenuArtifactComponent, {
-        remove: { imports: [DashboardTileComponent, WidgetHostComponent] },
-        add: { imports: [StubTileComponent, StubWidgetHostComponent] },
+        remove: { imports: [DashboardTileComponent, WidgetHostComponent, LinkViewWidgetComponent] },
+        add: { imports: [StubTileComponent, StubWidgetHostComponent, StubLinkViewWidgetComponent] },
     });
     const f = TestBed.createComponent(MenuArtifactComponent);
     if (dashboard) f.componentRef.setInput('binding', { kind: 'dashboard', componentId: dashboard.id });
@@ -106,6 +117,17 @@ function tile(f: ReturnType<typeof create>): StubTileComponent {
 }
 
 describe('MenuArtifactComponent', () => {
+    // R3-04: the Menu item owns the page title, so the saved view's description belongs under it.
+    it('asks a saved Link Analysis view for its description under the page title', () => {
+        const f = create(null);
+        f.componentRef.setInput('binding', { kind: 'link-analysis-view', componentId: 'fraud_entity_graph' });
+        f.detectChanges();
+        const w = f.debugElement.query((d) => d.componentInstance instanceof StubLinkViewWidgetComponent)
+            .componentInstance as StubLinkViewWidgetComponent;
+        expect(w.viewId()).toBe('fraud_entity_graph');
+        expect(w.showDescription()).toBe(true);
+    });
+
     it('renders the empty state (with a custom message) when there is no binding', async () => {
         const f = create(null);
         f.componentRef.setInput('emptyMessage', 'Pick a report to preview.');

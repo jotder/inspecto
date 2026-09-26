@@ -10,9 +10,11 @@
             [inset]="false"
         >
             <ng-container actions>
-                <button mat-icon-button (click)="edit()" matTooltip="Edit" aria-label="Edit">
-                    <mat-icon svgIcon="heroicons_outline:pencil-square"></mat-icon>
-                </button>
+                @if (canAuthor()) {
+                    <button mat-icon-button (click)="edit()" matTooltip="Edit" aria-label="Edit">
+                        <mat-icon svgIcon="heroicons_outline:pencil-square"></mat-icon>
+                    </button>
+                }
                 <button mat-flat-button color="primary" (click)="run()" [disabled]="running() || loading()">
                     @if (running()) {
                         <mat-progress-spinner diameter="16" mode="indeterminate" class="mr-2" />

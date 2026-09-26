@@ -51,7 +51,9 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
                     <div class="h-[70vh] min-h-0"><app-geo-view-widget [viewId]="b.componentId" /></div>
                 }
                 @case ('link-analysis-view') {
-                    <div class="h-[70vh] min-h-0"><app-link-view-widget [viewId]="b.componentId" /></div>
+                    <div class="h-[70vh] min-h-0">
+                        <app-link-view-widget [viewId]="b.componentId" [showDescription]="true" />
+                    </div>
                 }
                 @case ('dashboard') {
                     @if (dashboard(); as d) {

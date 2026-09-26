@@ -8,10 +8,12 @@
             <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
             </button>
-            <button mat-flat-button color="primary" (click)="create()">
-                <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
-                <span class="ml-2">New reconciliation</span>
-            </button>
+            @if (lens.canAuthorWorkbench()) {
+                <button mat-flat-button color="primary" (click)="create()">
+                    <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                    <span class="ml-2">New reconciliation</span>
+                </button>
+            }
         </ng-container>
     </inspecto-page-header>
 
@@ -29,7 +31,7 @@
             exportName="reconciliations"
             [rows]="rows()"
             [columns]="columns"
-            [rowActions]="rowActions"
+            [rowActions]="rowActions()"
             [loading]="loading()"
             (rowClick)="open($any($event))"
         />
