@@ -181,6 +181,9 @@ final class PendingChangeRoutes implements RouteModule {
         synchronized (PendingChanges.lock()) {
             Map<String, Object> rec = PendingChanges.read(root, id);   // 422 on an unsafe id
             if (rec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no pending change '" + id + "'");
+            if (PendingChanges.invalid(rec))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' fails its integrity check "
+                        + "(its MAC does not verify: it was not written by this server, or was edited since) — it cannot be decided");
             PendingChanges.expireIfDue(ex, root, rec);
             if (!"pending".equals(rec.get("status")))
                 throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' is already " + rec.get("status"));
@@ -203,6 +206,13 @@ final class PendingChangeRoutes implements RouteModule {
             }
 
             Map<String, Object> request = (Map<String, Object>) rec.get("request");
+            // Re-verification finding 2 (i): only a route that reaches the hold before it writes may be replayed —
+            // checked BEFORE anything is dispatched, so a record naming any other route cannot write at all.
+            if (request == null || !PendingChanges.replayable(String.valueOf(request.get("method")),
+                    String.valueOf(request.get("path"))))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' names a request ("
+                        + (request == null ? "none" : request.get("method") + " " + request.get("path"))
+                        + ") that is not a maker-checker route — nothing was dispatched");
             Map<String, Object> marker = new LinkedHashMap<>(rec);
             marker.put("approvedBy", by);   // AuditTrail stamps it on the replayed write beside the author (actor)
             Map<String, String> headers = new LinkedHashMap<>();

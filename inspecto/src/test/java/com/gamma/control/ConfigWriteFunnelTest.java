@@ -119,7 +119,33 @@ class ConfigWriteFunnelTest {
                             + "the recovery would strand a half-moved identity")
     ));
 
-    record Verdict(String route, boolean toon, boolean component, boolean saveGate, boolean hold, Path file) {}
+    record Verdict(String route, boolean toon, boolean component, boolean saveGate, boolean hold, Path file,
+                   boolean holdsItself) {}
+
+    /** A real hold — not {@code holdRefusing*}, which refuses instead of recording a replayable request. */
+    private static final Pattern REAL_HOLD = Pattern.compile("PendingChanges\\.hold\\(");
+
+    /**
+     * Re-verification finding 2 (i): the production replay allowlist ({@link PendingChanges#REPLAYABLE}) is EXACTLY
+     * the set of routes whose handler reaches a real {@code PendingChanges.hold} — a route added to one without the
+     * other goes red here, so approve can never replay a route that does not hold before it writes.
+     */
+    @Test
+    void theReplayAllowlistIsExactlyTheRoutesThatHold() throws IOException {
+        Set<String> holding = new java.util.TreeSet<>();
+        for (Verdict v : scan()) if (v.holdsItself()) holding.add(v.route());
+        assertTrue(holding.size() > 10, "the scan found almost no holding routes — scan broken? " + holding);
+        assertTrue(holding.equals(new java.util.TreeSet<>(PendingChanges.REPLAYABLE)), () ->
+                "PendingChanges.REPLAYABLE has drifted from the routes that hold.\nholding but not replayable: "
+                        + minus(holding, PendingChanges.REPLAYABLE) + "\nreplayable but not holding: "
+                        + minus(new java.util.TreeSet<>(PendingChanges.REPLAYABLE), holding));
+    }
+
+    private static Set<String> minus(Set<String> a, java.util.Collection<String> b) {
+        Set<String> out = new java.util.TreeSet<>(a);
+        out.removeAll(b);
+        return out;
+    }
 
     @Test
     void everyConfigWritingRoutePassesThroughTheFunnelsOrIsExempt() throws IOException {
@@ -220,7 +246,10 @@ class ConfigWriteFunnelTest {
                     + "on its target Dataset)"),
             Map.entry("EntityListRoutes#list", ENTITY_FACTS), Map.entry("EntityListRoutes#one", ENTITY_FACTS),
             Map.entry("EntityListRoutes#create", ENTITY_FACTS), Map.entry("EntityListRoutes#members", ENTITY_FACTS),
-            Map.entry("EntityListRoutes#retire", ENTITY_FACTS)
+            Map.entry("EntityListRoutes#retire", ENTITY_FACTS),
+            Map.entry("InvestigationRoutes#sealList", "READS the Identity Fact log to seal a list into an "
+                    + "Investigation op (LA-17) — the signal matches opening the log, which is not a write; "
+                    + ENTITY_FACTS)
     ));
 
     @Test
@@ -325,7 +354,8 @@ class ConfigWriteFunnelTest {
             String closure = closure(handler, methods);
             out.add(new Verdict(site.group(1).toUpperCase(Locale.ROOT) + " " + site.group(2),
                     TOON_WRITE.matcher(closure).find(), COMPONENT_WRITE.matcher(closure).find(),
-                    SAVE_GATE.matcher(closure).find(), HOLD.matcher(closure).find(), f));
+                    SAVE_GATE.matcher(closure).find(), HOLD.matcher(closure).find(), f,
+                    REAL_HOLD.matcher(closure).find()));
         }
     }
 

@@ -310,17 +310,122 @@ public final class PendingChanges {
         return f;
     }
 
+    /**
+     * Persist {@code rec} with its MAC (re-verification finding 2 (ii)): HMAC-SHA256 over the record's canonical
+     * JSON, keyed by {@link #key} — so a record no server wrote (a forged or edited file) is detected on read.
+     */
     static void save(Path root, Map<String, Object> rec) throws IOException {
         Path f = file(root, String.valueOf(rec.get("id")));
         Files.createDirectories(f.getParent());
-        AtomicFiles.write(f, ApiContext.JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(rec), ".pc-");
+        Map<String, Object> clean = new LinkedHashMap<>(rec);
+        clean.remove(MAC);
+        clean.remove(INTEGRITY);
+        Map<String, Object> normal = ApiContext.JSON.readValue(ApiContext.JSON.writeValueAsBytes(clean), MAP);
+        normal.put(MAC, mac(root, normal));
+        AtomicFiles.write(f, ApiContext.JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(normal), ".pc-");
+        rec.put(MAC, normal.get(MAC));
     }
 
-    /** One Pending Change, or {@code null}. Fail closed: an unreadable document is an IOException, never absent. */
+    /**
+     * One Pending Change, or {@code null}. Fail closed: an unreadable document is an IOException, never absent;
+     * and a document whose MAC does not verify comes back with {@code status: invalid} and
+     * {@code integrity: invalid} — shown, never decidable, never re-saved (that would sign a forgery).
+     */
     static Map<String, Object> read(Path root, String id) throws IOException {
         Path f = file(root, id);
         if (!Files.isRegularFile(f)) return null;
-        return ApiContext.JSON.readValue(Files.readAllBytes(f), new TypeReference<LinkedHashMap<String, Object>>() {});
+        Map<String, Object> rec = ApiContext.JSON.readValue(Files.readAllBytes(f), MAP);
+        Object claimed = rec.remove(MAC);
+        String expected = mac(root, rec);
+        boolean ok = claimed instanceof String c && java.security.MessageDigest.isEqual(
+                c.getBytes(StandardCharsets.UTF_8), expected.getBytes(StandardCharsets.UTF_8));
+        if (claimed != null) rec.put(MAC, claimed);
+        if (!ok) {
+            rec.put("status", "invalid");
+            rec.put(INTEGRITY, "invalid");
+        }
+        return rec;
+    }
+
+    static boolean invalid(Map<String, Object> rec) {
+        return "invalid".equals(rec.get(INTEGRITY));
+    }
+
+    private static final String MAC = "mac";
+    private static final String INTEGRITY = "integrity";
+    private static final TypeReference<LinkedHashMap<String, Object>> MAP = new TypeReference<>() {};
+    static final String KEY_FILE = ".pending-changes.key";
+
+    /** HMAC-SHA256 (hex) over the canonical JSON of {@code rec} (its MAC excluded). */
+    private static String mac(Path root, Map<String, Object> rec) throws IOException {
+        try {
+            javax.crypto.Mac m = javax.crypto.Mac.getInstance("HmacSHA256");
+            m.init(new javax.crypto.spec.SecretKeySpec(key(root), "HmacSHA256"));
+            return java.util.HexFormat.of().formatHex(m.doFinal(ContentHash.canonicalJson(rec).getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.GeneralSecurityException e) {
+            throw new IOException("HmacSHA256 unavailable", e);
+        }
+    }
+
+    /**
+     * The Space's Pending Change key: 32 random bytes, created on first use beside the store, published without
+     * replace (a racing first writer's key wins, the loser reads it). Never served; never exported
+     * ({@code BundleExporter.exportSpace} skips {@code pending-changes/}); never importable (the directory is
+     * reserved, and the segment rules refuse a leading-dot name). ⚠ It lives in the config tree because the
+     * default Space has no reliable per-Space data directory (its data dir is the CWD-relative {@code database});
+     * the MAC defends against a record written through any door that cannot READ the key — an import, a forged
+     * upload — not against a local administrator, who can read both.
+     */
+    private static byte[] key(Path root) throws IOException {
+        Path d = dir(root);
+        Files.createDirectories(d);
+        Path f = d.resolve(KEY_FILE);
+        if (!Files.isRegularFile(f)) {
+            byte[] k = new byte[32];
+            new java.security.SecureRandom().nextBytes(k);
+            Path tmp = Files.createTempFile(d, ".key-", ".tmp");
+            try {
+                Files.writeString(tmp, java.util.HexFormat.of().formatHex(k), StandardCharsets.UTF_8);
+                Files.move(tmp, f, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.FileAlreadyExistsException raced) {
+                // another request created it first — read theirs
+            } finally {
+                Files.deleteIfExists(tmp);
+            }
+        }
+        return java.util.HexFormat.of().parseHex(Files.readString(f, StandardCharsets.UTF_8).trim());
+    }
+
+    /**
+     * The routes a Pending Change may be REPLAYED through (re-verification finding 2 (i)): exactly the routes
+     * whose handler reaches {@link #hold} before it writes — {@code ConfigWriteFunnelTest} pins this table to the
+     * inventory it scans. Approve refuses (409, nothing dispatched) a recorded request outside it, so a record
+     * naming any other route — {@code PUT /access/roles}, say — can never be replayed, whoever wrote it.
+     * Keyed {@code "METHOD pattern"} with the route-table pattern.
+     */
+    static final List<String> REPLAYABLE = List.of(
+            "POST /config/write", "POST /config/patch", "DELETE /config/([^/]+)/([^/]+)",
+            "PUT /pipelines/([^/]+)/graph", "POST /pipelines/([^/]+)/history/([^/]+)/restore",
+            "POST /pipelines/([^/]+)/label", "POST /pipelines/([^/]+)/settings",
+            "POST /pipelines/([^/]+)/save-as-template", "POST /pipelines/([^/]+)/rename",
+            "POST /components/([^/]+)", "PUT /components/([^/]+)/([^/]+)", "DELETE /components/([^/]+)/([^/]+)",
+            "POST /components/([^/]+)/([^/]+)/versions/([^/]+)/restore",
+            "POST /components/findings-spec", "PUT /components/findings-spec/([^/]+)",
+            "DELETE /components/findings-spec/([^/]+)", "POST /components/findings-spec/([^/]+)/versions/([^/]+)/restore",
+            "POST /alerts/rules", "PUT /alerts/rules/([^/]+)", "DELETE /alerts/rules/([^/]+)",
+            "POST /decision-rules", "PUT /decision-rules/([^/]+)", "DELETE /decision-rules/([^/]+)",
+            "POST /expectations", "PUT /expectations/([^/]+)", "DELETE /expectations/([^/]+)",
+            "PUT /access/catalog", "PUT /access/profiles/([^/]+)", "DELETE /access/profiles/([^/]+)");
+
+    /** Whether {@code method path} (route-table path, query allowed) is on {@link #REPLAYABLE}. */
+    static boolean replayable(String method, String path) {
+        String route = path.contains("?") ? path.substring(0, path.indexOf('?')) : path;
+        for (String entry : REPLAYABLE) {
+            int sp = entry.indexOf(' ');
+            if (entry.substring(0, sp).equals(method)
+                    && Pattern.compile("^" + entry.substring(sp + 1) + "$").matcher(route).matches()) return true;
+        }
+        return false;
     }
 
     /** Every Pending Change of the Space, newest first. */
@@ -342,7 +447,7 @@ public final class PendingChanges {
 
     /** Record expiry: a still-pending change past its {@code expiresAt} becomes {@code expired}. */
     static boolean expireIfDue(HttpExchange ex, Path root, Map<String, Object> rec) throws IOException {
-        if (!"pending".equals(rec.get("status"))) return false;
+        if (invalid(rec) || !"pending".equals(rec.get("status"))) return false;
         Object at = rec.get("expiresAt");
         if (at == null || Instant.parse(String.valueOf(at)).isAfter(Instant.now())) return false;
         rec.put("status", "expired");

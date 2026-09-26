@@ -259,7 +259,7 @@ final class PipelineSettingsRoutes implements RouteModule {
         // template against it), so a held template takes it back — the approved replay copies it again.
         try {
             PendingChanges.hold(api, e, "pipeline", id, tpl, null);
-        } catch (PendingChanges.Held held) {
+        } catch (PendingChanges.Held | ApiException held) {   // held, or an approved replay refused at the hold
             if (tpl.get("processing") instanceof Map<?, ?> proc && proc.get("schema_file") != null
                     && notes.stream().anyMatch(n -> n.startsWith("copied the schema")))
                 Files.deleteIfExists(writeRoot.resolve(String.valueOf(proc.get("schema_file"))).normalize());

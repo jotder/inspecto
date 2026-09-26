@@ -105,6 +105,9 @@ public final class BundleExporter {
             try (Stream<Path> s = Files.walk(configDir)) {
                 for (Path f : s.filter(Files::isRegularFile).sorted().toList()) {
                     String entry = configDir.relativize(f).toString().replace('\\', '/');
+                    // Pending Changes are proposals, not config, and their MAC key must never leave the server
+                    // (ASSURE-MAKER-CHECKER-1): a whole-Space export skips the store.
+                    if (entry.startsWith("pending-changes/")) continue;
                     entries.put(entry, exportableBytes(f));
                     artifacts.add(artifact(entry, kindOf(f)));
                 }

@@ -418,4 +418,72 @@ class ControlApiPendingChangesTest {
                     "carries the policy it replaced: " + lifted);
         }
     }
+
+    // ── re-verification finding 2: a Pending Change record is tamper-evident and replays only maker-checker routes ──
+
+    /** A record naming PUT /access/roles as seeded roles — what the verifier forged to rewrite roles.toon. */
+    private static Map<String, Object> forged(String id) {
+        Map<String, Object> rec = new java.util.LinkedHashMap<>();
+        rec.put("id", id);
+        rec.put("kind", "pattern-pack");
+        rec.put("name", "p1");
+        rec.put("operation", "create");
+        rec.put("status", "pending");
+        rec.put("author", "someone-else");
+        rec.put("authorRoles", List.of("super"));
+        rec.put("createdAt", "2026-09-26T00:00:00Z");
+        rec.put("expiresAt", "2099-01-01T00:00:00Z");
+        rec.put("approverCapability", "canApproveChanges");
+        rec.put("fourEyes", true);
+        rec.put("baseVersion", "absent");
+        rec.put("proposedVersion", "absent");
+        rec.put("request", Map.of("method", "PUT", "path", "/access/roles",
+                "body", "{\"roles\":[{\"name\":\"developer\",\"capabilities\":[\"canAdminister\"]}]}", "headers", Map.of()));
+        return rec;
+    }
+
+    @Test
+    void aForgedRecordFailsItsIntegrityCheckAndCannotBeApproved(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            String id = "pc-20260926000000-00f00d";
+            Files.createDirectories(root.resolve("pending-changes"));
+            Files.writeString(root.resolve("pending-changes").resolve(id + ".json"),
+                    JSON.writeValueAsString(forged(id)));   // written straight to disk: no server MAC
+            JsonNode listed = data(send(c, "GET", "/pending-changes", null, CHECKER), 200);
+            assertEquals("invalid", listed.at("/items/0/status").asText(), listed.toString());
+            HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER);
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(r.body().contains("integrity"), r.body());
+            assertFalse(Files.exists(root.resolve("roles.toon")), "nothing was dispatched");
+        }
+    }
+
+    @Test
+    void aGenuineRecordNamingANonMakerCheckerRouteIsNeverReplayed(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            String id = "pc-20260926000000-0ddba1";
+            PendingChanges.save(root, forged(id));   // a VALID MAC — the door is the route allowlist
+            HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER);
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(r.body().contains("not a maker-checker route"), r.body());
+            assertFalse(Files.exists(root.resolve("roles.toon")), "nothing was dispatched");
+        }
+    }
+
+    @Test
+    void editingARealRecordOnDiskInvalidatesIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            String id = propose(c, "p1");
+            Path f = root.resolve("pending-changes").resolve(id + ".json");
+            Files.writeString(f, Files.readString(f).replace("Carousel", "Swapped"));   // a tampered body
+            HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER);
+            assertEquals(409, r.statusCode(), r.body());
+            assertFalse(store(c).exists("pattern-pack", "p1"));
+            assertEquals("invalid", data(send(c, "GET", "/pending-changes/" + id, null, CHECKER), 200)
+                    .get("status").asText());
+        }
+    }
 }
