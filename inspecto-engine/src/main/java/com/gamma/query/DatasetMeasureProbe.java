@@ -203,6 +203,27 @@ public final class DatasetMeasureProbe {
         }
     }
 
+    /**
+     * The DuckDB type of one column of the Dataset's relation, as {@code typeof} names it ({@code DATE},
+     * {@code TIMESTAMP}, {@code TIMESTAMP WITH TIME ZONE}, ...). Read off {@code max(column)}, whose static type is
+     * the column's, so an EMPTY relation still answers. The column must already be known to exist
+     * ({@link #columns}); it is quoted, never interpolated raw.
+     *
+     * @throws IllegalArgumentException as {@link #columns} does
+     */
+    public String columnType(String datasetId, String column) {
+        String relationSql = relationSql(datasetId);
+        if (relationSql == null) throw new IllegalArgumentException("unknown dataset '" + datasetId + "'");
+        try {
+            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(datasetId, relationSql,
+                    "SELECT typeof(max(" + SqlIdent.q(column) + ")) AS " + SqlIdent.q("t") + " FROM " + SqlIdent.q(datasetId),
+                    1, 0, List.of(), List.of()));
+            return String.valueOf(r.rows().get(0).get("t"));
+        } catch (Exception e) {
+            throw new IllegalArgumentException("dataset '" + datasetId + "' could not be read: " + e.getMessage(), e);
+        }
+    }
+
     /** The Dataset's relation SQL, or {@code null} when the Dataset is unknown; throws when there is no registry. */
     private String relationSql(String datasetId) {
         Path root = writeRoot.get();

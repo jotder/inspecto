@@ -185,6 +185,16 @@ class ControlApiKpiTest {
         }
     }
 
+    @Test
+    void aTimeFieldThatIsNotADateOrTimestampIsRefusedAtSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOrders(c, "orders", Map.of());
+            String refused = error(send(c, "POST", "/components/kpi", KPI.replace("\"order_date\"", "\"amount\""), ALICE), 422);
+            assertTrue(refused.contains("'amount' is DECIMAL") && refused.contains("DATE, TIMESTAMP or TIMESTAMPTZ"), refused);
+            assertEquals(200, send(c, "POST", "/components/kpi", KPI, ALICE).statusCode(), "a DATE column saves");
+        }
+    }
+
     // ── the Dataset sharing boundary ─────────────────────────────────────────────
 
     @Test

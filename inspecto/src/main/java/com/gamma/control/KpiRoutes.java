@@ -38,6 +38,9 @@ final class KpiRoutes implements RouteModule {
 
     static final String TYPE = "kpi";
 
+    /** The column types a period can be cut on, as DuckDB's {@code typeof} names them. */
+    private static final java.util.Set<String> TIME_TYPES = java.util.Set.of("DATE", "TIMESTAMP", "TIMESTAMP WITH TIME ZONE");
+
     @Override
     public void register(ApiContext api) {
         api.get("/kpis/([^/]+)/value", (e, m) -> value(api, e, ApiContext.name(m)));
@@ -158,7 +161,8 @@ final class KpiRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "kpi write");
         if (readableDataset(ex, new ComponentStore(writeRoot.resolve("registry")), kpi.dataset()) == null)
             throw new IllegalArgumentException("kpi dataset '" + kpi.dataset() + "' does not exist");
-        List<String> columns = new DatasetMeasureProbe(() -> writeRoot, api::dataRoot).columns(kpi.dataset());
+        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> writeRoot, api::dataRoot);
+        List<String> columns = probe.columns(kpi.dataset());
         String field = kpi.measure().field();
         if (field != null && !columns.contains(field))
             throw new IllegalArgumentException("kpi measure field '" + field + "' is not in the Schema of dataset '"
@@ -166,6 +170,10 @@ final class KpiRoutes implements RouteModule {
         if (!columns.contains(kpi.timeField()))
             throw new IllegalArgumentException("kpi timeField '" + kpi.timeField() + "' is not in the Schema of dataset '"
                     + kpi.dataset() + "' (have: " + columns + ")");
+        String type = probe.columnType(kpi.dataset(), kpi.timeField());
+        if (!TIME_TYPES.contains(type))
+            throw new IllegalArgumentException("kpi timeField '" + kpi.timeField() + "' is " + type
+                    + "; a period can only be cut on a DATE, TIMESTAMP or TIMESTAMPTZ column");
         return kpi;
     }
 }
