@@ -188,7 +188,9 @@ final class AuditTrail {
         if ("GET".equals(method) || isReadShaped(method, path)) {
             return path.endsWith("/export") ? new Action(resource(path) + ".exported", "export") : null;
         }
-        if (!"POST".equals(method) && !"PUT".equals(method) && !"DELETE".equals(method)) return null;
+        // PATCH is a mutation like PUT (`PATCH /objects/{id}` edits priority / severity / assignee): it used to be
+        // missing here, so no PATCH ever left an audit row (found rehearsing the telco demo, 2026-09-26).
+        if (!"POST".equals(method) && !"PUT".equals(method) && !"PATCH".equals(method) && !"DELETE".equals(method)) return null;
         // Non-mutating POSTs: diagnostics / previews / assist chat, and the user's own notification-feed
         // housekeeping (read/delete) — not part of the security audit trail. These literals cover routes
         // the manifest does NOT list as read-shaped (the gated /connections/test, the provenance-gated
@@ -208,7 +210,7 @@ final class AuditTrail {
                 : "data_mutation";
         String verb = switch (method) {
             case "DELETE" -> "deleted";
-            case "PUT" -> "updated";
+            case "PUT", "PATCH" -> "updated";
             default -> switch (last) {     // POST
                 case "trigger" -> "triggered";
                 case "pause" -> "paused";

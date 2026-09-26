@@ -22,6 +22,14 @@ class AuditTrailTest {
     }
 
     /** DUCKLE-C8: the baseline ops must not read as "expectation.created" in the audit trail. */
+    /** PATCH is a mutation too: `PATCH /objects/{id}` edits an Incident's priority, severity and assignee
+     *  (canAdminister). The classifier admitted only POST/PUT/DELETE, so every PATCH left no audit row. */
+    @Test
+    void classifiesPatchAsAnUpdate() {
+        assertEquals(new AuditTrail.Action("object.updated", "data_mutation"),
+                AuditTrail.classify("PATCH", "/objects/INC-1"));
+    }
+
     @Test
     void classifiesBaselineAcceptAndClear() {
         assertEquals(new AuditTrail.Action("expectation.accepted", "data_mutation"),
