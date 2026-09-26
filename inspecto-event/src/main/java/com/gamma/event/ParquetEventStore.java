@@ -465,8 +465,8 @@ public final class ParquetEventStore implements EventStore {
             if (AuditChain.chained(e) && AuditChain.seq(e) > 0
                     && (best == null || AuditChain.seq(e) > AuditChain.seq(best))) best = e;
         if (!hasParquet()) return best;
-        List<Event> disk = chainQuery("WHERE " + CHAINED_SQL + " ORDER BY " + SEQ_SQL + " DESC LIMIT 1", List.of());
-        if (!disk.isEmpty() && (best == null || AuditChain.seq(disk.get(0)) > AuditChain.seq(best))) best = disk.get(0);
+        for (Event d : chainQuery("WHERE " + CHAINED_SQL + " ORDER BY " + SEQ_SQL + " DESC LIMIT 1", List.of()))
+            if (best == null || AuditChain.seq(d) > AuditChain.seq(best)) best = d;
         return best;
     }
 
@@ -482,13 +482,78 @@ public final class ParquetEventStore implements EventStore {
         return new ArrayList<>(merged.subList(0, Math.min(n, merged.size())));
     }
 
-    /** A chain read over the Parquet files. Throws rather than answering short: the chain's callers must not
-     *  mistake an unreadable store for an empty chain (that would restart it at genesis, or pass a verify). */
+    @Override
+    public synchronized long unlinkedSince(long fromTs) {
+        long n = 0;
+        for (Event e : buffer)
+            if (AuditChain.TYPES.contains(e.type()) && e.ts() >= fromTs && AuditChain.unlinked(e)) n++;
+        if (!hasParquet()) return n;
+        String where = "WHERE type IN ('" + EventType.AUDIT + "', '" + EventType.ACCESS_DENIED + "') AND ts_ms >= ? AND ("
+                + SEQ_SQL + " IS NULL OR json_extract_string(attributes, '$." + AuditAttrs.AUDIT_UNLINKED + "') = 'true')";
+        return n + chainQuery(where, List.of(fromTs)).size();
+    }
+
+    @Override
+    public synchronized java.util.Set<String> presentIds(java.util.Collection<String> ids) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        for (Event e : buffer) if (ids.contains(e.eventId())) found.add(e.eventId());
+        List<Event> probe = new ArrayList<>();
+        for (String id : ids) probe.add(new Event(id, 0, null, null, null, null, null, null, null, null));
+        try {
+            found.addAll(flushedIds(probe));
+        } catch (IOException e) {
+            throw new IllegalStateException(e.getMessage(), e);
+        }
+        return found;
+    }
+
+    @Override
+    public synchronized List<String> unreadableUnits() {
+        return unreadable;
+    }
+
+    /** Files the last chain read could not open (see {@link #chainQuery}). */
+    private List<String> unreadable = List.of();
+
+    /**
+     * A chain read over the Parquet files. One glob query when every file reads; when the glob fails, every file is
+     * read ON ITS OWN, the unreadable ones are recorded ({@link #unreadableUnits}) and the rest still answer — so
+     * one corrupt file planted in the directory cannot blind the whole chain (and, through an unreadable head,
+     * unlink every later audit row). The per-file rows are the UNION of each file's answer to {@code tail}: callers
+     * re-sort and re-limit. Throws only when no file at all could be read, never answering "empty" for "unreadable".
+     */
     private List<Event> chainQuery(String tail, List<Long> params) {
-        String reader = SqlViews.reader("PARQUET", root + "/**/*.parquet", true);
+        List<Event> out = new ArrayList<>();
+        try {
+            readInto(out, SqlViews.reader("PARQUET", root + "/**/*.parquet", true), tail, params);
+            unreadable = List.of();
+            return out;
+        } catch (SQLException globFailed) {
+            out.clear();
+        }
+        List<String> bad = new ArrayList<>();
+        int good = 0;
+        try (Stream<Path> w = Files.walk(root)) {
+            for (Path f : w.filter(x -> x.getFileName().toString().endsWith(".parquet")).sorted().toList()) {
+                try {
+                    readInto(out, SqlViews.reader("PARQUET", f.toString(), true), tail, params);
+                    good++;
+                } catch (SQLException oneFile) {
+                    bad.add(root.relativize(f).toString().replace('\\', '/'));
+                }
+            }
+        } catch (IOException e) {
+            throw new IllegalStateException("audit chain read failed under " + root + ": " + e.getMessage(), e);
+        }
+        unreadable = List.copyOf(bad);
+        if (!bad.isEmpty()) log.error("Audit chain read: {} unreadable Parquet file(s) under {}: {}", bad.size(), root, bad);
+        if (good == 0) throw new IllegalStateException("audit chain read failed under " + root + ": no file readable");
+        return out;
+    }
+
+    private void readInto(List<Event> out, String reader, String tail, List<Long> params) throws SQLException {
         String sql = "SELECT event_id, ts_ms, level, type, source, pipeline, correlation_id, message, attributes, payload"
                 + " FROM " + reader + " " + tail;
-        List<Event> out = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.size(); i++) ps.setLong(i + 1, params.get(i));
             try (ResultSet rs = ps.executeQuery()) {
@@ -501,10 +566,57 @@ public final class ParquetEventStore implements EventStore {
                             JsonAttributes.fromPayloadJson(rs.getString("payload"))));
                 }
             }
-        } catch (SQLException e) {
-            throw new IllegalStateException("audit chain read failed under " + root + ": " + e.getMessage(), e);
         }
-        return out;
+    }
+
+    // -- the single chain writer per directory --
+
+    /** The lock file that makes one open store the ONLY chain writer for its directory. */
+    static final String WRITER_LOCK = ".chain-writer.lock";
+    private FileChannel lockChannel;
+    private java.nio.channels.FileLock writerLock;
+
+    /**
+     * Claim this directory's chain-writer lock (an OS file lock on {@value #WRITER_LOCK}). Two stores — two
+     * EventLogs, two processes — linking onto one directory would each recover the same head and fork the chain,
+     * so the second is REFUSED: this throws, and the EventLog stores that row marked unlinked, loudly. A reader
+     * that never links never takes the lock. A hard kill releases it with the process.
+     */
+    @Override
+    public synchronized void claimChainWriter() {
+        if (writerLock != null) return;
+        try {
+            if (lockChannel == null)
+                lockChannel = FileChannel.open(root.resolve(WRITER_LOCK), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            java.nio.channels.FileLock l = lockChannel.tryLock();
+            if (l == null) throw new IllegalStateException("another process holds the audit chain writer lock on " + root);
+            writerLock = l;
+        } catch (java.nio.channels.OverlappingFileLockException same) {
+            throw new IllegalStateException("another event store in this process is the audit chain writer for " + root);
+        } catch (IOException e) {
+            throw new IllegalStateException("could not claim the audit chain writer lock on " + root + ": " + e.getMessage(), e);
+        }
+    }
+
+    private void releaseWriter() {
+        try {
+            if (writerLock != null) writerLock.release();
+            if (lockChannel != null) lockChannel.close();
+        } catch (IOException ignore) {
+            // the process exit releases it anyway
+        }
+        writerLock = null;
+        lockChannel = null;
+    }
+
+    /** Test seam: behave as a hard kill would — nothing flushed, the journal left as it is, the OS lock released
+     *  (a killed process holds no lock). The store is unusable afterwards. */
+    synchronized void simulateCrash() {
+        closed = true;
+        if (journal != null) {
+            try { journal.close(); } catch (IOException ignore) { /* as a kill */ }
+        }
+        releaseWriter();
     }
 
     /** Comma-separated quoted level names at or above {@code min} — values are enum names, so safe to inline. */
@@ -595,6 +707,7 @@ public final class ParquetEventStore implements EventStore {
         if (journal != null) {
             try { journal.close(); } catch (IOException e) { log.warn("Error closing event journal: {}", e.getMessage()); }
         }
+        releaseWriter();
         try { conn.close(); } catch (SQLException e) { log.warn("Error closing event store: {}", e.getMessage()); }
     }
 }

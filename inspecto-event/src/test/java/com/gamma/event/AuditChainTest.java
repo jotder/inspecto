@@ -117,6 +117,7 @@ class AuditChainTest {
         EventLog before = EventLog.create();
         before.installStore(crashed);
         for (int i = 0; i < 4; i++) before.emit(audit(1_000 + i, "buffered " + i));
+        crashed.simulateCrash();   // a killed process holds no lock and flushed nothing
 
         try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
             EventLog after = EventLog.create();
@@ -208,6 +209,101 @@ class AuditChainTest {
             Set<String> messages = new HashSet<>();
             for (Event e : chain) messages.add(e.message());
             assertEquals(threads * each, messages.size(), "every emit is exactly one record");
+        }
+    }
+
+    // ── security fixes (independent verification, 2026-09-27) ─────────────────────────────────────────────
+
+    /** A store whose chain head cannot be read — what one corrupt file used to cause. */
+    private static final class UnreadableHead implements EventStore {
+        private final InMemoryEventStore d = new InMemoryEventStore();
+        @Override public Event chainHead() { throw new IllegalStateException("head unreadable"); }
+        @Override public void append(Event e) { d.append(e); }
+        @Override public List<Event> query(EventQuery q) { return d.query(q); }
+        @Override public List<Event> recent(int n) { return d.recent(n); }
+        @Override public List<Event> page(int n, Long t, String id) { return d.page(n, t, id); }
+    }
+
+    @Test
+    void aRowThatCannotBeLinkedIsMarkedAndAnnouncedNeverSilentlyUnchained() {
+        EventLog log = EventLog.create();
+        UnreadableHead store = new UnreadableHead();
+        log.installStore(store);
+        log.emit(audit(1_000, "while the head is unreadable"));
+        Event row = store.query(EventQuery.builder().type(EventType.AUDIT).limit(10).build()).get(0);
+        assertEquals("true", row.attributes().get(AuditAttrs.AUDIT_UNLINKED), "the row says it is off the chain");
+        assertNull(row.attributes().get(AuditAttrs.AUDIT_SEQ));
+        assertTrue(store.query(EventQuery.builder().minLevel(EventLevel.ERROR).limit(10).build()).stream()
+                .anyMatch(e -> e.message().contains("UNLINKED")), "and an ERROR event says so");
+        assertEquals(1, store.unlinkedSince(0), "the hole is countable");
+    }
+
+    @Test
+    void oneCorruptParquetFileNeitherBlindsTheChainNorUnlinksLaterRows(@TempDir Path dir) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            EventLog log = EventLog.create();
+            log.installStore(store);
+            for (int i = 0; i < 3; i++) log.emit(audit(1_000 + i, "e" + i));
+        }
+        Path day = Files.createDirectories(dir.resolve("level=INFO/year=1970/month=01/day=01"));
+        Files.writeString(day.resolve("planted.parquet"), "not a parquet file");
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            EventLog log = EventLog.create();
+            log.installStore(store);
+            log.emit(audit(2_000, "after the plant"));
+            List<Event> chain = assertChain(store, 4);
+            assertNull(chain.get(3).attributes().get(AuditAttrs.AUDIT_UNLINKED));
+            assertEquals(List.of("level=INFO/year=1970/month=01/day=01/planted.parquet"), store.unreadableUnits(),
+                    "the bad file is reported, not skipped silently");
+        }
+    }
+
+    @Test
+    void aSecondChainWriterOnOneDirectoryIsRefusedLoudly(@TempDir Path dir) {
+        try (ParquetEventStore first = new ParquetEventStore(dir, 1000, 0, 100);
+             ParquetEventStore second = new ParquetEventStore(dir, 1000, 0, 100)) {
+            EventLog a = EventLog.create();
+            a.installStore(first);
+            a.emit(audit(1_000, "first writer"));
+            EventLog b = EventLog.create();
+            b.installStore(second);
+            b.emit(audit(1_001, "second writer"));
+            Event refused = second.recent(10).stream().filter(e -> "second writer".equals(e.message())).findFirst()
+                    .orElseThrow();
+            assertEquals("true", refused.attributes().get(AuditAttrs.AUDIT_UNLINKED),
+                    "the second writer never links a fork onto the same head");
+        }
+    }
+
+    /** A Space restart re-installing onto its OWN directory must not re-link rows that directory already holds. */
+    @Test
+    void aCarriedRowTheIncomingStoreAlreadyHoldsIsNotRelinked(@TempDir Path dir) {
+        EventLog log = EventLog.create();
+        log.emit(audit(1_000, "one"));
+        log.emit(audit(1_001, "two"));
+        List<Event> linked = log.store().chainPage(1, 10);
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            for (Event e : linked) store.append(e);
+            log.installStore(store);
+            assertChain(store, 2);
+        }
+    }
+
+    /** Normalisation is load-bearing: a BigDecimal 1.00 reads back from Parquet as 1.0, so the hash must be taken
+     *  over the normalised form or every such row fails verify after a restart. */
+    @Test
+    void awkwardPayloadValuesVerifyAfterTheParquetRoundTrip(@TempDir Path dir) {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            EventLog log = EventLog.create();
+            log.installStore(store);
+            log.emit(Event.builder(EventType.AUDIT).ts(1).message("p").payload(Map.of(
+                    "amount", new java.math.BigDecimal("1.00"),
+                    "nested", Map.of("z", List.of(1, "two", 3.5), "a", true),
+                    "list", List.of(Map.of("k", 9L)),
+                    "flag", Boolean.FALSE)).build());
+        }
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertChain(store, 1);
         }
     }
 

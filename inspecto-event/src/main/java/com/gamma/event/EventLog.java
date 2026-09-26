@@ -167,6 +167,9 @@ public final class EventLog {
                 List<Event> carry = prev.recent(Integer.MAX_VALUE);   // newest-first
                 for (int i = carry.size() - 1; i >= 0; i--) {         // re-append oldest-first
                     Event e = carry.get(i);
+                    // A carried row the incoming store ALREADY holds (a Space restart re-installing onto its own
+                    // directory) is not appended again — re-linked, it would sit in the chain twice.
+                    if (AuditChain.chained(e) && !next.presentIds(List.of(e.eventId())).isEmpty()) continue;
                     next.append(AuditChain.chained(e) ? linkOrKeep(e, next) : e);
                 }
             } catch (RuntimeException ignore) {
@@ -179,14 +182,35 @@ public final class EventLog {
      *  across link + append, which is what makes the chain a single total order. */
     private final AuditChain chain = new AuditChain();
 
-    /** Link {@code e} onto {@code target}'s chain; when the head cannot be read, keep it unlinked rather than
-     *  lose the audit row or fork the chain at genesis. Caller holds {@link #chain}'s monitor. */
+    /**
+     * Link {@code e} onto {@code target}'s chain. When that fails (the head is unreadable, the row cannot be
+     * hashed) the row is still stored — losing an audit row is worse — but NEVER silently: it is marked
+     * {@link AuditAttrs#AUDIT_UNLINKED}, {@code inspecto_audit_unlinked_total} is incremented, and an ERROR event
+     * says so. {@code /audit/verify} counts every marked or seq-less audit row and fails on it, so a forced
+     * failure (a corrupt file planted in the store) cannot turn into a hole that verifies. Caller holds
+     * {@link #chain}'s monitor. ⚠ No SLF4J here: this runs on the capture appender's path.
+     */
     private Event linkOrKeep(Event e, EventStore target) {
         try {
             return chain.link(e, target);
-        } catch (RuntimeException unreadableHead) {
+        } catch (RuntimeException failed) {
             chain.reset();   // try again on the next audit row
-            return e;
+            java.util.Map<String, String> attrs = new java.util.LinkedHashMap<>(e.attributes());
+            attrs.put(AuditAttrs.AUDIT_UNLINKED, "true");
+            try {
+                MetricRegistry.global().inc("inspecto_audit_unlinked_total",
+                        "Audit rows stored WITHOUT a hash-chain link (the chain head could not be read)", Map.of());
+                target.append(Event.builder(EventType.LOG).level(EventLevel.ERROR).source(EventLog.class.getName())
+                        .message("audit row " + e.eventId() + " stored UNLINKED from the audit hash chain: "
+                                + failed.getMessage())
+                        .attr("unlinked_event_id", e.eventId()).build());
+            } catch (Throwable ignore) {
+                // best effort: the marker on the row itself is what verify reads
+            }
+            System.err.println("ERROR audit row " + e.eventId() + " stored UNLINKED from the audit hash chain: "
+                    + failed.getMessage());
+            return new Event(e.eventId(), e.ts(), e.level(), e.type(), e.source(), e.pipeline(), e.correlationId(),
+                    e.message(), attrs, e.payload());
         }
     }
 

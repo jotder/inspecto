@@ -81,7 +81,8 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
     @Override
     public void append(Event event) {
         if (event == null) return;
-        String sql = "INSERT INTO " + TABLE + " (" + COLS + ") VALUES (?,?,?,?,?,?,?,?,?,?)";
+        String sql = "INSERT INTO " + TABLE + " (" + COLS + ", audit_seq) VALUES (?,?,?,?,?,?,?,?,?,?,?)";
+        long seq = AuditChain.chained(event) ? AuditChain.seq(event) : -1;
         try {
             runConn(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -95,6 +96,8 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
                     ps.setString(8, event.message());
                     ps.setString(9, JsonAttributes.toJson(event.attributes()));
                     ps.setString(10, JsonAttributes.toPayloadJson(event.payload()));
+                    if (seq > 0) ps.setLong(11, seq);
+                    else ps.setNull(11, java.sql.Types.BIGINT);
                     ps.executeUpdate();
                 }
             });
@@ -145,6 +148,69 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
                 + " ORDER BY ts_ms DESC, event_id DESC LIMIT ?";
         params.add((long) Math.max(0, limit));
         return read(sql, params);
+    }
+
+    // ── the audit chain (ASSURE-AUDIT-CHAIN-1): indexed reads on audit_seq ─────────────────────
+
+    @Override
+    public Event chainHead() {
+        List<Event> r = readOrThrow("SELECT " + COLS + " FROM " + TABLE
+                + " WHERE audit_seq IS NOT NULL ORDER BY audit_seq DESC LIMIT 1", List.of());
+        return r.isEmpty() ? null : r.get(0);
+    }
+
+    @Override
+    public List<Event> chainPage(long fromSeq, int limit) {
+        return readOrThrow("SELECT " + COLS + " FROM " + TABLE
+                + " WHERE audit_seq >= ? ORDER BY audit_seq, event_id LIMIT ?", List.of(fromSeq, (long) Math.max(0, limit)));
+    }
+
+    @Override
+    public long unlinkedSince(long fromTs) {
+        return readOrThrow("SELECT " + COLS + " FROM " + TABLE + " WHERE type IN ('" + EventType.AUDIT + "', '"
+                + EventType.ACCESS_DENIED + "') AND ts_ms >= ? AND audit_seq IS NULL", List.of(fromTs)).size();
+    }
+
+    @Override
+    public java.util.Set<String> presentIds(java.util.Collection<String> ids) {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        List<String> all = new ArrayList<>(ids);
+        for (int from = 0; from < all.size(); from += 500) {
+            List<String> chunk = all.subList(from, Math.min(all.size(), from + 500));
+            String in = String.join(",", java.util.Collections.nCopies(chunk.size(), "?"));
+            for (Event e : readOrThrow("SELECT " + COLS + " FROM " + TABLE + " WHERE event_id IN (" + in + ")",
+                    new ArrayList<>(chunk))) found.add(e.eventId());
+        }
+        return found;
+    }
+
+    /** As {@link #read}, but a failure THROWS: a chain read must never answer "empty" for "unreadable". */
+    private List<Event> readOrThrow(String sql, List<Object> params) {
+        List<Event> out = new ArrayList<>();
+        try {
+            runConn(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    for (int i = 0; i < params.size(); i++) {
+                        Object p = params.get(i);
+                        if (p instanceof Long l) ps.setLong(i + 1, l);
+                        else ps.setString(i + 1, String.valueOf(p));
+                    }
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            out.add(new Event(rs.getString("event_id"), rs.getLong("ts_ms"),
+                                    EventLevel.parse(rs.getString("level")), rs.getString("type"),
+                                    rs.getString("source"), rs.getString("pipeline"),
+                                    rs.getString("correlation_id"), rs.getString("message"),
+                                    JsonAttributes.fromJson(rs.getString("attributes")),
+                                    JsonAttributes.fromPayloadJson(rs.getString("payload"))));
+                        }
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("audit chain read failed: " + e.getMessage(), e);
+        }
+        return out;
     }
 
     /** Exact count — the {@code metadata.pagination.total} companion of {@link #page}. */
@@ -220,6 +286,10 @@ public final class DbEventStore extends AbstractJdbcStore implements EventStore 
                             + "attributes VARCHAR, payload VARCHAR)");
                     // The one access path that is not a full scan. Both engines accept this form.
                     st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_ts ON " + TABLE + " (ts_ms)");
+                    // ASSURE-AUDIT-CHAIN-1: the chain seq as a real, indexed column, so the chain reads are an
+                    // index range and not a scan of every event's attributes JSON.
+                    st.execute("ALTER TABLE " + TABLE + " ADD COLUMN IF NOT EXISTS audit_seq BIGINT");
+                    st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_seq ON " + TABLE + " (audit_seq)");
                 }
             });
         } catch (SQLException e) {

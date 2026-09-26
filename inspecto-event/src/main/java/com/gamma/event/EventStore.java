@@ -147,6 +147,57 @@ public interface EventStore extends AutoCloseable {
         return out;
     }
 
+    /**
+     * How many audit-type rows ({@link AuditChain#TYPES}) at or after {@code fromTs} are NOT on the chain — no
+     * seq, or marked {@link AuditAttrs#AUDIT_UNLINKED}. Every one is a hole {@code /audit/verify} must report.
+     * Default: a keyset walk from the newest row back to {@code fromTs}.
+     *
+     * @since 5.x
+     */
+    default long unlinkedSince(long fromTs) {
+        long n = 0;
+        Long afterTs = null;
+        String afterId = null;
+        while (true) {
+            List<Event> page = page(1000, afterTs, afterId);
+            if (page.isEmpty()) return n;
+            for (Event e : page) {
+                if (e.ts() < fromTs) return n;
+                if (AuditChain.TYPES.contains(e.type()) && AuditChain.unlinked(e)) n++;
+            }
+            Event last = page.get(page.size() - 1);
+            afterTs = last.ts();
+            afterId = last.eventId();
+        }
+    }
+
+    /** The ids among {@code ids} this store already holds. Default: a keyset walk of the whole store. @since 5.x */
+    default java.util.Set<String> presentIds(java.util.Collection<String> ids) {
+        java.util.Set<String> want = new java.util.HashSet<>(ids);
+        java.util.Set<String> found = new java.util.HashSet<>();
+        Long afterTs = null;
+        String afterId = null;
+        while (!want.isEmpty()) {
+            List<Event> page = page(1000, afterTs, afterId);
+            if (page.isEmpty()) break;
+            for (Event e : page) if (want.remove(e.eventId())) found.add(e.eventId());
+            Event last = page.get(page.size() - 1);
+            afterTs = last.ts();
+            afterId = last.eventId();
+        }
+        return found;
+    }
+
+    /** Storage units (files) this store could not read on its last chain read — a verify must not pass over
+     *  them silently. Empty for stores that have no such units. @since 5.x */
+    default List<String> unreadableUnits() {
+        return List.of();
+    }
+
+    /** Claim the right to LINK onto this store's audit chain; throws when another writer holds it (see
+     *  {@code ParquetEventStore}). Default: nothing to claim. @since 5.x */
+    default void claimChainWriter() {}
+
     /** The {@link #chainPage} order: seq ascending, then eventId. */
     java.util.Comparator<Event> CHAIN_ORDER =
             java.util.Comparator.comparingLong(AuditChain::seq)

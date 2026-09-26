@@ -73,6 +73,9 @@ public final class AuditAttrs {
     public static final String AUDIT_PREV_HASH = "audit_prev_hash";
     /** SHA-256 (hex) over the record's canonical encoding, prevHash included ({@link AuditChain#canonical}). */
     public static final String AUDIT_HASH = "audit_hash";
+    /** {@code "true"} on an audit row that could NOT be linked (the chain head was unreadable) — stored, never
+     *  silently: {@code /audit/verify} counts every such row and fails. */
+    public static final String AUDIT_UNLINKED = "audit_unlinked";
 
     /**
      * Every audit attribute key above, in projection/column order — the ONE list consumers (e.g. the
@@ -83,5 +86,5 @@ public final class AuditAttrs {
     public static final java.util.List<String> ALL = java.util.List.of(
             ACTOR, ACTOR_TYPE, ACTION, ACTION_CATEGORY, TARGET_TYPE, TARGET_ID,
             IP, USER_AGENT, HTTP_METHOD, HTTP_PATH, HTTP_STATUS, ABAC_ACTION, POLICY, CAPABILITY,
-            AUDIT_SEQ, AUDIT_PREV_HASH, AUDIT_HASH);
+            AUDIT_SEQ, AUDIT_PREV_HASH, AUDIT_HASH, AUDIT_UNLINKED);
 }

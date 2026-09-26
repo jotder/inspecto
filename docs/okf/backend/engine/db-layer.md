@@ -284,6 +284,8 @@ CREATE TABLE IF NOT EXISTS inspecto_events (
   pipeline VARCHAR, correlation_id VARCHAR, message VARCHAR,
   attributes VARCHAR, payload VARCHAR)
 CREATE INDEX IF NOT EXISTS inspecto_events_ts ON inspecto_events (ts_ms)
+ALTER TABLE inspecto_events ADD COLUMN IF NOT EXISTS audit_seq BIGINT
+CREATE INDEX IF NOT EXISTS inspecto_events_seq ON inspecto_events (audit_seq)
 ```
 
 ⚠ Column names mirror `ParquetEventStore`'s exactly, so an operator reading one backend's raw table reads

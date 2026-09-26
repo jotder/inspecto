@@ -61,7 +61,7 @@ public final class AuditChain {
     public static final Set<String> TYPES = Set.of(EventType.AUDIT, EventType.ACCESS_DENIED);
 
     private static final Set<String> CHAIN_KEYS =
-            Set.of(AuditAttrs.AUDIT_SEQ, AuditAttrs.AUDIT_PREV_HASH, AuditAttrs.AUDIT_HASH);
+            Set.of(AuditAttrs.AUDIT_SEQ, AuditAttrs.AUDIT_PREV_HASH, AuditAttrs.AUDIT_HASH, AuditAttrs.AUDIT_UNLINKED);
 
     /** Recursively key-sorted, compact, nulls written — the canonical JSON (the same form {@code ContentHash} uses). */
     private static final ObjectMapper CANONICAL =
@@ -89,6 +89,11 @@ public final class AuditChain {
         } catch (NumberFormatException bad) {
             return -1;
         }
+    }
+
+    /** Whether {@code e} is off the chain: no seq, or explicitly marked {@link AuditAttrs#AUDIT_UNLINKED}. */
+    public static boolean unlinked(Event e) {
+        return seq(e) < 1 || "true".equals(e.attributes().get(AuditAttrs.AUDIT_UNLINKED));
     }
 
     /** The stored prevHash, or {@code null}. */
@@ -158,6 +163,7 @@ public final class AuditChain {
      */
     Event link(Event e, EventStore store) {
         if (recoveredFrom != store) {
+            store.claimChainWriter();   // one linker per directory, or two would fork from the same head
             Event head = store.chainHead();
             if (head == null) {
                 headSeq = 0;
