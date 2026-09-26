@@ -1,0 +1,127 @@
+<div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
+    <inspecto-page-header
+        title="Action Requests"
+        subtitle="Outbound API calls raised from Incidents and Cases, held for a second person. Read the payload, then approve to send it or decline it."
+        [inset]="false"
+    >
+        <ng-container actions>
+            <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
+                <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
+            </button>
+        </ng-container>
+    </inspecto-page-header>
+
+    <mat-button-toggle-group
+        class="mt-4 self-start"
+        aria-label="Which Action Requests to list"
+        [value]="filter()"
+        (change)="setFilter($event.value)"
+    >
+        <mat-button-toggle value="pending">Waiting</mat-button-toggle>
+        <mat-button-toggle value="all">All</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    @if (error()) {
+        <inspecto-alert class="mt-4" variant="error" title="Could not load the Action Requests">{{
+            error()
+        }}</inspecto-alert>
+    } @else {
+        <div class="mt-4">
+            <inspecto-data-table
+                stateKey="action-requests"
+                exportName="action-requests"
+                [rows]="requests()"
+                [columns]="columnDefs"
+                [loading]="loading()"
+                (rowClick)="open($event)"
+                noRowsTitle="No Action Requests waiting"
+                noRowsHint="When an Incident or a Decision Rule asks for an outbound call, it appears here for a second person to approve."
+            />
+        </div>
+    }
+
+    @if (selected(); as r) {
+        <section class="bg-card mt-6 rounded-2xl p-6 shadow" aria-labelledby="ar-title">
+            <div class="flex items-start gap-3">
+                <div class="min-w-0 flex-1">
+                    <h2 id="ar-title" class="text-lg font-semibold">{{ r.method }} → {{ r.connection }}</h2>
+                    <p class="text-secondary text-sm">
+                        Requested by {{ r.author }} on {{ r.createdAt | date: 'medium' }} from
+                        <a class="text-primary underline" [routerLink]="link(r)">{{ r.incidentId ?? r.caseId }}</a>
+                        · expires {{ r.expiresAt | date: 'medium' }} · a different person must decide
+                    </p>
+                </div>
+                <inspecto-status-badge [value]="r.status" />
+                <button mat-icon-button (click)="close()" aria-label="Close the Action Request">
+                    <mat-icon [svgIcon]="'heroicons_outline:x-mark'"></mat-icon>
+                </button>
+            </div>
+
+            @if (r.status === 'invalid') {
+                <inspecto-alert class="mt-4" variant="error" title="Integrity check failed">
+                    This record was not written by this server, or was edited since. It can be neither approved nor
+                    sent.
+                </inspecto-alert>
+            }
+
+            <dl class="mt-4 grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-2">
+                <dt class="text-secondary">Target</dt>
+                <dd class="m-0 font-mono break-all">{{ r.targetUrl }}</dd>
+                <dt class="text-secondary">Idempotency key</dt>
+                <dd class="m-0 font-mono">{{ r.idempotencyKey }}</dd>
+                <dt class="text-secondary">Attempts</dt>
+                <dd class="m-0 tabular-nums">{{ r.attempts }}</dd>
+                @if (r.approver) {
+                    <dt class="text-secondary">Approved by</dt>
+                    <dd class="m-0">{{ r.approver }} on {{ r.approvedAt | date: 'medium' }}</dd>
+                }
+                @if (r.lastResponse; as last) {
+                    <dt class="text-secondary">Last response</dt>
+                    <dd class="m-0">
+                        {{ last.status ?? 'none' }}
+                        @if (last.error) {
+                            — {{ last.error }}
+                        }
+                    </dd>
+                }
+            </dl>
+            @if (r.reason) {
+                <p class="mt-3 text-sm"><span class="font-semibold">Reason:</span> {{ r.reason }}</p>
+            }
+
+            <h3 class="mt-4 text-sm font-semibold">Payload that is sent</h3>
+            <pre class="bg-default mt-1 max-h-72 overflow-auto rounded p-3 text-xs" aria-label="Rendered payload">{{
+                r.payload | json
+            }}</pre>
+            @if (r.lastResponse?.bodyExcerpt) {
+                <h3 class="mt-4 text-sm font-semibold">Last response body (excerpt)</h3>
+                <pre class="bg-default mt-1 max-h-40 overflow-auto rounded p-3 text-xs whitespace-pre-wrap">{{
+                    r.lastResponse?.bodyExcerpt
+                }}</pre>
+            }
+
+            @if (decideError()) {
+                <inspecto-alert class="mt-4" variant="error" title="Not done">{{ decideError() }}</inspecto-alert>
+            }
+
+            @if (canDecide()) {
+                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-start">
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                        <mat-label>Reason (optional)</mat-label>
+                        <input matInput [formControl]="reason" maxlength="500" />
+                        @if (reason.hasError('maxlength')) {
+                            <mat-error>At most 500 characters.</mat-error>
+                        }
+                    </mat-form-field>
+                    <button mat-stroked-button color="warn" [disabled]="deciding()" (click)="decline()">Decline</button>
+                    <button mat-flat-button color="primary" [disabled]="deciding()" (click)="approve()">Approve</button>
+                </div>
+            }
+            @if (canRetry()) {
+                <div class="mt-4 flex justify-end">
+                    <button mat-flat-button color="primary" [disabled]="deciding()" (click)="retry()">Retry</button>
+                </div>
+            }
+        </section>
+    }
+</div>

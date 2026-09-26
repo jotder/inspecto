@@ -96,6 +96,13 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 icon: 'heroicons_outline:clipboard-document-check',
                 link: '/pending-changes',
             },
+            {
+                id: 'action-requests',
+                title: 'Action Requests',
+                type: 'basic',
+                icon: 'heroicons_outline:paper-airplane',
+                link: '/action-requests',
+            },
             { id: 'autonomy', title: 'Autonomy', type: 'basic', icon: 'heroicons_outline:cpu-chip', link: '/autonomy' },
             {
                 id: 'learning',

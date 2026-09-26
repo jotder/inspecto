@@ -125,6 +125,12 @@
                                 [headingLevel]="2"
                                 (saved)="obj.set($event)"
                             />
+                            <!-- ASSURE-ACTION-REQUESTS-1: outbound calls raised from here, and their delivery -->
+                            <app-action-requests-panel
+                                class="mt-6 block"
+                                [objectId]="obj().id"
+                                [objectType]="obj().objectType"
+                            />
                         }
                         @if (attributeRows.length) {
                             <div class="mt-6">

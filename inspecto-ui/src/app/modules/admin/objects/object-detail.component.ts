@@ -43,6 +43,7 @@ import { fmtDateTime } from 'app/inspecto/grid';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
 import { GraphViewComponent } from 'app/modules/admin/catalog/graph-view.component';
 import { ObjectLinkDialog } from './object-link.dialog';
+import { ActionRequestsPanelComponent } from './action-requests-panel.component';
 import { ImpactPanelComponent } from './impact-panel.component';
 import { ResolveDialog, ResolveDialogData, ResolveResult } from './resolve.dialog';
 
@@ -84,6 +85,7 @@ interface MemberTimelineEntry {
         InspectoSkeletonComponent,
         StatusBadgeComponent,
         ImpactPanelComponent,
+        ActionRequestsPanelComponent,
     ],
     templateUrl: './object-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,

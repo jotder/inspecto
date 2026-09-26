@@ -45,7 +45,7 @@ export interface Consequence {
     destination?: string | null;
     /** The component a platform action acts on (start-job ⇒ job, trigger-pipeline ⇒ pipeline, render-widget ⇒ widget). */
     target?: { kind: string; id: string } | null;
-    /** Action-specific params: emit-signal {type,severity,message} · create-alert {rule,metric} · invoke-api {url} · generate-report {name}. */
+    /** Action-specific params: emit-signal {type,severity,message} · create-alert {rule,metric} · invoke-api {connection, method?, payload?} (an Action Request) · generate-report {name}. */
     params?: Record<string, unknown>;
 }
 
@@ -125,7 +125,13 @@ export function consequenceInputSpec(action: ConsequenceType): ConsequenceInputS
         case 'generate-report':
             return { show: true, label: 'Report name', required: true, kind: 'param', paramKey: 'name' };
         case 'invoke-api':
-            return { show: true, label: 'API URL', required: true, kind: 'param', paramKey: 'url' };
+            return {
+                show: true,
+                label: 'Connection id (https)',
+                required: true,
+                kind: 'param',
+                paramKey: 'connection',
+            };
     }
 }
 
@@ -151,6 +157,8 @@ export interface ExecutedConsequence {
     action: string;
     status: 'executed' | 'skipped';
     detail: string;
+    /** invoke-api: the pending Action Request it proposed (ASSURE-ACTION-REQUESTS-1). */
+    actionRequestId?: string;
 }
 
 /** A one-line human summary of a consequence (the ledger / proposal list / reuse-graph tooltip). */
@@ -179,7 +187,7 @@ export function describeConsequence(c: Consequence): string {
         case 'generate-report':
             return `Generate report ${(c.params?.['name'] as string) ?? ''}`.trim();
         case 'invoke-api':
-            return `Invoke API ${(c.params?.['url'] as string) ?? ''}`.trim();
+            return `Request API call via ${(c.params?.['connection'] as string) ?? '?'} (needs approval)`;
         default:
             return c.action;
     }
