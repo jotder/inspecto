@@ -286,6 +286,39 @@ class ControlApiShareTest {
         }
     }
 
+    /** R2-02: a shared table Widget opens in its saved `tableSort` order — the resolve carries the option and the
+     *  fenced public query orders by the measure alias the SPA sends, so the row limit keeps the same top rows. */
+    @Test
+    void aSharedTableWidgetKeepsItsSavedSortOrder(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        System.setProperty("bi.share.secret", "test-secret-0123456789");
+        try (Ctx c = open(cfg, root)) {
+            seed(c);
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("widget", "table_w", Map.of("vizType", "table", "datasetId", "sales_ds",
+                    "options", Map.of("tableSort", Map.of("field", "sum_amount", "dir", "asc"))));
+            reg.write("dashboard", "table_board", Map.of("widgets", List.of("table_w")));
+            String token = shareToken(c, "table_board");
+
+            JsonNode widget = V1Body.of(get(c.port, "/public/dashboards/" + token).body()).get("widgets").get(0);
+            assertEquals("sum_amount", widget.at("/content/options/tableSort/field").asText(), widget.toString());
+            assertEquals("asc", widget.at("/content/options/tableSort/dir").asText());
+
+            // Both directions, so an ignored orderBy cannot pass by the unordered result happening to match one.
+            assertEquals("US", topRegion(c, token, "asc"), "ascending by sum → US (5) before EU (10)");
+            assertEquals("EU", topRegion(c, token, "desc"), "descending by sum → EU (10) before US (5)");
+        }
+    }
+
+    private String topRegion(Ctx c, String token, String dir) throws Exception {
+        HttpResponse<String> r = post(c.port, "/public/dashboards/" + token + "/query",
+                "{\"dataset\":\"sales_ds\",\"groupBy\":[\"region\"],\"measures\":[{\"agg\":\"sum\",\"field\":\"amount\"}],"
+                        + "\"orderBy\":[{\"field\":\"sum_amount\",\"dir\":\"" + dir + "\"}],\"limit\":1}");
+        assertEquals(200, r.statusCode(), r.body());
+        JsonNode rows = V1Body.of(r.body()).get("rows");
+        assertEquals(1, rows.size(), "the limit keeps only the top row");
+        return rows.get(0).get("region").asText();
+    }
+
     @Test
     void unknownDashboardShareIs404(@TempDir Path cfg, @TempDir Path root) throws Exception {
         System.setProperty("bi.share.secret", "test-secret-0123456789");

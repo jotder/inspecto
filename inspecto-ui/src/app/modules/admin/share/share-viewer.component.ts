@@ -11,7 +11,7 @@ import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
 import 'app/inspecto/viz/plugins';
 import { getViz } from 'app/inspecto/viz/viz-registry';
 import { channelMeasureId } from 'app/inspecto/viz/query-spec';
-import { ChannelValue, ControlValues, VizPlugin, VizProps } from 'app/inspecto/viz/viz-types';
+import { ChannelValue, ControlValues, VizPlugin, VizProps, VizRenderOptions } from 'app/inspecto/viz/viz-types';
 import { DashboardHeaderComponent } from 'app/modules/admin/studio/dashboards/dashboard-header.component';
 import { DashboardHeader, compactHeader } from 'app/modules/admin/studio/dashboards/dashboard-types';
 
@@ -22,6 +22,9 @@ interface EmbedWidget {
     vizType: string;
     controls: ControlValues;
     viewId?: string;
+    /** The widget's options. Only the query-shaping `tableSort` is read (it becomes the public query's `orderBy`),
+     *  so a shared table opens in the same row order, and keeps the same top rows, as in the app. */
+    options?: Pick<VizRenderOptions, 'tableSort'>;
 }
 
 /** One rendered tile's view-model; `state` drives the per-tile skeleton/alert/viz switch. */
@@ -51,6 +54,7 @@ export function embedQueryBody(widget: EmbedWidget): PublicQueryBody | null {
         datasetId: widget.datasetId,
         sourceName: widget.datasetId,
         filters: null,
+        options: widget.options?.tableSort ? { tableSort: widget.options.tableSort } : undefined,
     });
     const byId = new Map<string, ChannelValue>();
     for (const values of Object.values(widget.controls ?? {})) {

@@ -38,6 +38,16 @@ describe('embedQueryBody', () => {
         ).toBeNull();
         expect(embedQueryBody({ ...BAR_WIDGET, vizType: 'no-such-viz' })).toBeNull();
     });
+
+    it('R2-02: a table widget’s tableSort becomes the public query’s orderBy, as in the app', () => {
+        const table = {
+            ...BAR_WIDGET,
+            vizType: 'table',
+            options: { tableSort: { field: 'sum_amount', dir: 'desc' as const } },
+        };
+        expect(embedQueryBody(table)!.orderBy).toEqual([{ field: 'sum_amount', dir: 'desc' }]);
+        expect(embedQueryBody({ ...table, options: undefined })!.orderBy).toBeUndefined();
+    });
 });
 
 describe('ShareViewerComponent', () => {
@@ -143,6 +153,33 @@ describe('ShareViewerComponent', () => {
         // the tile reached ready state: no skeleton/alert remains inside the section
         const section = fixture.nativeElement.querySelector('section')!;
         expect(section.querySelector('inspecto-alert')).toBeNull();
+    });
+
+    it('R2-02: a shared table widget queries in its saved tableSort order', async () => {
+        const bodies: { orderBy?: unknown }[] = [];
+        await create({
+            resolve: () =>
+                of({
+                    dashboard: { id: 'd', content: { name: 'D', tiles: [{ widgetId: 't1', span: 4 }] } },
+                    widgets: [
+                        {
+                            id: 't1',
+                            content: {
+                                ...BAR_WIDGET,
+                                vizType: 'table',
+                                options: { tableSort: { field: 'region', dir: 'asc' } },
+                            },
+                        },
+                    ],
+                    expiresAt: '2026-12-31T00:00:00Z',
+                }),
+            query: (_token: string, body: { orderBy?: unknown }) => {
+                bodies.push(body);
+                return of({ rows: [{ region: 'EU', sum_amount: 40 }], rowCount: 1, truncated: false });
+            },
+        } as Partial<ShareService>);
+        expect(bodies).toHaveLength(1);
+        expect(bodies[0].orderBy).toEqual([{ field: 'region', dir: 'asc' }]);
     });
 
     it('draws each tile in the shared tile card: a zero-row answer is the compact empty line (and passes axe)', async () => {

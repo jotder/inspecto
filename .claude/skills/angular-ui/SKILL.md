@@ -201,7 +201,8 @@ src/app/
     reads it from `ctx.options` and emits a server-side `orderBy` (so the row limit keeps the TOP rows); `field` is a
     result column id (a chosen dimension or a measure id like `sum_exposure_sar`), anything else is dropped. Not the
     chart `sort` (client-side, value-of-first-series, ignored by tables). Every `buildQuery` caller that has the
-    widget's options must pass `options`; a grid header click still re-sorts client-side.
+    widget's options must pass `options`; a grid header click still re-sorts client-side. The share viewer's
+    `embedQueryBody` forwards ONLY `tableSort` (the rest of the widget's options never enter the public query).
   - **`<app-dashboard-date-range [selection] [anchor] (selectionChange)>`** — the Dashboard **date-range**
     control (UIE-5 d, 2026-09-25; `studio/dashboards/`): presets counted back from the Dashboard's `asOf` (or
     today), *All dates*, *Custom* From/To; a labelled `role="group"`, an inverted custom span is announced
