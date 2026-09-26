@@ -108,6 +108,9 @@ public final class BundleExporter {
                     // Pending Changes are proposals, not config, and their MAC key must never leave the server
                     // (ASSURE-MAKER-CHECKER-1): a whole-Space export skips the store.
                     if (entry.startsWith("pending-changes/")) continue;
+                    // Action Requests carry rendered payloads and target response excerpts, and are signed with
+                    // that same key (ASSURE-ACTION-REQUESTS-1): operational records, never exported config.
+                    if (entry.startsWith("action-requests/")) continue;
                     entries.put(entry, exportableBytes(f));
                     artifacts.add(artifact(entry, kindOf(f)));
                 }

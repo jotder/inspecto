@@ -428,6 +428,9 @@ final class BackupTask {
         for (Path seg : rel) {
             String name = seg.toString();
             if (name.endsWith(".secrets") || name.equals(".pending-changes.key")) return true;
+            // ASSURE-ACTION-REQUESTS-1: Action Request records hold rendered payloads and target response
+            // excerpts — sensitive operational data a backup archive must not spread.
+            if (name.equals("action-requests")) return true;
         }
         return false;
     }

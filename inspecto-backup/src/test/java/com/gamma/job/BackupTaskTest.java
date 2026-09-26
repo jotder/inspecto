@@ -93,6 +93,21 @@ class BackupTaskTest {
         assertTrue(names.stream().anyMatch(n -> n.endsWith("a.toon")), "the rest is archived: " + names);
     }
 
+    /** Action Request records (payloads, response excerpts) never enter a backup (ASSURE-ACTION-REQUESTS-1). */
+    @Test
+    void aBackupNeverCarriesActionRequestRecords(@TempDir Path source, @TempDir Path backupDir) throws Exception {
+        JobConfig cfg = backupCfg(source, backupDir);
+        Files.writeString(Files.createDirectories(source.resolve("config").resolve("action-requests"))
+                .resolve("ar-20260101000000-abcdef.json"), "{}");
+        new MaintenanceJob(cfg).run();
+        java.util.List<String> names = new java.util.ArrayList<>();
+        try (var zin = new java.util.zip.ZipInputStream(Files.newInputStream(onlyZip(backupDir)))) {
+            for (var e = zin.getNextEntry(); e != null; e = zin.getNextEntry()) names.add(e.getName());
+        }
+        assertFalse(names.stream().anyMatch(n -> n.contains("action-requests")), "no record archived: " + names);
+        assertTrue(names.stream().anyMatch(n -> n.endsWith("a.toon")), "the rest is archived: " + names);
+    }
+
     /** No backup or restore job may point INTO a Space's {@code config.secrets/} — source or target (PathJail). */
     @Test
     void aJobPointedAtTheSecretsDirectoryIsRefused(@TempDir Path source, @TempDir Path backupDir,

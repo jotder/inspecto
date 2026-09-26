@@ -316,6 +316,24 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    /** Verification finding 6: a whole-Space export never carries the records (payloads, response excerpts). */
+    @Test
+    void aSpaceExportSkipsTheActionRequestStore(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            propose(c, incident(c));
+            assertTrue(Files.isDirectory(c.root.resolve(ActionRequests.DIR)), "a record exists to be skipped");
+            HttpResponse<byte[]> zip = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port
+                    + "/api/v1/export")).header("Authorization", CHECKER).GET().build(), BodyHandlers.ofByteArray());
+            assertEquals(200, zip.statusCode());
+            List<String> names = new java.util.ArrayList<>();
+            try (var zin = new java.util.zip.ZipInputStream(new java.io.ByteArrayInputStream(zip.body()))) {
+                for (var e = zin.getNextEntry(); e != null; e = zin.getNextEntry()) names.add(e.getName());
+            }
+            assertFalse(names.isEmpty());
+            assertFalse(names.stream().anyMatch(n -> n.contains("action-requests")), names.toString());
+        }
+    }
+
     // ── the Decision Rule invoke-api consequence ────────────────────────────────────────────────
 
     @Test
