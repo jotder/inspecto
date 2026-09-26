@@ -8766,6 +8766,134 @@
         "x-generated" : true,
         "x-optional-module" : true
       }
+    },
+    "/settings/approval" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "GET /settings/approval (generated skeleton)",
+        "operationId" : "getSettingsApproval",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      },
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "PUT /settings/approval (generated skeleton)",
+        "operationId" : "putSettingsApproval",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/pending-changes" : {
+      "get" : {
+        "tags" : [ "pending-changes" ],
+        "summary" : "GET /pending-changes (generated skeleton)",
+        "operationId" : "getPendingChanges",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/pending-changes/{pendingchangeId}/diff" : {
+      "get" : {
+        "tags" : [ "pending-changes" ],
+        "summary" : "GET /pending-changes/{pendingchangeId}/diff (generated skeleton)",
+        "operationId" : "getPendingChangesByPendingchangeIdDiff",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "pendingchangeId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/pending-changes/{pendingchangeId}" : {
+      "get" : {
+        "tags" : [ "pending-changes" ],
+        "summary" : "GET /pending-changes/{pendingchangeId} (generated skeleton)",
+        "operationId" : "getPendingChangesByPendingchangeId",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "pendingchangeId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/pending-changes/{pendingchangeId}/approve" : {
+      "post" : {
+        "tags" : [ "pending-changes" ],
+        "summary" : "POST /pending-changes/{pendingchangeId}/approve (generated skeleton)",
+        "operationId" : "postPendingChangesByPendingchangeIdApprove",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "pendingchangeId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/pending-changes/{pendingchangeId}/decline" : {
+      "post" : {
+        "tags" : [ "pending-changes" ],
+        "summary" : "POST /pending-changes/{pendingchangeId}/decline (generated skeleton)",
+        "operationId" : "postPendingChangesByPendingchangeIdDecline",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "pendingchangeId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   },
   "components" : {
