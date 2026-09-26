@@ -47,8 +47,11 @@ SQL key**, and an unknown key is refused.
    - Every column a factor names (key, measure field, filter fields, evidence) must be in its Dataset's
      Schema, as `DatasetMeasureProbe.columns` reads it. A Dataset whose Schema cannot be read refuses the
      save. This is the same rule as the Alert Rule `by` check.
-   - The derived output names must collide with nothing. A directory of that name under the data root that
-     this model did not create is refused, and so is a Dataset of that id over another store.
+   - The derived output names must collide with nothing. The save is refused for a directory of that name
+     under the data root that this model did not create, a Dataset of that id over another store, or **any**
+     registered Dataset whose `physicalRef` is that name. The one exception is a Dataset over a store that is
+     already this model's own output: the documented Alert Rule Dataset over `_latest` reads it and never
+     collides.
 3. Then `PendingChanges.hold`, the maker-checker funnel.
 
 **Every writer runs gates 1 and 2.** `ComponentRoutes.validateKind(api, …)` is called by the component

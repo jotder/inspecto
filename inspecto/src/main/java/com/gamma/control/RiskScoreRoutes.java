@@ -147,6 +147,14 @@ final class RiskScoreRoutes implements RouteModule {
             if (store.exists("dataset", out) && !out.equals(String.valueOf(ref)))
                 throw new IllegalArgumentException("risk-score '" + model.id() + "' would write '" + out
                         + "', which is the id of a Dataset over another store");
+            // A registered Dataset over the derived store name is refused too — unless that store already IS this
+            // model's output (the documented Alert Rule Dataset over _latest), which reads, never collides.
+            boolean ours = dataRoot != null && com.gamma.risk.RiskScoreEvaluator.ownedBy(dataRoot.resolve(out), model.id());
+            if (!ours)
+                for (ComponentRegistry.Component ds : store.list("dataset"))
+                    if (out.equals(String.valueOf(ds.content().get("physicalRef")).trim()))
+                        throw new IllegalArgumentException("risk-score '" + model.id() + "' would write '" + out
+                                + "', which Dataset '" + ds.content().get("name") + "' already reads as its store");
         }
     }
 }

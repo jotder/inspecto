@@ -235,6 +235,14 @@ class ControlApiRiskScoreTest {
                     JSON.writeValueAsString(withId("named", model(null))), "analyst").statusCode(),
                     "a Dataset of the derived id over another store");
 
+            // Any Dataset whose physicalRef IS the derived store, whatever its own id, would be overwritten.
+            new ComponentStore(c.config.resolve("registry")).write("dataset", "innocent_name",
+                    Map.of("physicalRef", "risk_scores_aimed2"));
+            HttpResponse<String> byRef = send(c.port, "POST", "/spaces/s1/components/risk-score",
+                    JSON.writeValueAsString(withId("aimed2", model(null))), "analyst");
+            assertEquals(422, byRef.statusCode(), byRef.body());
+            assertTrue(byRef.body().contains("innocent_name"), byRef.body());
+
             Map<String, Object> authored = new java.util.LinkedHashMap<>(model(null));
             authored.put("scoresDataset", "topups");
             HttpResponse<String> a = send(c.port, "POST", "/spaces/s1/components/risk-score",
