@@ -4,6 +4,7 @@ import com.gamma.event.AuditChain;
 import com.gamma.event.Event;
 import com.gamma.event.EventStore;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -89,18 +90,15 @@ final class AuditVerifier {
      * @param onGood     called with each record that passed, in seq order; returning false stops the walk there
      *                   (the anchor roll uses it to stop at today)
      */
-    static Result verify(EventStore store, List<AuditAnchors.Anchor> anchors, Long from, Long to, long maxRecords,
-                         Predicate<Event> onGood) {
+    static Result verify(EventStore store, AuditAnchors.AnchorFile anchorFile, Long from, Long to, long maxRecords,
+                         Predicate<Event> onGood, LocalDate today, boolean requireAnchors) {
+        List<AuditAnchors.Anchor> anchors = anchorFile.anchors();
         Event head = store.chainHead();
         long headSeq = head == null ? 0 : AuditChain.seq(head);
         long anchoredTo = anchors.stream().mapToLong(AuditAnchors.Anchor::lastSeq).max().orElse(0);
-        long start;
-        if (from != null) {
-            start = from;
-        } else {
-            List<Event> first = store.chainPage(1, 1);
-            start = first.isEmpty() ? 1 : AuditChain.seq(first.get(0));
-        }
+        List<Event> firstRec = store.chainPage(1, 1);
+        long lowest = firstRec.isEmpty() ? 1 : AuditChain.seq(firstRec.get(0));
+        long start = from != null ? from : lowest;
         long end = to != null ? to : Math.max(headSeq, anchoredTo);
         boolean complete = true;
         Long next = null;
@@ -109,11 +107,40 @@ final class AuditVerifier {
             complete = false;
             next = end + 1;
         }
+        boolean fromGenesis = start == 1;
+        final long s0 = start, e0 = end;
+        final boolean c0 = complete;
+        final Long n0 = next;
+        java.util.function.Function<Bad, Result> fail =
+                b -> new Result(s0, e0, 0, fromGenesis, c0, n0, s0 - 1, null, 0, b);
+
+        // ---- the anchor FILE first: unreadable lines, MACs, the anchor chain, contiguity ----
+        Bad fileBad = anchorFile.firstProblem();
+        if (fileBad != null) return fail.apply(fileBad);
+
+        // ---- anchors that end BELOW the first retained record (from = the lowest): the anchored rows are gone.
+        // Retention removes whole old days, so an anchor whose day is wholly before the first retained record's
+        // day is what a prune leaves behind; one whose day still has retained rows was truncated.
+        if (from == null && !firstRec.isEmpty()) {
+            LocalDate firstDay = AuditAnchors.day(firstRec.get(0));
+            for (AuditAnchors.Anchor a : anchors)
+                if (a.firstSeq() < lowest && !LocalDate.parse(a.day()).isBefore(firstDay))
+                    return fail.apply(new Bad(a.firstSeq(), "truncated-before-anchor", "the anchor for " + a.day()
+                            + " covers seq " + a.firstSeq() + ".." + a.lastSeq() + " but the trail now starts at seq "
+                            + lowest + ", inside a day that still has rows"));
+        }
+
+        // ---- audit rows that are NOT on the chain, written since it began: every one is a hole ----
+        if (!firstRec.isEmpty()) {
+            long unlinked = store.unlinkedSince(firstRec.get(0).ts());
+            if (unlinked > 0)
+                return fail.apply(new Bad(0, "unlinked", unlinked + " audit row(s) written since the chain began "
+                        + "carry no chain link"));
+        }
 
         // The base the first record links onto: genesis at seq 1, else the stored hash of the record before `start`.
         String expectedPrev = null;
         long prevTs = Long.MIN_VALUE;
-        boolean fromGenesis = start == 1;
         if (start == 1) {
             expectedPrev = AuditChain.GENESIS;
         } else {
@@ -128,20 +155,30 @@ final class AuditVerifier {
         for (AuditAnchors.Anchor a : anchors) if (a.lastSeq() >= start && a.lastSeq() <= end) inRange.add(a);
         inRange.sort(Comparator.comparingLong(AuditAnchors.Anchor::lastSeq));
         int anchorIdx = 0;
+        // a day before yesterday must be anchored (the scheduled roll has had a whole day to do it)
+        LocalDate mustBeAnchored = today.minusDays(1);
 
         long expected = start;
         long checked = 0;
         long lastSeq = start - 1;
         String lastHash = expectedPrev;
         boolean stopped = false;
+        java.util.Map<String, Long> seenIds = new java.util.HashMap<>();
         Cursor records = new Cursor(store, start, end);
         Event cur = records.next();
         while (cur != null) {
             Event ahead = records.next();
             Bad bad = check(cur, ahead, expected, expectedPrev, prevTs, inRange, anchorIdx);
+            long s = AuditChain.seq(cur);
+            if (bad == null && seenIds.containsKey(cur.eventId()))
+                bad = new Bad(s, "duplicate-event", "event " + cur.eventId() + " is stored at seq "
+                        + seenIds.get(cur.eventId()) + " and again at seq " + s);
+            if (bad == null && requireAnchors && s > anchoredTo && AuditAnchors.day(cur).isBefore(mustBeAnchored))
+                bad = new Bad(s, "anchor-missing", "seq " + s + " is from " + AuditAnchors.day(cur)
+                        + ", a finished day no anchor covers");
             if (bad != null)
                 return new Result(start, end, checked, fromGenesis, complete, next, lastSeq, lastHash, anchorIdx, bad);
-            long s = AuditChain.seq(cur);
+            seenIds.put(cur.eventId(), s);
             while (anchorIdx < inRange.size() && inRange.get(anchorIdx).lastSeq() == s) anchorIdx++;
             checked++;
             expected = s + 1;
@@ -161,6 +198,11 @@ final class AuditVerifier {
                     new Bad(expected, "missing", "the anchor for " + a.day() + " covers seq " + a.firstSeq() + ".."
                             + a.lastSeq() + " but the trail ends at seq " + (expected - 1)));
         }
+        List<String> unreadable = store.unreadableUnits();
+        if (!unreadable.isEmpty())
+            return new Result(start, end, checked, fromGenesis, complete, next, lastSeq, lastHash, anchorIdx,
+                    new Bad(0, "unreadable-file", "the event store could not read " + unreadable
+                            + "; rows in them are not verified"));
         return new Result(start, end, checked, fromGenesis, complete, next, lastSeq, lastHash, anchorIdx, null);
     }
 

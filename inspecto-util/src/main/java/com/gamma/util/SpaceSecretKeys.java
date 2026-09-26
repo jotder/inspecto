@@ -75,7 +75,7 @@ public final class SpaceSecretKeys {
     }
 
     /** Windows: an ACL with one entry — the file's owner, full control — replacing whatever it inherited. */
-    private static void ownerOnlyAcl(Path f) {
+    public static void ownerOnlyAcl(Path f) {
         var view = Files.getFileAttributeView(f, AclFileAttributeView.class);
         if (view == null) return;   // neither POSIX nor ACL: nothing narrower to set
         try {

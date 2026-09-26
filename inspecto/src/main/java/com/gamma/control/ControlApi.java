@@ -374,8 +374,29 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      */
     public static final String LOCAL_BASE_URL_PROP = "inspecto.control.localBaseUrl";
 
+    /** ASSURE-AUDIT-CHAIN-1: the day-boundary audit anchor roll, on a schedule of its own — never driven by a
+     *  request, so an unauthenticated caller cannot trigger the walk. */
+    private java.util.concurrent.ScheduledExecutorService anchorRoll;
+
+    private void rollAuditAnchors() {
+        for (SpaceContext ctx : spaces.all()) {
+            try {
+                Path root = ctx.root().config() != null ? ctx.root().config() : writeRoot;
+                AuditAnchors.rollIfDue(ctx.service().events(), root, System.currentTimeMillis());
+            } catch (RuntimeException ignore) {
+                // one Space's failure must not stop the others; rollIfDue logs and backs off itself
+            }
+        }
+    }
+
     public void start() {
         http.start();
+        anchorRoll = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "audit-anchor-roll");
+            t.setDaemon(true);
+            return t;
+        });
+        anchorRoll.scheduleWithFixedDelay(this::rollAuditAnchors, 1, 10, java.util.concurrent.TimeUnit.MINUTES);
         System.setProperty(LOCAL_BASE_URL_PROP, "http://127.0.0.1:" + port());
         if (Authenticators.active().isPresent())
             log.info("ControlApi started on port {} (Professional edition — authentication enforced via {})",
@@ -393,6 +414,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     @Override
     public void close() {
+        if (anchorRoll != null) anchorRoll.shutdownNow();
         http.stop(SHUTDOWN_DRAIN_SECONDS);
         // Only clear the loopback URL if it still points at us (a later ControlApi in the same JVM may
         // have re-published its own — don't strip a live one out from under it).
@@ -819,12 +841,6 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             if (!"GET".equals(method)) AuditTrail.accessDenied(ex, method, path, 404);
             respond(ex, 404, Map.of("error", "not found — API routes are served under /api/v1"));
             return;
-        }
-        // ASSURE-AUDIT-CHAIN-1: the day-boundary audit anchor — once per UTC day per Space, in the background.
-        try {
-            AuditAnchors.rollIfDue(service().events(), writeRoot());
-        } catch (RuntimeException ignore) {
-            // best effort — anchoring must never break the request
         }
         boolean pathMatched = false;
         for (Route r : routes) {

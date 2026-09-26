@@ -67,7 +67,9 @@ class AuditVerifierTest {
 
     private static AuditVerifier.Result verify(Space s, Long from, Long to, long max) throws Exception {
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
-            return AuditVerifier.verify(store, AuditAnchors.read(s.config()), from, to, max, e -> true);
+            // anchors not REQUIRED here: most tests work on a fixed past day; anchor-missing has its own test
+            return AuditVerifier.verify(store, AuditAnchors.readFile(s.config()), from, to, max, e -> true,
+                    LocalDate.now(java.time.ZoneOffset.UTC), false);
         }
     }
 
@@ -77,10 +79,13 @@ class AuditVerifierTest {
         assertEquals(seq, r.bad().seq(), r.bad().toString());
     }
 
+    /** Anchor the fixed test day (2026-09-20) as the scheduled roll would on the day after it. */
     private static AuditAnchors.Anchor anchorNow(Space s) throws Exception {
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
-            return AuditAnchors.onDemand(store, s.config()).anchor();
+            AuditAnchors.roll(store, s.config(), LocalDate.of(2026, 9, 21));
         }
+        List<AuditAnchors.Anchor> all = AuditAnchors.read(s.config());
+        return all.get(all.size() - 1);
     }
 
     // ── tampering, directly on the store ──────────────────────────────────────────────────────────────────────
@@ -261,9 +266,10 @@ class AuditVerifierTest {
         LocalDate d1 = LocalDate.of(2026, 9, 20);
         emit(s, T0, T0 + 1000, T0 + 2000,                             // day 1: seq 1..3
                 T0 + DAY, T0 + DAY + 1, T0 + DAY + 2, T0 + DAY + 3,  // day 2: seq 4..7
-                T0 + 2 * DAY, T0 + 2 * DAY + 1);                     // day 3 (the "today" of this roll): 8..9
+                T0 + 2 * DAY, T0 + 2 * DAY + 1);                     // day 3: 8..9
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
-            assertEquals(2, AuditAnchors.roll(store, s.config(), d1.plusDays(2)));
+            assertEquals(1, AuditAnchors.roll(store, s.config(), d1.plusDays(1)), "day 1 closes on day 2");
+            assertEquals(1, AuditAnchors.roll(store, s.config(), d1.plusDays(2)), "day 2 closes on day 3");
             assertEquals(0, AuditAnchors.roll(store, s.config(), d1.plusDays(2)), "a second roll writes nothing");
         }
         List<AuditAnchors.Anchor> a = AuditAnchors.read(s.config());
@@ -271,11 +277,12 @@ class AuditVerifierTest {
         assertEquals(List.of(1L, 4L), a.stream().map(AuditAnchors.Anchor::firstSeq).toList());
         assertEquals(List.of(3L, 7L), a.stream().map(AuditAnchors.Anchor::lastSeq).toList());
         assertEquals(List.of(3L, 4L), a.stream().map(AuditAnchors.Anchor::count).toList());
+        assertEquals("", a.get(0).prevAnchorMac(), "the first anchor starts the anchor chain");
+        assertEquals(a.get(0).mac(), a.get(1).prevAnchorMac(), "each anchor carries the previous one's MAC");
         assertTrue(a.stream().allMatch(x -> x.macValid() && "daily".equals(x.kind())));
         assertTrue(verify(s).ok());
         assertEquals(2, verify(s).anchorsChecked());
 
-        // the day after: day 3 is finished too, and continues where day 2 stopped
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
             assertEquals(1, AuditAnchors.roll(store, s.config(), d1.plusDays(3)));
         }
@@ -287,10 +294,12 @@ class AuditVerifierTest {
     @Test
     void theRollNeverAnchorsTheDayABreakIsIn(@TempDir Path dir) throws Exception {
         Space s = space(dir);
+        LocalDate d1 = LocalDate.of(2026, 9, 20);
         emit(s, T0, T0 + 1000, T0 + DAY, T0 + DAY + 1, T0 + DAY + 2);
         rewrite(s, all -> all.stream().filter(e -> seq(e) != 4).toList());   // a gap in day 2
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
-            assertEquals(1, AuditAnchors.roll(store, s.config(), LocalDate.of(2026, 9, 25)));
+            assertEquals(1, AuditAnchors.roll(store, s.config(), d1.plusDays(1)));
+            assertEquals(0, AuditAnchors.roll(store, s.config(), d1.plusDays(2)), "day 2 holds the break");
         }
         List<AuditAnchors.Anchor> a = AuditAnchors.read(s.config());
         assertEquals(1, a.size());
@@ -298,26 +307,142 @@ class AuditVerifierTest {
     }
 
     @Test
-    void onDemandRefusesToSignABrokenChainAndAnswersNothingNewWhenUpToDate(@TempDir Path dir) throws Exception {
+    void onDemandIsRateLimitedAndRefusesToSignABrokenChain(@TempDir Path dir) throws Exception {
         Space s = space(dir);
         long now = System.currentTimeMillis();
-        emit(s, T0, T0 + 1000, now - 2000, now - 1000);   // a finished day, then today
+        emit(s, now - 2000, now - 1000);
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            AuditAnchors.resetRateLimit(s.config());
             AuditAnchors.OnDemand first = AuditAnchors.onDemand(store, s.config());
             assertTrue(first.created());
             assertEquals("on-demand", first.anchor().kind());
-            assertEquals(3, first.anchor().firstSeq(), "after the daily anchor the roll wrote for the finished day");
-            assertEquals(4, first.anchor().lastSeq());
+            assertEquals(2, first.anchor().lastSeq());
+            ApiException tooSoon = assertThrows(ApiException.class, () -> AuditAnchors.onDemand(store, s.config()));
+            assertEquals(429, tooSoon.status);
+            AuditAnchors.resetRateLimit(s.config());
             AuditAnchors.OnDemand again = AuditAnchors.onDemand(store, s.config());
             assertFalse(again.created(), "nothing chained since the last anchor");
-            assertEquals(4, again.anchor().lastSeq());
         }
-        assertEquals(List.of("daily", "on-demand"),
-                AuditAnchors.read(s.config()).stream().map(AuditAnchors.Anchor::kind).toList());
-        emit(s, now);   // seq 5, so there is something new to refuse to sign
-        rewrite(s, all -> all.stream().map(e -> seq(e) == 4 ? with(e, "forged", e.ts(), Map.of()) : e).toList());
-        ApiException refused = assertThrows(ApiException.class, () -> anchorNow(s));
-        assertEquals(409, refused.status);
+        emit(s, now);   // seq 3, so there is something new to refuse to sign
+        rewrite(s, all -> all.stream().map(e -> seq(e) == 2 ? with(e, "forged", e.ts(), Map.of()) : e).toList());
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            AuditAnchors.resetRateLimit(s.config());
+            ApiException refused = assertThrows(ApiException.class, () -> AuditAnchors.onDemand(store, s.config()));
+            assertEquals(409, refused.status);
+        }
+    }
+
+    // ── the anchor file is a chain too (independent verification, 2026-09-27) ──────────────────────────────
+
+    /** Two daily anchors over days 1 and 2 of ten records (1..5, 6..10). */
+    private static Space twoAnchoredDays(Path dir) throws Exception {
+        Space s = space(dir);
+        long[] ts = new long[10];
+        for (int i = 0; i < 10; i++) ts[i] = (i < 5 ? T0 : T0 + DAY) + i * 1000L;
+        emit(s, ts);
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            AuditAnchors.roll(store, s.config(), LocalDate.of(2026, 9, 21));
+            AuditAnchors.roll(store, s.config(), LocalDate.of(2026, 9, 22));
+        }
+        assertEquals(2, AuditAnchors.read(s.config()).size());
+        return s;
+    }
+
+    @Test
+    void aDeletedAnchorBreaksTheAnchorChain(@TempDir Path dir) throws Exception {
+        Space s = twoAnchoredDays(dir);
+        Path f = AuditAnchors.file(s.config());
+        List<String> lines = Files.readAllLines(f, StandardCharsets.UTF_8);
+        Files.write(f, List.of(lines.get(1)), StandardCharsets.UTF_8);   // the first anchor removed
+        assertBad(verify(s), 10, "anchor-chain-broken");
+    }
+
+    @Test
+    void aGarbledAnchorLineIsAFailureNotASkip(@TempDir Path dir) throws Exception {
+        Space s = twoAnchoredDays(dir);
+        Path f = AuditAnchors.file(s.config());
+        List<String> lines = Files.readAllLines(f, StandardCharsets.UTF_8);
+        Files.write(f, List.of(lines.get(0), "{not json"), StandardCharsets.UTF_8);
+        assertBad(verify(s), 0, "anchor-unreadable");
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            AuditAnchors.resetRateLimit(s.config());
+            assertEquals(409, assertThrows(ApiException.class, () -> AuditAnchors.onDemand(store, s.config())).status,
+                    "nothing is signed over a broken anchor file");
+        }
+    }
+
+    /** Deleting the whole file must not let the next anchor quietly re-sign history from genesis. */
+    @Test
+    void aMissingAnchorFileIsNeverSilentlyReSigned(@TempDir Path dir) throws Exception {
+        Space s = twoAnchoredDays(dir);
+        Files.delete(AuditAnchors.file(s.config()));
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            AuditAnchors.resetRateLimit(s.config());
+            assertEquals(409, assertThrows(ApiException.class, () -> AuditAnchors.onDemand(store, s.config())).status);
+            assertThrows(ApiException.class, () -> AuditAnchors.roll(store, s.config(), LocalDate.of(2026, 9, 25)));
+        }
+        assertFalse(Files.exists(AuditAnchors.file(s.config())));
+    }
+
+    @Test
+    void aFinishedDayWithNoAnchorFailsWhenAnchorsAreExpected(@TempDir Path dir) throws Exception {
+        Space s = space(dir);
+        emit(s, T0, T0 + 1000, T0 + DAY, T0 + DAY + 1);
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            AuditAnchors.roll(store, s.config(), LocalDate.of(2026, 9, 21));   // day 1 only
+            AuditVerifier.Result r = AuditVerifier.verify(store, AuditAnchors.readFile(s.config()), null, null,
+                    Long.MAX_VALUE, e -> true, LocalDate.of(2026, 9, 25), true);
+            assertBad(r, 3, "anchor-missing");
+        }
+    }
+
+    @Test
+    void anAnchoredDayCutShortAtTheFrontIsTruncatedBeforeAnchor(@TempDir Path dir) throws Exception {
+        Space s = twoAnchoredDays(dir);
+        rewrite(s, all -> all.stream().filter(e -> seq(e) > 2).toList());   // seq 1..2 of day 1 gone, 3..5 remain
+        assertBad(verify(s), 1, "truncated-before-anchor");
+        // whereas retention removes the WHOLE day: that is not a failure
+        rewrite(s, all -> all.stream().filter(e -> seq(e) > 5).toList());
+        assertTrue(verify(s).ok(), String.valueOf(verify(s).bad()));
+    }
+
+    @Test
+    void anAuditRowWithoutALinkIsAHole(@TempDir Path dir) throws Exception {
+        Space s = space(dir);
+        emit(s, seconds(3));
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            store.append(Event.builder(EventType.AUDIT).ts(T0 + 10_000).message("slipped past the chain").build());
+        }
+        assertBad(verify(s), 0, "unlinked");
+    }
+
+    @Test
+    void aCorruptFileInTheStoreIsReportedNotSkipped(@TempDir Path dir) throws Exception {
+        Space s = space(dir);
+        emit(s, seconds(3));
+        Path day = Files.createDirectories(s.events().resolve("level=INFO/year=2026/month=09/day=20"));
+        Files.writeString(day.resolve("planted.parquet"), "not parquet");
+        AuditVerifier.Result r = verify(s);
+        assertBad(r, 0, "unreadable-file");
+        assertEquals(3, r.checked(), "the readable files were still verified");
+    }
+
+    @Test
+    void oneEventStoredAtTwoSeqsIsADuplicateEvent(@TempDir Path dir) throws Exception {
+        Space s = space(dir);
+        emit(s, seconds(10));
+        rewrite(s, all -> {
+            List<Event> out = new ArrayList<>();
+            Event three = all.get(2);
+            for (Event e : all) {
+                if (seq(e) != 7) { out.add(e); continue; }
+                Event clone = new Event(three.eventId(), e.ts(), three.level(), three.type(), three.source(),
+                        three.pipeline(), three.correlationId(), three.message(), e.attributes(), three.payload());
+                out.add(reseal(clone));
+            }
+            return out;
+        });
+        assertBad(verify(s), 7, "duplicate-event");
     }
 
     // ── range, bounds and retention ───────────────────────────────────────────────────────────────────────────

@@ -75,9 +75,10 @@ final class AuditLogRoutes implements RouteModule {
         if (from != null && to != null && from > to)
             throw new ApiException(400, "from (" + from + ") is after to (" + to + ")");
         Path root = api.writeRoot();
-        List<AuditAnchors.Anchor> anchors = root == null ? List.of() : AuditAnchors.read(root);
+        AuditAnchors.AnchorFile anchors = root == null ? AuditAnchors.AnchorFile.NONE : AuditAnchors.readFile(root);
         java.util.Map<String, Object> out = new java.util.LinkedHashMap<>(AuditVerifier.verify(
-                api.service().events(), anchors, from, to, MAX_VERIFY, e -> true).toMap());
+                api.service().events(), anchors, from, to, MAX_VERIFY, e -> true,
+                java.time.LocalDate.now(java.time.ZoneOffset.UTC), root != null).toMap());
         out.put("anchors", root == null ? "unavailable" : "checked");
         return out;
     }

@@ -25,31 +25,33 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The audit chain's signed anchors (ASSURE-AUDIT-CHAIN-1): a record {@code {day, firstSeq, lastSeq, lastHash,
- * count}} that pins a contiguous run of the chain ({@link AuditChain}), MAC'd with the Space's key.
+ * count, prevAnchorMac}} that pins a contiguous run of the chain ({@link AuditChain}), MAC'd with the Space's key.
+ *
+ * <h3>The anchors are a chain of their own</h3>
+ * Each anchor carries the MAC of the anchor before it ({@code prevAnchorMac}, {@code ""} for the first) inside its
+ * own MAC input, and starts at the seq after the previous one's {@code lastSeq}. So the anchor FILE is verified end
+ * to end ({@link AuditVerifier}): a garbled line, a deleted or reordered anchor, or a gap between two anchors is a
+ * failure, never skipped. Nothing is ever re-signed over a broken or missing file: when the file is missing or
+ * broken while chained rows exist from a day that should already be anchored, the roll and
+ * {@code POST /audit/anchors} both REFUSE (409) — an operator has to see and resolve that.
  *
  * <h3>When one is written</h3>
- * A {@code daily} anchor closes each UTC day that has chained records, once the day is over — written by
- * {@link #rollIfDue} on the first request the Space serves after midnight (in the background), or by
- * {@link #onDemand} before it writes its own. An {@code on-demand} anchor ({@code POST /audit/anchors}) pins
- * everything since the previous anchor up to the head. Anchors partition the chain: each starts at the seq after
- * the previous one's {@code lastSeq}, so {@code count = lastSeq - firstSeq + 1}. Neither kind is written over a
- * chain that does not verify — the roll stops before the first bad record, and on-demand refuses (409).
+ * A {@code daily} anchor closes each UTC day that has chained records, once the day is over — by the control
+ * plane's scheduled roll ({@link #rollIfDue}, every few minutes, once a day per Space, backing off after a
+ * failure), or by {@link #onDemand} before it writes its own. An {@code on-demand} anchor pins everything since the
+ * previous anchor up to the head, and is rate-limited. Both walk only from the previous anchor's {@code lastSeq}.
  *
- * <h3>Where, and why there</h3>
- * {@code <config root>.secrets/audit-anchors.jsonl} — beside the Pending Change key ({@link PendingChanges#keyFile}),
- * outside the config tree: no import can write there (an import writes only under the config root, and
- * {@link com.gamma.service.ReservedConfigPaths} could not name a path outside it), no export or Exchange reads
- * it, and {@code BackupTask} skips every {@code *.secrets} directory. One JSON line per anchor, appended and
- * forced.
+ * <h3>Where</h3>
+ * {@code <config root>.secrets/audit-anchors.jsonl} — beside the Pending Change key, outside the config tree (no
+ * import, export or Exchange reaches it; {@code BackupTask} skips {@code *.secrets}), created owner-only like the
+ * key. One JSON line per anchor, appended and forced.
  *
- * <h3>The MAC</h3>
- * HMAC-SHA256 with the Space's Pending Change key ({@link PendingChanges#key}), over {@code "audit-anchor\n"}
- * followed by the anchor's canonical JSON (its MAC excluded). The prefix separates the domains: a Pending Change
- * MAC is over a bare canonical JSON object, which starts with {@code {}, so no MAC of one kind is ever a valid
- * MAC of the other. ⚠ Like the Pending Change MAC it defends against a writer who cannot READ the key — an
- * import, a forged upload, someone editing the store — not against a local administrator who can read both;
- * that is what exporting the anchors off the box ({@code GET /audit/anchors}) is for. HMAC is symmetric, so an
- * offline checker holding only the export compares {@code lastHash} values; it does not re-check the MAC.
+ * <h3>The MAC, and what it cannot defend against</h3>
+ * HMAC-SHA256 with the Space's Pending Change key over {@code "audit-anchor\n"} + the anchor's canonical JSON (MAC
+ * excluded) — domain-separated from the Pending Change MAC, whose input starts with {@code {}. ⛔ An attacker who
+ * can READ the key (a local administrator) can rewrite the store AND re-sign every anchor. On-box anchors do not
+ * defend against that party; the anchors exported OFF the box ({@code GET /audit/anchors}, kept elsewhere on a
+ * schedule) do.
  */
 final class AuditAnchors {
 
@@ -62,14 +64,53 @@ final class AuditAnchors {
     private static final TypeReference<LinkedHashMap<String, Object>> MAP = new TypeReference<>() {};
     private static final ConcurrentHashMap<Path, Object> LOCKS = new ConcurrentHashMap<>();
 
+    /** The least time between two on-demand anchors for one Space. */
+    static final long ON_DEMAND_MIN_INTERVAL_MS = 10_000;
+
     /** One stored anchor and whether its MAC verifies against this Space's key. */
     record Anchor(String kind, String day, long firstSeq, long lastSeq, String lastHash, long count,
-                  long createdAt, String mac, boolean macValid) {
+                  long createdAt, String prevAnchorMac, String mac, boolean macValid) {
         Map<String, Object> toMap() {
-            Map<String, Object> m = fields(kind, day, firstSeq, lastSeq, lastHash, count, createdAt);
+            Map<String, Object> m = fields(kind, day, firstSeq, lastSeq, lastHash, count, createdAt, prevAnchorMac);
             m.put("mac", mac);
             m.put("integrity", macValid ? "valid" : "invalid");
             return m;
+        }
+    }
+
+    /** The whole anchor file: the anchors that parsed, in file order, and the 1-based numbers of lines that did not. */
+    record AnchorFile(List<Anchor> anchors, List<Integer> unreadableLines, boolean exists) {
+        static final AnchorFile NONE = new AnchorFile(List.of(), List.of(), false);
+
+        /** The first integrity problem of the file itself, or {@code null}: unreadable lines, a bad MAC, a broken link
+         *  between two anchors, or a gap/overlap between their ranges. */
+        AuditVerifier.Bad firstProblem() {
+            if (!unreadableLines.isEmpty())
+                return new AuditVerifier.Bad(0, "anchor-unreadable", "the anchor file has unreadable line(s) "
+                        + unreadableLines);
+            String prevMac = "";
+            long prevLast = -1;
+            for (Anchor a : anchors) {
+                if (!a.macValid())
+                    return new AuditVerifier.Bad(a.lastSeq(), "anchor-mismatch", "the anchor for " + a.day()
+                            + " ending at seq " + a.lastSeq() + " does not carry a valid MAC");
+                if (!prevMac.equals(a.prevAnchorMac()))
+                    return new AuditVerifier.Bad(a.lastSeq(), "anchor-chain-broken", "the anchor for " + a.day()
+                            + " does not link onto the anchor before it (one was removed, reordered or replaced)");
+                if (prevLast >= 0 && a.firstSeq() != prevLast + 1)
+                    return new AuditVerifier.Bad(a.lastSeq(), "anchor-chain-broken", "the anchor for " + a.day()
+                            + " starts at seq " + a.firstSeq() + ", not at " + (prevLast + 1));
+                if (a.count() != a.lastSeq() - a.firstSeq() + 1)
+                    return new AuditVerifier.Bad(a.lastSeq(), "anchor-mismatch", "the anchor for " + a.day()
+                            + " claims " + a.count() + " records over seq " + a.firstSeq() + ".." + a.lastSeq());
+                prevMac = a.mac();
+                prevLast = a.lastSeq();
+            }
+            return null;
+        }
+
+        Anchor last() {
+            return anchors.isEmpty() ? null : anchors.get(anchors.size() - 1);
         }
     }
 
@@ -78,18 +119,26 @@ final class AuditAnchors {
         return PendingChanges.keyFile(root).getParent().resolve(FILE);
     }
 
-    /** Every anchor, in file order, each with its MAC verdict. A line that does not parse (a torn write) is skipped. */
+    /** The anchors that parsed (convenience for callers that only list them). */
     static List<Anchor> read(Path root) throws IOException {
+        return readFile(root).anchors();
+    }
+
+    /** Every line of the anchor file — a line that does not parse is RECORDED, never skipped. */
+    static AnchorFile readFile(Path root) throws IOException {
         Path f = file(root);
+        if (!Files.isRegularFile(f)) return AnchorFile.NONE;
         List<Anchor> out = new ArrayList<>();
-        if (!Files.isRegularFile(f)) return out;
-        for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
+        List<Integer> bad = new ArrayList<>();
+        List<String> lines = Files.readAllLines(f, StandardCharsets.UTF_8);
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
             if (line.isBlank()) continue;
             Map<String, Object> m;
             try {
                 m = ApiContext.JSON.readValue(line, MAP);
             } catch (IOException torn) {
-                log.warn("Audit anchors {}: skipped an unreadable line", f);
+                bad.add(i + 1);
                 continue;
             }
             Object claimed = m.remove("mac");
@@ -98,51 +147,53 @@ final class AuditAnchors {
                     c.getBytes(StandardCharsets.UTF_8), expected.getBytes(StandardCharsets.UTF_8));
             out.add(new Anchor(str(m.get("kind")), str(m.get("day")), num(m.get("firstSeq")), num(m.get("lastSeq")),
                     str(m.get("lastHash")), num(m.get("count")), num(m.get("createdAt")),
+                    m.get("prevAnchorMac") == null ? null : m.get("prevAnchorMac").toString(),
                     claimed == null ? null : claimed.toString(), ok));
         }
-        return out;
+        return new AnchorFile(List.copyOf(out), List.copyOf(bad), true);
     }
 
-    /** The day-boundary roll, per config root: the last UTC day it completed through, so it runs once a day. */
+    // -- the scheduled day-boundary roll --
+
+    /** Per config root: the last UTC day the roll completed through, and when it may next be attempted. */
     private static final ConcurrentHashMap<Path, LocalDate> ROLLED = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<Path, Boolean> ROLLING = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Path, long[]> BACKOFF = new ConcurrentHashMap<>();   // {notBefore, delay}
+    private static final long FIRST_BACKOFF_MS = 5 * 60_000L;
+    private static final long MAX_BACKOFF_MS = 6 * 3_600_000L;
 
     /**
-     * Called on every request the Space serves: when the UTC day has turned since the last roll, anchor the
-     * finished days in the background. Cheap otherwise (a map lookup). Never throws.
+     * Called by the control plane's scheduler (NOT per request, so an unauthenticated caller cannot drive it): when
+     * the UTC day has turned since the last successful roll, anchor the finished days. After a failure it waits
+     * 5 min, doubling to 6 h, before trying again. Never throws.
      */
-    static void rollIfDue(EventStore store, Path root) {
+    static void rollIfDue(EventStore store, Path root, long nowMs) {
         if (store == null || root == null) return;
+        Path key = root.toAbsolutePath().normalize();
+        LocalDate today = Instant.ofEpochMilli(nowMs).atZone(ZoneOffset.UTC).toLocalDate();
+        LocalDate done = ROLLED.get(key);
+        if (done != null && !done.isBefore(today)) return;
+        long[] b = BACKOFF.get(key);
+        if (b != null && nowMs < b[0]) return;
         try {
-            Path key = root.toAbsolutePath().normalize();
-            LocalDate today = LocalDate.now(ZoneOffset.UTC);
-            LocalDate done = ROLLED.get(key);
-            if (done != null && !done.isBefore(today)) return;
-            if (ROLLING.putIfAbsent(key, Boolean.TRUE) != null) return;
-            Thread.ofVirtual().name("audit-anchor-roll").start(() -> {
-                try {
-                    roll(store, key, today);
-                    ROLLED.put(key, today);
-                } catch (Exception e) {
-                    log.warn("Audit anchor roll for {} failed; retried on a later request: {}", key, e.getMessage());
-                } finally {
-                    ROLLING.remove(key);
-                }
-            });
-        } catch (RuntimeException ignore) {
-            // best effort — anchoring must never break the request
+            roll(store, key, today);
+            ROLLED.put(key, today);
+            BACKOFF.remove(key);
+        } catch (Exception e) {
+            long delay = b == null ? FIRST_BACKOFF_MS : Math.min(MAX_BACKOFF_MS, b[1] * 2);
+            BACKOFF.put(key, new long[] {nowMs + delay, delay});
+            log.error("Audit anchor roll for {} failed; next attempt in {} min: {}", key, delay / 60_000, e.getMessage());
         }
     }
 
     /**
-     * Write a {@code daily} anchor for every UTC day before {@code today} that has chained records after the
-     * last anchor. Walks the chain through {@link AuditVerifier}, so a day is anchored only as far as it verifies,
-     * and a day in which a bad record is found is not anchored at all. Returns the number written.
+     * Write a {@code daily} anchor for every UTC day before {@code today} that has chained records after the last
+     * anchor, walking only from that anchor. A day is anchored only as far as it verifies; the day a bad record is
+     * found in is not anchored at all. Refuses (409) over a broken or missing anchor file (see class doc).
      */
     static int roll(EventStore store, Path root, LocalDate today) throws IOException {
         synchronized (lock(root)) {
-            List<Anchor> anchors = read(root);
-            Anchor last = lastValid(store, anchors);
+            AnchorFile file = readFile(root);
+            Anchor last = lastValid(store, file, today);
             Long from = last == null ? null : last.lastSeq() + 1;
             Event head = store.chainHead();
             if (head == null || (last != null && AuditChain.seq(head) <= last.lastSeq())) return 0;
@@ -150,13 +201,14 @@ final class AuditAnchors {
             Event[] prev = {null};
             LocalDate[] curDay = {null};
             int[] written = {0};
+            String[] prevMac = {last == null ? "" : last.mac()};
             IOException[] failed = {null};
-            AuditVerifier.Result r = AuditVerifier.verify(store, anchors, from, null, Long.MAX_VALUE, e -> {
+            AuditVerifier.Result r = AuditVerifier.verify(store, AnchorFile.NONE, from, null, Long.MAX_VALUE, e -> {
                 LocalDate d = day(e);
                 if (!d.isBefore(today)) return false;
                 if (curDay[0] != null && !d.equals(curDay[0])) {
                     try {
-                        append(root, "daily", curDay[0], dayFirst[0], prev[0]);
+                        prevMac[0] = append(root, "daily", curDay[0], dayFirst[0], prev[0], prevMac[0]).mac();
                         written[0]++;
                     } catch (IOException io) {
                         failed[0] = io;
@@ -168,15 +220,15 @@ final class AuditAnchors {
                 curDay[0] = d;
                 prev[0] = e;
                 return true;
-            });
+            }, today, false);
             if (failed[0] != null) throw failed[0];
             if (!r.ok()) {
-                log.warn("Audit chain does not verify at seq {} ({}); anchors stop before it", r.bad().seq(),
+                log.error("Audit chain does not verify at seq {} ({}); anchors stop before it", r.bad().seq(),
                         r.bad().reason());
                 return written[0];
             }
             if (curDay[0] != null) {   // the walk ran out, or reached today: the day it was in is over
-                append(root, "daily", curDay[0], dayFirst[0], prev[0]);
+                append(root, "daily", curDay[0], dayFirst[0], prev[0], prevMac[0]);
                 written[0]++;
             }
             return written[0];
@@ -187,41 +239,70 @@ final class AuditAnchors {
      *  this call wrote any anchor. */
     record OnDemand(Anchor anchor, boolean created) {}
 
+    private static final ConcurrentHashMap<Path, Long> LAST_ON_DEMAND = new ConcurrentHashMap<>();
+
     /**
      * {@code POST /audit/anchors}: roll the finished days, then anchor everything since the last anchor up to the
-     * head. When the roll alone reached the head (every record is from a finished day), its last daily anchor is
-     * the answer; when nothing was chained since the last anchor, that anchor is, with {@code created: false}.
+     * head. When the roll alone reached the head, its last daily anchor is the answer; when nothing was chained
+     * since the last anchor, that anchor is, with {@code created: false}.
      *
-     * @throws ApiException 409 when the chain does not verify — an anchor over a broken chain would sign it
+     * @throws ApiException 429 within {@link #ON_DEMAND_MIN_INTERVAL_MS} of the last call for this Space; 409 when
+     *         the chain or the anchor file does not verify — an anchor over either would sign it
      */
     static OnDemand onDemand(EventStore store, Path root) throws IOException {
+        Path key = root.toAbsolutePath().normalize();
+        long now = System.currentTimeMillis();
+        Long prior = LAST_ON_DEMAND.get(key);
+        if (prior != null && now - prior < ON_DEMAND_MIN_INTERVAL_MS)
+            throw new ApiException(429, ErrorCodes.RATE_LIMITED, "an audit anchor was requested for this Space "
+                    + (now - prior) + " ms ago; wait " + ON_DEMAND_MIN_INTERVAL_MS / 1000 + " s between on-demand anchors");
+        LAST_ON_DEMAND.put(key, now);
         synchronized (lock(root)) {
-            int rolled = roll(store, root, LocalDate.now(ZoneOffset.UTC));
-            List<Anchor> anchors = read(root);
-            Anchor last = lastValid(store, anchors);
+            LocalDate today = LocalDate.now(ZoneOffset.UTC);
+            int rolled = roll(store, root, today);
+            AnchorFile file = readFile(root);
+            Anchor last = lastValid(store, file, today);
             Event head = store.chainHead();
             if (head == null) return new OnDemand(null, false);
             if (last != null && AuditChain.seq(head) <= last.lastSeq()) return new OnDemand(last, rolled > 0);
             Event[] tip = {null};
-            AuditVerifier.Result r = AuditVerifier.verify(store, anchors,
+            AuditVerifier.Result r = AuditVerifier.verify(store, AnchorFile.NONE,
                     last == null ? null : last.lastSeq() + 1, AuditChain.seq(head), Long.MAX_VALUE,
-                    e -> { tip[0] = e; return true; });
+                    e -> { tip[0] = e; return true; }, today, false);
             if (!r.ok())
                 throw new ApiException(409, ErrorCodes.CONFLICT, "the audit chain does not verify at seq "
                         + r.bad().seq() + " (" + r.bad().reason() + "): " + r.bad().detail());
-            return new OnDemand(append(root, "on-demand", day(tip[0]), r.from(), tip[0]), true);
+            return new OnDemand(append(root, "on-demand", day(tip[0]), r.from(), tip[0],
+                    last == null ? "" : last.mac()), true);
         }
     }
 
-    /** The anchor with the highest {@code lastSeq}; refuses to build on one whose MAC fails, or whose hash no
-     *  longer matches — a new anchor chained onto a forged one would carry the forgery forward. */
-    private static Anchor lastValid(EventStore store, List<Anchor> anchors) {
-        Anchor last = null;
-        for (Anchor a : anchors) if (last == null || a.lastSeq() > last.lastSeq()) last = a;
-        if (last == null) return null;
-        if (!last.macValid())
-            throw new ApiException(409, ErrorCodes.CONFLICT, "the last audit anchor (" + last.day()
-                    + ") does not carry a valid MAC; no anchor is written after it");
+    /** Test seam: forget the on-demand rate limit for {@code root}. */
+    static void resetRateLimit(Path root) {
+        LAST_ON_DEMAND.remove(root.toAbsolutePath().normalize());
+    }
+
+    /**
+     * The last anchor, after refusing (409) everything a new anchor must not be built on: an anchor file with any
+     * problem ({@link AnchorFile#firstProblem}), a last anchor whose record the chain no longer holds or no longer
+     * hashes to what it names, and a MISSING or empty file while the chain holds rows from a day that should
+     * already have been anchored (before yesterday) — a deleted file must never be silently re-signed.
+     */
+    private static Anchor lastValid(EventStore store, AnchorFile file, LocalDate today) {
+        AuditVerifier.Bad p = file.firstProblem();
+        if (p != null)
+            throw new ApiException(409, ErrorCodes.CONFLICT, "the audit anchor file does not verify (" + p.reason()
+                    + ": " + p.detail() + "); no anchor is written until an operator resolves it");
+        Anchor last = file.last();
+        if (last == null) {
+            List<Event> first = store.chainPage(1, 1);
+            if (!first.isEmpty() && day(first.get(0)).isBefore(today.minusDays(1)))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "the audit anchor file is "
+                        + (file.exists() ? "empty" : "missing") + " but the chain holds rows from "
+                        + day(first.get(0)) + ", which should already be anchored; no anchor is written until an "
+                        + "operator resolves it");
+            return null;
+        }
         List<Event> at = store.chainPage(last.lastSeq(), 1);
         if (at.isEmpty() || AuditChain.seq(at.get(0)) != last.lastSeq()
                 || !last.lastHash().equals(AuditChain.storedHash(at.get(0)))
@@ -231,26 +312,44 @@ final class AuditAnchors {
         return last;
     }
 
-    private static Anchor append(Path root, String kind, LocalDate day, long firstSeq, Event lastRec) throws IOException {
+    private static Anchor append(Path root, String kind, LocalDate day, long firstSeq, Event lastRec, String prevMac)
+            throws IOException {
         long lastSeq = AuditChain.seq(lastRec);
         Map<String, Object> m = fields(kind, day.toString(), firstSeq, lastSeq, AuditChain.storedHash(lastRec),
-                lastSeq - firstSeq + 1, System.currentTimeMillis());
+                lastSeq - firstSeq + 1, System.currentTimeMillis(), prevMac);
         Map<String, Object> normal = ApiContext.JSON.readValue(ApiContext.JSON.writeValueAsBytes(m), MAP);
         String mac = mac(root, normal);
         normal.put("mac", mac);
         Path f = file(root);
         Files.createDirectories(f.getParent());
-        try (FileChannel ch = FileChannel.open(f, StandardOpenOption.CREATE, StandardOpenOption.WRITE,
-                StandardOpenOption.APPEND)) {
+        createOwnerOnly(f);
+        try (FileChannel ch = FileChannel.open(f, StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
             ch.write(ByteBuffer.wrap((ContentHash.canonicalJson(normal) + "\n").getBytes(StandardCharsets.UTF_8)));
             ch.force(true);
         }
         return new Anchor(kind, day.toString(), firstSeq, lastSeq, AuditChain.storedHash(lastRec),
-                lastSeq - firstSeq + 1, num(normal.get("createdAt")), mac, true);
+                lastSeq - firstSeq + 1, num(normal.get("createdAt")), prevMac, mac, true);
+    }
+
+    /** Create the file owner-only (POSIX {@code rw-------}, else an owner-only ACL) — the key's own permissions. */
+    private static void createOwnerOnly(Path f) throws IOException {
+        if (Files.exists(f)) return;
+        boolean posix = f.getFileSystem().supportedFileAttributeViews().contains("posix");
+        try {
+            if (posix) {
+                Files.createFile(f, java.nio.file.attribute.PosixFilePermissions.asFileAttribute(
+                        java.nio.file.attribute.PosixFilePermissions.fromString("rw-------")));
+            } else {
+                Files.createFile(f);
+                com.gamma.util.SpaceSecretKeys.ownerOnlyAcl(f);
+            }
+        } catch (java.nio.file.FileAlreadyExistsException raced) {
+            // another writer created it; it did so owner-only too
+        }
     }
 
     private static Map<String, Object> fields(String kind, String day, long firstSeq, long lastSeq, String lastHash,
-                                              long count, long createdAt) {
+                                              long count, long createdAt, String prevAnchorMac) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("v", 1);
         m.put("kind", kind);
@@ -260,6 +359,7 @@ final class AuditAnchors {
         m.put("lastHash", lastHash);
         m.put("count", count);
         m.put("createdAt", createdAt);
+        m.put("prevAnchorMac", prevAnchorMac);
         return m;
     }
 
@@ -275,7 +375,7 @@ final class AuditAnchors {
         }
     }
 
-    private static LocalDate day(Event e) {
+    static LocalDate day(Event e) {
         return Instant.ofEpochMilli(e.ts()).atZone(ZoneOffset.UTC).toLocalDate();
     }
 
