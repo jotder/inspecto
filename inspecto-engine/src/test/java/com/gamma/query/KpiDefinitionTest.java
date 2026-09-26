@@ -196,6 +196,58 @@ class KpiDefinitionTest {
         assertEquals(java.time.DayOfWeek.MONDAY, week.from().getDayOfWeek());
     }
 
+    // ── the calendar edges (the day-count comparison, pinned) ────────────────────
+
+    private static LocalDate d(String s) {
+        return LocalDate.parse(s);
+    }
+
+    @Test
+    void leapDayMonthToDateAgainstThePreviousMonthsSameDayCount() {
+        KpiDefinition k = kpi(Map.of());
+        assertEquals(w("2028-02-01", "2028-03-01"), k.current(d("2028-02-29")));
+        assertEquals(w("2028-01-01", "2028-01-30"), k.comparison(d("2028-02-29")), "29 days of January");
+    }
+
+    @Test
+    void leapDayLastYearFallsOnThe28thAndAMonthIsClippedToTheShorterFebruary() {
+        assertEquals(w("2027-02-28", "2027-03-01"),
+                kpi(Map.of("grain", "day", "comparison", "last-year")).comparison(d("2028-02-29")));
+        assertEquals(w("2027-02-01", "2027-03-01"),
+                kpi(Map.of("comparison", "last-year")).comparison(d("2028-02-29")), "29 days asked, 28 exist");
+        assertEquals(w("2027-01-01", "2027-03-02"),
+                kpi(Map.of("grain", "year", "comparison", "last-year")).comparison(d("2028-02-29")), "60 days each");
+    }
+
+    @Test
+    void quarterBoundaries() {
+        KpiDefinition q = kpi(Map.of("grain", "quarter"));
+        assertEquals(w("2026-04-01", "2026-04-02"), q.current(d("2026-04-01")));
+        assertEquals(w("2026-01-01", "2026-01-02"), q.comparison(d("2026-04-01")));
+        assertEquals(w("2026-01-01", "2026-04-01"), q.current(d("2026-03-31")));
+        assertEquals(w("2025-10-01", "2025-12-30"), q.comparison(d("2026-03-31")), "90 days of Q4");
+        assertEquals(w("2026-10-01", "2027-01-01"), q.current(d("2026-12-31")));
+    }
+
+    @Test
+    void theWeekStartsOnMonday() {
+        KpiDefinition wk = kpi(Map.of("grain", "week"));
+        assertEquals(w("2026-08-10", "2026-08-11"), wk.current(d("2026-08-10")), "a Monday opens its own week");
+        assertEquals(w("2026-08-10", "2026-08-17"), wk.current(d("2026-08-16")), "a Sunday closes it");
+        assertEquals(w("2026-08-03", "2026-08-10"), wk.comparison(d("2026-08-16")));
+    }
+
+    @Test
+    void aYearBoundary() {
+        assertEquals(w("2025-12-31", "2026-01-01"), kpi(Map.of("grain", "day")).comparison(d("2026-01-01")));
+        assertEquals(w("2025-12-29", "2026-01-02"), kpi(Map.of("grain", "week")).current(d("2026-01-01")),
+                "the week of New Year's Day starts in the old year");
+        assertEquals(w("2025-12-01", "2025-12-02"), kpi(Map.of()).comparison(d("2026-01-01")));
+        KpiDefinition y = kpi(Map.of("grain", "year"));
+        assertEquals(w("2026-01-01", "2027-01-01"), y.current(d("2026-12-31")));
+        assertEquals(w("2025-01-01", "2026-01-01"), y.comparison(d("2026-12-31")));
+    }
+
     @Test
     void noneHasNoComparisonWindow() {
         assertNull(kpi(Map.of("comparison", "none")).comparison(LocalDate.parse("2026-08-13")));
