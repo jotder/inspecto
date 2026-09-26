@@ -63,7 +63,7 @@ column**; this table mirrors it.
 
 | ID | Requirement | MoSCoW | Status | Edition |
 |---|---|---|---|---|
-| `MET-1` | Everything authored is a **Component** `{kind, name, config, parts?, wiring?}`; the kind registry declares config schemas | Must | ✅ SHIPPED — ⚠ **that shape is the SPA's** (`inspecto/component-model/`); the server stores `Component(type, name, path, content)` with a free-form `content` map, and only 9 of 23 kinds have a `ConfigSpec` (§3.1) | All |
+| `MET-1` | Everything authored is a **Component** `{kind, name, config, parts?, wiring?}`; the kind registry declares config schemas | Must | ✅ SHIPPED — ⚠ **that shape is the SPA's** (`inspecto/component-model/`); the server stores `Component(type, name, path, content)` with a free-form `content` map, and only 9 of 24 kinds have a `ConfigSpec` (§3.1) | All |
 | `MET-2` | Derived **Registry** reuse graph + Catalog + lineage graph (canonical edge / node kinds) | Must | ✅ SHIPPED | All |
 | `MET-3` | Single ref derivation (`deriveRefs`) feeding reuse graph, bundles, **delete-protection** | Must | ✅ SHIPPED (R1) — ⚠ the single derivation is **client-side** (`refsForComponent`); server-side delete protection covers **pipeline `use:` refs and Exchange grants only** — a widget a dashboard tiles, or a dataset a widget binds, deletes unblocked (§3.4) | All |
 | `MET-4` | **Stream** read model in the Catalog | Should | ✅ SHIPPED 2026-07-08 — ⚠ `/catalog/streams` is **per-Collector**; the glossary's grouped Stream (`stream:` membership) is a different node (§3.6) | All |
@@ -118,10 +118,10 @@ column**; this table mirrors it.
 **Stored.** `ComponentStore` (`inspecto-engine/src/main/java/com/gamma/pipeline/ComponentStore.java`,
 `@PublicApi(since = "4.0.0")`) persists `<write-root>/registry/<typeDir>/<id>.toon` — `.csv` for the CSV
 kinds (`mapping`) — and `ComponentRegistry` scans it into `Component(type, name, path, content)`.
-**`WRITABLE_TYPES` is 23 kinds:** `grammar`, `schema`, `mapping`, `transform`, `sink`, `dataset`, `widget`,
+**`WRITABLE_TYPES` is 24 kinds:** `grammar`, `schema`, `mapping`, `transform`, `sink`, `dataset`, `widget`,
 `dashboard`, `query`, `expectation`, `requirement`, `link-analysis-view`, `geo-map-view`, `decision-rule`,
 `reconciliation`, `access-catalog`, `access-profile`, `alert-rule`, `channel`, `notification-rule`,
-`findings-spec`, `pattern-pack`, `rule-template`. `connection` is **deliberately excluded** (its own
+`findings-spec`, `pattern-pack`, `rule-template`, `kpi`. `connection` is **deliberately excluded** (its own
 secret-aware CRUD). ⚠ **A new kind needs two registrations** — `WRITABLE_TYPES` and
 `ComponentRegistry.TYPE_BY_DIR` — pinned by `ComponentStoreTest.everyWritableTypeHasARegistryDir`.
 **Persistence is federated by kind on purpose:** `WRITABLE_TYPES` widens only when a kind needs real storage

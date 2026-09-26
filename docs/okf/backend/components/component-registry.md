@@ -12,9 +12,9 @@ timestamp: 2026-07-07T00:00:00Z
 Components are the `use:`-referenced building blocks of authored [Pipelines](../pipeline-graph/pipeline-graph-design.md). They
 live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<name>`.
 
-* **Types**: `ComponentStore.WRITABLE_TYPES` is **23 kinds** (`ComponentStore.java:55-98`) — `grammar`, **`schema`**,
+* **Types**: `ComponentStore.WRITABLE_TYPES` is **24 kinds** (`ComponentStore.java:55-102`) — `grammar`, **`schema`**,
   **`mapping`** (a CSV kind), `transform`, `sink`, the Studio kinds, the access/notification/findings kinds, `pattern-pack`,
-  `rule-template`; `connection` is deliberately excluded (its own secret-aware CRUD). ⚠ **`schema` IS a component
+  `rule-template`, `kpi` (a KPI definition — [Studio](../../capabilities/studio/studio.md) §3.6); `connection` is deliberately excluded (its own secret-aware CRUD). ⚠ **`schema` IS a component
   again** — the 2026-07-31 retirement (unification W1) was **reversed on 2026-08-05** by the ELT amendment (Schema =
   structure-only component, Mapping = a new CSV kind); this paragraph said "NOT a component" until 2026-09-08. The
   original reasoning, kept for the record: the W1 retirement happened because no code path had resolved a component id

@@ -358,6 +358,25 @@ Business **on the Requirement**, not by the Builder inside the component that im
 `kind: 'kpi'` Requirement carries `target` with `comparator`/`unit`, and the Widget that satisfies it
 renders against that agreed bar.
 
+**A KPI is a server-side definition** (`ASSURE-KPI-DEFINITIONS-1`, WS-20, 2026-09-27): the `kpi` registry
+component — a Measure (`dataset` + `measure` shorthand + the `timeField` a period is cut on), `target`, good
+`direction` (`up` / `down` / `band`), RAG `bands`, period `grain` (`day`…`year` — wider than
+`MeasureCompiler.GRAINS`, which are grouping grains), `comparison` (`previous` / `last-year` / `none`),
+`unit` / `format`, and the R3 `owner`. Authored through `/components/kpi`, so it gets history and restore and
+reaches the maker-checker hold; validated fail closed by `KpiDefinition.fromMap`
+(`inspecto-engine/src/main/java/com/gamma/query/KpiDefinition.java`) on every door, and at the authoring doors
+the Dataset must exist AND be readable by the author, with the measure field and `timeField` in its Schema
+(`KpiRoutes.requireMeasure`). `GET /kpis/{id}/value?asOf=` (`KpiEvaluator`) evaluates the period **to date**
+against the SAME elapsed length of the comparison period (a month read on the 13th compares 13 days with 13
+days), through `MeasureCompiler` + `SqlGuard`, and answers value, comparison, delta, Δ%, `band`
+(`GREEN`/`AMBER`/`RED`, the `statusTone` words) and `tone`. ⚠ A Dataset the caller cannot read answers **404
+exactly as an absent one** — a KPI is never a way round Dataset sharing. The KPI tile binds with
+`options.kpi.kpiId`; the hand-set Widget inputs stay the fallback. A delivered `kpi` Requirement creates one
+only by the explicit `POST /requirements/{id}/kpi` (`canAuthorWorkbench`), which takes its
+`target`/`unit`/`title` and reads the direction off its `comparator`. ⚠ Distinct from the semantic model's
+descriptive **KPI catalog** (`kpis:` / `GET /catalog/kpis`), which is text for the assistant and runs nothing.
+Deferred: KPI packs inside Space Templates, and a bundle-imported KPI's Dataset is only checked structurally.
+
 **A schedule is a Job, not a new entity** (C6, 2026-07-04): `type: 'report'` with
 `params: {reportKind, dashboardId, format, recipients}`. ⚠ Dispatch keys on `params.dashboardId` being
 present, **not** on `type === 'report'`, because that type predates C6 and covers other report jobs.
@@ -542,6 +561,7 @@ query failure. Pinned by `NoGeoLinkShipsInThePersonalBuildTest`.
 | 2026-07-20 | Schema-relationship inference shipped (`GET /inv/schema/relationships`), closing the design's other deferred half; self-references included, unusable Datasets skipped rather than fatal | `link-analysis.md` |
 | 2026-07-20 | **PDF export** shipped as the PNG-wrapped-in-PDF fallback — no PDF library on the classpath and the build is offline, so a snapshot, not a general-purpose export | `kpi-reports.md` |
 | 2026-07-20 | The investigation pivot (design review R8): a point resolving an `objectRef` offers "View in graph" over a shared contract | `geo-map.md` |
+| 2026-09-27 | **A KPI is a `kpi` component, evaluated server-side** — the tile reads target, bands, comparison and format from `GET /kpis/{id}/value`; the period is compared to date, like for like | `ASSURE-KPI-DEFINITIONS-1` |
 | 2026-07-22 | **A KPI target is a business acceptance criterion**, authored by Business on the Requirement — not by the Builder inside the component that implements it | product sign-off; `kpi-reports.md` |
 | 2026-07-22 | Geo Phase 4 backend shipped (`GeoRoutes`) to scale past the browser point cap | `geo-map.md` |
 | 2026-07-24 | Four Link-Analysis V2 tracks shipped (advanced traversal, algorithm library, suspicion scoring, pattern packs), plus the edge-only timeline and per-view version history | `link-analysis.md` |

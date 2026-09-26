@@ -21,6 +21,11 @@ distinct from the analytical **Dashboards** authored in the [Studio](studio.md);
   that implements it (mirrors the "Business submits a Requirement, Builder delivers against it" pattern).
   A `kind: 'kpi'` Requirement (`POST /requirements`) carries optional `target` (+ `comparator`/`unit`)
   fields alongside title/description; the KPI Widget that satisfies it renders against that agreed bar.
+* **KPI definitions** (`ASSURE-KPI-DEFINITIONS-1`, 2026-09-27): the pane lists the `kpi` components and its
+  *New KPI definition* action (`canAuthorWorkbench`) opens `kpi-definition.dialog.ts`, a schema-form editor that
+  saves through `/components/kpi` and shows the server's fail-closed refusal in place. A KPI tile binds to one
+  with `options.kpi.kpiId` and then reads its numbers, target, direction, format and RAG band from
+  `GET /kpis/{id}/value`; the hand-set inputs are the fallback. Contract: [Studio](../../capabilities/studio/studio.md) §3.6.
 * **Scheduled exports** (C6, 2026-07-04): a schedule IS a [Job](jobs.md) — `type: 'report'` with
   `params: {reportKind, dashboardId, format, recipients}`; no separate entity. Dispatch keys on
   `params.dashboardId` presence, *not* on `type === 'report'` (that type predates C6 and covers other
