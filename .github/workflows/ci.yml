@@ -252,7 +252,7 @@ jobs:
       # that ABI — each of which would otherwise surface during a release. Falsified before wiring: renaming
       # $duckdbExtNames makes it exit 2 with the reason, not pass with an empty list.
       - name: Guard — every DuckDB extension the bundle stages is published for every platform
-        run: node tools/fetch-duckdb-extensions.mjs --check
+        run: node tools/fetch-duckdb-extensions.mjs --check && node --test tools/fetch-duckdb-extensions.test.mjs
 
       # Launcher guard (LAUNCHER-GUARD-1, 2026-09-14). Third in the same family: package.ps1 emits the
       # deployment surface and nothing had ever EXECUTED any of it. serve.bat spent its life dropping
@@ -380,9 +380,20 @@ jobs:
       # so `mvn … | tee` would report tee's exit 0 and a red reactor would turn this step green. An explicit
       # `shell: bash` runs `bash -eo pipefail`; the `set -o pipefail` restates it so the line survives a
       # shell change. The log lives in runner.temp, outside the tree the later guards walk.
+      # D-8 Linux proof (2026-09-26). PipelineDocumentXlsxTest runs the real workbook write only where a
+      # stageable excel.duckdb_extension exists, and until now none did on any Linux box: the release path
+      # fetches linux_amd64 binaries but has never run, and the dev desk is Windows-only. Fetching the ONE
+      # file here (~20 MB, not the release's ~160 MB) makes the Linux binary a bundle ships load and write a
+      # workbook on every push. DUCKDB_EXTENSION_CACHE is one of the caches that test probes. DuckDB's own
+      # signature check still applies to the LOAD, as it does in a bundle.
+      - name: Fetch the linux_amd64 excel extension for the xlsx export test
+        run: node tools/fetch-duckdb-extensions.mjs --only excel --platform linux_amd64 --out "$RUNNER_TEMP/duckdb-extensions"
+
       - name: Run tests (all editions) with coverage, and install so the dependency guard can resolve the reactor
         id: reactor
         shell: bash
+        env:
+          DUCKDB_EXTENSION_CACHE: ${{ runner.temp }}/duckdb-extensions
         run: |
           set -o pipefail
           mvn --batch-mode --no-transfer-progress install -Pedition-enterprise -Pcoverage \

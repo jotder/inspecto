@@ -186,7 +186,17 @@ keeps it honest:
   `styles.xml` makes the merge THROW, so a writer upgrade fails the export instead of mis-rendering it.
   `PipelineDocumentXlsxTest` opens the zip and asserts the sheet list and each sheet's first cell (red on
   the old code: `[Guarantees]` alone); `XlsxSheetMergerTest` covers the merger ungated on hand-built parts.
-  ⚠ Linux bundles still ship no `excel` until a `v1.5.2/linux_amd64` binary is fetched.
+  **Linux (grounded 2026-09-26).** The earlier note "Linux bundles ship no `excel`" was a desk fact, not a
+  product one: this Windows desk has no Linux jmods cache, so it builds no Linux zip at all, and the release
+  path (`release.yml`, ubuntu) already fetches every `linux_amd64` binary with `tools/fetch-duckdb-extensions.mjs`
+  and packages with `-RequireExtensions`, which throws on a missing one. What was really missing is that the
+  Linux binary had never been LOADED anywhere — no release run exists. `fetch-duckdb-extensions.mjs` now takes
+  `--only` / `--platform` (selecting from package.ps1's lists; an unknown value exits 2), and `ci.yml` fetches
+  `linux_amd64/excel` alone before the reactor with `DUCKDB_EXTENSION_CACHE` set, so `PipelineDocumentXlsxTest`
+  writes a real workbook on Linux on every push instead of skipping. `--check` confirmed the file is published
+  for `v1.5.2`. *Session decisions:* fetch in CI, not commit the binary (no binaries in git) and not a desk
+  download (Windows desk cannot run it); the ~20 MB per-run fetch is accepted, and DuckDB's own extension
+  signature check still guards the LOAD over plain `http`, as it does for the release fetch.
 
 ⚠ **`parse` and `map` serve `attributes: []` deliberately** — each has a richer editor of its own, so a
 generic attribute spec there would be a worse second way to author the same thing. And the palette publishes

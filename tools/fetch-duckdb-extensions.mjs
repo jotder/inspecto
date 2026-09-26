@@ -18,7 +18,7 @@
 // does the staging — so a name added there is fetched here automatically and the two cannot drift. This
 // repo has already shipped one defect from a list that existed in two places (see tools/bundle-modules.mjs).
 //
-//   node tools/fetch-duckdb-extensions.mjs [--out <dir>]
+//   node tools/fetch-duckdb-extensions.mjs [--out <dir>] [--check] [--only excel,...] [--platform linux_amd64,...]
 //
 // Writes <dir>/v<version>/<platform>/<name>.duckdb_extension, which is DuckDB's own cache layout and what
 // package.ps1's recursive glob expects. Default <dir> is <repo>/.duckdb-extension-cache, one of the
@@ -51,8 +51,29 @@ function ps1Array(pattern, what) {
     return [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
 }
 
-const names = ps1Array(/\$duckdbExtNames\s*=\s*@\(([^)]*)\)/, '$duckdbExtNames');
-const platforms = ps1Array(/foreach\s*\(\s*\$plat\s+in\s+@\(([^)]*)\)/, "the platform list (foreach \$plat)");
+/**
+ * Narrow a list read from package.ps1 by a comma-separated flag. ⛔ An unknown value exits 2 naming the
+ * known ones: a typo must not shrink the run to nothing and still print ✓ — the silent-no-op this script
+ * exists to end. The flag only SELECTS from package.ps1's list; it never adds a name the bundle does not stage.
+ */
+function narrow(list, flag, what) {
+    const want = arg(flag, null);
+    if (!want) return list;
+    const picked = want.split(',').map((s) => s.trim()).filter(Boolean);
+    const unknown = picked.filter((p) => !list.includes(p));
+    if (!picked.length || unknown.length) {
+        console.error(`✖ ${flag} ${want}: ${unknown.length ? `unknown ${what} ${unknown.join(', ')}` : 'empty'}`
+            + ` — package.ps1 stages ${list.join(', ')}.`);
+        process.exit(2);
+    }
+    return list.filter((x) => picked.includes(x));
+}
+
+// --only / --platform (D-8, 2026-09-26): CI's test job fetches just linux_amd64/excel (~20 MB, not ~160 MB)
+// so PipelineDocumentXlsxTest runs the real workbook write on Linux on every push.
+const names = narrow(ps1Array(/\$duckdbExtNames\s*=\s*@\(([^)]*)\)/, '$duckdbExtNames'), '--only', 'extension');
+const platforms = narrow(ps1Array(/foreach\s*\(\s*\$plat\s+in\s+@\(([^)]*)\)/, "the platform list (foreach \$plat)"),
+    '--platform', 'platform');
 
 // The extension ABI version is DuckDB's own, not the duckdb_jdbc artifact version: the pom carries
 // 1.5.2.1 (three DuckDB components plus a JDBC patch) and the cache directory is v1.5.2. Deriving it
