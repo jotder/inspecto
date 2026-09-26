@@ -13,8 +13,9 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **42<!--count:backlog-rows--> rows: 3<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 16<!--count:backlog-p3--> × P3** —
+> **42<!--count:backlog-rows--> rows: 2<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ↔ **42 on 2026-09-26**: P1 `ASSURE-BREAK-LIFECYCLE-1` closed (wave 1.2 shipped); its recurrence-reach residual re-filed as P3 `ASSURE-BREAK-RECURRENCE-REACH-1`.
 > ⬆ **36 → 42 on 2026-09-26**: filed waves 1–2 of `superpower/assurance-capability-plan.md` (operator: build the customer-independent
 > assurance capabilities before any project starts) — P1 `ASSURE-PER-ENTITY-ALERTS-1`, `ASSURE-BREAK-LIFECYCLE-1`, `ASSURE-IMPACT-LEDGER-1`;
 > P2 `ASSURE-MAKER-CHECKER-1`, `ASSURE-ENTITY-LISTS-1`, `ASSURE-ACTION-REQUESTS-1`.
@@ -32,8 +33,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 3<!--count:backlog-p1--> P1 + 23<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 16<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 2<!--count:backlog-p1--> P1 + 23<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 17<!--count:backlog-p3--> P3 rows are mostly a list of things
 > deliberately NOT being built, and reading all 42<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
@@ -62,7 +63,7 @@ changes**; a row that cannot is a decision (§1) or a design (P2). **P2** = buil
 or decision lands. **P3** = demand-gated; build only when someone asks by name. Every §3–§5 row carries its
 rank.
 
-**P1 = assurance wave 1** (`superpower/assurance-capability-plan.md` §3): `ASSURE-PER-ENTITY-ALERTS-1` (§3.5) · `ASSURE-BREAK-LIFECYCLE-1` (§3.6) · `ASSURE-IMPACT-LEDGER-1` (§3.9). The P2 rows split three ways — pick from the first group:
+**P1 = assurance wave 1** (`superpower/assurance-capability-plan.md` §3): `ASSURE-PER-ENTITY-ALERTS-1` (§3.5) · `ASSURE-IMPACT-LEDGER-1` (§3.9) — `ASSURE-BREAK-LIFECYCLE-1` ✅ shipped 2026-09-26. The P2 rows split three ways — pick from the first group:
 
 | State | P2 rows |
 |---|---|
@@ -218,7 +219,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 ### 3.6 Analytics — Queries, BI, Studio & Export
 
-- **P1** · `ASSURE-BREAK-LIFECYCLE-1` — **finish the server-side Break store (WS-11, wave 1.2 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** It shipped 2026-09-26 narrower than planned (`inspecto-engine/src/main/java/com/gamma/query/ReconBreaks.java`, `ReconStateStore.java`): states are `open / resolved / auto_closed` and only `firstSeenAt` is kept. Add per-Break `lastSeenAt` and `occurrences`, ageing and recurrence computed server-side, and an `assigned` state; the Recon Board shows them.
+- **P3** · `ASSURE-BREAK-RECURRENCE-REACH-1` — **a Break that stays absent for two or more runs comes back as a NEW Break, not a recurrence.** Residual of `ASSURE-BREAK-LIFECYCLE-1` (✅ shipped 2026-09-26: per-Break `lastSeenAt`, `occurrences`, `recurrences`, server-side `ageDays`, an `assigned` status with assignee on `POST /recon/{id}/breaks/status`; as-built in `okf/frontend/features/reconciliation.md`). The bounded-history rule in `inspecto-engine/src/main/java/com/gamma/query/ReconBreaks.java` drops an auto-closed Break after one further absent run, so recurrence only counts a Break that returns on the very next run. Widening it needs a retention call (keep auto-closed records N days or N runs) — a Reconciliation with rotating keys would otherwise keep every key it ever saw. Build when someone asks for longer recurrence.
 
 - **P2** · **D-8 XLSX export — bundle proof, two residuals** — the air-gapped half is PROVEN (2026-09-24, as-built in `okf/capabilities/pipeline-authoring/pipeline-authoring.md` §3.0): in STAGED mode (`-Dduckdb.extension.dir`, set by every launcher) `DuckDbExtension` now loads ONLY `<dir>/<name>.duckdb_extension` by path and a missing file fails loudly — never a fall-through to `INSTALL`; and the real route produced a workbook from a bundle with DuckDB's own cache made unreachable. `PipelineDocumentXlsxTest` now RUNS (not skips) wherever a stageable binary exists. Open: **(1)** the bundle used for the proof was the last `package.ps1` Enterprise output with `inspecto.jar` rebuilt, the policy jar removed and `spaces/` re-staged by package.ps1's step-4 rule — the session could not launch PowerShell — so one end-to-end `pwsh inspecto/package.ps1 -Edition Professional` run is owed; **(2)** no `linux_amd64` binary exists on the desk (`~/.duckdb/extensions/v1.5.2/` holds `windows_amd64` only), so a Linux zip still ships no `excel`: it needs `v1.5.2/linux_amd64/excel.duckdb_extension` from `http://extensions.duckdb.org/v1.5.2/linux_amd64/excel.duckdb_extension.gz` (what `node tools/fetch-duckdb-extensions.mjs` fetches), then `-RequireExtensions`. ⛔ **Do not add POI.** → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
 - **P2** · **QUERY-BOUND-WIDGET-1 — a Widget's `queryId` (R3) is modelled but never rendered** (cricket pilot 2026-09-25) — the Query Library says one saved query "can be bound by many widgets", but nothing binds one from the Widget Builder and no render path (widget host, `DatasetResultService`, `/bi/query`) reads `queryId`; a saved query's own filtering (e.g. `player_of_the_match <> ''`) cannot reach a Widget. Interim: the Widget option "Hide blank categories" covers the leaderboard case. → `okf/frontend/features/studio.md`
