@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ActionDispatcherTest {
 
     /** JDK HttpClient, redirects NEVER — the shape of the Professional transport, over plain http for the stub. */
-    static final class LoopbackWire implements WebhookSinkTransport {
+    static class LoopbackWire implements WebhookSinkTransport {
         private final HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
 
         @Override public void post(URI url, String t, Duration d, String b, Map<String, String> h) {

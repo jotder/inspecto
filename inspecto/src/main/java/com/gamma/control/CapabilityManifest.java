@@ -53,6 +53,13 @@ final class CapabilityManifest {
             new Entry("POST", "/inv/investigations/([^/]+)/reveal", Roles.CAN_REVEAL_LINK_ENTITIES),
             new Entry("POST", "/inv/investigations/([^/]+)/pending/([^/]+)/approve", Roles.CAN_APPROVE_LINK_EXPANSIONS),
             new Entry("POST", "/inv/investigations/([^/]+)/pending/([^/]+)/deny", Roles.CAN_APPROVE_LINK_EXPANSIONS),
+            // ActionRequestRoutes (ASSURE-ACTION-REQUESTS-1) — proposing an outbound call from an Incident / Case is
+            // working it; approving, declining and retrying one is oversight, the Pending Change capability reused
+            // (four-eyes enforced in the handler, always).
+            new Entry("POST", "/action-requests", Roles.CAN_WORK_INCIDENTS),
+            new Entry("POST", "/action-requests/([^/]+)/approve", Roles.CAN_APPROVE_CHANGES),
+            new Entry("POST", "/action-requests/([^/]+)/decline", Roles.CAN_APPROVE_CHANGES),
+            new Entry("POST", "/action-requests/([^/]+)/retry", Roles.CAN_APPROVE_CHANGES),
             // AccessRoutes
             new Entry("PUT", "/access/roles", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/policies", Roles.CAN_CONFIGURE_ACCESS),
