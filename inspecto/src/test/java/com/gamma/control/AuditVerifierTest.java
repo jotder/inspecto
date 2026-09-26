@@ -423,13 +423,28 @@ class AuditVerifierTest {
 
     /** A chained prune record, as EventPruneTask writes it. */
     private static void pruneRecord(Space s, long ts, LocalDate before) {
+        pruneRecord(s, ts, before, "job", "retention");
+    }
+
+    private static void pruneRecord(Space s, long ts, LocalDate before, String source, String category) {
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
             EventLog log = EventLog.create();
             log.installStore(store);
-            log.emit(Event.builder(EventType.AUDIT).ts(ts).source("job").message("event_prune")
-                    .actor("job:retention").action(AuditVerifier.PRUNE_ACTION)
+            log.emit(Event.builder(EventType.AUDIT).ts(ts).source(source).message("event_prune")
+                    .actor("job:retention").action(AuditVerifier.PRUNE_ACTION).actionCategory(category)
                     .attr(AuditVerifier.PRUNE_BEFORE, before));
         }
+    }
+
+    /** Anyone can emit an AUDIT row NAMED events.pruned; only the prune task's own shape (source=job,
+     *  actionCategory=retention) accounts for removed rows. */
+    @Test
+    void aRowMerelyNamedEventsPrunedIsNotAPrune(@TempDir Path dir) throws Exception {
+        Space s = twoAnchoredDays(dir);
+        rewrite(s, all -> all.stream().filter(e -> seq(e) > 5).toList());
+        pruneRecord(s, T0 + DAY + 20_000, LocalDate.of(2026, 9, 21), "audit", "retention");
+        pruneRecord(s, T0 + DAY + 21_000, LocalDate.of(2026, 9, 21), "job", "data_mutation");
+        assertBad(verifyWith(s, null, false), 1, "truncated-before-anchor");
     }
 
     /** Only what a prune ACTUALLY removed — a chained prune record — accounts for anchored rows being gone. A

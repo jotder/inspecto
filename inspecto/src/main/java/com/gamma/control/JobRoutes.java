@@ -52,7 +52,7 @@ final class JobRoutes implements RouteModule {
         // Job CRUD (Scheduler write actions). Requires canAuthorWorkbench (W6; a no-op on Personal).
         // Persisted as <write-root>/jobs/<name>_job.toon; the write also hot-registers the job on the
         // live JobService (JobService.upsertJob/removeJob) so it takes effect without a restart.
-        api.post("/jobs", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createJob(api, api.body(e))));
+        api.post("/jobs", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createJob(api, e, api.body(e))));
         api.put("/jobs/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> updateJob(api, e, ApiContext.name(m), api.body(e))));
         api.delete("/jobs/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
@@ -345,9 +345,10 @@ final class JobRoutes implements RouteModule {
     }
 
     /** {@code POST /jobs} — create a new scheduled job (write-root gated); 409 if the name exists. */
-    private Object createJob(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object createJob(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
         JobConfig c = parseJob(body);
+        requireAdministerForEventPrune(ex, c);
         WriteGates.conflictIf(api.service().jobServiceOrCreate().jobs().stream()
                         .anyMatch(v -> v.name().equals(c.name())),
                 "job '" + c.name() + "' already exists (use PUT to update)");
@@ -368,6 +369,8 @@ final class JobRoutes implements RouteModule {
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'"));
         ETags.requireMatch(ex, ETags.of(ContentHash.of(existing.toMap())));
         JobConfig c = parseJob(body);
+        requireAdministerForEventPrune(ex, existing);   // turning an event_prune INTO something else, too
+        requireAdministerForEventPrune(ex, c);
         if (!name.equals(c.name())) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body 'name' must match the path id");
         persistJob(api, c);
         ETags.set(ex, ETags.of(ContentHash.of(c.toMap())));
@@ -388,6 +391,17 @@ final class JobRoutes implements RouteModule {
 
     /** Parse+validate a job body into a {@link JobConfig} via the same {@code job:}-section shape the
      *  TOON loader accepts (name/type/cron/... at top level of the body, mirroring {@code fromMap}). */
+    /**
+     * ASSURE-AUDIT-CHAIN-1: an {@code event_prune} job decides which audit rows may lawfully vanish (its chained
+     * prune record is what {@code /audit/verify} accepts for anchored rows being gone), so authoring or editing
+     * one needs {@code canAdminister} on top of the route's {@code canAuthorWorkbench}. A no-op without a Subject
+     * (Personal), like every capability check.
+     */
+    static void requireAdministerForEventPrune(HttpExchange ex, JobConfig c) {
+        if (c != null && "maintenance".equals(c.type()) && "event_prune".equals(c.opt("task", "")))
+            ApiContext.requireCapability(ex, "canAdminister");
+    }
+
     private static JobConfig parseJob(Map<String, Object> body) {
         JobConfig cfg;
         try {

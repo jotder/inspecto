@@ -666,6 +666,11 @@ final class BundleRoutes implements RouteModule {
             List<String> errors = findings.stream().filter(f -> f.severity() == Severity.ERROR)
                     .map(f -> f.fieldPath() + ": " + f.message()).toList();
             if (!errors.isEmpty()) throw new IllegalArgumentException("job refused at import: " + errors);
+            // ASSURE-AUDIT-CHAIN-1: an event_prune job decides which audit rows may lawfully vanish; it is
+            // authored through /jobs under canAdminister, never carried in by a canAuthorWorkbench bundle.
+            if ("maintenance".equals(c.type()) && "event_prune".equals(c.opt("task", "")))
+                throw new IllegalArgumentException("an event_prune job is not imported by a bundle: author it "
+                        + "through /jobs (canAdminister)");
             String safe = WriteGates.safeName(c.name(), "job name");
             Path target = WriteGates.jail(api.writeRoot(),
                     api.writeRoot().resolve("jobs").resolve(safe + "_job.toon"), "resolved path");

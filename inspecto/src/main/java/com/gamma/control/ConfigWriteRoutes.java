@@ -54,6 +54,14 @@ final class ConfigWriteRoutes implements RouteModule {
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
         Map<String, Object> draft = mapAt(body, "config");
+        if ("job".equals(type)) {   // ASSURE-AUDIT-CHAIN-1: the event_prune gate, on this producer of jobs too
+            try {
+                JobRoutes.requireAdministerForEventPrune(ex, com.gamma.job.JobConfig.fromMap(
+                        draft.containsKey("job") ? draft : Map.of("job", draft)));
+            } catch (IllegalArgumentException | IllegalStateException unparseable) {
+                // the spec gate below refuses a malformed job; nothing to judge here
+            }
+        }
         // SCHEMA-FILE-NAME-1: a SCHEMA's file may be named apart from its content. A schema self-names via
         // `raw.name`, but `raw.name` is the raw/source identity (`ORDERS`, `CALL`) and a Pipeline references
         // its schema as `<pipeline>_schema.toon` — two names that differ in every committed schema. Deriving

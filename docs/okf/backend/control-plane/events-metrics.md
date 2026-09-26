@@ -239,6 +239,14 @@ timestamp: 2026-07-16T00:00:00Z
     the Space's EventLog; anchored rows gone from the front are retention only for days before the cutoff of a
     VERIFIED prune record. A configured `retention_days` job that never ran accounts for nothing; the configured
     window is only reported (`retention.configuredSource`), beside `retention.source: prune-record | none`.
+  - ⛔ **By design, after ANY rebaseline the default `/audit/verify` stays `ok: false` PERMANENTLY** — there is
+    no route that clears a break, and none will be added: a trail that once needed a break must say so to every
+    later reader. Day-to-day checking uses `?epoch=current`.
+  - *A prune is only a prune in the task's own shape:* verify counts a row as a prune record only when
+    `action=events.pruned` AND `source=job` AND `actionCategory=retention`. And because that record decides
+    which audit rows may lawfully vanish, authoring or editing an `event_prune` job needs `canAdminister` — on
+    `POST/PUT /jobs` and `POST /config/write` (on top of `canAuthorWorkbench`); a bundle import refuses to carry
+    one at all.
   - ⚠ **Two known windows, stated so they are not overclaimed.** (1) *Lock race:* a writer that already linked
     rows it had not yet flushed when its lock file was deleted can collide with a second writer that recovered an
     older head from disk — the fork is not prevented, it is DETECTED afterwards as a `duplicate`. (2) *One-anchor

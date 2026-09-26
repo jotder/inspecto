@@ -229,7 +229,11 @@ final class AuditVerifier {
             if (bad != null)
                 return new Result(start, end, checked, fromGenesis, complete, next, lastSeq, lastHash, anchorIdx, bad);
             // a VERIFIED prune record: the only thing that may account for anchored rows being gone
-            if (PRUNE_ACTION.equals(cur.attributes().get(com.gamma.event.AuditAttrs.ACTION))) {
+            // all three, as EventPruneTask writes them: a row merely NAMED events.pruned (any emitter can pick an
+            // action string) is not a prune
+            if (PRUNE_ACTION.equals(cur.attributes().get(com.gamma.event.AuditAttrs.ACTION))
+                    && "job".equals(cur.source())
+                    && "retention".equals(cur.attributes().get(com.gamma.event.AuditAttrs.ACTION_CATEGORY))) {
                 try {
                     LocalDate d = LocalDate.parse(cur.attributes().get(PRUNE_BEFORE));
                     if (prunedBefore == null || d.isAfter(prunedBefore)) prunedBefore = d;
