@@ -269,13 +269,14 @@ class PerEntityAlertTest {
     void keysThatReadAlikeAndNullVersusTheStringNullAreDistinctKeysAndSurviveARestart() {
         List<Map<String, Object>> keys = List.of(
                 key("a", "x, b=y", "b", "z"), key("a", "x", "b", "y, b=z"),   // same readable label
+                key("a", "x,b=y", "b", "z"), key("a", "x", "b", "y,b=z"),     // same key id if `,`/`=` went unescaped
                 key("a", null, "b", "1"), key("a", "null", "b", "1"),          // NULL vs 'null'
                 key("a", "p|q\\", "b", "="));                                  // every escaped character
         FakeObjectAccess objects = new FakeObjectAccess();
-        assertEquals(5, stubbed(rule("usage"), objects, r -> keys).evaluateRules().size(),
-                "five keys, five Alerts — none collapsed into another");
-        assertEquals(5, objects.activeAttributeIndex(ObjectType.INCIDENT, "usage", AlertService.ALERT_KEY).size(),
-                "five distinct dedupe keys");
+        assertEquals(7, stubbed(rule("usage"), objects, r -> keys).evaluateRules().size(),
+                "seven keys, seven Alerts — none collapsed into another");
+        assertEquals(7, objects.activeAttributeIndex(ObjectType.INCIDENT, "usage", AlertService.ALERT_KEY).size(),
+                "seven distinct dedupe keys");
         assertTrue(opened(objects, ObjectType.ALERT).stream().anyMatch(o -> "NULL".equals(o.attributes().get("key.a"))));
 
         assertEquals(0, stubbed(rule("usage"), objects, r -> keys).evaluateRules().size(),
