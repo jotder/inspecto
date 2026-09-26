@@ -71,6 +71,7 @@ public final class ComponentRegistry {
             Map.entry("access-catalog", "access-catalog"),          // Lens access config — AccessRoutes (singleton)
             Map.entry("access-profiles", "access-profile"),         // Lens access config — one per subject
             Map.entry("alert-rules", "alert-rule"),                 // Rules triad promotion 2026-07-18 — AlertRoutes
+            Map.entry("risk-scores", "risk-score"),                 // ASSURE-RISK-SCORE-1: Risk Score models — risk.score Job
             Map.entry("channels", "channel"),                       // Notification channel destinations — NotificationRoutes
             Map.entry("notification-rules", "notification-rule"),    // Authored notification rules — NotificationRoutes
             Map.entry("findings-specs", "findings-spec"),             // C3/D6: configurable Findings sections — GET /findings/{type}

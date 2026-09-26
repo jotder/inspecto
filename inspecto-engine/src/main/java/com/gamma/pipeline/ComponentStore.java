@@ -70,6 +70,9 @@ public final class ComponentStore {
                     // Alert Rule (the alerting third of the Rules triad — AlertRoutes), promoted off raw
                     // *_alert.toon files 2026-07-18 to the same CRUD contract as Expectation/Decision Rule.
                     "alert-rule",
+                    // Risk Score model (ASSURE-RISK-SCORE-1, WS-22): one weighted-factor model per entity type,
+                    // evaluated by the risk.score Job (com.gamma.risk.RiskScoreModel validates it at save).
+                    "risk-score",
                     // Notification channel destinations (NotificationRoutes /notifications/channels* admin
                     // CRUD, 2026-07-18): the managed record of where a channel delivers; live delivery still
                     // resolves channels from notify.* JVM flags (ChannelConfig).

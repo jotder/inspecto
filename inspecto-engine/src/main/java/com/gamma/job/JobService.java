@@ -534,6 +534,8 @@ public final class JobService implements AutoCloseable {
         // sql.template (P3b, §15.1): the first Run Artifact producer. Config-aware parameters — the
         // authored SQL's $name tokens are its contract (SqlParamScanner). Injected with the space dataDir.
         registry.register(new SqlTemplateJobType(dataDir));
+        // risk.score (ASSURE-RISK-SCORE-1): evaluates a saved risk-score model and writes its scores Dataset.
+        registry.register(new RiskScoreJobType(dataDir));
         // consignment.process (consignment-elt plan §14.2): runs a third-party ConsignmentProcessor over one
         // committed Consignment. Its consignment_id parameter deduces from $signal.batchId, which
         // mirrorPipelineCommit populates — so an author's processor never mentions signals.
