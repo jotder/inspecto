@@ -103,9 +103,10 @@ class ControlApiActionRequestsTest {
         priorTransport = ActionDispatcher.transport;
         ActionDispatcher.executor = Runnable::run;
         ActionDispatcher.transport = () -> new ActionDispatcherTest.LoopbackWire() {
-            @Override public Response exchange(String method, URI url, String token, Duration timeout, String json,
-                                               Map<String, String> headers, int cap) throws Exception {
-                return super.exchange(method, URI.create(url.toString().replaceFirst("^https:", "http:")), token,
+            @Override public Response exchange(String method, URI url, java.net.InetAddress to, String token,
+                                               Duration timeout, String json, Map<String, String> headers, int cap)
+                    throws Exception {
+                return super.exchange(method, URI.create(url.toString().replaceFirst("^https:", "http:")), to, token,
                         timeout, json, headers, cap);
             }
         };
@@ -141,6 +142,11 @@ class ControlApiActionRequestsTest {
         return open(cfg, writable ? Files.createDirectories(tmp.resolve("config")) : null);
     }
 
+    /** The stub target is on loopback, which the egress policy denies unless the Space allowlists its range. */
+    private void allowLoopback(Ctx c) throws Exception {
+        data(send(c, "PUT", "/settings/egress", "{\"allow\":[\"127.0.0.1/32\"]}", CHECKER), 200);
+    }
+
     private static String incident(Ctx c) {
         return c.svc.objects().orElseThrow().open(ObjectType.INCIDENT, "Leak", "d", "error", "t", Map.of());
     }
@@ -164,6 +170,7 @@ class ControlApiActionRequestsTest {
     }
 
     private String propose(Ctx c, String incidentId) throws Exception {
+        allowLoopback(c);
         JsonNode rec = data(send(c, "POST", "/action-requests", body(incidentId), AUTHOR), 200);
         assertEquals("pending", rec.get("status").asText());
         return rec.get("id").asText();
@@ -307,6 +314,7 @@ class ControlApiActionRequestsTest {
     @Test
     void theInvokeApiConsequenceProposesAPendingRequestOnItsIncident(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
             data(send(c, "POST", "/decision-rules", "{\"name\":\"leak\",\"consequences\":[{\"action\":\"invoke-api\","
                     + "\"params\":{\"connection\":\"hook\"}}]}", DEV), 200);
             JsonNode applied = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200);
@@ -332,6 +340,62 @@ class ControlApiActionRequestsTest {
             assertEquals("succeeded", data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200)
                     .get("status").asText());
             assertEquals(1, accepted.get());
+        }
+    }
+
+    // ── egress (verification finding 1) ─────────────────────────────────────────────────────────
+
+    @Test
+    void withoutAnAllowlistEntryTheLoopbackTargetIsNeverDialled(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String id = propose(c, incident(c));
+            data(send(c, "PUT", "/settings/egress", "{\"allow\":[]}", CHECKER), 200);
+            JsonNode done = data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200);
+            assertEquals("failed", done.get("status").asText());
+            assertTrue(done.at("/lastResponse/error").asText().contains("loopback"), done.toString());
+            assertTrue(keys.isEmpty(), "deny by default: nothing sent");
+        }
+    }
+
+    @Test
+    void theApproverSeesTheParsedHostPortPathAndWhetherItIsAllowlisted(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String id = propose(c, incident(c));
+            JsonNode e = data(send(c, "GET", "/action-requests/" + id, null, CHECKER), 200).get("egress");
+            assertEquals("127.0.0.1", e.get("host").asText());
+            assertEquals(target.getAddress().getPort(), e.get("port").asInt());
+            assertEquals("/api", e.get("path").asText());
+            assertTrue(e.get("allowlisted").asBoolean());
+            JsonNode done = data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200);
+            assertEquals("127.0.0.1", done.at("/attemptLog/0/address").asText(), "the checked address is recorded");
+        }
+    }
+
+    @Test
+    void theEgressAllowlistIsAdministratorOnlyAndValidatedFailClosed(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            assertEquals(403, send(c, "PUT", "/settings/egress", "{\"allow\":[\"10.0.0.0/8\"]}", ANALYST2).statusCode());
+            for (String bad : List.of("0x0a000000/8", "2130706433", "a@b.example", "10.0.0.0/99"))
+                assertEquals(422, send(c, "PUT", "/settings/egress", "{\"allow\":[\"" + bad + "\"]}", CHECKER)
+                        .statusCode(), bad);
+            assertEquals(422, send(c, "PUT", "/settings/egress", "{\"deny\":[]}", CHECKER).statusCode());
+            data(send(c, "PUT", "/settings/egress", "{\"allow\":[\"pcrf.internal\",\"10.9.0.0/16\"]}", CHECKER), 200);
+            assertEquals(2, data(send(c, "GET", "/settings/egress", null, AUTHOR), 200).get("allow").size());
+        }
+    }
+
+    @Test
+    void anHttpsConnectionWithUserinfoOrANumericTrickHostIsRefusedAtSave(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            for (String host : List.of("trusted.example.com@attacker.example", "2130706433", "0x7f000001", "127.1")) {
+                HttpResponse<String> r = send(c, "POST", "/connections", "{\"id\":\"t1\",\"connector\":\"https\","
+                        + "\"host\":\"" + host + "\",\"port\":443}", CHECKER);
+                assertEquals(422, r.statusCode(), host + " -> " + r.body());
+            }
+            ConnectionRegistry.register(new ConnectionProfile("trick", "https", "trusted.example.com@attacker.example",
+                    443, null, "api", null, null, Map.of(), null, null));
+            HttpResponse<String> r = send(c, "POST", "/action-requests", body(incident(c)).replace("\"hook\"", "\"trick\""), AUTHOR);
+            assertEquals(422, r.statusCode(), "a Connection that reached the registry some other way is refused at create: " + r.body());
         }
     }
 

@@ -31,7 +31,11 @@ const REQ: ActionRequest = {
     lastResponse: null,
     history: [],
 };
-const DETAIL: ActionRequestDetail = { ...REQ, payload: { ticket: 'INCIDENT-1', rule: 'leak' } };
+const DETAIL: ActionRequestDetail = {
+    ...REQ,
+    payload: { ticket: 'INCIDENT-1', rule: 'leak' },
+    egress: { scheme: 'https', host: 'tickets.example.test', port: 443, path: '/api', allowlisted: false },
+};
 
 async function create(overrides: Partial<Record<keyof ActionRequestsService, unknown>> = {}, canApprove = true) {
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
@@ -83,6 +87,8 @@ describe('ActionRequestsComponent', () => {
         expect(el.textContent).toContain('https://tickets.example.test/api');
         expect(el.textContent).toContain(REQ.idempotencyKey);
         expect(el.querySelector('pre')?.textContent).toContain('"rule": "leak"');
+        expect(el.querySelector('#ar-egress')?.parentElement?.textContent).toContain('tickets.example.test');
+        expect(el.textContent).toContain('Not on the egress allowlist');
         expect(buttons(el)).toEqual(expect.arrayContaining(['Approve', 'Decline']));
         await expectNoA11yViolations(el);
     });

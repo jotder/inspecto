@@ -210,6 +210,8 @@ final class CapabilityManifest {
             new Entry("POST", "/pending-changes/([^/]+)/approve", Roles.CAN_APPROVE_CHANGES),
             new Entry("POST", "/pending-changes/([^/]+)/decline", Roles.CAN_APPROVE_CHANGES),
             new Entry("PUT", "/settings/approval", Roles.CAN_ADMINISTER),
+            // EgressRoutes (ASSURE-ACTION-REQUESTS-1) — widening where an Action Request may reach is administration.
+            new Entry("PUT", "/settings/egress", Roles.CAN_ADMINISTER),
             // PipelineRoutes — W5: the graph editor writes the canonical *_pipeline.toon; the
             // *_flow.toon authoring writes (POST/PUT authored, /nodes, /edges) retired. DELETE + the
             // ad-hoc trigger stay for grandfathered flows.

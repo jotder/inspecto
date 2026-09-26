@@ -110,7 +110,7 @@ class HttpWebhookSinkTransportTest {
             ex.close();
         });
         WebhookSinkTransport.Response r = new HttpWebhookSinkTransport().exchange("PUT", URI.create(base() + "/api"),
-                null, Duration.ofSeconds(5), "{\"a\":1}", Map.of("Idempotency-Key", "ar-1"), 100);
+                LOOPBACK, null, Duration.ofSeconds(5), "{\"a\":1}", Map.of("Idempotency-Key", "ar-1"), 100);
         assertEquals(500, r.status(), "a non-2xx comes back, it does not throw");
         assertEquals(100, r.bodyExcerpt().length());
         assertEquals(List.of("PUT ar-1 {\"a\":1}"), seen);
@@ -135,12 +135,44 @@ class HttpWebhookSinkTransportTest {
                 ex.close();
             });
             WebhookSinkTransport.Response r = new HttpWebhookSinkTransport().exchange("POST",
-                    URI.create(base() + "/bounce"), "s3cret", Duration.ofSeconds(5), "{}", Map.of(), 100);
+                    URI.create(base() + "/bounce"), LOOPBACK, "s3cret", Duration.ofSeconds(5), "{}", Map.of(), 100);
             assertEquals(302, r.status());
             assertTrue(otherHits.isEmpty(), "the redirect's host must never receive the request: " + otherHits);
         } finally {
             other.stop(0);
         }
+    }
+
+    private static final java.net.InetAddress LOOPBACK = java.net.InetAddress.ofLiteral("127.0.0.1");
+
+    /**
+     * Pinned: the URL names a host that resolves NOWHERE, and the request still reaches the stub — so the wire
+     * connected to the given address and never resolved the name — while the Host header carries the name.
+     */
+    @Test
+    void exchangeConnectsToThePinnedAddressAndSendsTheNameAsHost() throws Exception {
+        List<String> hosts = new CopyOnWriteArrayList<>();
+        server.createContext("/pinned", ex -> {
+            hosts.add(ex.getRequestHeaders().getFirst("Host"));
+            ex.getRequestBody().readAllBytes();
+            byte[] out = "ok".getBytes(StandardCharsets.UTF_8);
+            ex.sendResponseHeaders(200, out.length);
+            ex.getResponseBody().write(out);
+            ex.close();
+        });
+        int port = server.getAddress().getPort();
+        WebhookSinkTransport.Response r = new HttpWebhookSinkTransport().exchange("POST",
+                URI.create("http://tickets.invalid:" + port + "/pinned"), LOOPBACK, null, Duration.ofSeconds(5), "{}",
+                Map.of(), 100);
+        assertEquals(200, r.status());
+        assertEquals("ok", r.bodyExcerpt());
+        assertEquals(List.of("tickets.invalid:" + port), hosts);
+    }
+
+    @Test
+    void aHeaderValueCarryingCrLfIsRefused() {
+        assertThrows(java.io.IOException.class, () -> new HttpWebhookSinkTransport().exchange("POST",
+                URI.create(base() + "/api"), LOOPBACK, "t\r\nX-Evil: 1", Duration.ofSeconds(5), "{}", Map.of(), 10));
     }
 
     @Test

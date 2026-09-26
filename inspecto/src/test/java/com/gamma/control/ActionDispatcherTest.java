@@ -38,14 +38,19 @@ class ActionDispatcherTest {
     /** JDK HttpClient, redirects NEVER — the shape of the Professional transport, over plain http for the stub. */
     static class LoopbackWire implements WebhookSinkTransport {
         private final HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
+        final List<String> addresses = new CopyOnWriteArrayList<>();
 
         @Override public void post(URI url, String t, Duration d, String b, Map<String, String> h) {
             throw new UnsupportedOperationException();
         }
 
-        @Override public Response exchange(String method, URI url, String token, Duration timeout, String json,
-                                           Map<String, String> headers, int cap) throws Exception {
-            HttpRequest.Builder b = HttpRequest.newBuilder(url).timeout(timeout)
+        /** Connects to the PINNED address, as the real wire does — the URL's host is never resolved here. */
+        @Override public Response exchange(String method, URI url, java.net.InetAddress to, String token,
+                                           Duration timeout, String json, Map<String, String> headers, int cap)
+                throws Exception {
+            addresses.add(to.getHostAddress());
+            URI pinned = new URI(url.getScheme(), null, to.getHostAddress(), url.getPort(), url.getPath(), null, null);
+            HttpRequest.Builder b = HttpRequest.newBuilder(pinned).timeout(timeout)
                     .header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(json));
             headers.forEach(b::header);
             HttpResponse<String> r = client.send(b.build(), HttpResponse.BodyHandlers.ofString());
@@ -100,7 +105,17 @@ class ActionDispatcherTest {
                 null, Duration.ofSeconds(5));
     }
 
+    /** The stub target is on loopback, which the egress policy denies unless its range is allowlisted. */
+    private static void allowLoopback(Path root) throws Exception {
+        Files.writeString(root.resolve(EgressRoutes.FILE), dev.toonformat.jtoon.JToon.encode(Map.of("allow", List.of("127.0.0.1/32"))));
+    }
+
     private static String approved(Path root) throws Exception {
+        allowLoopback(root);
+        return approvedWithoutAllowlist(root);
+    }
+
+    private static String approvedWithoutAllowlist(Path root) throws Exception {
         Map<String, Object> r = ActionRequests.draft("hook", "https://hooks.example.test/api", "POST",
                 Map.of("incident", "inc-1"), null, "inc-1", null, "manual", "author-1", "user", null, 168);
         ActionRequests.transition(r, ActionRequests.PENDING, "author-1");
@@ -167,6 +182,34 @@ class ActionDispatcherTest {
         assertEquals(1, rec.get("attempts"), "a redirect is not retried");
         assertTrue(otherHits.isEmpty(), "the redirect's host must never be dialled: " + otherHits);
         assertTrue(String.valueOf(((Map<?, ?>) rec.get("lastResponse")).get("error")).contains("redirect"));
+    }
+
+    /** Deny by default: a loopback target with no allowlist entry is never dialled, and fails without a retry. */
+    @Test
+    void aLoopbackTargetIsRefusedByTheEgressPolicyUnlessAllowlisted(@TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        String id = approvedWithoutAllowlist(root);
+        ActionDispatcher.run(root, id, endpoint(), new LoopbackWire());
+        Map<String, Object> rec = read(root, id);
+        assertEquals("failed", rec.get("status"));
+        assertTrue(keys.isEmpty(), "nothing sent");
+        assertTrue(String.valueOf(((Map<?, ?>) rec.get("lastResponse")).get("error")).contains("loopback"));
+        assertEquals(1, rec.get("attempts"), "an egress refusal is not retried");
+    }
+
+    @Test
+    void eachAttemptRecordsTheCheckedAddressItConnectedTo(@TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        String id = approved(root);
+        failFirst = 1;
+        LoopbackWire wire = new LoopbackWire();
+        ActionDispatcher.run(root, id, endpoint(), wire);
+        Map<String, Object> rec = read(root, id);
+        assertEquals(List.of("127.0.0.1", "127.0.0.1"), wire.addresses);
+        List<?> log = (List<?>) rec.get("attemptLog");
+        assertEquals(2, log.size());
+        assertEquals("127.0.0.1", ((Map<?, ?>) log.get(1)).get("address"));
+        assertEquals(500, ((Map<?, ?>) log.get(0)).get("status"));
     }
 
     @Test

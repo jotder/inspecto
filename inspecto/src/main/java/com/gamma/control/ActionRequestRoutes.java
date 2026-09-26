@@ -102,8 +102,34 @@ final class ActionRequestRoutes implements RouteModule {
             Map<String, Object> rec = ActionRequests.read(root, id);   // 422 on an unsafe id
             if (rec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no action request '" + id + "'");
             ActionRequests.expireIfDue(root, rec);
-            return ActionRequests.detail(rec);
+            return withEgress(root, ActionRequests.detail(rec));
         }
+    }
+
+    /**
+     * The approver's view of where it goes (verification finding 1d): the host AS PARSED from the URL
+     * ({@code URI.getHost()}), the port, the path, and whether the Space's egress allowlist names it — read live,
+     * since the allowlist can change while the request waits.
+     */
+    static Map<String, Object> withEgress(Path root, Map<String, Object> view) {
+        if (view.get("targetUrl") == null) return view;
+        try {
+            java.net.URI u = java.net.URI.create(String.valueOf(view.get("targetUrl")));
+            String host = u.getHost() == null ? null : u.getHost().replaceAll("^\\[|\\]$", "");
+            com.gamma.pipeline.exec.EgressPolicy.Allowlist allow = EgressRoutes.allowlist(root);
+            boolean listed = host != null && (allow.namesHost(host) || (com.gamma.pipeline.exec.EgressPolicy.isIpLiteral(host)
+                    && allow.cidrs().stream().anyMatch(c -> c.contains(java.net.InetAddress.ofLiteral(host)))));
+            Map<String, Object> e = new LinkedHashMap<>();
+            e.put("scheme", u.getScheme());
+            e.put("host", host);
+            e.put("port", u.getPort() > 0 ? u.getPort() : 443);
+            e.put("path", u.getRawPath());
+            e.put("allowlisted", listed);
+            view.put("egress", e);
+        } catch (RuntimeException unparseable) {
+            view.put("egress", Map.of("error", "the target URL does not parse"));
+        }
+        return view;
     }
 
     // ── create ──────────────────────────────────────────────────────────────────────────────────
@@ -114,7 +140,7 @@ final class ActionRequestRoutes implements RouteModule {
             if (!CREATE_KEYS.contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown key '" + k + "' — an action "
                         + "request takes " + new java.util.TreeSet<>(CREATE_KEYS));
-        return ActionRequests.detail(propose(api, root, body, ApiContext.actor(ex), ApiContext.actorType(ex), "manual"));
+        return withEgress(root, ActionRequests.detail(propose(api, root, body, ApiContext.actor(ex), ApiContext.actorType(ex), "manual")));
     }
 
     /**
@@ -262,7 +288,7 @@ final class ActionRequestRoutes implements RouteModule {
 
     private static Map<String, Object> current(Path root, String id) throws IOException {
         synchronized (ActionRequests.lock()) {
-            return ActionRequests.detail(ActionRequests.read(root, id));
+            return withEgress(root, ActionRequests.detail(ActionRequests.read(root, id)));
         }
     }
 }

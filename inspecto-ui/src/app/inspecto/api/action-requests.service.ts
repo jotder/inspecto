@@ -52,8 +52,28 @@ export interface ActionRequest {
 }
 
 /** One Action Request with the rendered payload that is (or was) sent. */
+/** Where the request goes, as the server parsed it, and whether the Space's egress allowlist names it. */
+export interface ActionEgress {
+    scheme: string;
+    host: string;
+    port: number;
+    path: string;
+    allowlisted: boolean;
+}
+
+/** One attempt: the checked address it connected to and what came back. */
+export interface ActionAttempt {
+    attempt: number;
+    address: string | null;
+    status: number | null;
+    error: string | null;
+    at: string;
+}
+
 export interface ActionRequestDetail extends ActionRequest {
     payload: Record<string, unknown> | null;
+    egress?: ActionEgress;
+    attemptLog?: ActionAttempt[];
 }
 
 export interface ActionRequestFilter {

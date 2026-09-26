@@ -43,11 +43,17 @@ public interface WebhookSinkTransport {
      * the Action Request dispatcher ({@code ASSURE-ACTION-REQUESTS-1}) records every attempt's response. Only an
      * I/O failure or a timeout throws. Redirects are NOT followed: a 3xx comes back as itself.
      *
+     * <p>🔴 <b>Pinned</b> (verification finding 1): the transport connects to {@code connectTo} — the address
+     * {@link EgressPolicy#resolve} checked — and NEVER resolves {@code url}'s host itself, so DNS rebinding cannot
+     * swap the address between the check and the connect. The host name still travels as the {@code Host}
+     * header, the TLS SNI and the name the server certificate is verified against.
+     *
      * <p>The default refuses, so a transport that implements only {@link #post} fails closed rather than
      * reporting a status it never saw.
      */
-    default Response exchange(String method, URI url, String bearerToken, Duration timeout, String jsonBody,
-                              Map<String, String> headers, int excerptCap) throws Exception {
+    default Response exchange(String method, URI url, java.net.InetAddress connectTo, String bearerToken,
+                              Duration timeout, String jsonBody, Map<String, String> headers, int excerptCap)
+            throws Exception {
         throw new UnsupportedOperationException("this outbound transport implements POST delivery only");
     }
 }

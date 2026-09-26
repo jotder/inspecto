@@ -96,24 +96,4 @@ public final class WebhookChannel implements NotificationChannel {
         if (resp.statusCode() / 100 != 2)
             throw new IllegalStateException("webhook returned HTTP " + resp.statusCode());
     }
-
-    /**
-     * {@link #send}'s request with any {@code method} (POST / PUT / PATCH), returning the status and at most
-     * {@code excerptCap} characters of the body instead of throwing on a non-2xx — the Action Request
-     * dispatcher's wire ({@code ASSURE-ACTION-REQUESTS-1}), which records every answer. The client's redirect
-     * policy is the caller's, and {@link HttpWebhookSinkTransport}'s is {@code NEVER}: a 3xx comes back as itself.
-     */
-    static com.gamma.pipeline.exec.WebhookSinkTransport.Response exchange(HttpClient client, String method, URI url,
-            String token, Duration timeout, String json, Map<String, String> headers, int excerptCap) throws Exception {
-        HttpRequest.Builder req = HttpRequest.newBuilder(url)
-                .timeout(timeout)
-                .header("Content-Type", "application/json")
-                .method(method, HttpRequest.BodyPublishers.ofString(json));
-        if (token != null) req.header("Authorization", "Bearer " + token);
-        headers.forEach(req::header);
-        HttpResponse<String> resp = client.send(req.build(), HttpResponse.BodyHandlers.ofString());
-        String body = resp.body() == null ? "" : resp.body();
-        return new com.gamma.pipeline.exec.WebhookSinkTransport.Response(resp.statusCode(),
-                body.length() > excerptCap ? body.substring(0, Math.max(0, excerptCap)) : body);
-    }
 }

@@ -287,6 +287,10 @@ final class ConnectionRoutes implements RouteModule {
     static void persistConnection(ApiContext api, ConnectionProfile p) throws IOException {
         try {
             com.gamma.acquire.CollectorConnectors.validate(p);   // the connector's own option checks, at the save
+            // ASSURE-ACTION-REQUESTS-1: an https Connection is an egress target — its host must be a DNS name or a
+            // canonical IP literal, never userinfo or a decimal / octal / hex / short numeric form.
+            if (com.gamma.pipeline.exec.WebhookSink.CONNECTOR.equals(p.connector()) && p.host() != null)
+                com.gamma.pipeline.exec.EgressPolicy.checkHost(p.host());
         } catch (IllegalArgumentException refused) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refused.getMessage());
         }

@@ -31,9 +31,22 @@ public final class HttpWebhookSinkTransport implements WebhookSinkTransport {
         WebhookChannel.send(client, url, bearerToken, timeout, jsonBody, headers);
     }
 
+    /** The TLS layer of {@link #exchange}; the platform default, or a test's. */
+    private final javax.net.ssl.SSLSocketFactory tls;
+
+    public HttpWebhookSinkTransport() {
+        this((javax.net.ssl.SSLSocketFactory) javax.net.ssl.SSLSocketFactory.getDefault());
+    }
+
+    HttpWebhookSinkTransport(javax.net.ssl.SSLSocketFactory tls) {
+        this.tls = tls;
+    }
+
+    /** The Action Request wire: {@link PinnedHttp} — connect to the checked address, verify TLS against the name. */
     @Override
-    public Response exchange(String method, URI url, String bearerToken, Duration timeout, String jsonBody,
-                             Map<String, String> headers, int excerptCap) throws Exception {
-        return WebhookChannel.exchange(client, method, url, bearerToken, timeout, jsonBody, headers, excerptCap);
+    public Response exchange(String method, URI url, java.net.InetAddress connectTo, String bearerToken,
+                             Duration timeout, String jsonBody, Map<String, String> headers, int excerptCap)
+            throws Exception {
+        return PinnedHttp.exchange(tls, method, url, connectTo, bearerToken, timeout, jsonBody, headers, excerptCap);
     }
 }

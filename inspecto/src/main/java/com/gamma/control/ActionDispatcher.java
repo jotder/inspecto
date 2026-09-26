@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.pipeline.exec.EgressPolicy;
 import com.gamma.pipeline.exec.WebhookSink;
 import com.gamma.pipeline.exec.WebhookSinkTransport;
 import org.slf4j.Logger;
@@ -24,9 +25,11 @@ import java.util.function.Supplier;
  * proxy, the bearer token resolved from its secret reference at send time — and the resolved URL must still be
  * the {@code targetUrl} the approver read, or nothing is sent. The wire is the edition's
  * {@link WebhookSinkTransport} (Professional / Enterprise; Personal bundles none, and the request fails naming
- * the edition). No SSRF / allowed-host policy exists beyond that in this codebase, so the Connection's own base
- * URL IS the allow-list: redirects are never followed (the transport's client is {@code Redirect.NEVER}) and a
- * 3xx answer fails the request without a retry.
+ * the edition). On top of that, the {@link EgressPolicy}: before EVERY attempt the host is resolved once, every
+ * address is checked against the deny-by-default classes (loopback, link-local, private, CGNAT, multicast, this
+ * host…) less the Space's {@link EgressRoutes egress allowlist}, and the wire connects to THAT address (never
+ * re-resolving), keeping the name for Host / SNI / certificate verification. A refusal fails the request at once,
+ * nothing sent. Redirects are never followed and a 3xx fails the request without a retry.
  *
  * <p><b>Retries</b> — up to {@code -Daction.dispatch.maxAttempts} attempts (default 3, clamped 1..10), with
  * exponential backoff from {@code -Daction.dispatch.backoffMs} (default 1000 ms, doubling, capped at 30 s), each
@@ -153,16 +156,25 @@ final class ActionDispatcher {
 
             WebhookSinkTransport.Response r = null;
             String error = null;
+            String address = null;
+            boolean egressRefused = false;
             try {
-                r = wire.exchange(method, endpoint.url(), endpoint.bearerToken(), endpoint.timeout(), json,
+                // Resolve ONCE per attempt and check EVERY address; the wire connects to the checked one.
+                java.net.InetAddress to = EgressPolicy.resolve(endpoint.url().getHost().replaceAll("^\\[|\\]$", ""),
+                        EgressRoutes.allowlist(root));
+                address = to.getHostAddress();
+                r = wire.exchange(method, endpoint.url(), to, endpoint.bearerToken(), endpoint.timeout(), json,
                         Map.of(IDEMPOTENCY_HEADER, key), ActionRequests.EXCERPT_CAP);
+            } catch (EgressPolicy.Refused refused) {
+                egressRefused = true;
+                error = "egress refused: " + refused.getMessage();
             } catch (Exception e) {
                 error = e.getClass().getSimpleName() + (e.getMessage() == null ? "" : ": " + cap(e.getMessage()));
             }
             int code = r == null ? 0 : r.status();
             boolean ok = r != null && code / 100 == 2;
             boolean redirect = r != null && code / 100 == 3;
-            boolean retryable = r == null || code / 100 == 5 || code == 408 || code == 429;
+            boolean retryable = !egressRefused && (r == null || code / 100 == 5 || code == 408 || code == 429);
             log.info("[ACTION] {} attempt {}/{} -> {}", id, n, max, r == null ? "no response" : code);
 
             synchronized (ActionRequests.lock()) {
@@ -173,7 +185,10 @@ final class ActionDispatcher {
                 rec.put("attempts", attempts + 1);
                 String why = redirect ? "the target answered a redirect (" + code + ") — redirects are never "
                         + "followed; the Connection's base URL is the only place this request may go" : error;
-                rec.put("lastResponse", response(r == null ? null : code, r == null ? null : r.bodyExcerpt(), why, n));
+                Map<String, Object> resp = response(r == null ? null : code, r == null ? null : r.bodyExcerpt(), why, n);
+                resp.put("address", address);
+                rec.put("lastResponse", resp);
+                rec.put("attemptLog", appendAttempt(rec.get("attemptLog"), n, address, r == null ? null : code, why));
                 if (ok || !retryable || n == max) {
                     ActionRequests.transition(rec, ok ? ActionRequests.SUCCEEDED : ActionRequests.FAILED, "system");
                     rec.put("completedAt", ActionRequests.now());
@@ -188,6 +203,25 @@ final class ActionDispatcher {
             long wait = Math.min(BACKOFF_CAP_MS, backoffMs() << Math.min(20, n - 1));
             if (wait > 0) Thread.sleep(wait);
         }
+    }
+
+    /** The most attempts {@code attemptLog} keeps (the latest). */
+    static final int ATTEMPT_LOG_CAP = 50;
+
+    /** One line per attempt: which address it connected to (the checked one) and what came back. */
+    @SuppressWarnings("unchecked")
+    private static java.util.List<Object> appendAttempt(Object log, int n, String address, Integer status, String error) {
+        java.util.List<Object> out = log instanceof java.util.List<?> l ? new java.util.ArrayList<>((java.util.List<Object>) l)
+                : new java.util.ArrayList<>();
+        Map<String, Object> a = new LinkedHashMap<>();
+        a.put("attempt", n);
+        a.put("address", address);
+        a.put("status", status);
+        a.put("error", error);
+        a.put("at", ActionRequests.now());
+        out.add(a);
+        while (out.size() > ATTEMPT_LOG_CAP) out.remove(0);
+        return out;
     }
 
     private static Map<String, Object> response(Integer status, String excerpt, String error, int attempt) {

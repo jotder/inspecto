@@ -128,6 +128,11 @@ public final class WebhookSink {
                     + "through — refused rather than bypassed");
         if (p.host() == null || p.host().isBlank())
             throw new IllegalStateException(who + ": Connection '" + p.id() + "' has no host");
+        try {
+            EgressPolicy.checkHost(p.host());   // no userinfo, no non-canonical numeric host
+        } catch (IllegalArgumentException refused) {
+            throw new IllegalStateException(who + ": Connection '" + p.id() + "': " + refused.getMessage(), refused);
+        }
         String path = p.basePath() == null || p.basePath().isBlank() ? "/"
                 : (p.basePath().startsWith("/") ? p.basePath() : "/" + p.basePath());
         URI url;
@@ -137,6 +142,10 @@ public final class WebhookSink {
             throw new IllegalStateException(who + ": Connection '" + p.id()
                     + "' does not form a valid URL: " + e.getMessage(), e);
         }
+        String parsed = url.getHost() == null ? "" : url.getHost().replaceAll("^\\[|\\]$", "");
+        if (url.getUserInfo() != null || !parsed.equalsIgnoreCase(p.host().replaceAll("^\\[|\\]$", "")))
+            throw new IllegalStateException(who + ": Connection '" + p.id() + "' host '" + p.host()
+                    + "' does not parse back as itself (" + url.getHost() + ") — refused");
         String token = null;
         if (p.password() != null && !p.password().isBlank()) {
             token = SecretResolver.resolve(p.password());

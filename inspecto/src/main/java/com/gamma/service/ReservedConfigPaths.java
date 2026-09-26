@@ -16,7 +16,8 @@ import java.util.Set;
  *       {@code access-policies.toon}, the Access Catalog and Access Profiles ({@code registry/access-catalog/},
  *       {@code registry/access-profiles/}, {@code canConfigureAccess}), {@code approval.toon} and
  *       {@code pending-changes/} (reserved for the maker-checker policy and its records), {@code action-requests/}
- *       (the signed Action Request records, `ASSURE-ACTION-REQUESTS-1`), {@code agent/} (the
+ *       (the signed Action Request records, `ASSURE-ACTION-REQUESTS-1`) and {@code egress.toon} (their egress
+ *       allowlist — an import that widened it would be an SSRF door), {@code agent/} (the
  *       assist agent's autonomy {@code policy.json}, {@code approvals.jsonl} and run logs), and the Data
  *       Exchange {@code offers.toon} / {@code grants.toon};</li>
  *   <li>Space settings documents — {@code branding.toon}, {@code geo.toon}, {@code link-analysis.toon},
@@ -39,7 +40,7 @@ public final class ReservedConfigPaths {
 
     /** Reserved files, matched at the config root. */
     static final Set<String> FILES = Set.of(
-            "roles.toon", "demo-users.toon", "access-policies.toon", "approval.toon", "offers.toon", "grants.toon",
+            "roles.toon", "demo-users.toon", "access-policies.toon", "approval.toon", "egress.toon", "offers.toon", "grants.toon",
             "branding.toon", "geo.toon", "link-analysis.toon", "pipeline-history.toon", "icon-map.toon",
             "scheduler.toon", "nav-menus.toon", "notification-preferences.toon", "partition.toon", "space.toon",
             "rename.journal", "dataset-publications.tsv");
