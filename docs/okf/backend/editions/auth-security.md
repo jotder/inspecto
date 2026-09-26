@@ -692,14 +692,33 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
   (`PendingChanges.authorNow`), exactly as `OidcAuthenticator` resolves them. The approver needs only the
   approver capability, so the seeded `admin` (no `canAuthorWorkbench`) approves a builder's change. An author
   who has since lost the grant gets 403 with that reason, and the change stays pending. ⚠ Role MEMBERSHIP is
-  the IdP's and is as of the proposal — a server cannot re-ask the IdP about a user who is not in the request;
-  with an Authenticator that stamps no roles, the propose-time capability snapshot is used.
+  the IdP's view as of the proposal — a server cannot re-ask the IdP about a user who is not in the request.
+  🔴 With an Authenticator that stamps no roles the apply FAILS CLOSED (403, "the author's roles are
+  unknown"); a propose-time capability snapshot is recorded for the reviewer and never trusted.
+- **Approve replays only a maker-checker route, from a record this server wrote.** Two checks run BEFORE
+  anything is dispatched: the record's MAC (HMAC-SHA256 over its canonical JSON, a per-Space key in
+  `pending-changes/.pending-changes.key` — never served, skipped by the whole-Space export, unimportable) must
+  verify, else the record lists as `invalid` and approve / decline are 409; and the recorded method + path must
+  be on `PendingChanges.REPLAYABLE` — exactly the routes that reach the hold before they write, pinned to the
+  scanned inventory by `ConfigWriteFunnelTest#theReplayAllowlistIsExactlyTheRoutesThatHold` — else 409. Found
+  by re-verification: a forged record naming `PUT /access/roles` had rewritten `roles.toon` while approve
+  reported "not applied". ⚠ The MAC defends against a record written through any door that cannot READ the
+  key (an import, an upload); a local administrator can read both.
 - **Every step is audited** as an `AUDIT` event, `actionCategory: configuration`: `pending-change.proposed`,
   `.approved`, `.declined`, `.expired`, `.stale`, `.apply-refused`, and `approval-policy.changed` (the actor
   and the policy before and after, JSON). ⚠ Know which row says what: the approve REQUEST's own route-level
   row (`AuditTrail`) has the **approver** as actor; the replayed WRITE's row has the **author** as actor plus
   `approvedBy` and `pendingChange`; `pending-change.approved` has the approver as actor and the author as an
   attribute.
+- **An import writes only an allowlist of shapes** (re-verification finding 1, `ImportPaths`) — a string
+  denylist alone was walked by Windows aliases (`roles.toon.`, `ROLES~1.TOO`, `PENDIN~1/`, `audit./`). Three
+  layers, all required, on `/import`, `/pipelines/import` satellites and the `BundleImporter` backstop: segment
+  rules on every platform (plain names only — no trailing `.`, `~`, `:`, space, control character, leading dot,
+  `..` or Windows device name); the allowlist (a file another carried config references, or a `.toon` / `.csv`
+  of a known shape — at the config root only the conventional suffixes, under `registry/` only
+  `registry/<importable kind>/<name>`); and the denylist below plus a real-path check (`toRealPath` +
+  `isSameFile` / prefix against every reserved file and directory, fail closed on I/O errors). Connections and
+  Jobs stay importable with `canAuthorWorkbench` — filed as `IMPORT-CONNECTION-JOB-GATE-1`.
 - **An import may never write the files a narrower gate owns** (D-P14, `ReservedConfigPaths`): `roles.toon`,
   `access-policies.toon`, the Access Catalog and Access Profiles, `approval.toon`, `pending-changes/`, every
   Space settings document, `rename.journal`, `recon-state/`, `.history/`, `audit/`. `/import` and a

@@ -74,7 +74,11 @@
 //
 // ⬇ 71 → 69 on 2026-09-26: `ControlApiAlertOwnerTest` (owner-routed alerting) arms `POST /alerts/rules` and
 // `PUT /alerts/rules/{name}` with Subjects.
-const BASELINE_UNCOVERED = 69;
+//
+// ⬇ 69 → 64 on 2026-09-26: `ASSURE-MAKER-CHECKER-1` — the Pending Change approve / decline / policy routes
+// and the import, tag and rename doors its fixes gate are all exercised by armed tests
+// (`ControlApiPendingChangesTest`, `ControlApiImportReservedPathsTest`, `ControlApiTagRoutesTest`).
+const BASELINE_UNCOVERED = 64;
 
 // Usage:  node tools/check-authgate-coverage.mjs           # report + exit 1 on a ratchet regression
 //         node tools/check-authgate-coverage.mjs --list    # also print every uncovered route

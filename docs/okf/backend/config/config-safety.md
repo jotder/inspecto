@@ -786,6 +786,11 @@ replay comes back as its status and leaves the change pending.
 `pc-<yyyyMMddHHmmss>-<6 hex>`), the `ReconStateStore` pattern: atomic temp + move, jailed, an unreadable
 document is an error, never "absent". Not an OperationalDb family, so there is no backup / bundle-staging
 lockstep; it sits in the config tree. Expiry is recorded lazily — on the next list, read or decide.
+Each record carries a MAC (HMAC-SHA256, per-Space key `pending-changes/.pending-changes.key`); a record that
+fails it reads as `status: invalid`, is never re-saved and cannot be decided. ⚠ The store stays in the config
+root rather than a data directory because the default Space has no reliable per-Space data dir (its data dir is
+the CWD-relative `database`); the whole-Space export skips `pending-changes/`, and every import refuses it.
+Approve dispatches only a route on `PendingChanges.REPLAYABLE` (the routes that hold before they write).
 
 **Reads** — `GET /pending-changes[?status=&kind=]` (capped at 500, `total` + `truncated`),
 `GET /pending-changes/{id}` (with `current` and `proposed`), `GET /pending-changes/{id}/diff` — the Pipeline
