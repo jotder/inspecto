@@ -187,4 +187,27 @@ class AlertServicePersistenceTest {
                 + "(over current data)", incident.description());
         assertEquals("ra_failed_controls_today", incident.attributes().get("rule"));
     }
+
+    @Test
+    void aMeasureIncidentNamesTheDatasetByItsResolvedLabelAndKeepsTheIdInItsAttributes(@TempDir Path dir)
+            throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        AlertService svc = new AlertService(List.of(new AlertRule("fm_open_exposure", null, "gt", 298668, null,
+                "CRITICAL", null, "fraud_cases_open", "sum(exposure_sar)")), configs(cfg), store(List.of()),
+                objects.access());
+        svc.measureProbe((dataset, measure) -> java.util.OptionalDouble.of(373335.09));
+        svc.datasetLabel(id -> "fraud_cases_open".equals(id) ? "Open fraud cases" : null);
+        assertEquals(1, svc.evaluateAll().size());
+
+        for (ObjectType type : List.of(ObjectType.ALERT, ObjectType.INCIDENT)) {
+            List<OperationalObject> found = objects.query(ObjectQuery.builder().objectType(type).build());
+            assertEquals(1, found.size(), type.name());
+            OperationalObject o = found.get(0);
+            assertEquals("Sum of exposure_sar on Open fraud cases is above 298,668", o.title(), type.name());
+            assertEquals("CRITICAL: Sum of exposure_sar on Open fraud cases is 373,335.09, above the threshold of "
+                    + "298,668 (over current data)", o.description(), type.name());
+            assertEquals("fraud_cases_open", o.attributes().get("dataset"), "the machine id stays in the attributes");
+        }
+    }
 }

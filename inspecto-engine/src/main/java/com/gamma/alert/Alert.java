@@ -24,16 +24,32 @@ public record Alert(String rule, String severity, String pipeline, String metric
                     String comparator, double threshold, String window, long epochMillis,
                     String message) {
 
+    /** Ledger metric id → the words an operator reads; anything else goes through {@link #metricLabel}'s fallback. */
+    private static final Map<String, String> METRIC_LABELS = Map.of(
+            "error_rate", "Error rate",
+            "failed_batches", "Failed batches",
+            "rejected_files", "Rejected files",
+            "duration_ms", "Average duration (ms)");
+
     private static final Pattern MEASURE = Pattern.compile("([A-Za-z]+)\\(([A-Za-z_][A-Za-z0-9_]*)\\)");
 
     static Alert of(AlertRule r, String pipeline, double value, long epochMillis) {
+        return of(r, pipeline, pipeline, value, epochMillis);
+    }
+
+    /**
+     * As {@link #of(AlertRule, String, double, long)}, but the sentence names the scope by
+     * {@code scopeLabel} (a Dataset's readable name, see {@code AlertService#datasetLabel}) while the
+     * {@link #pipeline} field keeps the machine id {@code pipeline}.
+     */
+    static Alert of(AlertRule r, String pipeline, String scopeLabel, double value, long epochMillis) {
         // A freshness rule (DUCKLE-C1) has no metric, measure, window or threshold — its value is the
         // AGE in seconds, so it gets its own sentence rather than being forced through the comparator
         // phrasing, which would read "freshness is 7200 (threshold gt 0 over 1h)".
         if (r.isFreshnessRule()) {
             String freshMsg = String.format(java.util.Locale.ROOT,
                     "%s: dataset %s has not published for %ss (freshness limit %s)",
-                    r.severity(), pipeline, trim(value), r.maximumAge());
+                    r.severity(), scopeLabel, trim(value), r.maximumAge());
             return new Alert(r.name(), r.severity(), pipeline, "freshness", value, r.comparator(),
                     r.threshold(), r.maximumAge(), epochMillis, freshMsg);
         }
@@ -54,7 +70,7 @@ public record Alert(String rule, String severity, String pipeline, String metric
         };
         String msg = String.format(Locale.ROOT,
                 "%s: %s is %s, %s the threshold of %s (over %s)",
-                r.severity(), subject(r, pipeline), number(value), against, number(r.threshold()), windowLabel);
+                r.severity(), subject(r, scopeLabel), number(value), against, number(r.threshold()), windowLabel);
         return new Alert(r.name(), r.severity(), pipeline, metricLabel, value, r.comparator(),
                 r.threshold(), r.window(), epochMillis, msg);
     }
@@ -77,11 +93,24 @@ public record Alert(String rule, String severity, String pipeline, String metric
         return subject(r, scope) + " " + phrase + " " + number(r.threshold());
     }
 
-    /** What was measured, where: {@code Sum of exposure_sar on fraud_cases_open}, {@code error_rate on EVENTS}. */
+    /** What was measured, where: {@code Sum of exposure_sar on fraud_cases_open}, {@code Error rate on EVENTS}. */
     private static String subject(AlertRule r, String scope) {
-        if (r.metric() != null) return r.metric() + " on " + scope;
+        if (r.metric() != null) return metricLabel(r.metric()) + " on " + scope;
         if (r.isInvestigationRule()) return measureLabel(r.measure()) + " of " + r.relation() + " in " + scope;
         return measureLabel(r.measure()) + " on " + scope;
+    }
+
+    /**
+     * The words for a ledger metric id ({@link AlertRule#METRICS}): {@code error_rate} → {@code Error rate},
+     * {@code duration_ms} → {@code Average duration (ms)} (it IS the average — see {@link AlertRule}). An id
+     * not in {@link #METRIC_LABELS} falls back to its snake_case read as words ({@code rejected_rows} →
+     * {@code Rejected rows}), so adding a metric can never leave its alert text blank.
+     */
+    static String metricLabel(String metric) {
+        String known = METRIC_LABELS.get(metric);
+        if (known != null) return known;
+        String words = metric.replace('_', ' ').trim();
+        return words.isEmpty() ? metric : Character.toUpperCase(words.charAt(0)) + words.substring(1);
     }
 
     /** {@code sum(exposure_sar)} → {@code Sum of exposure_sar}; {@code count} → {@code Row count}. */

@@ -60,13 +60,46 @@ class AlertTest {
     @Test
     void ledgerAndFreshnessRulesGetReadableTitlesToo() {
         AlertRule ledger = new AlertRule("r-crit", "failed_batches", "gte", 1, "20b", "CRITICAL", null);
-        assertEquals("failed_batches on MINI_ETL is at least 1", Alert.title(ledger, "MINI_ETL"));
-        assertEquals("CRITICAL: failed_batches on MINI_ETL is 2, at or above the threshold of 1 "
+        assertEquals("Failed batches on MINI_ETL is at least 1", Alert.title(ledger, "MINI_ETL"));
+        assertEquals("CRITICAL: Failed batches on MINI_ETL is 2, at or above the threshold of 1 "
                 + "(over the last 20 batches)", Alert.of(ledger, "MINI_ETL", 2, 0L).message());
 
         AlertRule fresh = new AlertRule("sales-stale", null, null, 0, null, "WARNING", null,
                 "sales_ds", null, null, "6h");
         assertEquals("Dataset sales_ds has not published within 6h", Alert.title(fresh, "sales_ds"));
+    }
+
+    @Test
+    void ledgerMetricIdsAreSaidInWordsAndTheMachineIdIsKept() {
+        AlertRule slow = new AlertRule("slow", "duration_ms", "gt", 5000, "1h", "WARNING", null);
+        Alert a = Alert.of(slow, "EVENTS", 7250.5, 0L);
+        assertEquals("WARNING: Average duration (ms) on EVENTS is 7,250.5, above the threshold of 5,000 "
+                + "(over the last 1h)", a.message());
+        assertEquals("duration_ms", a.metric(), "the ALERT_FIRED / API metric stays the machine id");
+        assertEquals("Error rate on EVENTS is above 0.05",
+                Alert.title(new AlertRule("err", "error_rate", "gt", 0.05, "1h", "WARNING", null), "EVENTS"));
+
+        assertEquals("Error rate", Alert.metricLabel("error_rate"));
+        assertEquals("Failed batches", Alert.metricLabel("failed_batches"));
+        assertEquals("Rejected files", Alert.metricLabel("rejected_files"));
+        assertEquals("Average duration (ms)", Alert.metricLabel("duration_ms"));
+        assertEquals("Total input rows", Alert.metricLabel("total_input_rows"), "an unmapped id reads as words");
+    }
+
+    @Test
+    void aDatasetIsNamedByItsLabelInTheWordsButKeepsItsIdInTheFields() {
+        AlertRule r = measureRule(null, "sum(exposure_sar)", "gt", 298668);
+        Alert a = Alert.of(r, "fraud_cases_open", "Open fraud cases", 373335.09, 0L);
+        assertEquals("CRITICAL: Sum of exposure_sar on Open fraud cases is 373,335.09, above the threshold of "
+                + "298,668 (over current data)", a.message());
+        assertEquals("fraud_cases_open", a.pipeline(), "the scope field stays the Dataset id");
+        assertEquals("Sum of exposure_sar on Open fraud cases is above 298,668", Alert.title(r, "Open fraud cases"));
+
+        AlertRule fresh = new AlertRule("sales-stale", null, null, 0, null, "WARNING", null,
+                "sales_ds", null, null, "6h");
+        Alert stale = Alert.of(fresh, "sales_ds", "Daily sales", 7200, 0L);
+        assertEquals("WARNING: dataset Daily sales has not published for 7200s (freshness limit 6h)", stale.message());
+        assertEquals("sales_ds", stale.pipeline());
     }
 
     @Test

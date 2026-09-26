@@ -156,7 +156,9 @@ class AlertServiceTest {
         List<Map<String, Object>> fired = svc.evaluateAll();
         assertEquals(1, fired.size());
         assertEquals("r-duration_ms", fired.get(0).get("rule"));
-        assertTrue(((String) fired.get(0).get("message")).contains("duration_ms"));
+        assertEquals("duration_ms", fired.get(0).get("metric"), "the machine metric id is kept");
+        assertTrue(((String) fired.get(0).get("message")).contains("Average duration (ms) on "),
+                (String) fired.get(0).get("message"));
     }
 
     // ── row-scoping 'when' (Rules triad condition-tree promotion, 2026-07-18) ──────

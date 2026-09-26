@@ -88,6 +88,9 @@ public final class AlertService {
      * edge detector with the same lifetime as {@link #lastFired}, not a record of anything.
      */
     private final Map<String, Long> staleSince = new ConcurrentHashMap<>();
+    /** R2-05 follow-up: {@code dataset id} → its readable name for alert TEXT, {@code null} when it has
+     *  none; {@code null} resolver = every Dataset is named by its id (the lean / unit paths). */
+    private volatile java.util.function.Function<String, String> datasetLabel;
     /** See {@link #onRulesChanged}. */
     private volatile Runnable rulesChanged = () -> {};
 
@@ -136,6 +139,30 @@ public final class AlertService {
      */
     public void freshnessProbe(java.util.function.Function<String, java.util.OptionalLong> probe) {
         this.freshnessProbe = probe;
+    }
+
+    /**
+     * Wire the Dataset name resolver used in the words of a fired Alert / Incident ({@code Row count on
+     * Open cases is above 5} rather than {@code … on cases}). Text only: the Alert's {@code pipeline}, the
+     * event, the Signal and every object attribute keep the Dataset id. A {@code null} or blank answer —
+     * or a resolver that throws — falls back to the id. The naming rule itself lives with the resolver
+     * ({@code DatasetMeasureProbe#label}).
+     */
+    public void datasetLabel(java.util.function.Function<String, String> resolver) {
+        this.datasetLabel = resolver;
+    }
+
+    /** The scope as a reader sees it: a Dataset-scoped rule's readable Dataset name, else {@code scope} unchanged. */
+    private String textScope(AlertRule rule, String scope) {
+        var resolver = datasetLabel;
+        if (resolver == null || rule.dataset() == null || !rule.dataset().equals(scope)) return scope;
+        try {
+            String label = resolver.apply(scope);
+            return label == null || label.isBlank() ? scope : label.trim();
+        } catch (RuntimeException e) {
+            log.debug("dataset label for '{}' unavailable: {}", scope, e.getMessage());
+            return scope;   // a naming hiccup never disturbs evaluation
+        }
     }
 
     /** The loaded rules, JSON-ready — backs {@code GET /alerts/rules}. */
@@ -395,7 +422,7 @@ public final class AlertService {
         lastFired.remove(cooldownKey);   // not merely ignored - the next breach must fire at once
         String message = String.format(Locale.ROOT,
                 "CLEARED: dataset %s published %ds ago, within its %s freshness limit",
-                scope, ageMs / 1000, rule.maximumAge());
+                textScope(rule, scope), ageMs / 1000, rule.maximumAge());
         log.info("[ALERT-CLEARED] {}", message);
         Event cleared = Event.builder(EventType.ALERT_CLEARED)
                 .level(EventLevel.INFO)
@@ -434,7 +461,7 @@ public final class AlertService {
         Long last = lastFired.get(key);
         if (last != null && nowMs - last < cooldownMs(rule)) return;   // still in cooldown
         lastFired.put(key, nowMs);
-        Alert alert = Alert.of(rule, display, value, nowMs);
+        Alert alert = Alert.of(rule, display, textScope(rule, display), value, nowMs);
         fired.addFirst(alert);
         while (fired.size() > capacity) fired.removeLast();
         out.add(alert);
@@ -512,9 +539,10 @@ public final class AlertService {
             if (rule.window() != null) attrs.put("window", rule.window());
             attrs.put("value", String.valueOf(value));
             if (eventId != null) attrs.put("causedByEvent", eventId);
+            String title = Alert.title(rule, textScope(rule, pipeline));
             String alertObjectId = objects.open(ObjectType.ALERT,
-                    Alert.title(rule, pipeline), alert.message(), rule.severity(), pipeline, attrs);
-            promoteToIncident(rule, alert, pipeline, attrs, alertObjectId);
+                    title, alert.message(), rule.severity(), pipeline, attrs);
+            promoteToIncident(rule, alert, title, pipeline, attrs, alertObjectId);
         } catch (RuntimeException e) {
             log.warn("could not persist alert object for rule {}: {}", rule.name(), e.getMessage());
         }
@@ -537,13 +565,13 @@ public final class AlertService {
      * that case needs "link to the active Incident instead", which the {@code IncidentAccess} contract
      * cannot express today (it reports suppressed and dry-run alike as an empty result).
      */
-    private void promoteToIncident(AlertRule rule, Alert alert, String pipeline, Map<String, String> attrs,
-                                   String alertObjectId) {
+    private void promoteToIncident(AlertRule rule, Alert alert, String title, String pipeline,
+                                   Map<String, String> attrs, String alertObjectId) {
         if (!isHighSeverity(rule.severity())) return;
         // S1-4: promote through the incidents Platform Service — the same interface a granted Run
         // uses. The service enforces the active-object convention (one active INCIDENT per
         // rule+pipeline) via the "rule" dedupe attribute already present in attrs.
-        incidents.openIncident(Alert.title(rule, pipeline), alert.message(),
+        incidents.openIncident(title, alert.message(),
                         rule.severity(), pipeline, new LinkedHashMap<>(attrs), "rule")
                 // Machine actor, mirroring the Case Rules auto-linker's `case-rule:<name>` convention.
                 // ⚠ `incidentId` is the id itself since EDG-01 cell 7 — this was the only reader of the

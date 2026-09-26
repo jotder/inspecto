@@ -50,6 +50,36 @@ public final class DatasetMeasureProbe {
         return text != null && MEASURE.matcher(text.trim()).matches();
     }
 
+    /** The longest {@code description} {@link #label} will put in an alert title (see there). */
+    static final int MAX_LABEL = 60;
+
+    /**
+     * The Dataset's readable name for alert TEXT (R2-05 follow-up), or {@code null} when it has none —
+     * the caller then names it by its id. Read from the same registry {@link #value} resolves against.
+     *
+     * <p>The rule: its {@code description}, trailing period dropped, when that is at most
+     * {@value #MAX_LABEL} characters — a title is one line, and a paragraph-length description would
+     * bury the breach; else {@code null}. ⚠ Not its {@code name}: a Dataset's {@code name} IS its id
+     * ({@link ComponentStore#write} stamps it so), so there is no separate display name to prefer.
+     * Never throws: an unreadable registry is just "no label".
+     */
+    public String label(String datasetId) {
+        try {
+            Path root = writeRoot.get();
+            if (root == null || datasetId == null) return null;
+            Map<String, Object> dataset = new ComponentStore(root.resolve("registry")).get("dataset", datasetId)
+                    .map(ComponentRegistry.Component::content).orElse(null);
+            if (dataset == null) return null;
+            Object raw = dataset.get("description");
+            String description = raw == null ? "" : raw.toString().trim();
+            if (description.endsWith(".")) description = description.substring(0, description.length() - 1).trim();
+            return description.isEmpty() || description.length() > MAX_LABEL ? null : description;
+        } catch (Exception e) {
+            log.debug("dataset label for '{}' unavailable: {}", datasetId, e.getMessage());
+            return null;
+        }
+    }
+
     /** The measure's current value over the dataset, or empty when it cannot be computed (see class doc). */
     public OptionalDouble value(String datasetId, String measureText) {
         try {

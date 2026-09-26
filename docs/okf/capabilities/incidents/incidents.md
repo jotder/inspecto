@@ -152,8 +152,16 @@ is 373335.09 (threshold gt 298668 over current data)`). Numbers use `Locale.ROOT
 every machine), at most two decimals, and a non-zero value that would round to 0 keeps two significant
 digits. ⚠ Nothing parses these sentences: the machine ids (`rule`, `dataset`/`metric`, `measure`,
 `comparator`, raw `threshold`/`value`) stay in the objects' attributes and the `ALERT_FIRED` event / Signal
-payload. ⚠ The Dataset is named by its **id**, not a Dataset description — `AlertService` has no Dataset
-catalog seam. ⚠ The UI authoring form has no `description` field yet (and, being ledger-only, re-saving a
+payload. **Dataset and ledger-metric words** (2026-09-26 follow-up): a Dataset-scoped rule (measure or
+freshness) names its Dataset through `AlertService.datasetLabel(Function)`, wired in `CollectorService` to
+`DatasetMeasureProbe::label` (the same per-Space registry the measure probe reads). The rule: the Dataset's
+`description`, trailing period dropped, **only when ≤ 60 chars** (`DatasetMeasureProbe.MAX_LABEL` — a title is
+one line); else — or with no resolver, or no Dataset — the **id**. ⚠ Not its `name`: a Dataset's `name` IS
+its id (`ComponentStore.write` stamps it). So `Row count on open cases is 10, above the threshold of 5`; the
+Alert's `pipeline`, the event, the Signal and every attribute keep the id. Ledger metric ids read as words
+via `Alert.metricLabel` — `Error rate`, `Failed batches`, `Rejected files`, `Average duration (ms)` (it is
+the average), any other id snake_case → words — while the `metric` field / event attr stays e.g.
+`duration_ms`. Pipeline and Investigation scopes are unchanged. ⚠ The UI authoring form has no `description` field yet (and, being ledger-only, re-saving a
 rule through it drops fields it does not show).
 
 **Evaluation.** `AlertService` polls on a window-derived floor of 1 min, default 10 min

@@ -68,6 +68,28 @@ class MeasureAlertTest {
     }
 
     @Test
+    void aFiredMeasureRuleIsWordedWithTheResolvedDatasetNameAndKeepsTheId(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        AlertService svc = new AlertService(List.of(measureRule("sales_ds", "sum(amount)", "lt", 1000),
+                measureRule2("orders_ds")), configs(cfg), emptyStore());
+        svc.measureProbe((dataset, measure) -> OptionalDouble.of(750.0));
+        svc.datasetLabel(id -> "sales_ds".equals(id) ? "Daily sales" : null);   // orders_ds has no label
+
+        Map<String, Map<String, Object>> byRule = new java.util.HashMap<>();
+        for (Map<String, Object> a : svc.evaluateAll()) byRule.put((String) a.get("rule"), a);
+        Map<String, Object> sales = byRule.get("low-revenue");
+        assertEquals("WARNING: Sum of amount on Daily sales is 750, below the threshold of 1,000 (over current data)",
+                sales.get("message"));
+        assertEquals("sales_ds", sales.get("pipeline"), "the scope field keeps the Dataset id");
+        assertEquals("WARNING: Row count on orders_ds is 750, below the threshold of 1,000 (over current data)",
+                byRule.get("few-orders").get("message"), "no label → the id");
+    }
+
+    private static AlertRule measureRule2(String dataset) {
+        return new AlertRule("few-orders", null, "lt", 1000, null, "WARNING", null, dataset, "count");
+    }
+
+    @Test
     void unresolvableMeasureNeverFires(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         AlertService svc = new AlertService(

@@ -98,4 +98,29 @@ class ControlApiMeasureRuleSpaceRootTest {
             MetricRegistry.global().reset();
         }
     }
+
+    /**
+     * R2-05 follow-up: the Dataset-name resolver is WIRED in the real service, not only unit-tested — the
+     * fired alert's words name the Dataset by its registry description ({@code open cases}), from the
+     * Space's own registry, while its {@code pipeline} stays the id.
+     */
+    @Test
+    void aFiredMeasureRuleNamesTheDatasetByItsRegistryDescription(@TempDir Path root) throws Exception {
+        space(root, "acme", 10);
+        SpaceManager spaces = SpaceManager.discover(root);
+        ControlApi api = new ControlApi(spaces, 0);
+        api.start();
+        try {
+            HttpResponse<String> acme = post(api.port(), "/spaces/acme/alerts/evaluate");
+            assertEquals(200, acme.statusCode(), acme.body());
+            assertTrue(acme.body().contains(
+                    "WARNING: Row count on open cases is 10, above the threshold of 5 (over current data)"),
+                    acme.body());
+            assertTrue(acme.body().contains("\"pipeline\":\"cases\""), "the id stays the scope: " + acme.body());
+        } finally {
+            api.close();
+            spaces.close();
+            MetricRegistry.global().reset();
+        }
+    }
 }
