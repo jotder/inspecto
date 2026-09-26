@@ -60,6 +60,9 @@ import { fmtDateTime } from 'app/inspecto/grid';
                                 <div class="mt-1">
                                     Last response:
                                     <span class="font-medium">{{ last.status ?? 'none' }}</span>
+                                    @if (last.bodyRedacted) {
+                                        <span class="text-secondary">(body shown to approvers only)</span>
+                                    }
                                     @if (last.error) {
                                         — {{ last.error }}
                                     }

@@ -81,6 +81,9 @@ class ControlApiActionRequestsTest {
                 case DEV -> new String[] {"dev-1", "pipeline-developer"};
                 default -> null;
             };
+            if ("Bearer scoped".equals(ex.getRequestHeaders().getFirst("Authorization")))
+                return Optional.of(new Subject("scoped-1", Roles.effective(ex).get("operations").capabilities(),
+                        Set.of("billing")));
             if (who == null) return Optional.empty();
             Roles.Def def = Roles.effective(ex).get(who[1]);
             ComponentAccess.heldRoles(ex, Set.of(who[1]));
@@ -93,7 +96,9 @@ class ControlApiActionRequestsTest {
             bodies.add(new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
             int status = keys.size() <= failFirst ? 500 : 200;
             if (status == 200) accepted.incrementAndGet();
-            ex.sendResponseHeaders(status, -1);
+            byte[] out = ("answer-" + status).getBytes(StandardCharsets.UTF_8);
+            ex.sendResponseHeaders(status, out.length);
+            ex.getResponseBody().write(out);
             ex.close();
         });
         target.start();
@@ -340,6 +345,51 @@ class ControlApiActionRequestsTest {
             assertEquals("succeeded", data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200)
                     .get("status").asText());
             assertEquals(1, accepted.get());
+        }
+    }
+
+    // ── reads (verification finding 2) ──────────────────────────────────────────────────────────
+
+    @Test
+    void readingNeedsCanWorkIncidentsOrCanApproveChanges(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String id = propose(c, incident(c));
+            assertEquals(403, send(c, "GET", "/action-requests", null, DEV).statusCode());
+            assertEquals(403, send(c, "GET", "/action-requests/ar-20260101000000-abcdef", null, DEV).statusCode());
+            assertEquals(200, send(c, "GET", "/action-requests/" + id, null, AUTHOR).statusCode());
+            assertEquals(200, send(c, "GET", "/action-requests/" + id, null, CHECKER).statusCode());
+        }
+    }
+
+    @Test
+    void aRequestOnAnObjectOutsideTheCallersScopeIsInvisible(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String fraud = c.svc.objects().orElseThrow().open(ObjectType.INCIDENT, "Fraud", "d", "error", "f",
+                    Map.of("caseType", "fraud"));
+            String id = propose(c, fraud);
+            assertEquals(0, data(send(c, "GET", "/action-requests", null, "Bearer scoped"), 200).get("total").asInt());
+            assertEquals(404, send(c, "GET", "/action-requests/" + id, null, "Bearer scoped").statusCode(),
+                    "absent, not forbidden");
+            assertEquals(1, data(send(c, "GET", "/action-requests", null, AUTHOR), 200).get("total").asInt(),
+                    "an unscoped reader sees it");
+        }
+    }
+
+    @Test
+    void theResponseBodyIsWithheldFromReadersWhoCannotApprove(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String inc = incident(c);
+            String id = propose(c, inc);
+            failFirst = 3;
+            data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200);
+            JsonNode asAuthor = data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200);
+            assertTrue(asAuthor.at("/lastResponse/bodyExcerpt").isNull(), asAuthor.toString());
+            assertTrue(asAuthor.at("/lastResponse/bodyRedacted").asBoolean());
+            assertEquals(500, asAuthor.at("/lastResponse/status").asInt(), "the status is still shown");
+            assertTrue(data(send(c, "GET", "/action-requests?incidentId=" + inc, null, AUTHOR), 200)
+                    .at("/items/0/lastResponse/bodyExcerpt").isNull(), "the list view withholds it too");
+            assertEquals("answer-500", data(send(c, "GET", "/action-requests/" + id, null, CHECKER), 200)
+                    .at("/lastResponse/bodyExcerpt").asText());
         }
     }
 

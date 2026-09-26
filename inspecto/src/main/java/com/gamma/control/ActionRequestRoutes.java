@@ -52,7 +52,7 @@ final class ActionRequestRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/action-requests", (e, m) -> list(api, e));
-        api.get("/action-requests/([^/]+)", (e, m) -> one(api, ApiContext.name(m)));
+        api.get("/action-requests/([^/]+)", (e, m) -> one(api, e, ApiContext.name(m)));
         api.post("/action-requests", ApiContext.withCapability("canWorkIncidents",
                 (e, m) -> create(api, e, api.body(e))));
         api.post("/action-requests/([^/]+)/approve", ApiContext.withCapability("canApproveChanges",
@@ -66,6 +66,7 @@ final class ActionRequestRoutes implements RouteModule {
     // ── reads ───────────────────────────────────────────────────────────────────────────────────
 
     private Object list(ApiContext api, HttpExchange ex) throws IOException {
+        requireReader(ex);
         Path root = api.writeRoot();
         String status = ApiContext.query(ex, "status");
         String incident = ApiContext.query(ex, "incidentId");
@@ -77,9 +78,9 @@ final class ActionRequestRoutes implements RouteModule {
                 for (Map<String, Object> rec : ActionRequests.list(root)) {
                     ActionRequests.expireIfDue(root, rec);
                     if (blankOr(status, rec.get("status")) && blankOr(incident, rec.get("incidentId"))
-                            && blankOr(kase, rec.get("caseId"))) {
+                            && blankOr(kase, rec.get("caseId")) && visible(api, ex, rec)) {
                         total++;
-                        if (items.size() < LIST_CAP) items.add(ActionRequests.summary(rec));
+                        if (items.size() < LIST_CAP) items.add(redacted(ex, ActionRequests.summary(rec)));
                     }
                 }
             }
@@ -95,15 +96,59 @@ final class ActionRequestRoutes implements RouteModule {
         return want == null || want.isBlank() || want.equals(have);
     }
 
-    private Object one(ApiContext api, String id) throws IOException {
+    private Object one(ApiContext api, HttpExchange ex, String id) throws IOException {
+        requireReader(ex);
         Path root = api.writeRoot();
         if (root == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no action request '" + id + "'");
         synchronized (ActionRequests.lock()) {
             Map<String, Object> rec = ActionRequests.read(root, id);   // 422 on an unsafe id
-            if (rec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no action request '" + id + "'");
+            if (rec == null || !visible(api, ex, rec))
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "no action request '" + id + "'");
             ActionRequests.expireIfDue(root, rec);
-            return withEgress(root, ActionRequests.detail(rec));
+            return redacted(ex, withEgress(root, ActionRequests.detail(rec)));
         }
+    }
+
+    /**
+     * Verification finding 2 — reading needs {@code canWorkIncidents} OR {@code canApproveChanges}, checked
+     * literally here because a manifest entry names one capability and this is an either-or. A no-op without a
+     * Subject (Personal), like every capability gate.
+     */
+    private static void requireReader(HttpExchange ex) {
+        Subject s = ApiContext.subject(ex).orElse(null);
+        if (s != null && !s.capabilities().contains("canWorkIncidents") && !s.capabilities().contains("canApproveChanges"))
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "reading Action Requests needs canWorkIncidents "
+                    + "or canApproveChanges");
+    }
+
+    /**
+     * A request is visible exactly when its linked Incident / Case is — the object's data scope and row policy
+     * ({@code AnnotationTargets.objectVisibleTo}). Invisible reads as absent (404), never 403. Without the ops module
+     * there is no object to scope against, so nothing is visible; a record failing its integrity check (whose
+     * linkage cannot be trusted) is visible only to an approver, who must see that it exists.
+     */
+    static boolean visible(ApiContext api, HttpExchange ex, Map<String, Object> rec) {
+        if (ActionRequests.invalid(rec))
+            return ApiContext.subject(ex).map(s -> s.capabilities().contains("canApproveChanges")).orElse(true);
+        Object linked = rec.get("incidentId") != null ? rec.get("incidentId") : rec.get("caseId");
+        ObjectAccess objects = api.service().objects().orElse(null);
+        if (linked == null || objects == null) return false;
+        Map<String, Object> o = objects.summary(String.valueOf(linked)).orElse(null);
+        return o != null && AnnotationTargets.objectVisibleTo(ex, o);
+    }
+
+    /** The target's response body is for approvers only: without {@code canApproveChanges} the excerpt is withheld. */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> redacted(HttpExchange ex, Map<String, Object> view) {
+        Subject s = ApiContext.subject(ex).orElse(null);
+        if (s == null || s.capabilities().contains("canApproveChanges")) return view;
+        if (view.get("lastResponse") instanceof Map<?, ?> last) {
+            Map<String, Object> copy = new LinkedHashMap<>((Map<String, Object>) last);
+            copy.put("bodyExcerpt", null);
+            copy.put("bodyRedacted", true);
+            view.put("lastResponse", copy);
+        }
+        return view;
     }
 
     /**
@@ -227,7 +272,8 @@ final class ActionRequestRoutes implements RouteModule {
         if (reason != null && reason.length() > ActionRequests.MAX_REASON)
             throw invalid("'reason' is at most " + ActionRequests.MAX_REASON + " chars");
         Map<String, Object> rec = ActionRequests.read(root, id);   // 422 on an unsafe id
-        if (rec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no action request '" + id + "'");
+        if (rec == null || !visible(api, ex, rec))
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no action request '" + id + "'");
         if (ActionRequests.invalid(rec))
             throw new ApiException(409, ErrorCodes.CONFLICT, "action request '" + id + "' fails its integrity check "
                     + "(its MAC does not verify: it was not written by this server, or was edited since) — it cannot be "

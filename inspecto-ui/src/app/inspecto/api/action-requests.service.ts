@@ -22,6 +22,8 @@ export interface ActionResponse {
     error: string | null;
     attempt: number;
     at: string;
+    /** The body is shown only to a canApproveChanges holder; true when it was withheld from this reader. */
+    bodyRedacted?: boolean;
 }
 
 /**
