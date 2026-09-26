@@ -158,11 +158,52 @@ class ControlApiAuditTest {
         }
     }
 
+    /**
+     * An {@code Idempotency-Key} replay answers from the cache BEFORE the Space seam strips {@code /spaces/{id}},
+     * so it used to classify the raw path: a replayed mutation filed as {@code space.*} under the prefixed path,
+     * and a replayed read-shaped POST (R2-12) was audited as a mutation. A replay now files exactly as the
+     * original request did.
+     */
+    @Test
+    void idempotencyReplayOfASpacePrefixedRequestIsAuditedLikeTheOriginal(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root)) {
+            new ViewStore(root.resolve("views")).write(new ViewDefinition("sales_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES ('EU',10.0),('US',5.0)) AS t(region,amount)", "2026-09-26T00:00:00Z"));
+            new ComponentStore(root.resolve("registry")).write("dataset", "sales_ds", Map.of("view", "sales_view"));
+            String actor = "replay_" + System.nanoTime();
+            String query = """
+                    {"dataset":"sales_ds","measures":[{"agg":"sum","field":"amount"}],"groupBy":["region"]}""";
+            String pause = "/spaces/default/runs/" + c.name + "/pause";
+
+            HttpResponse<String> first = sendAs(c.port, actor, pause, null, "k-pause");
+            HttpResponse<String> again = sendAs(c.port, actor, pause, null, "k-pause");
+            assertEquals(200, first.statusCode(), first.body());
+            assertEquals("true", again.headers().firstValue("Idempotency-Replayed").orElse(null), "second call is a replay");
+            assertEquals(200, sendAs(c.port, actor, "/spaces/default/bi/query", query, "k-read").statusCode());
+            HttpResponse<String> readAgain = sendAs(c.port, actor, "/spaces/default/bi/query", query, "k-read");
+            assertEquals("true", readAgain.headers().firstValue("Idempotency-Replayed").orElse(null), "read replayed too");
+
+            List<String> actions = new ArrayList<>();
+            for (JsonNode e : recentEvents(c)) {
+                JsonNode a = e.get("attributes");
+                if ("AUDIT".equals(e.get("type").asText()) && actor.equals(a.path("actor").asText()))
+                    actions.add(a.path("action").asText() + " " + a.path("http_path").asText());
+            }
+            String row = "pipeline.paused /runs/" + c.name + "/pause";
+            assertEquals(List.of(row, row), actions, "original and replay file under the real resource; neither read is audited");
+        }
+    }
+
     private HttpResponse<String> sendAs(int port, String actor, String path, String body) throws Exception {
-        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+        return sendAs(port, actor, path, body, null);
+    }
+
+    private HttpResponse<String> sendAs(int port, String actor, String path, String body, String idempotencyKey) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("X-Actor", actor)
-                .POST(body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body)).build(),
-                BodyHandlers.ofString());
+                .POST(body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body));
+        if (idempotencyKey != null) b.header("Idempotency-Key", idempotencyKey);
+        return client.send(b.build(), BodyHandlers.ofString());
     }
 
     /**

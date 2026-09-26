@@ -284,6 +284,16 @@ own typed events (`LINK_PROJECTED`, `GEO_PROJECTED`, …). What went away is the
 `ControlApiAuditTest.readShapedPostLeavesNoAuditRowButAMutationDoes`, and both were proven red by
 deleting the clause.
 
+**An idempotency replay is audited like the original (2026-09-26).** A request carrying an
+`Idempotency-Key` whose response is cached is answered by the `idempotency` stage, which runs BEFORE
+`bindSpace` strips `/spaces/{id}`. The replay used to classify that raw path, so a replayed mutation
+filed as `space.*` under the prefixed path (and outside the Space's own event store, because the MDC was
+not bound yet), and a replayed read-shaped POST was audited as a mutation. `ControlApi.auditReplay` now
+strips the prefix and binds the Space for the one record call, exactly as `bindSpace` does for a live
+request. The SPA never sends the header, so no demo showed it. Pinned by
+`ControlApiAuditTest.idempotencyReplayOfASpacePrefixedRequestIsAuditedLikeTheOriginal`, red before the fix
+(`space.paused /spaces/default/runs/…`, `space.created /spaces/default/bi/query`).
+
 **Durability claims, exactly.** The trail is **append-only by construction** — one write seam, no update
 or delete route, 405 inherent to dispatch — and that is the whole claim. It is **not tamper-evident** (no
 hash chain, no signature), not permission-hardened (no `PosixFilePermission` call exists repo-wide), and

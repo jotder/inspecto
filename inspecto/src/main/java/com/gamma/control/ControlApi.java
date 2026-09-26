@@ -745,13 +745,29 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             Idempotency.Entry hit = idempotency.get(idemKey);
             if (hit != null) {
                 Idempotency.replay(ex, hit);
-                AuditTrail.record(ex, method, path(ex), hit.status());
+                auditReplay(ex, method, hit.status());
                 return;
             }
             ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_STORE, idempotency);
             ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_KEY, idemKey);
         }
         next.proceed(ex);
+    }
+
+    /** Audit a replayed response as the original request was audited. A replay answers BEFORE {@link #bindSpace}
+     *  runs, so the "/spaces/{id}" prefix is still on the path: classified raw, a replayed mutation filed as
+     *  {@code space.*} under the prefixed path, and a replayed read-shaped POST (R2-12) as a mutation. Strip the
+     *  prefix and bind the Space's MDC for the one record call, exactly as bindSpace does for the live request. */
+    private static void auditReplay(HttpExchange ex, String method, int status) {
+        String path = path(ex);
+        Matcher sp = SPACE_PREFIX.matcher(path);
+        boolean bound = sp.matches() && !EventLog.DEFAULT_SPACE_ID.equals(sp.group(1));
+        if (bound) MDC.put(EventLog.SPACE_MDC_KEY, sp.group(1));
+        try {
+            AuditTrail.record(ex, method, sp.matches() ? sp.group(2) : path, status);
+        } finally {
+            if (bound) MDC.remove(EventLog.SPACE_MDC_KEY);
+        }
     }
 
     /** Per-space request seam: a "/spaces/{id}/<rest>" path binds this request to that space and is then
