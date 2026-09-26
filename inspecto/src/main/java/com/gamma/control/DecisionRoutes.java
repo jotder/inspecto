@@ -120,7 +120,9 @@ final class DecisionRoutes implements RouteModule {
     /**
      * A rule carrying an {@code invoke-api} consequence raises Action Requests whenever it is applied, so saving one
      * is proposing outbound calls by proxy (verification finding 3): the saver must hold {@code canWorkIncidents}, the
-     * capability {@code POST /action-requests} demands (403).
+     * capability {@code POST /action-requests} demands (403). Its params are validated here, not at apply time
+     * (finding 4): {@code params.connection} is required and must name a registered {@code https} Connection; a
+     * legacy {@code params.url} is refused (422) — a URL was never an authorable egress target.
      */
     @SuppressWarnings("unchecked")
     private static void checkInvokeApi(com.sun.net.httpserver.HttpExchange e, Map<String, Object> rule) {
@@ -129,6 +131,24 @@ final class DecisionRoutes implements RouteModule {
         for (Object o : cs) if (o instanceof Map<?, ?> c && "invoke-api".equals(String.valueOf(c.get("action")))) any = true;
         if (!any) return;
         ApiContext.requireCapability(e, "canWorkIncidents");
+        for (Object o : cs) {
+            if (!(o instanceof Map<?, ?> raw) || !"invoke-api".equals(String.valueOf(raw.get("action")))) continue;
+            Map<String, Object> p = params((Map<String, Object>) raw);
+            if (p.containsKey("url"))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an invoke-api consequence takes "
+                        + "params.connection (the id of an https Connection), not params.url — the target is always an "
+                        + "onboarded Connection, never a URL written into a rule");
+            Object id = p.get("connection");
+            if (id == null || String.valueOf(id).isBlank())
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an invoke-api consequence needs "
+                        + "params.connection (the id of an https Connection)");
+            com.gamma.acquire.ConnectionProfile cp = com.gamma.acquire.ConnectionRegistry.find(String.valueOf(id)).orElseThrow(
+                    () -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "invoke-api: Connection '" + id
+                            + "' is not registered in this Space"));
+            if (!com.gamma.pipeline.exec.WebhookSink.CONNECTOR.equals(cp.connector()))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "invoke-api: Connection '" + id
+                        + "' is a '" + cp.connector() + "' connection — an Action Request target must be an https Connection");
+        }
     }
 
     // ── simulate / apply ─────────────────────────────────────────────────────────

@@ -487,6 +487,23 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    /** Verification finding 4: invoke-api params are validated when the rule is saved, not when it is applied. */
+    @Test
+    void invokeApiParamsAreValidatedAtSave(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            ConnectionRegistry.register(new ConnectionProfile("files", "sftp", "files.example.test", 22, null, "in",
+                    null, null, Map.of(), null, null));
+            HttpResponse<String> url = send(c, "POST", "/decision-rules", INVOKE_RULE.replace(
+                    "\"connection\":\"hook\"", "\"url\":\"https://x.example/api\""), POWER);
+            assertEquals(422, url.statusCode(), url.body());
+            assertTrue(url.body().contains("not params.url"), url.body());
+            for (String params : List.of("{}", "{\"connection\":\"nope\"}", "{\"connection\":\"files\"}"))
+                assertEquals(422, send(c, "POST", "/decision-rules", INVOKE_RULE.replace(
+                        "{\"connection\":\"hook\"}", params), POWER).statusCode(), params);
+            data(send(c, "POST", "/decision-rules", INVOKE_RULE, POWER), 200);
+        }
+    }
+
     @Test
     void aRuleWithNoRecordedEditorRaisesNothing(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         try (Ctx c = open(cfg, tmp, true)) {
