@@ -32,7 +32,7 @@ const APPROVED: AgentApproval = {
 
 async function create(
     overrides: Partial<Record<keyof ApprovalsService, unknown>> = {},
-    { canOperate = true, confirmed = true } = {},
+    { canAdminister = true, canOperate = true, confirmed = true } = {},
 ) {
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
@@ -51,7 +51,7 @@ async function create(
                 provide: InspectoConfirmService,
                 useValue: { confirm: vi.fn(async () => confirmed), confirmDestructive: vi.fn(async () => confirmed) },
             },
-            { provide: LensService, useValue: { canOperateRuns: () => canOperate } },
+            { provide: LensService, useValue: { canAdminister: () => canAdminister, canOperateRuns: () => canOperate } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
@@ -71,9 +71,20 @@ describe('ApprovalsComponent', () => {
         expect(fixture.nativeElement.textContent).toContain('Approvals Inbox');
     });
 
-    it('deciding is Ops-gated: no row actions for a read-only lens', async () => {
-        const { fixture } = await create({}, { canOperate: false });
+    it('deciding follows the server gate (canAdminister): no row actions without it', async () => {
+        const { fixture } = await create({}, { canAdminister: false });
         expect(fixture.componentInstance.rowActions).toEqual([]);
+    });
+
+    // An operator who runs things but does not administer the installation must not see buttons the server refuses.
+    it('canOperateRuns alone offers no decision (the server answers 403)', async () => {
+        const { fixture } = await create({}, { canAdminister: false, canOperate: true });
+        expect(fixture.componentInstance.rowActions).toEqual([]);
+    });
+
+    it('canAdminister without canOperateRuns can decide', async () => {
+        const { fixture } = await create({}, { canAdminister: true, canOperate: false });
+        expect(fixture.componentInstance.rowActions.length).toBe(2);
     });
 
     it('row actions target only PENDING requests', async () => {

@@ -174,8 +174,11 @@ governed from an operator inbox UI. Five slices shipped (`a30049a`, `b5069c1`, `
   (`modules/admin/approvals/`, route `/approvals`, Operations nav). An `ApprovalsService`
   (`inspecto/api/approvals.service.ts`) wraps `GET /agent/approvals[/{id}]` and
   `POST /agent/approvals/{id}/decision`; the standalone `ApprovalsComponent` lists requests in the
-  shared `<inspecto-data-table>` (tool, actor, status badge, summary), and — Ops-gated on
-  `LensService.canOperateRuns` — offers Approve/Decline row actions on PENDING rows. Deciding opens the
+  shared `<inspecto-data-table>` (tool, actor, status badge, summary), and — gated on
+  `LensService.canAdminister`, the same capability the server's decision route takes
+  (`ROUTE-UNGATED-DEFAULT-1`, agent governance) — offers Approve/Decline row actions on PENDING rows.
+  (Until 2026-09-26 the buttons followed `canOperateRuns`, so operations and power users saw actions
+  that answered 403; the server gate was the recorded decision, the UI was aligned to it.) Deciding opens the
   shared confirm dialog carrying the request's dry-run `preview` + arguments (pretty-printed), then
   reflects the terminal status in place. Reads degrade to an empty inbox + toast (module absent / act
   tier off). Vitest specs cover the service wire contract and the component (gating, PENDING-only

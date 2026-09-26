@@ -16,8 +16,9 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
  * Approvals Inbox (AGT-5 P3, autonomy L2) — the operator surface over the agent's approval gate. A
  * mutating agent tool call parks in the intelligence module's inbox (`GET /agent/approvals`); the
  * operator reviews the request's dry-run `preview` and approves or declines it
- * (`POST /agent/approvals/{id}/decision`), which resumes or denies the parked tool. Deciding is
- * Ops-gated (`canOperateRuns`); every lens can read the inbox.
+ * (`POST /agent/approvals/{id}/decision`), which resumes or denies the parked tool. Deciding is agent
+ * GOVERNANCE, gated `canAdminister` on the server (`ROUTE-UNGATED-DEFAULT-1`, 2026-09-15), so the buttons
+ * follow the same capability; everyone can read the inbox.
  *
  * <p>⚠ **A 503 here is an expected state, never an error.** The route 503s when the optional
  * `inspecto-intelligence` module is absent — and the server deliberately does NOT degrade an
@@ -79,9 +80,10 @@ export class ApprovalsComponent implements OnInit {
         },
     ];
 
-    /** Approve/decline a pending request — Ops-gated (`canOperateRuns`); nothing for a read-only lens. */
+    /** Approve/decline a pending request — `canAdminister`, exactly the server's gate on the decision route
+     *  (it was `canOperateRuns`, so operations and power users saw buttons that answered 403). */
     get rowActions(): InspectoRowAction<AgentApproval>[] {
-        if (!this.lens.canOperateRuns()) return [];
+        if (!this.lens.canAdminister()) return [];
         return [
             {
                 icon: 'heroicons_outline:check',
