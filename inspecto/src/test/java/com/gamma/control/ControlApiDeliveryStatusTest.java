@@ -11,6 +11,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.OutputStream;
+import java.net.Socket;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -75,6 +77,36 @@ class ControlApiDeliveryStatusTest {
     private HttpResponse<String> get(int port, String path) throws Exception {
         return client.send(HttpRequest.newBuilder(
                 URI.create("http://localhost:" + port + "/api/v1" + path)).GET().build(), BodyHandlers.ofString());
+    }
+
+    /** The JDK server's default drain on exchange close ({@code sun.net.httpserver.drainAmount}). */
+    private static final int JDK_DRAIN_BYTES = 64 * 1024;
+
+    /**
+     * POST over a raw socket that DECLARES {@code contentLength} but sends only the first
+     * {@link #JDK_DRAIN_BYTES} of it, then reads the response. Returns {status line, body}.
+     *
+     * <p>Why exactly that many: a handler that refuses without reading leaves the body to the JDK, which on
+     * exchange close drains up to 64 KiB and only THEN flushes the response. Sending less makes the drain
+     * wait (a half-close instead is a premature EOF, and the server drops the response); sending more
+     * leaves bytes unread, so the close becomes a reset that can destroy the response in flight. At
+     * exactly the drain amount the response is flushed and the close is a clean FIN.
+     */
+    private static String[] declaredWithDrainOnly(int port, String path, int contentLength) throws Exception {
+        try (Socket s = new Socket("localhost", port)) {
+            s.setSoTimeout(10_000);
+            OutputStream out = s.getOutputStream();
+            out.write(("POST " + path + " HTTP/1.1\r\nHost: localhost\r\nContent-Type: application/json\r\n"
+                    + "X-Test-Signature: good\r\nContent-Length: " + contentLength + "\r\n\r\n")
+                    .getBytes(StandardCharsets.US_ASCII));
+            out.write(" ".repeat(JDK_DRAIN_BYTES).getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            String raw = new String(s.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            int eol = raw.indexOf("\r\n");
+            int eoh = raw.indexOf("\r\n\r\n");
+            assertTrue(eol > 0 && eoh > 0, "no complete response: " + raw);
+            return new String[] { raw.substring(0, eol), raw.substring(eoh + 4) };
+        }
     }
 
     private static JsonNode json(HttpResponse<String> r) throws Exception {
@@ -249,10 +281,16 @@ class ControlApiDeliveryStatusTest {
         try (Ctx c = open(dir)) {
             String huge = "[" + " ".repeat(DeliveryStatusRoutes.MAX_CALLBACK_BYTES) + "]";
 
-            // Declared length (Content-Length) — refused before the body is read.
-            HttpResponse<String> declared = callback(c.port, "test", huge, "good");
-            assertEquals(413, declared.statusCode(), declared.body());
-            assertEquals("PAYLOAD_TOO_LARGE", json(declared).at("/error/errorCode").asText(), declared.body());
+            // Declared length (Content-Length) — refused before the body is read. Sent over a raw socket
+            // that declares the full length but sends only a quarter of it, which proves "before the
+            // body is read" outright. ⚠ Not through HttpClient: posting the real 256 KiB body races the
+            // server, which answers after draining 64 KiB and closes with bytes unread; the OS resets the
+            // connection and the client, still writing, loses the 413 ("HTTP/1.1 header parser received
+            // no bytes": 6 of 200 such posts on an idle machine, 2026-09-26). That race failed a gate.
+            String[] declared = declaredWithDrainOnly(c.port, "/api/v1/public/delivery-status/test",
+                    huge.getBytes(StandardCharsets.UTF_8).length);
+            assertTrue(declared[0].startsWith("HTTP/1.1 413"), declared[0]);
+            assertEquals("PAYLOAD_TOO_LARGE", V1Body.of(declared[1]).at("/error/errorCode").asText(), declared[1]);
 
             // Undeclared length (chunked) — the read itself stops one byte past the cap.
             byte[] bytes = huge.getBytes(StandardCharsets.UTF_8);

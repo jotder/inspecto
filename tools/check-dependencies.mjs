@@ -71,8 +71,18 @@ function resolve() {
     // been `install`ed cannot resolve and the guard reports CANNOT RUN — which reads like drift but is
     // only a resolution artefact. A real `mvn test` resolves it from the reactor. inspecto-ops depends
     // on inspecto-policy (test scope) for the ABAC row-scope test, which is what surfaced this.
-    const args = ['-B', '-DskipTests', 'package', 'dependency:list', '-DincludeScope=runtime',
-                  '-Pedition-enterprise'];
+    // ⚠ `useIncrementalCompilation=false` (2026-09-26): the `package` above builds into the SAME target/
+    // dirs a reactor gate's surefire fork is loading classes from. Right after a `clean test`, the first
+    // `package` sees new upstream jars ("Recompiling the module because of changed dependency"), and the
+    // compiler's incremental mode then EMPTIES target/classes and target/test-classes and recompiles them
+    // (measured: inspecto/target/classes 0 → 291 over ~2 s). A gate test that first touches a class in
+    // that window dies with NoClassDefFoundError inside a ControlApi handler, and the client reads only
+    // "HTTP/1.1 header parser received no bytes" — 9 such errors in the 2026-09-26 gate, run alongside
+    // this guard. With the flag off, javac recompiles only stale sources in place, so an already-built
+    // tree is left untouched (measured: 291 classes throughout). The guard needs the artifacts, not a
+    // fresh compile.
+    const args = ['-B', '-DskipTests', '-Dmaven.compiler.useIncrementalCompilation=false',
+                  'package', 'dependency:list', '-DincludeScope=runtime', '-Pedition-enterprise'];
     if (process.env.MVN_OFFLINE === '1') args.unshift('-o');
     let out;
     try {
