@@ -29,6 +29,32 @@ class PathJailTest {
         assertEquals(root.resolve("a/b.toon").toAbsolutePath().normalize(), got);
     }
 
+    /** A {@code *.secrets} directory under an allowed root is still no job path — any spelling, or via its real path. */
+    @Test
+    void aJobPathIntoASecretsDirectoryIsRefused(@TempDir Path root) throws Exception {
+        Path secrets = Files.createDirectories(root.resolve("config.secrets"));
+        java.util.List<Path> roots = java.util.List.of(root);
+        for (String v : new String[]{secrets.toString(), secrets.resolve(".pending-changes.key").toString(),
+                root.resolve("CONFIG.SECRETS").resolve("x").toString(), root + "/config.secrets./x", "config.secrets/x",
+                root.resolve("data").resolve("..").resolve("config.secrets").toString()}) {
+            PathJail.Escape ex = assertThrows(PathJail.Escape.class,
+                    () -> PathJail.requireJobPathUnderAny(roots, root, v, "target_dir"), v);
+            assertTrue(ex.getMessage().contains("secrets directory"), ex.getMessage());
+        }
+        Path link = root.resolve("innocent");
+        try {
+            Files.createSymbolicLink(link, secrets);
+        } catch (Exception | Error e) {
+            link = null;   // no symlink privilege on this host: the spelling cases above still run
+        }
+        if (link != null) {
+            Path l = link;
+            assertThrows(PathJail.Escape.class, () -> PathJail.requireJobPathUnderAny(roots, root, l.resolve("x").toString(), "dir"));
+        }
+        assertDoesNotThrow(() -> PathJail.requireJobPathUnderAny(roots, root, root.resolve("data").toString(), "dir"),
+                "an ordinary path under the root still resolves");
+    }
+
     @Test
     void dotDotEscapeIsRefused(@TempDir Path root) {
         PathJail.Escape ex = assertThrows(PathJail.Escape.class,

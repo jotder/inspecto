@@ -93,6 +93,28 @@ class BackupTaskTest {
         assertTrue(names.stream().anyMatch(n -> n.endsWith("a.toon")), "the rest is archived: " + names);
     }
 
+    /** No backup or restore job may point INTO a Space's {@code config.secrets/} — source or target (PathJail). */
+    @Test
+    void aJobPointedAtTheSecretsDirectoryIsRefused(@TempDir Path source, @TempDir Path backupDir,
+                                                   @TempDir Path space) throws Exception {
+        new MaintenanceJob(backupCfg(source, backupDir)).run();
+        Path zip = onlyZip(backupDir);
+        Path secrets = Files.createDirectories(space.resolve("config.secrets"));
+        Files.writeString(secrets.resolve(".pending-changes.key"), "k");
+
+        refused(job(Map.of("task", "restore", "archive", zip.toString(),
+                "target_dir", secrets.toString(), "overwrite", "true")));
+        assertFalse(Files.exists(secrets.resolve("space.toon")), "nothing restored into the secrets directory");
+        refused(job(Map.of("task", "backup", "dir", secrets.toString(), "backup_dir", backupDir.toString())));
+        refused(job(Map.of("task", "backup", "dir", source.toString(), "backup_dir", secrets.resolve("out").toString())));
+        assertFalse(Files.exists(secrets.resolve("out")), "no backup written into it either");
+    }
+
+    private static void refused(JobConfig cfg) {
+        Exception ex = assertThrows(Exception.class, () -> new MaintenanceJob(cfg).run());
+        assertTrue(ex.getMessage().contains("secrets directory"), ex.getMessage());
+    }
+
     @Test
     void backupVerifyPassesThenDetectsCorruption(@TempDir Path source, @TempDir Path backupDir) throws Exception {
         new MaintenanceJob(backupCfg(source, backupDir)).run();

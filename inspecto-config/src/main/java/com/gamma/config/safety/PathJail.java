@@ -312,7 +312,24 @@ public final class PathJail {
         if (roots == null || roots.isEmpty())
             throw new IllegalArgumentException("no allowed roots configured for '" + field + "'");
         Path resolved = resolveJobPath(base, value, field);
+        refuseSecrets(resolved, value, field);
         return requireUnderAny(roots, resolved.toString(), field);
+    }
+
+    /**
+     * A {@code *.secrets} directory (the Space's {@code config.secrets/}, holding the Pending Change key) is never
+     * a job path — source or target — even though it sits under the Space root a packaged install jails to. Checked
+     * on the authored path AND its real path (a link, or a Windows 8.3 alias, walks around the spelling); a trailing
+     * dot or space is stripped first, because Windows drops it.
+     */
+    private static void refuseSecrets(Path resolved, String value, String field) {
+        for (Path p : new Path[]{resolved, realPathOfNearestExisting(resolved)})
+            if (p != null)
+                for (Path seg : p) {
+                    String s = seg.toString().replaceAll("[. ]+$", "").toLowerCase(java.util.Locale.ROOT);
+                    if (s.endsWith(".secrets"))
+                        throw new Escape(field, value, "names a secrets directory ('" + seg + "'), which no job may read or write");
+                }
     }
 
     public static Path require(Path root, String value, String field) {
