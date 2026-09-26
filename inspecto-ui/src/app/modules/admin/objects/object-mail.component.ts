@@ -133,6 +133,9 @@ export class ObjectMailComponent implements OnInit {
      * use them.
      */
     readonly canWork = inject(LensService).canWorkIncidents;
+    /** Priority, an Incident's Escalate flag and Merge ride the `canAdminister` PATCH / merge routes, so they
+     *  render only with it (operator, 2026-09-26). */
+    readonly canAdminister = inject(LensService).canAdminister;
     private dialog = inject(MatDialog);
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
@@ -275,17 +278,20 @@ export class ObjectMailComponent implements OnInit {
         if (this.isIncident && work) {
             a.push({ id: 'accept', label: 'Accept', icon: 'heroicons_outline:check', disabled: !this.canAccept() });
         }
-        for (const p of this.priorities) {
+        const admin = this.canAdminister(); // priority / escalate flag / merge — canAdminister (operator, 2026-09-26)
+        for (const p of admin ? this.priorities : []) {
             a.push({ id: 'prio:' + p, label: 'Set priority ' + p, icon: 'heroicons_outline:flag', disabled: !n });
         }
         a.push({ id: 'tag', label: 'Tag…', icon: 'heroicons_outline:tag', disabled: !n });
         if (this.isIncident) {
-            a.push({
-                id: 'escalate',
-                label: this.escalateLabel(),
-                icon: 'heroicons_outline:arrow-trending-up',
-                disabled: !this.canEscalate(),
-            });
+            if (admin) {
+                a.push({
+                    id: 'escalate',
+                    label: this.escalateLabel(),
+                    icon: 'heroicons_outline:arrow-trending-up',
+                    disabled: !this.canEscalate(),
+                });
+            }
             if (work) {
                 a.push({
                     id: 'resolve',
@@ -311,12 +317,14 @@ export class ObjectMailComponent implements OnInit {
             for (const c of work ? this.caseActions() : []) {
                 a.push({ id: 'case:' + c, label: this.stateLabel(c), disabled: !n });
             }
-            a.push({
-                id: 'merge',
-                label: 'Merge…',
-                icon: 'heroicons_outline:arrows-pointing-in',
-                disabled: n < 2,
-            });
+            if (admin) {
+                a.push({
+                    id: 'merge',
+                    label: 'Merge…',
+                    icon: 'heroicons_outline:arrows-pointing-in',
+                    disabled: n < 2,
+                });
+            }
         }
         return a;
     });
@@ -633,8 +641,9 @@ export class ObjectMailComponent implements OnInit {
     /**
      * Accept: Identified → Diagnosing. The 3-layer categorization is enforced here — when any
      * target has no category yet, one categorize dialog collects it (applied to the uncategorized
-     * targets); unassigned targets are assigned to me through `POST /objects/{id}/assign`
-     * (`canWorkIncidents`), not the `canAdminister` PATCH, so an analyst can accept an unassigned Incident.
+     * targets) and saved through `PUT /objects/{id}/category`; unassigned targets are assigned to me through
+     * `POST /objects/{id}/assign`. Both are `canWorkIncidents`, not the `canAdminister` PATCH, so an analyst can
+     * accept an uncategorised, unassigned Incident (operator, 2026-09-26).
      */
     accept(targets = this.selected().filter((o) => displayStatus(o) === 'IDENTIFIED')): void {
         targets = targets.filter((o) => displayStatus(o) === 'IDENTIFIED');
@@ -645,8 +654,7 @@ export class ObjectMailComponent implements OnInit {
                 targets,
                 (o) => {
                     const me = this.me;
-                    const categorize$ =
-                        !objectCategory(o) && category ? this.api.update(o.id, { attributes: { category } }) : of(o);
+                    const categorize$ = !objectCategory(o) && category ? this.api.saveCategory(o.id, category) : of(o);
                     return categorize$.pipe(
                         switchMap(() => (o.assignee ? of(o) : this.api.assign(o.id, me, me))),
                         switchMap(() => this.api.transition(o.id, 'accept', me)),

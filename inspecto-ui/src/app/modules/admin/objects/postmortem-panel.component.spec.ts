@@ -63,6 +63,7 @@ function create(object: OperationalObject = INCIDENT, findingsSpec: FindingsSpec
     const api = {
         update: vi.fn(() => of(object)),
         saveFindings: vi.fn(() => of(object)),
+        savePostmortem: vi.fn(() => of(object)),
         graph: vi.fn(() => of({ root: object.id, depth: 1, nodes: [], edges: [] })),
     };
     const toastr = { success: vi.fn(), error: vi.fn() };
@@ -94,16 +95,17 @@ describe('PostmortemPanelComponent', () => {
         expect(c.actionsArr.length).toBe(1);
     });
 
-    it('saves the edited postmortem as an attributes patch (causeAnalysis shape)', () => {
+    // Operator, 2026-09-26 (INCIDENT-FINISH-GATE-1): PUT /objects/{id}/postmortem (canWorkIncidents), not the PATCH.
+    it('saves the edited postmortem on the postmortem route (causeAnalysis shape)', () => {
         const { c, api } = create();
         c.form.controls.downtime.setValue('2 hours');
         c.removeCause(4); // rows are add/removable now — not pinned to exactly five
         c.form.markAsDirty();
         c.save();
-        expect(api.update).toHaveBeenCalledTimes(1);
-        const [id, patch] = (api.update as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect(api.update).not.toHaveBeenCalled();
+        expect(api.savePostmortem).toHaveBeenCalledTimes(1);
+        const [id, saved] = (api.savePostmortem as ReturnType<typeof vi.fn>).mock.calls[0];
         expect(id).toBe('i1');
-        const saved = JSON.parse(patch.attributes.postmortem);
         expect(saved.downtime).toBe('2 hours');
         expect(saved.commander).toBe('alice');
         expect(saved.causeMethod).toBe('The 5 Whys');
@@ -238,15 +240,37 @@ describe('PostmortemPanelComponent', () => {
 
     // Operator, 2026-09-26: the lifecycle verbs ride POST /objects/{id}/transition, gated canWorkIncidents —
     // so they render for exactly the subjects the server lets move the object. Escalate on an Incident is a
-    // flag edit (the PATCH), not a move, and is not this capability's to hide.
+    // flag edit on the canAdminister PATCH, so it follows canAdminister instead (CASE-UI-GATE-LEFTOVERS-1).
     it('hides the lifecycle verbs from a signed-in subject without canWorkIncidents', () => {
         const { c } = create();
         const session = TestBed.inject(SessionService);
         session.authMode.set('oidc');
         session.capabilities.set(['canOperateRuns']);
-        expect(c.quickActions.map((a) => a.id)).toEqual(['escalate']);
+        expect(c.quickActions.map((a) => a.id)).toEqual([]);
         session.capabilities.set(['canWorkIncidents']);
+        expect(c.quickActions.map((a) => a.id)).toEqual(['resolve', 'archive']);
+        session.capabilities.set(['canWorkIncidents', 'canAdminister']);
         expect(c.quickActions.map((a) => a.id)).toEqual(['resolve', 'archive', 'escalate']);
+    });
+
+    it('shows the team + target date fields only to a subject holding canAdminister', () => {
+        const { fixture } = create({
+            ...INCIDENT,
+            id: 'c4',
+            objectType: 'CASE',
+            status: 'INVESTIGATING',
+            attributes: {},
+        });
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canWorkIncidents']);
+        fixture.detectChanges();
+        const text = (): string => (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text()).not.toContain('Target date (loose SLA)');
+        expect(text()).toContain('Save findings'); // the Findings half stays — it is collaboration
+        session.capabilities.set(['canWorkIncidents', 'canAdminister']);
+        fixture.detectChanges();
+        expect(text()).toContain('Target date (loose SLA)');
     });
 
     it('offers a Case no workflow verb at all without canWorkIncidents', () => {

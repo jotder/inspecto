@@ -59,6 +59,7 @@ async function create(opts: CreateOpts = {}) {
         update: vi.fn((id: string) => of(OBJECTS.find((o) => o.id === id))),
         transition: vi.fn((id: string) => of(OBJECTS.find((o) => o.id === id))),
         assign: vi.fn((id: string) => of(OBJECTS.find((o) => o.id === id))),
+        saveCategory: vi.fn((id: string) => of(OBJECTS.find((o) => o.id === id))),
         addComment: vi.fn(() => of({})),
         tags: vi.fn(() => of([{ name: 'billing', createdAt: 1 }])),
         tagRules: vi.fn(() => of([])),
@@ -167,6 +168,43 @@ describe('ObjectMailComponent', () => {
         expect(api.assign).toHaveBeenCalledWith('i9', 'operator', 'operator');
         expect(api.update).not.toHaveBeenCalled();
         expect(api.transition).toHaveBeenCalledWith('i9', 'accept', 'operator');
+    });
+
+    // Operator, 2026-09-26 (INCIDENT-FINISH-GATE-1): the categorise step rides PUT /objects/{id}/category
+    // (canWorkIncidents), so an analyst can accept an uncategorised Incident.
+    it('accept categorises an uncategorised incident through the category route, not the PATCH', async () => {
+        const { c, api } = await create();
+        // The pane's own MatDialog (its imports provide one), not the root stub — answer the categorize dialog.
+        const dialog = (c as unknown as { dialog: { open: unknown } }).dialog;
+        dialog.open = vi.fn(() => ({ afterClosed: () => of('Data / Feed / Late') }));
+        c.accept([incident('i9', 'IDENTIFIED')]);
+        expect(api.saveCategory).toHaveBeenCalledWith('i9', 'Data / Feed / Late');
+        expect(api.update).not.toHaveBeenCalled();
+        expect(api.transition).toHaveBeenCalledWith('i9', 'accept', 'operator');
+    });
+
+    // CASE-UI-GATE-LEFTOVERS-1: priority, the Incident escalate flag and merge ride canAdminister routes.
+    it('offers Priority and Escalate only to a subject holding canAdminister', async () => {
+        const { c } = await create({ capabilities: ['canWorkIncidents'] });
+        c.onSelection([OBJECTS[0]] as unknown as Record<string, unknown>[]);
+        const ids = (): string[] => c.bulkActions().map((a) => a.id);
+        expect(ids().some((id) => id.startsWith('prio:'))).toBe(false);
+        expect(ids()).not.toContain('escalate');
+        expect(ids()).toContain('accept');
+        TestBed.inject(SessionService).capabilities.set(['canWorkIncidents', 'canAdminister']);
+        expect(ids()).toEqual(expect.arrayContaining(['prio:MAJOR', 'escalate']));
+    });
+
+    it('offers Merge only to a subject holding canAdminister', async () => {
+        const { c } = await create({
+            type: 'CASE',
+            list: of([kase('c1', 'OPEN'), kase('c2', 'OPEN')]),
+            capabilities: ['canWorkIncidents'],
+        });
+        c.onSelection([kase('c1', 'OPEN'), kase('c2', 'OPEN')] as unknown as Record<string, unknown>[]);
+        expect(c.bulkActions().map((a) => a.id)).not.toContain('merge');
+        TestBed.inject(SessionService).capabilities.set(['canWorkIncidents', 'canAdminister']);
+        expect(c.bulkActions().map((a) => a.id)).toContain('merge');
     });
 
     // ── "me" is the signed-in Subject (the Mine folder never matched anyone on a signed-in edition) ──

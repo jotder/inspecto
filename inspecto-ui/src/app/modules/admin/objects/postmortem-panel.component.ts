@@ -87,6 +87,9 @@ export class PostmortemPanelComponent {
     private confirm = inject(InspectoConfirmService);
     /** The lifecycle verbs ride `POST /objects/{id}/transition` — `canWorkIncidents` (operator, 2026-09-26). */
     private canWork = inject(LensService).canWorkIncidents;
+    /** Escalate (an Incident's flag) and team + target date ride the `canAdminister` PATCH, so they show only
+     *  with it (operator, 2026-09-26). */
+    readonly canAdminister = inject(LensService).canAdminister;
 
     /** Member roll-up from the Contents section (cases only) — feeds the soft close-gate (C1). */
     readonly memberRollup = signal<MemberRollup>({ total: 0, open: 0 });
@@ -189,7 +192,8 @@ export class PostmortemPanelComponent {
             if (work && (s === 'IDENTIFIED' || s === 'DIAGNOSING')) out.push({ id: 'resolve', label: 'Resolve' });
             if (work && s !== 'ARCHIVED') out.push({ id: 'archive', label: 'Archive' });
             if (work && (s === 'RESOLVED' || s === 'ARCHIVED')) out.push({ id: 'reopen', label: 'Reopen' });
-            out.push({ id: 'escalate', label: isEscalated(this.object()) ? 'De-escalate' : 'Escalate' });
+            if (this.canAdminister())
+                out.push({ id: 'escalate', label: isEscalated(this.object()) ? 'De-escalate' : 'Escalate' });
             return out;
         }
         if (!work) return [];
@@ -312,7 +316,9 @@ export class PostmortemPanelComponent {
             actions: (v.actions as PostmortemAction[]).filter((a) => a.text),
         };
         this.saving.set(true);
-        this.api.update(this.object().id, { attributes: { postmortem: JSON.stringify(p) } }).subscribe({
+        // PUT /objects/{id}/postmortem (canWorkIncidents), not the canAdminister PATCH — the analyst who resolves
+        // the Incident writes what resolving requires (operator, 2026-09-26).
+        this.api.savePostmortem(this.object().id, p).subscribe({
             next: () => {
                 this.saving.set(false);
                 this.form.markAsPristine();

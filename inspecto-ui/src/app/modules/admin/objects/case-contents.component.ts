@@ -4,7 +4,14 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ObjectGraphNode, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    LensService,
+    ObjectGraphNode,
+    ObjectsService,
+    OperationalObject,
+    SessionService,
+} from 'app/inspecto/api';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { currentOperator, normalizeIncidentStatus } from './mail-model';
 import { AddMemberDialog } from './add-member.dialog';
@@ -40,15 +47,18 @@ export interface MemberRollup {
                 >
                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:plus"></mat-icon>
                 </button>
-                <button
-                    mat-stroked-button
-                    type="button"
-                    [disabled]="!members().length"
-                    (click)="split()"
-                    matTooltip="Carve members out into a new case"
-                >
-                    Split…
-                </button>
+                <!-- POST /objects/{id}/split is canAdminister — shown only to those the server lets split -->
+                @if (canAdminister()) {
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        [disabled]="!members().length"
+                        (click)="split()"
+                        matTooltip="Carve members out into a new case"
+                    >
+                        Split…
+                    </button>
+                }
             </div>
 
             <p class="text-secondary mb-2 text-sm" role="status">
@@ -87,6 +97,8 @@ export class CaseContentsComponent {
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
     private session = inject(SessionService);
+    /** Split rides the `canAdminister` route (operator, 2026-09-26). */
+    readonly canAdminister = inject(LensService).canAdminister;
 
     readonly object = input.required<OperationalObject>();
 

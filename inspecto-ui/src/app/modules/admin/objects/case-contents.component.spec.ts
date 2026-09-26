@@ -3,7 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { ObjectGraph, ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { ObjectGraph, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
 import { CaseContentsComponent, MemberRollup } from './case-contents.component';
@@ -71,6 +71,20 @@ describe('CaseContentsComponent', () => {
         c.removeMember(c.members()[0]);
         expect(api.unlink).toHaveBeenCalledWith('case-1', 'i1', 'CONTAINS', expect.any(String));
         expect(api.graph).toHaveBeenCalledTimes(2); // init + reload
+    });
+
+    // CASE-UI-GATE-LEFTOVERS-1: POST /objects/{id}/split is canAdminister — the button follows it.
+    it('offers Split only to a subject holding canAdminister', () => {
+        const { fixture } = create();
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canWorkIncidents']);
+        fixture.detectChanges();
+        const text = (): string => (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text()).not.toContain('Split…');
+        session.capabilities.set(['canWorkIncidents', 'canAdminister']);
+        fixture.detectChanges();
+        expect(text()).toContain('Split…');
     });
 
     it('renders with no a11y violations', async () => {

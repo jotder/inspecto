@@ -322,6 +322,25 @@ export class ObjectsService {
     }
 
     /**
+     * Save an Incident's postmortem — PUT /objects/{id}/postmortem (`canWorkIncidents`, operator 2026-09-26), so
+     * the analyst who resolves an Incident can write what resolving requires. The server stores it as the
+     * `attributes.postmortem` JSON blob and refuses any key but `postmortem`.
+     */
+    savePostmortem(id: string, postmortem: object): Observable<OperationalObject> {
+        return this.http.put<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/postmortem`), {
+            postmortem,
+        });
+    }
+
+    /**
+     * Set an object's category (the 3-layer categorisation Accept requires) — PUT /objects/{id}/category
+     * (`canWorkIncidents`, operator 2026-09-26); the server refuses any key but `category`.
+     */
+    saveCategory(id: string, category: string): Observable<OperationalObject> {
+        return this.http.put<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/category`), { category });
+    }
+
+    /**
      * Assign an object to a person — POST /objects/{id}/assign (`canWorkIncidents`, operator 2026-09-26), the
      * narrower route than the `canAdminister` {@link update} for exactly this edit. The server records the
      * signed-in Subject as the actor when there is one; `actor` counts only without one (Personal).

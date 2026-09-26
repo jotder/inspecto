@@ -99,18 +99,21 @@
                         (submitted)="saveFindings()"
                     />
                 }
-                <form [formGroup]="teamForm" class="flex flex-col gap-3">
-                    <div class="grid grid-cols-2 gap-3">
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Target date (loose SLA)</mat-label>
-                            <input matInput formControlName="targetDate" placeholder="YYYY-MM-DD" />
-                        </mat-form-field>
-                        <mat-form-field subscriptSizing="dynamic">
-                            <mat-label>Team</mat-label>
-                            <input matInput formControlName="team" placeholder="comma-separated, e.g. alice, bob" />
-                        </mat-form-field>
-                    </div>
-                </form>
+                <!-- Team + target date ride the canAdminister PATCH — shown only to those the server lets save them -->
+                @if (canAdminister()) {
+                    <form [formGroup]="teamForm" class="flex flex-col gap-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <mat-form-field subscriptSizing="dynamic">
+                                <mat-label>Target date (loose SLA)</mat-label>
+                                <input matInput formControlName="targetDate" placeholder="YYYY-MM-DD" />
+                            </mat-form-field>
+                            <mat-form-field subscriptSizing="dynamic">
+                                <mat-label>Team</mat-label>
+                                <input matInput formControlName="team" placeholder="comma-separated, e.g. alice, bob" />
+                            </mat-form-field>
+                        </div>
+                    </form>
+                }
                 <div class="flex justify-end">
                     <button
                         mat-flat-button
