@@ -13,6 +13,9 @@ import com.gamma.signal.Severity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.gamma.ops.Impact;
+import com.gamma.ops.ObjectQuery;
+import com.gamma.ops.OperationalObject;
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
@@ -57,6 +60,15 @@ public final class ObjectsAnalyticsJob implements Job {
 
     /** Dataset id, {@code physicalRef}, and the sample sub-directory under the space data dir. */
     public static final String CATALOG = "ops_analytics";
+
+    /**
+     * WS-10 ({@code ASSURE-IMPACT-LEDGER-1}): the impact-ledger Dataset — one row per Incident/Case carrying a
+     * typed {@link Impact}, per run ({@code sampled_at}), written beside {@link #CATALOG} for the same reason
+     * that one exists: objects live only in the single-writer JDBC table, so the in-process sample is the only
+     * seam a Dataset's {@code physicalRef} can bind to. Current values filter
+     * {@code sampled_at = (SELECT max(sampled_at) …)}; trends group by it. Works on either objects backend.
+     */
+    public static final String LEDGER = "impact_ledger";
 
     private static final Logger log = LoggerFactory.getLogger(ObjectsAnalyticsJob.class);
 
@@ -109,6 +121,7 @@ public final class ObjectsAnalyticsJob implements Job {
 
         List<Object[]> rows = new ArrayList<>();
         for (ObjectType type : types) rows.addAll(flatten(type, svc.analytics(type)));
+        List<LedgerRow> ledger = ledger(svc, types);
 
         if (ctx.dryRun())
             return JobResult.ok("objects.analytics (dry run): " + rows.size() + " row(s) over " + types.size()
@@ -128,7 +141,18 @@ public final class ObjectsAnalyticsJob implements Job {
             content.put("physicalRef", CATALOG);
             content.put("description", "Operational-object analytics samples (one row per type/axis/key per run)");
             store.write("dataset", CATALOG, content, false);   // result-stamp write, no version churn
-            purged = purge(storeDir, retentionDays, now);
+            purged = purge(storeDir, "analytics_", retentionDays, now);
+
+            Path ledgerDir = Path.of(root).resolve(LEDGER);
+            Files.createDirectories(ledgerDir);
+            writeLedger(ledgerDir.resolve("impact_" + now.toEpochMilli() + "_out.parquet"), now, ledger);
+            Map<String, Object> ledgerContent = new LinkedHashMap<>();
+            ledgerContent.put("name", LEDGER);
+            ledgerContent.put("physicalRef", LEDGER);
+            ledgerContent.put("description", "Impact ledger: one row per Incident/Case with a typed impact per run "
+                    + "(suspected/confirmed/recovered/prevented/outstanding per currency, WS-10)");
+            store.write("dataset", LEDGER, ledgerContent, false);
+            purged += purge(ledgerDir, "impact_", retentionDays, now);
         } catch (Exception e) {
             Map<String, Object> failure = new LinkedHashMap<>();
             failure.put("rows", rows.size());
@@ -142,12 +166,14 @@ public final class ObjectsAnalyticsJob implements Job {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("dataset", CATALOG);
         payload.put("rows", rows.size());
+        payload.put("ledgerRows", ledger.size());
         payload.put("types", types.stream().map(Enum::name).toList());
         payload.put("durationMs", ms);
         if (purged > 0) payload.put("purged", purged);
         ctx.signals().emit("objects.analytics.completed", Severity.INFO, payload);
         ctx.log().info("object analytics sampled", "dataset", CATALOG, "rows", rows.size(),
                 "types", types.size(), "purged", purged);
+        ctx.artifacts().dataset(LEDGER, LEDGER, null, ledger.size(), now);
         ctx.artifacts().dataset(CATALOG, CATALOG, null, rows.size(), now);
 
         return JobResult.ok("objects.analytics: " + rows.size() + " row(s) over " + types.size()
@@ -209,6 +235,76 @@ public final class ObjectsAnalyticsJob implements Job {
         return v instanceof Number n ? n.doubleValue() : 0d;
     }
 
+    // ── the impact ledger (WS-10) ─────────────────────────────────────────────────────
+
+    /** One ledger row: an object's identity, its outcome, and its typed impact (outstanding derived here). */
+    public record LedgerRow(String objectId, ObjectType objectType, String status, String disposition,
+                            String category, long createdAt, Impact impact) {}
+
+    /**
+     * The ledger over the sampled {@code types} that carry an impact (Incident, Case), objects with a currency'd
+     * impact only. The Disposition is the Incident's own attribute, or for a Case its Findings value.
+     */
+    public static List<LedgerRow> ledger(ObjectService svc, List<ObjectType> types) {
+        List<LedgerRow> out = new ArrayList<>();
+        for (ObjectType type : types) {
+            if (!Impact.TYPES.contains(type)) continue;
+            for (OperationalObject o : svc.query(ObjectQuery.builder().objectType(type).limit(ObjectQuery.MAX_LIMIT).build())) {
+                Impact i = Impact.of(o).orElse(null);
+                if (i == null || i.currency() == null) continue;
+                String disposition = o.attributes().get(ObjectService.ATTR_DISPOSITION);
+                if (disposition == null) {
+                    Object d = com.gamma.util.JsonAttributes.fromPayloadJson(o.attributes().get("findings")).get("disposition");
+                    disposition = d == null || d.toString().isBlank() ? null : d.toString();
+                }
+                out.add(new LedgerRow(o.id(), type, o.status(), disposition, o.attributes().get("category"),
+                        o.createdAt(), i));
+            }
+        }
+        return out;
+    }
+
+    /** Amounts are {@code DECIMAL(21,6)} — exactly the bounds {@link Impact} admits, so no value is rounded. */
+    private static void writeLedger(Path parquet, Instant sampledAt, List<LedgerRow> rows) throws Exception {
+        com.gamma.util.DuckDbUtil.loadDriver();
+        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:")) {
+            try (Statement st = conn.createStatement()) {
+                st.execute("CREATE TABLE impact_ledger (sampled_at TIMESTAMP, object_id VARCHAR, object_type VARCHAR, "
+                        + "status VARCHAR, disposition VARCHAR, category VARCHAR, created_at TIMESTAMP, "
+                        + "currency VARCHAR, suspected DECIMAL(21,6), confirmed DECIMAL(21,6), "
+                        + "recovered DECIMAL(21,6), prevented DECIMAL(21,6), outstanding DECIMAL(21,6), "
+                        + "period VARCHAR)");
+            }
+            try (PreparedStatement ps = conn.prepareStatement(
+                    "INSERT INTO impact_ledger VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
+                Timestamp ts = Timestamp.from(sampledAt);
+                for (LedgerRow r : rows) {
+                    ps.setTimestamp(1, ts);
+                    ps.setString(2, r.objectId());
+                    ps.setString(3, r.objectType().name());
+                    ps.setString(4, r.status());
+                    ps.setString(5, r.disposition());
+                    ps.setString(6, r.category());
+                    ps.setTimestamp(7, new Timestamp(r.createdAt()));
+                    ps.setString(8, r.impact().currency());
+                    ps.setBigDecimal(9, r.impact().suspected());
+                    ps.setBigDecimal(10, r.impact().confirmed());
+                    ps.setBigDecimal(11, r.impact().recovered());
+                    ps.setBigDecimal(12, r.impact().prevented());
+                    ps.setBigDecimal(13, r.impact().outstanding());
+                    ps.setString(14, r.impact().period());
+                    ps.addBatch();
+                }
+                if (!rows.isEmpty()) ps.executeBatch();
+            }
+            try (Statement st = conn.createStatement()) {
+                st.execute("COPY impact_ledger TO '"
+                        + parquet.toAbsolutePath().toString().replace('\\', '/').replace("'", "''")
+                        + "' (FORMAT PARQUET)");
+            }
+        }
+    }
+
     // ── write / retention ─────────────────────────────────────────────────────────────
 
     /** {@code key} is quoted: it is a column name we deliberately keep (the authored row contract), and
@@ -246,16 +342,16 @@ public final class ObjectsAnalyticsJob implements Job {
      * {@code storage_report} chose over an ISO string). {@code 0} keeps forever. A run is a handful of
      * rows, so this is hygiene that bounds the read glob, not a necessity.
      */
-    private static int purge(Path storeDir, int retentionDays, Instant now) throws IOException {
+    private static int purge(Path storeDir, String prefix, int retentionDays, Instant now) throws IOException {
         if (retentionDays <= 0) return 0;
         long cutoff = now.minusSeconds(retentionDays * 86_400L).toEpochMilli();
         int purged = 0;
-        try (DirectoryStream<Path> files = Files.newDirectoryStream(storeDir, "analytics_*_out.parquet")) {
+        try (DirectoryStream<Path> files = Files.newDirectoryStream(storeDir, prefix + "*_out.parquet")) {
             for (Path p : files) {
                 String stem = p.getFileName().toString();
                 long stamp;
                 try {
-                    stamp = Long.parseLong(stem.substring("analytics_".length(), stem.length() - "_out.parquet".length()));
+                    stamp = Long.parseLong(stem.substring(prefix.length(), stem.length() - "_out.parquet".length()));
                 } catch (NumberFormatException e) {
                     continue;   // not one of ours — leave it alone
                 }

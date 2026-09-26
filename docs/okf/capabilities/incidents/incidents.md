@@ -405,7 +405,10 @@ and the request's actor. **On a Case this IS the Findings impact** — the built
 is one home for the money, not two. ⚠ A deployment-authored `findings-spec` may still declare an `impactAmount`
 key; it is then an ordinary scalar in the blob that nothing sums. `analytics()` sums the typed impact **per
 currency** (`impact.byCurrency.<ISO>` = `count` + the four amounts + `outstanding`) — never across currencies —
-and `objects.analytics` samples it as axis `impact.<ISO>`.
+and `objects.analytics` samples it as axis `impact.<ISO>`. **The impact ledger Dataset** (`impact_ledger`) is
+written by the same `objects.analytics` run — one row per Incident/Case with an impact per run, exact DECIMALs,
+`outstanding` and the Disposition included — so any Measure / Widget can read "money found / recovered /
+prevented" without a new seam (as-built + the freshness caveat: `okf/backend/control-plane/jobs.md`).
 
 ### 3.6 Annotations — Notes and Tags
 

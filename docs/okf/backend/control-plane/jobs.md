@@ -205,6 +205,20 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   * **Cadence is operator-authored** (the deferred product question dissolved rather than answered): the
     built-in registers only the *type*; a space schedules it with its own `cron:` in a `*_job.toon`. Demo seed:
     `spaces/demo/config/jobs/ops_analytics_sample_job.toon` (hourly, `retention_days: "90"`).
+  * **The impact ledger rides the same run (WS-10, `ASSURE-IMPACT-LEDGER-1`, 2026-09-26).** Beside the tall
+    sample it writes `<dataDir>/impact_ledger/impact_<epochMs>_out.parquet` and stamps an **`impact_ledger`**
+    Dataset: **one row per Incident/Case carrying a typed impact, per run** — `sampled_at, object_id,
+    object_type, status, disposition, category, created_at, currency, suspected, confirmed, recovered,
+    prevented, outstanding, period`, amounts `DECIMAL(21,6)` (the exact bounds `Impact` admits, so nothing
+    rounds; `outstanding` computed at write, never read from storage). Chosen as **snapshots, not current
+    values only**: the latest run is `sampled_at = max(sampled_at)`, and recovery-over-time falls out of the
+    same Dataset. The Disposition is the Incident's `attributes.disposition`, else the Case's Findings value.
+    Same retention (`retention_days`, prefix `impact_`), the `types` filter applies (only INCIDENT / CASE ever
+    produce rows), and it works on **either** objects backend because it reads through `ObjectService`, not the
+    table. ⚠ **Freshness = the job's cadence**: a Measure over it lags a live edit until the next run — there is
+    still no live view of `inspecto_ops_objects` (single-writer DB, the non-goal below). Pinned by
+    `ObjectsAnalyticsJobTest.writesTheImpactLedgerAsADatasetAnyMeasureCanRead` (read back through
+    `DatasetRelation`, plus a per-currency `sum(outstanding)` over the latest snapshot).
   * A write failure emits `objects.analytics.completed` at `WARN` **and rethrows** — the write *is* the work,
     so a swallowed failure would report a silent no-op success. Dry run computes the rows and writes nothing.
   * **Deliberate non-goals:** no Parquet/view surface for *raw* `inspecto_ops_objects` rows (row-level export

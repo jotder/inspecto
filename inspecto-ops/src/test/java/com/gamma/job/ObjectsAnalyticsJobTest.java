@@ -138,6 +138,59 @@ class ObjectsAnalyticsJobTest {
         }
     }
 
+    /**
+     * WS-10: the same run writes the impact ledger — one row per Incident/Case with a typed impact — and stamps
+     * the {@code impact_ledger} Dataset, read back through the real {@link DatasetRelation} seam as a Measure
+     * would. Amounts stay exact DECIMALs; outstanding is derived; a Case's Disposition comes from its Findings.
+     */
+    @Test
+    void writesTheImpactLedgerAsADatasetAnyMeasureCanRead(@TempDir Path tmp) throws Exception {
+        Path data = tmp.resolve("data");
+        Path write = tmp.resolve("write");
+        Files.createDirectories(data);
+        Files.createDirectories(write);
+        String prior = System.getProperty("assist.write.root");
+        System.setProperty("assist.write.root", write.toString());
+        try {
+            ObjectService svc = seeded();
+            svc.open(ObjectType.CASE, "leak", "d", "HIGH", "LOW", null, null, "corr", Map.of(
+                    "impact", "{\"confirmed\":\"1000.123456\",\"recovered\":\"0.123456\",\"currency\":\"USD\",\"period\":\"2026-09\"}",
+                    "findings", "{\"disposition\":\"RECOVERED\"}"));
+            svc.open(ObjectType.ALERT, "noise", "d", "HIGH", "LOW", null, null, "corr",
+                    Map.of("impact", "{\"confirmed\":\"9\",\"currency\":\"USD\"}"));   // an Alert carries no impact
+            JobResult result = new com.gamma.opsjob.ObjectsAnalyticsJob(cfg(Map.of()), data.toString(), () -> svc)
+                    .run(new CapturingContext());
+            assertEquals("SUCCESS", result.status(), result.message());
+
+            List<Map<String, Object>> ledger = readBack(data, "impact_ledger");
+            assertEquals(2, ledger.size(), "the EUR Incident and the USD Case — the unimpacted and the Alert are not rows");
+            Map<String, Object> leak = ledger.stream().filter(r -> "CASE".equals(r.get("object_type"))).findFirst().orElseThrow();
+            assertEquals("USD", leak.get("currency"));
+            assertEquals(0, new java.math.BigDecimal("1000.123456").compareTo((java.math.BigDecimal) leak.get("confirmed")),
+                    "exact to six places — never a double");
+            assertEquals(0, new java.math.BigDecimal("1000").compareTo((java.math.BigDecimal) leak.get("outstanding")));
+            assertEquals("RECOVERED", leak.get("disposition"), "a Case's Disposition is its Findings value");
+            assertEquals("2026-09", leak.get("period"));
+            assertTrue(Files.exists(write.resolve("registry").resolve("datasets").resolve("impact_ledger.toon")));
+
+            // a Measure over it: outstanding per currency, the current snapshot
+            com.gamma.util.DuckDbUtil.loadDriver();
+            String rel = DatasetRelation.relationSql(Map.of("name", "impact_ledger", "physicalRef", "impact_ledger"), data, null);
+            try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+                 Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT currency, sum(outstanding) FROM (" + rel + ") t "
+                         + "WHERE sampled_at = (SELECT max(sampled_at) FROM (" + rel + ") u) GROUP BY currency ORDER BY currency")) {
+                assertTrue(rs.next());
+                assertEquals("EUR", rs.getString(1));
+                assertEquals(0, new java.math.BigDecimal("150.5").compareTo(rs.getBigDecimal(2)));
+                assertTrue(rs.next());
+                assertEquals("USD", rs.getString(1));
+            }
+        } finally {
+            restore(prior);
+        }
+    }
+
     @Test
     void rerunAppendsASecondSampleAndRetentionZeroKeepsBoth(@TempDir Path tmp) throws Exception {
         Path data = tmp.resolve("data");
@@ -300,7 +353,11 @@ class ObjectsAnalyticsJobTest {
      * stamped dataset config, not through a hand-written glob. This is the seam that makes the feature real.
      */
     private static List<Map<String, Object>> readBack(Path dataDir) throws Exception {
-        Map<String, Object> dataset = Map.of("name", "ops_analytics", "physicalRef", "ops_analytics");
+        return readBack(dataDir, "ops_analytics");
+    }
+
+    private static List<Map<String, Object>> readBack(Path dataDir, String datasetId) throws Exception {
+        Map<String, Object> dataset = Map.of("name", datasetId, "physicalRef", datasetId);
         String sql = DatasetRelation.relationSql(dataset, dataDir, null);
         com.gamma.util.DuckDbUtil.loadDriver();
         List<Map<String, Object>> out = new ArrayList<>();
