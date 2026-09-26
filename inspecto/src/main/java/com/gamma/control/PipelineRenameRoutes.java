@@ -109,6 +109,7 @@ final class PipelineRenameRoutes implements RouteModule {
         // Maker-checker (ASSURE-MAKER-CHECKER-1): held BEFORE step 0 — nothing of the migration may move for
         // a rename that is still waiting for approval. The Pending Change shows the config as it will be
         // rewritten; the approved replay re-runs every gate above and then the whole migration.
+        refuseGovernedDependents(writeRoot, oldId, newId, rewriteDependents);   // finding 2: no side-door rewrite
         Map<String, Object> srcDoc = ConfigLoader.filesystem().decode(srcPath.toString());
         PendingChanges.hold(api, e, "pipeline", oldId, renamedDoc(srcDoc, oldId, newId, newNameRaw), srcDoc);
 
@@ -308,6 +309,7 @@ final class PipelineRenameRoutes implements RouteModule {
             throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline id '" + newId + "' is registered to a different config ("
                     + registeredNew.get().getFileName() + ") — manual reconciliation needed");
 
+        refuseGovernedDependents(writeRoot, oldId, newId, p.rewriteDependents());   // finding 2, before any step
         List<String> journal = new ArrayList<>();
         journalStep(journalFile, oldId, newId, "resume", journal);
         if (srcExists) api.service().unregisterPipeline(srcPath);
@@ -508,17 +510,46 @@ final class PipelineRenameRoutes implements RouteModule {
      * the total count of files rewritten.
      */
     private int rewriteDependents(Path writeRoot, String oldId, String newId) {
-        int count = rewriteEnrichTriggers(writeRoot, oldId, newId);
+        int count = rewriteEnrichTriggers(writeRoot, oldId, newId, null);
         count += rewriteJobTriggers(writeRoot, oldId, newId);
-        count += rewriteComponentTargets(writeRoot, "expectation", oldId, newId);
-        count += rewriteComponentTargets(writeRoot, "decision-rule", oldId, newId);
-        count += rewriteDatasetRefs(writeRoot, oldId, newId);
-        count += rewriteAlertRules(writeRoot, oldId, newId);
+        count += rewriteComponentTargets(writeRoot, "expectation", oldId, newId, null);
+        count += rewriteComponentTargets(writeRoot, "decision-rule", oldId, newId, null);
+        count += rewriteDatasetRefs(writeRoot, oldId, newId, null);
+        count += rewriteAlertRules(writeRoot, oldId, newId, null);
         return count;
     }
 
+    /**
+     * The dependents a rename would rewrite whose KIND this Space's approval policy holds
+     * (`ASSURE-MAKER-CHECKER-1` verification finding 2): the rename's own hold is on {@code pipeline}, so
+     * without this an Expectation, Decision Rule, Dataset, Alert Rule or Enrichment under a policy would be
+     * rewritten with no Pending Change of its own. The same matchers as the rewrite, run without writing.
+     * ({@code job} is not governable, so its triggers are not asked about.)
+     */
+    private List<String> governedDependents(Path writeRoot, String oldId, String newId) {
+        ApprovalPolicy policy = ApprovalPolicy.forRoot(writeRoot);
+        if (!policy.holdsAnything()) return List.of();
+        List<String> planned = new ArrayList<>();
+        if (policy.ruleFor("enrichment") != null) rewriteEnrichTriggers(writeRoot, oldId, newId, planned);
+        for (String type : List.of("expectation", "decision-rule"))
+            if (policy.ruleFor(type) != null) rewriteComponentTargets(writeRoot, type, oldId, newId, planned);
+        if (policy.ruleFor("dataset") != null) rewriteDatasetRefs(writeRoot, oldId, newId, planned);
+        if (policy.ruleFor("alert-rule") != null) rewriteAlertRules(writeRoot, oldId, newId, planned);
+        return planned;
+    }
+
+    /** Refuse (409) a rename or resume whose dependent rewrite would change governed components without approval. */
+    private void refuseGovernedDependents(Path writeRoot, String oldId, String newId, boolean rewriteDependents) {
+        if (!rewriteDependents) return;
+        List<String> governed = governedDependents(writeRoot, oldId, newId);
+        if (!governed.isEmpty())
+            throw new ApiException(409, ErrorCodes.CONFLICT, "renaming '" + oldId + "' would rewrite " + governed
+                    + ", which this Space's approval policy holds for approval — change each of them on its own "
+                    + "first (so it can be approved), or rename with rewriteDependents:false");
+    }
+
     /** {@code triggers.on_pipeline} in every {@code *_enrich.toon} directly under the write root. */
-    private int rewriteEnrichTriggers(Path writeRoot, String oldId, String newId) {
+    private int rewriteEnrichTriggers(Path writeRoot, String oldId, String newId, List<String> planned) {
         if (!Files.isDirectory(writeRoot)) return 0;
         int count = 0;
         try (Stream<Path> files = Files.list(writeRoot)) {
@@ -531,6 +562,10 @@ final class PipelineRenameRoutes implements RouteModule {
                     triggers.put("on_pipeline", newId);
                     Map<String, Object> out = new LinkedHashMap<>(raw);
                     out.put("triggers", triggers);
+                    if (planned != null) {
+                        planned.add("enrichment '" + p.getFileName() + "'");
+                        continue;
+                    }
                     AtomicFiles.write(p, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8), ".enr-");
                     count++;
                 } catch (Exception ex) {
@@ -572,7 +607,8 @@ final class PipelineRenameRoutes implements RouteModule {
      * is {@code pipeline} (the default when absent) and whose {@code target} names {@code oldId} —
      * mirrors {@code DataSourceBundleResolver.ruleTargets}'s matching rule.
      */
-    private int rewriteComponentTargets(Path writeRoot, String type, String oldId, String newId) {
+    private int rewriteComponentTargets(Path writeRoot, String type, String oldId, String newId,
+                                        List<String> planned) {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         int count = 0;
         for (ComponentRegistry.Component c : store.list(type)) {
@@ -583,6 +619,10 @@ final class PipelineRenameRoutes implements RouteModule {
             if (!oldId.equalsIgnoreCase(target)) continue;
             Map<String, Object> updated = new LinkedHashMap<>(content);
             updated.put("target", newId);
+            if (planned != null) {
+                planned.add(type + " '" + c.name() + "'");
+                continue;
+            }
             try {
                 store.write(type, c.name(), updated);
                 count++;
@@ -600,7 +640,7 @@ final class PipelineRenameRoutes implements RouteModule {
      * {@code sourceName} (a {@code kind: virtual} dataset's direct store reference, which that resolver
      * does not need to check but a rename does — an unrewritten one would silently start reading nothing).
      */
-    private int rewriteDatasetRefs(Path writeRoot, String oldId, String newId) {
+    private int rewriteDatasetRefs(Path writeRoot, String oldId, String newId, List<String> planned) {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         int count = 0;
         for (ComponentRegistry.Component c : store.list("dataset")) {
@@ -626,6 +666,10 @@ final class PipelineRenameRoutes implements RouteModule {
             }
 
             if (!changed) continue;
+            if (planned != null) {
+                planned.add("dataset '" + c.name() + "'");
+                continue;
+            }
             try {
                 store.write("dataset", c.name(), updated);
                 count++;
@@ -641,7 +685,7 @@ final class PipelineRenameRoutes implements RouteModule {
      * {@code _}) - mirrors {@code PipelineDependents.alertRules}. An alert's {@code dataset} names a Dataset,
      * not the pipeline, so a rename leaves it alone.
      */
-    private int rewriteAlertRules(Path writeRoot, String oldId, String newId) {
+    private int rewriteAlertRules(Path writeRoot, String oldId, String newId, List<String> planned) {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         int count = 0;
         for (ComponentRegistry.Component c : store.list("alert-rule")) {
@@ -650,6 +694,10 @@ final class PipelineRenameRoutes implements RouteModule {
             if (on.isEmpty() || !(on.equalsIgnoreCase(oldId) || on.replace(' ', '_').equalsIgnoreCase(oldId))) continue;
             Map<String, Object> updated = new LinkedHashMap<>(content);
             updated.put("onPipeline", newId);
+            if (planned != null) {
+                planned.add("alert-rule '" + c.name() + "'");
+                continue;
+            }
             try {
                 store.write("alert-rule", c.name(), updated);
                 count++;

@@ -314,4 +314,43 @@ class ControlApiPendingChangesTest {
             assertTrue(Files.readString(file).contains("Mini ETL (renamed)"), "applied through the label route");
         }
     }
+
+    /** The fixture Pipeline under the write root, switched off — a rename refuses an active one. */
+    private Ctx openInactive(Path root) throws Exception {
+        Path pipe = PipelineConfigBatchTest.writePipeline(root, "");
+        Map<String, Object> raw = com.gamma.config.io.ConfigLoader.filesystem().decode(pipe.toString());
+        Map<String, Object> patched = new java.util.LinkedHashMap<>(raw);
+        patched.put("active", false);
+        Files.writeString(pipe, com.gamma.config.io.ConfigCodec.toToon(patched));
+        System.setProperty("assist.write.root", root.toString());
+        try {
+            CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
+            ControlApi api = new ControlApi(svc, 0);
+            api.start();
+            return new Ctx(svc, api, api.port(), root);
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
+    /**
+     * Verification finding 2: a Pipeline rename rewrites its dependents (Expectation / Decision Rule targets,
+     * Dataset store refs, Alert Rule onPipeline, Enrichment triggers). With only the `pipeline` hold, a policy
+     * on a DEPENDENT's kind was bypassed. The rename is refused, naming the governed dependent.
+     */
+    @Test
+    void aRenameThatWouldRewriteAGovernedDependentIsRefused(@TempDir Path root) throws Exception {
+        try (Ctx c = openInactive(root)) {
+            store(c).write("expectation", "rows_present", Map.of("target", "mini_etl", "kind", "row_count", "min", 1));
+            policy(c, "{\"approval\":{\"expectation\":{\"required\":true}}}");
+            HttpResponse<String> r = send(c, "POST", "/pipelines/mini_etl/rename", "{\"newId\":\"mini_two\"}", AUTHOR);
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(r.body().contains("expectation 'rows_present'"), r.body());
+            assertEquals("mini_etl", store(c).get("expectation", "rows_present").orElseThrow().content().get("target"),
+                    "the governed dependent is untouched");
+            assertTrue(c.svc.pathFor("mini_etl").isPresent(), "and so is the Pipeline");
+            assertEquals(0, data(send(c, "GET", "/pending-changes", null, AUTHOR), 200).get("total").asInt(),
+                    "refused, not held: the rename never became a Pending Change");
+        }
+    }
 }
