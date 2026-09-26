@@ -40,13 +40,24 @@ import { environment } from 'environments/environment';
                             }
                         </div>
                     }
-                    <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
-                        Every Pipeline, every Run, one place to see it.
-                    </h1>
-                    <p class="text-secondary max-w-md text-lg">
-                        Onboard Streams, author Pipelines, watch Expectations hold, and hand the Business Lens a Dataset
-                        it can trust.
-                    </p>
+                    <!-- R2-17: a demo build is shown to business audiences — neutral copy, no builder jargon. -->
+                    @if (demo()) {
+                        <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
+                            Inspecto demonstration
+                        </h1>
+                        <p class="text-secondary max-w-md text-lg">
+                            A demonstration running on this computer only. Choose a Demo User to see Inspecto as that
+                            person would.
+                        </p>
+                    } @else {
+                        <h1 class="max-w-xl text-4xl font-bold leading-tight tracking-tight md:text-5xl">
+                            Every Pipeline, every Run, one place to see it.
+                        </h1>
+                        <p class="text-secondary max-w-md text-lg">
+                            Onboard Streams, author Pipelines, watch Expectations hold, and hand the Business Lens a
+                            Dataset it can trust.
+                        </p>
+                    }
                 </div>
 
                 <span class="text-secondary text-sm">
@@ -63,18 +74,26 @@ import { environment } from 'environments/environment';
                     <div
                         class="text-primary bg-primary-50 dark:bg-primary-900 mx-auto flex h-12 w-12 items-center justify-center rounded-xl"
                     >
-                        <mat-icon class="icon-size-6" [svgIcon]="'heroicons_outline:lock-closed'"></mat-icon>
+                        <mat-icon
+                            class="icon-size-6"
+                            [svgIcon]="demo() ? 'heroicons_outline:user-circle' : 'heroicons_outline:lock-closed'"
+                        ></mat-icon>
                     </div>
                     <h2 class="mt-5 text-2xl font-semibold">Sign in</h2>
+                    <!-- R2-17: demo sign-in is NOT secured and has no SSO — never claim either above its warning. -->
                     <p class="text-secondary mt-2">
-                        This workspace is secured. Continue with your organisation's single sign-on.
+                        @if (demo()) {
+                            Choose a Demo User to continue.
+                        } @else {
+                            This workspace is secured. Continue with your organisation's single sign-on.
+                        }
                     </p>
                     @if (failed()) {
                         <inspecto-alert class="mt-4 block text-left" variant="error" title="Sign-in failed">
                             We couldn't complete sign-in. Please try again.
                         </inspecto-alert>
                     }
-                    @if (demoUsers().length) {
+                    @if (demo()) {
                         <inspecto-alert class="mt-4 block text-left" variant="warning" title="Demo sign-in">
                             Not secure, local only. Pick who you are for this demo.
                         </inspecto-alert>
@@ -97,7 +116,13 @@ import { environment } from 'environments/environment';
                             }
                         </ul>
                     } @else {
-                        <button mat-flat-button color="primary" class="mt-6 w-full" [disabled]="busy()" (click)="signIn()">
+                        <button
+                            mat-flat-button
+                            color="primary"
+                            class="mt-6 w-full"
+                            [disabled]="busy()"
+                            (click)="signIn()"
+                        >
                             @if (busy()) {
                                 <mat-progress-spinner diameter="20" mode="indeterminate" aria-label="Signing in" />
                             } @else {
@@ -130,6 +155,8 @@ export class SignInComponent implements OnInit {
     readonly version = computed(() => this.session.version());
     /** DEMO-AUTH-1: a demo build's Demo Users — non-empty replaces the SSO button with a picker. */
     readonly demoUsers = computed(() => this.session.demoUsers());
+    /** R2-17: demo sign-in is on — the page must not claim security or SSO, nor pitch builder copy. */
+    readonly demo = computed(() => this.demoUsers().length > 0);
 
     ngOnInit(): void {
         // Already signed in (or Personal/offline where login is never required) → straight into the app.

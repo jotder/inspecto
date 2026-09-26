@@ -129,4 +129,44 @@ describe('SignInComponent behaviour (SIGN-IN-NO-SPEC-1)', () => {
         expect(session.beginLogin).toHaveBeenCalledWith('admin');
         await expectNoA11yViolations(el);
     });
+
+    // R2-17: a demo build is shown to a business audience. "This workspace is secured … single sign-on"
+    // directly above "Not secure, local only" was a contradiction, and the builder pitch was the wrong room.
+    describe('copy per sign-in mode (R2-17)', () => {
+        const text = (el: Element | null) => el?.textContent?.replace(/\s+/g, ' ').trim();
+        const DEMO: DemoUser[] = [{ id: 'cfo', displayName: 'Demo CFO', title: 'Chief Financial Officer' }];
+
+        it('demo sign-in: no security or SSO claim, keeps the honest warning, neutral panel', async () => {
+            const { el } = create({ demoUsers: DEMO });
+
+            expect(el.textContent).not.toMatch(/secured/i);
+            expect(el.textContent).not.toMatch(/single sign-on|\bSSO\b/i);
+            expect(text(el.querySelector('h1'))).toBe('Inspecto demonstration');
+            expect(text(el.querySelector('h1 + p'))).toBe(
+                'A demonstration running on this computer only. Choose a Demo User to see Inspecto as that person would.',
+            );
+            expect(text(el.querySelector('h2 + p'))).toBe('Choose a Demo User to continue.');
+            expect(el.textContent).not.toContain('Every Pipeline, every Run');
+            expect(el.querySelector('mat-icon')?.getAttribute('data-mat-icon-name')).toBe('user-circle');
+            expect(text(el.querySelector('inspecto-alert'))).toContain(
+                'Not secure, local only. Pick who you are for this demo.',
+            );
+            await expectNoA11yViolations(el);
+        });
+
+        it('OIDC sign-in: the existing copy is unchanged', async () => {
+            const { el } = create();
+
+            expect(text(el.querySelector('h1'))).toBe('Every Pipeline, every Run, one place to see it.');
+            expect(text(el.querySelector('h1 + p'))).toBe(
+                'Onboard Streams, author Pipelines, watch Expectations hold, and hand the Business Lens a Dataset it can trust.',
+            );
+            expect(text(el.querySelector('h2 + p'))).toBe(
+                "This workspace is secured. Continue with your organisation's single sign-on.",
+            );
+            expect(el.querySelector('mat-icon')?.getAttribute('data-mat-icon-name')).toBe('lock-closed');
+            expect(el.textContent).not.toContain('Demo sign-in');
+            await expectNoA11yViolations(el);
+        });
+    });
 });

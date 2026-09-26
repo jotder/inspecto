@@ -64,7 +64,9 @@ real roles. As built by DEMO-AUTH-1 (`9d0eb5da3` module + SPA, `d9911b793` packa
 - **`-Dauth.mode=demo`** — `/bootstrap` reports it as `features.authMode`; the SPA's `SessionService`
   treats `demo` like `oidc` (sign-in required, same session flow). The sign-in page
   (`sign-in.component.ts`) renders a Demo User picker under a *Not secure, local only* notice in
-  place of the SSO button; picking one sends `code=demo:<id>` through the unchanged
+  place of the SSO button (R2-17: with Demo Users present the page also drops the "workspace is
+  secured … single sign-on" line and the builder headline for neutral demo copy — the OIDC copy is
+  unchanged; keyed on `auth.demoUsers` being non-empty, not on `authMode`); picking one sends `code=demo:<id>` through the unchanged
   `/auth/callback` → `POST /auth/exchange` sequence. Sign out routes in-app, so the tester can
   switch Demo User.
 
