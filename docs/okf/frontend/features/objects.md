@@ -22,6 +22,11 @@ the real ControlApi.
   * The pinned "assigned to me" folder is named per type by `mineFolder()` in `mail-model.ts` — **My
     Incidents** on `/incidents`, **My Cases** on `/cases`. ⚠ It was one literal "My Cases" on both panes
     until 2026-09-26 (telco demo review): Incident and Case are distinct concepts (GLOSSARY §9).
+  * **"Me" is the signed-in Subject** — `currentOperator(SessionService.actor())`, falling back to the
+    Personal placeholder (`inspecto.operator` / `operator`) only when no one is signed in. 🔴 Until
+    2026-09-26 it was the placeholder everywhere: nothing in the SPA writes that key, so on OIDC or Demo User
+    sign-in the Mine folder matched no one and the create dialog offered "operator" as an assignee. The mail
+    pane reads it through a getter, so the folder counts follow the session.
   * **Landing folder** — with no explicit choice (there is no folder in the URL and none remembered, so
     only a click counts), the pane lands on the default (Identified / the workflow's `initial`) while it has
     items, else the first non-empty folder in display order, else the default. Counts are client-side over

@@ -4,7 +4,7 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { describe, expect, it, vi } from 'vitest';
 import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
-import { ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ObjectCreateDialog } from './object-create.dialog';
 
@@ -71,6 +71,16 @@ describe('ObjectCreateDialog', () => {
         expect(c.tagSuggestions()).toEqual(['network']);
         c.tagQuery.set('zzz');
         expect(c.tagSuggestions()).toEqual([]);
+    });
+
+    // "Me" is the signed-in Subject: nothing in the SPA writes the Personal `inspecto.operator` key, so on a
+    // signed-in edition the old fallback offered a literal "operator" that is nobody.
+    it('offers the signed-in subject as an assignee, not the Personal placeholder', () => {
+        const { c } = create();
+        TestBed.inject(SessionService).actor.set('ana');
+        expect(c.assigneeOptions()).toEqual(['ana', 'dana']);
+        TestBed.inject(SessionService).actor.set(null); // Personal: no session identity
+        expect(c.assigneeOptions()).toEqual(['dana', 'operator']);
     });
 
     it('renders with no a11y violations', async () => {

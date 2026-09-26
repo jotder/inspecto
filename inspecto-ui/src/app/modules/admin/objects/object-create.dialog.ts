@@ -10,7 +10,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { COMMA, ENTER } from '@angular/cdk/keycodes';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, CreateObject, ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { apiErrorMessage, CreateObject, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { INCIDENT_TAXONOMY, joinCategory } from './incident-taxonomy';
@@ -186,6 +186,7 @@ export class ObjectCreateDialog {
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
     private fb = inject(FormBuilder);
+    private session = inject(SessionService);
     readonly data = inject<{ type: string; label: string; assignees?: string[] }>(MAT_DIALOG_DATA);
 
     readonly isIncident = this.data.type === 'INCIDENT';
@@ -237,7 +238,7 @@ export class ObjectCreateDialog {
         const q = String(this.form.controls.assignee.value ?? '')
             .trim()
             .toLowerCase();
-        const all = [...new Set([currentOperator(), ...(this.data.assignees ?? [])])].sort();
+        const all = [...new Set([currentOperator(this.session.actor()), ...(this.data.assignees ?? [])])].sort();
         return q ? all.filter((a) => a.toLowerCase().includes(q)) : all;
     };
 

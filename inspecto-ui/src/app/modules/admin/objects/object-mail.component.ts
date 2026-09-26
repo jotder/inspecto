@@ -125,6 +125,7 @@ export class ObjectMailComponent implements OnInit {
      * but a bookmark still lands here, so the pane explains itself rather than 503-toasting.
      */
     readonly opsEnabled = inject(SessionService).opsEnabled;
+    private session = inject(SessionService);
     /**
      * May this caller work an object through its lifecycle — Accept / Resolve / Reopen / Archive and the Case
      * workflow verbs, which ride `POST /objects/{id}/transition` and `/assign` (`canWorkIncidents`, operator
@@ -148,7 +149,14 @@ export class ObjectMailComponent implements OnInit {
         ? ['Incident', 'Alert', 'Diagnosis', 'Tag']
         : ['Case', 'Incident', 'Findings', 'Disposition'];
     readonly priorities = INCIDENT_PRIORITIES;
-    readonly me = currentOperator();
+    /**
+     * "Me" — the signed-in Subject id when there is one, else Personal's placeholder ({@link currentOperator}).
+     * A getter over the session signal, so the folder counts (a `computed`) follow the session rather than a
+     * value frozen at construction.
+     */
+    get me(): string {
+        return currentOperator(this.session.actor());
+    }
 
     /** The effective CASE lifecycle (C6) — folders + toolbar verbs derive from it; TOON overrides win. */
     /** The lifecycle this pane's type actually follows. ⚠ Seeded per TYPE: defaulting both to the CASE

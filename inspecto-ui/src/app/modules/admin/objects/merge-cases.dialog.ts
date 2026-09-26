@@ -3,7 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialogModule, MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatRadioModule } from '@angular/material/radio';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { apiErrorMessage, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { currentOperator, objectTags } from './mail-model';
 
 /**
@@ -48,6 +48,7 @@ export class MergeCasesDialog {
     private api = inject(ObjectsService);
     private ref = inject(MatDialogRef<MergeCasesDialog>);
     private toastr = inject(ToastrService);
+    private session = inject(SessionService);
     readonly data = inject<{ cases: OperationalObject[] }>(MAT_DIALOG_DATA);
 
     /** Default survivor: the most recently updated case in the selection. */
@@ -63,7 +64,7 @@ export class MergeCasesDialog {
         const sources = this.data.cases.map((c) => c.id).filter((id) => id !== survivor);
         if (!survivor || !sources.length) return;
         this.saving.set(true);
-        this.api.mergeCases(survivor, sources, currentOperator()).subscribe({
+        this.api.mergeCases(survivor, sources, currentOperator(this.session.actor())).subscribe({
             next: (res) => {
                 this.toastr.success(
                     `Merged ${res.merged.length} case(s) into ${res.survivor.id} · ${res.membersMoved} member(s) moved`,

@@ -43,6 +43,8 @@ interface CreateOpts {
     type?: 'INCIDENT' | 'CASE';
     list?: Observable<OperationalObject[]>;
     workflow?: Observable<WorkflowDef>;
+    /** A signed-in session (OIDC / Demo User): the Subject id `/bootstrap` reported. */
+    actor?: string;
     /** Signed in with exactly these grants (arms `authMode: 'oidc'`, where capabilities are enforced client-side). */
     capabilities?: string[];
 }
@@ -91,6 +93,7 @@ async function create(opts: CreateOpts = {}) {
     // state, not on rendered output, so the gated branch was invisible to it.
     const session = TestBed.inject(SessionService);
     session.opsEnabled.set(true);
+    if (opts.actor) session.actor.set(opts.actor);
     if (opts.capabilities) {
         session.authMode.set('oidc');
         session.capabilities.set(opts.capabilities);
@@ -164,6 +167,27 @@ describe('ObjectMailComponent', () => {
         expect(api.assign).toHaveBeenCalledWith('i9', 'operator', 'operator');
         expect(api.update).not.toHaveBeenCalled();
         expect(api.transition).toHaveBeenCalledWith('i9', 'accept', 'operator');
+    });
+
+    // ── "me" is the signed-in Subject (the Mine folder never matched anyone on a signed-in edition) ──
+    it('the Mine folder matches the signed-in subject, not the Personal placeholder', async () => {
+        const list = of([
+            incident('a1', 'DIAGNOSING', { assignee: 'ana' }),
+            incident('a2', 'DIAGNOSING', { assignee: 'operator' }),
+        ]);
+        const { c } = await create({ list, actor: 'ana' });
+        expect(c.me).toBe('ana');
+        c.selectFolder('mine');
+        expect(c.rows().map((o) => o.id)).toEqual(['a1']);
+    });
+
+    it('accepting as a signed-in subject assigns and attributes the move to that subject', async () => {
+        const { c, api } = await create({ actor: 'ana' });
+        c.accept([
+            incident('i9', 'IDENTIFIED', { attributes: { category: 'Security / Access / Expired credentials' } }),
+        ]);
+        expect(api.assign).toHaveBeenCalledWith('i9', 'ana', 'ana');
+        expect(api.transition).toHaveBeenCalledWith('i9', 'accept', 'ana');
     });
 
     // ── the lifecycle verbs show for exactly the subjects the server lets move an object (canWorkIncidents) ──

@@ -55,9 +55,14 @@ export function isEscalated(o: OperationalObject): boolean {
         : o.attributes?.['escalated'] === 'true';
 }
 
-/** "Me" for the My Incidents / My Cases folder — the auth-free Personal edition has no session identity. */
-export function currentOperator(): string {
-    return localStorage.getItem('inspecto.operator') || 'operator';
+/**
+ * "Me" for the My Incidents / My Cases folder, the assignee pick-list and the `actor` a mutation sends: the
+ * signed-in Subject id (`SessionService.actor()`) when there is one — OIDC or Demo User sign-in — else the
+ * auth-free Personal edition's placeholder, which has no session identity. Callers pass the session actor;
+ * nothing in the SPA writes `inspecto.operator`, so on a signed-in edition that fallback matched no one.
+ */
+export function currentOperator(sessionActor?: string | null): string {
+    return sessionActor || localStorage.getItem('inspecto.operator') || 'operator';
 }
 
 // ── Postmortem (attributes.postmortem, JSON) ──────────────────────────────────────────────────

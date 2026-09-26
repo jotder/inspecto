@@ -4,7 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { apiErrorMessage, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { currentOperator, displayStatus } from './mail-model';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 
@@ -45,6 +45,7 @@ export class AddMemberDialog {
     private api = inject(ObjectsService);
     private ref = inject(MatDialogRef<AddMemberDialog>);
     private toastr = inject(ToastrService);
+    private session = inject(SessionService);
     readonly data = inject<{ caseId: string; exclude: string[] }>(MAT_DIALOG_DATA);
 
     readonly displayStatus = displayStatus;
@@ -69,7 +70,7 @@ export class AddMemberDialog {
             return;
         }
         this.saving.set(true);
-        this.api.link(this.data.caseId, this.pick.value!, 'CONTAINS', currentOperator()).subscribe({
+        this.api.link(this.data.caseId, this.pick.value!, 'CONTAINS', currentOperator(this.session.actor())).subscribe({
             next: () => {
                 this.toastr.success('Member added');
                 this.ref.close(true);

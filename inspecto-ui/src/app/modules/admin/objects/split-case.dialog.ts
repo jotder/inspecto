@@ -6,7 +6,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ObjectGraphNode, ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { apiErrorMessage, ObjectGraphNode, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { currentOperator } from './mail-model';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -75,6 +75,7 @@ export class SplitCaseDialog {
     /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     private toastr = inject(ToastrService);
+    private session = inject(SessionService);
     private fb = inject(FormBuilder);
     readonly data = inject<{
         caseObj: OperationalObject;
@@ -115,7 +116,7 @@ export class SplitCaseDialog {
                 title: v.title!.trim(),
                 members: [...this.picked()],
                 ...(v.assignee?.trim() ? { assignee: v.assignee.trim() } : {}),
-                actor: currentOperator(),
+                actor: currentOperator(this.session.actor()),
             })
             .subscribe({
                 next: (res) => {

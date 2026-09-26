@@ -4,7 +4,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ObjectGraphNode, ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { apiErrorMessage, ObjectGraphNode, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { currentOperator, normalizeIncidentStatus } from './mail-model';
 import { AddMemberDialog } from './add-member.dialog';
@@ -86,6 +86,7 @@ export class CaseContentsComponent {
     private api = inject(ObjectsService);
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
+    private session = inject(SessionService);
 
     readonly object = input.required<OperationalObject>();
 
@@ -140,7 +141,7 @@ export class CaseContentsComponent {
     }
 
     removeMember(n: ObjectGraphNode): void {
-        this.api.unlink(this.object().id, n.id, 'CONTAINS', currentOperator()).subscribe({
+        this.api.unlink(this.object().id, n.id, 'CONTAINS', currentOperator(this.session.actor())).subscribe({
             next: () => {
                 this.toastr.success(`${n.id} removed from this case`);
                 this.load(this.object().id);
