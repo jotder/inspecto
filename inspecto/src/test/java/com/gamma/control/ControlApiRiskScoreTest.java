@@ -171,8 +171,10 @@ class ControlApiRiskScoreTest {
                     "an unscoped caller sees every model");
 
             score(c, "open_subs", model(null));
-            assertEquals(200, send(c.port, "GET", "/spaces/s1/risk-scores/open_subs/m1", null, "billing").statusCode(),
-                    "an unscoped model is visible to a scoped caller");
+            assertEquals(404, send(c.port, "GET", "/spaces/s1/risk-scores/open_subs/m1", null, "billing").statusCode(),
+                    "a data-scoped caller cannot read an UNscoped model");
+            assertEquals(200, send(c.port, "GET", "/spaces/s1/risk-scores/open_subs/m1", null, "analyst").statusCode(),
+                    "an unscoped caller can");
         }
     }
 
@@ -226,6 +228,54 @@ class ControlApiRiskScoreTest {
             HttpResponse<String> a = send(c.port, "POST", "/spaces/s1/components/risk-score",
                     JSON.writeValueAsString(withId("aimed", authored)), "analyst");
             assertEquals(422, a.statusCode(), "the output name is not authorable: " + a.body());
+        }
+    }
+
+    @Test
+    void classifiedKeysAndEvidenceAreMaskedAndTheScoreStaysRecomputable(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            // msisdn is classified MSISDN, topup_id PII; status is not classified.
+            new ComponentStore(c.config.resolve("registry")).write("dataset", "topups", Map.of("physicalRef", "topups",
+                    "columns", List.of(Map.of("name", "msisdn", "classification", "msisdn"),
+                            Map.of("name", "topup_id", "classification", "PII"),
+                            Map.of("name", "status"))));
+            Map<String, Object> m = model(null);
+            new ComponentStore(c.config.resolve("registry")).write("risk-score", "subs", m);
+            RiskScoreModel model = RiskScoreModel.fromMap("subs", m);
+            RiskScoreEvaluator.write(c.data, model, "v", "r1", Instant.now(), List.of(RiskScorer.score(model, "447700900123",
+                    Map.of("failed", 1.0, "spend", 10.0),
+                    Map.of("failed", List.of(Map.of("topup_id", "t-secret"))))));
+
+            HttpResponse<String> r = send(c.port, "GET", "/spaces/s1/risk-scores/subs/447700900123", null, "analyst");
+            assertEquals(200, r.statusCode(), r.body());
+            // Only the envelope's links.self echoes the caller's OWN request path; the payload never carries it.
+            JsonNode d = V1Body.of(r.body());
+            assertFalse(d.toString().contains("447700900123"), "the raw MSISDN never leaves: " + d);
+            assertFalse(r.body().contains("t-secret"), "nor the PII evidence value: " + r.body());
+            assertTrue(d.get("entityKey").asText().startsWith("masked:"));
+            assertTrue(d.get("factors").get(0).get("evidence").get(0).get("topup_id").asText().startsWith("masked:"));
+            assertTrue(d.get("masking").get("entityKeyMasked").asBoolean());
+            assertEquals(d.get("entityKey").asText(), V1Body.of(send(c.port, "GET",
+                    "/spaces/s1/risk-scores/subs/447700900123", null, "analyst").body()).get("entityKey").asText(),
+                    "the pseudonym is stable");
+            List<Map<String, Object>> factors = JSON.convertValue(d.get("factors"), new TypeReference<>() {});
+            assertEquals(d.get("score").asDouble(), RiskScorer.recompute(factors), 1e-9, "masking touches no number");
+        }
+    }
+
+    @Test
+    void aBundleCannotPlantAModelWhoseEvidenceColumnTheSchemaLacks(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            Map<String, Object> bad = new java.util.LinkedHashMap<>(model(null));
+            bad.put("factors", List.of(Map.of("id", "x", "dataset", "topups", "key", "msisdn", "measure", "count",
+                    "weight", 1, "evidence", List.of("imsi"))));
+            String bundle = "{\"format\":\"inspecto-metadata-bundle\",\"version\":2,\"exportedAt\":\"2026-07-18T00:00:00Z\","
+                    + "\"sourceSpace\":null,\"items\":[{\"kind\":\"risk-score\",\"id\":\"planted\",\"content\":"
+                    + JSON.writeValueAsString(bad) + "}]}";
+            HttpResponse<String> r = send(c.port, "POST", "/spaces/s1/bundle/import", bundle, "analyst");
+            assertFalse(new ComponentStore(c.config.resolve("registry")).exists("risk-score", "planted"),
+                    "the bulk writer runs the Schema column check too: " + r.body());
+            assertTrue(r.body().contains("imsi"), "and names the column: " + r.body());
         }
     }
 

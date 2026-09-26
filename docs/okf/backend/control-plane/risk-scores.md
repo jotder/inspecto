@@ -126,13 +126,39 @@ not the history. `RiskScoreAlertTest` proves the flow end to end over real DuckD
   model whose `dataScope` the caller's data scopes lack; a `RowScope` DENY on the resource kind
   `risk-score`; or no score for the entity.
 
-An unscoped model is visible to every caller, as an untyped object is. The entity key is a **bound
-parameter**. It is never spliced into SQL and never resolved as a path. Real-HTTP coverage with an armed
-Subject is in `ControlApiRiskScoreTest`.
+**Data scopes are stricter than for objects.** A data-scoped caller reads only a model whose `dataScope`
+it holds. An **unscoped** model is readable by unscoped callers alone, because its evidence is raw source
+rows. The entity key is a **bound parameter**. It is never spliced into SQL and never resolved as a path.
+Real-HTTP coverage with an armed Subject is in `ControlApiRiskScoreTest`.
 
 ⚠ "Dataset data scopes" do not exist as a separate mechanism. `Subject.dataScopes` filters case-typed
-objects (SEC-7d), and nothing scopes Dataset rows. The route applies the same rule to the model's
-optional `dataScope`.
+objects (SEC-7d), and nothing scopes Dataset rows. The route applies that rule to the model's optional
+`dataScope`.
+
+### Masking (render time)
+
+🔴 Before this rule, `evidence` returned raw source values (up to 8 columns × 3 rows) and the raw entity
+key to anyone holding `canWorkIncidents`. `RiskScoreMasking` now masks on the way out. The stored scores
+Dataset stays raw, so every score stays recomputable; masking touches no number.
+
+- **What is sensitive.** A column is sensitive when its Dataset's registry `columns[].classification` is
+  `MSISDN`, `IMSI`, `ACCOUNT` or `PII` (case-insensitive). This is the same source Link Analysis's typed
+  masking reads.
+- **The entity key** is masked when **any** factor's key column is sensitive, because a key does not
+  record which Dataset it came from.
+- **An evidence value** is masked when its column is sensitive in that factor's Dataset.
+- **The pseudonym** is `masked:<16 hex>`, an HMAC-SHA256 under a random per-Space key
+  (`<dataDir>/.risk-score-mask.key`, created on first use, never served). It is stable across requests.
+- The response carries a `masking` block naming the masked columns.
+
+⛔ **There is no reveal.** Link Analysis's audited reveal (`EntityMasking`, `canRevealLinkEntities`) is bound
+to an Investigation's sealed log in the optional `inspecto-geo-link` module. The core cannot reach it, and
+a Risk Score has no Investigation to bind one to. A masked value simply stays masked.
+
+⚠ Two limits remain:
+- The caller looks a score up by its **raw** key. That key is the Incident's `key.entity_key`, which the
+  Alert already stores raw, and the envelope's `links.self` echoes the caller's own request path.
+- A column the registry leaves unclassified is not masked.
 
 ## UI
 

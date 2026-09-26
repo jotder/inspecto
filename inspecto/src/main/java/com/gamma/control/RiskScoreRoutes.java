@@ -56,15 +56,16 @@ final class RiskScoreRoutes implements RouteModule {
         Path writeRoot = api.writeRoot();
         Path dataRoot = api.dataRoot();
         if (writeRoot == null || dataRoot == null) throw notFound(modelId, entityKey);
-        Optional<Map<String, Object>> content = new ComponentStore(writeRoot.resolve("registry"))
-                .get(TYPE, modelId).map(ComponentRegistry.Component::content);
+        ComponentStore registry = new ComponentStore(writeRoot.resolve("registry"));
+        Optional<Map<String, Object>> content = registry.get(TYPE, modelId).map(ComponentRegistry.Component::content);
         if (content.isEmpty()) throw notFound(modelId, entityKey);
         RiskScoreModel model = RiskScoreModel.fromMap(modelId, content.get());
 
-        // Data scopes (SEC-7d): a scoped caller sees a scoped model only when it holds that scope; an unscoped
-        // model is visible to every caller, as an untyped object is.
+        // Data scopes (SEC-7d), stricter than objects: a data-scoped caller reads ONLY a model carrying a scope it
+        // holds. An unscoped model is readable by unscoped callers alone — its evidence is raw source rows, and a
+        // caller someone chose to scope has no business in rows nobody scoped.
         if (ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s && s.scoped()
-                && model.dataScope() != null && !s.dataScopes().contains(model.dataScope()))
+                && (model.dataScope() == null || !s.dataScopes().contains(model.dataScope())))
             throw notFound(modelId, entityKey);
         Map<String, Object> resource = new LinkedHashMap<>();
         resource.put("id", modelId + "/" + entityKey);
@@ -83,18 +84,20 @@ final class RiskScoreRoutes implements RouteModule {
         if (r.rows().isEmpty()) throw notFound(modelId, entityKey);
         Map<String, Object> row = r.rows().get(0);
 
+        RiskScoreMasking masking = RiskScoreMasking.of(registry, dataRoot, model);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("model", modelId);
         out.put("entityType", row.get("entity_type"));
-        out.put("entityKey", row.get("entity_key"));
+        out.put("entityKey", masking.entityKey(String.valueOf(row.get("entity_key"))));
         out.put("score", row.get("score"));
         out.put("high", row.get("high"));
         out.put("highThreshold", model.highThreshold());
         out.put("modelVersion", row.get("model_version"));
         out.put("runId", row.get("run_id"));
         out.put("scoredAt", String.valueOf(row.get("scored_at")));
-        out.put("factors", JSON.readValue(String.valueOf(row.get("factors")),
-                new TypeReference<List<Map<String, Object>>>() {}));
+        out.put("factors", masking.factors(JSON.readValue(String.valueOf(row.get("factors")),
+                new TypeReference<List<Map<String, Object>>>() {})));
+        out.put("masking", masking.basis());
         return out;
     }
 
