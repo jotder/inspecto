@@ -1,3 +1,4 @@
+import { formatNumber } from 'app/inspecto/viz/number-format';
 import { Component, computed, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule } from '@angular/material/dialog';
@@ -138,10 +139,19 @@ export class CaseAnalyticsDialog {
                     a.mttd?.definition ??
                     'occurrence → detection; only event-promoted objects carry an occurrence time',
             },
-            {
-                label: 'Impact total',
-                value: a.impact.impactAmount ? a.impact.impactAmount.toLocaleString() : '—',
-            },
+            // WS-10: one pair of tiles per currency — amounts in different currencies are never added together.
+            ...Object.entries(a.impact.byCurrency ?? {}).flatMap(([currency, t]) => [
+                {
+                    label: `Confirmed (${currency})`,
+                    value: formatNumber(t.confirmed, { style: 'currency', currency }),
+                    hint: `${t.count} with an impact recorded`,
+                },
+                {
+                    label: `Outstanding (${currency})`,
+                    value: formatNumber(t.outstanding, { style: 'currency', currency }),
+                    hint: 'confirmed − recovered, derived',
+                },
+            ]),
             {
                 label: 'Records affected',
                 value: a.impact.recordsAffected ? a.impact.recordsAffected.toLocaleString() : '—',

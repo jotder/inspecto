@@ -62,7 +62,7 @@ import { CategorizeDialog } from './categorize.dialog';
 import { MergeCasesDialog } from './merge-cases.dialog';
 import { ObjectCreateDialog } from './object-create.dialog';
 import { PostmortemPanelComponent } from './postmortem-panel.component';
-import { ResolveDialog } from './resolve.dialog';
+import { ResolveDialog, ResolveDialogData, ResolveResult } from './resolve.dialog';
 import { TagChange, TagDialog } from './tag.dialog';
 import { TagRulesDialog } from './tag-rules.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -830,17 +830,23 @@ export class ObjectMailComponent implements OnInit {
                 if (!ok) return;
             }
         }
+        // WS-10: an Incident resolves only with a Disposition (the server 422s without one), so it is asked here.
+        const data: ResolveDialogData = {
+            count: list.length,
+            label: this.createLabel,
+            askDisposition: this.isIncident,
+        };
         this.dialog
-            .open(ResolveDialog, { width: '560px', data: { count: list.length, label: this.createLabel } })
+            .open(ResolveDialog, { width: '560px', data })
             .afterClosed()
-            .subscribe((comment?: string | null) => {
-                if (!comment) return;
+            .subscribe((result?: ResolveResult | null) => {
+                if (!result?.comment) return;
                 this.bulk(
                     list,
                     (o) =>
                         this.api
-                            .addComment(o.id, comment, this.me)
-                            .pipe(switchMap(() => this.api.transition(o.id, 'resolve', this.me))),
+                            .addComment(o.id, result.comment, this.me)
+                            .pipe(switchMap(() => this.api.transition(o.id, 'resolve', this.me, result.disposition))),
                     `Resolved ${list.length}`,
                     this.expectTransition('resolve'),
                 );

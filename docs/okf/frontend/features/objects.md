@@ -79,11 +79,29 @@ the real ControlApi.
   soft no-disposition prompt); team `assignees` + `targetDate`. **Rule-raised cases**: `CaseRule`
   (`/cases/rules`, evaluate-on-demand, opens-or-attaches idempotently); **case analytics** via
   `GET /objects/analytics?type=` (stat tiles + by-category bar; Studio-dataset binding is a follow-up).
+* **Impact + Disposition (WS-10, `ASSURE-IMPACT-LEDGER-1`, 2026-09-26).** `ImpactPanelComponent`
+  (`objects/impact-panel.component.ts`) shows an Incident's or Case's typed impact — suspected · confirmed ·
+  recovered · prevented, currency, period, basis — and the **server-derived** `outstanding` (read from the
+  object's top-level `impact` block; the form's own "outstanding" is a live preview only). With
+  `LensService.canWorkIncidents()` it edits through `ObjectsService.saveImpact` → `PUT /objects/{id}/impact`,
+  sending amounts as exact decimal strings and never `outstanding`; a 422 / 409 renders as an inline
+  `<inspecto-alert>`, and no edit is offered on an `ARCHIVED` / `CLOSED` object (the server's closed-books 409).
+  Mounted in the mail detail panel (`postmortem-panel`, above the Findings / postmortem) and on the detail
+  page's Overview (`[headingLevel]="2"` there — axe `heading-order`). ⚠ The currency-required rule is a
+  GROUP validator, which never puts the field into an error state, so its message is an explicit
+  `role="alert"` line, not a `<mat-error>`. **Resolve asks the Disposition for Incidents**: `ResolveDialog`
+  takes `askDisposition` and closes with `{comment, disposition?}`; the mail view's bulk resolve and the
+  detail page's Resolve both pass it to `transition(id, 'resolve', actor, disposition)`. The ladder is
+  `incident-disposition.ts` (`DISPOSITIONS`, the `incident-taxonomy.ts` shape), mirroring the server's
+  `FindingsSpec.DISPOSITIONS`. The Case analytics dialog shows *Confirmed (CUR)* / *Outstanding (CUR)* per
+  currency from `impact.byCurrency`. Specs: `impact-panel.component.spec.ts`, `resolve.dialog.spec.ts`,
+  `case-analytics.dialog.spec.ts`.
 * **Configurable Findings sections (C3 / BACKLOG D6) — SHIPPED end-to-end 2026-07-26.** The Findings field
   set is deployment-authored: a **`findings-spec` ComponentStore kind** (one per `ObjectType`, id = the
   lowercased type) resolved and served by **`GET /findings/{type}`**, rendered by `<inspecto-schema-form>`.
   Absent a component, `FindingsSpec.defaultFor()` serves today's exact shape
-  (disposition/impactAmount/recordsAffected/summary, all `tier:'required'` + `required:false` — always
+  (disposition/recordsAffected/summary since WS-10 — `impactAmount` retired 2026-09-26, the Case's money is
+  its typed impact below — all `tier:'required'` + `required:false` — always
   visible, never mandatory), so an unconfigured deployment is byte-for-byte unchanged. A present spec
   **fully replaces** the default for its type; field-level merge is unsupported on purpose because it makes
   "remove a section" inexpressible. Full rationale + the rejected alternatives:
@@ -98,7 +116,8 @@ the real ControlApi.
   severity / assignee, so the Findings save could not ride it. The route writes **only** the blob and its flat
   copies, refuses any other body key (422 — it is not a way round the PATCH), keeps the scope guard's 404, and
   audits an `OBJECT_ACTIVITY` event (`action: findings`, actor = the authenticated Subject). The flat
-  `impactAmount`/`recordsAffected` copies are now **derived on the server** from the blob (`""` when absent),
+  `recordsAffected` copy is now **derived on the server** from the blob (`""` when absent; the `impactAmount` copy
+  went with WS-10, 2026-09-26),
   where the panel used to compute them. The panel's **team + target date** (C6) still go on the PATCH, and
   only when that form was edited — so a viewer's Findings save succeeds, and their team edit would 403.
   Pinned by `ControlApiFindingsWriteTest` (real scoped Subject without `canAdminister`).
@@ -188,7 +207,8 @@ the real ControlApi.
     authored to match on both sides. A Yes/No condition is written as a real boolean for the same reason.
   * **Problems list** mirrors `FindingsSpec.fromMap` rule for rule in the field's label, and Save is disabled
     while it is non-empty. **Removing** a saved field or choice warns generically that stored values stay but
-    stop showing (D7 — no count read); removing `impactAmount`/`recordsAffected` adds a Case-analytics warning.
+    stop showing (D7 — no count read); removing `recordsAffected` adds a Case-analytics warning (`ANALYTICS_KEYS`; an `impactAmount` field no longer
+    does — nothing sums it since WS-10).
   * **Preview** is the real `<inspecto-schema-form>` over the draft, values carried across edits.
   * **Gate:** Save / Add / Restore render only with `LensService.canManageIncidents()` (a new *identity*
     capability, action node `incidents.manage` under Case Manager); everyone else sees the same screen

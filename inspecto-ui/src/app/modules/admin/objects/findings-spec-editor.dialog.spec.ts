@@ -232,13 +232,21 @@ describe('FindingsSpecEditorDialog', () => {
         expect(sent.sections[2]['dependsOn']).toEqual({ key: 'disposition', equals: 'RECOVERED' });
     });
 
-    it('removing Impact amount warns that Case analytics stops receiving it (D7 generic warning)', async () => {
+    it('removing Records affected warns that Case analytics stops receiving it (D7 generic warning)', async () => {
         const { c, confirm } = await create();
-        await c.removeField(c.fields()[1]);
+        await c.removeField(c.fields()[2]);
         const message = (confirm.confirmDestructive.mock.calls[0] as unknown as [string])[0];
         expect(message).toContain('keep the value, but it will no longer be shown');
         expect(message).toContain('Case analytics');
-        expect(c.fields().map((f) => f.label)).not.toContain('Impact amount');
+        expect(c.fields().map((f) => f.label)).not.toContain('Records affected');
+    });
+
+    /** WS-10: a Case's money is its typed impact, so an `impactAmount` Findings field feeds no analytics. */
+    it('removing an Impact amount field no longer claims Case analytics reads it', async () => {
+        const { c, confirm } = await create();
+        await c.removeField(c.fields()[1]);
+        const message = (confirm.confirmDestructive.mock.calls[0] as unknown as [string])[0];
+        expect(message).not.toContain('Case analytics');
     });
 
     it('keeps a field when the removal is declined', async () => {

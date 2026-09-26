@@ -16,9 +16,42 @@ export interface OperationalObject {
     assignee?: string;
     correlationId?: string;
     attributes?: Record<string, string>;
+    /** The typed financial impact (WS-10) with its server-DERIVED `outstanding`; absent when none is recorded. */
+    impact?: ObjectImpact;
     createdAt: number;
     updatedAt: number;
     closedAt: number;
+}
+
+/**
+ * An Incident's or Case's typed financial impact as the server reads it back (WS-10). Amounts are decimals
+ * (numbers on the wire); `outstanding` = confirmed − recovered is derived by the server on every read and is
+ * never sent back — {@link ImpactInput} has no such field.
+ */
+export interface ObjectImpact {
+    suspected: number | null;
+    confirmed: number | null;
+    recovered: number | null;
+    prevented: number | null;
+    outstanding: number | null;
+    currency: string | null;
+    period: string | null;
+    basis: string | null;
+}
+
+/** What `PUT /objects/{id}/impact` accepts: amounts as decimal strings (exact), `{}` clears the impact. */
+export type ImpactInput = Partial<
+    Record<'suspected' | 'confirmed' | 'recovered' | 'prevented' | 'currency' | 'period' | 'basis', string>
+>;
+
+/** One currency's totals in the analytics roll-up — amounts in different currencies are never added. */
+export interface ImpactTotals {
+    count: number;
+    suspected: number;
+    confirmed: number;
+    recovered: number;
+    prevented: number;
+    outstanding: number;
 }
 
 /** A directed correlation edge between two objects (OBJECT_LINK). */
@@ -155,7 +188,8 @@ export interface ObjectAnalytics {
      * an older backend does not send it.
      */
     mttd?: { count: number; avgMs: number; definition?: string };
-    impact: { impactAmount: number; recordsAffected: number };
+    /** WS-10: the typed impact summed per ISO 4217 currency; `recordsAffected` from the Findings. */
+    impact: { byCurrency: Record<string, ImpactTotals>; recordsAffected: number };
 }
 
 /** Merge outcome (POST /objects/{id}/merge) — GLOSSARY §9 case group management. */
@@ -314,7 +348,7 @@ export class ObjectsService {
     /**
      * Save a Case's Findings values — PUT /objects/{id}/findings. Open to anyone who can see the Case
      * (collaboration, operator 2026-09-25), unlike the `canAdminister` {@link update}; the server stores the
-     * `attributes.findings` blob, derives the flat `impactAmount`/`recordsAffected` copies, and refuses any
+     * `attributes.findings` blob, derives the flat `recordsAffected` copy, and refuses any
      * key but `findings`.
      */
     saveFindings(id: string, findings: Record<string, string>): Observable<OperationalObject> {
@@ -353,11 +387,21 @@ export class ObjectsService {
     }
 
     /** Apply a workflow action (e.g. assign / start / resolve / close / investigate / escalate). */
-    transition(id: string, action: string, actor?: string): Observable<OperationalObject> {
+    /** `disposition` rides an Incident's resolve — the server refuses one without it (WS-10). */
+    transition(id: string, action: string, actor?: string, disposition?: string): Observable<OperationalObject> {
         return this.http.post<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/transition`), {
             action,
             actor,
+            ...(disposition ? { disposition } : {}),
         });
+    }
+
+    /**
+     * Replace an Incident's or Case's typed impact — PUT /objects/{id}/impact (`canWorkIncidents`, WS-10). The
+     * server validates it (422), refuses it on a terminal object (409), and derives `outstanding` on read.
+     */
+    saveImpact(id: string, impact: ImpactInput): Observable<OperationalObject> {
+        return this.http.put<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/impact`), { impact });
     }
 
     links(id: string): Observable<ObjectLink[]> {

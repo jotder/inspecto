@@ -450,7 +450,7 @@ export class FindingsSpecEditorDialog {
     async restoreBuiltIn(): Promise<void> {
         if (!this.canEdit() || !this.authored()) return;
         const ok = await this.confirm.confirmDestructive(
-            'Your team will see the built-in Findings fields again (Disposition, Impact amount, Records affected, ' +
+            'Your team will see the built-in Findings fields again (Disposition, Records affected, ' +
                 'Summary). Values already recorded in your own fields stay stored on each Case but stop showing.',
             { title: 'Restore the built-in Findings fields?', confirmText: 'Restore built-in', cancelText: 'Cancel' },
         );

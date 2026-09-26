@@ -101,8 +101,9 @@ export function usesPattern(type: AttributeType): boolean {
     return type === 'string' || type === 'multiline' || type === 'identifier' || type === 'autocomplete';
 }
 
-/** The two keys whose flat copies the Case analytics roll-up sums (design §5.4). */
-export const ANALYTICS_KEYS: readonly string[] = ['impactAmount', 'recordsAffected'];
+/** The key whose flat copy the Case analytics roll-up sums (design §5.4). A Case's money is NOT a Findings
+ *  field any more — it is the typed impact (`PUT /objects/{id}/impact`, WS-10). */
+export const ANALYTICS_KEYS: readonly string[] = ['recordsAffected'];
 
 let seq = 0;
 const nextUid = (prefix: string): string => `${prefix}${++seq}`;

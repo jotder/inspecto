@@ -19,7 +19,12 @@ const analytics = (over: Partial<ObjectAnalytics> = {}): ObjectAnalytics => ({
     byPriority: { HIGH: 3, NONE: 7 },
     cycleTime: { count: 5, avgMs: 720 * HOUR, definition: 'created → closed (the terminal state…)' },
     mttr: { count: 8, avgMs: 2 * HOUR, definition: 'created → most recent RESOLVED transition…' },
-    impact: { impactAmount: 0, recordsAffected: 0 },
+    impact: {
+        byCurrency: {
+            EUR: { count: 2, suspected: 0, confirmed: 150.5, recovered: 40, prevented: 0, outstanding: 110.5 },
+        },
+        recordsAffected: 0,
+    },
     ...over,
 });
 
@@ -63,6 +68,32 @@ describe('CaseAnalyticsDialog (KPI report)', () => {
      * counts objects in their TERMINAL state. It was naming the wrong thing, and this asserts the fix
      * rather than merely the presence of a new tile.
      */
+    /** WS-10: the typed impact is reported per currency — never one total adding euros to dollars. */
+    it('reports confirmed and the derived outstanding per currency', async () => {
+        const { c } = await create(
+            analytics({
+                impact: {
+                    byCurrency: {
+                        EUR: {
+                            count: 2,
+                            suspected: 0,
+                            confirmed: 150.5,
+                            recovered: 40,
+                            prevented: 0,
+                            outstanding: 110.5,
+                        },
+                        USD: { count: 1, suspected: 7, confirmed: 0, recovered: 0, prevented: 0, outstanding: 0 },
+                    },
+                    recordsAffected: 0,
+                },
+            }),
+        );
+        expect(tile(c, 'Confirmed (EUR)')?.value).toContain('150.5');
+        expect(tile(c, 'Outstanding (EUR)')?.value).toContain('110.5');
+        expect(tile(c, 'Confirmed (USD)')).toBeDefined();
+        expect(c.tiles().some((t) => t.label === 'Impact total')).toBe(false);
+    });
+
     it('does not label the terminal-state count as "Resolved"', async () => {
         const { c } = await create();
         expect(tile(c, 'Resolved')?.value).not.toBe(String(c.analytics()!.cycleTime.count));

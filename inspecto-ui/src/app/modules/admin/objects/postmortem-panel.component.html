@@ -78,6 +78,9 @@
             <p class="text-secondary mb-4 text-sm">{{ object().description }}</p>
         }
 
+        <!-- WS-10: the typed impact — on a Case this IS its Findings' impact (one home, not a Findings field) -->
+        <app-impact-panel class="mb-4 block" [object]="object()" (saved)="changed.emit()" />
+
         @if (!isIncident) {
             <!-- C1: the case's Contents (member incidents) + the C2 Split entry point -->
             <app-case-contents

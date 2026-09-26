@@ -117,6 +117,15 @@
                                 <div class="whitespace-pre-wrap">{{ obj().description }}</div>
                             </div>
                         }
+                        <!-- WS-10: typed impact, outstanding derived by the server -->
+                        @if (obj().objectType === 'INCIDENT' || obj().objectType === 'CASE') {
+                            <app-impact-panel
+                                class="mt-6 block"
+                                [object]="obj()!"
+                                [headingLevel]="2"
+                                (saved)="obj.set($event)"
+                            />
+                        }
                         @if (attributeRows.length) {
                             <div class="mt-6">
                                 <div class="text-secondary mb-1">Attributes</div>

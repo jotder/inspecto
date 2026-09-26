@@ -18,7 +18,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 import { ToastrService } from 'ngx-toastr';
 import {
     apiErrorMessage,
@@ -43,6 +43,8 @@ import { fmtDateTime } from 'app/inspecto/grid';
 import { G6GraphData } from 'app/modules/admin/catalog/catalog-graph';
 import { GraphViewComponent } from 'app/modules/admin/catalog/graph-view.component';
 import { ObjectLinkDialog } from './object-link.dialog';
+import { ImpactPanelComponent } from './impact-panel.component';
+import { ResolveDialog, ResolveDialogData, ResolveResult } from './resolve.dialog';
 
 type TabKey = 'overview' | 'graph' | 'timeline' | 'events' | 'comments' | 'attachments';
 
@@ -81,6 +83,7 @@ interface MemberTimelineEntry {
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
         StatusBadgeComponent,
+        ImpactPanelComponent,
     ],
     templateUrl: './object-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -335,6 +338,27 @@ export class ObjectDetailComponent implements OnInit {
     }
 
     transition(action: string): void {
+        // WS-10: an Incident resolves only with a Disposition (and, as in the mail view, a resolution comment).
+        if (action === 'resolve' && this.obj()?.objectType === 'INCIDENT') {
+            const data: ResolveDialogData = { count: 1, label: 'incident', askDisposition: true };
+            this.dialog
+                .open(ResolveDialog, { width: '560px', data })
+                .afterClosed()
+                .subscribe((r?: ResolveResult | null) => {
+                    if (!r?.comment) return;
+                    this.api
+                        .addComment(this.id(), r.comment)
+                        .pipe(switchMap(() => this.api.transition(this.id(), 'resolve', undefined, r.disposition)))
+                        .subscribe({
+                            next: (o) => {
+                                this.obj.set(o);
+                                this.toastr.success(`${o.title}: ${o.status}`);
+                            },
+                            error: (e) => this.toastr.error(apiErrorMessage(e, 'Transition failed')),
+                        });
+                });
+            return;
+        }
         this.api.transition(this.id(), action).subscribe({
             next: (o) => {
                 this.obj.set(o);

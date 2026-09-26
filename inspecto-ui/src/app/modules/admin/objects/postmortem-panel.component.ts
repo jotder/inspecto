@@ -33,6 +33,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { fmtDateTime } from 'app/inspecto/grid';
 import { CaseContentsComponent, MemberRollup } from './case-contents.component';
+import { ImpactPanelComponent } from './impact-panel.component';
 import {
     DEFAULT_CASE_WORKFLOW,
     displayStatus,
@@ -77,6 +78,7 @@ import {
         StatusBadgeComponent,
         CaseContentsComponent,
         InspectoSchemaFormComponent,
+        ImpactPanelComponent,
     ],
     templateUrl: './postmortem-panel.component.html',
 })
@@ -336,7 +338,7 @@ export class PostmortemPanelComponent {
      * C3 + C6: persist the case's Findings, then — only when edited — its team + target date. The two halves
      * ride different routes on purpose (operator 2026-09-25): Findings values are collaboration
      * (`PUT /objects/{id}/findings`, open to anyone who can see the Case; the server derives the flat
-     * `impactAmount`/`recordsAffected` copies the C4 roll-up sums), while team + target date stay on the
+     * `recordsAffected` copy the C4 roll-up sums), while team + target date stay on the
      * `canAdminister` PATCH.
      */
     saveFindings(): void {
