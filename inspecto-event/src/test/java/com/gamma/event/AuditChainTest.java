@@ -275,6 +275,27 @@ class AuditChainTest {
         }
     }
 
+    /** The lock guards a FILE: deleted while held, a second writer locks a NEW file at the same path. The first
+     *  writer must notice before its next link and stop linking. */
+    @Test
+    void aDeletedWriterLockStopsTheFirstWriterBeforeASecondCanFork(@TempDir Path dir) throws Exception {
+        try (ParquetEventStore first = new ParquetEventStore(dir, 1000, 0, 100);
+             ParquetEventStore second = new ParquetEventStore(dir, 1000, 0, 100)) {
+            EventLog a = EventLog.create();
+            a.installStore(first);
+            a.emit(audit(1_000, "first, locked"));
+            Files.delete(dir.resolve(ParquetEventStore.WRITER_LOCK));   // mid-run
+            EventLog b = EventLog.create();
+            b.installStore(second);
+            b.emit(audit(1_001, "second, on a new lock file"));
+            a.emit(audit(1_002, "first, after its lock vanished"));
+            Event late = first.recent(10).stream().filter(e -> e.message().startsWith("first, after")).findFirst()
+                    .orElseThrow();
+            assertEquals("true", late.attributes().get(AuditAttrs.AUDIT_UNLINKED),
+                    "the first writer no longer links once the path no longer names its locked file");
+        }
+    }
+
     /** A Space restart re-installing onto its OWN directory must not re-link rows that directory already holds. */
     @Test
     void aCarriedRowTheIncomingStoreAlreadyHoldsIsNotRelinked(@TempDir Path dir) {

@@ -575,6 +575,10 @@ public final class ParquetEventStore implements EventStore {
     static final String WRITER_LOCK = ".chain-writer.lock";
     private FileChannel lockChannel;
     private java.nio.channels.FileLock writerLock;
+    /** The random token written into the lock file when it was locked — what "the same file" is checked by. */
+    private String writerToken = "";
+    /** Set once the lock file was found removed or replaced: this store never links again. */
+    private boolean writerLost;
 
     /**
      * Claim this directory's chain-writer lock (an OS file lock on {@value #WRITER_LOCK}). Two stores — two
@@ -584,13 +588,40 @@ public final class ParquetEventStore implements EventStore {
      */
     @Override
     public synchronized void claimChainWriter() {
-        if (writerLock != null) return;
+        if (writerLost)
+            throw new IllegalStateException("this store lost the audit chain writer lock on " + root + "; it links nothing more");
+        Path lockPath = root.resolve(WRITER_LOCK);
+        if (writerLock != null) {
+            // The lock guards a FILE, not a path: the file can be deleted while locked (Windows and POSIX both
+            // allow it) and a second writer then locks a NEW file at the same path. So before every link, the
+            // path must still name the file this store locked — its token re-read through a fresh open.
+            String now;
+            try {
+                now = Files.readString(lockPath, StandardCharsets.UTF_8);
+            } catch (IOException gone) {
+                now = null;
+            }
+            if (!writerToken.equals(now)) {
+                writerLost = true;
+                releaseWriter();
+                log.error("Audit chain writer lock {} was removed or replaced while held; this store stops linking "
+                        + "(its audit rows are stored marked unlinked)", lockPath);
+                throw new IllegalStateException("the audit chain writer lock on " + root + " was removed or replaced");
+            }
+            return;
+        }
         try {
             if (lockChannel == null)
-                lockChannel = FileChannel.open(root.resolve(WRITER_LOCK), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-            java.nio.channels.FileLock l = lockChannel.tryLock();
+                lockChannel = FileChannel.open(lockPath, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+            // Lock a byte FAR past the token, so the token itself stays readable through other handles (Windows
+            // locks are mandatory over their range).
+            java.nio.channels.FileLock l = lockChannel.tryLock(1L << 40, 1, false);
             if (l == null) throw new IllegalStateException("another process holds the audit chain writer lock on " + root);
             writerLock = l;
+            writerToken = java.util.UUID.randomUUID().toString();
+            lockChannel.truncate(0);
+            lockChannel.write(ByteBuffer.wrap(writerToken.getBytes(StandardCharsets.UTF_8)), 0);
+            lockChannel.force(true);
         } catch (java.nio.channels.OverlappingFileLockException same) {
             throw new IllegalStateException("another event store in this process is the audit chain writer for " + root);
         } catch (IOException e) {

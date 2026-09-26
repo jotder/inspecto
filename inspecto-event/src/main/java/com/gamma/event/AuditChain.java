@@ -162,8 +162,8 @@ public final class AuditChain {
      *         restart at genesis and fork the chain
      */
     Event link(Event e, EventStore store) {
+        store.claimChainWriter();   // EVERY link: one linker per directory, and the lock must still be ours
         if (recoveredFrom != store) {
-            store.claimChainWriter();   // one linker per directory, or two would fork from the same head
             Event head = store.chainHead();
             if (head == null) {
                 headSeq = 0;
