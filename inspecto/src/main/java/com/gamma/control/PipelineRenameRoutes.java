@@ -2,11 +2,7 @@ package com.gamma.control;
 
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
-import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
-import com.gamma.config.spec.Severity;
-import com.gamma.config.safety.ConfigSafetyValidator;
-import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.event.Event;
 import com.gamma.event.EventType;
@@ -26,12 +22,10 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Stream;
 import static com.gamma.util.Values.mapAt;
 
@@ -412,16 +406,12 @@ final class PipelineRenameRoutes implements RouteModule {
             if (!"name".equals(k) && !"id".equals(k)) out.put(k, v);
         });
 
-        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy(), newPath.getParent()));
-        Set<String> preExisting = new HashSet<>();
-        ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
-        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy(), srcPath.getParent())
-                .forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
-        List<Finding> introduced = findings.stream()
-                .filter(f -> f.severity() == Severity.ERROR)
-                .filter(f -> !preExisting.contains(PipelineSupport.findingKey(f)))
-                .toList();
+        // The whole SaveGate (ASSURE-MAKER-CHECKER-1 S0), before and after.
+        Path writeRoot = api.writeRoot();
+        List<Finding> findings = SaveGate.check(api, "pipeline", out, writeRoot, newPath.getParent(),
+                SaveGate.Referents.MUST_EXIST);
+        List<Finding> introduced = SaveGate.introduced(findings, SaveGate.check(api, "pipeline", src, writeRoot,
+                srcPath.getParent(), SaveGate.Referents.MUST_EXIST));
         if (!introduced.isEmpty()) {
             journalStep(journalFile, oldId, newId,
                     "refused: renamed config introduces ERROR findings — source restored", journal);

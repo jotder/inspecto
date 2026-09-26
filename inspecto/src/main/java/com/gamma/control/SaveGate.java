@@ -19,7 +19,9 @@ import java.util.Map;
 
 /**
  * THE authoring gate: the one list of checks every config save path runs — {@code POST /config/write},
- * {@code POST /config/patch}, {@code PUT /pipelines/{name}/graph}, {@code POST /pipelines/import} — and
+ * {@code POST /config/patch}, {@code PUT /pipelines/{name}/graph}, {@code POST /pipelines/import}, and since
+ * `ASSURE-MAKER-CHECKER-1` S0 the four Pipeline edits {@code /label}, {@code /settings},
+ * {@code /save-as-template} and {@code /rename} ({@link #introduced}) — and
  * that {@code POST /validate} reports for a draft (`PROCESSOR-RELEASE-READINESS-1` G3, 2026-09-23).
  *
  * <p>🔴 <b>Why one function and not a list per route.</b> Until this class each route carried its own
@@ -149,6 +151,20 @@ final class SaveGate {
     /** Whether {@code findings} carries an ERROR — the one verdict every save path refuses on. */
     static boolean refuses(List<Finding> findings) {
         return findings.stream().anyMatch(x -> x.severity() == Severity.ERROR);
+    }
+
+    /**
+     * The ERROR findings in {@code after} that {@code before} did not already carry — the verdict for an EDIT
+     * of a config that is already on disk ({@code POST /pipelines/{name}/label}, {@code /settings},
+     * {@code /rename}; `ASSURE-MAKER-CHECKER-1` S0). Both lists come from {@link #check}, so those routes run
+     * the whole gate instead of the spec + safety pair they used to hand-roll, while a config on disk that was
+     * never judged by today's gate is not re-punished for findings the edit did not cause.
+     */
+    static List<Finding> introduced(List<Finding> after, List<Finding> before) {
+        java.util.Set<String> pre = new java.util.HashSet<>();
+        for (Finding f : before) pre.add(PipelineSupport.findingKey(f));
+        return after.stream().filter(f -> f.severity() == Severity.ERROR)
+                .filter(f -> !pre.contains(PipelineSupport.findingKey(f))).toList();
     }
 
     /**

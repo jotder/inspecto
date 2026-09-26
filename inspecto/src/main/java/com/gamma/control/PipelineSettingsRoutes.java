@@ -2,12 +2,8 @@ package com.gamma.control;
 
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
-import com.gamma.config.spec.ConfigSpecs;
 import com.gamma.config.spec.Finding;
-import com.gamma.config.spec.Severity;
-import com.gamma.config.safety.ConfigSafetyValidator;
 import com.gamma.config.safety.PathJail;
-import com.gamma.config.safety.SafetyPolicy;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;
@@ -19,11 +15,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import static com.gamma.util.Values.mapAt;
 
 /**
@@ -105,16 +99,12 @@ final class PipelineSettingsRoutes implements RouteModule {
         // rewrites no paths, and a config already on disk was never subjected to the write-time safety policy
         // — so re-punishing it here would make any pipeline whose data lives outside the default allowed
         // roots impossible to rename, which is most of them in a real deployment.
-        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy(), srcPath.getParent()));
-        Set<String> preExisting = new HashSet<>();
-        ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
-        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy(), srcPath.getParent())
-                .forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
-        List<Finding> introduced = findings.stream()
-                .filter(f -> f.severity() == Severity.ERROR)
-                .filter(f -> !preExisting.contains(PipelineSupport.findingKey(f)))
-                .toList();
+        // The whole SaveGate (ASSURE-MAKER-CHECKER-1 S0), judged before AND after, so only what the edit
+        // introduces can block it.
+        List<Finding> findings = SaveGate.check(api, "pipeline", out, writeRoot, srcPath.getParent(),
+                SaveGate.Referents.MUST_EXIST);
+        List<Finding> introduced = SaveGate.introduced(findings, SaveGate.check(api, "pipeline", src, writeRoot,
+                srcPath.getParent(), SaveGate.Referents.MUST_EXIST));
         if (!introduced.isEmpty())
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "the new name introduces ERROR-level findings; not written",
@@ -179,16 +169,12 @@ final class PipelineSettingsRoutes implements RouteModule {
             else out.put("description", String.valueOf(d).trim());
         }
 
-        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), out));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", out, SafetyPolicy.defaultPolicy(), srcPath.getParent()));
-        Set<String> preExisting = new HashSet<>();
-        ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), src).forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
-        ConfigSafetyValidator.check("pipeline", src, SafetyPolicy.defaultPolicy(), srcPath.getParent())
-                .forEach(f -> preExisting.add(PipelineSupport.findingKey(f)));
-        List<Finding> introduced = findings.stream()
-                .filter(f -> f.severity() == Severity.ERROR)
-                .filter(f -> !preExisting.contains(PipelineSupport.findingKey(f)))
-                .toList();
+        // The whole SaveGate (ASSURE-MAKER-CHECKER-1 S0), judged before AND after, so only what the edit
+        // introduces can block it.
+        List<Finding> findings = SaveGate.check(api, "pipeline", out, writeRoot, srcPath.getParent(),
+                SaveGate.Referents.MUST_EXIST);
+        List<Finding> introduced = SaveGate.introduced(findings, SaveGate.check(api, "pipeline", src, writeRoot,
+                srcPath.getParent(), SaveGate.Referents.MUST_EXIST));
         if (!introduced.isEmpty())
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "the new settings introduce ERROR-level findings; not written",
@@ -256,13 +242,12 @@ final class PipelineSettingsRoutes implements RouteModule {
                 (displayName == null || displayName.isBlank()) ? id : displayName.trim(),
                 srcPath, writeRoot, notes);
 
-        // The same gate POST /config/write runs — a template is still a real config and must be safe.
-        List<Finding> findings = new ArrayList<>(ConfigLoader.filesystem().validate(ConfigSpecs.pipeline(), tpl));
-        findings.addAll(ConfigSafetyValidator.check("pipeline", tpl, SafetyPolicy.defaultPolicy(), target.getParent()));
-        // W3: against the template's own directory — see saveGraph. `neutralizeForTemplate` copies the
-        // schema next to the template and re-points `schema_file` at it, so it resolves exactly there.
-        findings.addAll(ConfigRoutes.schemaFileFindings("pipeline", tpl, Severity.WARNING, target.getParent()));
-        if (findings.stream().anyMatch(f -> f.severity() == Severity.ERROR))
+        // The same gate POST /config/write runs (SaveGate, ASSURE-MAKER-CHECKER-1 S0) — a template is still a
+        // real config and must be safe. Against the template's own directory: `neutralizeForTemplate` copies
+        // the schema next to the template and re-points `schema_file` at it, so it resolves exactly there.
+        List<Finding> findings = SaveGate.check(api, "pipeline", tpl, writeRoot, target.getParent(),
+                SaveGate.Referents.MUST_EXIST);
+        if (SaveGate.refuses(findings))
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
 

@@ -459,6 +459,26 @@ Pinned by `ControlApiSaveGateParityTest`: every fault × every door, one verdict
 + the graph editor's own `sink.webhook` node shape). A new check added to `SaveGate` reaches all five doors
 at once; a door that stops calling it goes red there.
 
+### The four Pipeline edits joined the gate — and a guard enumerates every door (2026-09-26)
+
+*`ASSURE-MAKER-CHECKER-1` S0.* `POST /pipelines/{name}/label`, `/settings`, `/save-as-template`
+(`PipelineSettingsRoutes.java`) and `/rename` (`PipelineRenameRoutes.java`) used to hand-roll spec +
+`ConfigSafetyValidator` only. They now run `SaveGate.check`. Label, settings and rename edit a config already
+on disk, so they judge it **before and after** and refuse only the ERRORs the edit *introduces*
+(`SaveGate.introduced`) — the posture they had, over the whole list now. Save-as-template runs the full gate
+on the new config (its schema-file check is the gate's inactive-draft WARNING, as before).
+
+`ConfigWriteFunnelTest` enumerates every mutating registration site in every reactor module (the scan
+`CapabilityManifestTest` trusts), follows each handler through the methods it calls **in its own source
+file**, and fails when a route that encodes TOON (`ConfigCodec.toToon` / `JToon.encode`) never reaches
+`SaveGate`. The routes that write a kind `SaveGate` has no arm for are on its `NO_SAVE_GATE` table with a
+reason: Tags and Case Rules (inspecto-ops), Connections (secret-aware CRUD), the five `/jobs` writers
+(`JobRoutes` runs the job spec + `checkJob` itself — the two checks `SaveGate`'s job arm runs, not the whole
+list), and `/bundle/import` (components, jobs, enrichments; Pipelines import through `/pipelines/import`).
+Proved by mutation: stripping `SaveGate` from `/settings` turns the test red, naming the route.
+⚠ The closure stops at the file boundary — a route whose write lives in another class (the settings
+documents, whose records write themselves) is invisible to it.
+
 ### Step config checks (G4)
 
 *Added 2026-09-23 (`PROCESSOR-RELEASE-READINESS-1` G4).* `ConfigRoutes.stepConfigFindings`, run by
