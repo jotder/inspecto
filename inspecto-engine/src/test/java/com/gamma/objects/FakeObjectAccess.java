@@ -96,6 +96,23 @@ public final class FakeObjectAccess implements ObjectAccess {
         return id;
     }
 
+    /** One recorded {@link #transition} call, in order. */
+    public record Transitioned(String objectId, String action, String actor) {}
+
+    public final List<Transitioned> transitioned = new ArrayList<>();
+
+    /**
+     * The fake has no workflow: {@code resolve} closes the object (it stops suppressing, as a terminal object
+     * would), any other action on a known id just records. {@code false} for an unknown id, per the seam.
+     */
+    @Override
+    public boolean transition(String objectId, String action, String actor) {
+        if (opened.stream().noneMatch(o -> o.id().equals(objectId))) return false;
+        transitioned.add(new Transitioned(objectId, action, actor));
+        if ("resolve".equals(action)) close(objectId);
+        return true;
+    }
+
     @Override
     public void link(String fromId, String toId, String relationship, String actor) {
         linked.add(new Linked(fromId, toId, relationship, actor));

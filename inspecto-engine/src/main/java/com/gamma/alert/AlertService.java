@@ -10,6 +10,7 @@ import com.gamma.event.EventType;
 import com.gamma.objects.ObjectAccess;
 import com.gamma.objects.ObjectType;
 import com.gamma.etl.StatusStore;
+import com.gamma.query.DatasetMeasureProbe;
 import com.gamma.signal.Ref;
 import com.gamma.signal.Severity;
 import com.gamma.signal.Signal;
@@ -72,6 +73,20 @@ public final class AlertService {
     private final Map<String, Long> lastFired = new ConcurrentHashMap<>();
     /** BI-5: evaluates {@code (dataset, measure)} → current scalar value; {@code null} disables measure rules. */
     private volatile java.util.function.BiFunction<String, String, java.util.OptionalDouble> measureProbe;
+    /** ASSURE-PER-ENTITY-ALERTS-1: a {@code by} rule → its breaching groups; {@code null} disables {@code by} rules. */
+    private volatile java.util.function.Function<AlertRule, java.util.Optional<DatasetMeasureProbe.Breaches>>
+            groupedProbe;
+    /**
+     * ASSURE-PER-ENTITY-ALERTS-1: rule name → the keys (and the {@link #STORM_KEY}) currently open, i.e.
+     * breached at the last sweep that could see them — the breach / heal EDGE detector for {@code by} rules.
+     * Seeded per rule from the still-active ALERT objects on its first sweep ({@link #seedOpenKeys}), so a
+     * restart neither re-raises every open key nor forgets to heal one.
+     */
+    private final Map<String, java.util.Set<String>> openKeys = new ConcurrentHashMap<>();
+    /** The object attribute that dedupes a per-key Alert / Incident: {@code <rule>|<key>}. */
+    static final String ALERT_KEY = "alertKey";
+    /** The pseudo-key of a {@code by} rule's storm Alert. A real key always reads {@code col=value}, so never this. */
+    static final String STORM_KEY = "*";
     /** LA-23: an Investigation rule → its Measure over the Working Set ({@link InvestigationMeasureProbe});
      *  {@code null} (no {@code inspecto-geo-link} module) disables Investigation rules. */
     private volatile java.util.function.Function<AlertRule, java.util.OptionalDouble> investigationProbe;
@@ -125,6 +140,16 @@ public final class AlertService {
     /** Wire the BI-5 measure evaluator (BiFunction so this engine stays decoupled from the query layer). */
     public void measureProbe(java.util.function.BiFunction<String, String, java.util.OptionalDouble> probe) {
         this.measureProbe = probe;
+    }
+
+    /**
+     * Wire the ASSURE-PER-ENTITY-ALERTS-1 evaluator for a {@code by} rule: the rule → its breaching groups
+     * (at most {@link AlertRule#stormCap} of them, plus the total), empty when they cannot be computed.
+     * {@code null} leaves {@code by} rules inert, like {@link #measureProbe} does for scalar ones.
+     */
+    public void groupedMeasureProbe(
+            java.util.function.Function<AlertRule, java.util.Optional<DatasetMeasureProbe.Breaches>> probe) {
+        this.groupedProbe = probe;
     }
 
     /** Wire the LA-23 Investigation-rule evaluator (a Function so this engine never names the optional module). */
@@ -305,6 +330,10 @@ public final class AlertService {
 
         for (AlertRule rule : rules) {
             if (!rule.isMeasureRule()) continue;
+            if (rule.isGrouped()) {                       // per-entity (by:) — its own edge-triggered pass
+                evaluateGrouped(rule, nowMs, out);
+                continue;
+            }
             var probe = measureProbe;
             if (probe == null) continue;
             java.util.OptionalDouble value = probe.apply(rule.dataset(), rule.measure());
@@ -452,6 +481,220 @@ public final class AlertService {
         } catch (RuntimeException e) {
             log.warn("could not emit alert-rule.cleared signal for {}: {}", rule.name(), e.getMessage());
         }
+    }
+
+    // ── per-entity (by:) rules — ASSURE-PER-ENTITY-ALERTS-1 ──────────────────────────────
+
+    /**
+     * Evaluate one {@code by} rule. <b>Edge-triggered per key</b>, unlike the cooldown-throttled scalar rules:
+     * a key that starts breaching raises ONE Alert (and, at critical/error, one Incident) named for it; while it
+     * stays breached nothing new is raised; when it stops breaching its Alert and Incident are resolved and an
+     * all-clear is emitted. Above {@link AlertRule#stormCap} breached keys ONE storm Alert stands for them all,
+     * and no key fires or heals until the count is back under the cap — a capped read cannot see which keys
+     * healed. An empty probe answer is UNKNOWN: nothing fires and nothing heals.
+     */
+    private void evaluateGrouped(AlertRule rule, long nowMs, List<Alert> out) {
+        var probe = groupedProbe;
+        if (probe == null) return;
+        java.util.Optional<DatasetMeasureProbe.Breaches> result = probe.apply(rule);
+        if (result.isEmpty()) return;
+        DatasetMeasureProbe.Breaches breaches = result.get();
+        java.util.Set<String> open = openKeys.computeIfAbsent(rule.name(), n -> seedOpenKeys(rule));
+        ObjectIndex index = new ObjectIndex(rule.dataset());
+        if (breaches.total() > rule.stormCap()) {
+            if (open.add(STORM_KEY)) fireKey(rule, STORM_KEY, Map.of(), breaches.total(), nowMs, out, index);
+            return;
+        }
+        if (open.remove(STORM_KEY)) healKey(rule, STORM_KEY, nowMs, index);
+        Map<String, DatasetMeasureProbe.Breach> now = new LinkedHashMap<>();
+        for (DatasetMeasureProbe.Breach b : breaches.keys()) now.put(keyLabel(b.key()), b);
+        for (Map.Entry<String, DatasetMeasureProbe.Breach> e : now.entrySet())
+            if (open.add(e.getKey()))
+                fireKey(rule, e.getKey(), e.getValue().key(), e.getValue().value(), nowMs, out, index);
+        for (String key : List.copyOf(open)) {
+            if (now.containsKey(key)) continue;
+            open.remove(key);
+            healKey(rule, key, nowMs, index);
+        }
+    }
+
+    /** {@code msisdn=4471, region=EU} — the key as an operator reads it, and (prefixed by the rule) the dedupe key. */
+    static String keyLabel(Map<String, Object> key) {
+        List<String> parts = new ArrayList<>(key.size());
+        key.forEach((column, value) -> parts.add(column + "=" + value));
+        return String.join(", ", parts);
+    }
+
+    /**
+     * The keys a rule left open before this service instance existed: its still-active ALERT objects. Without
+     * this a restart would forget every open key — never healing them, and re-raising each as a fresh breach.
+     */
+    private java.util.Set<String> seedOpenKeys(AlertRule rule) {
+        java.util.Set<String> open = new java.util.LinkedHashSet<>();
+        if (objects == null) return open;
+        try {
+            String prefix = rule.name() + "|";
+            for (String v : objects.activeAttributeIndex(ObjectType.ALERT, rule.dataset(), ALERT_KEY).keySet())
+                if (v.startsWith(prefix)) open.add(v.substring(prefix.length()));
+        } catch (RuntimeException e) {
+            log.warn("could not read the open keys of alert rule {}: {}", rule.name(), e.getMessage());
+        }
+        return open;
+    }
+
+    /** One sweep's lazy view of the active ALERT / INCIDENT objects by {@link #ALERT_KEY}: one scan each, not one per key. */
+    private final class ObjectIndex {
+        private final String scope;
+        private Map<String, String> alerts;
+        private Map<String, String> incidents;
+
+        ObjectIndex(String scope) {
+            this.scope = scope;
+        }
+
+        Map<String, String> alerts() {
+            if (alerts == null) alerts = objects.activeAttributeIndex(ObjectType.ALERT, scope, ALERT_KEY);
+            return alerts;
+        }
+
+        Map<String, String> incidents() {
+            if (incidents == null) incidents = objects.activeAttributeIndex(ObjectType.INCIDENT, scope, ALERT_KEY);
+            return incidents;
+        }
+    }
+
+    /** Raise one key's breach (or the storm, {@link #STORM_KEY}): the Alert, its event + Signal, and its objects. */
+    private void fireKey(AlertRule rule, String key, Map<String, Object> keyValues, double value, long nowMs,
+                         List<Alert> out, ObjectIndex index) {
+        String scope = rule.dataset();
+        boolean storm = STORM_KEY.equals(key);
+        String label = storm ? textScope(rule, scope) : textScope(rule, scope) + " for " + key;
+        Alert alert = storm ? Alert.storm(rule, scope, label, (long) value, nowMs)
+                : Alert.of(rule, scope, label, value, nowMs);
+        fired.addFirst(alert);
+        while (fired.size() > capacity) fired.removeLast();
+        out.add(alert);
+        log.warn("[ALERT] {}", alert.message());
+        Event firedEvent = Event.builder(EventType.ALERT_FIRED)
+                .level(EventLevel.WARN)
+                .source(AlertService.class.getName())
+                .pipeline(scope)
+                .message(alert.message())
+                .attr("rule", rule.name())
+                .attr("metric", alert.metric())
+                .attr("value", value)
+                .attr("severity", rule.severity())
+                .attr("key", key)
+                .build();
+        EventLog.current().emit(firedEvent);
+        emitFiredSignal(rule, scope, scope + "|" + key, alert, value, nowMs);
+        persistKeyObjects(rule, key, keyValues, alert, label, value, firedEvent.eventId(), index);
+    }
+
+    /**
+     * The ALERT (and, at critical/error, the INCIDENT) for one breached key, deduplicated per
+     * (Alert Rule, key) on {@link #ALERT_KEY} and carrying the key column→value pairs ({@code key.<column>})
+     * and the Measure value, so triage opens on the offender rather than on "breached".
+     */
+    private void persistKeyObjects(AlertRule rule, String key, Map<String, Object> keyValues, Alert alert,
+                                   String label, double value, String eventId, ObjectIndex index) {
+        if (objects == null) return;
+        try {
+            String alertKey = rule.name() + "|" + key;
+            if (index.alerts().containsKey(alertKey)) return;   // opened by an earlier sweep and still active
+            boolean storm = STORM_KEY.equals(key);
+            Map<String, String> attrs = new LinkedHashMap<>();
+            attrs.put("rule", rule.name());
+            attrs.put("dataset", rule.dataset());
+            attrs.put("measure", rule.measure());
+            attrs.put("comparator", rule.comparator());
+            attrs.put("threshold", String.valueOf(rule.threshold()));
+            attrs.put("value", String.valueOf(value));
+            attrs.put(ALERT_KEY, alertKey);
+            if (storm) {
+                attrs.put("breachedKeys", String.valueOf((long) value));
+                attrs.put("stormCap", String.valueOf(rule.stormCap()));
+            } else {
+                attrs.put("key", key);
+                keyValues.forEach((column, v) -> attrs.put("key." + column, String.valueOf(v)));
+            }
+            if (eventId != null) attrs.put("causedByEvent", eventId);
+            String title = storm ? Alert.stormTitle(rule, label, (long) value) : Alert.title(rule, label);
+            String alertObjectId = objects.open(ObjectType.ALERT, title, alert.message(), rule.severity(),
+                    rule.dataset(), attrs);
+            if (!isHighSeverity(rule.severity())) return;
+            java.util.Optional<String> incidentId = incidents.openIncident(title, alert.message(),
+                    rule.severity(), rule.dataset(), new LinkedHashMap<>(attrs), ALERT_KEY);
+            if (incidentId.isEmpty()) {
+                // Suppressed: the key breaches AGAIN while its earlier Incident is still active — e.g. RESOLVED (by
+                // the heal below or an operator), which is not terminal until archived. Re-open that Incident rather
+                // than leave the relapse invisible in triage (a no-op when it was never resolved).
+                String existing = index.incidents().get(alertKey);
+                if (existing != null && objects.transition(existing, "reopen", actor(rule)))
+                    incidentId = java.util.Optional.of(existing);
+            }
+            incidentId.ifPresent(id -> objects.link(id, alertObjectId, ESCALATED_FROM, actor(rule)));
+        } catch (RuntimeException e) {
+            log.warn("could not persist alert objects for rule {} key {}: {}", rule.name(), key, e.getMessage());
+        }
+    }
+
+    /**
+     * One key stopped breaching (or the storm ended): the all-clear Event + Signal, and — unlike the
+     * freshness all-clear ({@link #clear}) — its ALERT and INCIDENT are resolved through
+     * {@link ObjectAccess#transition}, since a per-key Incident is precisely the thing triage is working.
+     *
+     * <p>⚠ The ALERT always resolves; the INCIDENT only when its workflow allows it. The shipped Incident
+     * workflow refuses {@code resolve} until the postmortem is complete (I1), and a machine heal deliberately
+     * does not bypass that — such an Incident stays open for its operator, the heal visible on its resolved
+     * Alert and the all-clear. {@code transition} answers {@code false} there, which is ignored.
+     */
+    private void healKey(AlertRule rule, String key, long nowMs, ObjectIndex index) {
+        String scope = rule.dataset();
+        String message = STORM_KEY.equals(key)
+                ? String.format(Locale.ROOT, "CLEARED: the storm on %s is over — at most %d keys breach alert rule %s",
+                        textScope(rule, scope), rule.stormCap(), rule.name())
+                : String.format(Locale.ROOT, "CLEARED: %s for %s no longer breaches alert rule %s",
+                        textScope(rule, scope), key, rule.name());
+        log.info("[ALERT-CLEARED] {}", message);
+        EventLog.current().emit(Event.builder(EventType.ALERT_CLEARED)
+                .level(EventLevel.INFO)
+                .source(AlertService.class.getName())
+                .pipeline(scope)
+                .message(message)
+                .attr("rule", rule.name())
+                .attr("dataset", scope)
+                .attr("key", key)
+                .attr("severity", rule.severity())
+                .build());
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("rule", rule.name());
+            payload.put("dataset", scope);
+            payload.put("key", key);
+            Signal s = new Signal(null, "alert-rule.cleared", Instant.ofEpochMilli(nowMs),
+                    Severity.INFO, Ref.of("alert-rule", rule.name()), Ref.of("dataset", scope),
+                    "alert:" + rule.name() + "|" + scope + "|" + key,   // the fired Signal's correlation key
+                    null, null, null, message, payload, 1);
+            EventLog.current().emit(s.toEvent());
+        } catch (RuntimeException e) {
+            log.warn("could not emit alert-rule.cleared signal for {}: {}", rule.name(), e.getMessage());
+        }
+        if (objects == null) return;
+        try {
+            String alertKey = rule.name() + "|" + key;
+            String alertId = index.alerts().get(alertKey);
+            if (alertId != null) objects.transition(alertId, "resolve", actor(rule));
+            String incidentId = index.incidents().get(alertKey);
+            if (incidentId != null) objects.transition(incidentId, "resolve", actor(rule));
+        } catch (RuntimeException e) {
+            log.warn("could not resolve the objects of rule {} key {}: {}", rule.name(), key, e.getMessage());
+        }
+    }
+
+    /** The machine actor an Alert Rule acts as — the {@code case-rule:<name>} convention. */
+    private static String actor(AlertRule rule) {
+        return "alert-rule:" + rule.name();
     }
 
     /** Fire one breached rule for a scope (a pipeline, or a measure rule's dataset), cooldown-guarded. */

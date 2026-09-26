@@ -212,6 +212,18 @@ describe('AlertRuleFormDialog', () => {
         });
     });
 
+    it('shows a per-entity rule’s key columns read-only and keeps by/stormCap on re-save', () => {
+        const { c, save, fixture } = create({
+            rule: { ...MEASURE_RULE, by: ['msisdn', 'region'], stormCap: 50 } as AlertRule,
+        });
+        const text = fixture.nativeElement.textContent as string;
+        expect(text).toContain('msisdn, region');
+        expect(text).toContain('at most 50');
+        c.save();
+        const [, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
+        expect(body).toEqual(expect.objectContaining({ by: ['msisdn', 'region'], stormCap: 50 }));
+    });
+
     it('renders a measure rule edit with no a11y violations', async () => {
         const { fixture } = create({ rule: MEASURE_RULE });
         await expectNoA11yViolations(fixture.nativeElement);

@@ -3,12 +3,14 @@ package com.gamma.query;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
+import com.gamma.util.SqlIdent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -117,5 +119,97 @@ public final class DatasetMeasureProbe {
             log.warn("measure probe failed for {} over dataset '{}': {}", measureText, datasetId, e.getMessage());
             return OptionalDouble.empty();
         }
+    }
+
+    /** One breaching group of a per-entity Measure: its key (column → value, in {@code by} order) and value. */
+    public record Breach(Map<String, Object> key, double value) {}
+
+    /**
+     * The breaching groups of a per-entity Measure, at most {@code limit} of them in key order, and how
+     * many groups breach in total — the total is what tells a caller the list was cut short.
+     */
+    public record Breaches(List<Breach> keys, int total) {}
+
+    /** The result column carrying the total breach count — prefixed so it cannot collide with a key column. */
+    private static final String TOTAL = "__inspecto_breached_keys";
+
+    /**
+     * ASSURE-PER-ENTITY-ALERTS-1: the Measure evaluated PER GROUP of the {@code by} key columns, filtered to
+     * the groups that breach {@code comparator threshold}. The grouped SELECT is {@link MeasureCompiler}'s own
+     * (the same compilation {@link #value} uses, with {@code groupBy}); the breach filter and the total are a
+     * wrapper built from the quoted measure id, a fixed operator and a numeric literal — no author text enters
+     * the statement unquoted. Empty — never a throw — when the value cannot be computed, exactly like
+     * {@link #value}: a caller must read empty as UNKNOWN, never as "nothing breaches".
+     */
+    public Optional<Breaches> breaches(String datasetId, String measureText, List<String> by,
+                                       String comparator, double threshold, int limit) {
+        try {
+            Matcher m = MEASURE.matcher(measureText.trim());
+            if (!m.matches() || by == null || by.isEmpty()) return Optional.empty();
+            MeasureCompiler.Measure measure = m.group(1) != null
+                    ? new MeasureCompiler.Measure("count", null)
+                    : new MeasureCompiler.Measure(m.group(2), m.group(3));
+            String grouped = MeasureCompiler.compile(new MeasureCompiler.Spec(
+                    datasetId, List.of(measure), List.copyOf(by), Map.of(), List.of(), List.of(), Integer.MAX_VALUE));
+            String op = switch (comparator) {
+                case "gt" -> ">";
+                case "gte" -> ">=";
+                case "lt" -> "<";
+                case "lte" -> "<=";
+                default -> throw new IllegalArgumentException("unknown comparator '" + comparator + "'");
+            };
+            String sql = "SELECT *, COUNT(*) OVER () AS " + SqlIdent.q(TOTAL) + " FROM (" + grouped + ") AS "
+                    + SqlIdent.q("g") + " WHERE " + SqlIdent.q(measure.id()) + " " + op + " "
+                    + java.math.BigDecimal.valueOf(threshold).toPlainString()
+                    + " ORDER BY " + String.join(", ", by.stream().map(SqlIdent::q).toList());
+            String relationSql = relationSql(datasetId);
+            if (relationSql == null) return Optional.empty();
+            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
+                    datasetId, relationSql, sql, Math.max(1, limit), 0, List.of(), List.of()));
+            if (r.rows().isEmpty()) return Optional.of(new Breaches(List.of(), 0));
+            List<Breach> keys = new java.util.ArrayList<>(r.rows().size());
+            for (Map<String, Object> row : r.rows()) {
+                if (!(row.get(measure.id()) instanceof Number n)) continue;   // a NULL aggregate never compared true
+                Map<String, Object> key = new java.util.LinkedHashMap<>();
+                for (String c : by) key.put(c, row.get(c));
+                keys.add(new Breach(key, n.doubleValue()));
+            }
+            int total = r.rows().get(0).get(TOTAL) instanceof Number t ? t.intValue() : keys.size();
+            return Optional.of(new Breaches(keys, total));
+        } catch (Exception e) {
+            log.warn("grouped measure probe failed for {} by {} over dataset '{}': {}",
+                    measureText, by, datasetId, e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * The column names of the Dataset's relation — its Schema as {@code GET /datasets/{id}/rows} reports it
+     * (view or {@code physicalRef}, plus calculated columns). Backs the save-time check that every {@code by}
+     * column of an Alert Rule exists.
+     *
+     * @throws IllegalArgumentException naming why the Schema could not be read (no write root, unknown
+     *                                  Dataset, a relation DuckDB cannot open) — the caller refuses on it
+     */
+    public List<String> columns(String datasetId) {
+        String relationSql = relationSql(datasetId);
+        if (relationSql == null) throw new IllegalArgumentException("unknown dataset '" + datasetId + "'");
+        try {
+            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
+                    datasetId, relationSql, "SELECT * FROM " + SqlIdent.q(datasetId), 1, 0, List.of(), List.of()));
+            return r.columns().stream().map(ResultSetDescriptor.Column::name).toList();
+        } catch (Exception e) {
+            throw new IllegalArgumentException("dataset '" + datasetId + "' could not be read: " + e.getMessage(), e);
+        }
+    }
+
+    /** The Dataset's relation SQL, or {@code null} when the Dataset is unknown; throws when there is no registry. */
+    private String relationSql(String datasetId) {
+        Path root = writeRoot.get();
+        if (root == null) throw new IllegalArgumentException("no write root — cannot resolve dataset '" + datasetId + "'");
+        Map<String, Object> dataset = new ComponentStore(root.resolve("registry")).get("dataset", datasetId)
+                .map(ComponentRegistry.Component::content).orElse(null);
+        if (dataset == null) return null;
+        return DatasetRelation.relationSql(dataset, dataRoot.get(), new ViewStore(root.resolve("views")));
     }
 }

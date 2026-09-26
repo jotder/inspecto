@@ -146,6 +146,15 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                                 <dd class="inline">{{ data.rule?.measure }}</dd>
                             </div>
                         }
+                        @if (data.rule?.by?.length) {
+                            <div>
+                                <dt class="inline font-semibold">One Alert per:</dt>
+                                <dd class="inline">
+                                    {{ data.rule?.by?.join(', ') }} (at most {{ data.rule?.stormCap }}, then one storm
+                                    Alert)
+                                </dd>
+                            </div>
+                        }
                         @if (data.rule?.maximumAge) {
                             <div>
                                 <dt class="inline font-semibold">Maximum age:</dt>

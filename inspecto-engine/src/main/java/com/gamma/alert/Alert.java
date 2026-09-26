@@ -76,6 +76,23 @@ public record Alert(String rule, String severity, String pipeline, String metric
     }
 
     /**
+     * The ONE aggregate Alert a {@code by} rule raises when more than {@link AlertRule#stormCap} keys breach at
+     * once (ASSURE-PER-ENTITY-ALERTS-1) — its {@link #value} is the count of breached keys, not a Measure value.
+     */
+    static Alert storm(AlertRule r, String pipeline, String scopeLabel, long keys, long epochMillis) {
+        String msg = String.format(Locale.ROOT,
+                "%s: storm — %s keys (by %s) breach: %s; above the storm cap of %s, one storm Alert stands for them all",
+                r.severity(), number(keys), String.join(", ", r.by()), title(r, scopeLabel), number(r.stormCap()));
+        return new Alert(r.name(), r.severity(), pipeline, r.measure(), keys, r.comparator(),
+                r.threshold(), r.window(), epochMillis, msg);
+    }
+
+    /** The title of a storm's ALERT / INCIDENT objects: how many keys, then what they breach. */
+    static String stormTitle(AlertRule r, String scope, long keys) {
+        return "Storm: " + number(keys) + " keys breach — " + title(r, scope);
+    }
+
+    /**
      * The title of the ALERT / INCIDENT objects a firing of {@code r} over {@code scope} opens: the
      * rule's {@link AlertRule#description} when it has one, else a sentence built from what it watches
      * (e.g. {@code Sum of exposure_sar on fraud_cases_open is above 298,668}).

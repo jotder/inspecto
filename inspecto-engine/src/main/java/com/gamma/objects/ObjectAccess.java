@@ -83,6 +83,17 @@ public interface ObjectAccess {
     String open(ObjectType kind, String title, String description, String severity,
                 String scope, Map<String, String> attributes);
 
+    /**
+     * Apply the workflow {@code action} (e.g. {@code "resolve"}, {@code "reopen"}) to an object, as
+     * {@code actor}. {@code false} — never a throw — when no such object exists or the action is not legal
+     * from its current state, so a caller acting on a possibly-stale id cannot be disturbed by it.
+     *
+     * <p>⚠ The action is a {@code String} for the same reason {@link #link}'s relationship is: the workflows
+     * are module vocabulary. Added for per-entity Alert Rules (ASSURE-PER-ENTITY-ALERTS-1), whose healed keys
+     * resolve their own Alert and Incident — before it this seam had no transition at all.
+     */
+    boolean transition(String objectId, String action, String actor);
+
     /** Relate two objects — {@code relationship} is the {@code LinkRelationship} name, e.g. {@code
      *  "ESCALATED_FROM"} (the enum is module vocabulary). Used by alert→incident promotion. */
     void link(String fromId, String toId, String relationship, String actor);

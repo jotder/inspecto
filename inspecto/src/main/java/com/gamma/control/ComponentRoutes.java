@@ -624,6 +624,13 @@ final class ComponentRoutes implements RouteModule {
         content.remove("id");   // routing key, not content (the store stamps name=id)
         try {
             validateKind(type, id, content);
+            // ASSURE-PER-ENTITY-ALERTS-1: this door must not arm a `by` rule the /alerts/rules door refuses.
+            // ⚠ Only a rule carrying `by` is parsed here; the door's wider lack of Alert Rule validation predates it.
+            if ("alert-rule".equals(type) && content.get("by") != null) {
+                Map<String, Object> stamped = new LinkedHashMap<>(content);
+                stamped.put("name", id);
+                AlertRoutes.requireGroupingColumns(api, com.gamma.alert.AlertRule.fromMap(stamped));
+            }
             // D7 (c): a widget's `tags` array is a projection of the assignment store, so it is derived
             // here rather than taken from the body — adopted on create, overwritten on update.
             WidgetTags.project(api, type, id, content, !componentExists(store, type, id),

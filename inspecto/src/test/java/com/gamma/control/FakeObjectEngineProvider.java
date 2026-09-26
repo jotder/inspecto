@@ -132,6 +132,11 @@ public final class FakeObjectEngineProvider implements ObjectEngineProvider {
         }
 
         @Override
+        public boolean transition(String objectId, String action, String actor) {
+            return false;   // not exercised: the fake has no workflow to move through
+        }
+
+        @Override
         public void link(String fromId, String toId, String relationship, String actor) {
             // not exercised by the moved test; no fake link store to keep it in
         }

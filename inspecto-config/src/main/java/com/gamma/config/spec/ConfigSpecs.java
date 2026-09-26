@@ -755,7 +755,15 @@ public final class ConfigSpecs {
                                 + "alert.measure; takes no metric, window or dataset."),
                 FieldSpec.enumField("alert.relation", "Working Set relation",
                         List.of("entities", "links", "excluded"), null,
-                        "Which relation of the Investigation's Working Set the Measure is computed over.")
+                        "Which relation of the Investigation's Working Set the Measure is computed over."),
+                // ASSURE-PER-ENTITY-ALERTS-1: a Dataset measure rule evaluated per key instead of as one aggregate.
+                FieldSpec.of("alert.by", "Group by", FieldType.LIST,
+                        "Key columns of the Dataset (a Dataset measure rule only): the Measure is evaluated per "
+                                + "key and every breaching key raises its own Alert and Incident. Each column "
+                                + "must exist in the Dataset's Schema."),
+                FieldSpec.of("alert.stormCap", "Storm cap", FieldType.INT,
+                        "With alert.by: above this many breaching keys, one storm Alert replaces the per-key "
+                                + "Alerts. Default 100.")
         );
         List<CrossFieldRule> rules = List.of(
                 new CrossFieldRule(

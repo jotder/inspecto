@@ -41,6 +41,10 @@ export interface AlertRule {
     dataset?: string | null;
     /** Measure rule (BI-5): the Measure over `dataset` — `count` or `agg(field)`, e.g. `sum(exposure_sar)`. */
     measure?: string | null;
+    /** Per-entity measure rule: the key columns the Measure is evaluated per — each breaching key raises its own Alert. */
+    by?: string[] | null;
+    /** With `by`: above this many breaching keys one storm Alert replaces the per-key ones (server default 100). */
+    stormCap?: number | null;
     /** Freshness rule (DUCKLE-C1): the Dataset must have published within this (`Ns|Nm|Nh|Nd`). */
     maximumAge?: string | null;
     /** Investigation rule (LA-23): the Investigation whose Working Set `relation` the `measure` reads. */

@@ -87,6 +87,17 @@ public final class ObjectServiceAccess implements ObjectAccess {
         return service.open(kind, title, description, severity, scope, attributes).id();
     }
 
+    /** ⚠ The service throws on an unknown id or an illegal move; the seam's contract is a {@code false} instead. */
+    @Override
+    public boolean transition(String objectId, String action, String actor) {
+        try {
+            service.transition(objectId, action, actor);
+            return true;
+        } catch (java.util.NoSuchElementException | IllegalStateException e) {
+            return false;
+        }
+    }
+
     @Override
     public void link(String fromId, String toId, String relationship, String actor) {
         service.link(fromId, toId, relationship, actor);

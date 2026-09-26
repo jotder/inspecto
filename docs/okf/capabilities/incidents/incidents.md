@@ -164,6 +164,42 @@ the average), any other id snake_case → words — while the `metric` field / e
 `duration_ms`. Pipeline and Investigation scopes are unchanged. ⚠ The UI authoring form has no `description` field yet (and, being ledger-only, re-saving a
 rule through it drops fields it does not show).
 
+**Per-entity Measure rules — `by`** (`ASSURE-PER-ENTITY-ALERTS-1`, 2026-09-26). A Dataset Measure rule may
+add `by: [col, …]` (key columns; a list or one comma-separated string) and `stormCap` (default **100**,
+`AlertRule.DEFAULT_STORM_CAP`). `by` is refused on a ledger, freshness or Investigation rule, a key column must
+be a plain identifier, and `stormCap` without `by` is refused. Without `by` nothing changes — `toMap` emits
+neither key, and the rule takes the scalar path below. How it runs:
+- **Evaluation** — `DatasetMeasureProbe.breaches` compiles the Measure with `MeasureCompiler` (`groupBy` = the
+  key columns, every identifier `SqlIdent.q`-quoted) and wraps it in a breach filter built from the quoted
+  measure id, a fixed operator and a numeric literal, plus `COUNT(*) OVER ()` for the total; at most `stormCap`
+  rows come back. Wired in `CollectorService` beside the scalar probe (same per-Space roots).
+- **Edge-triggered per key, not cooldown-throttled** — a key that starts breaching raises ONE Alert and (at
+  critical/error) ONE Incident; while it stays breached nothing is raised; `AlertService.openKeys` is the edge
+  detector, seeded on a rule's first sweep from its still-active ALERT objects so a restart neither re-raises
+  nor forgets. Dedupe attribute `alertKey = <rule>|<col=value, …>`; the objects also carry `key`,
+  `key.<column>` per key column, and the Measure `value`; the title is `<description> — <Dataset> for
+  msisdn=m7, region=EU` (or the generated title with the same suffix). Scope stays the Dataset id.
+- **Heal** — a key no longer breaching emits `ALERT_CLEARED` + an `alert-rule.cleared` Signal (correlation
+  `alert:<rule>|<dataset>|<key>`) and resolves its ALERT and INCIDENT through the new
+  `ObjectAccess.transition(id, action, actor)` (answers `false`, never throws). 🔴 The shipped Incident workflow
+  **refuses `resolve` until the postmortem is complete** (I1) and a machine heal does not bypass it — so an
+  Incident whose postmortem is unwritten STAYS OPEN; only its ALERT resolves. A key that relapses while its
+  Incident is RESOLVED (non-terminal until archived) **re-opens** that Incident instead of being suppressed.
+  ⚠ The scalar (no-`by`) Measure rule still has no heal — unchanged on purpose.
+- **Storm** — more than `stormCap` breaching keys → ONE storm Alert/Incident (pseudo-key `*`, attributes
+  `breachedKeys`, `stormCap`; title `Storm: 40 keys breach — …`). While it rages no key fires or heals (a capped
+  read cannot see which keys healed); back under the cap it heals and the keys are raised one by one.
+- **Unknown is not healed** — an empty probe answer (unreadable Dataset) neither fires nor resolves anything.
+- **Save-time check, fail closed** — `AlertRoutes.requireGroupingColumns` (every `/alerts/rules` write and a
+  Decision Rule's `create-alert`, and `/components/alert-rule` for a body carrying `by`) reads the Dataset's
+  Schema via `DatasetMeasureProbe.columns` — its relation's columns, as `GET /datasets/{id}/rows` serves them —
+  and 422s a missing column, or a Schema that cannot be read (unknown Dataset, no data yet). Names match exactly.
+  ⚠ Outside `by`, `/components/alert-rule` still does not run `AlertRule` validation at all — a pre-existing gap.
+- **Case grouping** — no Case Rule change is needed: an existing Case Rule whose `q` matches the rule's title
+  (e.g. its `description`) groups the per-key Incidents into one Case.
+- **UI** — the Alert Rule dialog authors ledger rules only; for a `by` rule it shows "One Alert per: <columns>
+  (at most N, then one storm Alert)" read-only and carries `by`/`stormCap` through a re-save.
+
 **Evaluation.** `AlertService` polls on a window-derived floor of 1 min, default 10 min
 (`AlertService.java:411-413`); a breach emits `EventType.ALERT_FIRED` (`:227`) and the canonical
 `alert-rule.fired` Signal (`:243`), and appends to a **bounded in-memory ring** the feed reads
@@ -183,7 +219,7 @@ degrades to "no object".
 
 | Path | Where | Rule |
 |---|---|---|
-| **Severity promotion** | `AlertService.promoteToIncident` (`:304-334`) | a `CRITICAL` (or `error`) rule opens a deduped `INCIDENT` — one open Incident per rule + pipeline — beside the `ALERT`; lower severities stay alerts. Since 2026-08-10 the Incident carries an **`ESCALATED_FROM` link to the ALERT** (actor `alert-rule:<name>`). ⚠ A *suppressed* promotion adds no edge |
+| **Severity promotion** | `AlertService.promoteToIncident` (`:304-334`) | a `CRITICAL` (or `error`) rule opens a deduped `INCIDENT` — one open Incident per rule + pipeline (a `by` rule: one per rule + key, §3.2) — beside the `ALERT`; lower severities stay alerts. Since 2026-08-10 the Incident carries an **`ESCALATED_FROM` link to the ALERT** (actor `alert-rule:<name>`). ⚠ A *suppressed* promotion adds no edge |
 | **Decision-Rule consequences** | `decision-rules.md` | `create-alert` records a signal **and** opens an object (2026-07-19); `create-incident` opens an Incident at any severity with no Alert Rule, deduped per rule (2026-07-24) |
 | **Expectation breach** | `ExpectationRoutes` | the original signal → Incident dedup + open pattern the others reuse |
 | **Reconciliation breach** | `ReconRunJob` (`jobs.md`) | same pattern, at **run** granularity — ONE aggregate Incident per reconciliation (scope = the reconciliation id), carrying only break counts |
@@ -679,7 +715,9 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 | Class | Module | Proves |
 |---|---|---|
 | `AlertRuleTest` | `inspecto-engine` | both record shapes parse; `when` scoping |
-| `ControlApiAlertRuleWriteTest` | `inspecto` | the write routes' gate order, in-process arming, `canAuthorAlertRules` |
+| `ControlApiAlertRuleWriteTest` | `inspecto` | the write routes' gate order, in-process arming, `canAuthorAlertRules`; a `by` column outside the Dataset's Schema refused at both save doors |
+| `PerEntityAlertTest` | `inspecto-engine` | `by` rules over real DuckDB: 40 keys → 40 Incidents, re-fire → 0, restart seeding, a healed key resolves only its own objects, storm cap → one Alert, unknown never heals, no-`by` unchanged |
+| `PerEntityAlertObjectsTest` | `inspecto-ops` | the real workflow: the postmortem gate keeps a healed Incident open, a relapse after resolve re-opens it, an existing Case Rule groups 40 per-key Incidents into one Case |
 | `NotificationServiceTest` | `inspecto-engine` | subscriber hand-off, rate limiter, preferences gating |
 | `ControlApiNotificationsTest` · `ControlApiNotificationChannelsTest` · `ControlApiNotificationRulesTest` · `ControlApiNotificationStreamTest` | `inspecto` | feed routes, channel CRUD (`422` on a bad EMAIL target), rules, the SSE stream |
 | `ControlApiCollectorNotifyTest` | `inspecto` | the ACQ push-notify seam that feeds the ledger |

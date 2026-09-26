@@ -67,7 +67,7 @@ final class AlertRoutes implements RouteModule {
 
     private Object create(ApiContext api, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
-        AlertRule rule = parse(body);                                   // 422 on an invalid rule
+        AlertRule rule = parse(api, body);                              // 422 on an invalid rule
         if (RouteErrors.exists(store, TYPE, rule.name()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists (use PUT to update)");
         Map<String, Object> content = write(store, rule.name(), rule.toMap());
@@ -82,7 +82,7 @@ final class AlertRoutes implements RouteModule {
         // stale/edited body name can never fork the component or the in-memory rule.
         Map<String, Object> patched = new java.util.LinkedHashMap<>(body);
         patched.put("name", name);
-        AlertRule rule = parse(patched);
+        AlertRule rule = parse(api, patched);
         Map<String, Object> content = write(store, name, rule.toMap());
         alerts(api).upsert(rule);
         return content;
@@ -105,7 +105,7 @@ final class AlertRoutes implements RouteModule {
      */
     static Map<String, Object> authorFromConsequence(ApiContext api, Map<String, Object> body) throws IOException {
         ComponentStore store = new ComponentStore(WriteGates.requireWriteRoot(api, "alert rule write").resolve("registry"));
-        AlertRule rule = parse(body);
+        AlertRule rule = parse(api, body);
         Map<String, Object> content = write(store, rule.name(), rule.toMap());
         alerts(api).upsert(rule);
         return content;
@@ -145,7 +145,7 @@ final class AlertRoutes implements RouteModule {
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
     }
 
-    private static AlertRule parse(Map<String, Object> body) {
+    private static AlertRule parse(ApiContext api, Map<String, Object> body) {
         if (!EditionFeatures.present(EditionFeatures.ALERT_DISPATCH))   // the consequence's door (G9)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH));
         AlertRule rule;
@@ -160,6 +160,30 @@ final class AlertRoutes implements RouteModule {
         if (rule.isInvestigationRule())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an Alert Rule over an Investigation (investigation:) is authored through "
                     + "POST /inv/investigations/{id}/alert-rules, which checks that you own the Investigation");
+        requireGroupingColumns(api, rule);
         return rule;
+    }
+
+    /**
+     * ASSURE-PER-ENTITY-ALERTS-1: every {@code by} column of a per-entity rule must exist in its Dataset's
+     * Schema — the relation's columns, as {@code GET /datasets/{id}/rows} reports them. <b>Fail closed</b>: a
+     * Schema that cannot be read (unknown Dataset, a relation DuckDB cannot open, no data yet) refuses the save
+     * rather than arming a rule whose every sweep would silently compute nothing. A rule with no {@code by} is
+     * not looked at. Also run by {@code /components/alert-rule} ({@code ComponentRoutes}).
+     */
+    static void requireGroupingColumns(ApiContext api, AlertRule rule) {
+        if (!rule.isGrouped()) return;
+        java.nio.file.Path writeRoot = WriteGates.requireWriteRoot(api, "alert rule write");
+        List<String> columns;
+        try {
+            columns = new com.gamma.query.DatasetMeasureProbe(() -> writeRoot, api::dataRoot).columns(rule.dataset());
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "alert.by cannot be checked against "
+                    + "the Schema of dataset '" + rule.dataset() + "': " + e.getMessage());
+        }
+        List<String> missing = rule.by().stream().filter(c -> !columns.contains(c)).toList();
+        if (!missing.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "alert.by column(s) " + missing
+                    + " are not in the Schema of dataset '" + rule.dataset() + "' (have: " + columns + ")");
     }
 }

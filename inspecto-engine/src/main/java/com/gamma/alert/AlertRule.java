@@ -5,6 +5,7 @@ import com.gamma.util.ToonHelper;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -39,6 +40,26 @@ import java.util.Set;
  *     comparator: lt
  *     threshold:  1000
  *     severity:   WARNING
+ *   }
+ * </pre>
+ *
+ * <p><b>Per-entity measure rules ({@code by}, ASSURE-PER-ENTITY-ALERTS-1)</b> — a Dataset measure rule may add
+ * {@code by}, one or more key columns of the Dataset. The Measure is then evaluated per group ({@code GROUP BY}
+ * the key columns) and every breaching key raises its OWN Alert (and, at critical/error, its own Incident),
+ * named for the key. {@code stormCap} (default {@value #DEFAULT_STORM_CAP}) bounds that: above it ONE aggregate
+ * storm Alert reports how many keys breached instead of N. Every {@code by} column must exist in the Dataset's
+ * Schema — checked when the rule is saved ({@code AlertRoutes}).
+ *
+ * <pre>
+ *   alert {
+ *     name:       high-msisdn-spend
+ *     dataset:    usage_ds
+ *     measure:    sum(amount)
+ *     by:         [msisdn]                 # one or more key columns
+ *     stormCap:   100                      # optional; above it one storm Alert replaces N
+ *     comparator: gt
+ *     threshold:  5000
+ *     severity:   CRITICAL
  *   }
  * </pre>
  *
@@ -88,7 +109,13 @@ import java.util.Set;
 public record AlertRule(String name, String metric, String comparator, double threshold,
                         String window, String severity, String onPipeline,
                         String dataset, String measure, Object when, String maximumAge,
-                        String investigation, String relation, String description) {
+                        String investigation, String relation, String description,
+                        List<String> by, int stormCap) {
+
+    /** The {@code stormCap} a {@code by} rule takes when it declares none. */
+    public static final int DEFAULT_STORM_CAP = 100;
+    /** A {@code by} key column: a plain identifier (it is still quoted wherever it reaches SQL). */
+    private static final java.util.regex.Pattern KEY_COLUMN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     public static final Set<String> METRICS =
             Set.of("error_rate", "failed_batches", "rejected_files", "duration_ms");
@@ -136,6 +163,15 @@ public record AlertRule(String name, String metric, String comparator, double th
                      String investigation, String relation) {
         this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
                 investigation, relation, null);
+    }
+
+    /** Every pre-{@code by} caller (ASSURE-PER-ENTITY-ALERTS-1: per-entity grouping). */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when, String maximumAge,
+                     String investigation, String relation, String description) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
+                investigation, relation, description, null, 0);
     }
 
     public AlertRule {
@@ -209,6 +245,23 @@ public record AlertRule(String name, String metric, String comparator, double th
         require(relation == null || investigation != null, "alert.relation requires alert.investigation");
         if (maximumAge == null) require(threshold > 0, "alert.threshold must be a positive number");
         onPipeline = (onPipeline == null || onPipeline.isBlank()) ? null : onPipeline.trim();
+        by = by == null ? List.of() : by.stream().map(c -> c == null ? "" : c.trim()).filter(c -> !c.isEmpty())
+                .distinct().toList();
+        if (by.isEmpty()) {
+            require(stormCap == 0, "alert.stormCap requires alert.by");
+        } else {
+            require(dataset != null && maximumAge == null && investigation == null,
+                    "alert.by groups a Dataset measure rule (dataset: + measure:); this rule is not one");
+            for (String c : by)
+                require(KEY_COLUMN.matcher(c).matches(), "alert.by column '" + c + "' must be a plain column name");
+            if (stormCap == 0) stormCap = DEFAULT_STORM_CAP;
+            require(stormCap >= 1, "alert.stormCap must be a positive whole number");
+        }
+    }
+
+    /** Whether this measure rule is evaluated per key ({@code by}) rather than as one aggregate. */
+    public boolean isGrouped() {
+        return !by.isEmpty();
     }
 
     /** Whether this is a BI-5 measure rule (a Dataset measure) vs a ledger-metric rule. */
@@ -261,7 +314,9 @@ public record AlertRule(String name, String metric, String comparator, double th
                 str(alert.get("maximumAge")),
                 str(alert.get("investigation")),
                 str(alert.get("relation")),
-                str(alert.get("description")));
+                str(alert.get("description")),
+                columns(alert.get("by")),
+                alert.get("stormCap") == null ? 0 : wholeNumber(alert.get("stormCap"), "alert.stormCap"));
     }
 
     /**
@@ -328,6 +383,10 @@ public record AlertRule(String name, String metric, String comparator, double th
         m.put("severity", severity);
         if (onPipeline != null) m.put("onPipeline", onPipeline);
         if (when != null) m.put("when", when);
+        if (!by.isEmpty()) {
+            m.put("by", by);
+            m.put("stormCap", stormCap);
+        }
         return m;
     }
 
@@ -343,6 +402,25 @@ public record AlertRule(String name, String metric, String comparator, double th
 
     private static String lower(String v) {
         return v == null ? null : v.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /** {@code by} as authored: a list, or one comma-separated scalar. */
+    private static List<String> columns(Object v) {
+        if (v == null) return null;
+        List<?> items = v instanceof List<?> l ? l : List.of(String.valueOf(v).split(","));
+        return items.stream().map(o -> o == null ? null : String.valueOf(o)).toList();
+    }
+
+    private static int wholeNumber(Object v, String field) {
+        String s = str(v);
+        double d;
+        try {
+            d = v instanceof Number n ? n.doubleValue() : Double.parseDouble(s == null ? "" : s);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(field + " must be a positive whole number, got '" + s + "'");
+        }
+        require(d == Math.rint(d) && d >= 1 && d <= Integer.MAX_VALUE, field + " must be a positive whole number");
+        return (int) d;
     }
 
     private static double number(Object v) {

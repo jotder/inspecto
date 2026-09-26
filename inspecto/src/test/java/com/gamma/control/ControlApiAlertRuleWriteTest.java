@@ -258,4 +258,46 @@ class ControlApiAlertRuleWriteTest {
             assertTrue(ruleNames(c.port).isEmpty(), "disarmed in the running engine");
         }
     }
+
+    /** A view-backed {@code usage} Dataset whose Schema is {@code msisdn, region, amount}. */
+    private static void seedUsage(Path root) throws Exception {
+        new com.gamma.pipeline.ViewStore(root.resolve("views")).write(new com.gamma.pipeline.ViewDefinition(
+                "usage_view", "pipeline-x", List.of(),
+                "SELECT * FROM (VALUES ('m1', 'EU', 900)) AS t(msisdn, region, amount)", "2026-09-26T00:00:00Z"));
+        store(root).write("dataset", "usage", new java.util.HashMap<>(java.util.Map.of("view", "usage_view")));
+    }
+
+    private static String byRule(String name, String dataset, String by) {
+        return """
+                {"name":"%s","dataset":"%s","measure":"sum(amount)","by":%s,
+                 "comparator":"gt","threshold":500,"severity":"CRITICAL"}""".formatted(name, dataset, by);
+    }
+
+    /** ASSURE-PER-ENTITY-ALERTS-1: a {@code by} column must be in the Dataset's Schema — refused at save, fail closed. */
+    @Test
+    void aByColumnNotInTheDatasetSchemaIsRefusedAtEverySaveDoor(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedUsage(root);
+
+            HttpResponse<String> bad = send(c.port, "POST", "/alerts/rules", byRule("spend", "usage", "[\"imsi\"]"));
+            assertEquals(422, bad.statusCode(), bad.body());
+            assertTrue(bad.body().contains("[imsi] are not in the Schema of dataset 'usage'"), bad.body());
+            assertTrue(store(root).get("alert-rule", "spend").isEmpty(), "nothing written");
+            assertTrue(ruleNames(c.port).isEmpty(), "nothing armed");
+
+            HttpResponse<String> unknown = send(c.port, "POST", "/alerts/rules", byRule("spend", "ghost", "[\"msisdn\"]"));
+            assertEquals(422, unknown.statusCode(), "an unreadable Schema refuses, never waves through");
+
+            HttpResponse<String> viaComponent = send(c.port, "POST", "/components/alert-rule",
+                    byRule("spend", "usage", "[\"imsi\"]"));
+            assertEquals(422, viaComponent.statusCode(), "the generic component door refuses the same rule");
+            assertTrue(store(root).get("alert-rule", "spend").isEmpty());
+
+            HttpResponse<String> ok = send(c.port, "POST", "/alerts/rules", byRule("spend", "usage", "[\"msisdn\",\"region\"]"));
+            assertEquals(200, ok.statusCode(), ok.body());
+            AlertRule onDisk = AlertRule.fromMap(store(root).get("alert-rule", "spend").orElseThrow().content());
+            assertEquals(List.of("msisdn", "region"), onDisk.by());
+            assertEquals(AlertRule.DEFAULT_STORM_CAP, onDisk.stormCap());
+        }
+    }
 }
