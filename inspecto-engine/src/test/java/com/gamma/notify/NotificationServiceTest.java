@@ -422,4 +422,81 @@ class NotificationServiceTest {
 
         assertEquals(1, store.recent(10).size(), "alice opted in, so the shared feed holds it for her view");
     }
+
+    // ---- DUCKLE-C1 residual 2: owner-routed alerting on the delivery path -------------------------------
+
+    private static Event alertFired(String recipient) {
+        Event.Builder b = Event.builder(EventType.ALERT_FIRED).pipeline("orders")
+                .message("error_rate 0.1 breached threshold 0.05")
+                .attr("rule", "orders-errors").attr("severity", "WARNING");
+        if (recipient != null) b.attr(Notification.RECIPIENT_ATTR, recipient);
+        return b.build();
+    }
+
+    private static NotificationPreferenceOverrides everyoneOptedIntoOpsEmail() throws Exception {
+        NotificationPreferenceOverrides o = NotificationPreferenceOverrides.inMemory();
+        o.apply("alice", "alice@example.com", Map.of("ops", Map.of(NotificationPreferences.EMAIL, true)));
+        o.apply("bob", "bob@example.com", Map.of("ops", Map.of(NotificationPreferences.EMAIL, true)));
+        return o;
+    }
+
+    @Test
+    void anOwnedAlertIsAddressedToItsOwnerAndEmailedToThemAlone() throws Exception {
+        NotificationStore store = new InMemoryNotificationStore();
+        List<String> targets = new CopyOnWriteArrayList<>();
+        NotificationService svc = new NotificationService(store, NotificationRules.defaults(),
+                new NotificationPreferences(), List.of(targetRecorder(targets)));
+        svc.preferenceOverrides(everyoneOptedIntoOpsEmail());
+
+        svc.onEvent(alertFired("alice"));
+        svc.close();
+
+        assertEquals(List.of("alice@example.com"), targets, "bob opted in too, but the alert is alice's");
+        Notification n = store.recent(10).get(0);
+        assertEquals("alice", n.recipient());
+        assertTrue(n.addressedTo("alice"));
+        assertFalse(n.addressedTo("bob"));
+        assertEquals("alice", n.toMap().get("recipient"));
+    }
+
+    @Test
+    void anUnownedAlertIsStillABroadcast() throws Exception {
+        NotificationStore store = new InMemoryNotificationStore();
+        List<String> targets = new CopyOnWriteArrayList<>();
+        NotificationService svc = new NotificationService(store, NotificationRules.defaults(),
+                new NotificationPreferences(), List.of(targetRecorder(targets)));
+        svc.preferenceOverrides(everyoneOptedIntoOpsEmail());
+
+        svc.onEvent(alertFired(null));
+        svc.close();
+
+        assertEquals(List.of("alice@example.com", "bob@example.com"), targets);
+        Notification n = store.recent(10).get(0);
+        assertNull(n.recipient());
+        assertTrue(n.addressedTo("bob"));
+    }
+
+    @Test
+    void theOwnersOwnOptOutStillWins() throws Exception {
+        NotificationStore store = new InMemoryNotificationStore();
+        List<String> targets = new CopyOnWriteArrayList<>();
+        NotificationService svc = new NotificationService(store, NotificationRules.defaults(),
+                new NotificationPreferences(), List.of(targetRecorder(targets)));
+        NotificationPreferenceOverrides o = everyoneOptedIntoOpsEmail();
+        o.apply("alice", "alice@example.com", Map.of("ops", Map.of(NotificationPreferences.EMAIL, false)));
+        svc.preferenceOverrides(o);
+
+        svc.onEvent(alertFired("alice"));
+        svc.close();
+
+        assertEquals(List.of(), targets, "routing narrows who is emailed; it never overrides an opt-out");
+    }
+
+    @Test
+    void theRecipientTemplateVariableNamesTheOwner() {
+        NotificationRule rule = NotificationRule.fromMap(Map.of("id", "r", "eventType", EventType.ALERT_FIRED,
+                "category", "ops", "bodyTemplate", "for {{recipient.name}}"));
+        assertEquals("for alice", rule.render(alertFired("alice")).body());
+        assertEquals("for appUser", rule.render(alertFired(null)).body());
+    }
 }

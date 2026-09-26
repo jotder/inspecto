@@ -159,10 +159,17 @@ final class NotificationRoutes implements RouteModule {
      * preference is on (critical always) — the feed is shared, so the per-Subject in-app choice is applied
      * at read time. Without one (Personal) everything stored is shown, as before, and so is a category the
      * grid has no row for (an authored rule's own category) — there is no preference to have opted out of.
+     *
+     * <p>An <b>addressed</b> notification (an owned Alert Rule's, DUCKLE-C1 residual 2) is in its recipient's
+     * feed only — for every Subject, {@code canAdminister} included: the feed is a personal inbox, and the
+     * oversight view of every fired alert is {@code GET /alerts} and the Incidents it opens. Personal has no
+     * Subject and so no owner could have been stamped; there, as before, everything stored is shown.
      */
     private static boolean visible(ApiContext api, HttpExchange ex, Notification n) {
         Subject s = ApiContext.subject(ex).orElse(null);
-        if (s == null || NotificationCategory.byId(n.category()).isEmpty()) return true;
+        if (s == null) return true;
+        if (!n.addressedTo(s.id())) return false;
+        if (NotificationCategory.byId(n.category()).isEmpty()) return true;
         return overrides(api).enabled(api.service().notificationPreferences(), n.category(),
                 NotificationPreferences.IN_APP, s.id(), s.email());
     }

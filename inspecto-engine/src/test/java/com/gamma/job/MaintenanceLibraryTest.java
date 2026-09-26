@@ -251,9 +251,9 @@ class MaintenanceLibraryTest {
         long now = System.currentTimeMillis();
         long old = now - Duration.ofDays(100).toMillis();
         store.add(new com.gamma.notify.Notification("n-old", old, "ops", null, null, "old", "b",
-                com.gamma.notify.NotificationState.UNREAD, null, null));
+                com.gamma.notify.NotificationState.UNREAD, null, null, null));
         store.add(new com.gamma.notify.Notification("n-new", now, "ops", null, null, "new", "b",
-                com.gamma.notify.NotificationState.UNREAD, null, null));
+                com.gamma.notify.NotificationState.UNREAD, null, null, null));
         try (com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
              JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
             js.notificationStore(store);

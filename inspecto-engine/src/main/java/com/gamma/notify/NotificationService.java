@@ -403,11 +403,16 @@ public final class NotificationService implements NotificationAccess, AutoClosea
      * default; critical always) gets the notification at its verified email claim — the only address it can
      * have, since the store never takes one from a request. Suppression and receipts apply as for any
      * addressed destination. No email transport ⇒ nothing to deliver through.
+     *
+     * <p>An <b>addressed</b> notification (an owned Alert Rule's — DUCKLE-C1 residual 2) goes to its recipient
+     * only, and only while that recipient's own effective preference is on: owner routing narrows who is
+     * emailed, it never overrides a Subject's opt-out. A broadcast goes to every enrolled Subject, as before.
      */
     private void deliverPersonalEmail(NotificationPreferenceOverrides personal, Notification n) {
         NotificationChannel email = channelByKind(NotificationPreferences.EMAIL);
         if (email == null) return;
         for (NotificationPreferenceOverrides.Enrolled s : personal.enrolled()) {
+            if (!n.addressedTo(s.subject())) continue;
             if (!personal.enabled(prefs, n.category(), NotificationPreferences.EMAIL, s.subject(), s.email())) continue;
             java.util.Optional<String> suppressed = suppression.reasonToSuppress(s.email(), System.currentTimeMillis());
             if (suppressed.isPresent()) {

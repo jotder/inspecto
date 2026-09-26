@@ -71,7 +71,10 @@
 // ⬇ 79 → 71 on 2026-09-26: `ControlApiTriageGateTest` (the `canWorkIncidents` re-gate) now carries literal
 // paths for ack / resolve / transition / assign / merge / split / the PATCH / Case-Rule evaluate — several of
 // them were armed-tested before only through `"/objects/" + id + …` concatenations this guard cannot read.
-const BASELINE_UNCOVERED = 71;
+//
+// ⬇ 71 → 69 on 2026-09-26: `ControlApiAlertOwnerTest` (owner-routed alerting) arms `POST /alerts/rules` and
+// `PUT /alerts/rules/{name}` with Subjects.
+const BASELINE_UNCOVERED = 69;
 
 // Usage:  node tools/check-authgate-coverage.mjs           # report + exit 1 on a ratchet regression
 //         node tools/check-authgate-coverage.mjs --list    # also print every uncovered route

@@ -26,6 +26,7 @@ import java.util.Set;
  *     severity:   WARNING                  # INFO | WARNING | CRITICAL
  *     onPipeline: EVENTS                   # optional; null/absent = every pipeline
  *     description: Error rate too high     # optional; the human title of a fired Alert / Incident
+ *     owner:      alice                    # optional; the Subject its alerts are addressed to (absent = appUser)
  *   }
  * </pre>
  *
@@ -110,12 +111,20 @@ public record AlertRule(String name, String metric, String comparator, double th
                         String window, String severity, String onPipeline,
                         String dataset, String measure, Object when, String maximumAge,
                         String investigation, String relation, String description,
-                        List<String> by, int stormCap) {
+                        List<String> by, int stormCap, String owner) {
 
     /** The {@code stormCap} a {@code by} rule takes when it declares none. */
     public static final int DEFAULT_STORM_CAP = 100;
     /** A {@code by} key column: a plain identifier (it is still quoted wherever it reaches SQL). */
     private static final java.util.regex.Pattern KEY_COLUMN = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+    /**
+     * The owner of a rule no authenticated {@code Subject} authored — a Personal-edition rule, a hand-edited
+     * registry file with no {@code owner:}, a Decision Rule's {@code create-alert} consequence. The same
+     * placeholder identity the auth-free core already uses ({@code ApiContext.actor}), and it means
+     * <b>unowned</b>: its alerts route to everyone, exactly as before owner routing (DUCKLE-C1 residual 2).
+     */
+    public static final String UNOWNED = "appUser";
 
     public static final Set<String> METRICS =
             Set.of("error_rate", "failed_batches", "rejected_files", "duration_ms");
@@ -165,18 +174,19 @@ public record AlertRule(String name, String metric, String comparator, double th
                 investigation, relation, null);
     }
 
-    /** Every pre-{@code by} caller (ASSURE-PER-ENTITY-ALERTS-1: per-entity grouping). */
+    /** Every pre-{@code by}, pre-{@code owner} caller: no per-entity grouping, and {@link #UNOWNED}. */
     public AlertRule(String name, String metric, String comparator, double threshold,
                      String window, String severity, String onPipeline,
                      String dataset, String measure, Object when, String maximumAge,
                      String investigation, String relation, String description) {
         this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
-                investigation, relation, description, null, 0);
+                investigation, relation, description, null, 0, null);
     }
 
     public AlertRule {
         require(name != null && !name.isBlank(), "alert.name is required");
         description = (description == null || description.isBlank()) ? null : description.trim();
+        owner = (owner == null || owner.isBlank()) ? UNOWNED : owner.trim();
         metric = lower(metric);
         comparator = lower(comparator);
         // Absent/blank → the spec default (ConfigSpecs.alert: gt). ⚠ Set.of(..).contains(null) THROWS, so
@@ -264,6 +274,14 @@ public record AlertRule(String name, String metric, String comparator, double th
         return !by.isEmpty();
     }
 
+    /**
+     * Whether this rule has a real owner — a {@code Subject} id — rather than {@link #UNOWNED}. An owned rule's
+     * alerts are addressed to that Subject alone; an unowned one's go to everyone, as they always did.
+     */
+    public boolean isOwned() {
+        return !UNOWNED.equals(owner);
+    }
+
     /** Whether this is a BI-5 measure rule (a Dataset measure) vs a ledger-metric rule. */
     public boolean isMeasureRule() {
         return dataset != null && maximumAge == null;
@@ -316,7 +334,8 @@ public record AlertRule(String name, String metric, String comparator, double th
                 str(alert.get("relation")),
                 str(alert.get("description")),
                 columns(alert.get("by")),
-                alert.get("stormCap") == null ? 0 : wholeNumber(alert.get("stormCap"), "alert.stormCap"));
+                alert.get("stormCap") == null ? 0 : wholeNumber(alert.get("stormCap"), "alert.stormCap"),
+                str(alert.get("owner")));
     }
 
     /**
@@ -387,6 +406,10 @@ public record AlertRule(String name, String metric, String comparator, double th
             m.put("by", by);
             m.put("stormCap", stormCap);
         }
+        // Only a real owner is written: this map is also the stored component, whose `owner` key is the R3
+        // sharing envelope's (ComponentAccess) - persisting the appUser placeholder there would make it look
+        // claimed, and R3 lets only an owner or an access admin change a claimed envelope.
+        if (isOwned()) m.put("owner", owner);
         return m;
     }
 

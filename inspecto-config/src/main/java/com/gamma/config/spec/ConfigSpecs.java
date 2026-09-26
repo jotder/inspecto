@@ -747,6 +747,11 @@ public final class ConfigSpecs {
                         "Dataset freshness limit: Ns/Nm/Nh/Nd since the Dataset last published "
                                 + "(e.g. 6h, 1d). Requires alert.dataset; takes no metric, window or "
                                 + "threshold. Absent = this rule does not check freshness."),
+                // DUCKLE-C1 residual 2: owner routing. The HTTP authoring routes STAMP it from the calling
+                // Subject (a body value is ignored there); a hand-edited registry file may name one.
+                FieldSpec.of("alert.owner", "Owner", FieldType.STRING,
+                        "The Subject id this rule's alerts are addressed to. Set by the platform to the "
+                                + "authenticated author; blank = appUser (unowned: every reader is notified)."),
                 // LA-23 Investigation rule: watches a Measure over an Investigation's sealed Working Set.
                 // Authored ONLY through POST /inv/investigations/{id}/alert-rules (the generic alert
                 // routes refuse this kind), declared here so the spec and AlertRule.fromMap agree.

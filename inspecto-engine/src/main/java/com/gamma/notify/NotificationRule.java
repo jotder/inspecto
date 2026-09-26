@@ -90,7 +90,8 @@ public record NotificationRule(String id, String eventType, EventLevel minLevel,
         return Notification.create(category, e.type(), e.correlationId(),
                 NotificationTemplate.render(titleTemplate, ctx),
                 NotificationTemplate.render(bodyTemplate, ctx),
-                NotificationTemplate.render(dedupeKeyTemplate, ctx));
+                NotificationTemplate.render(dedupeKeyTemplate, ctx),
+                e.attributes().get(Notification.RECIPIENT_ATTR));
     }
 
     /** The interpolation context for an event: top-level fields, {@code time} (event-signal-backbone-plan
@@ -109,8 +110,11 @@ public record NotificationRule(String id, String eventType, EventLevel minLevel,
         ctx.put("time", e.timestamp());
         ctx.put("attributes", e.attributes());
         ctx.put("payload", e.payload());
-        // In the auth-free core the recipient is always appUser; an edition fills in real identity.
-        ctx.put("recipient", Map.of("first_name", "appUser", "name", "appUser"));
+        // An addressed event (an owned Alert Rule's, DUCKLE-C1 residual 2) names its recipient, a Subject id;
+        // anything else is a broadcast and keeps the auth-free core's placeholder, appUser.
+        String recipient = e.attributes().get(Notification.RECIPIENT_ATTR);
+        if (recipient == null || recipient.isBlank()) recipient = "appUser";
+        ctx.put("recipient", Map.of("first_name", recipient, "name", recipient));
         return ctx;
     }
 }

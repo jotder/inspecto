@@ -249,6 +249,46 @@ required; the `alert-metric-by-shape` / `alert-window-by-shape` / `alert-thresho
 them per shape, decided in `AlertRule`'s own order (investigation → freshness → measure → ledger), so a
 freshness rule written through `/config/write` is no longer refused for omitting what the engine refuses.
 
+**Alerts are owner-routed** (2026-09-26, residual 2 — the last one; the row is closed). The operator's
+2026-09-15 design stands: **owner = the authenticated `Subject`, `appUser` where none**. As built, across
+four seams (every rule shape, not only freshness):
+* **The record.** `AlertRule.owner` — a Subject id, or `AlertRule.UNOWNED` (`appUser`) for a blank/absent
+  one; `isOwned()` tells them apart. `alert.owner` is declared in `ConfigSpecs.alert()`.
+* **The capture point is the component's R3 envelope, not a new one.** `owner` was already the sharing
+  envelope's key on every registry component (`ComponentAccess`: stamped from the Subject on create, carried
+  forward by an edit, changed only by the owner, an access admin, or a first claim on an owner-less
+  component). ⚠ `/alerts/rules` used to bypass `ComponentAccess` altogether; `AlertRoutes` create/update now
+  run `onCreate`/`onUpdate`, so the two write paths share one ownership model, and a save through the alert
+  routes keeps the `shares` list `AlertRule` does not model (it used to strip it). A config-authored rule — a
+  hand-edited registry file — names its owner with `owner:`, and a Decision Rule's `create-alert` consequence
+  (no request, no Subject) carries a stored rule's envelope forward. That answers the row's "no moment at
+  which a `Subject` could be captured": the moment is the write, and the owner is stored with the rule.
+* **The event.** An owned rule's `ALERT_FIRED` / `ALERT_CLEARED` carry a `recipient` attribute
+  (`Notification.RECIPIENT_ATTR`) and the `alert-rule.fired` / `.cleared` Signals carry `owner` in their
+  payload. An unowned rule's events carry **no** recipient — that absence is what keeps them a broadcast.
+* **Delivery.** A `Notification` is a broadcast (`recipient == null`) or addressed. `NotificationRule`
+  renders the recipient into `{{recipient.name}}` (no longer a hardcoded `appUser`); the personal email leg
+  goes to the recipient alone, still subject to its own effective preference; the in-app feed, badge count
+  and SSE stream show an addressed notification to its recipient only.
+
+Session decisions (2026-09-26, recorded here, reversible):
+* **The feed is a personal inbox** — an addressed notification is hidden from every other Subject,
+  `canAdminister` included. Oversight of every breach is `GET /alerts` and the Incidents a critical breach
+  opens. Personal has no Subject, so there nothing is hidden, as before.
+* **Unowned means broadcast**, not "addressed to `appUser`" — a Personal-built or pre-existing rule notifies
+  exactly as it always did, and `appUser` is never written into the stored component (R3 would read it as a
+  claimed owner and refuse the first claim).
+* **`ChannelConfig` stays flat.** Operator-managed destinations (a team mailbox, a webhook) deliver every
+  alert as before; the per-owner destination is the Subject's own verified email from
+  `NotificationPreferenceOverrides`, which already existed — no per-owner channel was added.
+* **The key is `recipient`, not `owner`, on the event**: Exchange events already use `owner` for a Space.
+* ⚠ Inherited from R3, not new: a creator may name an `owner` in the create body (and anyone with edit
+  access may first-claim an owner-less rule), which addresses that rule's alerts to the named Subject. The
+  routing only narrows who is told; it discloses nothing a broadcast did not.
+
+Pinned by `AlertOwnerRoutingTest` (engine), `NotificationServiceTest` (the `owned`/`unowned`/opt-out/template
+cases) and `ControlApiAlertOwnerTest` (real HTTP, with Subjects).
+
 **A Measure is a client-side `NamedMeasure`** — `{id, expression, label}` — authored per Dataset in the
 Dataset's Measures editor and previewed client-side. There is **no server-side Measure entity**: what
 crosses the wire is always a validated `{agg, field}` pair, so a named-Measure expression is exactly the

@@ -499,6 +499,7 @@ public final class AlertService {
                 .attr("dataset", rule.dataset())
                 .attr("maximumAge", rule.maximumAge())
                 .attr("severity", rule.severity())
+                .attr(com.gamma.notify.Notification.RECIPIENT_ATTR, recipient(rule))
                 .build();
         EventLog.current().emit(cleared);
         try {
@@ -507,6 +508,7 @@ public final class AlertService {
             payload.put("dataset", rule.dataset());
             payload.put("ageSeconds", ageMs / 1000);
             payload.put("maximumAge", rule.maximumAge());
+            payload.put("owner", rule.owner());
             // INFO, not the rule's severity: a recovery is never itself critical, and emitting it at
             // CRITICAL would page the on-call to tell them everything is fine.
             Signal s = new Signal(null, "alert-rule.cleared", Instant.ofEpochMilli(nowMs),
@@ -776,10 +778,21 @@ public final class AlertService {
                 .attr("metric", alert.metric())
                 .attr("value", value)
                 .attr("severity", rule.severity())
+                .attr(com.gamma.notify.Notification.RECIPIENT_ATTR, recipient(rule))
                 .build();
         EventLog.current().emit(firedEvent);
         emitFiredSignal(rule, display, cooldownScope, alert, value, nowMs);
         persistAlertObject(rule, alert, display, value, firedEvent.eventId());
+    }
+
+    /**
+     * The {@code recipient} attribute an owned rule's events carry (DUCKLE-C1 residual 2) — what the
+     * notification layer addresses the notification by. ⚠ Absent for an {@link AlertRule#UNOWNED} rule, and
+     * that absence IS the routing: no recipient ⇒ every reader, as before. A dedicated key rather than
+     * {@code owner}, because Exchange events already use {@code owner} for a Space.
+     */
+    private static String recipient(AlertRule rule) {
+        return rule.isOwned() ? rule.owner() : null;   // Event.Builder.attr ignores a null value
     }
 
     /**
@@ -796,6 +809,7 @@ public final class AlertService {
             payload.put("metric", alert.metric());
             payload.put("value", value);
             payload.put("severity", rule.severity());
+            payload.put("owner", rule.owner());
             Signal s = new Signal(null, "alert-rule.fired", Instant.ofEpochMilli(nowMs),
                     Severity.parse(rule.severity()), Ref.of("alert-rule", rule.name()),
                     Ref.of("pipeline", display), "alert:" + rule.name() + "|" + cooldownScope,

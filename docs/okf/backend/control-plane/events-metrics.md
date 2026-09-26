@@ -51,6 +51,13 @@ timestamp: 2026-07-16T00:00:00Z
   (`hasActiveDuplicate` matches only store-UNREAD rows) so the next identical alert is delivered again, as
   before. It can only let a repeat alert through, never hide one, and no reader's view reports it. Tests:
   `ControlApiNotificationsTest.readStateIsPerSubject` (real HTTP, with Subjects), `NotificationReadStateTest`.
+* **A notification is a broadcast or addressed** (2026-09-26, `DUCKLE-C1-DATASET-FRESHNESS-1` residual 2) —
+  `Notification.recipient` is `null` (every reader, the usual case) or a Subject id, taken from the triggering
+  event's `recipient` attribute, which only an **owned** Alert Rule's `ALERT_FIRED` / `ALERT_CLEARED` carry.
+  An addressed one is in its recipient's feed, badge and SSE stream only (`NotificationRoutes.visible`; no
+  Subject ⇒ everything, as before) and its personal email goes to the recipient alone. Operator
+  `ChannelConfig` destinations still receive every notification. As-built and the decisions in
+  [`studio.md`](../../capabilities/studio/studio.md) §3.4.
 * **Preferences are two layers** (operator, 2026-09-25; ses-sns-adapter-design §7, fixes SEC review F2) — the
   **deployment default** is `NotificationPreferences` (per Space's `CollectorService`, in memory, as before),
   and each Subject may hold a sparse **override** in **`NotificationPreferenceOverrides`**:

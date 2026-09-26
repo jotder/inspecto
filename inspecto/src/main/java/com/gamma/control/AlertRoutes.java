@@ -49,10 +49,10 @@ final class AlertRoutes implements RouteModule {
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                         "alert engine not armed (no alert-rule components loaded)"))));
         api.post("/alerts/rules", ApiContext.withCapability("canAuthorAlertRules",
-                (e, m) -> editionRefused(e) ? ApiContext.HANDLED : single(e, create(api, api.body(e)))));
+                (e, m) -> editionRefused(e) ? ApiContext.HANDLED : single(e, create(api, e, api.body(e)))));
         api.put("/alerts/rules/([^/]+)", ApiContext.withCapability("canAuthorAlertRules",
                 (e, m) -> editionRefused(e) ? ApiContext.HANDLED
-                        : single(e, update(api, ApiContext.name(m), api.body(e)))));
+                        : single(e, update(api, e, ApiContext.name(m), api.body(e)))));
         api.delete("/alerts/rules/([^/]+)", ApiContext.withCapability("canAuthorAlertRules",
                 (e, m) -> delete(api, ApiContext.name(m))));
     }
@@ -65,25 +65,30 @@ final class AlertRoutes implements RouteModule {
 
     // ── CRUD ──────────────────────────────────────────────────────────────────────
 
-    private Object create(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object create(ApiContext api, HttpExchange e, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
-        AlertRule rule = parse(api, body);                              // 422 on an invalid rule
+        // R3 envelope: the authenticated Subject becomes the owner — who the rule's alerts are addressed to.
+        Map<String, Object> shaped = ComponentAccess.onCreate(e, body);
+        AlertRule rule = parse(api, shaped);                                 // 422 on an invalid rule
         if (RouteErrors.exists(store, TYPE, rule.name()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists (use PUT to update)");
-        Map<String, Object> content = write(store, rule.name(), rule.toMap());
+        Map<String, Object> content = write(store, rule.name(), persisted(rule, shaped));
         alerts(api).upsert(rule);                                       // arm in the running engine
         return content;
     }
 
-    private Object update(ApiContext api, String name, Map<String, Object> body) throws IOException {
+    private Object update(ApiContext api, HttpExchange e, String name, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
-        RouteErrors.existing(store, TYPE, "alert rule", name);   // 404 if absent
+        Map<String, Object> stored = RouteErrors.existing(store, TYPE, "alert rule", name);   // 404 if absent
         // The name is the storage key — immutable on update. Bind it from the path, not the body, so a
         // stale/edited body name can never fork the component or the in-memory rule.
         Map<String, Object> patched = new java.util.LinkedHashMap<>(body);
         patched.put("name", name);
-        AlertRule rule = parse(api, patched);
-        Map<String, Object> content = write(store, name, rule.toMap());
+        // R3 envelope: edit access against the stored rule, owner/shares carried forward, and an owner change
+        // only by the owner or an access admin — so an edit never silently re-addresses someone's alerts.
+        Map<String, Object> shaped = ComponentAccess.onUpdate(e, TYPE, name, stored, patched);
+        AlertRule rule = parse(api, shaped);
+        Map<String, Object> content = write(store, name, persisted(rule, shaped));
         alerts(api).upsert(rule);
         return content;
     }
@@ -105,13 +110,48 @@ final class AlertRoutes implements RouteModule {
      */
     static Map<String, Object> authorFromConsequence(ApiContext api, Map<String, Object> body) throws IOException {
         ComponentStore store = new ComponentStore(WriteGates.requireWriteRoot(api, "alert rule write").resolve("registry"));
-        AlertRule rule = parse(api, body);
-        Map<String, Object> content = write(store, rule.name(), rule.toMap());
+        // No Subject: a consequence fires on data, not on a request. An existing rule keeps its envelope (the
+        // owner its alerts go to, its shares), exactly as a plain content save does in R3.
+        Map<String, Object> shaped = carryEnvelope(storedContent(store, ApiContext.str(body, "name")), body);
+        AlertRule rule = parse(api, shaped);
+        Map<String, Object> content = write(store, rule.name(), persisted(rule, shaped));
         alerts(api).upsert(rule);
         return content;
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────
+
+    /**
+     * What an Alert Rule write stores: the rule's own map plus the R3 {@code shares} list, which
+     * {@link AlertRule} does not model — without it a save through these routes would strip a shared rule's
+     * protection. The {@code owner} rides {@link AlertRule#toMap} itself (DUCKLE-C1 residual 2: it is the
+     * addressee of the rule's alerts).
+     */
+    private static Map<String, Object> persisted(AlertRule rule, Map<String, Object> shaped) {
+        Map<String, Object> out = rule.toMap();
+        if (shaped.containsKey(ComponentAccess.SHARES)) out.put(ComponentAccess.SHARES, shaped.get(ComponentAccess.SHARES));
+        return out;
+    }
+
+    /** {@code body} with the stored envelope ({@code owner}, {@code shares}) carried forward where it omits them. */
+    private static Map<String, Object> carryEnvelope(Map<String, Object> stored, Map<String, Object> body) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>(body);
+        if (stored == null) return out;
+        for (String key : List.of(ComponentAccess.OWNER, ComponentAccess.SHARES))
+            if (!out.containsKey(key) && stored.containsKey(key)) out.put(key, stored.get(key));
+        return out;
+    }
+
+    /** The stored rule's content, or {@code null} when there is none (or the name is not a storable one —
+     *  the write that follows refuses that itself). */
+    private static Map<String, Object> storedContent(ComponentStore store, String name) {
+        if (name == null) return null;
+        try {
+            return store.get(TYPE, name).map(com.gamma.pipeline.ComponentRegistry.Component::content).orElse(null);
+        } catch (IllegalArgumentException unsafeName) {
+            return null;
+        }
+    }
 
     private ComponentStore store(ApiContext api) {
         return new ComponentStore(WriteGates.requireWriteRoot(api, "alert rule write").resolve("registry"));
