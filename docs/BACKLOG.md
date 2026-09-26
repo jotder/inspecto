@@ -13,8 +13,9 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **48<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 24<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** —
+> **48<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ↔ **48 on 2026-09-27**: P2 `ASSURE-RISK-SCORE-1` closed (wave 3.2 shipped); residuals re-filed as P3 `ASSURE-RISK-SCORE-RESIDUALS-1`.
 > ↔ **48 on 2026-09-27**: P2 `ASSURE-ACTION-REQUESTS-1` closed (wave 2.3 shipped); residuals re-filed as P3 `ASSURE-ACTION-REQUESTS-RESIDUALS-1`.
 > ⬆ **47 → 48 on 2026-09-27**: filed P2 `WEBHOOK-EGRESS-POLICY-1` — the Action Request egress policy is not applied to the `sink.webhook` Step or the webhook notification channel.
 > ⬆ **44 → 47 on 2026-09-27**: filed assurance wave 3 — P2 `ASSURE-KPI-DEFINITIONS-1`, `ASSURE-RISK-SCORE-1`, `ASSURE-AUDIT-CHAIN-1`.
@@ -48,8 +49,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 24<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 24<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 23<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 25<!--count:backlog-p3--> P3 rows are mostly a list of things
 > deliberately NOT being built, and reading all 48<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
@@ -82,7 +83,7 @@ rank.
 
 | State | P2 rows |
 |---|---|
-| **Startable now** — no gate, no owed decision | assurance wave 2 (wave 1 has shipped; `ASSURE-MAKER-CHECKER-1` ✅ shipped 2026-09-27): `ASSURE-ACTION-REQUESTS-1` ✅ shipped 2026-09-27; `ASSURE-ENTITY-LISTS-1` ⏸ on hold for Link Analysis. Assurance wave 3, in flight: `ASSURE-KPI-DEFINITIONS-1` (§3.6) · `ASSURE-RISK-SCORE-1` (§3.9) · `ASSURE-AUDIT-CHAIN-1` (§3.8) |
+| **Startable now** — no gate, no owed decision | assurance wave 2 (wave 1 has shipped; `ASSURE-MAKER-CHECKER-1` ✅ shipped 2026-09-27): `ASSURE-ACTION-REQUESTS-1` ✅ shipped 2026-09-27; `ASSURE-ENTITY-LISTS-1` ⏸ on hold for Link Analysis. Assurance wave 3, in flight: `ASSURE-KPI-DEFINITIONS-1` (§3.6) · `ASSURE-RISK-SCORE-1` ✅ shipped 2026-09-27 · `ASSURE-AUDIT-CHAIN-1` (§3.8) |
 | **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | Platform Services Stage 2/3 (§3.2) · `findings-spec` acceptance session with a Case-desk lead (§3.9) · cross-Space consequence (§3.5, ⏸ on hold until D10 is named) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residual (one `package.ps1` run) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · `D8-SES-SNS-1` (SES/SNS adapter ON HOLD by operator 2026-09-25; per-user preferences need a call) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) |
 
@@ -276,7 +277,7 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.9 Cases, Incidents & Assistant
 
-- **P2** · `ASSURE-RISK-SCORE-1` — **an explainable Risk Score per entity (WS-22, wave 3.2 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** Nothing scores an entity today. Build a weighted-factor component per entity type (`score = Σ weight × indicator`, capped 0–100, `factors[]` with indicator, value, weight, contribution and evidence) evaluated by a **Job** (never a new Step Processor — the hold stands) that writes a scores Dataset and feeds Incident priority. Feeding a watch Entity List waits on `ASSURE-ENTITY-LISTS-1`. **Built 2026-09-27, not closed (awaiting integration + GAUNTLET):** the `risk-score` kind, the `risk.score` Job (history + `_latest` scores Datasets, reproducible factors), `GET /risk-scores/{model}/{entityKey}` and the factor panel on Incidents / Link Analysis; Incident priority is a documented per-entity Alert Rule over `_latest` (truth: [`okf/backend/control-plane/risk-scores.md`](okf/backend/control-plane/risk-scores.md)). Residuals: the watch Entity List (on hold), an authoring pane, and history retention.
+- **P3** · `ASSURE-RISK-SCORE-RESIDUALS-1` — **residuals of Risk Scores** (✅ `ASSURE-RISK-SCORE-1` shipped 2026-09-27 after three rounds of adversarial security review: the `risk-score` kind, the `risk.score` Job writing `risk_scores_<id>` history + `_latest` with reproducible factors, derived output names under a reserved `risk_scores_` prefix with an ownership marker, write-time masking of classified evidence under a Space key in `<config root>.secrets/`, `GET /risk-scores/{model}/{entityKey}` with scoped existence-hiding, and Incident priority through a per-entity Alert Rule; as-built in [`okf/backend/control-plane/risk-scores.md`](okf/backend/control-plane/risk-scores.md)). Open: **(1)** the watch Entity List is not fed (waits on `ASSURE-ENTITY-LISTS-1`, on hold); **(2)** no authoring pane (models via `/components/risk-score`); **(3)** the history Dataset is never pruned; **(4)** the entity key is raw on every surface pending D-P8; **(5)** rows written before a column was classified stay raw (history is never rewritten); **(6)** no `risk.score` entry in the UI job palette (`job-attributes.ts`); **(7)** indicators are Measures only — no free-form arithmetic, no saved-Measure reference. Build on demand.
 
 - **P3** · `ASSURE-IMPACT-LEDGER-RESIDUALS-1` — **residuals of the impact ledger** (✅ `ASSURE-IMPACT-LEDGER-1` shipped 2026-09-26: typed impact on Incident and Case via `PUT /objects/{id}/impact` with `outstanding` derived, late recoveries on a RESOLVED Incident / CLOSED Case, the Findings `impactAmount` retired, a Disposition required on Incident resolve (+ `DUPLICATE`, `ACCEPTED_RISK`) and cleared on reopen, a machine heal never resolving an Incident, the SPA impact panel and resolve-dialog Disposition, the `impact_ledger` Dataset; as-built in `okf/capabilities/incidents/incidents.md` §3.4–3.5, `okf/backend/control-plane/jobs.md`, `okf/frontend/features/objects.md`). Open: **(1)** `analytics()` and the ledger read at most `ObjectQuery.MAX_LIMIT` (10 000) objects per type, silently; **(2)** the ledger is as fresh as the `objects.analytics` cadence — no live view of the single-writer objects table; **(3)** a stored object carrying only the retired flat `impactAmount` no longer counts (no migration, by design); **(4)** no browser pass yet over the impact panel and resolve dialog; **(5)** the generated `resolve` / `transition` operations in `openapi-v1.json` do not document `disposition`. Build on demand.
 
