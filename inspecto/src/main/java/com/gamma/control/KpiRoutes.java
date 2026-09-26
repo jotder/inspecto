@@ -119,8 +119,9 @@ final class KpiRoutes implements RouteModule {
     }
 
     /**
-     * {@code YYYY-MM-DD}, or an ISO instant read as its date in the KPI's zone; absent means today in that zone.
-     * 400 otherwise.
+     * {@code YYYY-MM-DD}, or an ISO instant read as its date in the KPI's zone; absent means today in that zone. 400
+     * on anything unparseable, on an instant the calendar cannot place (an extreme year), and on a date after today:
+     * a period that has not started yet has no value to report.
      */
     static LocalDate asOf(String raw, java.time.ZoneId zone) {
         LocalDate today = LocalDate.now(zone);
@@ -128,9 +129,14 @@ final class KpiRoutes implements RouteModule {
         LocalDate d;
         try {
             d = raw.length() == 10 ? LocalDate.parse(raw) : Instant.parse(raw).atZone(zone).toLocalDate();
-        } catch (java.time.format.DateTimeParseException bad) {
+        } catch (java.time.DateTimeException bad) {   // DateTimeParseException included
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "asOf must be YYYY-MM-DD or an ISO instant, got '" + raw + "'");
         }
+        if (d.getYear() < 1)
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "asOf " + d + " is before year 1");
+        if (d.isAfter(today))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "asOf " + d + " is in the future (today in "
+                    + zone.getId() + " is " + today + ")");
         return d;
     }
 

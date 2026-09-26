@@ -195,6 +195,22 @@ class ControlApiKpiTest {
         }
     }
 
+    @Test
+    void aFutureOrUnplaceableAsOfIsA400AndTheZoneIsReported(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOrders(c, "orders", Map.of());
+            data(send(c, "POST", "/components/kpi", KPI, ALICE), 200);
+            String tomorrow = java.time.LocalDate.now(java.time.ZoneId.of("UTC")).plusDays(1).toString();
+            assertTrue(error(send(c, "GET", "/kpis/revenue/value?asOf=" + tomorrow, null, ALICE), 400).contains("in the future"));
+            assertEquals(400, send(c, "GET", "/kpis/revenue/value?asOf=%2B999999999-12-31T23:59:59Z", null, ALICE).statusCode());
+            assertEquals(400, send(c, "GET", "/kpis/revenue/value?asOf=-999999999-01-01T00:00:00Z", null, ALICE).statusCode());
+            assertEquals(400, send(c, "GET", "/kpis/revenue/value?asOf=%2B1000000001-01-01T00:00:00Z", null, ALICE).statusCode());
+            JsonNode today = data(send(c, "GET", "/kpis/revenue/value", null, ALICE), 200);
+            assertEquals("UTC", today.get("timezone").asText(), "no timezone on the KPI and no Space setting ⇒ UTC");
+            assertEquals(java.time.LocalDate.now(java.time.ZoneId.of("UTC")).toString(), today.get("asOf").asText());
+        }
+    }
+
     // ── the Dataset sharing boundary ─────────────────────────────────────────────
 
     @Test
