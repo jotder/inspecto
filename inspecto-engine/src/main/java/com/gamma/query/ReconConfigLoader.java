@@ -9,7 +9,7 @@ import java.util.function.Function;
 
 /**
  * Assembles a validated {@link ReconService.Spec} from a persisted/inline {@code reconciliation} config map
- * — the single place the {@code datasets} (with v1 {@code leftDataset}/{@code rightDataset} compatibility),
+ * — the single place the {@code datasets} (with v1 {@code leftDataset}/{@code rightDataset}/{@code thirdDataset} compatibility),
  * {@code keyColumns}, {@code compareColumns} (agg/tolerance), {@code columnMap}, {@code filters} and
  * {@code impact.column} (a carried, never-compared Break impact column) are read.
  * Shared by the interactive {@code POST /recon/run} route ({@code ReconRoutes}) and the scheduled
@@ -24,11 +24,14 @@ public final class ReconConfigLoader {
     /** Build a spec from {@code config}, resolving each dataset id to its trusted relation SQL via {@code relationSqlFor}. */
     public static ReconService.Spec buildSpec(Map<String, Object> config, Function<String, String> relationSqlFor) {
         List<String> datasets = strings(config.get("datasets"));
-        if (datasets.isEmpty()) {   // v1 config compatibility: leftDataset/rightDataset
+        if (datasets.isEmpty()) {   // v1 config compatibility: leftDataset/rightDataset[/thirdDataset]
             String left = Values.blankToNull(config.get("leftDataset"));
             String right = Values.blankToNull(config.get("rightDataset"));
+            // The third side too — without it a v1 3-way config silently ran (and recorded) as 2-way.
+            String third = Values.blankToNull(config.get("thirdDataset"));
             if (left != null) datasets.add(left);
             if (right != null) datasets.add(right);
+            if (third != null) datasets.add(third);
         }
         if (datasets.size() < 2 || datasets.size() > 3)
             throw new IllegalArgumentException("expected 2 or 3 datasets (the first is the anchor), got " + datasets.size());

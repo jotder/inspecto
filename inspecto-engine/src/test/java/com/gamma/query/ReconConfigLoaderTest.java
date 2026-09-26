@@ -20,6 +20,7 @@ class ReconConfigLoaderTest {
         return switch (id) {
             case "a" -> "SELECT * FROM (VALUES ('EU',100.0),('US',50.0)) t(region, amount)";
             case "b" -> "SELECT * FROM (VALUES ('EU',100.0),('APAC',7.0)) t(region, amount)";
+            case "c" -> "SELECT * FROM (VALUES ('EU',100.0)) t(region, amount)";
             default -> throw new IllegalArgumentException("unknown dataset '" + id + "'");
         };
     }
@@ -54,6 +55,19 @@ class ReconConfigLoaderTest {
         ReconService.Spec spec = ReconConfigLoader.buildSpec(config, ReconConfigLoaderTest::rel);
         assertEquals("a", spec.sides().get(0).datasetId());
         assertEquals("b", spec.sides().get(1).datasetId());
+    }
+
+    /** A v1 3-way config ({@code thirdDataset}) must keep its third side: the compat path used to drop it,
+     *  so a 3-way Reconciliation silently ran — and recorded — as 2-way (telco demo, 2026-09-26). */
+    @Test
+    void v1ThirdDatasetKeepsTheThirdSide() {
+        Map<String, Object> config = Map.of(
+                "leftDataset", "a", "rightDataset", "b", "thirdDataset", "c",
+                "keyColumns", List.of("region"),
+                "compareColumns", List.of(Map.of("column", "amount")));
+
+        ReconService.Spec spec = ReconConfigLoader.buildSpec(config, ReconConfigLoaderTest::rel);
+        assertEquals(List.of("a", "b", "c"), spec.sides().stream().map(ReconService.Side::datasetId).toList());
     }
 
     @Test
