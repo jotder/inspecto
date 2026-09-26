@@ -81,6 +81,11 @@ final class CapabilityManifest {
             // Standard/Enterprise bundle — inspecto-agent IS staged, unlike inspecto-intelligence.
             new Entry("POST", "/assist/settings", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/assist/settings/test", Roles.CAN_AUTHOR_WORKBENCH),
+            // AuditLogRoutes (ASSURE-AUDIT-CHAIN-1) — the tamper-evidence reads are gated like the anchor write: a
+            // verify walks the whole trail and the anchors are what an auditor carries off the box.
+            new Entry("GET", "/audit/verify", Roles.CAN_ADMINISTER),
+            new Entry("GET", "/audit/anchors", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/audit/anchors", Roles.CAN_ADMINISTER),
             // BiRoutes
             new Entry("POST", "/bi/templates/([^/]+)/apply", Roles.CAN_AUTHOR_WORKBENCH),
             // BundleRoutes

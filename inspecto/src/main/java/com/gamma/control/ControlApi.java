@@ -820,6 +820,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             respond(ex, 404, Map.of("error", "not found — API routes are served under /api/v1"));
             return;
         }
+        // ASSURE-AUDIT-CHAIN-1: the day-boundary audit anchor — once per UTC day per Space, in the background.
+        try {
+            AuditAnchors.rollIfDue(service().events(), writeRoot());
+        } catch (RuntimeException ignore) {
+            // best effort — anchoring must never break the request
+        }
         boolean pathMatched = false;
         for (Route r : routes) {
             Matcher m = r.pattern.matcher(path);

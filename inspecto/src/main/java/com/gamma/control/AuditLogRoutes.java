@@ -7,6 +7,7 @@ import com.gamma.event.EventType;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
 
@@ -46,6 +47,78 @@ final class AuditLogRoutes implements RouteModule {
         // 4d: the route inventory the evidence report and an auditor's own probe both consume. A READ,
         // therefore open by policy (3e) - it exposes the SHAPE of the surface, never data behind it.
         api.get("/audit/route-inventory", (e, m) -> routeInventory(api));
+        // ASSURE-AUDIT-CHAIN-1: tamper evidence. Reads, but gated: a verify walks the whole trail (bounded, still
+        // costly) and the anchors are the evidence an auditor carries off the box, so both are an administrator's.
+        api.get("/audit/verify", ApiContext.withCapability("canAdminister", (e, m) -> verify(api, e)));
+        api.get("/audit/anchors", ApiContext.withCapability("canAdminister", (e, m) -> anchors(api, e)));
+        api.post("/audit/anchors", ApiContext.withCapability("canAdminister", (e, m) -> anchorNow(api)));
+    }
+
+    /** The most chain records one {@code /audit/verify} walks; past it the result says {@code complete: false}
+     *  and names the seq to resume from. */
+    static final int MAX_VERIFY = 100_000;
+
+    /** The default and the ceiling of {@code /audit/anchors?limit=}. */
+    static final int ANCHORS_DEFAULT = 1000;
+    static final int ANCHORS_MAX = 10_000;
+
+    /**
+     * {@code GET /audit/verify?from=&to=} — recompute the Space's audit hash chain over the seq range
+     * {@code [from, to]} (both optional: the lowest retained seq, the head) and answer {@code ok}, or the FIRST bad
+     * seq with its reason ({@link AuditVerifier}). A broken chain is a 200 with {@code ok: false} — the answer to
+     * the question asked, not a failure of the request. Without a write root there is no key and so no anchors:
+     * the chain is still verified, and {@code anchors} says {@code unavailable}.
+     */
+    private static Object verify(ApiContext api, HttpExchange ex) throws IOException {
+        Long from = seqParam(ex, "from");
+        Long to = seqParam(ex, "to");
+        if (from != null && to != null && from > to)
+            throw new ApiException(400, "from (" + from + ") is after to (" + to + ")");
+        Path root = api.writeRoot();
+        List<AuditAnchors.Anchor> anchors = root == null ? List.of() : AuditAnchors.read(root);
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>(AuditVerifier.verify(
+                api.service().events(), anchors, from, to, MAX_VERIFY, e -> true).toMap());
+        out.put("anchors", root == null ? "unavailable" : "checked");
+        return out;
+    }
+
+    /** {@code GET /audit/anchors?limit=} — the Space's signed anchors, oldest first, each with its MAC verdict; the
+     *  newest {@code limit} when there are more, with {@code total} and {@code truncated}. For export off the box. */
+    private static Object anchors(ApiContext api, HttpExchange ex) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "audit anchors");
+        int limit = Math.max(1, Math.min(ANCHORS_MAX,
+                ApiContext.parseIntOr(ApiContext.query(ex, "limit"), ANCHORS_DEFAULT)));
+        List<AuditAnchors.Anchor> all = AuditAnchors.read(root);
+        List<AuditAnchors.Anchor> shown = all.subList(Math.max(0, all.size() - limit), all.size());
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("total", all.size());
+        out.put("truncated", shown.size() < all.size());
+        out.put("anchors", shown.stream().map(AuditAnchors.Anchor::toMap).toList());
+        return out;
+    }
+
+    /** {@code POST /audit/anchors} — anchor now (after closing any finished day); 409 over a chain that does not
+     *  verify. {@code created: false} when nothing was chained since the last anchor. */
+    private static Object anchorNow(ApiContext api) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "audit anchors");
+        AuditAnchors.OnDemand done = AuditAnchors.onDemand(api.service().events(), root);
+        java.util.Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("created", done.created());
+        out.put("anchor", done.anchor() == null ? null : done.anchor().toMap());
+        return out;
+    }
+
+    /** A positive seq query parameter, or {@code null} when absent; anything else is a 400. */
+    private static Long seqParam(HttpExchange ex, String name) {
+        String v = ApiContext.query(ex, name);
+        if (v == null || v.isBlank()) return null;
+        try {
+            long n = Long.parseLong(v.trim());
+            if (n >= 1) return n;
+        } catch (NumberFormatException ignore) {
+            // fall through
+        }
+        throw new ApiException(400, name + " must be a chain seq (an integer from 1), got '" + v + "'");
     }
 
     /** {@code GET /audit/search?type=AUDIT|ACCESS_DENIED&limit=&offset=&pipeline=&correlationId=&q=&from=&to=} */

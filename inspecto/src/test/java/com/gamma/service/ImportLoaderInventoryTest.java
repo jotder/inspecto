@@ -84,6 +84,9 @@ class ImportLoaderInventoryTest {
         for (String p : List.of("access-catalog/catalog.toon", "catalog.toon"))
             ALLOWED.put(p, "registry/access-catalog/catalog.toon (AccessGrants) — inside the RESERVED "
                     + "registry/access-catalog/");
+        ALLOWED.put("audit-anchors.jsonl", "the signed audit anchors (AuditAnchors, ASSURE-AUDIT-CHAIN-1) in "
+                + "<config root>.secrets/ beside the Pending Change key — a SIBLING of the config tree, so no import "
+                + "reaches it; each line is MAC'd, so a planted one reads as integrity: invalid");
         for (String p : List.of("reference.key", "inspecto.idempotency.key"))
             ALLOWED.put(p, NOT_A_FILE);
     }
