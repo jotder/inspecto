@@ -39,8 +39,8 @@ import java.util.regex.Pattern;
  * The caller then CONNECTS TO THE CHECKED ADDRESS ({@link #resolve} returns it), so a second resolution cannot
  * swap it — the transport keeps the original name for the Host header, SNI and certificate verification.
  *
- * <p>⚠ Embedded-IPv4 IPv6 forms other than IPv4-mapped (6to4, NAT64 {@code 64:ff9b::/96}) are classified as
- * IPv6 addresses — i.e. public. The allowlist is the place to be stricter if a network routes them.
+ * <p>Embedded-IPv4 IPv6 forms (IPv4-compatible {@code ::/96}, IPv4-mapped, 6to4 {@code 2002::/16}, NAT64
+ * {@code 64:ff9b::/96} and {@code 64:ff9b:1::/48}) are classified by the IPv4 address they carry.
  */
 public final class EgressPolicy {
 
