@@ -39,7 +39,8 @@ import java.util.Map;
  * opening a managed Incident (the author-selectable, any-severity generalization of the
  * {@code create-alert} high-severity auto-promotion) — and emits a descriptive stub
  * signal for the remaining platform actions ({@code render-widget},
- * {@code generate-report}, {@code invoke-api}), matching the mock's own scope; the routing actions
+ * {@code generate-report}), matching the mock's own scope — {@code invoke-api} proposes a pending
+ * Action Request on the rule's Incident ({@link ActionRequestRoutes#propose}), never a direct call; the routing actions
  * ({@code route}/{@code tag}/{@code quarantine}/{@code drop}) are record-level — {@code simulate}
  * counts the rows they would affect, and they take effect during live pipeline runs via
  * {@link com.gamma.query.DecisionRuleApplier} (every batch applies the target pipeline's enabled rules
@@ -172,6 +173,7 @@ final class DecisionRoutes implements RouteModule {
         String status = "skipped";
         String detail;
         String runId = null;
+        String actionRequestId = null;
         switch (action) {
             case "emit-signal" -> {
                 String type = paramStr(c, "type", "decision-rule." + ruleName);
@@ -287,7 +289,15 @@ final class DecisionRoutes implements RouteModule {
                     detail = "Incident already open for rule '" + ruleName + "'";
                 }
             }
-            case "render-widget", "generate-report", "invoke-api" -> {
+            case "invoke-api" -> {
+                // ASSURE-ACTION-REQUESTS-1: never a direct call — a PENDING Action Request on the rule's Incident,
+                // which a second person approves before ActionDispatcher sends it.
+                String[] made = proposeActionRequest(api, ruleName, c, automatic, actor);
+                status = made[0];
+                detail = made[1];
+                actionRequestId = made[2];
+            }
+            case "render-widget", "generate-report" -> {
                 emitSignal("decision-rule." + action, "decision-rule:" + ruleName, Map.of("action", action));
                 status = "executed";
                 detail = "recorded " + action + " stub signal (execution engine not built yet)";
@@ -301,7 +311,62 @@ final class DecisionRoutes implements RouteModule {
         out.put("status", status);
         out.put("detail", detail);
         if (runId != null) out.put("runId", runId);
+        if (actionRequestId != null) out.put("actionRequestId", actionRequestId);
         return out;
+    }
+
+    /**
+     * The {@code invoke-api} consequence: propose a {@code pending} Action Request linked to the rule's open
+     * Incident (correlation {@code decision-rule:<rule>}; opened here when none is open, as {@code create-incident}
+     * would), with the consequence's {@code params} — {@code connection}, {@code method} (default POST) and
+     * {@code payload}, a JSON object whose string leaves may use {@code {{incident.id}}} / {@code {{context.rule}}}.
+     * Deduped: while one this rule proposed on that Incident is still pending, another is not. The author is the
+     * person applying the rule, or {@code decision-rule:<rule>} when the engine did — never the approver.
+     *
+     * @return {status, detail, actionRequestId-or-null}
+     */
+    /** The payload an {@code invoke-api} consequence sends when it names none: which Incident, which rule. */
+    static final Map<String, Object> DEFAULT_INVOKE_PAYLOAD = Map.of("incident", "{{incident.id}}", "rule", "{{context.rule}}");
+
+    private static String[] proposeActionRequest(ApiContext api, String ruleName, Map<String, Object> c,
+                                                 boolean automatic, String actor) {
+        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        if (objects == null)
+            return new String[] {"skipped", "no Action Request — operational objects are not installed in this "
+                    + "bundle, so there is no Incident to raise it on", null};
+        Path root = api.writeRoot();
+        if (root == null)
+            return new String[] {"skipped", "no Action Request — set -Dassist.write.root to enable", null};
+        String corr = "decision-rule:" + ruleName;
+        String incident = objects.activeAttributeIndex(ObjectType.INCIDENT, corr, "decisionRule").get(ruleName);
+        if (incident == null) {
+            String severity = paramStr(c, "severity", "warning");
+            incident = objects.open(ObjectType.INCIDENT, "Decision Rule " + ruleName,
+                    "Raised by Decision Rule '" + ruleName + "' for an invoke-api action", severity, corr,
+                    Map.of("rule", ruleName, "decisionRule", ruleName, "severity", severity));
+        }
+        Map<String, Object> p = params(c);
+        try {
+            synchronized (ActionRequests.lock()) {
+                for (Map<String, Object> r : ActionRequests.list(root))
+                    if (ActionRequests.PENDING.equals(r.get("status")) && corr.equals(r.get("origin"))
+                            && incident.equals(r.get("incidentId")))
+                        return new String[] {"executed", "Action Request " + r.get("id") + " is already pending "
+                                + "approval on Incident " + incident, String.valueOf(r.get("id"))};
+            }
+            Map<String, Object> spec = new LinkedHashMap<>();
+            spec.put("connection", p.get("connection"));
+            spec.put("method", p.getOrDefault("method", "POST"));
+            spec.put("payloadTemplate", p.containsKey("payload") ? p.get("payload") : DEFAULT_INVOKE_PAYLOAD);
+            spec.put("incidentId", incident);
+            spec.put("context", Map.of("rule", ruleName));
+            Map<String, Object> rec = ActionRequestRoutes.propose(api, root, spec,
+                    automatic ? corr : actor, automatic ? "system" : "user", corr);
+            return new String[] {"executed", "proposed Action Request " + rec.get("id") + " on Incident " + incident
+                    + " — pending approval, nothing sent yet", String.valueOf(rec.get("id"))};
+        } catch (ApiException | IOException refused) {
+            return new String[] {"skipped", "no Action Request: " + refused.getMessage(), null};
+        }
     }
 
     private static String targetId(Map<String, Object> c) {

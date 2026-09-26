@@ -302,6 +302,39 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    // ── the Decision Rule invoke-api consequence ────────────────────────────────────────────────
+
+    @Test
+    void theInvokeApiConsequenceProposesAPendingRequestOnItsIncident(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            data(send(c, "POST", "/decision-rules", "{\"name\":\"leak\",\"consequences\":[{\"action\":\"invoke-api\","
+                    + "\"params\":{\"connection\":\"hook\"}}]}", DEV), 200);
+            JsonNode applied = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200);
+            JsonNode one = applied.at("/executed/0");
+            assertEquals("executed", one.get("status").asText(), applied.toString());
+            String id = one.get("actionRequestId").asText();
+            assertTrue(keys.isEmpty(), "not a direct call — nothing is sent before approval");
+
+            JsonNode rec = data(send(c, "GET", "/action-requests/" + id, null, CHECKER), 200);
+            assertEquals("pending", rec.get("status").asText());
+            assertEquals("decision-rule:leak", rec.get("origin").asText());
+            assertEquals("author-1", rec.get("author").asText(), "the person who applied the rule");
+            String inc = rec.get("incidentId").asText();
+            Map<String, Object> incident = c.svc.objects().orElseThrow().summary(inc).orElseThrow();
+            assertEquals("incident", incident.get("kind"));
+            assertEquals("decision-rule:leak", incident.get("correlationId"));
+            assertEquals(Map.of("incident", inc, "rule", "leak"), JSON.convertValue(rec.get("payload"), Map.class));
+
+            assertEquals(id, data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200)
+                    .at("/executed/0/actionRequestId").asText(), "deduped while one is pending on that Incident");
+            assertEquals(1, data(send(c, "GET", "/action-requests?incidentId=" + inc, null, AUTHOR), 200).get("total").asInt());
+
+            assertEquals("succeeded", data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200)
+                    .get("status").asText());
+            assertEquals(1, accepted.get());
+        }
+    }
+
     // ── create gates ────────────────────────────────────────────────────────────────────────────
 
     @Test
