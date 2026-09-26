@@ -53,6 +53,26 @@ class MappingMigrationTest {
         }
     }
 
+    /**
+     * The schema as the loader hands it to the compiler: the decoded file plus the sibling
+     * {@code <name>_structure.csv}, which REPLACES {@code raw.fields} when present (STRUCTURE-CSV-1, mirrored
+     * from {@code PipelineConfigParser.mergeSiblingStructure}). Decoding the file alone reads such a
+     * schema as having no raw columns — a valid Space whose structure lives in the CSV then fails here.
+     */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> loadedSchema(Path schemaFile) throws IOException {
+        Map<String, Object> schema = new LinkedHashMap<>(
+                com.gamma.config.io.ConfigCodec.toMap(Files.readString(schemaFile)));
+        Path csv = com.gamma.util.StructureCsv.siblingFor(schemaFile);
+        if (Files.exists(csv)) {
+            Map<String, Object> raw = schema.get("raw") instanceof Map<?, ?> r
+                    ? new LinkedHashMap<>((Map<String, Object>) r) : new LinkedHashMap<>();
+            raw.put("fields", com.gamma.util.StructureCsv.parse(Files.readString(csv), csv.toString()));
+            schema.put("raw", raw);
+        }
+        return schema;
+    }
+
     @Test
     void everyStoredSchemaIsOnFieldsAndCompiles() throws Exception {
         List<Path> schemas = storedSchemas();
@@ -61,7 +81,7 @@ class MappingMigrationTest {
         List<String> checked = new ArrayList<>();
         for (Path p : schemas) {
             String rel = repoRoot().relativize(p).toString();
-            Map<String, Object> schema = com.gamma.config.io.ConfigCodec.toMap(Files.readString(p));
+            Map<String, Object> schema = loadedSchema(p);
             if (!(schema.get("mapping") instanceof Map<?, ?> mapping)) continue;
 
             assertNull(mapping.get("rules"), rel + " still carries mapping.rules[] — transform.map is gone; "

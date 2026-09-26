@@ -116,11 +116,7 @@ public final class DataTransformer {
     @SuppressWarnings("unchecked")
     public static String selectFor(Map<String, Object> schemaConfig, PipelineConfig cfg, String sourceTable) {
 
-        List<Map<String, Object>> fields =
-                (List<Map<String, Object>>) ((Map<String, Object>) schemaConfig.get("raw")).get("fields");
-        Map<String, String> fieldTypes = new LinkedHashMap<>();
-        for (Map<String, Object> f : fields)
-            fieldTypes.put((String) f.get("name"), (String) f.get("type"));
+        Map<String, String> fieldTypes = rawFieldTypes(schemaConfig);
         SourceZones zones = SourceZones.of(schemaConfig, cfg.csv().sourceTimezone());
         Map<String, String> fieldFormats = SchemaFieldTypes.formatsOf(schemaConfig);
 
@@ -197,10 +193,7 @@ public final class DataTransformer {
     @SuppressWarnings("unchecked")
     public static long countCastFailures(Connection conn, Map<String, Object> schemaConfig,
                                         PipelineConfig cfg, String sourceTable) {
-        Map<String, String> fieldTypes = new LinkedHashMap<>();
-        for (Map<String, Object> f : (List<Map<String, Object>>)
-                ((Map<String, Object>) schemaConfig.get("raw")).get("fields"))
-            fieldTypes.put((String) f.get("name"), (String) f.get("type"));
+        Map<String, String> fieldTypes = rawFieldTypes(schemaConfig);
         SourceZones zones = SourceZones.of(schemaConfig, cfg.csv().sourceTimezone());
         Map<String, String> fieldFormats = SchemaFieldTypes.formatsOf(schemaConfig);
 
@@ -269,11 +262,7 @@ public final class DataTransformer {
     @SuppressWarnings("unchecked")
     public static List<Map<String, Object>> dataColumns(Map<String, Object> schemaConfig,
                                                        PipelineConfig.CsvSettings csv, String sourceTable) {
-        List<Map<String, Object>> fields =
-                (List<Map<String, Object>>) ((Map<String, Object>) schemaConfig.get("raw")).get("fields");
-        Map<String, String> fieldTypes = new LinkedHashMap<>();
-        for (Map<String, Object> f : fields)
-            fieldTypes.put((String) f.get("name"), (String) f.get("type"));
+        Map<String, String> fieldTypes = rawFieldTypes(schemaConfig);
         SourceZones zones = SourceZones.of(schemaConfig, csv.sourceTimezone());
 
         // `typedSource=false`: this compiles over the RAW relation, which is deliberately ALL-VARCHAR,
@@ -284,6 +273,34 @@ public final class DataTransformer {
                     + "' has a mapping with neither fields[] nor rules[] — nothing to project");
         return RecordTransform.compile(fieldRows, fieldTypes, SchemaFieldTypes.formatsOf(schemaConfig),
                 csv, zones, sourceTable, false);
+    }
+
+    /**
+     * The schema's {@code raw.fields[]} as an ordered name&rarr;type map. A schema without that list fails
+     * here with a named error instead of a {@code NullPointerException}: nothing at config-load time
+     * requires it ({@link Identifiers#validateSchema} only checks it when present), and the loader fills
+     * it from a sibling {@code <name>_structure.csv} when the schema file itself omits it — so a schema
+     * map decoded WITHOUT that merge, or one with neither, reaches the compiler without it.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> rawFieldTypes(Map<String, Object> schemaConfig) {
+        if (!(schemaConfig.get("raw") instanceof Map<?, ?> raw) || !(raw.get("fields") instanceof List<?> fields))
+            throw new IllegalArgumentException("schema '" + schemaName(schemaConfig) + "' has no raw.fields[] "
+                    + "— the raw column list the mapping compiles against is missing; declare raw.fields[] "
+                    + "inline or place a sibling <name>_structure.csv next to the schema file");
+        Map<String, String> fieldTypes = new LinkedHashMap<>();
+        for (Map<String, Object> f : (List<Map<String, Object>>) fields)
+            fieldTypes.put((String) f.get("name"), (String) f.get("type"));
+        return fieldTypes;
+    }
+
+    /** A schema's display name for errors: its {@code name}, else {@code raw.name}, else {@code mapping.canonicalName}. */
+    private static Object schemaName(Map<String, Object> schemaConfig) {
+        if (schemaConfig.get("name") != null) return schemaConfig.get("name");
+        if (schemaConfig.get("raw") instanceof Map<?, ?> raw && raw.get("name") != null) return raw.get("name");
+        if (schemaConfig.get("mapping") instanceof Map<?, ?> m && m.get("canonicalName") != null)
+            return m.get("canonicalName");
+        return "<unnamed>";
     }
 
     /**
