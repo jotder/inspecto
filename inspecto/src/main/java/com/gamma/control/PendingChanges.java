@@ -374,6 +374,24 @@ public final class PendingChanges {
     }
 
     /**
+     * HMAC-SHA256 (hex) over {@code domain + "\n" + canonical JSON of rec}, keyed by the SAME per-Space key
+     * ({@link #key}) — for another record type that must be tamper-evident (Action Requests,
+     * {@code ASSURE-ACTION-REQUESTS-1}) without a second key. The domain prefix separates the types: a Pending
+     * Change's MAC input starts with <code>{</code>, so no record of another domain can ever verify as one, nor
+     * one as it.
+     */
+    static String domainMac(Path root, String domain, Map<String, Object> rec) throws IOException {
+        try {
+            javax.crypto.Mac m = javax.crypto.Mac.getInstance("HmacSHA256");
+            m.init(new javax.crypto.spec.SecretKeySpec(key(root), "HmacSHA256"));
+            return java.util.HexFormat.of().formatHex(m.doFinal((domain + "\n" + ContentHash.canonicalJson(rec))
+                    .getBytes(StandardCharsets.UTF_8)));
+        } catch (java.security.GeneralSecurityException e) {
+            throw new IOException("HmacSHA256 unavailable", e);
+        }
+    }
+
+    /**
      * Where the Space's Pending Change key lives (round-3 verification finding 2): OUTSIDE the config tree, in the
      * sibling directory {@code <config root>.secrets/} — for a hosted Space {@code <space>/config.secrets/}, for the
      * default Space {@code <assist.write.root>.secrets/}. Outside every tree that is exported ({@code /export}
