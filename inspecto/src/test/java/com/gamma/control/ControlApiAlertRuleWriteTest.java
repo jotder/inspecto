@@ -121,6 +121,24 @@ class ControlApiAlertRuleWriteTest {
         }
     }
 
+    /** R2-05: the optional human-readable {@code description} (the fired Incident's title) is persisted
+     *  and served back, so a stored rule keeps it across a restart. */
+    @Test
+    void aDescriptionIsPersistedAndServed(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String body = """
+                    {"name":"described","metric":"error_rate","threshold":0.05,"window":"1h",
+                     "description":"Error rate too high"}""";
+            HttpResponse<String> r = send(c.port, "POST", "/alerts/rules", body);
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals("Error rate too high", V1Body.of(r.body()).get("description").asText());
+            ComponentRegistry.Component saved = store(root).get("alert-rule", "described").orElseThrow();
+            assertEquals("Error rate too high", AlertRule.fromMap(saved.content()).description());
+            assertEquals(List.of("Error rate too high"),
+                    JSON.readTree(send(c.port, "GET", "/alerts/rules", null).body()).findValuesAsText("description"));
+        }
+    }
+
     /** A body without {@code comparator} used to answer 500 (an NPE in validation); it now takes the
      *  documented default {@code gt}. */
     @Test

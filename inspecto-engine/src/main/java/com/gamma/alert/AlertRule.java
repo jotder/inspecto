@@ -24,6 +24,7 @@ import java.util.Set;
  *     window:     1h                       # Ns/Nm/Nh/Nd duration, or Nb = last N batches
  *     severity:   WARNING                  # INFO | WARNING | CRITICAL
  *     onPipeline: EVENTS                   # optional; null/absent = every pipeline
+ *     description: Error rate too high     # optional; the human title of a fired Alert / Incident
  *   }
  * </pre>
  *
@@ -87,7 +88,7 @@ import java.util.Set;
 public record AlertRule(String name, String metric, String comparator, double threshold,
                         String window, String severity, String onPipeline,
                         String dataset, String measure, Object when, String maximumAge,
-                        String investigation, String relation) {
+                        String investigation, String relation, String description) {
 
     public static final Set<String> METRICS =
             Set.of("error_rate", "failed_batches", "rejected_files", "duration_ms");
@@ -128,8 +129,18 @@ public record AlertRule(String name, String metric, String comparator, double th
                 null, null);
     }
 
+    /** Every pre-{@code description} caller (R2-05: the optional human-readable rule name). */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when, String maximumAge,
+                     String investigation, String relation) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
+                investigation, relation, null);
+    }
+
     public AlertRule {
         require(name != null && !name.isBlank(), "alert.name is required");
+        description = (description == null || description.isBlank()) ? null : description.trim();
         metric = lower(metric);
         comparator = lower(comparator);
         // Absent/blank → the spec default (ConfigSpecs.alert: gt). ⚠ Set.of(..).contains(null) THROWS, so
@@ -249,7 +260,8 @@ public record AlertRule(String name, String metric, String comparator, double th
                 alert.get("when"),
                 str(alert.get("maximumAge")),
                 str(alert.get("investigation")),
-                str(alert.get("relation")));
+                str(alert.get("relation")),
+                str(alert.get("description")));
     }
 
     /**
@@ -303,6 +315,7 @@ public record AlertRule(String name, String metric, String comparator, double th
     public Map<String, Object> toMap() {
         Map<String, Object> m = new java.util.LinkedHashMap<>();
         m.put("name", name);
+        if (description != null) m.put("description", description);
         if (metric != null) m.put("metric", metric);
         if (dataset != null) m.put("dataset", dataset);
         if (investigation != null) m.put("investigation", investigation);

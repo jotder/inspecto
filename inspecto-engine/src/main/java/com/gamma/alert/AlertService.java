@@ -513,7 +513,7 @@ public final class AlertService {
             attrs.put("value", String.valueOf(value));
             if (eventId != null) attrs.put("causedByEvent", eventId);
             String alertObjectId = objects.open(ObjectType.ALERT,
-                    rule.name() + " on " + pipeline, alert.message(), rule.severity(), pipeline, attrs);
+                    Alert.title(rule, pipeline), alert.message(), rule.severity(), pipeline, attrs);
             promoteToIncident(rule, alert, pipeline, attrs, alertObjectId);
         } catch (RuntimeException e) {
             log.warn("could not persist alert object for rule {}: {}", rule.name(), e.getMessage());
@@ -543,7 +543,7 @@ public final class AlertService {
         // S1-4: promote through the incidents Platform Service — the same interface a granted Run
         // uses. The service enforces the active-object convention (one active INCIDENT per
         // rule+pipeline) via the "rule" dedupe attribute already present in attrs.
-        incidents.openIncident(rule.name() + " on " + pipeline, alert.message(),
+        incidents.openIncident(Alert.title(rule, pipeline), alert.message(),
                         rule.severity(), pipeline, new LinkedHashMap<>(attrs), "rule")
                 // Machine actor, mirroring the Case Rules auto-linker's `case-rule:<name>` convention.
                 // ⚠ `incidentId` is the id itself since EDG-01 cell 7 — this was the only reader of the

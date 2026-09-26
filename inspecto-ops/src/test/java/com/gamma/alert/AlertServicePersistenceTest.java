@@ -144,4 +144,47 @@ class AlertServicePersistenceTest {
         assertEquals("ESCALATED_FROM", edge.relationship());
         assertEquals(edges, objects.linksOf(alert.id()), "traversable from the Alert end too");
     }
+
+    /** R2-05: the Incident a measure breach raises, read by an operator — with and without a rule description. */
+    private static OperationalObject incidentRaisedBy(AlertRule rule, double value, Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        AlertService svc = new AlertService(List.of(rule), configs(cfg), store(List.of()), objects.access());
+        svc.measureProbe((dataset, measure) -> java.util.OptionalDouble.of(value));
+        assertEquals(1, svc.evaluateAll().size());
+        List<OperationalObject> incidents =
+                objects.query(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build());
+        assertEquals(1, incidents.size());
+        return incidents.get(0);
+    }
+
+    @Test
+    void aMeasureIncidentWithoutADescriptionIsTitledByWhatItWatches(@TempDir Path dir) throws Exception {
+        AlertRule rule = new AlertRule("fm_open_exposure", null, "gt", 298668, null, "CRITICAL", null,
+                "fraud_cases_open", "sum(exposure_sar)");
+        OperationalObject incident = incidentRaisedBy(rule, 373335.09, dir);
+
+        assertEquals("Sum of exposure_sar on fraud_cases_open is above 298,668", incident.title());
+        assertEquals("CRITICAL: Sum of exposure_sar on fraud_cases_open is 373,335.09, above the threshold of "
+                + "298,668 (over current data)", incident.description());
+        // The machine ids the old title carried stay where the API already exposes them.
+        assertEquals("fm_open_exposure", incident.attributes().get("rule"));
+        assertEquals("fraud_cases_open", incident.attributes().get("dataset"));
+        assertEquals("sum(exposure_sar)", incident.attributes().get("measure"));
+        assertEquals("gt", incident.attributes().get("comparator"));
+        assertEquals("298668.0", incident.attributes().get("threshold"));
+        assertEquals("373335.09", incident.attributes().get("value"));
+    }
+
+    @Test
+    void aMeasureIncidentWithADescriptionIsTitledByIt(@TempDir Path dir) throws Exception {
+        AlertRule rule = new AlertRule("ra_failed_controls_today", null, "gte", 1, null, "CRITICAL", null,
+                "control_runs_today", "sum(failed)", null, null, null, null, "Revenue Assurance controls failing today");
+        OperationalObject incident = incidentRaisedBy(rule, 1, dir);
+
+        assertEquals("Revenue Assurance controls failing today — control_runs_today", incident.title());
+        assertEquals("CRITICAL: Sum of failed on control_runs_today is 1, at or above the threshold of 1 "
+                + "(over current data)", incident.description());
+        assertEquals("ra_failed_controls_today", incident.attributes().get("rule"));
+    }
 }

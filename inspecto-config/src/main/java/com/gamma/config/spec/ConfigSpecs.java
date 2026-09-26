@@ -737,6 +737,9 @@ public final class ConfigSpecs {
                         List.of("INFO", "WARNING", "CRITICAL"), "WARNING", "Operator-facing severity."),
                 FieldSpec.of("alert.onPipeline", "Pipeline", FieldType.STRING,
                         "Restrict to one pipeline (display or normalized name); blank = every pipeline."),
+                FieldSpec.of("alert.description", "Description", FieldType.STRING,
+                        "Optional human-readable name, used as the title of the Alert and Incident the rule "
+                                + "raises; blank = a title generated from what the rule watches."),
                 // DUCKLE-C1 freshness rule: authored with alert.dataset and NOTHING else from the
                 // ledger-metric vocabulary. ⚠ Nd/Nh/Nm/Ns only — a batch (Nb) window is not a clock,
                 // and freshness is the one check whose trigger is the passage of time.
