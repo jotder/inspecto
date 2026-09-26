@@ -143,6 +143,49 @@ timestamp: 2026-07-16T00:00:00Z
   404/405 path, this records **GET** too: a 404 on a bare GET is usually an SPA deep link, but a matched
   route is unambiguously an API call, and a refused read is exactly the attempt worth keeping.
   Pinned by three tests in `ControlApiAuthV1Test`, each proven red by removing the recording call.
+* **Tamper evidence — the audit hash chain (`ASSURE-AUDIT-CHAIN-1`, 2026-09-27).** Every `AUDIT` and
+  `ACCESS_DENIED` event a Space's `EventLog` emits is linked onto that Space's chain
+  (`inspecto-event/src/main/java/com/gamma/event/AuditChain.java`): attributes `audit_seq` (from 1),
+  `audit_prev_hash` (`""` at genesis — the Entity Fact log's convention) and `audit_hash`, SHA-256 over a
+  canonical encoding (JSON, keys sorted at every depth, nulls written, UTF-8, format version `v: 1`; the payload
+  is normalised through the store's own JSON round trip first, so a double reads back as the same text).
+  - **The seam is `EventLog.emit`, not `AuditTrail`** — `AuditTrail` is not the only class that emits `AUDIT` rows, and the hash must cover
+    the row AFTER `SecretScrubber` has run. The log holds its `AuditChain` monitor across link + append: one
+    writer per Space, so seq order is append order.
+  - **No stored head.** The head is recovered from the store (`EventStore.chainHead`) on first use and after a
+    store swap. A row replayed from the write-ahead journal is already linked and is appended as-is, so a hard
+    kill neither forks nor duplicates the chain; the replay also skips events already flushed to Parquet (a kill
+    between flush and truncate used to store them twice — a duplicate seq). A store swap re-links the carried
+    audit rows onto the incoming store's head. `chainHead` THROWS on an unreadable store, because answering
+    "empty" would restart the chain at genesis; the row is then kept unlinked rather than lost.
+  - **Time never goes back along the chain:** linking raises `ts` to the head's when the clock reads earlier,
+    which is what lets the verifier call an out-of-time record a `reorder`.
+  - `GET /audit/verify?from=&to=` (seqs; `canAdminister`) walks `[from, to]` in 1000-record pages with one
+    record of look-ahead, at most 100 000 per call (`complete: false` + `next`), and names the FIRST bad seq:
+    `duplicate`, `gap`, `reorder`, `broken-link`, `hash-mismatch`, `anchor-mismatch`, `missing`
+    (`inspecto/src/main/java/com/gamma/control/AuditVerifier.java`). A broken chain is a 200 with `ok: false`.
+  - **Anchors** (`inspecto/src/main/java/com/gamma/control/AuditAnchors.java`): `{day, firstSeq, lastSeq,
+    lastHash, count}`, HMAC-SHA256 with the Space's Pending Change key over `"audit-anchor\n"` + canonical JSON
+    (domain-separated from the Pending Change MAC, whose input starts with `{`). Stored in
+    `<config root>.secrets/audit-anchors.jsonl`, the key's sibling — outside every import, export, Exchange and
+    backup. A `daily` anchor closes each finished UTC day, rolled in the background on the first request the
+    Space serves after midnight (`ControlApi.routeDispatch` → `rollIfDue`); `POST /audit/anchors` anchors on
+    demand; `GET /audit/anchors` exports them. Neither signs a chain that does not verify: the roll stops before
+    a break and never anchors the day the break is in; on-demand answers 409, as it does when the last anchor's
+    MAC fails or its record no longer hashes to what it names.
+  - **Records from before 2026-09-27 carry no seq and are outside the chain**: it starts at seq 1 with the first
+    row linked after the upgrade.
+  - ⚠ **What it cannot see.** SHA-256 needs no key, so a chain rewritten end to end AFTER the last anchor
+    verifies — only an anchor catches it (`AuditVerifierTest.aChainRewrittenEndToEndIsCaughtOnlyByTheAnchor`
+    pins both halves). Rows deleted from the FRONT look exactly like retention (`prune` drops whole old days), so
+    a walk starting above seq 1 reports `fromGenesis: false` rather than a break. A local administrator can read
+    the key and re-sign; exporting the anchors off the box is the answer to both. Anchors are not backed up
+    (`BackupTask` skips `*.secrets`), so a restored store verifies without them.
+  - **Residuals (not built):** a `DbEventStore` shared by several pods gets one chain per process interleaved in
+    one table (verifies as duplicates) and serves the chain reads through the `EventStore` keyset-walk defaults
+    (linear per page); no offline checker tool ships (the JSON `/audit/export` carries every hashed field);
+    per decision D-P8, classification-driven masking of audit rows and read auditing beyond what exists stay
+    out of scope.
 * **Email/SMTP channel wired to `deliver(n, target)`** (2026-07-20) — `SmtpEmailChannel`
   (`inspecto-notify-channels/src/main/java/com/gamma/notify/channel/SmtpEmailChannel.java`, id `email`,
   ⚠ **relocated from `inspecto-connectors` 2026-09-07, EDG-01 cell 1** — CP-15 is not for Personal and that sidecar ships in every edition,

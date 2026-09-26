@@ -18,9 +18,12 @@ is the defensible one. An auditor who disproves an overclaim discredits the cont
 > giving one auditable point of instrumentation.
 >
 > **Protection of written audit files against deletion or tampering by a party with filesystem access
-> to the event-store directory is NOT enforced by the application.** There is no checksum, hash
-> chain, digital signature, WORM flag, or filesystem-permission hardening. That protection depends
-> entirely on OS-level file permissions and deployment controls configured by the operator.
+> to the event-store directory is NOT enforced by the application** — there is no WORM flag or
+> filesystem-permission hardening, and PREVENTION depends entirely on OS-level file permissions and
+> deployment controls configured by the operator. ✅ **Since 2026-09-27 (`ASSURE-AUDIT-CHAIN-1`) such
+> tampering is EVIDENT:** every audit record is hash-chained per Space and each finished day is pinned by a
+> MAC-signed anchor; `GET /audit/verify` names the first edited, deleted, inserted or reordered record
+> (§6). Evident is not prevented, and §6 states what the chain still cannot see.
 
 ---
 
@@ -47,9 +50,11 @@ These are the overclaims to refuse, each with the reason:
   signature or WORM flag, and no code sets filesystem permissions — a repo-wide search for
   `PosixFilePermission` / `setPosixFilePermissions` returns **nothing**. Parquet's internal checksums
   detect *corruption*, not deliberate edits.
-- **Not tamper-evident, and therefore not non-repudiable.** Nothing would reveal that a file had been
-  edited or removed. Append-only is a property of *this application's* write path; any process with
-  filesystem access can edit or delete the files with ordinary tools, undetected.
+- ~~**Not tamper-evident, and therefore not non-repudiable.**~~ **Superseded 2026-09-27** — the audit
+  records are now tamper-EVIDENT (§6). ⚠ Still **not non-repudiable**: the anchor MAC is symmetric (HMAC with
+  a key a local administrator can read), so it is not a signature a third party can verify. Append-only is
+  still a property of *this application's* write path; any process with filesystem access can still edit or
+  delete the files — what changed is that `/audit/verify` then reports it.
 - **Not access-controlled by the application.** The store's root comes from `-Devents.dir` (default
   `SpaceRoot.eventsDir()`, wired at `inspecto/src/main/java/com/gamma/service/ServiceStores.java:156-174`).
   ⚠ **PathJail does not apply here** — it governs config writes reachable through Control API config
@@ -65,8 +70,8 @@ These are the overclaims to refuse, each with the reason:
 
 Not scheduled — recorded so the gap is a known one rather than an implied capability:
 
-- A hash chain or per-file digest written to a separate location would make deletion and edit
-  **evident** (not prevented). This is the smallest real step.
+- ~~A hash chain or per-file digest written to a separate location would make deletion and edit
+  **evident** (not prevented).~~ ✅ **Built 2026-09-27** (§6).
 - OS-level enforcement — restrictive directory permissions, an append-only mount flag, or WORM
   storage — is the operator's lever, and is where actual *prevention* lives.
 - ⚠ Note the interaction with retention: the one-year audit-retention window (operator, 2026-08-30)
@@ -82,3 +87,21 @@ Not scheduled — recorded so the gap is a known one rather than an implied capa
 Re-verify this statement when: a prune/retention path is added (COMPLY-3) · a new event sink or
 dispatch seam appears · the event store's storage engine changes · anyone proposes citing this
 control as "immutability".
+
+---
+
+## 6. Tamper evidence — the audit hash chain (2026-09-27, `ASSURE-AUDIT-CHAIN-1`)
+
+| Claim | Evidence |
+|---|---|
+| Every `AUDIT` / `ACCESS_DENIED` record carries `audit_seq`, `audit_prev_hash` and `audit_hash` (SHA-256 over a canonical encoding, prevHash included), in one total order per Space | `inspecto-event/src/main/java/com/gamma/event/AuditChain.java`; linked in `EventLog.emit` under one monitor with the append |
+| An edit, deletion, insertion, reordering or tail truncation is named by seq and reason | `GET /audit/verify` → `inspecto/src/main/java/com/gamma/control/AuditVerifier.java`; each case tampered directly in the Parquet store in `AuditVerifierTest` |
+| Each finished UTC day is pinned by an HMAC-SHA256 anchor kept outside every import, export, Exchange and backup, and exportable off the box | `inspecto/src/main/java/com/gamma/control/AuditAnchors.java`; `GET /audit/anchors`; `<config root>.secrets/audit-anchors.jsonl` |
+| A restart or a hard-kill journal replay neither forks nor duplicates the chain | `AuditChainTest` (restart, abandoned store replayed, already-flushed journal) |
+
+🔴 **What it does NOT give, stated so it is not overclaimed:** a chain rewritten end to end after the
+last anchor verifies (SHA-256 needs no key — only an anchor catches it); records deleted from the front
+are indistinguishable from retention (`fromGenesis: false`); a local administrator can read the key and
+re-sign anchors — so the anchors must be exported off the box to be evidence against that party; anchors
+are not in backups; records stored before 2026-09-27 are outside the chain. ⛔ Cite it as
+**tamper-evident**, never as tamper-proof or non-repudiable.
