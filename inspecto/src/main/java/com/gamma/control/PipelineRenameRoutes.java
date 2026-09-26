@@ -619,6 +619,8 @@ final class PipelineRenameRoutes implements RouteModule {
             if (!oldId.equalsIgnoreCase(target)) continue;
             Map<String, Object> updated = new LinkedHashMap<>(content);
             updated.put("target", newId);
+            // A rename moves target only; a decision-rule's invoke-api consequences (and its stamped makers) stay.
+            if (DecisionRuleGuard.TYPE.equals(type)) DecisionRuleGuard.checkTargetRewrite(content, updated);
             if (planned != null) {
                 planned.add(type + " '" + c.name() + "'");
                 continue;

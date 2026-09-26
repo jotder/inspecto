@@ -295,7 +295,7 @@ class ConfigWriteFunnelTest {
         assertTrue(heldButListed.isEmpty(), () -> "WRITERS rows that now reach the hold — drop them: " + heldButListed);
     }
 
-    private static void writerSites(Path f, Map<String, Boolean> out) throws IOException {
+    static void writerSites(Path f, Map<String, Boolean> out) throws IOException {
         String text = withoutComments(Files.readString(f));
         Matcher w = WRITER.matcher(text);
         if (!w.find()) return;
@@ -413,7 +413,7 @@ class ConfigWriteFunnelTest {
             "return", "new", "else", "try", "do");
 
     /** Method name → body (overloads concatenated), brace-matched over code only. */
-    private static Map<String, String> methodBodies(String text) {
+    static Map<String, String> methodBodies(String text) {
         Map<String, String> out = new LinkedHashMap<>();
         Matcher m = METHOD.matcher(text);
         while (m.find()) {

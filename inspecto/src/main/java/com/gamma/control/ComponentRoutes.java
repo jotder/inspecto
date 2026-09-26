@@ -625,6 +625,12 @@ final class ComponentRoutes implements RouteModule {
         content.remove("id");   // routing key, not content (the store stamps name=id)
         try {
             validateKind(type, id, content);
+            // ASSURE-ACTION-REQUESTS-1 round-2 finding 1: this door writes decision-rule too — the same invoke-api gate
+            // and server-stamped makers as /decision-rules, before the hold (version restore lands here as well).
+            if (DecisionRuleGuard.TYPE.equals(type)) {
+                ComponentRegistry.Component prior = existing(store, type, id);
+                content = DecisionRuleGuard.prepare(ex, content, prior == null ? null : prior.content());
+            }
             // ASSURE-PER-ENTITY-ALERTS-1: this door must not arm a `by` rule the /alerts/rules door refuses.
             // ⚠ Only a rule carrying `by` is parsed here; the door's wider lack of Alert Rule validation predates it.
             if ("alert-rule".equals(type) && content.get("by") != null) {

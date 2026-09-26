@@ -142,7 +142,7 @@ final class BundleRoutes implements RouteModule {
         api.post("/bundle/preview", (e, m) -> previewBundle(api, api.body(e)));
         // Import writes real components → Builder capability (W6; no-op on Personal) then the write-root gate.
         api.post("/bundle/import", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> importBundle(api, api.body(e))));
+                (e, m) -> importBundle(api, e, api.body(e))));
     }
 
     // ── export ───────────────────────────────────────────────────────────────────
@@ -292,7 +292,7 @@ final class BundleRoutes implements RouteModule {
      * re-promotion). Reports per item ({@code imported}/{@code overwritten}/{@code skipped}/{@code unchanged}/
      * {@code failed}) without aborting the batch.
      */
-    private Object importBundle(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object importBundle(ApiContext api, com.sun.net.httpserver.HttpExchange exchange, Map<String, Object> body) throws IOException {
         // Gate 1 — writes disabled → 503.
         Path registry = WriteGates.requireWriteRoot(api, "bundle import").resolve("registry");
         // Gate 2 — structural validation → 422.
@@ -342,6 +342,10 @@ final class BundleRoutes implements RouteModule {
                 "a bundle import writes many items in one act");
         if (!introduced.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bundle fails referential integrity — import would introduce: " + introduced);
+        // ASSURE-ACTION-REQUESTS-1 round-2 finding 1: every decision-rule item passes the ONE rule gate (invoke-api
+        // needs canWorkIncidents, params validated, makers server-stamped) BEFORE the first item is written — one
+        // refusal refuses the whole import.
+        preparedDecisionRules(api, exchange, ordered);
 
         List<Map<String, Object>> results = new ArrayList<>();
         int imported = 0, overwritten = 0, skipped = 0, unchanged = 0, failed = 0;
@@ -493,6 +497,24 @@ final class BundleRoutes implements RouteModule {
             case "enrichment" -> new EnrichmentBundleSource(api, root);
             default -> null;
         };
+    }
+
+    /** Run {@link DecisionRuleGuard#prepare} over every decision-rule item, replacing its content with the stamped one. */
+    @SuppressWarnings("unchecked")
+    private static void preparedDecisionRules(ApiContext api, com.sun.net.httpserver.HttpExchange ex, List<Map<String, Object>> items) {
+        ComponentStore store = new ComponentStore(api.writeRoot().resolve("registry"));
+        for (Map<String, Object> item : items) {
+            if (!DecisionRuleGuard.TYPE.equals(ApiContext.str(item, "kind")) || !(item.get("content") instanceof Map<?, ?> c))
+                continue;
+            String id = ApiContext.str(item, "id");
+            Map<String, Object> prev = null;
+            try {
+                prev = id == null ? null : store.get(DecisionRuleGuard.TYPE, id).map(ComponentRegistry.Component::content).orElse(null);
+            } catch (IllegalArgumentException badId) {
+                prev = null;   // the per-item write refuses the id
+            }
+            item.put("content", DecisionRuleGuard.prepare(ex, (Map<String, Object>) c, prev));
+        }
     }
 
     /** {@link ComponentStore#WRITABLE_TYPES} kinds — the pre-existing behaviour, unwrapped from

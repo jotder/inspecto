@@ -156,6 +156,11 @@ public final class Investigator {
             log.info("Fix draft for {}/{} not persisted (no component write root configured)", k, i);
             return List.of();
         }
+        // ASSURE-ACTION-REQUESTS-1: a Decision Rule can raise outbound calls (invoke-api); the agent never drafts one.
+        if ("decision-rule".equals(k)) {
+            log.info("Fix draft for {}/{} not persisted: the agent does not draft Decision Rules", k, i);
+            return List.of();
+        }
         Map<String, Object> content = new LinkedHashMap<>();
         Object cfg = fixDraft.get("config");
         if (cfg instanceof Map<?, ?> m) m.forEach((ck, cv) -> content.put(String.valueOf(ck), cv));

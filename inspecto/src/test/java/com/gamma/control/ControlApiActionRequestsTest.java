@@ -595,6 +595,125 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    // ── round-2 finding 1: every writer of a decision-rule runs the ONE guard ─────────────────────
+
+    private static final String FORGED_RULE = "{\"name\":\"leak\",\"createdBy\":\"someone-else\",\"updatedBy\":\"someone-else\","
+            + "\"consequences\":[{\"action\":\"invoke-api\",\"params\":{\"connection\":\"hook\"}}]}";
+
+    /** The reproduced side door: /components/decision-rule, a forged editor, then the maker approving. */
+    @Test
+    void theGenericComponentDoorRunsTheGuardAndStampsTheMakers(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
+            assertEquals(403, send(c, "POST", "/components/decision-rule", FORGED_RULE, DEV).statusCode(),
+                    "no canWorkIncidents: no invoke-api rule through this door either");
+            assertEquals(422, send(c, "POST", "/components/decision-rule", FORGED_RULE.replace(
+                    "\"connection\":\"hook\"", "\"url\":\"https://x.example\""), POWER).statusCode(), "params validated too");
+            data(send(c, "POST", "/components/decision-rule", FORGED_RULE, POWER), 200);
+            JsonNode stored = data(send(c, "GET", "/components/decision-rule/leak", null, POWER), 200);
+            assertEquals("power-1", stored.at("/content/updatedBy").asText(stored.toString()), stored.toString());
+            assertEquals("power-1", stored.at("/content/createdBy").asText(), "the body's editor is never trusted");
+            String id = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200)
+                    .at("/executed/0/actionRequestId").asText();
+            HttpResponse<String> maker = send(c, "POST", "/action-requests/" + id + "/approve", "{}", POWER);
+            assertEquals(403, maker.statusCode(), maker.body());
+            assertTrue(keys.isEmpty());
+        }
+    }
+
+    /** Makers come from the version history: every editor since the invoke-api consequence last changed. */
+    @Test
+    void makersAreEveryEditorSinceTheInvokeApiConsequenceLastChanged(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
+            data(send(c, "POST", "/decision-rules", INVOKE_RULE, EDITOR), 200);
+            data(send(c, "PUT", "/decision-rules/leak", INVOKE_RULE.replace("\"name\":\"leak\",",
+                    "\"name\":\"leak\",\"description\":\"reworded\","), POWER), 200);   // same invoke-api
+            String first = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200)
+                    .at("/executed/0/actionRequestId").asText();
+            JsonNode rec = data(send(c, "GET", "/action-requests/" + first, null, CHECKER), 200);
+            assertEquals(List.of("power-1", "editor-1"), JSON.convertValue(rec.get("coAuthors"), List.class));
+            assertEquals(403, send(c, "POST", "/action-requests/" + first + "/approve", "{}", EDITOR).statusCode(),
+                    "the maker of the consequence, two versions back");
+            data(send(c, "POST", "/action-requests/" + first + "/decline", "{}", CHECKER), 200);
+
+            data(send(c, "PUT", "/decision-rules/leak", INVOKE_RULE.replace("\"params\":{\"connection\":\"hook\"}",
+                    "\"params\":{\"connection\":\"hook\",\"payload\":{\"n\":\"2\"}}"), POWER), 200);   // changed
+            String second = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200)
+                    .at("/executed/0/actionRequestId").asText();
+            assertEquals(List.of("power-1"), JSON.convertValue(data(send(c, "GET", "/action-requests/" + second, null,
+                    CHECKER), 200).get("coAuthors"), List.class), "the change resets who made it");
+            assertEquals("succeeded", data(send(c, "POST", "/action-requests/" + second + "/approve", "{}", EDITOR), 200)
+                    .get("status").asText(), "an earlier editor of a consequence that has since changed may approve");
+        }
+    }
+
+    @Test
+    void aVersionRestoreOfAnInvokeApiRuleIsGuarded(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            data(send(c, "POST", "/decision-rules", INVOKE_RULE, POWER), 200);
+            data(send(c, "PUT", "/decision-rules/leak", "{\"name\":\"leak\",\"consequences\":[{\"action\":"
+                    + "\"emit-signal\"}]}", POWER), 200);
+            assertEquals(403, send(c, "POST", "/components/decision-rule/leak/versions/1/restore", "{}", DEV).statusCode(),
+                    "restoring the invoke-api version is writing one");
+            data(send(c, "POST", "/components/decision-rule/leak/versions/1/restore", "{}", POWER), 200);
+        }
+    }
+
+    private HttpResponse<String> sendBytes(Ctx c, String path, byte[] body, String auth) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path))
+                .header("Authorization", auth).POST(BodyPublishers.ofByteArray(body)).build(), BodyHandlers.ofString());
+    }
+
+    private static byte[] importZip(Map<String, String> entries) throws Exception {
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        try (java.util.zip.ZipOutputStream z = new java.util.zip.ZipOutputStream(bytes)) {
+            Map<String, String> all = new java.util.LinkedHashMap<>();
+            all.put("bundle.toon", "kind: datasource\n");
+            all.putAll(entries);
+            for (Map.Entry<String, String> e : all.entrySet()) {
+                z.putNextEntry(new java.util.zip.ZipEntry(e.getKey()));
+                z.write(e.getValue().getBytes(StandardCharsets.UTF_8));
+                z.closeEntry();
+            }
+        }
+        return bytes.toByteArray();
+    }
+
+    /** The raw /import: an invoke-api rule needs canWorkIncidents, all-or-nothing, and its editor is stamped. */
+    @Test
+    void aRawImportCarryingAnInvokeApiRuleIsGuardedAllOrNothing(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String rule = com.gamma.config.io.ConfigCodec.toToon(JSON.readValue(FORGED_RULE, Map.class));
+            String dataset = com.gamma.config.io.ConfigCodec.toToon(Map.of("name", "side_ds", "title", "Side"));
+            byte[] zip = importZip(Map.of("registry/decision-rules/leak.toon", rule, "registry/datasets/side_ds.toon", dataset));
+            HttpResponse<String> dev = sendBytes(c, "/import", zip, DEV);
+            assertEquals(403, dev.statusCode(), dev.body());
+            assertFalse(Files.exists(c.root.resolve("registry/decision-rules/leak.toon")));
+            assertFalse(Files.exists(c.root.resolve("registry/datasets/side_ds.toon")), "all-or-nothing");
+            HttpResponse<String> power = sendBytes(c, "/import", zip, POWER);
+            assertEquals(200, power.statusCode(), power.body());
+            assertEquals("power-1", data(send(c, "GET", "/components/decision-rule/leak", null, POWER), 200)
+                    .at("/content/updatedBy").asText(), "the file's forged editor was replaced");
+        }
+    }
+
+    /** /bundle/import: the same guard before the first item is written. */
+    @Test
+    void aBundleImportCarryingAnInvokeApiRuleIsGuardedAllOrNothing(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String bundle = "{\"format\":\"inspecto-metadata-bundle\",\"version\":2,\"items\":["
+                    + "{\"kind\":\"dataset\",\"id\":\"side_ds\",\"content\":{\"title\":\"Side\"}},"
+                    + "{\"kind\":\"decision-rule\",\"id\":\"leak\",\"content\":" + FORGED_RULE + "}]}";
+            HttpResponse<String> dev = send(c, "POST", "/bundle/import", bundle, DEV);
+            assertEquals(403, dev.statusCode(), dev.body());
+            assertEquals(404, send(c, "GET", "/components/dataset/side_ds", null, POWER).statusCode(), "all-or-nothing");
+            data(send(c, "POST", "/bundle/import", bundle, POWER), 200);
+            assertEquals("power-1", data(send(c, "GET", "/components/decision-rule/leak", null, POWER), 200)
+                    .at("/content/updatedBy").asText());
+        }
+    }
+
     // ── create gates ────────────────────────────────────────────────────────────────────────────
 
     @Test

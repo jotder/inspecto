@@ -337,9 +337,19 @@ public final class SpaceManager implements AutoCloseable {
      * @throws IllegalStateException    single-tenant mode, or a space with this id / directory already exists
      */
     public SpaceContext createFromBundle(SpaceId id, byte[] zip) throws IOException {
+        return createFromBundle(id, zip, java.util.function.UnaryOperator.identity());
+    }
+
+    /**
+     * {@link #createFromBundle(SpaceId, byte[])} with {@code guard} applied to the parsed bundle before any directory
+     * is created — the control plane's per-kind content gate (a Decision Rule's invoke-api gate and stamped makers,
+     * {@code ASSURE-ACTION-REQUESTS-1}); it throws to refuse the whole bundle.
+     */
+    public SpaceContext createFromBundle(SpaceId id, byte[] zip, java.util.function.UnaryOperator<BundleImporter.Bundle> guard)
+            throws IOException {
         if (spacesRoot == null)
             throw new IllegalStateException("This server hosts a single space; set -Dspaces.root to manage many");
-        BundleImporter.Bundle bundle = BundleImporter.parse(zip);   // validates the manifest before touching disk
+        BundleImporter.Bundle bundle = guard.apply(BundleImporter.parse(zip));   // validates the manifest before touching disk
         synchronized (lifecycleLock) {
             if (spaces.containsKey(id))
                 throw new IllegalStateException("Space already exists: " + id.value());

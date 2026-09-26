@@ -121,6 +121,11 @@ public final class ComponentStore {
 
     private final Path registryRoot;
 
+    /** How many archived versions a component keeps — a reader of the history needs it to tell "complete" from "pruned". */
+    public static int historyKeep() {
+        return HISTORY_KEEP;
+    }
+
     /** @param registryRoot the parent of {@code grammars/}, {@code schemas/}, {@code transforms/}, {@code sinks/}. */
     public ComponentStore(Path registryRoot) {
         this.registryRoot = Objects.requireNonNull(registryRoot, "registryRoot").normalize();

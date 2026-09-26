@@ -83,13 +83,11 @@ final class DecisionRoutes implements RouteModule {
         String name = requireName(rule);
         if (RouteErrors.exists(store, TYPE, name))
             throw new ApiException(409, ErrorCodes.CONFLICT, "decision rule '" + name + "' already exists (use PUT to update)");
-        checkInvokeApi(e, rule);
         long now = System.currentTimeMillis();
         rule.put("lastSimulation", null);
         rule.put("createdAt", now);
         rule.put("updatedAt", now);
-        rule.put("createdBy", ApiContext.actor(e));   // the makers an invoke-api Action Request's four-eyes excludes
-        rule.put("updatedBy", ApiContext.actor(e));
+        rule = DecisionRuleGuard.prepare(e, rule, null);   // invoke-api gate + server-stamped makers
         PendingChanges.hold(api, e, TYPE, name, rule, null);   // maker-checker
         return write(store, name, rule);
     }
@@ -100,11 +98,9 @@ final class DecisionRoutes implements RouteModule {
         Map<String, Object> rule = normalize(body);
         rule.put("name", name);
         rule.put("lastSimulation", prev.get("lastSimulation"));
-        checkInvokeApi(e, rule);
         rule.put("createdAt", prev.getOrDefault("createdAt", System.currentTimeMillis()));
         rule.put("updatedAt", System.currentTimeMillis());
-        rule.put("createdBy", prev.get("createdBy"));
-        rule.put("updatedBy", ApiContext.actor(e));
+        rule = DecisionRuleGuard.prepare(e, rule, prev);   // invoke-api gate + server-stamped makers
         PendingChanges.hold(api, e, TYPE, name, rule, prev);   // maker-checker
         return write(store, name, rule);
     }
@@ -115,40 +111,6 @@ final class DecisionRoutes implements RouteModule {
         PendingChanges.hold(api, e, TYPE, name, null, current);   // maker-checker
         store.delete(TYPE, name);
         return Map.of("deleted", name);
-    }
-
-    /**
-     * A rule carrying an {@code invoke-api} consequence raises Action Requests whenever it is applied, so saving one
-     * is proposing outbound calls by proxy (verification finding 3): the saver must hold {@code canWorkIncidents}, the
-     * capability {@code POST /action-requests} demands (403). Its params are validated here, not at apply time
-     * (finding 4): {@code params.connection} is required and must name a registered {@code https} Connection; a
-     * legacy {@code params.url} is refused (422) — a URL was never an authorable egress target.
-     */
-    @SuppressWarnings("unchecked")
-    private static void checkInvokeApi(com.sun.net.httpserver.HttpExchange e, Map<String, Object> rule) {
-        List<Map<String, Object>> cs = (List<Map<String, Object>>) (List<?>) (rule.get("consequences") instanceof List<?> l ? l : List.of());
-        boolean any = false;
-        for (Object o : cs) if (o instanceof Map<?, ?> c && "invoke-api".equals(String.valueOf(c.get("action")))) any = true;
-        if (!any) return;
-        ApiContext.requireCapability(e, "canWorkIncidents");
-        for (Object o : cs) {
-            if (!(o instanceof Map<?, ?> raw) || !"invoke-api".equals(String.valueOf(raw.get("action")))) continue;
-            Map<String, Object> p = params((Map<String, Object>) raw);
-            if (p.containsKey("url"))
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an invoke-api consequence takes "
-                        + "params.connection (the id of an https Connection), not params.url — the target is always an "
-                        + "onboarded Connection, never a URL written into a rule");
-            Object id = p.get("connection");
-            if (id == null || String.valueOf(id).isBlank())
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an invoke-api consequence needs "
-                        + "params.connection (the id of an https Connection)");
-            com.gamma.acquire.ConnectionProfile cp = com.gamma.acquire.ConnectionRegistry.find(String.valueOf(id)).orElseThrow(
-                    () -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "invoke-api: Connection '" + id
-                            + "' is not registered in this Space"));
-            if (!com.gamma.pipeline.exec.WebhookSink.CONNECTOR.equals(cp.connector()))
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "invoke-api: Connection '" + id
-                        + "' is a '" + cp.connector() + "' connection — an Action Request target must be an https Connection");
-        }
     }
 
     // ── simulate / apply ─────────────────────────────────────────────────────────
@@ -377,14 +339,14 @@ final class DecisionRoutes implements RouteModule {
         Path root = api.writeRoot();
         if (root == null)
             return new String[] {"skipped", "no Action Request — set -Dassist.write.root to enable", null};
-        // Verification finding 3: the makers of the rule are co-authors of every request it raises, so neither may
-        // approve one. A rule saved before its editors were recorded cannot say who they were — fail closed.
-        List<String> coAuthors = java.util.stream.Stream.of(rule.get("createdBy"), rule.get("updatedBy"))
-                .filter(java.util.Objects::nonNull).map(String::valueOf).distinct().toList();
-        if (coAuthors.isEmpty())
-            return new String[] {"skipped", "no Action Request — Decision Rule '" + ruleName + "' has no recorded "
-                    + "editor (it was saved before editors were recorded), so four-eyes cannot exclude its maker; "
-                    + "save the rule again", null};
+        // Round-2 finding 1b: the makers are every editor, from the VERSION HISTORY, since the invoke-api
+        // consequence last changed — all co-authors, none may approve. Unknown provenance fails closed.
+        List<String> coAuthors = DecisionRuleGuard.makers(new ComponentStore(root.resolve("registry")), ruleName, rule);
+        if (coAuthors == null || coAuthors.isEmpty())
+            return new String[] {"skipped", "no Action Request — the version history of Decision Rule '" + ruleName
+                    + "' has no recorded editor for its invoke-api consequence (a version saved before editors were "
+                    + "recorded, or history pruned past the change), so four-eyes cannot exclude its makers; save the "
+                    + "rule again", null};
         String corr = "decision-rule:" + ruleName;
         String incident = objects.activeAttributeIndex(ObjectType.INCIDENT, corr, "decisionRule").get(ruleName);
         if (incident == null) {
