@@ -37,6 +37,17 @@ class PendingChangesKeyTest {
         assertArrayEquals(key, PendingChanges.key(config), "stable once created");
     }
 
+    /** No import entry reaches the key: the sibling is outside the config-root jail, and the leading dot fails
+     *  the segment rules wherever it is named (upstream {@code ImportPaths}, real-path check included). */
+    @Test
+    void noImportEntryCanReachTheKey(@TempDir Path tmp) throws Exception {
+        Path config = Files.createDirectories(tmp.resolve("config"));
+        PendingChanges.key(config);   // the key and its directory EXIST, so the real-path check sees them
+        for (String entry : new String[]{"../config.secrets/.pending-changes.key", "..\\config.secrets\\.pending-changes.key",
+                ".pending-changes.key", "pending-changes/.pending-changes.key", "config.secrets/.pending-changes.key"})
+            assertTrue(com.gamma.service.ImportPaths.refusal(config, entry) != null, entry);
+    }
+
     /** Two threads racing the first use get ONE key: CREATE_NEW, the loser reads the winner's — never replaces it. */
     @Test
     void theFirstWriterWinsARace(@TempDir Path tmp) throws Exception {

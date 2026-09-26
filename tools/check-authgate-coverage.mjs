@@ -78,7 +78,8 @@
 // ⬇ 69 → 64 on 2026-09-26: `ASSURE-MAKER-CHECKER-1` — the Pending Change approve / decline / policy routes
 // and the import, tag and rename doors its fixes gate are all exercised by armed tests
 // (`ControlApiPendingChangesTest`, `ControlApiImportReservedPathsTest`, `ControlApiTagRoutesTest`).
-const BASELINE_UNCOVERED = 64;
+// ⬇ 64 → 63 on 2026-09-27: `ControlApiImportUnderPolicyTest` arms the Data Source import door under a policy.
+const BASELINE_UNCOVERED = 63;
 
 // Usage:  node tools/check-authgate-coverage.mjs           # report + exit 1 on a ratchet regression
 //         node tools/check-authgate-coverage.mjs --list    # also print every uncovered route

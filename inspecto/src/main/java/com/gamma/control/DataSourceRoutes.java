@@ -235,6 +235,11 @@ final class DataSourceRoutes implements RouteModule {
         List<String> refused = com.gamma.service.ImportPaths.refusals(config, bundle.configEntries());
         if (!refused.isEmpty())
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "an import may not write " + refused);
+        // Maker-checker (ASSURE-MAKER-CHECKER-1): under an approval policy an import cannot be one Pending Change,
+        // so it is refused (409) when any entry is a governed kind or cannot be classified — before the first
+        // write, so nothing reaches the journal.
+        PendingChanges.holdRefusingPaths(api, bundle.configEntries().keySet(),
+                "an import writes a Space's configs in one act");
 
         // Conflict = a bundle pipeline id that already exists in this space's registry.
         Set<String> existing = api.service().pipelines().stream()
