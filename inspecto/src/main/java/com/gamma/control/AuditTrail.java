@@ -6,6 +6,9 @@ import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
 import com.sun.net.httpserver.HttpExchange;
 
+import java.util.List;
+import java.util.regex.Pattern;
+
 /**
  * The security audit trail's capture point — turns a state-changing Control API request into one
  * append-only audit {@link Event} ({@code type = }{@link EventType#AUDIT}). Called once from
@@ -17,8 +20,10 @@ import com.sun.net.httpserver.HttpExchange;
  * <ul>
  *   <li>Successful {@code POST}/{@code PUT}/{@code DELETE} that {@link #classify classify}s as a real
  *       mutation (create/update/delete/trigger/…); diagnostic POSTs ({@code /test}, {@code /preview},
- *       {@code /dry-run}, {@code /validate}, {@code /assist/*}) are skipped as non-mutating.</li>
- *   <li>{@code GET .../export} — data-export actions (Category B).</li>
+ *       {@code /dry-run}, {@code /assist/*}) are skipped as non-mutating, and so is every POST that
+ *       {@link CapabilityManifest#EXEMPTIONS} declares {@code read-shaped} ({@code /bi/query},
+ *       {@code /db/query}, {@code /validate}, …) — the manifest is the one list of them (R2-12).</li>
+ *   <li>{@code GET .../export}, and a read-shaped {@code POST .../export} — data-export actions (Category B).</li>
  *   <li>{@link #accessDenied} — a non-GET request to a forbidden/unknown route (404) or a disallowed
  *       method on a read-only route (405): the auth-free analogue of a 401/403 attempt.</li>
  * </ul>
@@ -176,19 +181,24 @@ final class AuditTrail {
      */
     static Action classify(String method, String path) {
         if (path == null || path.isEmpty()) return null;
-        // Export actions are GET but auditable (Category B); nothing else GET is.
-        if ("GET".equals(method)) {
+        // Export actions are GET but auditable (Category B); nothing else GET is. A read-shaped POST is a
+        // READ that carries a body, so it is classified exactly like a GET (R2-12, operator 2026-09-26):
+        // every dashboard tile's POST /bi/query was recorded as `bi.created · data_mutation`, ~120 rows a
+        // short session, drowning the real acts. The one list of such POSTs is CapabilityManifest's.
+        if ("GET".equals(method) || isReadShaped(method, path)) {
             return path.endsWith("/export") ? new Action(resource(path) + ".exported", "export") : null;
         }
         if (!"POST".equals(method) && !"PUT".equals(method) && !"DELETE".equals(method)) return null;
         // Non-mutating POSTs: diagnostics / previews / assist chat, and the user's own notification-feed
-        // housekeeping (read/delete) — not part of the security audit trail.
+        // housekeeping (read/delete) — not part of the security audit trail. These literals cover routes
+        // the manifest does NOT list as read-shaped (the gated /connections/test, the provenance-gated
+        // /parsers/{id}/preview, the self-limiting /assist/*), so they stay.
         // The /auth/* session routes emit their own typed rows through authentication() — category
         // `authentication`, action auth.exchange/refresh/logout. Classifying them here as well wrote a
         // SECOND row per sign-in ("auth.created", data_mutation), so the audit trail double-counted
         // every session event and mis-categorised it (AUDIT-AUTH-DUPLICATE-ROW-1).
         if (path.endsWith("/test") || path.endsWith("/preview") || path.endsWith("/dry-run")
-                || path.equals("/validate") || path.startsWith("/assist")
+                || path.startsWith("/assist")
                 || path.startsWith("/auth/")
                 || path.startsWith("/notifications")) return null;
 
@@ -222,6 +232,22 @@ final class AuditTrail {
             };
         };
         return new Action(resource(path) + "." + verb, category);
+    }
+
+    /** The {@code read-shaped} entries of {@link CapabilityManifest#EXEMPTIONS}, their route patterns
+     *  compiled once. Matched against the same prefix-stripped path the route table (and so the
+     *  manifest) uses, as a FULL match — {@code /bi/query} matches, a persisting sibling does not. */
+    private static final List<ReadShaped> READ_SHAPED = CapabilityManifest.EXEMPTIONS.stream()
+            .filter(e -> "read-shaped".equals(e.category()))
+            .map(e -> new ReadShaped(e.method(), Pattern.compile(e.pattern())))
+            .toList();
+
+    private record ReadShaped(String method, Pattern pattern) {}
+
+    private static boolean isReadShaped(String method, String path) {
+        for (ReadShaped r : READ_SHAPED)
+            if (r.method().equals(method) && r.pattern().matcher(path).matches()) return true;
+        return false;
     }
 
     /**

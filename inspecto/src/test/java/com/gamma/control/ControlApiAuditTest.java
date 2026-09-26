@@ -5,6 +5,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
 import com.gamma.event.Event;
+import com.gamma.pipeline.ComponentStore;
+import com.gamma.pipeline.ViewDefinition;
+import com.gamma.pipeline.ViewStore;
 import com.gamma.service.CollectorService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,7 +20,9 @@ import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,6 +39,16 @@ class ControlApiAuditTest {
 
     private record Ctx(CollectorService svc, ControlApi api, int port, String name) implements AutoCloseable {
         public void close() { api.close(); svc.close(); }
+    }
+
+    /** {@link #open} with a component write root, which {@code POST /bi/query} needs to resolve a Dataset. */
+    private Ctx open(Path dir, Path writeRoot) throws Exception {
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            return open(dir);
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
     }
 
     private Ctx open(Path dir) throws Exception {
@@ -111,6 +126,43 @@ class ControlApiAuditTest {
             }
             assertTrue(denied, "a non-GET attempt at an unknown route is recorded as ACCESS_DENIED");
         }
+    }
+
+    /**
+     * R2-12 (operator, 2026-09-26): a read-shaped POST — here the dashboard tile's {@code /bi/query}, bare and
+     * Space-prefixed — leaves no AUDIT row, while a real mutation by the same caller still does. Rows are
+     * matched by a per-run actor, because the default Space's event store is shared with other tests.
+     */
+    @Test
+    void readShapedPostLeavesNoAuditRowButAMutationDoes(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root)) {
+            new ViewStore(root.resolve("views")).write(new ViewDefinition("sales_view", "flow-x", List.of(),
+                    "SELECT * FROM (VALUES ('EU',10.0),('US',5.0)) AS t(region,amount)", "2026-09-26T00:00:00Z"));
+            new ComponentStore(root.resolve("registry")).write("dataset", "sales_ds", Map.of("view", "sales_view"));
+            String actor = "r2_12_" + System.nanoTime();
+            String query = """
+                    {"dataset":"sales_ds","measures":[{"agg":"sum","field":"amount"}],"groupBy":["region"]}""";
+
+            assertEquals(200, sendAs(c.port, actor, "/bi/query", query).statusCode());
+            assertEquals(200, sendAs(c.port, actor, "/spaces/default/bi/query", query).statusCode());
+            assertEquals(200, sendAs(c.port, actor, "/runs/" + c.name + "/pause", null).statusCode());
+
+            List<String> actions = new ArrayList<>();
+            for (JsonNode e : recentEvents(c)) {
+                JsonNode a = e.get("attributes");
+                if ("AUDIT".equals(e.get("type").asText()) && actor.equals(a.path("actor").asText()))
+                    actions.add(a.path("action").asText() + " " + a.path("http_path").asText());
+            }
+            assertEquals(List.of("pipeline.paused /runs/" + c.name + "/pause"), actions,
+                    "only the mutation is audited; neither /bi/query read is");
+        }
+    }
+
+    private HttpResponse<String> sendAs(int port, String actor, String path, String body) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("X-Actor", actor)
+                .POST(body == null ? BodyPublishers.noBody() : BodyPublishers.ofString(body)).build(),
+                BodyHandlers.ofString());
     }
 
     /**

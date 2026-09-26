@@ -264,6 +264,26 @@ same requests as `auth.created` (`data_mutation`), so every sign-in wrote two ro
 (`AUDIT-AUTH-DUPLICATE-ROW-1`; an over-count in auditor-facing data). *Authorization*
 decisions are in it too (`access.denied`/`access.granted`, ABAC A5). Secrets are scrubbed at `EventLog.emit`, not here.
 
+**Read-shaped POSTs are not audited (operator, 2026-09-26, demo finding R2-12).** Read-shaped POSTs, as
+declared in `CapabilityManifest.EXEMPTIONS`, are not audited — **the manifest is the single list.**
+`AuditTrail.classify` treats a (method, path) that fully matches a `read-shaped` entry's route pattern
+exactly like a GET. The pattern is compiled once and matched against the prefix-stripped path the route
+table uses, so `/spaces/{id}/bi/query` counts too. It must be a FULL match, so a persisting sibling
+(`/recon/promote` beside `/recon/breaks`) is still audited. Before this, every dashboard tile's
+`POST /bi/query` was written as `bi.created · data_mutation`, ~120 rows in a short demo session, and
+the real acts were lost among them. The trail's own skip list had also drifted from the manifest
+(`/bi/query`, `/db/query`, `/recon/*`, `/geo/*`, `/inv/*` and `/config/preview/*` were all missing
+from it; the last was even filed under `configuration`). ⚠ Being like a GET cuts both ways:
+`POST /bundle/export` (read-shaped) is still audited, now as `bundle.exported · export`, the way a
+GET export is, rather than `bundle.created · data_mutation`. The literal skips (`…/test`,
+`…/preview`, `…/dry-run`, `/assist*`, `/auth/*`, `/notifications*`) stay, because each of them covers
+routes the manifest does not list as read-shaped. Only `/validate` was fully covered, so its literal
+went. The Link Analysis and Geo reads (`/inv/*`, `/geo/*`) still say who looked at what, through their
+own typed events (`LINK_PROJECTED`, `GEO_PROJECTED`, …). What went away is the generic duplicate
+`inv.created` row. Pinned by `AuditTrailTest` and
+`ControlApiAuditTest.readShapedPostLeavesNoAuditRowButAMutationDoes`, and both were proven red by
+deleting the clause.
+
 **Durability claims, exactly.** The trail is **append-only by construction** — one write seam, no update
 or delete route, 405 inherent to dispatch — and that is the whole claim. It is **not tamper-evident** (no
 hash chain, no signature), not permission-hardened (no `PosixFilePermission` call exists repo-wide), and
@@ -576,6 +596,7 @@ the form authors the kind), and per-measure limits.
 | 2026-09-08 | EDG-01 cell 6: the events feed + audit CSV export moved **whole** to `inspecto-events` (gating the CSV alone needed an `if` inside a core route, banned by §Assembly); recording not gated; new core `AuditLogRoutes` keeps `/audit/*` on every edition | operator; `EDITIONS.md` CP-13, §Audit |
 | 2026-09-08 | This spec: OPS-2's "ungated" cell, OPS-3's "tamper-evident"/"sign-ins", OPS-4's "off by default" and the 7-field GLOSSARY envelope corrected; `OPS`/Ops-Lens naming applied to REQUIREMENTS §3.7 | this file §2 |
 | 2026-09-24 | `DUCKLE-C8` baseline Expectation kind shipped with its durable profile store; acceptance only on a whole successful run (the sweep counts as one run); accept/clear gated `canOperateRuns` and audited with the replaced value | §3.10 |
+| 2026-09-26 | Read-shaped POSTs, as declared in `CapabilityManifest.EXEMPTIONS`, are not audited — the manifest is the single list; a read is classified like a GET, so a read-shaped export stays audited as an export (R2-12) | operator; §3.3 Layer 3 |
 
 ## 5. Not built
 
