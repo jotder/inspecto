@@ -268,7 +268,9 @@ existing-but-unreadable `roles.toon` suspends *all* role grants. `GET/PUT /acces
 `source: authored|seed` badges, a strike-through overlay for capabilities an Access Profile denies, and a
 Revert that removes the override.
 
-**The capability vocabulary is exactly eleven names**, static across editions (a Standard-authored role file
+**The capability vocabulary is exactly fifteen names** — `Roles.KNOWN_CAPABILITIES`, derived from the
+capabilities `CapabilityManifest` gates on (it said "eleven" until 2026-09-26, four additions after it was
+written) — static across editions (a Standard-authored role file
 must validate on Personal — a per-edition validator was refused, `EDITIONS.md` SEC-10 note):
 
 | Capability | Gates |
@@ -284,7 +286,10 @@ must validate on Personal — a per-edition validator was refused, `EDITIONS.md`
 | `canApproveShares` | approve / deny / revoke an Exchange grant |
 | `canRequestShares` | request access / pin a snapshot version |
 | `canAdminister` | installation administration: `PUT /spaces/{id}`, `DELETE /spaces/{id}` (⛔ NOT `POST /spaces`, which is the recovery route when a server hosts no Space); agent governance (`PUT /agent/policy`, the kill switch, approvals, Case feedback); and since 2026-09-15 step 2b **Incident/Case disposition** — `merge` / `split`, `PATCH /objects/{id}`, `POST /cases/rules/{id}/evaluate` (`ack` / `resolve` / `transition` / `assign` moved to `canWorkIncidents` on 2026-09-26) — while comment / attach / link / RCA-seed stay open as `collaboration` (recorded in `CapabilityManifest.EXEMPTIONS`, whose 60 rows plus the 4 `PENDING_OPERATOR_CALLS` make every ungated mutating route a *recorded* state; `CapabilityManifestTest` fails the build on a mutating route in no state) — added 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`). ⛔ Deliberately ONE coarse capability rather than three per-family ones (operator call): the alternative left no catch-all for the next unlisted route. ⚠ Whoever can delete a Space can do everything else this guards |
-| `canWorkIncidents` | working an Incident or Case through its lifecycle — `POST /objects/{id}/ack`, `/resolve`, `/transition`, `/assign` (operator, 2026-09-26: they left `canAdminister`, which only Admin/Super hold, so an analyst could not close their own Case). Seeded to `operations`, `support`, `power`, `admin`. ⛔ Not merge / split / the PATCH / Case-Rule evaluate — those stay `canAdminister` |
+| `canWorkIncidents` | working an Incident or Case through its lifecycle — `POST /objects/{id}/ack`, `/resolve`, `/transition`, `/assign` (operator, 2026-09-26: they left `canAdminister`, which only Admin/Super hold, so an analyst could not close their own Case). Seeded to `operations`, `support`, `power`, `admin`. Also (operator, 2026-09-26, `INCIDENT-FINISH-GATE-1`) the narrow `PUT /objects/{id}/postmortem` and `PUT /objects/{id}/category`, each writing only its one attribute and refusing any other key (422), so an analyst can FINISH an Incident. ⛔ Not merge / split / the PATCH / Case-Rule evaluate — those stay `canAdminister` |
+| `canManageIncidents` | OPENING an Incident or Case — `POST /objects`, `POST /recon/promote`, `POST /cases/from-entities` — plus Link Analysis Investigation authoring (`/inv/investigations*`, `/inv/snapshots*`) and the `findings-spec` component kind |
+| `canRevealLinkEntities` | `POST /inv/investigations/{id}/reveal` — unmasking an entity id, per entity, audited (LA-19 / D-U6). ⛔ Deliberately not `canManageIncidents`, which every Investigation owner holds |
+| `canApproveLinkExpansions` | approving / denying a PENDING sensitive expand in someone else's Investigation — four-eyes; never makes self-approval legal (LA-19 / D-U7) |
 
 **Seed roles** (`Roles.java:121-131`): `pipeline-developer`, `app-developer`, `developer` (the builder set),
 `operations`, `power`, `admin` (`canOnboardConnections`, `canConfigureAccess`, `canApproveShares`,
@@ -487,6 +492,7 @@ earlier one, both appear.
 | 2026-07-25 (**D4**) | **`canCurateMenus`** split out of `canAuthorWorkbench`, seeded admin/power/super | Editing a pipeline and changing what every business user sees are different activities |
 | 2026-07-25 | `LensService` capabilities split into **identity** vs **lens-scoped** | The whole admin seed held neither lens-qualifying capability and was snapped to read-only Business — a bootstrap deadlock |
 | 2026-07-26 | `canTriageRequirements` is **identity by operator call**; "Business lens ⇒ read-only" is no longer true | It is the `business` seed's only grant; lens-scoping it revoked the role's single capability |
+| 2026-09-26 (operator) | **Narrow postmortem + category routes on `canWorkIncidents`** (`INCIDENT-FINISH-GATE-1`): `PUT /objects/{id}/postmortem` and `PUT /objects/{id}/category` each write one attribute and refuse any other key (422); the `PATCH /objects/{id}` stays `canAdminister`. A signed-in comment's `author` is the Subject, never the body (`CASE-UI-GATE-LEFTOVERS-1`) | An analyst who may move an Incident must be able to finish it without being handed the whole field editor; a body field must not re-attribute a Subject's act. Detail: `incidents.md` §4 |
 | 2026-09-07 | The **capability vocabulary is static across editions** | Deriving it from registered routes would make a Standard-authored role file fail validation on Personal |
 | 2026-09-08 | **Audit read stays in core** in every edition via `AuditLogRoutes` (`/audit/search`, `/audit/export`), fail-closed so it cannot become the events feed | `EDITIONS.md` promises Personal an audit log; gating the events module would have removed it |
 

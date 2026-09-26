@@ -13,8 +13,11 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **38<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** —
+> **37<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ⬇ **38 → 37 on 2026-09-26**: closed P2 `INCIDENT-FINISH-GATE-1` (operator: narrow postmortem + category routes on
+> `canWorkIncidents`) and P3 `CASE-UI-GATE-LEFTOVERS-1`; its 3-way Reconciliation residue re-filed as P3
+> `RECON-3WAY-RECORDED-BREAKS-1`.
 > ⬆ **36 → 38 on 2026-09-26**: filed P2 `INCIDENT-FINISH-GATE-1` and P3 `CASE-UI-GATE-LEFTOVERS-1` (telco demo shift 2).
 > ⬇ **55 → 42 on 2026-09-24** (one integration of ~30 lanes): 14 rows closed and 1 filed. Closed: P2 `STREAM-CONSUMER-1`,
 > P2 **Consignment ELT** (`generation` deleted), P2 **Onboarding ↔ Pipeline unification** (W5 forward closure), P3
@@ -25,9 +28,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 17<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 38<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 37<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -99,7 +102,6 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | Area | Row | The call |
 |---|---|---|
 | 3.12 | Link Analysis | every open D-U* / LA-* call lives in `superpower/link-analysis-backlog-plan.md` |
-| 3.9 | `INCIDENT-FINISH-GATE-1` | may an operations user FINISH an Incident (postmortem + categorise), or only move it? |
 | 3.2 | Platform Services Stage 2 / 3 | 10 calls in `superpower/platform-services-stage2-design.md` (Decisions owed) |
 | 3.5 | cross-Space consequence | ⏸ ON HOLD 2026-09-25 (operator) until someone names the concrete consequence (D10); D2 two-party consent stands |
 | 3.5 | `D8-SES-SNS-1` | ⏸ adapter ON HOLD 2026-09-25 (D1–D12 parked); D13 answered by per-user read state; D14 done 2026-09-25 (the category label is now "Security"; id `security` unchanged); open: GeoIP and security triggers, §6 and §8 of `superpower/ses-sns-adapter-design.md` (§7 per-user preferences shipped 2026-09-25) |
@@ -211,6 +213,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 - **P2** · **D-8 XLSX export — bundle proof, two residuals** — the air-gapped half is PROVEN (2026-09-24, as-built in `okf/capabilities/pipeline-authoring/pipeline-authoring.md` §3.0): in STAGED mode (`-Dduckdb.extension.dir`, set by every launcher) `DuckDbExtension` now loads ONLY `<dir>/<name>.duckdb_extension` by path and a missing file fails loudly — never a fall-through to `INSTALL`; and the real route produced a workbook from a bundle with DuckDB's own cache made unreachable. `PipelineDocumentXlsxTest` now RUNS (not skips) wherever a stageable binary exists. Open: **(1)** the bundle used for the proof was the last `package.ps1` Enterprise output with `inspecto.jar` rebuilt, the policy jar removed and `spaces/` re-staged by package.ps1's step-4 rule — the session could not launch PowerShell — so one end-to-end `pwsh inspecto/package.ps1 -Edition Professional` run is owed; **(2)** no `linux_amd64` binary exists on the desk (`~/.duckdb/extensions/v1.5.2/` holds `windows_amd64` only), so a Linux zip still ships no `excel`: it needs `v1.5.2/linux_amd64/excel.duckdb_extension` from `http://extensions.duckdb.org/v1.5.2/linux_amd64/excel.duckdb_extension.gz` (what `node tools/fetch-duckdb-extensions.mjs` fetches), then `-RequireExtensions`. ⛔ **Do not add POI.** → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
 - **P2** · **QUERY-BOUND-WIDGET-1 — a Widget's `queryId` (R3) is modelled but never rendered** (cricket pilot 2026-09-25) — the Query Library says one saved query "can be bound by many widgets", but nothing binds one from the Widget Builder and no render path (widget host, `DatasetResultService`, `/bi/query`) reads `queryId`; a saved query's own filtering (e.g. `player_of_the_match <> ''`) cannot reach a Widget. Interim: the Widget option "Hide blank categories" covers the leaderboard case. → `okf/frontend/features/studio.md`
+- **P3** · `RECON-3WAY-RECORDED-BREAKS-1` — **a 3-way Reconciliation records only its A-vs-B Breaks** (re-filed 2026-09-26 out of `CASE-UI-GATE-LEFTOVERS-1`). A recorded run (R2-03) keeps the A↔B pair only (`ReconBreaks.compute`), so C-side Breaks are live on the Breaks page but never enter the recorded lifecycle; their identity carries no side, so recording them as-is would collide with the A↔B ones. Demand-gated: reopen when a 3-way Reconciliation needs C-side Breaks worked as Incidents. → `okf/frontend/features/reconciliation.md`
 - **P3** · **Queries / BI** — `graph`/`spatial`/`search`/`api` QueryTypes; more `$`-resolvers. (The DuckDB `spatial` extension itself: zero demand, re-verified 2026-08-26 — do not re-open on speculation.) → `okf/backend/control-plane/queries.md`
 
 Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-overview`, `quality-monitor`,
@@ -239,8 +242,6 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.9 Cases, Incidents & Assistant
 
-- **P2** · `INCIDENT-FINISH-GATE-1` — **an operations user can move an Incident but not finish it** (found 2026-09-26, after `f2bc7e47e` gave ack / resolve / transition / assign to `canWorkIncidents`). Resolving an Incident needs a postmortem, and the postmortem and Accept's categorise step are both saved through `PATCH /objects/{id}`, which stays `canAdminister`. Cases are unaffected (their Disposition goes through the open `PUT /objects/{id}/findings`). **Call owed:** (a) open the postmortem and category writes to `canWorkIncidents` as a narrow route that refuses any other key, following the findings precedent, or (b) keep Incident closure admin-only. Detail: `okf/capabilities/incidents/incidents.md` §5.
-- **P3** · `CASE-UI-GATE-LEFTOVERS-1` — leftovers from the 2026-09-26 Incident/Case lanes: Priority, Escalate, Merge and team / target-date controls still show to users the server refuses; a comment's `author` is taken from the request body, not the Subject; `okf/capabilities/security/security.md` says "exactly eleven" capabilities (there are 15); a 3-way Reconciliation records only its A-vs-B Breaks (`okf/frontend/features/reconciliation.md`).
 - **P2** · **D6 spec-authoring UI (`findings-spec`)** — ✅ **BUILT 2026-09-25, acceptance owed.** All ten calls answered that day. The Cases toolbar opens a **Findings fields** dialog (plain answer kinds, Always / Under More, *Must be filled in*, *Show only when* limited to fields above, a live preview of the real Case form, technical properties under a collapsed section, view-only without `canManageIncidents`); the server now validates the `attributes.findings` blob it stores (S0 — before this, a Case with a required field filled in was refused). As-built: `okf/frontend/features/objects.md`. **Still open:** ⚠ D10 acceptance — one think-aloud session with a real Case-desk lead, recorded in `objects.md` (the row closes on that, not on the build); a browser pass over the dialog; ✅ Findings values now save through `PUT /objects/{id}/findings` (2026-09-25, operator: open to anyone who can see the Case, like comments; only `findings` accepted, spec-validated, audited) — disposition edits stay on the `canAdminister` PATCH. → `okf/frontend/features/objects.md` · design: [`superpower/findings-spec-authoring-ui-design.md`](superpower/findings-spec-authoring-ui-design.md)
 - **P2** · **AGT-5 per-tool dry-run seam — BLOCKED-EXTERNAL** (re-gated 2026-09-16). The upstream `DryRunProvider` type ships, but the seam does not: `javap` on the pinned `eoiagent-platform` jar shows `PlatformBuilder` with `approvalHandler(...)` and `approvalDecisionStore(...)` and **no `dryRunProvider(...)`**. **Upstream ask (to `jotder/inspect-agent`): expose `PlatformBuilder.dryRunProvider(DryRunProvider)` and thread it to the gate builder.** Until then `AgentApprovals` stays as the previewer. ⛔ Do not re-discharge on the presence of the type — check the builder. `incident_explain` waits separately on the eoiagent host seam. → `archived-documents/plans-archive/agt-6-plan.md` §4.2 G2
 - **P3** · `AGT-SEGMENT-1` — **the assistant's commercial framing is an unvalidated product read.** The tier packaging (A Explain / B Author-with-approval / C Bounded autonomy), the "Tier A is the wedge" argument and the SHADOW-first on-ramp were never validated against a client segment. ⛔ Decided 2026-09-10: keep the caveat and reopen on the first customer conversation — needs product input, not engineering; the framing is quoted in a stakeholder-facing doc, so it carries its caveat until this closes. → `stakeholders/PRODUCT_CAPABILITIES.md` §"How the ladder is packaged" · `archived-documents/plans-archive/agt-6-plan.md` §2
