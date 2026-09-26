@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { AccessGrant } from '../api/access.service';
 import {
     ACCESS_ACTION_NODES,
+    capabilityLabel,
     deriveAccessCatalog,
     deriveDefaultAccessCatalog,
     filterNavByAccess,
@@ -137,5 +138,20 @@ describe('filterNavByLens (lens-default nav scope)', () => {
                 expect(idx.byId.has(id), `${lensId}:${id}`).toBe(true);
             }
         }
+    });
+});
+
+describe('capabilityLabel (R2-16)', () => {
+    it('reuses the action node label without its trailing detail', () => {
+        expect(capabilityLabel('canConfigureAccess')).toBe('Configure Lens access');
+        expect(capabilityLabel('canAuthorAlertRules')).toBe('Author Alert Rules');
+        expect(capabilityLabel('canOperateRuns')).toBe('Operate Runs');
+        expect(capabilityLabel('canOnboardConnections')).toBe('Onboard Connections');
+    });
+
+    it('humanises a Capability no action node carries, so a new grant never renders blank', () => {
+        expect(capabilityLabel('canRevealLinkEntities')).toBe('Reveal link entities');
+        expect(capabilityLabel('canApproveLinkExpansions')).toBe('Approve link expansions');
+        expect(capabilityLabel('exportEverything')).toBe('Export everything');
     });
 });

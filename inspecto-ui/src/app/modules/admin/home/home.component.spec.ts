@@ -247,6 +247,29 @@ describe('HomeComponent', () => {
         expect(single.el.textContent).not.toContain('Your access here');
     });
 
+    // R2-16: the card listed raw Capability ids (`canManageIncidents`). Labels now, sorted by label, id on the tooltip.
+    it('names each grant by its label, sorted by label, with the raw id as the tooltip', async () => {
+        const { el } = create({
+            runs: [RUN()],
+            multiSpace: true,
+            capabilities: ['canOperateRuns', 'canRevealLinkEntities', 'canAuthorAlertRules', 'canManageIncidents'],
+        });
+        const chips = [...el.querySelectorAll('inspecto-chip')];
+        expect(chips.map((c) => c.textContent?.trim())).toEqual([
+            'Author Alert Rules',
+            'Manage Incidents and Cases',
+            'Operate Runs',
+            'Reveal link entities',
+        ]);
+        expect(chips.map((c) => c.getAttribute('title'))).toEqual([
+            'canAuthorAlertRules',
+            'canManageIncidents',
+            'canOperateRuns',
+            'canRevealLinkEntities',
+        ]);
+        await expectNoA11yViolations(el);
+    });
+
     /** HOME-TILES-1: the two counted tiles (operational Home only — first-run shows the onboarding panel) show the server's numbers and hide — not dash — when the call fails. */
     describe('counted tiles', () => {
         it('shows breached Expectations and Datasets written from the server counts', () => {

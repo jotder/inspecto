@@ -33,7 +33,7 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             id: 'runs.operate',
             kind: 'action',
             capability: 'canOperateRuns',
-            label: 'Operate runs (trigger / pause / resume / reprocess)',
+            label: 'Operate Runs (trigger / pause / resume / reprocess)',
         },
     ],
     requirements: [
@@ -41,7 +41,7 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             id: 'requirements.triage',
             kind: 'action',
             capability: 'canTriageRequirements',
-            label: 'Triage requirements (accept / reject / deliver)',
+            label: 'Triage Requirements (accept / reject / deliver)',
         },
     ],
     alerts: [
@@ -49,7 +49,7 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             id: 'alerts.author',
             kind: 'action',
             capability: 'canAuthorAlertRules',
-            label: 'Author alert rules',
+            label: 'Author Alert Rules',
         },
     ],
     cases: [
@@ -60,7 +60,7 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             id: 'incidents.manage',
             kind: 'action',
             capability: 'canManageIncidents',
-            label: 'Manage incidents and cases (author Findings fields)',
+            label: 'Manage Incidents and Cases (author Findings fields)',
         },
     ],
     catalog: [
@@ -68,19 +68,19 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             id: 'exchange.offer',
             kind: 'action',
             capability: 'canOfferDatasets',
-            label: 'Offer datasets and widgets for sharing',
+            label: 'Offer Datasets and Widgets for sharing',
         },
         {
             id: 'exchange.approve',
             kind: 'action',
             capability: 'canApproveShares',
-            label: 'Decide share requests (approve / deny / revoke)',
+            label: 'Decide Share requests (approve / deny / revoke)',
         },
         {
             id: 'exchange.request',
             kind: 'action',
             capability: 'canRequestShares',
-            label: 'Request access to another space’s offer',
+            label: 'Request access to another Space’s offer',
         },
     ],
     settings: [
@@ -88,13 +88,13 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             id: 'access.configure',
             kind: 'action',
             capability: 'canConfigureAccess',
-            label: 'Configure lens access',
+            label: 'Configure Lens access',
         },
         {
             id: 'menus.curate',
             kind: 'action',
             capability: 'canCurateMenus',
-            label: 'Curate the space menu tree',
+            label: 'Curate the Space menu tree',
         },
         {
             // Grafted here since Connections moved out of Workbench into a Settings section (2026-07-28).
@@ -104,7 +104,7 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             id: 'connections.onboard',
             kind: 'action',
             capability: 'canOnboardConnections',
-            label: 'Onboard connections (create / edit / delete)',
+            label: 'Onboard Connections (create / edit / delete)',
         },
         {
             // The coarse Space-governance grant (2026-09-15): the backend gates Space update/delete and
@@ -112,10 +112,29 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             id: 'space.administer',
             kind: 'action',
             capability: 'canAdminister',
-            label: 'Administer the space (settings / agent governance)',
+            label: 'Administer the Space (settings / agent governance)',
         },
     ],
 };
+
+/**
+ * A Capability id's human label, for surfaces that list grants (Home's "Your access here", R2-16): its
+ * {@link ACCESS_ACTION_NODES} label without the trailing "(…)" detail, so the catalog stays the one label
+ * source. A Capability no action node carries (a backend-only gate such as `canRevealLinkEntities`) is
+ * humanised from its id — "Reveal link entities" — so a new grant never renders blank.
+ */
+export function capabilityLabel(capability: string): string {
+    for (const nodes of Object.values(ACCESS_ACTION_NODES)) {
+        const node = nodes.find((n) => n.capability === capability);
+        if (node) return node.label.replace(/\s*\([^)]*\)$/, '');
+    }
+    const words = capability
+        .replace(/^can(?=[A-Z])/, '')
+        .split(/(?=[A-Z])/)
+        .join(' ')
+        .toLowerCase();
+    return words ? words.charAt(0).toUpperCase() + words.slice(1) : capability;
+}
 
 /**
  * Map a navigation tree into catalog nodes: `collapsable` → `menu`, `basic` → `pane`, dividers

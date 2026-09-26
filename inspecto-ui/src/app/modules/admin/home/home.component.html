@@ -225,8 +225,8 @@
                             Scoped to this space. These are the grants the server resolved for you.
                         </p>
                         <div class="flex flex-wrap gap-2">
-                            @for (g of grants(); track g) {
-                                <inspecto-chip>{{ g }}</inspecto-chip>
+                            @for (g of grants(); track g.id) {
+                                <inspecto-chip [attr.title]="g.id">{{ g.label }}</inspecto-chip>
                             }
                         </div>
                     </div>

@@ -19,6 +19,7 @@ import {
     isFeatureAbsent,
     normalizeIncidentStatus,
 } from 'app/inspecto/api';
+import { capabilityLabel } from 'app/inspecto/access/access-catalog';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -188,8 +189,14 @@ export class HomeComponent implements OnInit {
     readonly opsEnabled = this.session.opsEnabled;
 
     /** The subject's effective grants, for the access card — server-resolved, so it is the honest
-     *  answer to "what may I do here". Empty (and the card hidden) off OIDC. */
-    readonly grants = this.session.capabilities;
+     *  answer to "what may I do here". Empty (and the card hidden) off OIDC. Shown by label, sorted by
+     *  label; the raw Capability id stays on the chip's tooltip for admins (R2-16). */
+    readonly grants = computed(() =>
+        this.session
+            .capabilities()
+            .map((id) => ({ id, label: capabilityLabel(id) }))
+            .sort((a, b) => a.label.localeCompare(b.label)),
+    );
 
     ngOnInit(): void {
         this.load();
