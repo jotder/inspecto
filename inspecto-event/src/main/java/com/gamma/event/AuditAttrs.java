@@ -66,6 +66,14 @@ public final class AuditAttrs {
      *  absence means "not checked", never "checked and passed". */
     public static final String CAPABILITY = "capability";
 
+    // ── tamper evidence (ASSURE-AUDIT-CHAIN-1) ────────────────────────────────────
+    /** The record's position in its Space's audit hash chain, from 1 (see {@link AuditChain}). */
+    public static final String AUDIT_SEQ = "audit_seq";
+    /** The previous record's {@link #AUDIT_HASH}; the empty string for seq 1. */
+    public static final String AUDIT_PREV_HASH = "audit_prev_hash";
+    /** SHA-256 (hex) over the record's canonical encoding, prevHash included ({@link AuditChain#canonical}). */
+    public static final String AUDIT_HASH = "audit_hash";
+
     /**
      * Every audit attribute key above, in projection/column order — the ONE list consumers (e.g. the
      * {@code /events/export} audit-shaped CSV) derive their columns from instead of hand-listing keys.
@@ -74,5 +82,6 @@ public final class AuditAttrs {
      */
     public static final java.util.List<String> ALL = java.util.List.of(
             ACTOR, ACTOR_TYPE, ACTION, ACTION_CATEGORY, TARGET_TYPE, TARGET_ID,
-            IP, USER_AGENT, HTTP_METHOD, HTTP_PATH, HTTP_STATUS, ABAC_ACTION, POLICY, CAPABILITY);
+            IP, USER_AGENT, HTTP_METHOD, HTTP_PATH, HTTP_STATUS, ABAC_ACTION, POLICY, CAPABILITY,
+            AUDIT_SEQ, AUDIT_PREV_HASH, AUDIT_HASH);
 }

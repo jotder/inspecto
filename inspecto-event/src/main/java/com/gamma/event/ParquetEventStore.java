@@ -152,6 +152,7 @@ public final class ParquetEventStore implements EventStore {
         try {
             List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
             int torn = 0;
+            List<Event> replay = new ArrayList<>();
             for (String line : lines) {
                 if (line.isBlank()) continue;
                 try {
@@ -161,13 +162,23 @@ public final class ParquetEventStore implements EventStore {
                             str(m.get("pipeline")), str(m.get("correlationId")), str(m.get("message")),
                             JsonAttributes.fromJson(str(m.get("attributes"))),
                             JsonAttributes.fromPayloadJson(str(m.get("payload"))));
-                    tail.append(e);
-                    buffer.addLast(e);
+                    replay.add(e);
                 } catch (Exception bad) {
                     torn++;   // a kill mid-write tears the last line; everything before it is whole
                 }
             }
             if (torn > 0) log.warn("Event journal {}: skipped {} unreadable line(s)", file, torn);
+            // A journal whose events DID reach Parquet (a flush landed, then its truncate failed or the kill came
+            // between the two) must not write them twice: a duplicated audit row is a forked chain
+            // (ASSURE-AUDIT-CHAIN-1). Skip every event whose id is already on disk.
+            java.util.Set<String> flushed = flushedIds(replay);
+            for (Event e : replay) {
+                if (flushed.contains(e.eventId())) continue;
+                tail.append(e);
+                buffer.addLast(e);
+            }
+            if (!flushed.isEmpty())
+                log.info("Event journal {}: {} event(s) were already flushed; not written again", file, flushed.size());
             if (!buffer.isEmpty()) {
                 log.info("Event journal {}: replaying {} event(s) a previous run did not flush", file, buffer.size());
                 flushLocked();
@@ -176,6 +187,28 @@ public final class ParquetEventStore implements EventStore {
         } catch (IOException e) {
             log.warn("Event journal {} could not be replayed: {}", file, e.getMessage());
         }
+    }
+
+    /** The ids among {@code events} already present in the Parquet files. Throws when they cannot be read, so a
+     *  replay is retried on the next open rather than risking a duplicate. */
+    private java.util.Set<String> flushedIds(List<Event> events) throws IOException {
+        java.util.Set<String> found = new java.util.HashSet<>();
+        if (events.isEmpty() || !hasParquet()) return found;
+        String reader = SqlViews.reader("PARQUET", root + "/**/*.parquet", true);
+        for (int from = 0; from < events.size(); from += 500) {
+            List<Event> chunk = events.subList(from, Math.min(events.size(), from + 500));
+            String sql = "SELECT DISTINCT event_id FROM " + reader + " WHERE event_id IN ("
+                    + String.join(",", java.util.Collections.nCopies(chunk.size(), "?")) + ")";
+            try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                for (int i = 0; i < chunk.size(); i++) ps.setString(i + 1, chunk.get(i).eventId());
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) found.add(rs.getString(1));
+                }
+            } catch (SQLException e) {
+                throw new IOException("could not check the journal against the flushed events: " + e.getMessage(), e);
+            }
+        }
+        return found;
     }
 
     private static String str(Object o) {
@@ -415,6 +448,63 @@ public final class ParquetEventStore implements EventStore {
             log.warn("Event Parquet count failed: {}", e.getMessage());
         }
         return total;
+    }
+
+    // -- the audit chain (ASSURE-AUDIT-CHAIN-1) --
+
+    /** The chain seq of a stored row, from its attributes JSON; NULL for an unchained row. */
+    private static final String SEQ_SQL = "TRY_CAST(json_extract_string(attributes, '$." + AuditAttrs.AUDIT_SEQ
+            + "') AS BIGINT)";
+    private static final String CHAINED_SQL = "type IN ('" + EventType.AUDIT + "', '" + EventType.ACCESS_DENIED
+            + "') AND " + SEQ_SQL + " IS NOT NULL";
+
+    @Override
+    public synchronized Event chainHead() {
+        Event best = null;
+        for (Event e : buffer)
+            if (AuditChain.chained(e) && AuditChain.seq(e) > 0
+                    && (best == null || AuditChain.seq(e) > AuditChain.seq(best))) best = e;
+        if (!hasParquet()) return best;
+        List<Event> disk = chainQuery("WHERE " + CHAINED_SQL + " ORDER BY " + SEQ_SQL + " DESC LIMIT 1", List.of());
+        if (!disk.isEmpty() && (best == null || AuditChain.seq(disk.get(0)) > AuditChain.seq(best))) best = disk.get(0);
+        return best;
+    }
+
+    @Override
+    public synchronized List<Event> chainPage(long fromSeq, int limit) {
+        int n = Math.max(0, limit);
+        List<Event> merged = new ArrayList<>();
+        for (Event e : buffer) if (AuditChain.chained(e) && AuditChain.seq(e) >= fromSeq) merged.add(e);
+        if (hasParquet())
+            merged.addAll(chainQuery("WHERE " + CHAINED_SQL + " AND " + SEQ_SQL + " >= ? ORDER BY " + SEQ_SQL
+                    + ", event_id LIMIT ?", List.of(fromSeq, (long) n)));
+        merged.sort(CHAIN_ORDER);
+        return new ArrayList<>(merged.subList(0, Math.min(n, merged.size())));
+    }
+
+    /** A chain read over the Parquet files. Throws rather than answering short: the chain's callers must not
+     *  mistake an unreadable store for an empty chain (that would restart it at genesis, or pass a verify). */
+    private List<Event> chainQuery(String tail, List<Long> params) {
+        String reader = SqlViews.reader("PARQUET", root + "/**/*.parquet", true);
+        String sql = "SELECT event_id, ts_ms, level, type, source, pipeline, correlation_id, message, attributes, payload"
+                + " FROM " + reader + " " + tail;
+        List<Event> out = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (int i = 0; i < params.size(); i++) ps.setLong(i + 1, params.get(i));
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    out.add(new Event(rs.getString("event_id"), rs.getLong("ts_ms"),
+                            EventLevel.parse(rs.getString("level")), rs.getString("type"),
+                            rs.getString("source"), rs.getString("pipeline"),
+                            rs.getString("correlation_id"), rs.getString("message"),
+                            JsonAttributes.fromJson(rs.getString("attributes")),
+                            JsonAttributes.fromPayloadJson(rs.getString("payload"))));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("audit chain read failed under " + root + ": " + e.getMessage(), e);
+        }
+        return out;
     }
 
     /** Comma-separated quoted level names at or above {@code min} — values are enum names, so safe to inline. */

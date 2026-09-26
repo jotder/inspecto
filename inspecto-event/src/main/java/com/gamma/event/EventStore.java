@@ -92,6 +92,67 @@ public interface EventStore extends AutoCloseable {
     }
 
     /**
+     * The audit chain's head: the {@linkplain AuditChain#chained chained} record with the highest
+     * {@linkplain AuditChain#seq seq}, or {@code null} when none is stored (ASSURE-AUDIT-CHAIN-1). Must THROW
+     * rather than answer {@code null} when the store cannot be read — a {@code null} restarts the chain at
+     * genesis and forks it. The default walks {@link #page} newest-first: a chain's timestamps never go back
+     * (see {@link AuditChain}), so the first chained record met is the head, bar same-millisecond ties.
+     *
+     * @since 5.x
+     */
+    default Event chainHead() {
+        Long afterTs = null;
+        String afterId = null;
+        Event best = null;
+        while (true) {
+            List<Event> page = page(1000, afterTs, afterId);
+            if (page.isEmpty()) return best;
+            for (Event e : page) {
+                if (best != null && e.ts() < best.ts()) return best;
+                if (AuditChain.chained(e) && AuditChain.seq(e) > 0
+                        && (best == null || AuditChain.seq(e) > AuditChain.seq(best))) best = e;
+            }
+            Event last = page.get(page.size() - 1);
+            afterTs = last.ts();
+            afterId = last.eventId();
+        }
+    }
+
+    /**
+     * Up to {@code limit} chained records with {@code seq >= fromSeq}, ordered by seq then eventId (so two
+     * records claiming one seq sit side by side). The unit {@code /audit/verify} streams the chain in, so a
+     * range is never loaded whole. The default scans the whole store through {@link #page} per call — correct
+     * for any backend, linear in its size; the bundled Parquet and in-memory stores override it.
+     *
+     * @since 5.x
+     */
+    default List<Event> chainPage(long fromSeq, int limit) {
+        java.util.PriorityQueue<Event> keep = new java.util.PriorityQueue<>(CHAIN_ORDER.reversed());
+        Long afterTs = null;
+        String afterId = null;
+        while (true) {
+            List<Event> page = page(1000, afterTs, afterId);
+            if (page.isEmpty()) break;
+            for (Event e : page) {
+                if (!AuditChain.chained(e) || AuditChain.seq(e) < fromSeq) continue;
+                keep.add(e);
+                if (keep.size() > limit) keep.poll();
+            }
+            Event last = page.get(page.size() - 1);
+            afterTs = last.ts();
+            afterId = last.eventId();
+        }
+        List<Event> out = new java.util.ArrayList<>(keep);
+        out.sort(CHAIN_ORDER);
+        return out;
+    }
+
+    /** The {@link #chainPage} order: seq ascending, then eventId. */
+    java.util.Comparator<Event> CHAIN_ORDER =
+            java.util.Comparator.comparingLong(AuditChain::seq)
+                    .thenComparing(e -> e.eventId() == null ? "" : e.eventId());
+
+    /**
      * Force any buffered events to durable storage. No-op for purely in-memory stores; for
      * {@code ParquetEventStore} this flushes the in-memory buffer to a Parquet file.
      */

@@ -80,6 +80,24 @@ public final class InMemoryEventStore implements EventStore {
         return ring.size();
     }
 
+    @Override
+    public synchronized Event chainHead() {
+        Event best = null;
+        for (Event e : ring)
+            if (AuditChain.chained(e) && AuditChain.seq(e) > 0
+                    && (best == null || AuditChain.seq(e) > AuditChain.seq(best))) best = e;
+        return best;
+    }
+
+    @Override
+    public synchronized List<Event> chainPage(long fromSeq, int limit) {
+        return ring.stream()
+                .filter(e -> AuditChain.chained(e) && AuditChain.seq(e) >= fromSeq)
+                .sorted(CHAIN_ORDER)
+                .limit(Math.max(0, limit))
+                .toList();
+    }
+
     /** Current ring size (diagnostics/tests). */
     public synchronized int size() {
         return ring.size();

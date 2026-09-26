@@ -156,13 +156,37 @@ public final class EventLog {
      */
     public void installStore(EventStore next) {
         if (next == null) return;
-        EventStore prev = store.getAndSet(next);
-        if (prev == next || prev == null) return;
+        synchronized (chain) {
+            EventStore prev = store.getAndSet(next);
+            if (prev == next || prev == null) return;
+            // The next store has its own chain head (a durable store's history). An audit row carried over was
+            // linked onto the OUTGOING store's chain, so it is re-linked onto the incoming one — appended as it
+            // was, it would claim a seq the incoming chain already holds (ASSURE-AUDIT-CHAIN-1).
+            chain.reset();
+            try {
+                List<Event> carry = prev.recent(Integer.MAX_VALUE);   // newest-first
+                for (int i = carry.size() - 1; i >= 0; i--) {         // re-append oldest-first
+                    Event e = carry.get(i);
+                    next.append(AuditChain.chained(e) ? linkOrKeep(e, next) : e);
+                }
+            } catch (RuntimeException ignore) {
+                // best effort — never block the swap
+            }
+        }
+    }
+
+    /** This log's audit hash chain — one per log, so one per Space (see {@link AuditChain}). Its monitor is held
+     *  across link + append, which is what makes the chain a single total order. */
+    private final AuditChain chain = new AuditChain();
+
+    /** Link {@code e} onto {@code target}'s chain; when the head cannot be read, keep it unlinked rather than
+     *  lose the audit row or fork the chain at genesis. Caller holds {@link #chain}'s monitor. */
+    private Event linkOrKeep(Event e, EventStore target) {
         try {
-            List<Event> carry = prev.recent(Integer.MAX_VALUE);   // newest-first
-            for (int i = carry.size() - 1; i >= 0; i--) next.append(carry.get(i));   // re-append oldest-first
-        } catch (RuntimeException ignore) {
-            // best effort — never block the swap
+            return chain.link(e, target);
+        } catch (RuntimeException unreadableHead) {
+            chain.reset();   // try again on the next audit row
+            return e;
         }
     }
 
@@ -173,7 +197,17 @@ public final class EventLog {
         // or handed to a subscriber. Cheap (same reference) for the clean common case; never throws.
         event = SecretScrubber.scrub(event);
         try {
-            store.get().append(event);
+            if (AuditChain.chained(event)) {
+                // ASSURE-AUDIT-CHAIN-1: linked AFTER the scrub (the hash covers what is stored) and appended under
+                // the same monitor, so seq order is append order.
+                synchronized (chain) {
+                    EventStore target = store.get();
+                    event = linkOrKeep(event, target);
+                    target.append(event);
+                }
+            } else {
+                store.get().append(event);
+            }
             MetricRegistry.global().inc("inspecto_events_total", "Operational events recorded",
                     Map.of("level", event.level().name(), "type", event.type()));
         } catch (Throwable t) {
