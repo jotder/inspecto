@@ -13,8 +13,9 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **44<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 23<!--count:backlog-p3--> × P3** —
+> **47<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 24<!--count:backlog-p2--> × P2 · 23<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ⬆ **44 → 47 on 2026-09-27**: filed assurance wave 3 — P2 `ASSURE-KPI-DEFINITIONS-1`, `ASSURE-RISK-SCORE-1`, `ASSURE-AUDIT-CHAIN-1`.
 > ↔ **44 on 2026-09-27**: P2 `ASSURE-MAKER-CHECKER-1` closed (wave 2.1 shipped); its residuals re-filed as P3 `ASSURE-MAKER-CHECKER-RESIDUALS-1`.
 > ⬆ **43 → 44 on 2026-09-27**: filed P2 `ASSURE-MAKER-CHECKER-MULTIPOD-1` (deciding a Pending Change is single-process), a residual of `ASSURE-MAKER-CHECKER-1`.
 > ↔ **43 on 2026-09-27**: P1 `SEC-IMPORT-OPS-CONFIGS-1` closed (fix verified); its residuals, with the earlier import ones, re-filed as P3 `IMPORT-RESIDUALS-1`.
@@ -45,9 +46,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 24<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 23<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 44<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 47<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -79,7 +80,7 @@ rank.
 
 | State | P2 rows |
 |---|---|
-| **Startable now** — no gate, no owed decision | assurance wave 2 (wave 1 has shipped; `ASSURE-MAKER-CHECKER-1` ✅ shipped 2026-09-27): `ASSURE-ACTION-REQUESTS-1` (§3.5, in flight); `ASSURE-ENTITY-LISTS-1` ⏸ on hold for Link Analysis |
+| **Startable now** — no gate, no owed decision | assurance wave 2 (wave 1 has shipped; `ASSURE-MAKER-CHECKER-1` ✅ shipped 2026-09-27): `ASSURE-ACTION-REQUESTS-1` (§3.5, in flight); `ASSURE-ENTITY-LISTS-1` ⏸ on hold for Link Analysis. Assurance wave 3, in flight: `ASSURE-KPI-DEFINITIONS-1` (§3.6) · `ASSURE-RISK-SCORE-1` (§3.9) · `ASSURE-AUDIT-CHAIN-1` (§3.8) |
 | **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | Platform Services Stage 2/3 (§3.2) · `findings-spec` acceptance session with a Case-desk lead (§3.9) · cross-Space consequence (§3.5, ⏸ on hold until D10 is named) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residual (one `package.ps1` run) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · `D8-SES-SNS-1` (SES/SNS adapter ON HOLD by operator 2026-09-25; per-user preferences need a call) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) |
 
@@ -230,6 +231,8 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 ### 3.6 Analytics — Queries, BI, Studio & Export
 
+- **P2** · `ASSURE-KPI-DEFINITIONS-1` — **a KPI is a server-side definition, not tile inputs (WS-20, wave 3.1 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** UIE-1…4 gave the tile format, target and compare (`inspecto-ui/src/app/inspecto/viz/plugins/kpi.component.ts`), but the target, bands and comparison are hand-set per Widget. Build a KPI component kind (Measure + target + good direction + bands + period + comparison period) that the tile reads; a delivered `kpi` Requirement can create one; KPI packs ship inside Space Templates.
+
 - **P3** · `ASSURE-BREAK-RECURRENCE-REACH-1` — **a Break that stays absent for two or more runs comes back as a NEW Break, not a recurrence.** Residual of `ASSURE-BREAK-LIFECYCLE-1` (✅ shipped 2026-09-26: per-Break `lastSeenAt`, `occurrences`, `recurrences`, server-side `ageDays`, an `assigned` status with assignee on `POST /recon/{id}/breaks/status`; as-built in `okf/frontend/features/reconciliation.md`). The bounded-history rule in `inspecto-engine/src/main/java/com/gamma/query/ReconBreaks.java` drops an auto-closed Break after one further absent run, so recurrence only counts a Break that returns on the very next run. Widening it needs a retention call (keep auto-closed records N days or N runs) — a Reconciliation with rotating keys would otherwise keep every key it ever saw. Build when someone asks for longer recurrence.
 
 - **P2** · **D-8 XLSX export — bundle proof, one `package.ps1` run owed** — the air-gapped half is PROVEN (2026-09-24, as-built in `okf/capabilities/pipeline-authoring/pipeline-authoring.md` §3.0): in STAGED mode (`-Dduckdb.extension.dir`, set by every launcher) `DuckDbExtension` loads ONLY `<dir>/<name>.duckdb_extension` by path and a missing file fails loudly — never a fall-through to `INSTALL`; and the real route produced a workbook from a bundle with DuckDB's own cache made unreachable. Open: **one end-to-end `pwsh inspecto/package.ps1 -Edition Professional` run** — the proof bundle was the last Enterprise output with `inspecto.jar` rebuilt, the policy jar removed and `spaces/` re-staged by step 4's rule, because that session could not launch PowerShell; it needs a quiet machine (no concurrent build) and is the row's only remaining clause. ~~(2) the Linux binary~~ **narrowed 2026-09-26**: the gap was a desk fact — this desk builds no Linux zip (no Linux jmods cache), and `release.yml` already fetches every `linux_amd64` binary and packages with `-RequireExtensions`; what was missing is that the Linux `excel` binary had never been LOADED. `ci.yml` now fetches it alone (`fetch-duckdb-extensions.mjs --only excel --platform linux_amd64`, new, tested by `tools/fetch-duckdb-extensions.test.mjs`) so `PipelineDocumentXlsxTest` writes a real workbook on Linux on every push — ⚠ its first green CI run on GitHub is the evidence, not yet observed (the lane does not push). ⛔ **Do not add POI.** → `archived-documents/plans-archive/elt-final-amendment-plan.md` §9 D-8
@@ -255,6 +258,8 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 ### 3.8 Security, Policy, Editions & Compliance
 
+- **P2** · `ASSURE-AUDIT-CHAIN-1` — **a tamper-evident audit trail (WS-25, wave 3.3 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** The trail is correct and durable (`inspecto/src/main/java/com/gamma/control/AuditTrail.java`, write-ahead journal `1de1dadd5`) but not tamper-evident. Build a per-Space hash chain (`prevHash` / `hash`, SHA-256 over a canonical encoding) with a daily anchor, and `GET /audit/verify` that names the first bad record. Classification-driven masking stays out (D-P8).
+
 - **P3** · `IMPORT-RESIDUALS-1` — **residuals of the 2026-09-26 import hardening** (✅ `SEC-IMPORT-ROLES-ESCALATION-1` and `SEC-IMPORT-OPS-CONFIGS-1` closed: no import writes identity, access, governance or settings files, or any suffix-scanned ops config (`_workflow`, `_caserule`, `_tagrule`, `_tag`, `_meta`, `_rca`, `_job_template`, …) anywhere; imports are all-or-nothing; the Incident resolution gate covers every custom terminal state except `ARCHIVED`; as-built in `okf/backend/editions/auth-security.md`). Open: **(1)** a WHOLE-Space export (`GET /spaces/{id}/export`) fed into `POST /import` on an existing Space is now 403, because it carries `_job_template` / `_tag` / `_tagrule` files; per-data-source export → import round-trips (all 13 demo data sources verified), and Space cloning through Space creation is unaffected — decide whether importing a whole Space into an existing one is a supported flow; **(2)** `/import` can write `registry/findings-specs/<x>.toon` with `canAuthorWorkbench`, while `/components/findings-spec` needs `canManageIncidents` (a capability widening, not a gate bypass: the Disposition ladder is static); **(3)** the rollback restores pre-import bytes over a concurrent legitimate write to the same file (no lock); **(4)** the SLA sweep skips only `RESOLVED`, so an Incident in a custom terminal state keeps being swept; **(5)** whether archiving an undecided Incident should also need a Disposition (today it is the Trash, by design). Build on demand.
 - **P3** · `IMPORT-CONNECTION-JOB-GATE-1` — **`*_connection.toon` and `*_job.toon` are importable with `canAuthorWorkbench` only**, although `/connections` needs `canOnboardConnections`: Connections are secret-bearing and Jobs executable. Decide whether imports of those kinds need the stricter capability. Build on demand.
 
@@ -267,6 +272,8 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 [`compliance/controls-matrix.md`](../compliance/controls-matrix.md) §4.
 
 ### 3.9 Cases, Incidents & Assistant
+
+- **P2** · `ASSURE-RISK-SCORE-1` — **an explainable Risk Score per entity (WS-22, wave 3.2 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** Nothing scores an entity today. Build a weighted-factor component per entity type (`score = Σ weight × indicator`, capped 0–100, `factors[]` with indicator, value, weight, contribution and evidence) evaluated by a **Job** (never a new Step Processor — the hold stands) that writes a scores Dataset and feeds Incident priority. Feeding a watch Entity List waits on `ASSURE-ENTITY-LISTS-1`.
 
 - **P3** · `ASSURE-IMPACT-LEDGER-RESIDUALS-1` — **residuals of the impact ledger** (✅ `ASSURE-IMPACT-LEDGER-1` shipped 2026-09-26: typed impact on Incident and Case via `PUT /objects/{id}/impact` with `outstanding` derived, late recoveries on a RESOLVED Incident / CLOSED Case, the Findings `impactAmount` retired, a Disposition required on Incident resolve (+ `DUPLICATE`, `ACCEPTED_RISK`) and cleared on reopen, a machine heal never resolving an Incident, the SPA impact panel and resolve-dialog Disposition, the `impact_ledger` Dataset; as-built in `okf/capabilities/incidents/incidents.md` §3.4–3.5, `okf/backend/control-plane/jobs.md`, `okf/frontend/features/objects.md`). Open: **(1)** `analytics()` and the ledger read at most `ObjectQuery.MAX_LIMIT` (10 000) objects per type, silently; **(2)** the ledger is as fresh as the `objects.analytics` cadence — no live view of the single-writer objects table; **(3)** a stored object carrying only the retired flat `impactAmount` no longer counts (no migration, by design); **(4)** no browser pass yet over the impact panel and resolve dialog; **(5)** the generated `resolve` / `transition` operations in `openapi-v1.json` do not document `disposition`. Build on demand.
 

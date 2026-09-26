@@ -82,7 +82,9 @@ Turns findings into controlled action. Order is forced: lists need approval, dis
 | 2.2 | ⏸ **ON HOLD 2026-09-26 (operator)** — Link Analysis (`LA-17`) leads the Entity List; an unverified lane branch is kept for later evaluation (BACKLOG `ASSURE-ENTITY-LISTS-1`). **WS-12 Entity Lists** — allow / block / watch; key types msisdn, imsi, imei, iccid, prefix / range, country, operator, dealer, device, instrument token, BIN, IP, CIDR; reason, added-by, expires-at; Parquet sidecar for 10⁵ entries; **range and CIDR matching** (equal-key join cannot do it) | 4–6 | needs D-P5; one kind with Link Analysis `LA-17` (D-P10) |
 | 2.3 | **WS-24 Action Requests** — `ActionDispatcher`: target Connection, payload template, `draft → pending → approved → dispatched → succeeded / failed`, idempotent retries, linked Incident, audit; replaces the `invoke-api` stub | 3–5 | accepted against a stub HTTP endpoint — no real target system needed |
 
-### Wave 3 — measurement and scoring · ≈ 11–17 eng-wk
+### Wave 3 — measurement and scoring
+
+*Started 2026-09-27; on the board as `ASSURE-KPI-DEFINITIONS-1`, `ASSURE-RISK-SCORE-1` and `ASSURE-AUDIT-CHAIN-1` (P2).* · ≈ 11–17 eng-wk
 
 | # | Item | Eng-wk | Notes |
 |---|---|---|---|
