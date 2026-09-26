@@ -696,8 +696,7 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
   🔴 With an Authenticator that stamps no roles the apply FAILS CLOSED (403, "the author's roles are
   unknown"); a propose-time capability snapshot is recorded for the reviewer and never trusted.
 - **Approve replays only a maker-checker route, from a record this server wrote.** Two checks run BEFORE
-  anything is dispatched: the record's MAC (HMAC-SHA256 over its canonical JSON, a per-Space key in
-  `pending-changes/.pending-changes.key` — never served, skipped by the whole-Space export, unimportable) must
+  anything is dispatched: the record's MAC (HMAC-SHA256 over its canonical JSON, a per-Space key) must
   verify, else the record lists as `invalid` and approve / decline are 409; and the recorded method + path must
   be on `PendingChanges.REPLAYABLE` — exactly the routes that reach the hold before they write, pinned to the
   scanned inventory by `ConfigWriteFunnelTest#theReplayAllowlistIsExactlyTheRoutesThatHold` — else 409. Found

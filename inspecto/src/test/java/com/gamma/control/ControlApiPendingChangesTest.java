@@ -123,7 +123,9 @@ class ControlApiPendingChangesTest {
     // ── S1: the policy ──────────────────────────────────────────────────────────────────────────────
 
     @Test
-    void policyOffLeavesEveryWriteExactlyAsBefore(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void policyOffLeavesEveryWriteExactlyAsBefore(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             JsonNode p = data(send(c, "GET", "/settings/approval", null, AUTHOR), 200);
             assertEquals(0, p.get("approval").size(), "default OFF");
@@ -135,7 +137,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void thePolicyIsValidatedFailClosedAndAdministratorOnly(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void thePolicyIsValidatedFailClosedAndAdministratorOnly(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             assertEquals(403, send(c, "PUT", "/settings/approval", PACK_POLICY, AUTHOR).statusCode(),
                     "an author cannot lift (or set) the policy");
@@ -159,8 +163,10 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void aPolicyThatCouldNeverApproveIsRefusedOnABuildWithNoAuthenticator(@TempDir Path cfg, @TempDir Path root)
+    void aPolicyThatCouldNeverApproveIsRefusedOnABuildWithNoAuthenticator(@TempDir Path cfg, @TempDir Path tmp)
             throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         Authenticators.forTest(null);
         try (Ctx c = open(cfg, root)) {
             HttpResponse<String> r = send(c, "PUT", "/settings/approval", PACK_POLICY, null);
@@ -170,7 +176,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void anUnreadablePolicyFileHoldsEveryGovernableKind(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void anUnreadablePolicyFileHoldsEveryGovernableKind(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             Files.writeString(root.resolve(ApprovalPolicy.FILE), "approval:\n  pattern-pack: 7\n");
             assertTrue(data(send(c, "GET", "/settings/approval", null, AUTHOR), 200).get("failedClosed").asBoolean());
@@ -182,7 +190,9 @@ class ControlApiPendingChangesTest {
     // ── S2 + S3: propose → approve ──────────────────────────────────────────────────────────────────
 
     @Test
-    void anAuthorProposesAndADifferentPersonApproves(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void anAuthorProposesAndADifferentPersonApproves(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             String id = propose(c, "p1");
@@ -218,7 +228,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void aChangeAgainstAStaleBaseIsRefusedAndClosedAsStale(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void aChangeAgainstAStaleBaseIsRefusedAndClosedAsStale(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             store(c).write("pattern-pack", "p1", Map.of("title", "v1"));
             policy(c, PACK_POLICY);
@@ -236,8 +248,10 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void declineClosesTheChangeUnappliedAndTheAuthorCannotDeclineTheirOwn(@TempDir Path cfg, @TempDir Path root)
+    void declineClosesTheChangeUnappliedAndTheAuthorCannotDeclineTheirOwn(@TempDir Path cfg, @TempDir Path tmp)
             throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             String id = propose(c, "p1");
@@ -253,7 +267,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void oneChangePerTargetAtATime(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void oneChangePerTargetAtATime(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             propose(c, "p1");
@@ -263,7 +279,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void theDecideGates(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void theDecideGates(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             String id = propose(c, "p1");
@@ -299,8 +317,10 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void aSeededAdminApprovesABuildersChangeAndTheAuthorIsRecheckedAtApplyTime(@TempDir Path cfg, @TempDir Path root)
+    void aSeededAdminApprovesABuildersChangeAndTheAuthorIsRecheckedAtApplyTime(@TempDir Path cfg, @TempDir Path tmp)
             throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         armWithSeededRoles();
         String builder = "Bearer dana:pipeline-developer", admin = "Bearer ada:admin";
         try (Ctx c = open(cfg, root)) {
@@ -329,7 +349,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void approvingWithNoSubjectIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void approvingWithNoSubjectIsRefused(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             String id = propose(c, "p1");
@@ -341,7 +363,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void anExpiredChangeCannotBeApproved(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void anExpiredChangeCannotBeApproved(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             String id = propose(c, "p1");
@@ -355,7 +379,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void aPipelineEditThroughItsOwnRouteIsHeldAndAppliedThroughTheSameRoute(@TempDir Path root) throws Exception {
+    void aPipelineEditThroughItsOwnRouteIsHeldAndAppliedThroughTheSameRoute(@TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(root, root)) {   // the Pipeline must live under the write root to be edited
             policy(c, "{\"approval\":{\"pipeline\":{\"required\":true}}}");
             Path file = c.svc.pathFor("mini_etl").orElseThrow();
@@ -397,7 +423,9 @@ class ControlApiPendingChangesTest {
      * on a DEPENDENT's kind was bypassed. The rename is refused, naming the governed dependent.
      */
     @Test
-    void aRenameThatWouldRewriteAGovernedDependentIsRefused(@TempDir Path root) throws Exception {
+    void aRenameThatWouldRewriteAGovernedDependentIsRefused(@TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = openInactive(root)) {
             store(c).write("expectation", "rows_present", Map.of("target", "mini_etl", "kind", "row_count", "min", 1));
             policy(c, "{\"approval\":{\"expectation\":{\"required\":true}}}");
@@ -414,7 +442,9 @@ class ControlApiPendingChangesTest {
 
     /** Verification finding 5: changing the policy is audited as its own row — who, and before / after. */
     @Test
-    void changingThePolicyIsAuditedWithBeforeAndAfter(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void changingThePolicyIsAuditedWithBeforeAndAfter(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             policy(c, "{\"approval\":{}}");   // and lifted again
@@ -458,7 +488,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void aForgedRecordFailsItsIntegrityCheckAndCannotBeApproved(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void aForgedRecordFailsItsIntegrityCheckAndCannotBeApproved(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             String id = "pc-20260926000000-00f00d";
@@ -475,7 +507,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void aGenuineRecordNamingANonMakerCheckerRouteIsNeverReplayed(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void aGenuineRecordNamingANonMakerCheckerRouteIsNeverReplayed(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             String id = "pc-20260926000000-0ddba1";
@@ -488,7 +522,9 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void editingARealRecordOnDiskInvalidatesIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void editingARealRecordOnDiskInvalidatesIt(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             String id = propose(c, "p1");
@@ -504,7 +540,9 @@ class ControlApiPendingChangesTest {
 
     /** Re-verification finding 3: an author whose roles were never recorded cannot be re-checked — 403, not applied. */
     @Test
-    void anAuthorWhoseRolesWereNeverRecordedIsRefusedAtApply(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void anAuthorWhoseRolesWereNeverRecordedIsRefusedAtApply(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
         try (Ctx c = open(cfg, root)) {
             policy(c, PACK_POLICY);
             String id = data(send(c, "POST", "/components/pattern-pack", "{\"id\":\"p9\",\"title\":\"x\"}",

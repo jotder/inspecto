@@ -80,6 +80,10 @@
 # Link Analysis evidence (snapshots, Investigations, the Identity Fact log) is written under the Space's CONFIG root
 # (SnapshotStore / EntityFactLog resolve <write root>/audit/) — runtime state, never committed.
 /spaces/*/config/audit/
+# Maker-checker (ASSURE-MAKER-CHECKER-1): Pending Changes are runtime proposals, and a Space's Pending Change key
+# lives OUTSIDE its config tree in the sibling <space>/config.secrets/ — neither is ever committed.
+/spaces/*/config/pending-changes/
+/spaces/*/config.secrets/
 /spaces/*/duckdb/
 /spaces/*/flows/
 # The UAT space is fully GENERATED (config cloned from spaces/demo by tools/seed-uat.ps1) — never commit it.

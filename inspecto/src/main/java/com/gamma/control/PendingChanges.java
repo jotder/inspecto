@@ -374,32 +374,82 @@ public final class PendingChanges {
     }
 
     /**
-     * The Space's Pending Change key: 32 random bytes, created on first use beside the store, published without
-     * replace (a racing first writer's key wins, the loser reads it). Never served; never exported
-     * ({@code BundleExporter.exportSpace} skips {@code pending-changes/}); never importable (the directory is
-     * reserved, and the segment rules refuse a leading-dot name). ⚠ It lives in the config tree because the
-     * default Space has no reliable per-Space data directory (its data dir is the CWD-relative {@code database});
-     * the MAC defends against a record written through any door that cannot READ the key — an import, a forged
-     * upload — not against a local administrator, who can read both.
+     * Where the Space's Pending Change key lives (round-3 verification finding 2): OUTSIDE the config tree, in the
+     * sibling directory {@code <config root>.secrets/} — for a hosted Space {@code <space>/config.secrets/}, for the
+     * default Space {@code <assist.write.root>.secrets/}. Outside every tree that is exported ({@code /export}
+     * walks the config tree only), imported (an import writes only under the config root) or shared (the Exchange
+     * lives under {@code <spaces-root>/_shared/}); {@code BackupTask} skips any {@code *.secrets} directory and the
+     * key file by name; {@code .gitignore} ignores it under {@code spaces/}.
      */
-    private static byte[] key(Path root) throws IOException {
-        Path d = dir(root);
-        Files.createDirectories(d);
-        Path f = d.resolve(KEY_FILE);
-        if (!Files.isRegularFile(f)) {
+    static Path keyFile(Path root) {
+        Path config = root.toAbsolutePath().normalize();
+        if (config.getParent() == null || config.getFileName() == null)
+            throw new IllegalStateException("the config root " + config + " has no parent to hold its secrets");
+        return config.resolveSibling(config.getFileName() + SECRETS_SUFFIX).resolve(KEY_FILE);
+    }
+
+    /** The suffix of the per-config-root secrets directory — {@code BackupTask} skips any directory ending in it. */
+    public static final String SECRETS_SUFFIX = ".secrets";
+
+    /**
+     * The Space's Pending Change key: 32 random bytes, created on first use ({@link #keyFile}). Created with
+     * {@code CREATE_NEW}, so exactly one writer ever creates it — a racing second writer gets
+     * {@code FileAlreadyExistsException} and reads the first writer's key; no writer ever replaces it (a replace
+     * would invalidate every record the first key signed). Owner-only where the platform allows it (POSIX
+     * {@code rw-------}; on Windows an owner-only ACL). A reader that meets a file still being written retries
+     * briefly until it holds a whole key. Never served, exported, imported or backed up. ⚠ The MAC defends
+     * against a record written through any door that cannot READ the key — an import, a forged upload — not
+     * against a local administrator, who can read both.
+     */
+    static byte[] key(Path root) throws IOException {
+        Path f = keyFile(root);
+        Files.createDirectories(f.getParent());
+        // No exists() pre-check: EVERY first use attempts CREATE_NEW, and the filesystem decides the one winner —
+        // a check-then-create would leave a window in which two creators both believe they are first.
+        {
             byte[] k = new byte[32];
             new java.security.SecureRandom().nextBytes(k);
-            Path tmp = Files.createTempFile(d, ".key-", ".tmp");
-            try {
-                Files.writeString(tmp, java.util.HexFormat.of().formatHex(k), StandardCharsets.UTF_8);
-                Files.move(tmp, f, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            byte[] hex = java.util.HexFormat.of().formatHex(k).getBytes(StandardCharsets.US_ASCII);
+            boolean posix = f.getFileSystem().supportedFileAttributeViews().contains("posix");
+            java.nio.file.attribute.FileAttribute<?>[] attrs = posix
+                    ? new java.nio.file.attribute.FileAttribute<?>[] {java.nio.file.attribute.PosixFilePermissions
+                            .asFileAttribute(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"))}
+                    : new java.nio.file.attribute.FileAttribute<?>[0];
+            try (var ch = Files.newByteChannel(f, java.util.EnumSet.of(java.nio.file.StandardOpenOption.CREATE_NEW,
+                    java.nio.file.StandardOpenOption.WRITE), attrs)) {
+                if (!posix) ownerOnlyAcl(f);
+                ch.write(java.nio.ByteBuffer.wrap(hex));
             } catch (java.nio.file.FileAlreadyExistsException raced) {
-                // another request created it first — read theirs
-            } finally {
-                Files.deleteIfExists(tmp);
+                // another writer created it first — theirs is the key; read it below
             }
         }
-        return java.util.HexFormat.of().parseHex(Files.readString(f, StandardCharsets.UTF_8).trim());
+        for (int attempt = 0; ; attempt++) {
+            String text = Files.readString(f, StandardCharsets.US_ASCII).trim();
+            if (text.length() == 64) return java.util.HexFormat.of().parseHex(text);
+            if (attempt >= 200) throw new IOException("the Pending Change key " + f + " is not a whole key");
+            try {
+                Thread.sleep(5);   // the first writer is between CREATE_NEW and its write
+            } catch (InterruptedException stop) {
+                Thread.currentThread().interrupt();
+                throw new IOException("interrupted reading the Pending Change key", stop);
+            }
+        }
+    }
+
+    /** Windows: an ACL with one entry — the file's owner, full control — replacing whatever it inherited. */
+    private static void ownerOnlyAcl(Path f) {
+        var view = Files.getFileAttributeView(f, java.nio.file.attribute.AclFileAttributeView.class);
+        if (view == null) return;   // neither POSIX nor ACL: nothing narrower to set
+        try {
+            var owner = view.getOwner();
+            var entry = java.nio.file.attribute.AclEntry.newBuilder()
+                    .setType(java.nio.file.attribute.AclEntryType.ALLOW).setPrincipal(owner)
+                    .setPermissions(java.util.EnumSet.allOf(java.nio.file.attribute.AclEntryPermission.class)).build();
+            view.setAcl(List.of(entry));
+        } catch (IOException | RuntimeException bestEffort) {
+            // a filesystem that refuses an ACL change keeps its default permissions; the key is still outside
+            // every exported, imported and backed-up tree
+        }
     }
 
     /**

@@ -105,6 +105,7 @@ final class BackupTask {
             files = new ArrayList<>(walk.filter(Files::isRegularFile)
                     .filter(p -> !p.toAbsolutePath().normalize()
                             .startsWith(backupDir.toAbsolutePath()))   // never archive the archive dir
+                    .filter(p -> !secret(dir, p))                       // never archive a secret
                     .toList());
         }
         files.sort(Comparator.comparing(Path::toString));   // deterministic archive order
@@ -414,5 +415,20 @@ final class BackupTask {
         } catch (NoSuchAlgorithmException e) {
             throw new IOException(e);
         }
+    }
+
+    /**
+     * Whether {@code p} is a secret no backup may carry (`ASSURE-MAKER-CHECKER-1`): anything under a
+     * {@code *.secrets} directory (where the control plane keeps a Space's Pending Change key, beside its config
+     * root — {@code PendingChanges.keyFile}), or a Pending Change key by name wherever it sits. The names are
+     * restated here because this module does not depend on the control plane.
+     */
+    static boolean secret(Path source, Path p) {
+        Path rel = source.toAbsolutePath().normalize().relativize(p.toAbsolutePath().normalize());
+        for (Path seg : rel) {
+            String name = seg.toString();
+            if (name.endsWith(".secrets") || name.equals(".pending-changes.key")) return true;
+        }
+        return false;
     }
 }

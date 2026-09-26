@@ -76,6 +76,23 @@ class BackupTaskTest {
                 "sidecar manifest written");
     }
 
+    /** A backup of a whole Space never carries its Pending Change key (ASSURE-MAKER-CHECKER-1 round 3). */
+    @Test
+    void aBackupNeverCarriesAPendingChangeKey(@TempDir Path source, @TempDir Path backupDir) throws Exception {
+        JobConfig cfg = backupCfg(source, backupDir);
+        Files.writeString(Files.createDirectories(source.resolve("config.secrets")).resolve(".pending-changes.key"), "k");
+        Files.writeString(Files.createDirectories(source.resolve("config").resolve("pending-changes"))
+                .resolve(".pending-changes.key"), "stray");
+        new MaintenanceJob(cfg).run();
+        java.util.List<String> names = new java.util.ArrayList<>();
+        try (var zin = new java.util.zip.ZipInputStream(Files.newInputStream(onlyZip(backupDir)))) {
+            for (var e = zin.getNextEntry(); e != null; e = zin.getNextEntry()) names.add(e.getName());
+        }
+        assertFalse(names.stream().anyMatch(n -> n.contains(".pending-changes.key") || n.contains(".secrets")),
+                "no key in the archive: " + names);
+        assertTrue(names.stream().anyMatch(n -> n.endsWith("a.toon")), "the rest is archived: " + names);
+    }
+
     @Test
     void backupVerifyPassesThenDetectsCorruption(@TempDir Path source, @TempDir Path backupDir) throws Exception {
         new MaintenanceJob(backupCfg(source, backupDir)).run();
