@@ -85,7 +85,7 @@ public final class ObjectRoutes implements RouteModule {
         api.post("/objects/([^/]+)/merge", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> mergeCases(api, e, ApiContext.name(m), api.body(e)))));
         api.post("/objects/([^/]+)/split", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> splitCase(api, e, ApiContext.name(m), api.body(e)))));
         api.get("/objects/([^/]+)/graph", scoped(api, (e, m) -> objectGraph(api, ApiContext.name(m), e)));
-        api.post("/objects/([^/]+)/comments", scoped(api, (e, m) -> addComment(api, ApiContext.name(m), api.body(e))));
+        api.post("/objects/([^/]+)/comments", scoped(api, (e, m) -> addComment(api, e, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/comments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.COMMENT))));
         api.post("/objects/([^/]+)/attachments", scoped(api, (e, m) -> addAttachment(api, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/attachments", scoped(api, (e, m) -> toNoteMaps(OpsEngine.of(api).notesOf(ApiContext.name(m), NoteKind.ATTACHMENT))));
@@ -95,6 +95,12 @@ public final class ObjectRoutes implements RouteModule {
         // CapabilityManifest.EXEMPTIONS. It writes ONLY attributes.findings + its flat copies and refuses any
         // other key (422), so it is not a way round the canAdminister PATCH below.
         api.put("/objects/([^/]+)/findings", scoped(api, (e, m) -> saveFindings(api, e, ApiContext.name(m), api.body(e))));
+        // (operator, 2026-09-26, INCIDENT-FINISH-GATE-1) narrow postmortem + category routes on canWorkIncidents:
+        // resolving an Incident needs its postmortem, and Accept needs a category, so an analyst who may move an
+        // Incident must be able to write these two — and ONLY these two. Each writes one attribute and refuses
+        // any other key (422); priority / severity / assignee / tags stay on the canAdminister PATCH.
+        api.put("/objects/([^/]+)/postmortem", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> savePostmortem(api, e, ApiContext.name(m), api.body(e)))));
+        api.put("/objects/([^/]+)/category", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> saveCategory(api, e, ApiContext.name(m), api.body(e)))));
         api.patch("/objects/([^/]+)", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> patchObject(api, ApiContext.name(m), api.body(e)))));
         api.get("/objects/([^/]+)", scoped(api, (e, m) -> objectById(api, ApiContext.name(m))));
         api.get("/rca/templates", (e, m) -> rcaTemplateList(api));
@@ -645,12 +651,17 @@ public final class ObjectRoutes implements RouteModule {
         return g;
     }
 
-    /** {@code POST /objects/{id}/comments} (Phase 4) — add a comment; body {@code {body, author?}}. */
-    private Object addComment(ApiContext api, String id, Map<String, Object> body) {
+    /**
+     * {@code POST /objects/{id}/comments} (Phase 4) — add a comment; body {@code {body, author?}}. The author is
+     * the signed-in Subject when there is one; the body's {@code author} counts only without one (Personal) —
+     * operator 2026-09-26, as {@link #actorOf} does for a lifecycle move.
+     */
+    private Object addComment(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
         String text = ApiContext.str(body, "body");
         if (text == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'body'");
+        String author = ApiContext.subject(ex).map(Subject::id).orElseGet(() -> ApiContext.str(body, "author"));
         try {
-            return OpsEngine.of(api).comment(id, ApiContext.str(body, "author"), text).toMap();
+            return OpsEngine.of(api).comment(id, author, text).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -734,7 +745,8 @@ public final class ObjectRoutes implements RouteModule {
     /**
      * {@code PATCH /objects/{id}} — partial update of the operator-mutable fields; body any of
      * {@code {priority?, severity?, assignee?, attributes?}} (attributes merge over the stored bag,
-     * updates win). The mail view's Prioritize / tagging / postmortem saves ride this. At least one
+     * updates win). The mail view's Prioritize / tagging saves ride this (the postmortem and category moved
+     * to their own {@code canWorkIncidents} routes, 2026-09-26). At least one
      * field → else 400; unknown id → 404. No workflow involvement — status changes stay on
      * {@code /objects/{id}/transition}.
      */
@@ -791,6 +803,54 @@ public final class ObjectRoutes implements RouteModule {
         validateFindings(api, id, attrs);
         try {
             return OpsEngine.of(api).saveFindings(id, attrs, ApiContext.actor(ex)).toMap();
+        } catch (java.util.NoSuchElementException notFound) {
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
+        }
+    }
+
+    /**
+     * {@code PUT /objects/{id}/postmortem} — save an Incident's postmortem; body {@code {postmortem:{…}}} and
+     * NOTHING else (operator 2026-09-26, INCIDENT-FINISH-GATE-1: on {@code canWorkIncidents}, so an analyst can
+     * write what {@code → RESOLVED} requires). Stored as the {@code attributes.postmortem} JSON blob the panel
+     * and the I1 resolution gate read. A missing/non-object {@code postmortem} → 400; any other key → 422;
+     * unknown or out-of-scope id → 404. Audited with {@link ApiContext#actor}.
+     */
+    private Object savePostmortem(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
+        if (!(body.get(POSTMORTEM_ATTR) instanceof Map<?, ?> postmortem))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'postmortem' as an object");
+        onlyKey(body, POSTMORTEM_ATTR);
+        Map<String, Object> blob = new LinkedHashMap<>();
+        postmortem.forEach((k, v) -> blob.put(k.toString(), v));
+        return saveAttribute(api, ex, id, POSTMORTEM_ATTR, JsonAttributes.toPayloadJson(blob));
+    }
+
+    /**
+     * {@code PUT /objects/{id}/category} — set an object's category, the 3-layer categorisation Accept
+     * requires; body {@code {category:"…"}} and NOTHING else (operator 2026-09-26, INCIDENT-FINISH-GATE-1, on
+     * {@code canWorkIncidents}). A missing, blank or non-string {@code category} → 400; any other key → 422;
+     * unknown or out-of-scope id → 404. Audited with {@link ApiContext#actor}.
+     */
+    private Object saveCategory(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
+        if (!(body.get(CATEGORY_ATTR) instanceof String category) || category.isBlank())
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'category' as a non-blank string");
+        onlyKey(body, CATEGORY_ATTR);
+        return saveAttribute(api, ex, id, CATEGORY_ATTR, category.trim());
+    }
+
+    private static final String POSTMORTEM_ATTR = "postmortem";
+    private static final String CATEGORY_ATTR = "category";
+
+    /** A narrow write takes its one key and nothing else — anything more is a disposition edit → 422. */
+    private static void onlyKey(Map<String, Object> body, String key) {
+        List<String> extra = body.keySet().stream().filter(k -> !key.equals(k)).sorted().toList();
+        if (!extra.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "only '" + key + "' may be saved here, not " + extra + " — other field changes use PATCH /objects/{id}");
+    }
+
+    private static Object saveAttribute(ApiContext api, HttpExchange ex, String id, String key, String value) {
+        try {
+            return OpsEngine.of(api).saveAttributes(id, Map.of(key, value), ApiContext.actor(ex), key).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }

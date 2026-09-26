@@ -182,6 +182,10 @@ final class CapabilityManifest {
             new Entry("POST", "/objects/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS),
             new Entry("POST", "/objects/([^/]+)/transition", Roles.CAN_WORK_INCIDENTS),
             new Entry("POST", "/objects/([^/]+)/assign", Roles.CAN_WORK_INCIDENTS),
+            // (operator, 2026-09-26, INCIDENT-FINISH-GATE-1) the postmortem and Accept's categorise step, so an
+            // analyst can FINISH an Incident — each writes ONLY its one attribute and refuses any other key (422).
+            new Entry("PUT", "/objects/([^/]+)/postmortem", Roles.CAN_WORK_INCIDENTS),
+            new Entry("PUT", "/objects/([^/]+)/category", Roles.CAN_WORK_INCIDENTS),
             new Entry("POST", "/objects/([^/]+)/merge", Roles.CAN_ADMINISTER),
             new Entry("POST", "/objects/([^/]+)/split", Roles.CAN_ADMINISTER),
             new Entry("PATCH", "/objects/([^/]+)", Roles.CAN_ADMINISTER),

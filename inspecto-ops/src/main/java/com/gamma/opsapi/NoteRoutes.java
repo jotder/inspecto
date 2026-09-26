@@ -6,6 +6,7 @@ import com.gamma.control.RouteErrors;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.RouteModule;
+import com.gamma.control.Subject;
 
 import com.gamma.ops.note.NoteKind;
 import com.gamma.ops.note.NoteService;
@@ -63,13 +64,19 @@ public final class NoteRoutes implements RouteModule {
                 .map(ObjectNote::toMap).toList());
     }
 
-    /** {@code POST /notes/{targetKind}/{targetId}/comments} — body {@code {body, author?}}. */
+    /**
+     * {@code POST /notes/{targetKind}/{targetId}/comments} — body {@code {body, author?}}. The author is the
+     * signed-in Subject when there is one; the body's {@code author} counts only without one (Personal) —
+     * operator 2026-09-26.
+     */
     private Object addComment(ApiContext api, HttpExchange ex, String targetKind, String targetId,
                               Map<String, Object> body) {
         String text = ApiContext.str(body, "body");
         if (text == null) throw new ApiException(400, "body must include 'body'");
         return RouteErrors.mapErrors(() -> notes(api, ex)
-                .comment(targetKind, targetId, ApiContext.str(body, "author"), text).toMap());
+                .comment(targetKind, targetId,
+                        ApiContext.subject(ex).map(Subject::id).orElseGet(() -> ApiContext.str(body, "author")), text)
+                .toMap());
     }
 
     /**

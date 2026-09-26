@@ -318,16 +318,27 @@ public final class ObjectService {
      * @throws NoSuchElementException if no object has this id
      */
     public OperationalObject saveFindings(String id, Map<String, String> attributes, String actor) {
+        return saveAttributes(id, attributes, actor, "findings");
+    }
+
+    /**
+     * The narrow-write seam {@link #saveFindings} and the {@code PUT /objects/{id}/postmortem|category} routes
+     * share (operator 2026-09-26): merge {@code attributes} over the stored bag, always write, and audit an
+     * {@link EventType#OBJECT_ACTIVITY} event whose {@code action} is {@code what}, naming the {@code actor}.
+     *
+     * @throws NoSuchElementException if no object has this id
+     */
+    public OperationalObject saveAttributes(String id, Map<String, String> attributes, String actor, String what) {
         OperationalObject obj = require(id);
         OperationalObject updated = store.update(obj.withAttributes(attributes, System.currentTimeMillis()));
         EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
                 .level(EventLevel.INFO)
                 .source(SOURCE)
                 .correlationId(obj.correlationId())
-                .message(obj.objectType() + " " + id + ": findings saved" + (actor == null ? "" : " by " + actor))
+                .message(obj.objectType() + " " + id + ": " + what + " saved" + (actor == null ? "" : " by " + actor))
                 .attr("objectId", id)
                 .attr("objectType", obj.objectType().name())
-                .attr("action", "findings")
+                .attr("action", what)
                 .attr("actor", actor));
         return updated;
     }
