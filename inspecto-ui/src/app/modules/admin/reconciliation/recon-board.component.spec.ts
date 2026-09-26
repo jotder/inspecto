@@ -5,7 +5,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { EMPTY, Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { ReconApiService } from 'app/inspecto/api';
+import { LensService, ReconApiService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import {
@@ -69,6 +69,7 @@ async function create(
         result?: ReconRunResult;
         datasets?: Partial<Dataset>[];
         record?: () => Observable<ReconState>;
+        canOperateRuns?: boolean;
     } = {},
 ) {
     const recon: Reconciliation = { ...RECON, ...opts.patch };
@@ -88,6 +89,7 @@ async function create(
             },
             { provide: ReconciliationsService, useValue: { get: () => of(recon), save } },
             { provide: ReconApiService, useValue: { record, state } },
+            { provide: LensService, useValue: { canOperateRuns: () => opts.canOperateRuns ?? true } },
             { provide: ReconExecService, useValue: { run: vi.fn(async () => opts.result ?? RESULT) } },
             { provide: DatasetsService, useValue: { list: () => of(opts.datasets ?? []) } },
             { provide: MatDialog, useValue: { open: vi.fn() } },
@@ -154,6 +156,17 @@ describe('ReconBoardComponent', () => {
         expect(state).toHaveBeenCalledWith('med_vs_bill');
         expect(c.state()?.runs).toBe(3);
         expect(c.result()).not.toBeNull(); // the Board itself still renders
+    });
+
+    // A manager (no canOperateRuns) opens a Board: the comparison and the recorded lifecycle show, nothing is recorded,
+    // and no refusal toast greets them on every open.
+    it('a viewer who may not operate runs reads the recorded lifecycle without recording or toasting', async () => {
+        const { c, record, state, toastr } = await create({ canOperateRuns: false });
+        await vi.waitFor(() => expect(c.state()).not.toBeNull());
+        expect(record).not.toHaveBeenCalled();
+        expect(state).toHaveBeenCalledWith('med_vs_bill');
+        expect(toastr.error).not.toHaveBeenCalled();
+        expect(c.result()).not.toBeNull();
     });
 
     it('the details action navigates to the Breaks page with the encoded path', async () => {

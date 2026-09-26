@@ -8,7 +8,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ColDef } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ReconApiService } from 'app/inspecto/api';
+import { apiErrorMessage, LensService, ReconApiService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { FlatTreeRow, TreeNode, TreeTableComponent } from 'app/inspecto/tree-table';
@@ -84,6 +84,7 @@ export class ReconBoardComponent implements OnInit {
     private router = inject(Router);
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
+    private lens = inject(LensService);
     private datasetsApi = inject(DatasetsService);
 
     private tree = viewChild(TreeTableComponent);
@@ -230,7 +231,9 @@ export class ReconBoardComponent implements OnInit {
      * Run the aggregate comparison, then RECORD the run (R2-03): the server computes every Break of the saved
      * Reconciliation itself, merges the locked lifecycle (re-matched keys auto-close, resolutions and
      * first-seen stamps carry forward) and stamps the run — gated `canOperateRuns`, so an operations-only
-     * user records it too. A failed record is toasted and the Board keeps the last RECORDED lifecycle.
+     * user records it too. A failed record is toasted and the Board keeps the last RECORDED lifecycle. A viewer
+     * who may not operate runs (a manager, a developer) sees the comparison and the recorded lifecycle but records
+     * nothing — so opening a Board does not toast a refusal they cannot act on.
      */
     async run(): Promise<void> {
         const r = this.recon();
@@ -244,6 +247,10 @@ export class ReconBoardComponent implements OnInit {
             return;
         } finally {
             this.running.set(false);
+        }
+        if (!this.lens.canOperateRuns()) {
+            this.stateApi.state(r.id).subscribe({ next: (s) => this.state.set(s), error: () => undefined });
+            return;
         }
         this.stateApi.record(r.id).subscribe({
             next: (s) => this.state.set(s),
