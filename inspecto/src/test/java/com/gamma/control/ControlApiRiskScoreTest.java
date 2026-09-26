@@ -308,6 +308,33 @@ class ControlApiRiskScoreTest {
         }
     }
 
+    @Test
+    void theRiskScoresPrefixIsReservedForDatasetsAndSinks(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            ComponentStore store = new ComponentStore(c.config.resolve("registry"));
+            for (String[] body : new String[][]{
+                    {"dataset", "{\"id\":\"risk_scores_x\",\"physicalRef\":\"topups\"}"},
+                    {"dataset", "{\"id\":\"harmless\",\"physicalRef\":\"RISK_SCORES_subs\"}"},
+                    {"dataset", "{\"id\":\"harmless2\",\"physicalRef\":\"./a/../risk_scores_subs/x\"}"},
+                    {"dataset", "{\"id\":\"risk_scores_ghost_latest\",\"physicalRef\":\"risk_scores_ghost_latest\"}"},
+                    {"sink", "{\"id\":\"risk_scores_sink\",\"format\":\"PARQUET\"}"}}) {
+                HttpResponse<String> r = send(c.port, "POST", "/spaces/s1/components/" + body[0], body[1], "analyst");
+                assertEquals(422, r.statusCode(), body[1] + " -> " + r.body());
+                assertTrue(r.body().contains("reserved prefix"), r.body());
+            }
+            assertFalse(store.exists("dataset", "harmless"));
+
+            // The documented exception: id = physicalRef = risk_scores_<model>_latest over a SAVED model.
+            assertTrue(send(c.port, "POST", "/spaces/s1/components/risk-score",
+                    JSON.writeValueAsString(withId("subs", model(null))), "analyst").statusCode() < 300);
+            HttpResponse<String> ok = send(c.port, "POST", "/spaces/s1/components/dataset",
+                    "{\"id\":\"risk_scores_subs_latest\",\"physicalRef\":\"risk_scores_subs_latest\"}", "analyst");
+            assertTrue(ok.statusCode() < 300, ok.body());
+            assertTrue(send(c.port, "POST", "/spaces/s1/components/dataset",
+                    "{\"id\":\"plain\",\"physicalRef\":\"topups\"}", "analyst").statusCode() < 300, "others unaffected");
+        }
+    }
+
     private static Map<String, Object> withId(String id, Map<String, Object> m) {
         Map<String, Object> out = new java.util.LinkedHashMap<>(m);
         out.put("id", id);

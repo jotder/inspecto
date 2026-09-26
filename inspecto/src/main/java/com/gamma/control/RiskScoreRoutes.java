@@ -157,4 +157,45 @@ final class RiskScoreRoutes implements RouteModule {
                                 + "', which Dataset '" + ds.content().get("name") + "' already reads as its store");
         }
     }
+
+    /** Content keys through which a Dataset or sink names the store it reads or writes. */
+    private static final List<String> STORE_KEYS = List.of("physicalRef", "store", "output_store", "path", "sourceName");
+
+    /**
+     * The {@code risk_scores_} prefix is RESERVED for the {@code risk.score} Job's outputs: a Dataset or sink whose id,
+     * or whose store (any of {@link #STORE_KEYS}, compared case-insensitively on its normalised first path segment),
+     * starts with it is refused — so nothing else can name, read into, or write over a scores store. The one exception
+     * is the documented Dataset over a saved model's own {@code _latest}: its id AND its {@code physicalRef} both
+     * equal {@code risk_scores_<model>_latest}, and that model exists.
+     */
+    static void requireNotReserved(ApiContext api, String type, String id, Map<String, Object> content) {
+        String prefix = RiskScoreModel.SCORES_PREFIX;
+        java.util.List<String> named = new java.util.ArrayList<>();
+        named.add(id);
+        for (String k : STORE_KEYS) if (content.get(k) instanceof String v && !v.isBlank()) named.add(v);
+        boolean reserved = named.stream().map(RiskScoreRoutes::firstSegment)
+                .anyMatch(n -> n.toLowerCase(java.util.Locale.ROOT).startsWith(prefix));
+        if (!reserved) return;
+        if ("dataset".equals(type) && id != null && id.equals(content.get("physicalRef"))
+                && named.size() == 2 && id.endsWith(RiskScoreModel.LATEST_SUFFIX) && api.writeRoot() != null) {
+            String model = id.substring(prefix.length(), id.length() - RiskScoreModel.LATEST_SUFFIX.length());
+            if (id.startsWith(prefix) && new ComponentStore(api.writeRoot().resolve("registry")).exists(TYPE, model))
+                return;   // the documented Alert Rule Dataset over risk_scores_<model>_latest
+        }
+        throw new IllegalArgumentException(type + " '" + id + "' names a store under the reserved prefix '" + prefix
+                + "' (Risk Score outputs); only a Dataset with id = physicalRef = " + prefix
+                + "<model>" + RiskScoreModel.LATEST_SUFFIX + " over a saved model is allowed");
+    }
+
+    /** The first path segment of a store reference, normalised ({@code ./a/../risk_scores_x/y} → {@code risk_scores_x}). */
+    private static String firstSegment(String ref) {
+        String n = ref.trim().replace('\\', '/');
+        java.util.Deque<String> parts = new java.util.ArrayDeque<>();
+        for (String p : n.split("/")) {
+            if (p.isEmpty() || p.equals(".")) continue;
+            if (p.equals("..")) { if (!parts.isEmpty()) parts.removeLast(); continue; }
+            parts.addLast(p);
+        }
+        return parts.isEmpty() ? "" : parts.getFirst();
+    }
 }

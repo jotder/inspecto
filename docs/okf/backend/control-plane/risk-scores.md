@@ -54,6 +54,12 @@ SQL key**, and an unknown key is refused.
      collides.
 3. Then `PendingChanges.hold`, the maker-checker funnel.
 
+🔴 **The `risk_scores_` prefix is reserved.** A `dataset` or `sink` whose id, or whose store (`physicalRef` /
+`store` / `output_store` / `path` / `sourceName`), starts with `risk_scores_` is refused (422). The match is
+case-insensitive and made on the normalised first path segment (`RiskScoreRoutes.requireNotReserved`, run by
+every writer). The one exception is the documented Dataset whose id and `physicalRef` are both
+`risk_scores_<model>_latest` over a saved model.
+
 **Every writer runs gates 1 and 2.** `ComponentRoutes.validateKind(api, …)` is called by the component
 route and by both bulk writers (`BundleRoutes`, `BiTemplates`), so a bundle cannot plant a model the
 authoring route refuses.
@@ -96,6 +102,11 @@ the stored model, excluding the `name`/`owner`/`shares` envelope.
 **Every score is reproducible from its factors.** `RiskScorer.recompute(factors)` re-derives each
 contribution from `weight`, `value` and `cap`; it does not trust the stored `contribution`. The Job test
 and the HTTP test both assert that it matches the stored score.
+
+⚠ **A query failure carries a generic message.** A DuckDB cast error quotes the cell it could not convert,
+and a Job failure's message reaches the run ledger, the logs and the UI. So `RiskScoreEvaluator` rethrows
+with the model, the factor, the Dataset and the error class only. It keeps neither the message nor the
+cause.
 
 Limits: a factor that names more than 200 000 entities **fails the run** rather than scoring a subset.
 Evidence reads at most 20 000 rows per factor, and the run log reports `evidenceTruncated` when that cap
@@ -195,3 +206,5 @@ A 404 renders nothing.
 - An indicator is a Measure. There is no free-form arithmetic expression, and no reference to a saved
   Measure component, because none exists.
 - The history Dataset grows by one file per run. No retention is applied yet.
+- There is no `risk.score` entry in the UI job palette (`job-attributes.ts`).
+- Tracked as P3 `ASSURE-RISK-SCORE-RESIDUALS-1`.

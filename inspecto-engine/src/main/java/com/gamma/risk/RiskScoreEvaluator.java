@@ -81,7 +81,7 @@ public final class RiskScoreEvaluator {
             String relation = relationSql.apply(f.dataset());
             MeasureCompiler.Spec spec = f.valueSpec(MAX_ENTITIES);
             String valueId = spec.measures().get(0).id();
-            QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
+            QueryExecutor.Result r = run(model, f, "indicator", new QueryExecutor.Request(
                     f.dataset(), relation, MeasureCompiler.compile(spec), MAX_ENTITIES, 0, List.of(), List.of()));
             if (r.truncated())
                 throw new IllegalStateException("risk-score '" + model.id() + "' factor '" + f.id()
@@ -94,7 +94,7 @@ public final class RiskScoreEvaluator {
                 if (v instanceof Number n) perEntity.put(f.id(), n.doubleValue());
             }
             if (!f.evidence().isEmpty()) {
-                QueryExecutor.Result ev = QueryExecutor.run(new QueryExecutor.Request(f.dataset(), relation,
+                QueryExecutor.Result ev = run(model, f, "evidence", new QueryExecutor.Request(f.dataset(), relation,
                         MeasureCompiler.compile(f.evidenceSpec(MAX_EVIDENCE_ROWS)), MAX_EVIDENCE_ROWS, 0,
                         List.of(), List.of()));
                 evidenceTruncated |= ev.truncated();
@@ -115,6 +115,22 @@ public final class RiskScoreEvaluator {
         for (Map.Entry<String, Map<String, Double>> e : values.entrySet())
             scored.add(RiskScorer.score(model, e.getKey(), e.getValue(), evidence.get(e.getKey())));
         return new Run(List.copyOf(scored), evidenceTruncated);
+    }
+
+    /**
+     * Run one factor query with a GENERIC failure. A DuckDB error can quote a raw cell value (a cast error names
+     * the value it could not convert), and a Job failure's message lands in the run ledger, the logs and the UI —
+     * so neither the message nor the cause is carried; the error CLASS and the factor are enough to act on.
+     */
+    private static QueryExecutor.Result run(RiskScoreModel model, RiskScoreModel.Factor f, String what,
+                                            QueryExecutor.Request req) {
+        try {
+            return QueryExecutor.run(req);
+        } catch (Exception e) {
+            throw new IllegalStateException("risk-score '" + model.id() + "' factor '" + f.id() + "': the " + what
+                    + " query over dataset '" + f.dataset() + "' failed (" + e.getClass().getSimpleName()
+                    + "; details withheld because they may quote source values) - check the column types");
+        }
     }
 
     /**

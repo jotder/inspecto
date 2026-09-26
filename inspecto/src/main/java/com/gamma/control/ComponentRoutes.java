@@ -677,6 +677,7 @@ final class ComponentRoutes implements RouteModule {
         validateKind(type, id, content);
         if (RiskScoreRoutes.TYPE.equals(type))
             RiskScoreRoutes.requireStorable(api, com.gamma.risk.RiskScoreModel.fromMap(id, content));
+        if ("dataset".equals(type) || "sink".equals(type)) RiskScoreRoutes.requireNotReserved(api, type, id, content);
     }
 
     static void validateKind(String type, String id, Map<String, Object> content) {

@@ -48,4 +48,34 @@ class RiskScoreEvaluatorTest {
                 id -> DatasetRelation.relationSql(Map.of("physicalRef", id), data, null), NO_MASK).scored().isEmpty(),
                 "an injection attempt is a literal that matches nothing");
     }
+
+    @Test
+    void aQueryFailureNeverQuotesASourceValue(@TempDir Path data) throws Exception {
+        DuckDbUtil.loadDriver();
+        Path dir = Files.createDirectories(data.resolve("spend"));
+        String file = dir.resolve("data.parquet").toString().replace('\\', '/');
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES ('m1', '447700900123x')) AS v(msisdn, amount)) TO '"
+                    + file + "' (FORMAT PARQUET)");
+        }
+        // A virtual Dataset casting the text column to a number: the cast fails AT RUN TIME on the cell value.
+        Map<String, Object> ds = Map.of("sql", "SELECT msisdn, CAST(amount AS INTEGER) AS amount FROM spend",
+                "sourceName", "spend");
+        RiskScoreModel m = RiskScoreModel.fromMap("bad", Map.of("entityType", "subscriber", "highThreshold", 50,
+                "factors", List.of(Map.of("id", "spend", "dataset", "spend_num", "key", "msisdn", "measure",
+                        "sum(amount)", "weight", 1))));
+        java.util.function.Function<String, String> rel = id -> DatasetRelation.relationSql(ds, data, null);
+
+        // The premise, proven: the SAME query run raw DOES quote the value — so the wrapper is what hides it.
+        Throwable rawT = assertThrows(Exception.class, () -> com.gamma.query.QueryExecutor.run(
+                new com.gamma.query.QueryExecutor.Request("spend_num", rel.apply("spend_num"),
+                        com.gamma.query.MeasureCompiler.compile(m.factors().get(0).valueSpec(10)), 10, 0,
+                        List.of(), List.of())));
+        assertTrue(rawT.getMessage().contains("447700900123"), "DuckDB's own message quotes the cell: " + rawT.getMessage());
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> RiskScoreEvaluator.evaluate(m, rel, NO_MASK));
+        assertFalse(e.getMessage().contains("447700900123"), e.getMessage());
+        assertNull(e.getCause(), "the cause (which carries the DuckDB message) is not attached");
+        assertTrue(e.getMessage().contains("factor 'spend'"), e.getMessage());
+    }
 }
