@@ -199,7 +199,7 @@ class ConfigWriteFunnelTest {
      * the maker-checker hold itself, or be on {@link #WRITERS} with the reason it need not.
      */
     private static final Pattern WRITER = Pattern.compile(
-            "(?i)\\b\\w*(store|components)\\w*(\\(\\w*\\))?\\.(write|delete)\\(|BundleImporter\\.writeConfig\\(|new EntityFactLog\\(");
+            "(?i)\\b\\w*(store|components)\\w*(\\(\\w*\\))?\\.(write|delete)\\(|BundleImporter\\.writeConfig\\(|new EntityFactLog\\(|ActionRequests\\.save\\(");
     private static final Pattern HELD = Pattern.compile(
             "PendingChanges\\.(hold\\w*|governs)\\(|WidgetTags\\.refuseUnderPolicy\\(|refuseGovernedDependents\\(");
 
@@ -212,6 +212,11 @@ class ConfigWriteFunnelTest {
     private static final String ENTITY_FACTS = "the Identity Fact log behind Entity Lists (LA-17): an append-only, "
             + "hash-chained, reason-carrying log of analyst facts under audit/, not a ComponentStore kind — not "
             + "governable, and reserved from every import (ReservedConfigPaths audit/)";
+
+    private static final String ACTION_REQUESTS = "an Action Request record (ASSURE-ACTION-REQUESTS-1) under "
+            + "action-requests/ — an operational record of an outbound call, not config: it carries its own mandatory "
+            + "four-eyes approval, so an approval policy must not hold it a second time; HMAC-signed, and reserved from "
+            + "every import (ReservedConfigPaths)";
 
     /** Writer sites ({@code SimpleClass#method}) that do not reach the hold themselves, each with its reason. */
     static final Map<String, String> WRITERS = new TreeMap<>(Map.ofEntries(
@@ -249,7 +254,10 @@ class ConfigWriteFunnelTest {
             Map.entry("EntityListRoutes#retire", ENTITY_FACTS),
             Map.entry("InvestigationRoutes#sealList", "READS the Identity Fact log to seal a list into an "
                     + "Investigation op (LA-17) — the signal matches opening the log, which is not a write; "
-                    + ENTITY_FACTS)
+                    + ENTITY_FACTS),
+            Map.entry("ActionRequestRoutes#propose", ACTION_REQUESTS),
+            Map.entry("ActionRequestRoutes#decide", ACTION_REQUESTS), Map.entry("ActionRequestRoutes#retry", ACTION_REQUESTS),
+            Map.entry("ActionDispatcher#fail", ACTION_REQUESTS), Map.entry("ActionDispatcher#run", ACTION_REQUESTS)
     ));
 
     @Test

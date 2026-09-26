@@ -15,7 +15,8 @@ import java.util.Set;
  *       user → role table, read from every Space's config root: a {@code roles: super} Demo User),
  *       {@code access-policies.toon}, the Access Catalog and Access Profiles ({@code registry/access-catalog/},
  *       {@code registry/access-profiles/}, {@code canConfigureAccess}), {@code approval.toon} and
- *       {@code pending-changes/} (reserved for the maker-checker policy and its records), {@code agent/} (the
+ *       {@code pending-changes/} (reserved for the maker-checker policy and its records), {@code action-requests/}
+ *       (the signed Action Request records, `ASSURE-ACTION-REQUESTS-1`), {@code agent/} (the
  *       assist agent's autonomy {@code policy.json}, {@code approvals.jsonl} and run logs), and the Data
  *       Exchange {@code offers.toon} / {@code grants.toon};</li>
  *   <li>Space settings documents — {@code branding.toon}, {@code geo.toon}, {@code link-analysis.toon},
@@ -45,7 +46,7 @@ public final class ReservedConfigPaths {
 
     /** Reserved directories (a prefix of the config-relative path). */
     static final List<String> DIRS = List.of(
-            "pending-changes/", "recon-state/", ".history/", "audit/", "agent/", "expectation-baselines/",
+            "pending-changes/", "action-requests/", "recon-state/", ".history/", "audit/", "agent/", "expectation-baselines/",
             "registry/access-catalog/", "registry/access-profiles/");
 
     /** Component kinds no bundle may carry — the access config, gated {@code canConfigureAccess} on its own routes. */

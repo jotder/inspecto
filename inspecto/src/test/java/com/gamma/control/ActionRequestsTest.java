@@ -78,6 +78,13 @@ class ActionRequestsTest {
         assertEquals(Map.of("title", "Incident inc-\"1\"}", "n", 3, "tags", List.of("r1")), out);
     }
 
+    /** An import can never land a record here, signed or not. */
+    @Test
+    void theStoreDirectoryIsReservedFromEveryImport() {
+        assertTrue(com.gamma.service.ReservedConfigPaths.reserved(ActionRequests.DIR + "/ar-20260101000000-abcdef.json"));
+        assertTrue(com.gamma.service.ReservedConfigPaths.reserved("ACTION-REQUESTS/x.json"));
+    }
+
     @Test
     void anUnsafeIdIsRefused(@TempDir Path tmp) {
         ApiException e = assertThrows(ApiException.class, () -> ActionRequests.read(tmp, "../../etc"));
