@@ -758,6 +758,20 @@ pendingChange}`. One pending change per kind + name at a time (a second is 409).
 Writers that cannot be ONE Pending Change **refuse** under a policy (409) instead —
 `PendingChanges.holdRefusing`: `/bundle/import`, `/pipelines/import` (a binary bundle a replay cannot
 carry), BI template apply, and the Investigation Alert Rule bind (owner-only, so no approver could apply it).
+Added after the 2026-09-26 verification:
+- **`POST /import`** refuses (409) when any zip entry is a governed kind or cannot be classified
+  (`PendingChanges.holdRefusingPaths` / `kindOfConfigPath`); and every import refuses the reserved files
+  whatever the policy (see [auth & security](../editions/auth-security.md)).
+- **A Pipeline rename** that would rewrite a dependent (Expectation / Decision Rule target, Dataset store ref,
+  Alert Rule `onPipeline`, Enrichment trigger) of a governed kind is refused (409) naming it
+  (`refuseGovernedDependents`, rename and resume, before step 0).
+- **Tag routes** (assign / unassign / rename / delete) that would re-project a widget's `tags` refuse under a
+  policy on `widget`, before the edge moves (`WidgetTags.refuseUnderPolicy`).
+- **The agent's fix drafts** never overwrite an existing component of a governed kind (`PendingChanges.governs`).
+- `ConfigWriteFunnelTest#everyConfigWriterRepoWideReachesTheHoldOrIsOnTheInventory` scans EVERY module —
+  not only routes — for ComponentStore-shaped writes, bundle unpacks and Entity Fact log appends; each site's
+  method must reach the hold or sit on its `WRITERS` inventory with a reason (shared helpers, result stamps,
+  non-governable kinds, Job/engine writes, the Identity Fact log). Removing the `/import` refusal turns it red.
 
 **The apply** — approve replays the stored request (method, route path + query, body, `If-Match`) through
 `ApiContext.replay`, with the Pending Change stamped on the replay (`ATTR_APPROVED_CHANGE`). Every gate of that

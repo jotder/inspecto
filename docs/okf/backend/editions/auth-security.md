@@ -685,14 +685,35 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
 
 - **A policy that could never approve is refused.** Requiring approval on a build with no Authenticator is
   422 at save: without Subjects an author and an approver cannot be told apart.
-- **The apply runs AS the approver.** Approve replays the author's original request in-process through the
-  same route (`ApiContext.replay`), so the approver must also hold that route's own capability (an approver
-  with `canApproveChanges` but not `canAuthorWorkbench` gets the route's 403, and the change stays pending).
-  Provenance a route stamps from the caller names the author: a created component's `owner` is the author
-  (`ComponentAccess.onCreate` reads `PendingChanges.onBehalfOf`).
+- **The apply runs AS THE AUTHOR, re-checked at apply time** (D-P13, operator 2026-09-26 — a checker need not
+  be a builder). Approve replays the author's original request in-process through the same route
+  (`ApiContext.replay`) with a Subject for the author: their recognised roles, recorded at propose time, are
+  re-resolved against the Space's role table and Access Profiles as they stand NOW
+  (`PendingChanges.authorNow`), exactly as `OidcAuthenticator` resolves them. The approver needs only the
+  approver capability, so the seeded `admin` (no `canAuthorWorkbench`) approves a builder's change. An author
+  who has since lost the grant gets 403 with that reason, and the change stays pending. ⚠ Role MEMBERSHIP is
+  the IdP's and is as of the proposal — a server cannot re-ask the IdP about a user who is not in the request;
+  with an Authenticator that stamps no roles, the propose-time capability snapshot is used.
 - **Every step is audited** as an `AUDIT` event, `actionCategory: configuration`: `pending-change.proposed`,
-  `.approved`, `.declined`, `.expired`, `.stale`, `.apply-refused`. The replayed write is also recorded by
-  `AuditTrail` like any request, with the approver as actor.
+  `.approved`, `.declined`, `.expired`, `.stale`, `.apply-refused`, and `approval-policy.changed` (the actor
+  and the policy before and after, JSON). ⚠ Know which row says what: the approve REQUEST's own route-level
+  row (`AuditTrail`) has the **approver** as actor; the replayed WRITE's row has the **author** as actor plus
+  `approvedBy` and `pendingChange`; `pending-change.approved` has the approver as actor and the author as an
+  attribute.
+- **An import may never write the files a narrower gate owns** (D-P14, `ReservedConfigPaths`): `roles.toon`,
+  `access-policies.toon`, the Access Catalog and Access Profiles, `approval.toon`, `pending-changes/`, every
+  Space settings document, `rename.journal`, `recon-state/`, `.history/`, `audit/`. `/import` and a
+  `/pipelines/import` satellite refuse them (403), `/bundle/import` refuses `access-*` items, and
+  `BundleImporter.writeConfig` refuses them as a backstop. 🔴 **This closed a privilege escalation older than
+  maker-checker**: `POST /import` needs only `canAuthorWorkbench`, and until 2026-09-26 a zip carrying
+  `roles.toon` rewrote the role table the Authenticator resolves every Subject from (reproduced: 200, the
+  builder's `developer` role gained `canAdminister`); `/pipelines/import ?conflict=overwrite` could land it as
+  a satellite, and `/bundle/import` could carry `access-profile` items. `SpaceManager.createFromBundle` (a NEW
+  Space, `canAdminister`) still writes them — there is nothing there yet to overwrite.
+- 🔴 **Approval is single-process.** Deciding is serialised by one JVM lock (`PendingChanges.lock()`), and the
+  store is plain files. Two Pods sharing a Space could both approve (or approve and decline) the same change.
+  Multi-Pod needs a store-level compare-and-set on the Pending Change's status — filed as
+  `ASSURE-MAKER-CHECKER-MULTIPOD-1`.
 - The AI-agent approvals inbox (`/agent/approvals*`) is a different thing and is unchanged.
 
 As-built detail (the hold, the funnels, what is governable): [config safety](../config/config-safety.md#maker-checker--pending-changes-2026-09-26).
