@@ -42,8 +42,9 @@ so a value can never break the JSON. The approver reads exactly what will go out
   **`canApproveChanges`** (reused, no new capability, so `Roles.SEED` is unchanged).
 - Deciding needs an authenticated Subject (403 without one — author and approver could not be told apart).
 - **Four-eyes is always on**: the author approving or declining their own request is **403** — and so is any
-  **co-author**: a request raised by a Decision Rule's `invoke-api` carries the rule's `createdBy` / `updatedBy`
-  as `coAuthors`, so the rule's maker cannot approve what the rule raised. It is not a policy option. Retry and
+  **co-author**: a request raised by a Decision Rule's `invoke-api` carries the rule's **makers** as `coAuthors`
+  — every editor, read from the component version history, since the invoke-api consequence (connection, method,
+  payload) last changed — so no maker of what the rule sends can approve or decline what it raised. It is not a policy option. Retry and
   mark-failed are not four-eyes: they send nothing new.
 - 🔴 **Not under the Approval Policy.** An Action Request is not config and carries its own mandatory approval;
   `PendingChanges.hold` is never reached and no policy kind names it. Holding the proposal as a Pending Change
@@ -83,17 +84,22 @@ An Action Request may only reach where the **egress policy** (`EgressPolicy`, `i
    host and dials another), decimal (`2130706433`), octal (`0177.0.0.1`), hex (`0x7f000001`), short (`127.1`) and
    leading-zero forms, zone ids, ports, whitespace. The built URL must parse back as the host.
 2. **Address classes, deny by default** — before EVERY attempt the host is resolved once and every address is
-   checked: loopback, link-local (`169.254.0.0/16` — the cloud metadata service — and `fe80::/10`), private (RFC 1918,
+   checked (an IPv6 address carrying an IPv4 — `::/96` except `::`/`::1`, `::ffff:0:0/96`, `64:ff9b::/96`,
+   `64:ff9b:1::/48`, 6to4 `2002::/16` bits 16–47 — is classed by that IPv4, so `64:ff9b::a9fe:a9fe` is the
+   metadata service; one denied answer among several refuses the host; the resolver is an injectable seam): loopback, link-local (`169.254.0.0/16` — the cloud metadata service — and `fe80::/10`), private (RFC 1918,
    `fc00::/7`, `fec0::/10`), CGNAT `100.64.0.0/10`, `0.0.0.0/8`, broadcast, multicast, unspecified, and any address
    of THIS host (which covers every address the control plane binds). A refusal fails the request at once, nothing
    sent, not retried.
 3. **The Egress Allowlist** — `GET|PUT /settings/egress` (`egress.toon`, default empty; PUT is `canAdminister`,
    validated fail closed, audited as `egress-allowlist.changed` with before/after, reserved from imports; no
-   approval-policy kind covers Space settings, so it is not held). A **host** entry lets that exact name reach the
-   PRIVATE classes only (RFC 1918, ULA, CGNAT) — never loopback, link-local or this host, so a name that is
-   re-pointed by DNS rebinding still cannot reach the metadata service. A **CIDR** entry (or a bare IP literal, taken
-   as /32 or /128) lets anything inside it through except multicast / unspecified / broadcast — real targets such as
-   a CBS or a PCRF often live on private networks, and this is how they are allowed.
+   approval-policy kind covers Space settings, so it is not held). An entry lifts **only the liftable classes** —
+   private (RFC 1918, ULA, site-local) and CGNAT: a **host** entry for that exact name, a **CIDR** entry (or a bare
+   IP literal, taken as /32 or /128) for its range. 🔴 **Never liftable**, by any entry: loopback, link-local
+   (`169.254.169.254`, `fe80::/10`), unspecified, multicast, broadcast and this host — and a CIDR overlapping
+   `0/8`, `127/8`, `169.254/16`, `224/4`, `255.255.255.255`, `::/127`, `fe80::/10` or `ff00::/8` is refused at
+   `PUT /settings/egress` (422 naming the range), so `0.0.0.0/1` + `128.0.0.0/1` cannot reopen the metadata
+   service and a name re-pointed by DNS rebinding cannot reach it. Real targets such as a CBS or a PCRF on private
+   networks are allowed this way.
 4. **Pinned connect** — the wire (`PinnedHttp` in `inspecto-notify-channels`, behind
    `WebhookSinkTransport.exchange(…, InetAddress connectTo, …)`) connects to the CHECKED address and never resolves
    the name itself, so rebinding cannot swap it between check and connect. The name still travels as the `Host`
@@ -136,13 +142,22 @@ the rule's open Incident (correlation `decision-rule:<rule>`, opened when none i
 `params.connection`, `params.method` (default POST) and `params.payload` (default
 `{incident: {{incident.id}}, rule: {{context.rule}}}`). Deduped while one is pending on that Incident. The
 author is the person applying the rule, or `decision-rule:<rule>` for an engine-fired application; the rule's
-`createdBy` / `updatedBy` become `coAuthors`. A rule with no recorded editor (saved before editors were recorded)
-raises nothing, *skipped* — fail closed, because its maker cannot be excluded; save it again.
+makers (above, from the version history) become `coAuthors`. When the history cannot say — an unstamped version
+on the chain, or a chain running past the retained history — the rule raises nothing, *skipped* — fail closed,
+because its makers cannot be excluded; save it again.
 
 **At save** (`POST|PUT /decision-rules`), a rule with an `invoke-api` consequence needs the saver to hold
 `canWorkIncidents` (403) — otherwise a `canAuthorWorkbench`-only author could propose outbound calls by proxy — and
 its params are validated: `params.connection` required, registered, `https` (422); a legacy `params.url` is 422
 with a message saying the target is always an onboarded Connection. ⚠ Breaking.
+
+🔴 **One guard on every writer.** `decision-rule` is a `ComponentStore.WRITABLE_TYPES` kind, so the same check runs
+in `DecisionRuleGuard` from EVERY door that writes one: `/decision-rules`, `/components/decision-rule` (and version
+restore, which lands there), `/import`, `/bundle/import`, a new Space's bundle; a pipeline rename may move
+`target` only; the agent's fix drafts refuse the kind. `createdBy` / `updatedBy` are **server-stamped** — body
+values are discarded. An import carrying an invoke-api rule by someone without `canWorkIncidents` is 403 before
+anything is written (all-or-nothing). `DecisionRuleWritersTest` enumerates `ConfigWriteFunnelTest`'s writer
+inventory and fails for a new writer that neither calls the guard nor is listed with its reason.
 
 ## Routes
 
