@@ -21,11 +21,14 @@ It is stored at `registry/risk-scores/<id>.toon` through `ComponentStore` / `Com
 diff, restore and the maker-checker hold come with the generic component routes. It is parsed and
 validated by `com.gamma.risk.RiskScoreModel`.
 
+The scores Datasets are **always** `risk_scores_<id>` and `risk_scores_<id>_latest`. The name is derived,
+never authored: sending `scoresDataset` is a 422. A model id is letters, digits and `_` only, so the mapping
+is injective (`a-b` and `a_b` cannot share an output).
+
 | Key | Meaning |
 |---|---|
 | `entityType` | `subscriber` · `account` · `device` · `sim` · `dealer` · `channel` · `partner`, or any plain token |
 | `highThreshold` | a score at or above this is `high` (in (0, 100]) |
-| `scoresDataset` | optional; defaults to `risk_scores_<id>` |
 | `dataScope` | optional; a data-scoped caller must hold it to read a score |
 | `factors[]` | `id`, `label?`, `dataset`, `key`, `measure`, `filters?`, `weight`, `cap?`, `evidence?` |
 
@@ -40,14 +43,23 @@ SQL key**, and an unknown key is refused.
    keys. Weights and caps must be finite numbers (a numeric string is accepted). Every factor's value query
    and evidence query is **compiled** there, so an unknown aggregation, an unknown filter operator or an
    unsafe identifier fails the save.
-2. `ComponentRoutes.writeComponent` → `RiskScoreRoutes.requireColumns`. Every column a factor names (key,
-   measure field, filter fields, evidence) must be in its Dataset's Schema, as
-   `DatasetMeasureProbe.columns` reads it. A Dataset whose Schema cannot be read refuses the save. This is
-   the same rule as the Alert Rule `by` check.
+2. `RiskScoreRoutes.requireStorable`, which needs the Space:
+   - Every column a factor names (key, measure field, filter fields, evidence) must be in its Dataset's
+     Schema, as `DatasetMeasureProbe.columns` reads it. A Dataset whose Schema cannot be read refuses the
+     save. This is the same rule as the Alert Rule `by` check.
+   - The derived output names must collide with nothing. A directory of that name under the data root that
+     this model did not create is refused, and so is a Dataset of that id over another store.
 3. Then `PendingChanges.hold`, the maker-checker funnel.
 
-⚠ The two bulk writers (`BundleRoutes`, `BiTemplates`) call `validateKind` only, so they get gate 1 but
-not gate 2. That is the same gap the Alert Rule `by` check has.
+**Every writer runs gates 1 and 2.** `ComponentRoutes.validateKind(api, …)` is called by the component
+route and by both bulk writers (`BundleRoutes`, `BiTemplates`), so a bundle cannot plant a model the
+authoring route refuses.
+
+🔴 **The writer never deletes what it does not own.** Each scores directory carries a
+`.risk-score-output` marker naming its model. `RiskScoreEvaluator.write` creates the directory with the
+marker, or accepts one whose marker names this model. Anything else fails the run, untouched. The
+`_latest` swap removes only `scores-*.parquet`. Before this fix, an authored `scoresDataset: orders`
+wiped a real Dataset's files, and two models sharing an output erased each other.
 
 ## The `risk.score` Job
 
@@ -66,8 +78,8 @@ The math is in `RiskScorer` and is pure:
 
 The Job scores every entity that **any** factor names. It writes two outputs:
 
-- `<dataDir>/<scoresDataset>/scores-<ts>-<runId>.parquet` is the **history**: one row per entity per run.
-- `<dataDir>/<scoresDataset>_latest/` is swapped to this run's rows alone. This is the relation an Alert
+- `<dataDir>/risk_scores_<id>/scores-<ts>-<runId>.parquet` is the **history**: one row per entity per run.
+- `<dataDir>/risk_scores_<id>_latest/` is swapped to this run's rows alone. This is the relation an Alert
   Rule watches.
 
 Both files are written as `*.tmp` and revealed by an atomic move.

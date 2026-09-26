@@ -163,15 +163,15 @@ class ControlApiRiskScoreTest {
     @Test
     void aScopedModelIsHiddenFromACallerOutsideItsScope(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            score(c, "fraud-subs", model("fraud"));
-            HttpResponse<String> out = send(c.port, "GET", "/spaces/s1/risk-scores/fraud-subs/m1", null, "billing");
+            score(c, "fraud_subs", model("fraud"));
+            HttpResponse<String> out = send(c.port, "GET", "/spaces/s1/risk-scores/fraud_subs/m1", null, "billing");
             assertEquals(404, out.statusCode(), "out of scope reads as absence: " + out.body());
-            assertEquals(200, send(c.port, "GET", "/spaces/s1/risk-scores/fraud-subs/m1", null, "fraud").statusCode());
-            assertEquals(200, send(c.port, "GET", "/spaces/s1/risk-scores/fraud-subs/m1", null, "analyst").statusCode(),
+            assertEquals(200, send(c.port, "GET", "/spaces/s1/risk-scores/fraud_subs/m1", null, "fraud").statusCode());
+            assertEquals(200, send(c.port, "GET", "/spaces/s1/risk-scores/fraud_subs/m1", null, "analyst").statusCode(),
                     "an unscoped caller sees every model");
 
-            score(c, "open-subs", model(null));
-            assertEquals(200, send(c.port, "GET", "/spaces/s1/risk-scores/open-subs/m1", null, "billing").statusCode(),
+            score(c, "open_subs", model(null));
+            assertEquals(200, send(c.port, "GET", "/spaces/s1/risk-scores/open_subs/m1", null, "billing").statusCode(),
                     "an unscoped model is visible to a scoped caller");
         }
     }
@@ -201,6 +201,31 @@ class ControlApiRiskScoreTest {
             assertTrue(ok.statusCode() < 300, ok.body());
             assertTrue(new ComponentStore(c.config.resolve("registry")).exists("risk-score", "good"));
             assertFalse(new ComponentStore(c.config.resolve("registry")).exists("risk-score", "bad"), "nothing stored");
+        }
+    }
+
+    @Test
+    void aSaveWhoseOutputWouldOverwriteAnotherStoreIs422AndDestroysNothing(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            Path foreign = Files.createDirectories(c.data.resolve("risk_scores_clash"));
+            Path precious = Files.writeString(foreign.resolve("data.parquet"), "not ours");
+            HttpResponse<String> r = send(c.port, "POST", "/spaces/s1/components/risk-score",
+                    JSON.writeValueAsString(withId("clash", model(null))), "analyst");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("not this model's output"), r.body());
+            assertTrue(Files.exists(precious));
+
+            new ComponentStore(c.config.resolve("registry")).write("dataset", "risk_scores_named",
+                    Map.of("physicalRef", "topups"));
+            assertEquals(422, send(c.port, "POST", "/spaces/s1/components/risk-score",
+                    JSON.writeValueAsString(withId("named", model(null))), "analyst").statusCode(),
+                    "a Dataset of the derived id over another store");
+
+            Map<String, Object> authored = new java.util.LinkedHashMap<>(model(null));
+            authored.put("scoresDataset", "topups");
+            HttpResponse<String> a = send(c.port, "POST", "/spaces/s1/components/risk-score",
+                    JSON.writeValueAsString(withId("aimed", authored)), "analyst");
+            assertEquals(422, a.statusCode(), "the output name is not authorable: " + a.body());
         }
     }
 

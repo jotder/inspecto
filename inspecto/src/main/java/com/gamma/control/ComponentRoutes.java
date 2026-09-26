@@ -624,7 +624,7 @@ final class ComponentRoutes implements RouteModule {
         Map<String, Object> content = new LinkedHashMap<>(body);
         content.remove("id");   // routing key, not content (the store stamps name=id)
         try {
-            validateKind(type, id, content);
+            validateKind(api, type, id, content);
             // ASSURE-ACTION-REQUESTS-1 round-2 finding 1: this door writes decision-rule too — the same invoke-api gate
             // and server-stamped makers as /decision-rules, before the hold (version restore lands here as well).
             if (DecisionRuleGuard.TYPE.equals(type)) {
@@ -638,9 +638,6 @@ final class ComponentRoutes implements RouteModule {
                 stamped.put("name", id);
                 AlertRoutes.requireGroupingColumns(api, com.gamma.alert.AlertRule.fromMap(stamped));
             }
-            // ASSURE-RISK-SCORE-1: every column a factor names must exist in its Dataset's Schema (fail closed).
-            if (RiskScoreRoutes.TYPE.equals(type))
-                RiskScoreRoutes.requireColumns(api, com.gamma.risk.RiskScoreModel.fromMap(id, content));
             // Maker-checker (ASSURE-MAKER-CHECKER-1): after validation, before the tag projection's side effects.
             Map<String, Object> stamped = new LinkedHashMap<>(content);
             stamped.put("name", id);   // what the store persists
@@ -671,6 +668,17 @@ final class ComponentRoutes implements RouteModule {
     // whole apply, in its resolve loop before any write). ⛔ Reuse it
     // rather than growing a second accepted-set - two copies of an accepted-set is exactly how the
     // widget/dashboard census came to be needed in the first place.
+    /**
+     * {@link #validateKind(String, String, Map)} plus the checks that need the Space (a {@code risk-score}'s Schema
+     * columns and output-name collisions). EVERY writer calls this one — the authoring route and both bulk writers —
+     * so a bundle cannot plant a model the authoring route refuses.
+     */
+    static void validateKind(ApiContext api, String type, String id, Map<String, Object> content) {
+        validateKind(type, id, content);
+        if (RiskScoreRoutes.TYPE.equals(type))
+            RiskScoreRoutes.requireStorable(api, com.gamma.risk.RiskScoreModel.fromMap(id, content));
+    }
+
     static void validateKind(String type, String id, Map<String, Object> content) {
         // ASSURE-RISK-SCORE-1: structure, numeric weights, and every indicator compiled by MeasureCompiler.
         if (RiskScoreRoutes.TYPE.equals(type)) com.gamma.risk.RiskScoreModel.fromMap(id, content);

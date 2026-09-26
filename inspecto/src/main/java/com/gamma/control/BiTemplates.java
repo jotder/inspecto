@@ -138,7 +138,7 @@ final class BiTemplates {
             String id = substitute((String) c.get("id"), dataset, prefix);
             Map<String, Object> content = substituteTree(asMap(c.get("content")), dataset, prefix);
             try {
-                ComponentRoutes.validateKind(kind, id, content);
+                ComponentRoutes.validateKind(api, kind, id, content);
             } catch (IllegalArgumentException e) {
                 throw new ApiException(422, "template '" + templateId + "' would write an invalid "
                         + kind + " '" + id + "': " + e.getMessage());

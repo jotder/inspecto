@@ -19,7 +19,7 @@ import java.util.regex.Pattern;
  * <pre>
  * entityType: subscriber            (subscriber · account · device · sim · dealer · channel · partner, or free-form)
  * highThreshold: 70                 (a score at or above this is "high")
- * scoresDataset: risk_scores_subs   (optional; default risk_scores_&lt;id&gt;)
+ * (the scores Datasets are ALWAYS risk_scores_&lt;id&gt; and risk_scores_&lt;id&gt;_latest — not authorable)
  * dataScope: fraud                  (optional; a data-scoped caller must hold it to read a score)
  * factors[n]:
  *   id: failed_topups
@@ -46,12 +46,17 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
 
     static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
+    /** A model id: no '-', so {@code risk_scores_<id>} is injective (a-b and a_b cannot share an output). */
+    private static final Pattern MODEL_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_]*");
+    /** The prefix of every scores Dataset — the output name is derived, never authored. */
+    public static final String SCORES_PREFIX = "risk_scores_";
+    public static final String LATEST_SUFFIX = "_latest";
     static final int MAX_FACTORS = 32;
     static final int MAX_EVIDENCE = 8;
     /** The component envelope the store/route adds (name = id, owner, shares) — accepted, never scored. */
     public static final Set<String> ENVELOPE_KEYS = Set.of("name", "owner", "shares");
     private static final Set<String> MODEL_KEYS = Set.of("name", "owner", "shares", "id", "entityType",
-            "highThreshold", "scoresDataset", "dataScope", "description", "factors");
+            "highThreshold", "dataScope", "description", "factors");
     private static final Set<String> FACTOR_KEYS = Set.of("id", "label", "dataset", "key", "measure",
             "filters", "weight", "cap", "evidence");
 
@@ -106,6 +111,9 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
         factors = List.copyOf(factors);
     }
 
+    /** The latest-run scores Dataset ({@code risk_scores_<id>_latest}). */
+    public String latestDataset() { return scoresDataset + LATEST_SUFFIX; }
+
     /** Every column each Dataset must carry: key, measure field, filter fields, evidence (for the Schema check). */
     public Map<String, Set<String>> referencedColumns() {
         Map<String, Set<String>> out = new LinkedHashMap<>();
@@ -124,8 +132,11 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
      * which the component route maps to 422.
      */
     public static RiskScoreModel fromMap(String id, Map<String, Object> m) {
-        if (id == null || !SAFE_ID.matcher(id).matches())
-            throw new IllegalArgumentException("risk-score id '" + id + "' must be a plain name");
+        if (id == null || !MODEL_ID.matcher(id).matches())
+            throw new IllegalArgumentException("risk-score id '" + id + "' must be letters, digits and '_'");
+        if (m.containsKey("scoresDataset"))
+            throw new IllegalArgumentException("risk-score.scoresDataset is not authorable: the scores Dataset is "
+                    + "always '" + SCORES_PREFIX + id + "' (and '" + SCORES_PREFIX + id + LATEST_SUFFIX + "')");
         for (String k : m.keySet())
             if (!MODEL_KEYS.contains(k))
                 throw new IllegalArgumentException("risk-score: unknown key '" + k + "' (expected " + MODEL_KEYS + ")");
@@ -136,10 +147,7 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
         double high = number(m.get("highThreshold"), "risk-score.highThreshold");
         if (high <= 0 || high > 100)
             throw new IllegalArgumentException("risk-score.highThreshold must be in (0, 100], got " + high);
-        String scores = Values.trimToNull(m.get("scoresDataset"));
-        if (scores == null) scores = "risk_scores_" + id.replace('-', '_');
-        if (!SAFE_IDENT.matcher(scores).matches())
-            throw new IllegalArgumentException("risk-score.scoresDataset '" + scores + "' must be a plain name");
+        String scores = SCORES_PREFIX + id;
         String scope = Values.trimToNull(m.get("dataScope"));
         if (scope != null && !SAFE_IDENT.matcher(scope).matches())
             throw new IllegalArgumentException("risk-score.dataScope '" + scope + "' must be a plain token");

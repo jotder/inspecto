@@ -483,7 +483,7 @@ final class BundleRoutes implements RouteModule {
     private static BundleSource sourceFor(ApiContext api, String kind) {
         if (ComponentStore.WRITABLE_TYPES.contains(kind)) {
             Path root = componentRootOrNull(api);
-            return root == null ? null : new ComponentBundleSource(new ComponentStore(root), kind);
+            return root == null ? null : new ComponentBundleSource(api, new ComponentStore(root), kind);
         }
         // A registered pipeline exports with or without a write root, exactly like GET /pipelines/{name}/bundle.
         if ("pipeline".equals(kind)) return new RegisteredPipelineBundleSource(api);
@@ -519,7 +519,7 @@ final class BundleRoutes implements RouteModule {
 
     /** {@link ComponentStore#WRITABLE_TYPES} kinds — the pre-existing behaviour, unwrapped from
      *  {@link ComponentRegistry.Component} to a plain content map. */
-    private record ComponentBundleSource(ComponentStore store, String kind) implements BundleSource {
+    private record ComponentBundleSource(ApiContext api, ComponentStore store, String kind) implements BundleSource {
         public Optional<Map<String, Object>> get(String id) {
             return store.get(kind, id).map(ComponentRegistry.Component::content);
         }
@@ -531,7 +531,7 @@ final class BundleRoutes implements RouteModule {
             // route refuses with 422 - and a registry schema is engine-parsed. Per-item by design: an
             // IllegalArgumentException lands as status `failed` for THIS item, before the write and
             // before hot-registration, and the rest of the batch still imports.
-            ComponentRoutes.validateKind(kind, id, content);
+            ComponentRoutes.validateKind(api, kind, id, content);
             return store.write(kind, id, content).content();
         }
     }

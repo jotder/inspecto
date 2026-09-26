@@ -99,25 +99,45 @@ final class RiskScoreRoutes implements RouteModule {
     }
 
     /**
-     * Save-time Schema check for a {@code risk-score} model: every column a factor names (key, measure field,
-     * filter fields, evidence) must exist in its Dataset's Schema. <b>Fail closed</b>, like the Alert Rule
-     * {@code by} check: a Dataset whose Schema cannot be read refuses the save.
+     * Save-time gate for a {@code risk-score} model that needs the Space: run by EVERY writer (the component route and
+     * both bulk writers, through {@link ComponentRoutes#validateKind(ApiContext, String, String, Map)}). Fail closed;
+     * every refusal is an {@link IllegalArgumentException} the caller maps to 422 (or a per-item bundle failure).
+     * <ol>
+     *   <li>Every column a factor names (key, measure field, filter fields, evidence) is in its Dataset's Schema.
+     *       A Dataset whose Schema cannot be read refuses the save, like the Alert Rule {@code by} check.</li>
+     *   <li>The derived scores names ({@code risk_scores_<id>}, {@code …_latest}) collide with nothing: no directory
+     *       under the data root this model did not create, and no Dataset of that id over some other store.</li>
+     * </ol>
      */
-    static void requireColumns(ApiContext api, RiskScoreModel model) {
-        Path writeRoot = WriteGates.requireWriteRoot(api, "risk-score write");
+    static void requireStorable(ApiContext api, RiskScoreModel model) {
+        Path writeRoot = api.writeRoot();
+        if (writeRoot == null) throw new IllegalArgumentException("risk-score write needs a write root");
         DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> writeRoot, api::dataRoot);
         for (Map.Entry<String, Set<String>> e : model.referencedColumns().entrySet()) {
             List<String> columns;
             try {
                 columns = probe.columns(e.getKey());
             } catch (IllegalArgumentException ex) {
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "risk-score factors cannot be "
-                        + "checked against the Schema of dataset '" + e.getKey() + "': " + ex.getMessage());
+                throw new IllegalArgumentException("risk-score factors cannot be checked against the Schema of "
+                        + "dataset '" + e.getKey() + "': " + ex.getMessage(), ex);
             }
             List<String> missing = e.getValue().stream().filter(c -> !columns.contains(c)).toList();
             if (!missing.isEmpty())
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "risk-score column(s) " + missing
+                throw new IllegalArgumentException("risk-score column(s) " + missing
                         + " are not in the Schema of dataset '" + e.getKey() + "' (have: " + columns + ")");
+        }
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        Path dataRoot = api.dataRoot();
+        for (String out : List.of(model.scoresDataset(), model.latestDataset())) {
+            if (dataRoot != null && Files.exists(dataRoot.resolve(out))
+                    && !com.gamma.risk.RiskScoreEvaluator.ownedBy(dataRoot.resolve(out), model.id()))
+                throw new IllegalArgumentException("risk-score '" + model.id() + "' would write '" + out
+                        + "', which already exists under the data root and is not this model's output");
+            Object ref = store.get("dataset", out).map(ComponentRegistry.Component::content)
+                    .map(c -> c.get("physicalRef")).orElse(null);
+            if (store.exists("dataset", out) && !out.equals(String.valueOf(ref)))
+                throw new IllegalArgumentException("risk-score '" + model.id() + "' would write '" + out
+                        + "', which is the id of a Dataset over another store");
         }
     }
 }

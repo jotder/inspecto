@@ -49,7 +49,13 @@ public final class RiskScoreEvaluator {
     /** Evidence rows read per factor, and kept per entity. */
     static final int MAX_EVIDENCE_ROWS = 20_000;
     static final int EVIDENCE_PER_ENTITY = 3;
-    public static final String LATEST_SUFFIX = "_latest";
+    public static final String LATEST_SUFFIX = RiskScoreModel.LATEST_SUFFIX;
+    /**
+     * The ownership marker in each scores directory, holding the model id. The evaluator writes only into a
+     * directory it created (marker present and naming THIS model) and deletes only its own {@code scores-*.parquet}
+     * there — so a scores name that happens to equal a real store can never be wiped.
+     */
+    public static final String OWNER_MARKER = ".risk-score-output";
 
     private static final ObjectMapper JSON = new ObjectMapper()
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
@@ -145,11 +151,11 @@ public final class RiskScoreEvaluator {
     public static Path write(Path dataDir, RiskScoreModel model, String modelVersion, String runId,
                              Instant scoredAt, List<RiskScorer.Scored> scored) throws SQLException, IOException {
         Path history = dataDir.resolve(model.scoresDataset()).normalize();
-        Path latest = dataDir.resolve(model.scoresDataset() + LATEST_SUFFIX).normalize();
+        Path latest = dataDir.resolve(model.latestDataset()).normalize();
         if (!history.startsWith(dataDir.normalize()) || !latest.startsWith(dataDir.normalize()))
             throw new IllegalArgumentException("scores Dataset escapes the data root");
-        Files.createDirectories(history);
-        Files.createDirectories(latest);
+        claim(history, model.id());
+        claim(latest, model.id());
         String stamp = scoredAt.toEpochMilli() + "-" + runId.replaceAll("[^A-Za-z0-9_-]", "_");
         Path histTmp = history.resolve("scores-" + stamp + ".parquet.tmp");
         Path latestTmp = latest.resolve("scores-" + stamp + ".parquet.tmp");
@@ -181,9 +187,34 @@ public final class RiskScoreEvaluator {
         return history;
     }
 
+    /** Whether {@code dir} is a scores directory THIS model created (its marker names the model). */
+    public static boolean ownedBy(Path dir, String modelId) {
+        Path marker = dir.resolve(OWNER_MARKER);
+        try {
+            return Files.isRegularFile(marker) && modelId.equals(Files.readString(marker).trim());
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Create {@code dir} with this model's marker, or accept it when the marker already names this model.
+     * Anything else — a directory with no marker, or another model's — is refused, untouched.
+     */
+    static void claim(Path dir, String modelId) throws IOException {
+        if (!Files.exists(dir)) {
+            Files.createDirectories(dir);
+            Files.writeString(dir.resolve(OWNER_MARKER), modelId);
+            return;
+        }
+        if (!ownedBy(dir, modelId))
+            throw new IllegalStateException("risk-score '" + modelId + "' refuses to write into '" + dir.getFileName()
+                    + "': the directory exists and was not created by this model");
+    }
+
     private static void swapIn(Path dir, Path tmp, String name) throws IOException {
         List<Path> stale = new ArrayList<>();
-        try (DirectoryStream<Path> old = Files.newDirectoryStream(dir, "*.parquet")) {
+        try (DirectoryStream<Path> old = Files.newDirectoryStream(dir, "scores-*.parquet")) {
             for (Path p : old) {
                 Path hidden = p.resolveSibling(p.getFileName() + ".stale");
                 Files.move(p, hidden, StandardCopyOption.ATOMIC_MOVE);
