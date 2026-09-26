@@ -405,6 +405,8 @@ final class PipelineGraphRoutes implements RouteModule {
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
 
+        PendingChanges.hold(api, e, "pipeline", name, lowered, existsOnDisk ? existing : null);   // maker-checker
+
         byte[] bytes = ConfigCodec.toToon(lowered).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".cfg-");
         PipelineHistory.record(writeRoot, target);   // PIPELINE-CONFIG-HISTORY-1

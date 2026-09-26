@@ -209,6 +209,11 @@ final class ConfigWriteRoutes implements RouteModule {
             }
         }
 
+        // Maker-checker (ASSURE-MAKER-CHECKER-1): every gate above has passed; under the Space's approval
+        // policy the write becomes a Pending Change here, before the first byte (the schema's CSV siblings
+        // included) is written.
+        PendingChanges.hold(api, ex, type, fileName, draft, exists ? ConfigFileSupport.storedContent(target, type) : null);
+
         // Encode and write atomically: a partial/concurrent reader never sees a half-written file.
         Map<String, Object> toWrite = draft;
         String mappingRel = null, structureRel = null;
@@ -384,6 +389,8 @@ final class ConfigWriteRoutes implements RouteModule {
                         "error", "schema edit is not BACKWARD-compatible; not written", "findings", findings));
             }
         }
+
+        PendingChanges.hold(api, ex, type, fileName, merged, existing);   // maker-checker, before any byte
 
         Map<String, Object> toWrite = merged;
         String mappingRel = null, structureRel = null;

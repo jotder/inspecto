@@ -92,6 +92,10 @@ public interface ApiContext {
     /** Pod-scoped response (`POD-SCOPE-DIVERGENCE-1`): this payload describes only the Pod that answered,
      *  declared via {@link #podScoped}; {@link Envelope} emits it as {@code metadata.podScoped}. */
     String ATTR_POD_SCOPED = "inspecto.podScoped";
+    /** The Pending Change an approval is applying (`ASSURE-MAKER-CHECKER-1`): stamped ONLY on the in-process
+     *  replay {@link #replay} runs, where {@code PendingChanges.hold} reads it as "this write was approved —
+     *  verify it is the one that was, then let it through". Absent on every request a client sends. */
+    String ATTR_APPROVED_CHANGE = "inspecto.approvedChange";
 
     /** JSON bodies at or above this size are gzipped when the client sent {@code Accept-Encoding: gzip}. */
     int GZIP_MIN_BYTES = 1024;
@@ -335,6 +339,20 @@ public interface ApiContext {
 
     /** Parse the request body as a JSON object map (an empty map when the body is empty). */
     Map<String, Object> body(HttpExchange ex) throws IOException;
+
+    /** What an in-process {@link #replay} answered: the status the route sent and its body text. */
+    record Replayed(int status, String body) {}
+
+    /**
+     * Re-run {@code METHOD path} (route-table form, no {@code /api/v1} prefix, an optional {@code ?query}) in-process with {@code body},
+     * as the caller of {@code outer} — its Subject and bound Space — and capture the answer instead of
+     * sending it (`ASSURE-MAKER-CHECKER-1`: approving a Pending Change applies it through the SAME route, so
+     * every gate that route runs runs again). {@code attrs} are stamped on the replay's own request scope;
+     * {@code headers} are the original request's headers worth keeping (its {@code If-Match}). The replay is
+     * authorized (the PDP) and audited like a request; a route's refusal comes back as its status.
+     */
+    Replayed replay(HttpExchange outer, String method, String path, byte[] body, Map<String, String> headers,
+                    Map<String, Object> attrs) throws Exception;
 
     /**
      * The request body's <b>raw bytes</b>, exactly as they arrived (D8).

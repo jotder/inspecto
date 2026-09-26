@@ -140,6 +140,16 @@ public final class Roles {
      */
     public static final String CAN_APPROVE_LINK_EXPANSIONS = "canApproveLinkExpansions";
 
+    /**
+     * Approving (or declining) a <b>Pending Change</b> — a config change an approval policy held
+     * (`ASSURE-MAKER-CHECKER-1`, {@code POST /pending-changes/{id}/approve | decline}). A per-kind policy may
+     * demand a further capability on top ({@code approverCapability}); with {@code fourEyes} the approver must
+     * be a DIFFERENT Subject from the author, and holding this never makes self-approval legal. Granted to
+     * {@code admin} in {@link #SEED} ({@code super} holds everything): checking a change is oversight, not
+     * authoring, so no builder role gets it.
+     */
+    public static final String CAN_APPROVE_CHANGES = "canApproveChanges";
+
     /** The capability vocabulary = exactly what the route gates demand ({@link CapabilityManifest},
      *  R4) — the 422 validation set for authored roles and Access-Catalog action nodes. */
     static final Set<String> KNOWN_CAPABILITIES = Set.copyOf(CapabilityManifest.capabilities());
@@ -195,7 +205,8 @@ public final class Roles {
         // Admin (and Super, which holds everything) — NOT with the analyst roles that own Investigations.
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
                 CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER,
-                CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS, CAN_REVEAL_LINK_ENTITIES, CAN_APPROVE_LINK_EXPANSIONS), null));
+                CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS, CAN_REVEAL_LINK_ENTITIES, CAN_APPROVE_LINK_EXPANSIONS,
+                CAN_APPROVE_CHANGES), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,
                 CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_MANAGE_INCIDENTS,
                 CAN_WORK_INCIDENTS), null));

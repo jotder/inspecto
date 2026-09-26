@@ -336,6 +336,10 @@ final class BundleRoutes implements RouteModule {
             }
             PipelineBundleRoutes.judgeClosure(api, api.writeRoot(), cast(m), entries, ApiContext.str(item, "id"));
         }
+        // Maker-checker (ASSURE-MAKER-CHECKER-1): N items cannot be ONE Pending Change — under a policy for any
+        // kind the bundle carries, the import is refused before any write, never written around the policy.
+        PendingChanges.holdRefusing(api, ordered.stream().map(i -> ApiContext.str(i, "kind")).distinct().toList(),
+                "a bundle import writes many items in one act");
         if (!introduced.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bundle fails referential integrity — import would introduce: " + introduced);
 

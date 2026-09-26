@@ -68,11 +68,11 @@ final class ExpectationRoutes implements RouteModule {
                 (e, m) -> clearBaseline(api, e, ApiContext.name(m))));
 
         api.post("/expectations", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> single(e, create(api, api.body(e)))));
+                (e, m) -> single(e, create(api, e, api.body(e)))));
         api.put("/expectations/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> single(e, update(api, ApiContext.name(m), api.body(e)))));
+                (e, m) -> single(e, update(api, e, ApiContext.name(m), api.body(e)))));
         api.delete("/expectations/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> delete(api, ApiContext.name(m))));
+                (e, m) -> delete(api, e, ApiContext.name(m))));
     }
 
     /** SEC-7(b): an expectation's only verbs are the Workbench-authoring family — declare the
@@ -112,7 +112,7 @@ final class ExpectationRoutes implements RouteModule {
                 .toList();
     }
 
-    private Object create(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object create(ApiContext api, com.sun.net.httpserver.HttpExchange e, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
         census(body);
         Expectation exp = parse(body);
@@ -123,10 +123,11 @@ final class ExpectationRoutes implements RouteModule {
         content.put("lastResult", null);
         content.put("createdAt", now);
         content.put("updatedAt", now);
+        PendingChanges.hold(api, e, TYPE, exp.name(), content, null);   // maker-checker
         return write(store, exp.name(), content);
     }
 
-    private Object update(ApiContext api, String name, Map<String, Object> body) throws IOException {
+    private Object update(ApiContext api, com.sun.net.httpserver.HttpExchange e, String name, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
         Map<String, Object> prev = RouteErrors.existing(store, TYPE, "expectation", name);
         census(body);
@@ -135,12 +136,14 @@ final class ExpectationRoutes implements RouteModule {
         content.put("lastResult", prev.get("lastResult"));                       // preserve last evaluation
         content.put("createdAt", prev.getOrDefault("createdAt", System.currentTimeMillis()));
         content.put("updatedAt", System.currentTimeMillis());
+        PendingChanges.hold(api, e, TYPE, name, content, prev);   // maker-checker
         return write(store, name, content);
     }
 
-    private Object delete(ApiContext api, String name) throws IOException {
+    private Object delete(ApiContext api, com.sun.net.httpserver.HttpExchange e, String name) throws IOException {
         ComponentStore store = store(api);
-        RouteErrors.existing(store, TYPE, "expectation", name);   // 404 if absent
+        Map<String, Object> current = RouteErrors.existing(store, TYPE, "expectation", name);   // 404 if absent
+        PendingChanges.hold(api, e, TYPE, name, null, current);   // maker-checker
         store.delete(TYPE, name);
         baselines(api).delete(name);   // a re-created same-name expectation must not inherit this baseline
         return Map.of("deleted", name);

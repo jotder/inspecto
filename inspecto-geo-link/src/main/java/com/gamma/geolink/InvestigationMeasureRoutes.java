@@ -120,6 +120,10 @@ public final class InvestigationMeasureRoutes implements RouteModule {
         ComponentStore store = new ComponentStore(inv.writeRoot().resolve("registry"));
         if (store.get("alert-rule", rule.name()).isPresent())
             throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists");
+        // Maker-checker (ASSURE-MAKER-CHECKER-1): an approver could not replay this bind — the Investigation is
+        // owner-only — so under a policy for Alert Rules it is refused rather than written around the policy.
+        com.gamma.control.PendingChanges.holdRefusing(api, java.util.List.of("alert-rule"),
+                "an Investigation Alert Rule is bound inside an owner-only Investigation, where no approver can apply it");
         Map<String, Object> written;
         try {
             written = store.write("alert-rule", rule.name(), rule.toMap()).content();

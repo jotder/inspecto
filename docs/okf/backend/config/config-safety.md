@@ -726,3 +726,61 @@ and a fresh clone — the CI case — is the failing side.
 escape and the main checkout is green by accident (so `JOB-CONFIG-THIRD-PRODUCER-1`'s fix is incomplete), or
 the gate holds and only the **test** is fragile. ⛔ Do not make the test green first — that is how a real gate
 gets papered over.
+
+## Maker-checker — Pending Changes (2026-09-26)
+
+*`ASSURE-MAKER-CHECKER-1` S1–S3.* Glossary: **Pending Change**, **Approval Policy**. Security side:
+[auth & security](../editions/auth-security.md#maker-checker-a-held-config-change-needs-a-different-person-assure-maker-checker-1-2026-09-26).
+
+**The policy** — `approval.toon` in the Space config root, `GET|PUT /settings/approval`:
+`{approval: {<kind>: {required, approverCapability, fourEyes}}, expiresAfterHours}` (defaults: off, the
+`canApproveChanges` capability, four-eyes on, 168 h). Validated fail-closed at save: a kind outside
+`ApprovalPolicy.GOVERNABLE`, a capability no route demands, an unknown key or a bad value is 422. A file that
+is present but unreadable is **not** read as off: every governable kind is held until it is fixed
+(`failedClosed: true` on the GET).
+
+**Governable** — `pipeline`, `schema`, `enrichment`, `meta` (the `/config/write` + `/config/patch` types) and
+every `ComponentStore` kind except `requirement`, `channel` and `notification-rule`. ⛔ Not governable: `job`
+(the `/jobs` writers are not held), Connections, Tags and Case Rules, the Space settings documents — the
+approval policy above all, which could otherwise never be lifted.
+
+**The hold** — `PendingChanges.hold(api, ex, kind, name, proposed, current)`, called by each authoring route
+after every validation it runs and before any side effect: `/config/write`, `/config/patch`,
+`DELETE /config/{type}/{name}`, `PUT /pipelines/{name}/graph`, the history restore, `/label`, `/settings`,
+`/save-as-template` (its schema copy is taken back while held), `/rename` (before the journal's step 0), and
+the component writers — `/components/*` create / update / restore / delete, `/alerts/rules*`,
+`/decision-rules*`, `/expectations*`, `/access/catalog`, `/access/profiles*`. With no rule for the kind it
+returns and the route writes exactly as before. With one, it stores the Pending Change and throws
+`PendingChanges.Held`, which `ControlApi.routeDispatch` answers `202 {status: pending, written: false,
+pendingChange}`. One pending change per kind + name at a time (a second is 409). The author may send
+`X-Change-Reason`.
+
+Writers that cannot be ONE Pending Change **refuse** under a policy (409) instead —
+`PendingChanges.holdRefusing`: `/bundle/import`, `/pipelines/import` (a binary bundle a replay cannot
+carry), BI template apply, and the Investigation Alert Rule bind (owner-only, so no approver could apply it).
+
+**The apply** — approve replays the stored request (method, route path + query, body, `If-Match`) through
+`ApiContext.replay`, with the Pending Change stamped on the replay (`ATTR_APPROVED_CHANGE`). Every gate of that
+route runs again. When the replay reaches the hold it lets the write through only if it is the same write:
+the same kind + name, the content it replaces still at the **base version** (else 409, closed as `stale` —
+the route's own `If-Match` 409 counts too), and the content it produces still the approved one. Versions are
+content hashes that leave out write-time and result stamps (`createdAt`, `updatedAt`, `lastResult`,
+`lastSimulation`), so a routine evaluation does not make a waiting change stale. Any other refusal of the
+replay comes back as its status and leaves the change pending.
+
+**Storage** — one JSON document per change at `<write-root>/pending-changes/<id>.json` (ids
+`pc-<yyyyMMddHHmmss>-<6 hex>`), the `ReconStateStore` pattern: atomic temp + move, jailed, an unreadable
+document is an error, never "absent". Not an OperationalDb family, so there is no backup / bundle-staging
+lockstep; it sits in the config tree. Expiry is recorded lazily — on the next list, read or decide.
+
+**Reads** — `GET /pending-changes[?status=&kind=]` (capped at 500, `total` + `truncated`),
+`GET /pending-changes/{id}` (with `current` and `proposed`), `GET /pending-changes/{id}/diff` — the Pipeline
+history's line diff (`PipelineHistory.diff`) over both contents encoded as TOON.
+
+`ConfigWriteFunnelTest#everyConfigWritingRouteReachesTheMakerCheckerHoldOrIsExempt` fails a config-writing
+route that reaches neither `hold` nor `holdRefusing` unless it is on `NO_HOLD` with a reason. Pinned over
+real HTTP, with an armed Authenticator, by `ControlApiPendingChangesTest`.
+
+⚠ Known limits: the guard's closure stops at the file boundary (a write in another class is invisible);
+`channel` / `notification-rule` / `job` are not governable yet; an author cannot withdraw their own change
+(four-eyes forbids self-decline, as in Link Analysis) — it is declined by someone else or expires.

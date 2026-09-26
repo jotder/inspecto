@@ -672,3 +672,27 @@ subdirectory, under `registry/`, at the root and through a real reference key, a
 `/pipelines/import` satellite and a `/bundle/import` closure file), `ImportPathsTest`,
 `ImportLoaderInventoryTest`. The Incident gate's own half (a workflow with a `CLOSED` terminal state) is in
 the incidents concept, [`incidents.md`](../../capabilities/incidents/incidents.md).
+
+## Maker-checker: a held config change needs a different person (`ASSURE-MAKER-CHECKER-1`, 2026-09-26)
+
+A Space's **Approval Policy** (`approval.toon`, `PUT /settings/approval`, gated `canAdminister`) can require
+approval per config kind. Under it an authoring write becomes a **Pending Change** (answered `202`) and is
+applied only when `POST /pending-changes/{id}/approve` succeeds. The decide gates follow the Link Analysis
+four-eyes precedent (D-U7): `canApproveChanges` on the route (a literal gate, in `CapabilityManifest`) → an
+authenticated Subject, else 403 → already decided or expired 409 → the kind's `approverCapability` (default
+`canApproveChanges`) → with `fourEyes` (the default) the author deciding their own change is 403, whether
+approving or declining. `canApproveChanges` is seeded to `admin` only (`super` holds everything).
+
+- **A policy that could never approve is refused.** Requiring approval on a build with no Authenticator is
+  422 at save: without Subjects an author and an approver cannot be told apart.
+- **The apply runs AS the approver.** Approve replays the author's original request in-process through the
+  same route (`ApiContext.replay`), so the approver must also hold that route's own capability (an approver
+  with `canApproveChanges` but not `canAuthorWorkbench` gets the route's 403, and the change stays pending).
+  Provenance a route stamps from the caller names the author: a created component's `owner` is the author
+  (`ComponentAccess.onCreate` reads `PendingChanges.onBehalfOf`).
+- **Every step is audited** as an `AUDIT` event, `actionCategory: configuration`: `pending-change.proposed`,
+  `.approved`, `.declined`, `.expired`, `.stale`, `.apply-refused`. The replayed write is also recorded by
+  `AuditTrail` like any request, with the approver as actor.
+- The AI-agent approvals inbox (`/agent/approvals*`) is a different thing and is unchanged.
+
+As-built detail (the hold, the funnels, what is governable): [config safety](../config/config-safety.md#maker-checker--pending-changes-2026-09-26).

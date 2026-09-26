@@ -110,6 +110,8 @@ final class PipelineSettingsRoutes implements RouteModule {
                     "error", "the new name introduces ERROR-level findings; not written",
                     "findings", introduced));
 
+        PendingChanges.hold(api, e, "pipeline", id, out, src);   // maker-checker (ASSURE-MAKER-CHECKER-1)
+
         byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(srcPath, bytes, ".cfg-");
         PipelineHistory.record(writeRoot, srcPath);   // PIPELINE-CONFIG-HISTORY-1
@@ -179,6 +181,8 @@ final class PipelineSettingsRoutes implements RouteModule {
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "the new settings introduce ERROR-level findings; not written",
                     "findings", introduced));
+
+        PendingChanges.hold(api, e, "pipeline", name, out, src);   // maker-checker (ASSURE-MAKER-CHECKER-1)
 
         byte[] bytes = ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(srcPath, bytes, ".cfg-");
@@ -250,6 +254,17 @@ final class PipelineSettingsRoutes implements RouteModule {
         if (SaveGate.refuses(findings))
             return ApiContext.respondJson(e, 422, Map.of("written", false,
                     "error", "config has ERROR-level findings; not written", "findings", findings));
+
+        // Maker-checker (ASSURE-MAKER-CHECKER-1). The schema copy above already landed (the gate judges the
+        // template against it), so a held template takes it back — the approved replay copies it again.
+        try {
+            PendingChanges.hold(api, e, "pipeline", id, tpl, null);
+        } catch (PendingChanges.Held held) {
+            if (tpl.get("processing") instanceof Map<?, ?> proc && proc.get("schema_file") != null
+                    && notes.stream().anyMatch(n -> n.startsWith("copied the schema")))
+                Files.deleteIfExists(writeRoot.resolve(String.valueOf(proc.get("schema_file"))).normalize());
+            throw held;
+        }
 
         byte[] bytes = ConfigCodec.toToon(tpl).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".tpl-");

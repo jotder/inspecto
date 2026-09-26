@@ -22,8 +22,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * `ASSURE-MAKER-CHECKER-1` S0 — <b>every config-writing control-plane route passes through a funnel, or is on
- * a justified exemption list.</b> Maker-checker is only as strong as its narrowest door: a route that writes
+ * `ASSURE-MAKER-CHECKER-1` S0 + S2 — <b>every config-writing control-plane route passes through the funnels,
+ * or is on a justified exemption list.</b> Maker-checker is only as strong as its narrowest door: a route that writes
  * config beside the funnels is a route an approval policy cannot hold.
  *
  * <p><b>The enumeration</b> is the one {@code CapabilityManifestTest#everyMutatingRouteIsGatedExemptOrPending}
@@ -33,13 +33,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * class), and reads that closure for:
  * <ul>
  *   <li>a <b>config write</b> — a TOON encode ({@code ConfigCodec.toToon(}, {@code JToon.encode(}) or a
- *       {@code ComponentStore} write ({@code store.write(TYPE|type|kind|"…", …)});</li>
- *   <li>the <b>funnel</b> — {@link SaveGate} ({@code SaveGate.check}/{@code SaveGate.introduced}), the content
- *       gate every pipeline-shaped save runs. ({@code ComponentStore.write} is the component writers' funnel
- *       by construction.)</li>
+ *       {@code ComponentStore} write or delete ({@code store.write|delete(TYPE|type|kind|"…", …)});</li>
+ *   <li>the <b>content funnel</b> — {@link SaveGate} ({@code SaveGate.check}/{@code SaveGate.introduced}), the
+ *       gate every pipeline-shaped save runs ({@code ComponentStore.write} is the component writers' funnel by
+ *       construction);</li>
+ *   <li>the <b>maker-checker hold</b> — {@code PendingChanges.hold} (or {@code holdRefusing} for a writer that
+ *       cannot be one Pending Change), which an approval policy needs every authoring write to reach.</li>
  * </ul>
- * A TOON-writing route must reach {@code SaveGate} or sit on {@link #NO_SAVE_GATE} with the reason SaveGate has
- * no arm for what it writes.
+ * A TOON-writing route must reach {@code SaveGate} or sit on {@link #NO_SAVE_GATE}; every config-writing route
+ * must reach the hold or sit on {@link #NO_HOLD} — each row with its reason.
  *
  * <p>⚠ <b>Scope, stated so it is not mistaken for more:</b> the closure stops at the file boundary, so a route
  * that delegates its write to ANOTHER class is invisible here (the settings documents, whose records write
@@ -54,7 +56,7 @@ class ConfigWriteFunnelTest {
 
     private static final Pattern TOON_WRITE = Pattern.compile("ConfigCodec\\.toToon\\(|JToon\\.encode\\(");
     private static final Pattern COMPONENT_WRITE = Pattern.compile(
-            "\\.write\\(\\s*(TYPE|type|kind|KIND|[A-Z_]+_TYPE|\"[a-z-]+\")\\s*,");
+            "\\.(write|delete)\\(\\s*(TYPE|type|kind|KIND|[A-Z_]+_TYPE|\"[a-z-]+\")\\s*,");
     private static final Pattern SAVE_GATE = Pattern.compile("SaveGate\\.(check|introduced)\\(");
     private static final Pattern HOLD = Pattern.compile("PendingChanges\\.hold\\w*\\(");
 
@@ -72,17 +74,51 @@ class ConfigWriteFunnelTest {
      */
     static final Map<String, String> NO_SAVE_GATE = new TreeMap<>(Map.ofEntries(
             Map.entry("POST /tags", TAGS), Map.entry("POST /tags/([^/]+)/rename", TAGS),
-            Map.entry("DELETE /tags/([^/]+)", TAGS), Map.entry("POST /tags/rules", TAGS),
+            Map.entry("POST /tags/rules", TAGS),
             Map.entry("POST /cases/rules", "a Case Rule of the operational-object layer (inspecto-ops) — "
                     + "ConfigSpecs has no case-rule type"),
             Map.entry("POST /connections", CONNECTIONS), Map.entry("PUT /connections/([^/]+)", CONNECTIONS),
             Map.entry("POST /jobs", JOBS), Map.entry("PUT /jobs/([^/]+)", JOBS),
             Map.entry("POST /jobs/([^/]+)/enable", JOBS), Map.entry("POST /jobs/([^/]+)/disable", JOBS),
-            Map.entry("POST /jobs/([^/]+)/reschedule", JOBS),
-            Map.entry("POST /bundle/import", "a bulk import of components (each through ComponentRoutes.validateKind "
-                    + "and ComponentStore), jobs and enrichments — never a pipeline-shaped save: Pipelines import "
-                    + "through POST /pipelines/import, which runs SaveGate")
+            Map.entry("POST /jobs/([^/]+)/reschedule", JOBS)
     ));
+
+    private static final String NOT_GOVERNABLE = "writes a kind ApprovalPolicy.GOVERNABLE excludes, so no policy can "
+            + "name it and there is nothing to hold";
+    private static final String RESULT_STAMP = "a RESULT stamp an evaluation writes onto the component "
+            + "(archive=false, outside the version history) — operating, not authoring; the Pending Change version "
+            + "ignores it (PendingChanges.version)";
+
+    /**
+     * Config-writing routes that deliberately do NOT reach {@code PendingChanges.hold}, each with its reason.
+     * A stale row fails too.
+     */
+    static final Map<String, String> NO_HOLD = new TreeMap<>(Map.ofEntries(
+            Map.entry("POST /tags", TAGS), Map.entry("POST /tags/([^/]+)/rename", TAGS),
+            Map.entry("POST /tags/rules", TAGS),
+            Map.entry("POST /cases/rules", "a Case Rule of the operational-object layer — " + NOT_GOVERNABLE),
+            Map.entry("POST /connections", CONNECTIONS), Map.entry("PUT /connections/([^/]+)", CONNECTIONS),
+            Map.entry("POST /jobs", "job: " + NOT_GOVERNABLE), Map.entry("PUT /jobs/([^/]+)", "job: " + NOT_GOVERNABLE),
+            Map.entry("POST /jobs/([^/]+)/enable", "job: " + NOT_GOVERNABLE),
+            Map.entry("POST /jobs/([^/]+)/disable", "job: " + NOT_GOVERNABLE),
+            Map.entry("POST /jobs/([^/]+)/reschedule", "job: " + NOT_GOVERNABLE),
+            Map.entry("POST /notifications/channels", "channel: " + NOT_GOVERNABLE),
+            Map.entry("PUT /notifications/channels/([^/]+)", "channel: " + NOT_GOVERNABLE),
+            Map.entry("DELETE /notifications/channels/([^/]+)", "channel: " + NOT_GOVERNABLE),
+            Map.entry("POST /notifications/rules", "notification-rule: " + NOT_GOVERNABLE),
+            Map.entry("PUT /notifications/rules/([^/]+)", "notification-rule: " + NOT_GOVERNABLE),
+            Map.entry("DELETE /notifications/rules/([^/]+)", "notification-rule: " + NOT_GOVERNABLE),
+            Map.entry("POST /requirements", "requirement: " + NOT_GOVERNABLE),
+            Map.entry("POST /requirements/([^/]+)/decision", "requirement: " + NOT_GOVERNABLE),
+            Map.entry("POST /requirements/([^/]+)/deliver", "requirement: " + NOT_GOVERNABLE),
+            Map.entry("POST /decision-rules/([^/]+)/simulate", RESULT_STAMP),
+            Map.entry("POST /expectations/evaluate", RESULT_STAMP),
+            Map.entry("POST /expectations/([^/]+)/evaluate", RESULT_STAMP),
+            Map.entry("POST /pipelines/rename/resume",
+                    "finishes a rename that was already let through (held and approved, or ungoverned) — holding "
+                            + "the recovery would strand a half-moved identity")
+    ));
+
     record Verdict(String route, boolean toon, boolean component, boolean saveGate, boolean hold, Path file) {}
 
     @Test
@@ -106,6 +142,24 @@ class ConfigWriteFunnelTest {
         Set<String> stale = new LinkedHashSet<>(NO_SAVE_GATE.keySet());
         stale.removeAll(toonWriters);
         assertTrue(stale.isEmpty(), () -> "NO_SAVE_GATE rows that no longer name a TOON-writing route: " + stale);
+    }
+
+    @Test
+    void everyConfigWritingRouteReachesTheMakerCheckerHoldOrIsExempt() throws IOException {
+        Set<String> unheld = new LinkedHashSet<>();
+        Set<String> writers = new LinkedHashSet<>();
+        for (Verdict v : scan()) {
+            if (!v.toon() && !v.component()) continue;
+            writers.add(v.route());
+            if (!v.hold() && !NO_HOLD.containsKey(v.route()))
+                unheld.add(v.route() + "  [" + v.file().getFileName() + "]");
+        }
+        assertTrue(unheld.isEmpty(), () -> "config-writing routes an approval policy cannot hold — call "
+                + "PendingChanges.hold after validation and before the write, or add a justified row to NO_HOLD:\n  "
+                + String.join("\n  ", unheld));
+        Set<String> stale = new LinkedHashSet<>(NO_HOLD.keySet());
+        stale.removeAll(writers);
+        assertTrue(stale.isEmpty(), () -> "NO_HOLD rows that no longer name a config-writing route: " + stale);
     }
 
     /** The four S0 routes by name, so "the scan went blind to them" cannot pass as "they are fine". */
@@ -140,7 +194,7 @@ class ConfigWriteFunnelTest {
     }
 
     private static void scanFile(Path f, List<Verdict> out) throws IOException {
-        String text = Files.readString(f);
+        String text = withoutComments(Files.readString(f));
         Matcher site = SITE.matcher(text);
         if (!site.find()) return;
         Map<String, String> methods = methodBodies(text);
@@ -165,7 +219,8 @@ class ConfigWriteFunnelTest {
         return text.substring(start);
     }
 
-    private static final Pattern CALL = Pattern.compile("\\b([a-zA-Z_]\\w*)\\s*\\(");
+    /** An UNQUALIFIED call — {@code Roles.write(…)} is another class's method, never this file's {@code write}. */
+    private static final Pattern CALL = Pattern.compile("(?<![.\\w])([a-zA-Z_]\\w*)\\s*\\(");
 
     /** {@code seed} plus the bodies of every same-file method it reaches, transitively. */
     private static String closure(String seed, Map<String, String> methods) {
@@ -208,6 +263,26 @@ class ConfigWriteFunnelTest {
             out.merge(name, text.substring(open, end), (a, b) -> a + "\n" + b);
         }
         return out;
+    }
+
+    /**
+     * {@code text} with every comment blanked (newlines kept) — prose like "a refused rename (above)" must not
+     * read as a call. String literals stay: a component kind is often one ({@code store.write("dataset", …)}).
+     */
+    static String withoutComments(String text) {
+        // Dropped, not blanked: long runs of blanks send the METHOD pattern into catastrophic backtracking.
+        StringBuilder sb = new StringBuilder(text.length());
+        for (int i = 0; i < text.length(); i++) {
+            int end = skip(text, i);
+            if (end > i && text.charAt(i) == '/') {
+                sb.append(' ');
+                for (int j = i; j <= end && j < text.length(); j++) if (text.charAt(j) == '\n') sb.append('\n');
+            } else {
+                sb.append(text, i, end + 1);
+            }
+            i = end;
+        }
+        return sb.toString();
     }
 
     /** Index of the last character of the token at {@code i} when it opens a string, char or comment. */

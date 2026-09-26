@@ -53,11 +53,11 @@ final class DecisionRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/decision-rules", (e, m) -> list(api));
         api.post("/decision-rules", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> create(api, api.body(e))));
+                (e, m) -> create(api, e, api.body(e))));
         api.put("/decision-rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> update(api, ApiContext.name(m), api.body(e))));
+                (e, m) -> update(api, e, ApiContext.name(m), api.body(e))));
         api.delete("/decision-rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> delete(api, ApiContext.name(m))));
+                (e, m) -> delete(api, e, ApiContext.name(m))));
         api.post("/decision-rules/([^/]+)/simulate", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> simulate(api, ApiContext.name(m), api.body(e))));
         api.post("/decision-rules/([^/]+)/apply", ApiContext.withCapability("canOperateRuns",
@@ -76,7 +76,7 @@ final class DecisionRoutes implements RouteModule {
                 .toList();
     }
 
-    private Object create(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object create(ApiContext api, com.sun.net.httpserver.HttpExchange e, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
         Map<String, Object> rule = normalize(body);
         String name = requireName(rule);
@@ -86,10 +86,11 @@ final class DecisionRoutes implements RouteModule {
         rule.put("lastSimulation", null);
         rule.put("createdAt", now);
         rule.put("updatedAt", now);
+        PendingChanges.hold(api, e, TYPE, name, rule, null);   // maker-checker
         return write(store, name, rule);
     }
 
-    private Object update(ApiContext api, String name, Map<String, Object> body) throws IOException {
+    private Object update(ApiContext api, com.sun.net.httpserver.HttpExchange e, String name, Map<String, Object> body) throws IOException {
         ComponentStore store = store(api);
         Map<String, Object> prev = RouteErrors.existing(store, TYPE, "decision rule", name);
         Map<String, Object> rule = normalize(body);
@@ -97,12 +98,14 @@ final class DecisionRoutes implements RouteModule {
         rule.put("lastSimulation", prev.get("lastSimulation"));
         rule.put("createdAt", prev.getOrDefault("createdAt", System.currentTimeMillis()));
         rule.put("updatedAt", System.currentTimeMillis());
+        PendingChanges.hold(api, e, TYPE, name, rule, prev);   // maker-checker
         return write(store, name, rule);
     }
 
-    private Object delete(ApiContext api, String name) throws IOException {
+    private Object delete(ApiContext api, com.sun.net.httpserver.HttpExchange e, String name) throws IOException {
         ComponentStore store = store(api);
-        RouteErrors.existing(store, TYPE, "decision rule", name);   // 404 if absent
+        Map<String, Object> current = RouteErrors.existing(store, TYPE, "decision rule", name);   // 404 if absent
+        PendingChanges.hold(api, e, TYPE, name, null, current);   // maker-checker
         store.delete(TYPE, name);
         return Map.of("deleted", name);
     }

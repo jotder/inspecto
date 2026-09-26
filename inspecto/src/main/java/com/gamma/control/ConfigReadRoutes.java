@@ -100,6 +100,9 @@ final class ConfigReadRoutes implements RouteModule {
             }
         }
 
+        // Maker-checker (ASSURE-MAKER-CHECKER-1): a delete is a change — held before any data or file goes.
+        PendingChanges.hold(api, ex, type, fileName, null, ConfigFileSupport.storedContent(target, type));
+
         // Data first, config second: the config is what NAMES the directories, so deleting it first
         // and then failing would leave orphaned data nothing points at any more.
         if ("pipeline".equals(type) && withData) {

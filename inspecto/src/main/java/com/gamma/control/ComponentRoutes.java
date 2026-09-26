@@ -407,6 +407,7 @@ final class ComponentRoutes implements RouteModule {
         if (!consumers.isEmpty())
             throw new ApiException(409, ErrorCodes.CONFLICT, type + " component '" + id + "' is shared with space(s): "
                     + String.join(", ", consumers) + " — revoke the grant(s) first");
+        PendingChanges.hold(api, ex, type, id, null, current.content());   // maker-checker: a delete is a change
         boolean removed;
         try {
             removed = store.delete(type, id);
@@ -631,6 +632,11 @@ final class ComponentRoutes implements RouteModule {
                 stamped.put("name", id);
                 AlertRoutes.requireGroupingColumns(api, com.gamma.alert.AlertRule.fromMap(stamped));
             }
+            // Maker-checker (ASSURE-MAKER-CHECKER-1): after validation, before the tag projection's side effects.
+            Map<String, Object> stamped = new LinkedHashMap<>(content);
+            stamped.put("name", id);   // what the store persists
+            ComponentRegistry.Component before = existing(store, type, id);
+            PendingChanges.hold(api, ex, type, id, stamped, before == null ? null : before.content());
             // D7 (c): a widget's `tags` array is a projection of the assignment store, so it is derived
             // here rather than taken from the body — adopted on create, overwritten on update.
             WidgetTags.project(api, type, id, content, !componentExists(store, type, id),

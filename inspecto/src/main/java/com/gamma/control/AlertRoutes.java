@@ -54,7 +54,7 @@ final class AlertRoutes implements RouteModule {
                 (e, m) -> editionRefused(e) ? ApiContext.HANDLED
                         : single(e, update(api, e, ApiContext.name(m), api.body(e)))));
         api.delete("/alerts/rules/([^/]+)", ApiContext.withCapability("canAuthorAlertRules",
-                (e, m) -> delete(api, ApiContext.name(m))));
+                (e, m) -> delete(api, e, ApiContext.name(m))));
     }
 
     /** An alert rule's only verbs are the alert-authoring family — declare the applicable set (SEC-7b). */
@@ -72,6 +72,7 @@ final class AlertRoutes implements RouteModule {
         AlertRule rule = parse(api, shaped);                                 // 422 on an invalid rule
         if (RouteErrors.exists(store, TYPE, rule.name()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists (use PUT to update)");
+        PendingChanges.hold(api, e, TYPE, rule.name(), persisted(rule, shaped), null);   // maker-checker
         Map<String, Object> content = write(store, rule.name(), persisted(rule, shaped));
         alerts(api).upsert(rule);                                       // arm in the running engine
         return content;
@@ -88,14 +89,16 @@ final class AlertRoutes implements RouteModule {
         // only by the owner or an access admin — so an edit never silently re-addresses someone's alerts.
         Map<String, Object> shaped = ComponentAccess.onUpdate(e, TYPE, name, stored, patched);
         AlertRule rule = parse(api, shaped);
+        PendingChanges.hold(api, e, TYPE, name, persisted(rule, shaped), stored);   // maker-checker
         Map<String, Object> content = write(store, name, persisted(rule, shaped));
         alerts(api).upsert(rule);
         return content;
     }
 
-    private Object delete(ApiContext api, String name) throws IOException {
+    private Object delete(ApiContext api, HttpExchange e, String name) throws IOException {
         ComponentStore store = store(api);
-        RouteErrors.existing(store, TYPE, "alert rule", name);   // 404 if absent
+        var current = RouteErrors.existing(store, TYPE, "alert rule", name);   // 404 if absent
+        PendingChanges.hold(api, e, TYPE, name, null, current);   // maker-checker
         store.delete(TYPE, name);
         alerts(api).remove(name);
         return Map.of("deleted", name);

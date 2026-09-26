@@ -92,8 +92,11 @@ public final class ComponentAccess {
      *  authenticated subject when absent (provenance; no restriction until shares are added). */
     static Map<String, Object> onCreate(HttpExchange ex, Map<String, Object> content) {
         Map<String, Object> out = new LinkedHashMap<>(content);
-        if (ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s && !out.containsKey(OWNER))
-            out.put(OWNER, s.id());
+        if (ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s && !out.containsKey(OWNER)) {
+            // An approved Pending Change is applied by the approver on the AUTHOR's behalf: the author owns it.
+            String author = PendingChanges.onBehalfOf(ex);
+            out.put(OWNER, author != null ? author : s.id());
+        }
         validate(out);
         return out;
     }

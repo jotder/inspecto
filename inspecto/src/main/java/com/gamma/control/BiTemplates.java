@@ -109,6 +109,9 @@ final class BiTemplates {
         Path writeRoot = WriteGates.requireWriteRoot(api, "template apply");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         store.get("dataset", dataset).orElseThrow(() -> new ApiException(404, "no dataset '" + dataset + "'"));
+        // Maker-checker (ASSURE-MAKER-CHECKER-1): an all-or-nothing board is not ONE Pending Change.
+        PendingChanges.holdRefusing(api, java.util.List.of("dataset", "widget", "dashboard"),
+                "applying a BI template writes a whole board in one act");
 
         // Two resolve passes, then the writes — apply is all-or-nothing, never a partial board.
         //

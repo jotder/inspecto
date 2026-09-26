@@ -196,13 +196,14 @@ class OidcAuthenticatorTest {
         //                           approve another analyst's over-threshold expansion)
         //   canWorkIncidents      — operator, 2026-09-26 (ack / resolve / transition / assign an Incident or
         //                           Case left canAdminister for this narrower grant)
+        //   canApproveChanges     — ASSURE-MAKER-CHECKER-1, 2026-09-26 (approve / decline a Pending Change)
         String jwt = token(Instant.now().plusSeconds(60), List.of("admin"), RSA_KEY, ISSUER, AUDIENCE, "root");
         Subject admin = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt).orElseThrow();
         assertEquals(Set.of(Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_CONFIGURE_ACCESS,
                 Roles.CAN_APPROVE_SHARES, Roles.CAN_TRIAGE_REQUIREMENTS,
                 Roles.CAN_OFFER_DATASETS, Roles.CAN_CURATE_MENUS, Roles.CAN_MANAGE_INCIDENTS,
                 Roles.CAN_WORK_INCIDENTS, Roles.CAN_ADMINISTER, Roles.CAN_REVEAL_LINK_ENTITIES,
-                Roles.CAN_APPROVE_LINK_EXPANSIONS),
+                Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_APPROVE_CHANGES),
                 admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
                 "canAuthorWorkbench stays Builder-only");
@@ -304,7 +305,8 @@ class OidcAuthenticatorTest {
                         Roles.CAN_REQUEST_SHARES, Roles.CAN_APPROVE_SHARES, Roles.CAN_CURATE_MENUS,
                         Roles.CAN_ADMINISTER,    // ROUTE-UNGATED-DEFAULT-1, 2026-09-15 — the eleventh
                         Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_APPROVE_LINK_EXPANSIONS,  // LA-19, 2026-09-24
-                        Roles.CAN_WORK_INCIDENTS),   // operator, 2026-09-26
+                        Roles.CAN_WORK_INCIDENTS,    // operator, 2026-09-26
+                        Roles.CAN_APPROVE_CHANGES),  // ASSURE-MAKER-CHECKER-1, 2026-09-26
                 subject.get().capabilities());
     }
 

@@ -492,7 +492,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 new QueryRoutes(), new DatasetRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new DbBrowserRoutes(), new ReconRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b)
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new AcquisitionRoutes(),
-                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new NavRoutes(), new AccessRoutes(),
+                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new PendingChangeRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AuditLogRoutes(),   // the audit projection stays CORE though the /events feed is gated (EDG-01 cell 6)
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes()))
             module.register(this);
@@ -588,6 +588,9 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         return ApiContext.attr(ex, ATTR_EFFECTIVE_PATH) instanceof String s ? s : ex.getRequestURI().getPath();
     }
     private static void setPath(HttpExchange ex, String path) { ApiContext.attr(ex, ATTR_EFFECTIVE_PATH, path); }
+    /** The route-table path this request matched (no {@code /api/v1} or {@code /spaces/{id}} prefix) — what a
+     *  Pending Change records so {@link #replay} can re-run the same route (`ASSURE-MAKER-CHECKER-1`). */
+    static String routePath(HttpExchange ex) { return path(ex); }
 
     /** SEC-EXCHANGE-ATTRS (BACKLOG §1 0-b): every request-scoped attribute any stage or route stamps on
      *  the exchange. The attribute map is private to the exchange only by DEFAULT — see the note on
@@ -604,7 +607,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             ApiContext.ATTR_ERROR_CODE, ApiContext.ATTR_IDEMPOTENCY_STORE, ApiContext.ATTR_IDEMPOTENCY_KEY,
             ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_CLIENT_IP, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_CAPABILITY,
             ApiContext.ATTR_RESOURCE_PERMISSIONS,
-            ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ATTR_EFFECTIVE_PATH,
+            ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ApiContext.ATTR_APPROVED_CHANGE, ATTR_EFFECTIVE_PATH,
             Roles.ATTR_CONFIG_ROOT, AccessDecider.ATTR_MATCHED_POLICY };
 
     /** Drop the request's whole attribute scope — dispatch's first act (see {@link #correlation}).
@@ -851,6 +854,11 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             } catch (ApiException ae) {
                 if (ae.status == 401 || ae.status == 403) AuditTrail.accessDenied(ex, method, path, ae.status);
                 throw ae;
+            } catch (PendingChanges.Held held) {
+                // ASSURE-MAKER-CHECKER-1: the write became a Pending Change; nothing was written.
+                respond(ex, 202, held.body());
+                AuditTrail.record(ex, method, path, 202);
+                return;
             }
             if (result != HANDLED) respond(ex, 200, result);
             // The REAL status, not a literal 200. A handler that responds itself and returns HANDLED
@@ -868,6 +876,45 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         // the append-only immutability guard) is the auth-free analogue of a 401/403.
         if (!"GET".equals(method)) AuditTrail.accessDenied(ex, method, path, status);
         respond(ex, status, Map.of("error", pathMatched ? "method not allowed" : "not found"));
+    }
+
+    /** The approver's request-scoped identity a {@link #replay} inherits — who is acting, in which Space. */
+    private static final String[] REPLAY_INHERITED_ATTRS = {
+            ApiContext.ATTR_CORRELATION_ID, ApiContext.ATTR_CLIENT_IP, ApiContext.ATTR_SUBJECT,
+            Roles.ATTR_CONFIG_ROOT, ComponentAccess.ATTR_HELD_ROLES };
+
+    @Override
+    public Replayed replay(HttpExchange outer, String method, String path, byte[] body,
+                           Map<String, String> headers, Map<String, Object> attrs) throws Exception {
+        ReplayExchange rx = new ReplayExchange(outer, method, "/api/v1" + path, body, headers);
+        int q = path.indexOf('?');   // the query rides the URI (?force, ?subdir, ?compatibility); routes match the path
+        String routePath = q < 0 ? path : path.substring(0, q);
+        for (String a : REPLAY_INHERITED_ATTRS) ApiContext.attr(rx, a, ApiContext.attr(outer, a));
+        attrs.forEach((k, v) -> ApiContext.attr(rx, k, v));
+        ApiContext.attr(rx, ApiContext.ATTR_START_NANOS, System.nanoTime());
+        ApiContext.attr(rx, ApiContext.ATTR_SELF_PATH, "/api/v1" + routePath);
+        path = routePath;
+        setPath(rx, path);
+        try {
+            for (Route r : routes) {
+                Matcher m = r.pattern.matcher(path);
+                if (!r.method.equals(method) || !m.matches()) continue;
+                authorize(rx, method, path);
+                Object result = r.handler.handle(rx, m);
+                if (result != HANDLED) respond(rx, 200, result);
+                AuditTrail.record(rx, method, path, rx.status() > 0 ? rx.status() : 200);
+                return new Replayed(rx.status(), rx.body());
+            }
+            respond(rx, 404, Map.of("error", "no route answers " + method + " " + path));
+            return new Replayed(404, rx.body());
+        } catch (ApiException ae) {
+            if (ae.status == 401 || ae.status == 403) AuditTrail.accessDenied(rx, method, path, ae.status);
+            if (ae.errorCode != null) ApiContext.attr(rx, ApiContext.ATTR_ERROR_CODE, ae.errorCode);
+            respond(rx, ae.status, Map.of("error", ae.getMessage()));
+            return new Replayed(ae.status, rx.body());
+        } finally {
+            ApiContext.dropAttrScope(rx);
+        }
     }
 
     /** AuthN gate (W6): a no-op when no {@link Authenticator} is on the classpath (Personal edition —

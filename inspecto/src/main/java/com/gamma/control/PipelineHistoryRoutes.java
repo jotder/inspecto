@@ -106,7 +106,9 @@ final class PipelineHistoryRoutes implements RouteModule {
         WriteGates.conflictIf(!p.id().equals(declared == null ? null : declared.trim()),
                 "version " + v.version() + " declares pipeline id '" + declared + "' (saved before a rename); "
                         + "restoring it would re-key '" + p.id() + "'");
-        ETags.requireMatch(ex, ETags.of(ContentHash.of(ConfigLoader.filesystem().decode(target.toString()))));
+        Map<String, Object> current = ConfigLoader.filesystem().decode(target.toString());
+        ETags.requireMatch(ex, ETags.of(ContentHash.of(current)));
+        PendingChanges.hold(api, ex, "pipeline", p.id(), config, current);   // maker-checker: a restore is a save
 
         AtomicFiles.write(target, bytes, ".cfg-");
         PipelineHistory.record(writeRoot, target);

@@ -105,9 +105,15 @@ final class PipelineRenameRoutes implements RouteModule {
         boolean rewriteDependents = !"false".equalsIgnoreCase(
                 String.valueOf(body.getOrDefault("rewriteDependents", "true")));
 
+        String newNameRaw = ApiContext.str(body, "newName");
+        // Maker-checker (ASSURE-MAKER-CHECKER-1): held BEFORE step 0 — nothing of the migration may move for
+        // a rename that is still waiting for approval. The Pending Change shows the config as it will be
+        // rewritten; the approved replay re-runs every gate above and then the whole migration.
+        Map<String, Object> srcDoc = ConfigLoader.filesystem().decode(srcPath.toString());
+        PendingChanges.hold(api, e, "pipeline", oldId, renamedDoc(srcDoc, oldId, newId, newNameRaw), srcDoc);
+
         List<String> journal = new ArrayList<>();
         Path journalFile = writeRoot.resolve("rename.journal");
-        String newNameRaw = ApiContext.str(body, "newName");
 
         // Step 0: bracket the migration in the journal BEFORE any state moves. `begin` records the source
         // file name and the request parameters; `completed` (after step 9) closes the bracket. A begin with
@@ -397,14 +403,8 @@ final class PipelineRenameRoutes implements RouteModule {
             String newFileName, String oldId, String newId, String newNameRaw,
             Path journalFile, List<String> journal) throws IOException {
         Map<String, Object> src = ConfigLoader.filesystem().decode(srcPath.toString());
-        String label = (newNameRaw == null || newNameRaw.isBlank())
-                ? String.valueOf(src.getOrDefault("name", oldId)) : newNameRaw.trim();
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("name", label);
-        out.put("id", newId);
-        src.forEach((k, v) -> {
-            if (!"name".equals(k) && !"id".equals(k)) out.put(k, v);
-        });
+        Map<String, Object> out = renamedDoc(src, oldId, newId, newNameRaw);
+        String label = String.valueOf(out.get("name"));
 
         // The whole SaveGate (ASSURE-MAKER-CHECKER-1 S0), before and after.
         Path writeRoot = api.writeRoot();
@@ -430,6 +430,19 @@ final class PipelineRenameRoutes implements RouteModule {
         Files.deleteIfExists(srcPath);
         journalStep(journalFile, oldId, newId, "wrote " + newFileName + "; removed source config", journal);
         return new ConfigWrite(label, findings, null);
+    }
+
+    /** The renamed config: {@code name} (the new display name, else the old one) and {@code id} first, the rest verbatim. */
+    private static Map<String, Object> renamedDoc(Map<String, Object> src, String oldId, String newId, String newNameRaw) {
+        String label = (newNameRaw == null || newNameRaw.isBlank())
+                ? String.valueOf(src.getOrDefault("name", oldId)) : newNameRaw.trim();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("name", label);
+        out.put("id", newId);
+        src.forEach((k, v) -> {
+            if (!"name".equals(k) && !"id".equals(k)) out.put(k, v);
+        });
+        return out;
     }
 
     /** Append one line to {@code <writeRoot>/rename.journal} (plan §3.3) — best-effort; a journal write

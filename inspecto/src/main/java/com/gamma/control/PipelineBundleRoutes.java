@@ -367,6 +367,12 @@ final class PipelineBundleRoutes implements RouteModule {
             companions.put(et, enrich);
         }
 
+        // Maker-checker (ASSURE-MAKER-CHECKER-1): a bundle lands a Pipeline with its satellites and companions
+        // in ONE act, from a binary upload a replay cannot carry — under a policy it is refused, never held,
+        // and before the first write.
+        PendingChanges.holdRefusing(api, List.of("pipeline", "schema", "enrichment"),
+                "a bundle import lands a Pipeline with its satellites and companions in one act");
+
         // All-or-nothing: every write below goes through the journal, and every refusal after the first write
         // (a SaveGate ERROR, a registration refusal, an I/O failure) restores the tree byte-for-byte.
         com.gamma.service.ImportJournal journal = new com.gamma.service.ImportJournal();

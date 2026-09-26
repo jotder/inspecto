@@ -817,6 +817,19 @@ strategy, and config schema. (A *Visualization Type* is a Component Type whose i
 
 **Registry** — The **derived** reuse graph over Components (composition ∪ reference). Not a new store.
 
+**Pending Change** — A human config change that a Space's **Approval Policy** held for approval instead of
+writing: the proposed content, the kind + name it targets, the base version the author saw, the author, a
+reason, created / expires-at. It is **approved** (applied through the same route it was proposed through),
+**declined**, or it **expires**; a change whose base moved underneath it is closed as **stale**. Four-eyes:
+the approver must be a different person from the author. *(Added 2026-09-26, `ASSURE-MAKER-CHECKER-1`; as
+built: [`okf/backend/config/config-safety.md`](okf/backend/config/config-safety.md).)* ⛔ never "Change
+Request" — that word means a commercial CR. ⛔ Not an agent approval: the `/agent/approvals` inbox governs
+what the assistant may do, not whether a human's config change lands.
+
+**Approval Policy** — The per-Space, per-kind setting (`approval.toon`, `GET|PUT /settings/approval`) that
+says which config kinds need a Pending Change, which capability may approve one, and whether four-eyes
+applies. Default off.
+
 ---
 
 ## 11. Graphs & Relationships

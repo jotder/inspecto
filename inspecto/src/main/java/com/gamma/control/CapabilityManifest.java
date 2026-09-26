@@ -197,6 +197,12 @@ final class CapabilityManifest {
             new Entry("POST", "/objects/([^/]+)/split", Roles.CAN_ADMINISTER),
             new Entry("PATCH", "/objects/([^/]+)", Roles.CAN_ADMINISTER),
             new Entry("POST", "/cases/rules/([^/]+)/evaluate", Roles.CAN_ADMINISTER),
+            // PendingChangeRoutes — maker-checker (ASSURE-MAKER-CHECKER-1). Deciding a held config change is
+            // oversight, so it takes its own capability (a kind's policy may demand one more on top, checked in
+            // the handler); the policy itself is administration — an author must not be able to lift it.
+            new Entry("POST", "/pending-changes/([^/]+)/approve", Roles.CAN_APPROVE_CHANGES),
+            new Entry("POST", "/pending-changes/([^/]+)/decline", Roles.CAN_APPROVE_CHANGES),
+            new Entry("PUT", "/settings/approval", Roles.CAN_ADMINISTER),
             // PipelineRoutes — W5: the graph editor writes the canonical *_pipeline.toon; the
             // *_flow.toon authoring writes (POST/PUT authored, /nodes, /edges) retired. DELETE + the
             // ad-hoc trigger stay for grandfathered flows.

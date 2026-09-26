@@ -67,7 +67,7 @@ final class AccessRoutes implements RouteModule {
         api.put("/access/profiles/([^/]+)", ApiContext.withCapability("canConfigureAccess",
                 (e, m) -> saveProfile(api, e, ApiContext.name(m), api.body(e))));
         api.delete("/access/profiles/([^/]+)", ApiContext.withCapability("canConfigureAccess",
-                (e, m) -> deleteProfile(api, ApiContext.name(m))));
+                (e, m) -> deleteProfile(api, e, ApiContext.name(m))));
     }
 
     // ── roles (RBAC R1 — authorable role → capability/data-scope table) ────────────
@@ -358,6 +358,8 @@ final class AccessRoutes implements RouteModule {
         Object version = body.get("version");
         doc.put("version", version instanceof Number n ? n.intValue() : 1);
         doc.put("nodes", validNodes(body.get("nodes"), new LinkedHashSet<>()));
+        PendingChanges.hold(api, ex, CATALOG_TYPE, CATALOG_ID, stamped(doc, CATALOG_ID),
+                store.get(CATALOG_TYPE, CATALOG_ID).map(ComponentRegistry.Component::content).orElse(null));   // maker-checker
         Object written = write(store, CATALOG_TYPE, CATALOG_ID, doc);
         ETags.set(ex, ETags.of(ContentHash.of(written)));
         return written;
@@ -433,16 +435,20 @@ final class AccessRoutes implements RouteModule {
         doc.put("subjectId", subjectId);
         doc.put("label", trimOrEmpty(body.get("label")).isBlank() ? subjectId : trimOrEmpty(body.get("label")).trim());
         doc.put("grants", validGrants(body.get("grants")));
+        PendingChanges.hold(api, ex, PROFILE_TYPE, safeId, stamped(doc, safeId),
+                store.get(PROFILE_TYPE, safeId).map(ComponentRegistry.Component::content).orElse(null));   // maker-checker
         Object written = write(store, PROFILE_TYPE, safeId, doc);
         ETags.set(ex, ETags.of(ContentHash.of(written)));
         return written;
     }
 
-    private Object deleteProfile(ApiContext api, String id) throws IOException {
+    private Object deleteProfile(ApiContext api, HttpExchange ex, String id) throws IOException {
         ComponentStore store = writeStore(api);
         String safeId = WriteGates.safeName(id, "access profile id");
         if (!store.exists(PROFILE_TYPE, safeId))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "access profile '" + safeId + "' not found");
+        PendingChanges.hold(api, ex, PROFILE_TYPE, safeId, null,
+                store.get(PROFILE_TYPE, safeId).map(ComponentRegistry.Component::content).orElse(null));   // maker-checker
         store.delete(PROFILE_TYPE, safeId);
         return Map.of("deleted", safeId);
     }
@@ -475,6 +481,13 @@ final class AccessRoutes implements RouteModule {
 
     private static ComponentStore writeStore(ApiContext api) {
         return new ComponentStore(WriteGates.requireWriteRoot(api, "access config write").resolve("registry"));
+    }
+
+    /** {@code doc} as the store persists it — {@code name} stamped with the id — for the Pending Change. */
+    private static Map<String, Object> stamped(Map<String, Object> doc, String id) {
+        Map<String, Object> m = new LinkedHashMap<>(doc);
+        m.put("name", id);
+        return m;
     }
 
     private static Object write(ComponentStore store, String type, String id, Map<String, Object> content)
