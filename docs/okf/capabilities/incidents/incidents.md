@@ -176,7 +176,10 @@ neither key, and the rule takes the scalar path below. How it runs:
 - **Edge-triggered per key, not cooldown-throttled** — a key that starts breaching raises ONE Alert and (at
   critical/error) ONE Incident; while it stays breached nothing is raised; `AlertService.openKeys` is the edge
   detector, seeded on a rule's first sweep from its still-active ALERT objects so a restart neither re-raises
-  nor forgets. Dedupe attribute `alertKey = <rule>|<col=value, …>`; the objects also carry `key`,
+  nor forgets. Dedupe attribute `alertKey = <rule>|<col=value,…>` — the INJECTIVE `AlertService.keyId`: in a
+  value `\ , = |` are backslash-escaped and SQL NULL is `\0`, so two keys that read alike (`a="x, b=y", b="z"`
+  vs `a="x", b="y, b=z"`) or NULL vs the string `null` never share an Incident; the readable `keyLabel`
+  (NULL → `NULL`) is for titles and the `key` attribute only. The objects also carry `key`,
   `key.<column>` per key column, and the Measure `value`; the title is `<description> — <Dataset> for
   msisdn=m7, region=EU` (or the generated title with the same suffix). Scope stays the Dataset id.
 - **Heal** — a key no longer breaching emits `ALERT_CLEARED` + an `alert-rule.cleared` Signal (correlation
@@ -184,7 +187,13 @@ neither key, and the rule takes the scalar path below. How it runs:
   `ObjectAccess.transition(id, action, actor)` (answers `false`, never throws). 🔴 The shipped Incident workflow
   **refuses `resolve` until the postmortem is complete** (I1) and a machine heal does not bypass it — so an
   Incident whose postmortem is unwritten STAYS OPEN; only its ALERT resolves. A key that relapses while its
-  Incident is RESOLVED (non-terminal until archived) **re-opens** that Incident instead of being suppressed.
+  Incident is RESOLVED (non-terminal until archived) **re-opens** that Incident instead of being suppressed;
+  one whose Incident never left IDENTIFIED/DIAGNOSING is not re-opened, but either way the relapse ALERT is
+  linked `ESCALATED_FROM` to that still-active Incident.
+- **Rule edits** — re-saving a `by` rule over different keys (another Dataset, Measure or `by`) or removing it
+  **retires** its open keys (`AlertService.retireKeys`): the edge state is dropped and each still-active per-key
+  ALERT of the old rule resolves as actor `alert-rule:<name>:rule-changed`; no all-clear is emitted (nothing
+  recovered) and the Incidents stay with triage. A threshold/severity edit keeps the open keys.
   ⚠ The scalar (no-`by`) Measure rule still has no heal — unchanged on purpose.
 - **Storm** — more than `stormCap` breaching keys → ONE storm Alert/Incident (pseudo-key `*`, attributes
   `breachedKeys`, `stormCap`; title `Storm: 40 keys breach — …`). While it rages no key fires or heals (a capped

@@ -109,7 +109,7 @@ class PerEntityAlertTest {
         assertEquals("High spend — usage for msisdn=m7, region=EU", m7.title(), "the title names the key");
         assertEquals("EU", m7.attributes().get("key.region"), "every key column is an attribute");
         assertEquals("1000.0", m7.attributes().get("value"), "the Measure value rides along");
-        assertEquals("high-spend|msisdn=m7, region=EU", m7.attributes().get(AlertService.ALERT_KEY));
+        assertEquals("high-spend|msisdn=m7,region=EU", m7.attributes().get(AlertService.ALERT_KEY));
         assertEquals("usage", m7.scope());
         assertTrue(incidents.stream().allMatch(o ->
                         Integer.parseInt(o.attributes().get("key.msisdn").substring(1)) <= OFFENDERS),
@@ -145,7 +145,7 @@ class PerEntityAlertTest {
         plantUsage(root, OFFENDERS, Set.of(7));
         assertEquals(0, svc.evaluateRules().size(), "healing raises no Alert");
 
-        String healedKey = "high-spend|msisdn=m7, region=EU";
+        String healedKey = "high-spend|msisdn=m7,region=EU";
         List<String> resolved = objects.transitioned.stream()
                 .filter(t -> "resolve".equals(t.action())).map(FakeObjectAccess.Transitioned::objectId).toList();
         assertEquals(2, resolved.size(), "exactly the healed key's Alert and Incident resolve");
@@ -238,5 +238,97 @@ class PerEntityAlertTest {
                 "measure", "count", "threshold", 5, "stormCap", 10)), "stormCap needs by");
         assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(Map.of("name", "x", "dataset", "ds",
                 "measure", "count", "threshold", 5, "by", List.of("a"), "stormCap", 0)), "stormCap is positive");
+    }
+
+    // ── stub-probe cases: the key identity and the rule lifecycle ─────────────────────────────────
+
+    private static Map<String, Object> key(String a, Object aValue, String b, Object bValue) {
+        Map<String, Object> k = new java.util.LinkedHashMap<>();
+        k.put(a, aValue);
+        k.put(b, bValue);
+        return k;
+    }
+
+    private static AlertRule rule(String dataset) {
+        return AlertRule.fromMap(Map.of("name", "high-spend", "dataset", dataset, "measure", "sum(amount)",
+                "by", List.of("a", "b"), "comparator", "gt", "threshold", 500, "severity", "CRITICAL"));
+    }
+
+    private static AlertService stubbed(AlertRule rule, FakeObjectAccess objects,
+                                        java.util.function.Function<AlertRule, List<Map<String, Object>>> keys) {
+        AlertService svc = new AlertService(List.of(rule), noPipelines(), emptyStore(), objects);
+        svc.groupedMeasureProbe(r -> {
+            List<DatasetMeasureProbe.Breach> b = keys.apply(r).stream()
+                    .map(k -> new DatasetMeasureProbe.Breach(k, 1000)).toList();
+            return Optional.of(new DatasetMeasureProbe.Breaches(b, b.size()));
+        });
+        return svc;
+    }
+
+    @Test
+    void keysThatReadAlikeAndNullVersusTheStringNullAreDistinctKeysAndSurviveARestart() {
+        List<Map<String, Object>> keys = List.of(
+                key("a", "x, b=y", "b", "z"), key("a", "x", "b", "y, b=z"),   // same readable label
+                key("a", null, "b", "1"), key("a", "null", "b", "1"),          // NULL vs 'null'
+                key("a", "p|q\\", "b", "="));                                  // every escaped character
+        FakeObjectAccess objects = new FakeObjectAccess();
+        assertEquals(5, stubbed(rule("usage"), objects, r -> keys).evaluateRules().size(),
+                "five keys, five Alerts — none collapsed into another");
+        assertEquals(5, objects.activeAttributeIndex(ObjectType.INCIDENT, "usage", AlertService.ALERT_KEY).size(),
+                "five distinct dedupe keys");
+        assertTrue(opened(objects, ObjectType.ALERT).stream().anyMatch(o -> "NULL".equals(o.attributes().get("key.a"))));
+
+        assertEquals(0, stubbed(rule("usage"), objects, r -> keys).evaluateRules().size(),
+                "a restart seeds every encoded key back — nothing re-fires");
+        assertTrue(objects.transitioned.isEmpty(), "and nothing is healed by a mis-decoded key");
+    }
+
+    @Test
+    void reSavingOverAnotherDatasetRetiresTheOldKeysInsteadOfHealingThemAgainstTheNewOne() {
+        FakeObjectAccess objects = new FakeObjectAccess();
+        List<Map<String, Object>> old = List.of(key("a", "1", "b", "1"), key("a", "2", "b", "2"));
+        AlertService svc = stubbed(rule("usage"), objects, r -> "usage".equals(r.dataset()) ? old : List.of());
+        assertEquals(2, svc.evaluateRules().size());
+
+        svc.upsert(rule("usage_v2"));
+        List<String> oldAlerts = opened(objects, ObjectType.ALERT).stream().map(FakeObjectAccess.Opened::id).toList();
+        assertEquals(oldAlerts, objects.transitioned.stream().map(FakeObjectAccess.Transitioned::objectId).toList(),
+                "exactly the old rule's per-key Alerts are resolved");
+        assertTrue(objects.transitioned.stream().allMatch(t -> "alert-rule:high-spend:rule-changed".equals(t.actor())));
+        assertEquals(2, objects.activeAttributeIndex(ObjectType.INCIDENT, "usage", AlertService.ALERT_KEY).size(),
+                "the Incidents stay with triage");
+
+        assertEquals(0, svc.evaluateRules().size());
+        assertEquals(2, objects.transitioned.size(), "the sweep over the new Dataset heals nothing old");
+
+        // A threshold-only edit keeps the open keys: nothing retired, nothing re-raised.
+        FakeObjectAccess objects2 = new FakeObjectAccess();
+        AlertService svc2 = stubbed(rule("usage"), objects2, r -> old);
+        svc2.evaluateRules();
+        svc2.upsert(AlertRule.fromMap(Map.of("name", "high-spend", "dataset", "usage", "measure", "sum(amount)",
+                "by", List.of("a", "b"), "comparator", "gt", "threshold", 600, "severity", "CRITICAL")));
+        assertTrue(objects2.transitioned.isEmpty());
+        assertEquals(0, svc2.evaluateRules().size());
+    }
+
+    @Test
+    void removingAndReAddingTheRuleRetiresItsKeysAndStartsClean() {
+        FakeObjectAccess objects = new FakeObjectAccess();
+        List<Map<String, Object>> keys = List.of(key("a", "1", "b", "1"));
+        AlertService svc = stubbed(rule("usage"), objects, r -> keys);
+        svc.evaluateRules();
+
+        assertTrue(svc.remove("high-spend"));
+        assertEquals(1, objects.transitioned.size(), "the removed rule's Alert is resolved");
+        assertEquals(opened(objects, ObjectType.ALERT).get(0).id(), objects.transitioned.get(0).objectId(),
+                "the Alert, not the Incident");
+
+        svc.upsert(rule("usage"));
+        assertEquals(1, svc.evaluateRules().size(), "re-added, the still-breaching key is a fresh breach");
+        assertEquals(1, opened(objects, ObjectType.INCIDENT).size(), "its open Incident is not duplicated");
+        String incident = opened(objects, ObjectType.INCIDENT).get(0).id();
+        String newAlert = opened(objects, ObjectType.ALERT).get(1).id();
+        assertTrue(objects.linked.stream().anyMatch(l -> l.fromId().equals(incident) && l.toId().equals(newAlert)),
+                "the new Alert is linked to the Incident still being worked");
     }
 }

@@ -208,11 +208,47 @@ public final class AlertService {
     public void upsert(AlertRule rule) {
         synchronized (this) {
             List<AlertRule> next = new ArrayList<>(rules.size() + 1);
-            for (AlertRule r : rules) if (!r.name().equals(rule.name())) next.add(r);
+            for (AlertRule r : rules) {
+                if (!r.name().equals(rule.name())) next.add(r);
+                else if (!sameKeys(r, rule)) retireKeys(r);
+            }
             next.add(rule);
             this.rules = List.copyOf(next);
         }
         rulesChanged.run();
+    }
+
+    /** Whether two versions of a rule identify the SAME keys — same Dataset, Measure and {@code by}. A threshold
+     *  or severity edit keeps the open keys (the next sweep heals or fires them against the new condition). */
+    private static boolean sameKeys(AlertRule a, AlertRule b) {
+        return a.isGrouped() == b.isGrouped() && java.util.Objects.equals(a.dataset(), b.dataset())
+                && java.util.Objects.equals(a.measure(), b.measure()) && a.by().equals(b.by());
+    }
+
+    /**
+     * A {@code by} rule is being removed, or re-saved over different keys (another Dataset, Measure or
+     * {@code by}): its open keys can no longer be healed — the next sweep would read the NEW Dataset and "heal"
+     * every old key against it. So they are retired here: the edge state is dropped and each still-active
+     * per-key ALERT of the old rule is resolved (actor {@code alert-rule:<name>:rule-changed}, which the
+     * object's activity record carries). No all-clear is emitted — nothing recovered. The Incidents are left to
+     * the human workflow: someone may be working them. Called under this service's monitor.
+     */
+    private void retireKeys(AlertRule old) {
+        openKeys.remove(old.name());
+        if (!old.isGrouped() || objects == null) return;
+        String prefix = old.name() + "|";
+        String actor = actor(old) + ":rule-changed";
+        try {
+            int retired = 0;
+            for (Map.Entry<String, String> e
+                    : objects.activeAttributeIndex(ObjectType.ALERT, old.dataset(), ALERT_KEY).entrySet())
+                if (e.getKey().startsWith(prefix) && objects.transition(e.getValue(), "resolve", actor)) retired++;
+            if (retired > 0)
+                log.info("alert rule {} changed: resolved {} per-key Alert(s) of its old keys; their Incidents stay "
+                        + "with triage", old.name(), retired);
+        } catch (RuntimeException e) {
+            log.warn("could not retire the open keys of alert rule {}: {}", old.name(), e.getMessage());
+        }
     }
 
     /** Disarm a rule by name ({@code DELETE /alerts/rules/{name}}); {@code true} if one was armed. */
@@ -221,6 +257,7 @@ public final class AlertService {
         synchronized (this) {
             List<AlertRule> next = rules.stream().filter(r -> !r.name().equals(name)).toList();
             removed = next.size() != rules.size();
+            rules.stream().filter(r -> r.name().equals(name)).forEach(this::retireKeys);
             this.rules = List.copyOf(next);
         }
         if (removed) rulesChanged.run();
@@ -507,7 +544,7 @@ public final class AlertService {
         }
         if (open.remove(STORM_KEY)) healKey(rule, STORM_KEY, nowMs, index);
         Map<String, DatasetMeasureProbe.Breach> now = new LinkedHashMap<>();
-        for (DatasetMeasureProbe.Breach b : breaches.keys()) now.put(keyLabel(b.key()), b);
+        for (DatasetMeasureProbe.Breach b : breaches.keys()) now.put(keyId(b.key()), b);
         for (Map.Entry<String, DatasetMeasureProbe.Breach> e : now.entrySet())
             if (open.add(e.getKey()))
                 fireKey(rule, e.getKey(), e.getValue().key(), e.getValue().value(), nowMs, out, index);
@@ -518,11 +555,26 @@ public final class AlertService {
         }
     }
 
-    /** {@code msisdn=4471, region=EU} — the key as an operator reads it, and (prefixed by the rule) the dedupe key. */
+    /** {@code msisdn=4471, region=EU} — the key as an operator READS it (titles, the {@code key} attribute). Not
+     *  injective — a value may itself contain {@code ", b="} — so it never identifies a key; {@link #keyId} does. */
     static String keyLabel(Map<String, Object> key) {
         List<String> parts = new ArrayList<>(key.size());
-        key.forEach((column, value) -> parts.add(column + "=" + value));
+        key.forEach((column, value) -> parts.add(column + "=" + (value == null ? "NULL" : value)));
         return String.join(", ", parts);
+    }
+
+    /**
+     * The key's IDENTITY — what {@link #openKeys} holds and, prefixed by the rule, the {@link #ALERT_KEY} dedupe
+     * attribute. Injective: in a value {@code \ , = |} are backslash-escaped, and SQL NULL is {@code \0}, which no
+     * escaped string can produce (its backslashes are always doubled or followed by one of those four). Column
+     * names are plain identifiers ({@link AlertRule}), so they need no escaping.
+     */
+    static String keyId(Map<String, Object> key) {
+        List<String> parts = new ArrayList<>(key.size());
+        key.forEach((column, value) -> parts.add(column + "=" + (value == null ? "\\0"
+                : String.valueOf(value).replace("\\", "\\\\").replace(",", "\\,").replace("=", "\\=")
+                        .replace("|", "\\|"))));
+        return String.join(",", parts);
     }
 
     /**
@@ -568,7 +620,7 @@ public final class AlertService {
                          List<Alert> out, ObjectIndex index) {
         String scope = rule.dataset();
         boolean storm = STORM_KEY.equals(key);
-        String label = storm ? textScope(rule, scope) : textScope(rule, scope) + " for " + key;
+        String label = storm ? textScope(rule, scope) : textScope(rule, scope) + " for " + keyLabel(keyValues);
         Alert alert = storm ? Alert.storm(rule, scope, label, (long) value, nowMs)
                 : Alert.of(rule, scope, label, value, nowMs);
         fired.addFirst(alert);
@@ -615,8 +667,8 @@ public final class AlertService {
                 attrs.put("breachedKeys", String.valueOf((long) value));
                 attrs.put("stormCap", String.valueOf(rule.stormCap()));
             } else {
-                attrs.put("key", key);
-                keyValues.forEach((column, v) -> attrs.put("key." + column, String.valueOf(v)));
+                attrs.put("key", keyLabel(keyValues));
+                keyValues.forEach((column, v) -> attrs.put("key." + column, v == null ? "NULL" : String.valueOf(v)));
             }
             if (eventId != null) attrs.put("causedByEvent", eventId);
             String title = storm ? Alert.stormTitle(rule, label, (long) value) : Alert.title(rule, label);
@@ -626,12 +678,16 @@ public final class AlertService {
             java.util.Optional<String> incidentId = incidents.openIncident(title, alert.message(),
                     rule.severity(), rule.dataset(), new LinkedHashMap<>(attrs), ALERT_KEY);
             if (incidentId.isEmpty()) {
-                // Suppressed: the key breaches AGAIN while its earlier Incident is still active — e.g. RESOLVED (by
-                // the heal below or an operator), which is not terminal until archived. Re-open that Incident rather
-                // than leave the relapse invisible in triage (a no-op when it was never resolved).
+                // Suppressed: the key breaches AGAIN while its earlier Incident is still active. If that Incident is
+                // RESOLVED (by the heal below or an operator — not terminal until archived) it is re-opened; if it
+                // never left IDENTIFIED/DIAGNOSING (the postmortem gate refused the heal's resolve) `reopen` is
+                // illegal and answers false. Either way the new Alert is linked to it, so the relapse is visible
+                // on the Incident being worked.
                 String existing = index.incidents().get(alertKey);
-                if (existing != null && objects.transition(existing, "reopen", actor(rule)))
+                if (existing != null) {
+                    objects.transition(existing, "reopen", actor(rule));
                     incidentId = java.util.Optional.of(existing);
+                }
             }
             incidentId.ifPresent(id -> objects.link(id, alertObjectId, ESCALATED_FROM, actor(rule)));
         } catch (RuntimeException e) {

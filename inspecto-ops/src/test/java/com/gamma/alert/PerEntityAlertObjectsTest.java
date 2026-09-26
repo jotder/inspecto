@@ -94,6 +94,14 @@ class PerEntityAlertObjectsTest {
         now.set(offenders(1, 40));                                   // m1 relapses while its Incident is open
         assertEquals(1, svc.evaluateRules().size(), "the relapse is a new breach edge");
         assertEquals(40, incidents(objects).size(), "no second Incident for the same key");
+        OperationalObject stillOpen = incidentFor(objects, "m1");
+        OperationalObject relapseAlert = objects.query(ObjectQuery.builder().objectType(ObjectType.ALERT).status("OPEN")
+                        .limit(ObjectQuery.MAX_LIMIT).build()).stream()
+                .filter(o -> "m1".equals(o.attributes().get("key.msisdn"))).findFirst().orElseThrow();
+        assertTrue(objects.linksOf(stillOpen.id()).stream().anyMatch(l -> l.fromId().equals(stillOpen.id())
+                        && l.toId().equals(relapseAlert.id()) && "ESCALATED_FROM".equalsIgnoreCase(l.relationship())),
+                "the relapse Alert is linked to the Incident still being worked");
+        assertEquals("IDENTIFIED", stillOpen.status(), "an Incident never resolved is not 'reopened'");
 
         // Once the operator has written the postmortem, the next heal resolves the Incident too …
         objects.saveAttributes(incidentFor(objects, "m1").id(), Map.of("postmortem", COMPLETE_POSTMORTEM,
