@@ -76,8 +76,10 @@ describe('TreemapComponent', () => {
         const summary = box.getAttribute('aria-label')!;
         expect(summary).toContain('Treemap, two levels: 3 groups totalling SAR 1.5M');
         expect(summary).toContain('Largest: Online (SIM box) SAR 600K (40.0 %); Roaming (IRSF) SAR 500K (33.3 %)');
-        expect(summary).toContain('1 row with a zero or negative value not shown');
-        expect(el.querySelector('[data-testid="treemap-excluded"]')?.textContent).toContain('1 row with a zero');
+        expect(summary).toContain('1 item at zero or below is not shown.');
+        expect(el.querySelector('[data-testid="treemap-excluded"]')?.textContent?.trim()).toBe(
+            '1 item at zero or below is not shown',
+        );
     });
 
     it('a group click reports its group; a subgroup click its subgroup AND parent group — raw values, a blank stays blank', () => {
@@ -161,7 +163,18 @@ describe('TreemapComponent', () => {
     it('shows the shared empty state when nothing is left to draw, saying why', () => {
         const { el } = create([{ group: 'a', value: 0 }]);
         expect(cells(el).length).toBe(0);
-        expect(el.querySelector('inspecto-empty-state')?.textContent).toContain('1 row with a zero or negative value');
+        expect(el.querySelector('inspecto-empty-state')?.textContent).toContain('1 item at zero or below is not shown');
+    });
+
+    it('counts several left-out items in the plural', () => {
+        const { el } = create([
+            { group: 'a', value: 5 },
+            { group: 'b', value: 0 },
+            { group: 'c', value: -2 },
+        ]);
+        expect(el.querySelector('[data-testid="treemap-excluded"]')?.textContent?.trim()).toBe(
+            '2 items at zero or below are not shown',
+        );
     });
 
     it('has no a11y violations', async () => {

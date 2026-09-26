@@ -135,9 +135,13 @@ export class ProgressListComponent {
         return r.met == null ? null : r.met ? CHART_TONE.success : CHART_TONE.error;
     }
 
-    /** What the bar shows, for a screen reader: its share of the maximum and where it stands against the target. */
+    /**
+     * What the bar shows, for a screen reader, and where it stands against the target. The bar is relative — to
+     * `options.progress.max` when set, else to the largest item — never a share of the total, so the words say which.
+     */
     rowNote(r: ProgressRow): string {
-        const share = `, ${Math.round(r.pct)} % of ${this.fmt(this.model().max)}`;
+        const m = this.model();
+        const share = `, ${Math.round(r.pct)} % of ${m.maxSet ? this.fmt(m.max) : 'the largest item'}`;
         if (r.met == null) return share;
         const where = r.met ? 'on target' : this.better() === 'higher' ? 'below target' : 'above target';
         return `${share}, ${where}`;

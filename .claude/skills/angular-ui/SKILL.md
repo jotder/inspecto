@@ -661,14 +661,16 @@ src/app/
   visualization types*): SVG / HTML, not canvas — colours are `--gamma-*` tokens (the sparkline) or `CHART_TONE`
   (good / bad bars), text via `formatNumber`, the delta wording via the shared `viz/kpi-delta.ts` (`kpiDelta`, also
   used by `kpi`); a component-render plugin that drills takes viz-render's stable `select` callback input, since
-  `NgComponentOutlet` carries inputs only.
+  `NgComponentOutlet` carries inputs only. A progress bar is RELATIVE, never a share of the total, and its sr text
+  says to what: "80 % of the largest item" (default) or "80 % of <formatted `options.progress.max`>" (R2-16).
 - **Treemap (`vizType: treemap`) → `viz/treemap-layout.ts` + `<inspecto-treemap>`** (2026-09-25; `/design` ▸ *More
   visualization types*): DOM buttons over a pure squarified layout (no chart dependency), channels `group` / optional
   `subgroup` / `value`, `options.treemap.limit` (default 20, rest → "Other"), colour = `seriesColors()` by group with
   `color-mix` tints toward `--gamma-bg-card`; a cell click reaches the host as viz-render's `(channelClick)` and
   `widget-host` drills on THAT channel's field — a group cell on the group alone, a subgroup cell on subgroup AND its
   parent group (one `DrillEvent` with `and`, carried as `channelClick.group`), so it selects exactly the clicked
-  rectangle and a click in another group moves the selection (operator 2026-09-25); "Other" never drills.
+  rectangle and a click in another group moves the selection (operator 2026-09-25); "Other" never drills. Values
+  ≤ 0 are dropped and counted in business words — "8 items at zero or below are not shown" (not "rows", R2-16).
   - **Waterfall + Combo** (2026-09-25; gallery: `/design` ▸ *More visualization types*). `waterfall` = floating
     `[low, high]` bars from `viz/waterfall-chart.ts` (`options.waterfall.start/totalLabel/order`, tones flipped by
     `kpi.better: 'lower'`); it ignores the generic `sort`/`limit` (step order is its meaning) and its drill click emits

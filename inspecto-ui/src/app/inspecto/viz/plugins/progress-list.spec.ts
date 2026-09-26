@@ -59,12 +59,18 @@ describe('Progress list — pure transforms', () => {
     });
 });
 
-function create(inputs: { format?: NumberFormat; target?: number; better?: 'higher' | 'lower'; limit?: number }) {
+function create(inputs: {
+    format?: NumberFormat;
+    target?: number;
+    better?: 'higher' | 'lower';
+    limit?: number;
+    max?: number;
+}) {
     TestBed.configureTestingModule({ imports: [ProgressListComponent] });
     const fixture = TestBed.createComponent(ProgressListComponent);
     fixture.componentRef.setInput('labels', LABELS);
     fixture.componentRef.setInput('values', VALUES);
-    for (const k of ['format', 'target', 'better', 'limit'] as const)
+    for (const k of ['format', 'target', 'better', 'limit', 'max'] as const)
         if (inputs[k] !== undefined) fixture.componentRef.setInput(k, inputs[k]);
     fixture.detectChanges();
     return fixture.nativeElement as HTMLElement;
@@ -98,6 +104,24 @@ describe('ProgressListComponent', () => {
         expect(el.querySelector('[data-testid="progress-footer"]')?.textContent?.trim()).toBe(
             'Target 25 — 2 of 3 on target · +1 more',
         );
+    });
+
+    it('says what a bar is relative to — the largest item by default, never the total', () => {
+        const el = create({});
+        const notes = Array.from(el.querySelectorAll('li .sr-only')).map((n) => n.textContent?.trim());
+        expect(notes).toEqual([
+            ', 100 % of the largest item',
+            ', 75 % of the largest item',
+            ', 50 % of the largest item',
+            ', 25 % of the largest item',
+        ]);
+    });
+
+    it('with options.progress.max, a bar is a share of that max — named in the value format', () => {
+        const el = create({ max: 80, target: 25 });
+        const notes = Array.from(el.querySelectorAll('li .sr-only')).map((n) => n.textContent?.trim());
+        expect(notes[0]).toBe(', 50 % of 80, on target');
+        expect(notes[3]).toBe(', 13 % of 80, below target');
     });
 
     it('renders with no a11y violations, target included', async () => {

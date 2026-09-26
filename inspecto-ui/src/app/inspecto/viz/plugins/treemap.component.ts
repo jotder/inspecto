@@ -42,7 +42,7 @@ const SUMMARY_TOP = 5;
  * - every cell is a keyboard-focusable button with a two-tone focus ring, and a click reports the cell's channel and
  *   raw value through `select` (the drill seam — "Other" is not a value and never reports); a subgroup click also
  *   reports its parent group's raw value, so the host can select exactly that rectangle;
- * - a text alternative names the total, the largest items and how many rows were left out as zero or negative;
+ * - a text alternative names the total, the largest items and how many items were left out at zero or below;
  * - the layout follows the container through a `ResizeObserver` (dashboard span, side-pane collapse).
  */
 @Component({
@@ -203,7 +203,7 @@ export class TreemapComponent implements AfterViewInit, OnDestroy {
 
     readonly excludedText = computed(() => {
         const n = this.tree().excluded;
-        return `${n} ${n === 1 ? 'row' : 'rows'} with a zero or negative value not shown`;
+        return n === 1 ? '1 item at zero or below is not shown' : `${n} items at zero or below are not shown`;
     });
 
     ngAfterViewInit(): void {

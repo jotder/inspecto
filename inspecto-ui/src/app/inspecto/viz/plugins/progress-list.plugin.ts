@@ -55,6 +55,8 @@ export interface ProgressModel {
     /** Rows left out by the limit. */
     more: number;
     max: number;
+    /** True when `max` is the `options.progress.max` given; false when it defaulted to the largest value shown. */
+    maxSet: boolean;
 }
 
 /** Rank `labels`/`values`, keep the top `limit`, and size each bar as a percentage of `max`. Pure. */
@@ -69,10 +71,8 @@ export function rankProgress(
         .sort((a, b) => dir * (a.value - b.value));
     const limit = opts.limit != null && opts.limit >= 1 ? Math.floor(opts.limit) : PROGRESS_DEFAULT_LIMIT;
     const shown = all.slice(0, limit);
-    const max =
-        opts.max != null && Number.isFinite(opts.max) && opts.max > 0
-            ? opts.max
-            : Math.max(0, ...shown.map((r) => r.value));
+    const maxSet = opts.max != null && Number.isFinite(opts.max) && opts.max > 0;
+    const max = maxSet ? (opts.max as number) : Math.max(0, ...shown.map((r) => r.value));
     const pctOf = (v: number): number => (max > 0 ? clamp((v / max) * 100) : 0);
     const rows = shown.map(({ label, value }): ProgressRow => {
         const status = targetStatus(value, opts.target, opts.better ?? 'higher');
@@ -83,7 +83,7 @@ export function rankProgress(
             ...(status ? { targetPct: pctOf(opts.target as number), met: status.met } : {}),
         };
     });
-    return { rows, more: all.length - shown.length, max };
+    return { rows, more: all.length - shown.length, max, maxSet };
 }
 
 function clamp(n: number): number {
