@@ -47,15 +47,30 @@ class ControlApiPendingChangesTest {
         }
     }
 
+    /**
+     * Shaped like the OIDC Authenticator (re-verification finding 3: apply now FAILS CLOSED without recorded
+     * roles): each caller holds ONE seeded role, resolved against this Space's role table, and the recognised
+     * role is stamped as held. AUTHOR is a pipeline-developer; every approver is an admin (canApproveChanges, no
+     * canAuthorWorkbench — a checker need not be a builder); SELF is the author's own id holding admin.
+     * {@code Bearer noroles} is an Authenticator that stamps NO roles.
+     */
     @BeforeEach
     void armAuthenticator() {
-        Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
-            case AUTHOR -> Optional.of(new Subject("author-1", Set.of("canAuthorWorkbench")));
-            case CHECKER -> Optional.of(new Subject("checker-1", Set.of("canAuthorWorkbench", "canApproveChanges")));
-            case SELF -> Optional.of(new Subject("author-1", Set.of("canAuthorWorkbench", "canApproveChanges")));
-            case ADMIN -> Optional.of(new Subject("admin-1", Set.of("canAdminister")));
-            case PLAIN -> Optional.of(new Subject("plain-1", Set.of("canApproveChanges")));
-            default -> Optional.empty();
+        Authenticators.forTest(ex -> {
+            String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
+            if ("Bearer noroles".equals(h)) return Optional.of(new Subject("nr-1", Set.of("canAuthorWorkbench")));
+            String[] who = switch (h) {
+                case AUTHOR -> new String[] {"author-1", "pipeline-developer"};
+                case CHECKER -> new String[] {"checker-1", "admin"};
+                case SELF -> new String[] {"author-1", "admin"};
+                case ADMIN -> new String[] {"admin-1", "admin"};
+                case PLAIN -> new String[] {"plain-1", "admin"};
+                default -> null;
+            };
+            if (who == null) return Optional.empty();
+            Roles.Def def = Roles.effective(ex).get(who[1]);
+            ComponentAccess.heldRoles(ex, Set.of(who[1]));
+            return Optional.of(new Subject(who[0], def.capabilities(), def.dataScopes()));
         });
     }
 
@@ -484,6 +499,20 @@ class ControlApiPendingChangesTest {
             assertFalse(store(c).exists("pattern-pack", "p1"));
             assertEquals("invalid", data(send(c, "GET", "/pending-changes/" + id, null, CHECKER), 200)
                     .get("status").asText());
+        }
+    }
+
+    /** Re-verification finding 3: an author whose roles were never recorded cannot be re-checked — 403, not applied. */
+    @Test
+    void anAuthorWhoseRolesWereNeverRecordedIsRefusedAtApply(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            String id = data(send(c, "POST", "/components/pattern-pack", "{\"id\":\"p9\",\"title\":\"x\"}",
+                    "Bearer noroles"), 202).at("/pendingChange/id").asText();
+            HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER);
+            assertEquals(403, r.statusCode(), r.body());
+            assertTrue(r.body().contains("roles are unknown"), r.body());
+            assertFalse(store(c).exists("pattern-pack", "p9"));
         }
     }
 }
