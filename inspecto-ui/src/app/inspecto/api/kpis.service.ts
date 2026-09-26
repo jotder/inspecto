@@ -13,6 +13,8 @@ export interface KpiDefinition {
     /** The column a period is cut on. */
     timeField: string;
     grain: 'day' | 'week' | 'month' | 'quarter' | 'year';
+    /** IANA zone the periods are cut in (`Asia/Kolkata`); absent ⇒ UTC. */
+    timezone?: string;
     comparison?: 'previous' | 'last-year' | 'none';
     direction?: 'up' | 'down' | 'band';
     target?: number;
@@ -30,6 +32,8 @@ export interface KpiValue {
     comparison: string;
     direction: 'up' | 'down' | 'band';
     asOf: string;
+    /** The zone the periods were cut in. */
+    timezone: string;
     period: { from: string; to: string };
     value: number | null;
     comparisonPeriod: { from: string; to: string } | null;

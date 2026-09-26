@@ -97,6 +97,7 @@ describe('KpiComponent (UIE-1)', () => {
             comparison: 'previous',
             direction: 'down',
             asOf: '2026-08-13',
+            timezone: 'UTC',
             period: { from: '2026-08-01', to: '2026-08-14' },
             value: 50,
             comparisonPeriod: null,
@@ -126,22 +127,44 @@ describe('KpiComponent (UIE-1)', () => {
             else req.flush(response);
             fixture.detectChanges();
             const el = fixture.nativeElement as HTMLElement;
-            return (id: string) => el.querySelector(`[data-testid="${id}"]`)?.textContent?.trim() ?? null;
+            return { el, text: (id: string) => el.querySelector(`[data-testid="${id}"]`)?.textContent?.trim() ?? null };
         }
 
-        it('reads value, comparison, target, direction, format and band from the server', () => {
-            const text = bound(served);
+        it('reads value, comparison, target, direction, format and band from the server', async () => {
+            const { el, text } = bound(served);
             expect(text('kpi-value')).toBe('SAR 50.00');
             expect(text('kpi-delta')).toContain('▲ Up 25.0 %');
             expect(text('kpi-target')).toBe('Target SAR 35.00 — above target');
             expect(text('kpi-band')).toBe('RAG: Red');
+            await expectNoA11yViolations(el);
         });
 
-        it('falls back to the hand-set inputs when the definition cannot be read', () => {
-            const text = bound('error');
-            expect(text('kpi-value')).toBe('7');
-            expect(text('kpi-target')).toBe('Target 1 — on target');
+        it('says "No data" for a null value and never shows the hand-set one in its place', async () => {
+            const { el, text } = bound({ ...served, value: null, delta: null, deltaPct: null, band: null });
+            expect(text('kpi-value')).toBe('No data');
+            expect(el.textContent).not.toContain('7');
+            expect(text('kpi-delta')).toBeNull();
+            expect(text('kpi-target')).toBeNull();
+            await expectNoA11yViolations(el);
+        });
+
+        it('shows "KPI unavailable" on a read error, not the hand-set inputs', async () => {
+            const { el, text } = bound('error');
+            expect(text('kpi-value')).toBe('KPI unavailable');
+            expect(text('kpi-target')).toBeNull();
             expect(text('kpi-band')).toBeNull();
+            expect(el.textContent).not.toContain('Target 1');
+            await expectNoA11yViolations(el);
+        });
+
+        it('a band KPI drops the up / down wording and takes its tones from the server band', async () => {
+            const { el, text } = bound({ ...served, direction: 'band', value: 50, band: 'AMBER', tone: 'warning' });
+            expect(text('kpi-delta')).toBe('Change +SAR 10 (25.0 %) vs prior period');
+            expect(text('kpi-delta')).not.toMatch(/Up|Down|▲|▼/);
+            expect(text('kpi-target')).toBe('Target SAR 35.00 — near band');
+            for (const id of ['kpi-delta', 'kpi-target'])
+                expect(el.querySelector(`[data-testid="${id}"] span`)?.className).toContain('amber');
+            await expectNoA11yViolations(el);
         });
     });
 });
