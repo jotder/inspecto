@@ -82,10 +82,11 @@ system: the evidence cannot say something the code does not.
 | DELETE | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:69` |
 | PUT | `/access/profiles/([^/]+)` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:67` |
 | PUT | `/access/roles` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java:47` |
-| POST | `/action-requests` | gated | `canWorkIncidents` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:56` |
-| POST | `/action-requests/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:58` |
-| POST | `/action-requests/([^/]+)/decline` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:60` |
-| POST | `/action-requests/([^/]+)/retry` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:62` |
+| POST | `/action-requests` | gated | `canWorkIncidents` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:57` |
+| POST | `/action-requests/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:59` |
+| POST | `/action-requests/([^/]+)/decline` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:61` |
+| POST | `/action-requests/([^/]+)/mark-failed` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:65` |
+| POST | `/action-requests/([^/]+)/retry` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java:63` |
 | POST | `/agent/approvals/(.+)/decision` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:177` |
 | PUT | `/agent/policy` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:194` |
 | POST | `/agent/policy/kill-switch` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java:199` |
@@ -280,6 +281,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/runs/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:50` |
 | PUT | `/settings/approval` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:50` |
 | PUT | `/settings/branding` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:50` |
+| PUT | `/settings/egress` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/EgressRoutes.java:46` |
 | PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:53` |
 | PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:56` |
 | PUT | `/settings/pipeline-history` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:59` |

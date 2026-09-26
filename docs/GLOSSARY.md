@@ -835,6 +835,13 @@ built: [`okf/backend/control-plane/action-requests.md`](okf/backend/control-plan
 "webhook call" or "outbound action" for this — a **webhook** is the `sink.webhook` Step or a notification
 channel, neither of which is approved. ⛔ Not a **Pending Change**: that holds a config change; this holds a call.
 
+**Egress Allowlist** — The per-Space list (`egress.toon`, `GET|PUT /settings/egress`, `canAdminister`) of host
+names and CIDR ranges an **Action Request** may reach although the egress policy denies their address class by
+default (loopback, link-local, private, CGNAT, this host…). A host entry lifts only the private classes; a CIDR lifts
+its range. Default empty. *(Added 2026-09-27, `ASSURE-ACTION-REQUESTS-1`; as built:
+[`okf/backend/control-plane/action-requests.md`](okf/backend/control-plane/action-requests.md) §*The egress policy*.)*
+⛔ Not an Access Profile or an access policy: it governs where a call may go, not who may make it.
+
 **Approval Policy** — The per-Space, per-kind setting (`approval.toon`, `GET|PUT /settings/approval`) that
 says which config kinds need a Pending Change, which capability may approve one, and whether four-eyes
 applies. Default off.

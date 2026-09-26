@@ -38,14 +38,24 @@ so a value can never break the JSON. The approver reads exactly what will go out
 
 ## Approval — the Pending Change four-eyes model, not the policy
 
-- `POST /action-requests` needs `canWorkIncidents`; approve / decline / retry need **`canApproveChanges`** (reused,
-  no new capability, so `Roles.SEED` is unchanged).
+- `POST /action-requests` needs `canWorkIncidents`; approve / decline / retry / mark-failed need
+  **`canApproveChanges`** (reused, no new capability, so `Roles.SEED` is unchanged).
 - Deciding needs an authenticated Subject (403 without one — author and approver could not be told apart).
-- **Four-eyes is always on**: the author approving or declining their own request is **403**. It is not a
-  policy option. Retry is not four-eyes: it re-sends content already approved.
+- **Four-eyes is always on**: the author approving or declining their own request is **403** — and so is any
+  **co-author**: a request raised by a Decision Rule's `invoke-api` carries the rule's `createdBy` / `updatedBy`
+  as `coAuthors`, so the rule's maker cannot approve what the rule raised. It is not a policy option. Retry and
+  mark-failed are not four-eyes: they send nothing new.
 - 🔴 **Not under the Approval Policy.** An Action Request is not config and carries its own mandatory approval;
   `PendingChanges.hold` is never reached and no policy kind names it. Holding the proposal as a Pending Change
   as well would make one call need two approvals.
+
+## Who can read one
+
+`GET /action-requests*` needs `canWorkIncidents` **or** `canApproveChanges` (checked literally in the handler — a
+manifest entry names one capability). A request is visible exactly when its linked Incident / Case is
+(`AnnotationTargets.objectVisibleTo`: the Subject's data scope on `caseType` and the row policy); otherwise it is
+**absent — 404, never 403** — for reads and decisions alike. The target's response body (`lastResponse.bodyExcerpt`)
+is withheld (`bodyRedacted: true`) from anyone without `canApproveChanges`; the status still shows.
 
 ## Integrity — the Pending Change key, domain-separated
 
@@ -54,29 +64,70 @@ atomic temp + move, path-jailed, fail closed on an unreadable file). It is signe
 HMAC key** Pending Changes use (`<config>.secrets/.pending-changes.key` — no second key) through
 `PendingChanges.domainMac(root, "action-request", rec)`, which prefixes the domain inside the MAC input, so an
 Action Request can never verify as a Pending Change or the reverse. A record whose MAC fails — or that names
-another id or record type than its file — reads back `invalid`: shown, never decidable (409), never
+another id or record type than its file — reads back `invalid`: shown to approvers, never decidable (409), never
 dispatched, and **never re-saved** (`save` refuses, which would sign a forgery). The dispatcher re-verifies
 before EVERY attempt and before every write-back. ⚠ As for Pending Changes, the MAC defends against a record
 written through a door that cannot read the key (an import, a forged upload), not against a local administrator.
 
-Not an OperationalDb family, so no backup / bundle-staging lockstep: the documents ride in the config tree a
-Space backup carries, and the key stays in the `.secrets` sibling the backup skips.
+Not an OperationalDb family, so no bundle-staging lockstep. The store is **reserved from every import**
+(`ReservedConfigPaths`: `action-requests/`), **skipped by a whole-Space export** (`BundleExporter.exportSpace`) and
+**never archived by a backup** (`BackupTask`) — the records carry rendered payloads and target response excerpts.
+⚠ So a restored Space has no Action Request history; the AUDIT rows are the durable trail.
 
-## Dispatch and egress
+## The egress policy
+
+An Action Request may only reach where the **egress policy** (`EgressPolicy`, `inspecto-engine`) lets it:
+
+1. **Host syntax** — at https Connection save, at Action Request create and in `WebhookSink.endpoint`: a DNS name
+   or a CANONICAL IPv4 / IPv6 literal. Refused (422): userinfo (`trusted.example.com@attacker.example` reads as one
+   host and dials another), decimal (`2130706433`), octal (`0177.0.0.1`), hex (`0x7f000001`), short (`127.1`) and
+   leading-zero forms, zone ids, ports, whitespace. The built URL must parse back as the host.
+2. **Address classes, deny by default** — before EVERY attempt the host is resolved once and every address is
+   checked: loopback, link-local (`169.254.0.0/16` — the cloud metadata service — and `fe80::/10`), private (RFC 1918,
+   `fc00::/7`, `fec0::/10`), CGNAT `100.64.0.0/10`, `0.0.0.0/8`, broadcast, multicast, unspecified, and any address
+   of THIS host (which covers every address the control plane binds). A refusal fails the request at once, nothing
+   sent, not retried.
+3. **The Egress Allowlist** — `GET|PUT /settings/egress` (`egress.toon`, default empty; PUT is `canAdminister`,
+   validated fail closed, audited as `egress-allowlist.changed` with before/after, reserved from imports; no
+   approval-policy kind covers Space settings, so it is not held). A **host** entry lets that exact name reach the
+   PRIVATE classes only (RFC 1918, ULA, CGNAT) — never loopback, link-local or this host, so a name that is
+   re-pointed by DNS rebinding still cannot reach the metadata service. A **CIDR** entry (or a bare IP literal, taken
+   as /32 or /128) lets anything inside it through except multicast / unspecified / broadcast — real targets such as
+   a CBS or a PCRF often live on private networks, and this is how they are allowed.
+4. **Pinned connect** — the wire (`PinnedHttp` in `inspecto-notify-channels`, behind
+   `WebhookSinkTransport.exchange(…, InetAddress connectTo, …)`) connects to the CHECKED address and never resolves
+   the name itself, so rebinding cannot swap it between check and connect. The name still travels as the `Host`
+   header, the TLS SNI and the name the server certificate is verified against (`endpointIdentificationAlgorithm =
+   HTTPS` on an `SSLSocket` layered over the pinned socket). One HTTP/1.1 request, `Connection: close`, no
+   redirects, the body read only up to the excerpt cap, CR/LF refused in every header value.
+
+Each attempt's checked address is recorded (`attemptLog[]`: attempt, address, status, error — the last 50), and
+the approver sees the host AS PARSED, the port, the path and whether the allowlist names it (`egress` on the
+detail view, read live) before approving.
+
+⚠ **Scope:** applied to Action Requests only. The `sink.webhook` Step and the webhook notification channel keep
+their `HttpClient` path — they get the host-syntax check but not the address check or the pinned connect;
+existing sinks target private hosts with no allowlist entry. Filed as P2 `WEBHOOK-EGRESS-POLICY-1`.
+⚠ Embedded-IPv4 IPv6 forms other than IPv4-mapped (6to4, NAT64 `64:ff9b::/96`) are classified as public.
+
+## Dispatch
 
 `ActionDispatcher.submit` resolves the Connection on the request thread (it carries the Space) through
-**`WebhookSink.endpoint`** — the webhook sink's egress rules, extracted rather than copied: a registered
-`https` Connection (onboarded under the admin-only `canOnboardConnections`), a host, **no tunnel or proxy**, the
-bearer token resolved from its secret reference at send time. It then refuses if the Connection now resolves
-to anything other than the approved `targetUrl`. **No SSRF / allowed-host policy exists beyond that in this
-codebase**, so the Connection's base URL IS the allow-list: the client never follows redirects
-(`Redirect.NEVER`) and a 3xx fails the request at once, without a retry.
+**`WebhookSink.endpoint`** — a registered `https` Connection (onboarded under the admin-only
+`canOnboardConnections`), a host, **no tunnel or proxy**, the bearer token resolved from its secret reference at
+send time — and refuses if it now resolves to anything other than the approved `targetUrl` (pinned by
+`aRetryAfterTheConnectionMovedFailsAndSendsNothing`). A 3xx fails the request at once, without a retry.
 
 Retries: up to `-Daction.dispatch.maxAttempts` (default 3, clamped 1..10), backoff from
 `-Daction.dispatch.backoffMs` (default 1000 ms, doubling, capped at 30 s), each attempt under the Connection's
 `timeout_seconds`. Retryable: I/O failure or timeout, 5xx, 408, 429; anything else fails at once. The
 `Idempotency-Key` header is identical on every attempt and every retry. The last response (status, a 1 KiB
-body excerpt, the error, the attempt) is kept on the record; nothing logs a payload, a token or a body.
+body excerpt, the error, the attempt, the address) is kept on the record; nothing logs a payload, a token or a body.
+
+**Stuck in `dispatched`.** A request left there by a process stop is NOT resumed at boot — nothing is ever re-sent
+automatically. `POST /action-requests/{id}/mark-failed` (`canApproveChanges`, not four-eyes, audited) moves it to
+`failed` once it has made no progress for `-Daction.dispatch.stuckAfterMinutes` (default 15); a retry then re-sends
+it under the SAME idempotency key, which is what lets a receiver drop a delivery it did get.
 
 ## The Decision Rule `invoke-api` consequence
 
@@ -84,30 +135,39 @@ Applying a rule with `invoke-api` no longer emits a stub Signal: it **proposes a
 the rule's open Incident (correlation `decision-rule:<rule>`, opened when none is), with
 `params.connection`, `params.method` (default POST) and `params.payload` (default
 `{incident: {{incident.id}}, rule: {{context.rule}}}`). Deduped while one is pending on that Incident. The
-author is the person applying the rule, or `decision-rule:<rule>` for an engine-fired application. ⚠ Breaking:
-the consequence takes a Connection id, never a `url` — a URL was never an authorable egress target.
+author is the person applying the rule, or `decision-rule:<rule>` for an engine-fired application; the rule's
+`createdBy` / `updatedBy` become `coAuthors`. A rule with no recorded editor (saved before editors were recorded)
+raises nothing, *skipped* — fail closed, because its maker cannot be excluded; save it again.
+
+**At save** (`POST|PUT /decision-rules`), a rule with an `invoke-api` consequence needs the saver to hold
+`canWorkIncidents` (403) — otherwise a `canAuthorWorkbench`-only author could propose outbound calls by proxy — and
+its params are validated: `params.connection` required, registered, `https` (422); a legacy `params.url` is 422
+with a message saying the target is always an onboarded Connection. ⚠ Breaking.
 
 ## Routes
 
 | Route | Gate | |
 |---|---|---|
-| `GET /action-requests[?status&incidentId&caseId]` | Space access | newest first, capped at 500 with `total` + `truncated`; no payload |
-| `GET /action-requests/{id}` | Space access | with the rendered payload |
-| `POST /action-requests` | `canWorkIncidents` | 503 no write root → 422 body → 503 no ops module → 404 linked object → 503 no transport → 422 Connection → 413 payload > 64 KiB |
-| `POST /action-requests/{id}/approve` · `/decline` | `canApproveChanges` | Subject 403 → 503 → 422 body key / id → 404 → 409 invalid → 409 not pending → 403 four-eyes |
+| `GET /action-requests[?status&incidentId&caseId]` | `canWorkIncidents` or `canApproveChanges` | only requests on visible objects; capped at 500 with `total` + `truncated`; no payload |
+| `GET /action-requests/{id}` | `canWorkIncidents` or `canApproveChanges` | 404 when its object is invisible; the rendered payload and the `egress` view |
+| `POST /action-requests` | `canWorkIncidents` | 503 no write root → 422 body → 503 no ops module → 404 linked object → 503 no transport → 422 Connection / host syntax → 413 payload > 64 KiB |
+| `POST /action-requests/{id}/approve` · `/decline` | `canApproveChanges` | Subject 403 → 503 → 422 body key / id → 404 (absent or invisible) → 409 invalid → 409 not pending → 403 four-eyes (author or co-author) |
 | `POST /action-requests/{id}/retry` | `canApproveChanges` | as above, but the request must be `failed` |
+| `POST /action-requests/{id}/mark-failed` | `canApproveChanges` | as above, but `dispatched` and idle ≥ the stuck timeout (409 otherwise) |
+| `GET|PUT /settings/egress` | PUT `canAdminister` | the Egress Allowlist |
 
 ## UI
 
 The **Action Requests** inbox (`/action-requests`, Operations nav, the Pending Changes inbox pattern) lists
-waiting / all requests; selecting one shows target, key, attempts and the exact payload, with Approve / Decline
-(pending) or Retry (failed) for a `canApproveChanges` holder. The Incident / Case detail page carries an
-**Action Requests** panel: status badge, attempts, last response and Retry.
+waiting / all requests; selecting one shows, first, **where it is sent** — the parsed host in large type, scheme,
+port, path and an allowlist badge — then key, attempts (with each attempt's address) and the exact payload, with
+Approve / Decline (pending), Retry (failed) or Mark as failed (dispatched) for a `canApproveChanges` holder. The
+Incident / Case detail page carries an **Action Requests** panel: status badge, attempts, last response and Retry.
 
 ## Deferred / known gaps
 
-- A request left `dispatched` by a process stop is not resumed at boot, and retry accepts only `failed` — it
-  stays `dispatched`, and no route recovers it yet.
 - No per-request `path` below the Connection's base path: one Connection per endpoint.
-- Tests drive the dispatcher over a loopback **test** wire (plain http, same `Redirect.NEVER` client); the real
-  wire's redirect refusal is pinned in `HttpWebhookSinkTransportTest`.
+- No UI for the Egress Allowlist yet — `PUT /settings/egress` only.
+- `inspecto`-module tests drive the dispatcher over a loopback **test** wire (it connects to the pinned address like
+  the real one); the real wire's pinning, SNI / certificate verification and redirect refusal are pinned in
+  `HttpWebhookSinkTransportTest` and `PinnedHttpTlsTest`.
