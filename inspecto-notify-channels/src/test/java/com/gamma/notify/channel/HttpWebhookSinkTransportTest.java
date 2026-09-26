@@ -96,6 +96,53 @@ class HttpWebhookSinkTransportTest {
         assertTrue(redirectHits.isEmpty(), "the redirect target must never receive the rows");
     }
 
+    // ── exchange: the Action Request wire (ASSURE-ACTION-REQUESTS-1) ────────────────────────────────
+
+    @Test
+    void exchangeSendsTheMethodAndKeyAndReturnsTheStatusWithACappedExcerpt() throws Exception {
+        List<String> seen = new CopyOnWriteArrayList<>();
+        server.createContext("/api", ex -> {
+            seen.add(ex.getRequestMethod() + " " + ex.getRequestHeaders().getFirst("Idempotency-Key") + " "
+                    + new String(ex.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            byte[] body = "x".repeat(5000).getBytes(StandardCharsets.UTF_8);
+            ex.sendResponseHeaders(500, body.length);
+            ex.getResponseBody().write(body);
+            ex.close();
+        });
+        WebhookSinkTransport.Response r = new HttpWebhookSinkTransport().exchange("PUT", URI.create(base() + "/api"),
+                null, Duration.ofSeconds(5), "{\"a\":1}", Map.of("Idempotency-Key", "ar-1"), 100);
+        assertEquals(500, r.status(), "a non-2xx comes back, it does not throw");
+        assertEquals(100, r.bodyExcerpt().length());
+        assertEquals(List.of("PUT ar-1 {\"a\":1}"), seen);
+    }
+
+    /** A redirect to ANOTHER host comes back as the 3xx itself; the other host is never dialled. */
+    @Test
+    void exchangeNeverFollowsARedirectToAnotherHost() throws Exception {
+        HttpServer other = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        List<String> otherHits = new CopyOnWriteArrayList<>();
+        other.createContext("/", ex -> {
+            otherHits.add(ex.getRequestMethod());
+            ex.sendResponseHeaders(200, -1);
+            ex.close();
+        });
+        other.start();
+        try {
+            server.createContext("/bounce", ex -> {
+                ex.getRequestBody().readAllBytes();
+                ex.getResponseHeaders().add("Location", "http://localhost:" + other.getAddress().getPort() + "/steal");
+                ex.sendResponseHeaders(302, -1);
+                ex.close();
+            });
+            WebhookSinkTransport.Response r = new HttpWebhookSinkTransport().exchange("POST",
+                    URI.create(base() + "/bounce"), "s3cret", Duration.ofSeconds(5), "{}", Map.of(), 100);
+            assertEquals(302, r.status());
+            assertTrue(otherHits.isEmpty(), "the redirect's host must never receive the request: " + otherHits);
+        } finally {
+            other.stop(0);
+        }
+    }
+
     @Test
     void thisModuleRegistersTheTransportTheEngineDiscovers() {
         assertInstanceOf(HttpWebhookSinkTransport.class,

@@ -31,4 +31,23 @@ public interface WebhookSinkTransport {
      */
     void post(URI url, String bearerToken, Duration timeout, String jsonBody, Map<String, String> headers)
             throws Exception;
+
+    /**
+     * One answered request — its status and at most {@code excerptCap} characters of its body. ⚠ Never a
+     * header: a receiver's headers can echo a credential.
+     */
+    record Response(int status, String bodyExcerpt) {}
+
+    /**
+     * Send {@code jsonBody} with {@code method} (POST / PUT / PATCH) and return the answer, WHATEVER its status —
+     * the Action Request dispatcher ({@code ASSURE-ACTION-REQUESTS-1}) records every attempt's response. Only an
+     * I/O failure or a timeout throws. Redirects are NOT followed: a 3xx comes back as itself.
+     *
+     * <p>The default refuses, so a transport that implements only {@link #post} fails closed rather than
+     * reporting a status it never saw.
+     */
+    default Response exchange(String method, URI url, String bearerToken, Duration timeout, String jsonBody,
+                              Map<String, String> headers, int excerptCap) throws Exception {
+        throw new UnsupportedOperationException("this outbound transport implements POST delivery only");
+    }
 }

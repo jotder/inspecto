@@ -98,32 +98,50 @@ public final class WebhookSink {
             throw new IllegalStateException("sink '" + sink.id() + "' is a webhook, and this bundle ships no "
                     + "outbound HTTP transport — webhook delivery is a Professional/Enterprise edition capability "
                     + "(inspecto-notify-channels). Nothing was sent.");
-        ConnectionProfile p = ConnectionRegistry.find(w.connection()).orElseThrow(() -> new IllegalStateException(
-                "sink '" + sink.id() + "' names Connection '" + w.connection() + "', which is not registered "
+        Endpoint e = endpoint(w.connection(), "sink '" + sink.id() + "'");
+        return new Target(e.url(), e.bearerToken(), e.timeout(), w, transport);
+    }
+
+    /** A Connection resolved to where an outbound request goes — its URL, token and timeout. */
+    public record Endpoint(URI url, String bearerToken, Duration timeout) {
+        @Override public String toString() {       // never print the token
+            return "Endpoint[" + url + ", timeout=" + timeout + "]";
+        }
+    }
+
+    /**
+     * The egress rules of this class for any outbound caller (the webhook sink; the Action Request dispatcher,
+     * {@code ASSURE-ACTION-REQUESTS-1}): the named Connection must be registered in this space, an {@code https}
+     * connection, with a host and neither tunnel nor proxy; the URL is {@code https://<host>[:<port>]<base_path>};
+     * the bearer token is its {@code password} reference resolved now. {@code who} prefixes every refusal.
+     */
+    public static Endpoint endpoint(String connection, String who) {
+        ConnectionProfile p = ConnectionRegistry.find(connection).orElseThrow(() -> new IllegalStateException(
+                who + " names Connection '" + connection + "', which is not registered "
                         + "in this space"));
         if (!CONNECTOR.equals(p.connector()))
-            throw new IllegalStateException("sink '" + sink.id() + "': Connection '" + p.id() + "' is a '"
+            throw new IllegalStateException(who + ": Connection '" + p.id() + "' is a '"
                     + p.connector() + "' connection — a webhook target must be an '" + CONNECTOR + "' connection");
         if (p.tunnel() != null || p.proxy() != null)
-            throw new IllegalStateException("sink '" + sink.id() + "': Connection '" + p.id() + "' declares a "
+            throw new IllegalStateException(who + ": Connection '" + p.id() + "' declares a "
                     + (p.tunnel() != null ? "tunnel" : "proxy") + ", which the webhook sink does not dial "
                     + "through — refused rather than bypassed");
         if (p.host() == null || p.host().isBlank())
-            throw new IllegalStateException("sink '" + sink.id() + "': Connection '" + p.id() + "' has no host");
+            throw new IllegalStateException(who + ": Connection '" + p.id() + "' has no host");
         String path = p.basePath() == null || p.basePath().isBlank() ? "/"
                 : (p.basePath().startsWith("/") ? p.basePath() : "/" + p.basePath());
         URI url;
         try {
             url = new URI(CONNECTOR, null, p.host(), p.port() > 0 ? p.port() : -1, path, null, null);
         } catch (java.net.URISyntaxException e) {
-            throw new IllegalStateException("sink '" + sink.id() + "': Connection '" + p.id()
+            throw new IllegalStateException(who + ": Connection '" + p.id()
                     + "' does not form a valid URL: " + e.getMessage(), e);
         }
         String token = null;
         if (p.password() != null && !p.password().isBlank()) {
             token = SecretResolver.resolve(p.password());
             if (token == null)
-                throw new IllegalStateException("sink '" + sink.id() + "': the token reference on Connection '"
+                throw new IllegalStateException(who + ": the token reference on Connection '"
                         + p.id() + "' does not resolve on this host");
         }
         long timeoutSeconds = DEFAULT_TIMEOUT_SECONDS;
@@ -132,13 +150,13 @@ public final class WebhookSink {
             try {
                 timeoutSeconds = Long.parseLong(t.trim());
             } catch (NumberFormatException e) {
-                throw new IllegalStateException("sink '" + sink.id() + "': Connection '" + p.id() + "' option "
+                throw new IllegalStateException(who + ": Connection '" + p.id() + "' option "
                         + TIMEOUT_OPTION + " must be a whole number of seconds, got: " + t);
             }
             if (timeoutSeconds < 1)
-                throw new IllegalStateException("sink '" + sink.id() + "': " + TIMEOUT_OPTION + " must be ≥ 1");
+                throw new IllegalStateException(who + ": " + TIMEOUT_OPTION + " must be ≥ 1");
         }
-        return new Target(url, token, Duration.ofSeconds(timeoutSeconds), w, transport);
+        return new Endpoint(url, token, Duration.ofSeconds(timeoutSeconds));
     }
 
     /** Send {@code inputTable}'s rows; returns the number of rows accepted. Throws when a batch fails. */
@@ -224,7 +242,7 @@ public final class WebhookSink {
     }
 
     /** The first bundled {@link WebhookSinkTransport}, or {@code null} — Personal bundles none. */
-    static WebhookSinkTransport discoveredTransport() {
+    public static WebhookSinkTransport discoveredTransport() {
         return ServiceLoader.load(WebhookSinkTransport.class).findFirst().orElse(null);
     }
 }

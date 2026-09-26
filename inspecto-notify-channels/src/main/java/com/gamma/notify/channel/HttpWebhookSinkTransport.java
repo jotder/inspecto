@@ -30,4 +30,10 @@ public final class HttpWebhookSinkTransport implements WebhookSinkTransport {
             throws Exception {
         WebhookChannel.send(client, url, bearerToken, timeout, jsonBody, headers);
     }
+
+    @Override
+    public Response exchange(String method, URI url, String bearerToken, Duration timeout, String jsonBody,
+                             Map<String, String> headers, int excerptCap) throws Exception {
+        return WebhookChannel.exchange(client, method, url, bearerToken, timeout, jsonBody, headers, excerptCap);
+    }
 }
