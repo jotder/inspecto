@@ -41,6 +41,13 @@ function referencedFields(group: ConditionGroup): string[] {
     return [...new Set(out)];
 }
 
+/** A ledger-metric rule (metric + window over the batch ledger) — the only kind this form authors. A
+ *  measure (`dataset`+`measure`), freshness (`maximumAge`) or Investigation rule is edit-only here:
+ *  the engine refuses `metric`/`window`/`when` on those, so the form must not write them. */
+function isLedgerRule(r: AlertRule | undefined): boolean {
+    return !r || !(r.dataset || r.maximumAge || r.investigation);
+}
+
 /** Dialog input: an existing rule ⇒ edit; absent ⇒ create. */
 export interface AlertRuleFormData {
     rule?: AlertRule;
@@ -113,10 +120,39 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                     (submitted)="save()"
                 ></inspecto-schema-form>
 
-                <div class="mt-4 font-semibold">Only count batches matching (optional)</div>
-                <inspecto-query-condition-group class="mt-2 block" [group]="when" [columns]="columns" [root]="true" />
-                @if (whenEmpty()) {
-                    <div class="text-secondary mt-1 text-sm">No conditions — every batch in the window counts.</div>
+                @if (ledgerRule) {
+                    <div class="mt-4 font-semibold">Only count batches matching (optional)</div>
+                    <inspecto-query-condition-group
+                        class="mt-2 block"
+                        [group]="when"
+                        [columns]="columns"
+                        [root]="true"
+                    />
+                    @if (whenEmpty()) {
+                        <div class="text-secondary mt-1 text-sm">No conditions — every batch in the window counts.</div>
+                    }
+                } @else {
+                    <!-- Read-only: this form cannot re-author a Dataset-scoped rule's target; save keeps it as stored. -->
+                    <dl class="text-secondary mt-4 space-y-1 text-sm" aria-label="Rule target (read-only)">
+                        @if (data.rule?.dataset) {
+                            <div>
+                                <dt class="inline font-semibold">Dataset:</dt>
+                                <dd class="inline">{{ data.rule?.dataset }}</dd>
+                            </div>
+                        }
+                        @if (data.rule?.measure) {
+                            <div>
+                                <dt class="inline font-semibold">Measure:</dt>
+                                <dd class="inline">{{ data.rule?.measure }}</dd>
+                            </div>
+                        }
+                        @if (data.rule?.maximumAge) {
+                            <div>
+                                <dt class="inline font-semibold">Maximum age:</dt>
+                                <dd class="inline">{{ data.rule?.maximumAge }}</dd>
+                            </div>
+                        }
+                    </dl>
                 }
             </div>
             @if (!isEdit && step() === 'save') {
@@ -183,7 +219,11 @@ export class AlertRuleFormDialog {
     readonly isEdit = !!this.data.rule;
     readonly saving = signal(false);
     readonly writesDisabled = signal(false);
-    readonly attributes = ALERT_RULE_ATTRIBUTES;
+    readonly ledgerRule = isLedgerRule(this.data.rule);
+    /** A non-ledger rule has no metric / window to edit (the engine refuses both on it). */
+    readonly attributes = this.ledgerRule
+        ? ALERT_RULE_ATTRIBUTES
+        : ALERT_RULE_ATTRIBUTES.filter((s) => s.key !== 'metric' && s.key !== 'window');
 
     /** Create flow: `config` (metric/threshold) → `save` (rule id, asked last). Edit stays on `config`. */
     readonly step = signal<'config' | 'save'>('config');
@@ -245,15 +285,22 @@ export class AlertRuleFormDialog {
         }
         const v = this.schemaForm.value() as Partial<AlertRule>;
         const onPipeline = String(v.onPipeline ?? '').trim();
+        const description = String(v.description ?? '').trim();
+        // A PUT replaces the whole rule, so every stored key this form does not edit (a measure rule's
+        // dataset/measure, anything newer than this form) is carried over from the loaded rule. The keys
+        // the form DOES edit are dropped first, so clearing one (pipeline scope, description) removes it.
+        const edited = new Set(['name', ...this.attributes.map((s) => s.key), ...(this.ledgerRule ? ['when'] : [])]);
+        const kept = Object.fromEntries(Object.entries(this.data.rule ?? {}).filter(([k]) => !edited.has(k)));
         const body: AlertRuleUpsert = {
+            ...kept,
             name: this.isEdit ? this.data.rule!.name : String(this.saveForm.getRawValue().name ?? '').trim(),
-            metric: String(v.metric ?? '').trim(),
+            ...(this.ledgerRule ? { metric: String(v.metric ?? '').trim(), window: String(v.window ?? '15m') } : {}),
             comparator: String(v.comparator ?? 'gt'),
             threshold: Number(v.threshold ?? 0),
-            window: String(v.window ?? '15m'),
             severity: String(v.severity ?? 'WARNING'),
             ...(onPipeline ? { onPipeline } : {}),
-            ...(this.whenEmpty() ? {} : { when: this.when }),
+            ...(description ? { description } : {}),
+            ...(this.ledgerRule && !this.whenEmpty() ? { when: this.when } : {}),
         };
         this.saving.set(true);
         const call = this.isEdit ? this.api.updateRule(body.name, body) : this.api.createRule(body);

@@ -66,4 +66,12 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         placeholder: 'e.g. cdr_ingest',
         help: 'Limit the rule to one Pipeline; leave blank to watch every Pipeline.',
     },
+    {
+        key: 'description',
+        label: 'Description',
+        type: 'string',
+        tier: 'optional',
+        placeholder: 'e.g. Open fraud exposure is too high',
+        help: 'The human title for the Alerts and Incidents this rule raises; leave blank to generate one.',
+    },
 ];

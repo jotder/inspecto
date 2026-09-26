@@ -21,10 +21,14 @@ export interface FiredAlert {
 /** One armed alert rule (GET /alerts/rules). */
 export interface AlertRule {
     name: string;
-    metric: string;
+    /** Optional human title (`alert.description`) — titles the rule's fired Alerts and Incidents. */
+    description?: string | null;
+    /** Ledger-metric rules only — a measure / freshness rule has none (GET omits it). */
+    metric?: string;
     comparator: string;
     threshold: number;
-    window: string;
+    /** Ledger-metric rules only — a measure / freshness rule has none (GET omits it). */
+    window?: string;
     severity: string;
     onPipeline?: string;
     /**
@@ -35,8 +39,13 @@ export interface AlertRule {
     when?: ConditionGroup | null;
     /** A Dataset-scoped rule's Dataset id (measure or freshness rule). */
     dataset?: string | null;
+    /** Measure rule (BI-5): the Measure over `dataset` — `count` or `agg(field)`, e.g. `sum(exposure_sar)`. */
+    measure?: string | null;
     /** Freshness rule (DUCKLE-C1): the Dataset must have published within this (`Ns|Nm|Nh|Nd`). */
     maximumAge?: string | null;
+    /** Investigation rule (LA-23): the Investigation whose Working Set `relation` the `measure` reads. */
+    investigation?: string | null;
+    relation?: string | null;
 }
 
 /** Create/update body — the whole rule is authorable; `name` is the identity (immutable on edit). */

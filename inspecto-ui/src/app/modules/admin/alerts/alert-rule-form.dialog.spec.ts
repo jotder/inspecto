@@ -19,6 +19,18 @@ const RULE: AlertRule = {
     onPipeline: 'cdr_ingest',
 };
 
+/** A BI-5 measure rule as GET /alerts/rules serves it (the telco demo's shape) + a key this form does not model. */
+const MEASURE_RULE = {
+    name: 'fraud_exposure_high',
+    description: 'Open fraud exposure is too high',
+    dataset: 'fraud_cases_open',
+    measure: 'sum(exposure_sar)',
+    comparator: 'gt',
+    threshold: 298668,
+    severity: 'CRITICAL',
+    futureKey: { kept: true },
+} as unknown as AlertRule;
+
 function create(data: AlertRuleFormData, save = vi.fn(() => of(RULE))) {
     const ref = { close: vi.fn() };
     TestBed.configureTestingModule({
@@ -156,6 +168,53 @@ describe('AlertRuleFormDialog', () => {
                 },
             }),
         );
+    });
+
+    it('round-trips description: seeded on edit, written on save, removed once cleared', () => {
+        const { c, save } = create({ rule: { ...RULE, description: 'Error rate spiking' } });
+        expect(c.schemaForm.form.get('description')?.value).toBe('Error rate spiking');
+        c.save();
+        expect(save).toHaveBeenLastCalledWith(
+            'high_error_rate',
+            expect.objectContaining({ description: 'Error rate spiking', metric: 'error_rate' }),
+        );
+
+        c.schemaForm.form.patchValue({ description: '  ' });
+        c.save();
+        expect(save).toHaveBeenLastCalledWith(
+            'high_error_rate',
+            expect.not.objectContaining({ description: expect.anything() }),
+        );
+    });
+
+    it('re-saving a measure rule keeps dataset, measure and unmodelled keys, and never adds metric/window/when', () => {
+        const { c, save, fixture } = create({ rule: MEASURE_RULE });
+        expect(c.schemaForm.form.get('metric')).toBeNull();
+        expect(c.schemaForm.form.get('window')).toBeNull();
+        const text = fixture.nativeElement.textContent as string;
+        expect(text).toContain('sum(exposure_sar)');
+        expect(text).toContain('fraud_cases_open');
+        expect(fixture.nativeElement.querySelector('inspecto-query-condition-group')).toBeNull();
+
+        c.schemaForm.form.patchValue({ threshold: 300000 });
+        c.save();
+        const [name, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
+        expect(name).toBe('fraud_exposure_high');
+        expect(body).toEqual({
+            name: 'fraud_exposure_high',
+            description: 'Open fraud exposure is too high',
+            dataset: 'fraud_cases_open',
+            measure: 'sum(exposure_sar)',
+            comparator: 'gt',
+            threshold: 300000,
+            severity: 'CRITICAL',
+            futureKey: { kept: true },
+        });
+    });
+
+    it('renders a measure rule edit with no a11y violations', async () => {
+        const { fixture } = create({ rule: MEASURE_RULE });
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 
     it('renders with no a11y violations', async () => {
