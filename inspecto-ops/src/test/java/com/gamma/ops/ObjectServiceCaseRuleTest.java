@@ -109,9 +109,9 @@ class ObjectServiceCaseRuleTest {
     void analyticsRollsUpCountsCycleTimeAndImpact() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
         OperationalObject c1 = svc.open(ObjectType.CASE, "one", "d", "HIGH", "MAJOR", null, null, "corr",
-                Map.of("category", "Security / Data / Leak", "impactAmount", "1000", "recordsAffected", "50"));
+                Map.of("category", "Security / Data / Leak", "impact", "{\"confirmed\":\"1000\",\"recovered\":\"250\",\"currency\":\"EUR\"}", "recordsAffected", "50"));
         svc.open(ObjectType.CASE, "two", "d", "HIGH", "LOW", null, null, "corr",
-                Map.of("category", "Pipeline / Ingest / Parse", "impactAmount", "500"));
+                Map.of("category", "Pipeline / Ingest / Parse", "impact", "{\"confirmed\":\"500\",\"currency\":\"EUR\"}"));
         // resolve+close c1 so it contributes a cycle time
         svc.transition(c1.id(), "investigate", "op");
         svc.transition(c1.id(), "resolve", "op");
@@ -126,7 +126,11 @@ class ObjectServiceCaseRuleTest {
         assertEquals(1, byCategory.get("Pipeline"));
         @SuppressWarnings("unchecked")
         Map<String, Object> impact = (Map<String, Object>) a.get("impact");
-        assertEquals(1500.0, (double) impact.get("impactAmount"), 0.001);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> eur = ((Map<String, Map<String, Object>>) impact.get("byCurrency")).get("EUR");
+        assertEquals(0, new java.math.BigDecimal("1500").compareTo((java.math.BigDecimal) eur.get("confirmed")));
+        assertEquals(0, new java.math.BigDecimal("1250").compareTo((java.math.BigDecimal) eur.get("outstanding")));
+        assertEquals(2, eur.get("count"));
         assertEquals(50L, impact.get("recordsAffected"));
         @SuppressWarnings("unchecked")
         Map<String, Object> cycle = (Map<String, Object>) a.get("cycleTime");

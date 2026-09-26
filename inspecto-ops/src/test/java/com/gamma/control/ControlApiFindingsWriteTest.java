@@ -83,13 +83,13 @@ class ControlApiFindingsWriteTest {
             c.svc.eventLog().addSubscriber(sub);
             try {
                 HttpResponse<String> r = send(c.port, "PUT", "/objects/" + seed.id() + "/findings",
-                        "{\"findings\":{\"disposition\":\"CONFIRMED\",\"impactAmount\":\"1200\",\"summary\":\"ring\"}}");
+                        "{\"findings\":{\"disposition\":\"CONFIRMED\",\"recordsAffected\":\"40\",\"summary\":\"ring\"}}");
                 assertEquals(200, r.statusCode(), r.body());
                 JsonNode attrs = V1Body.of(r.body()).get("attributes");
-                assertEquals(Map.of("disposition", "CONFIRMED", "impactAmount", "1200", "summary", "ring"),
+                assertEquals(Map.of("disposition", "CONFIRMED", "recordsAffected", "40", "summary", "ring"),
                         JSON.readValue(attrs.get("findings").asText(), Map.class), "the blob is the canonical home (D3)");
-                assertEquals("1200", attrs.get("impactAmount").asText(), "the flat copy the C4 roll-up sums");
-                assertEquals("", attrs.get("recordsAffected").asText(), "an absent value blanks its flat copy");
+                assertEquals("40", attrs.get("recordsAffected").asText(), "the flat copy the C4 roll-up sums");
+                assertFalse(attrs.has("impactAmount"), "the Case's money is its typed impact (WS-10), not a Findings copy");
                 assertEquals("fraud", attrs.get(ObjectRoutes.ATTR_CASE_TYPE).asText(), "the rest of the bag survives");
             } finally {
                 c.svc.eventLog().removeSubscriber(sub);

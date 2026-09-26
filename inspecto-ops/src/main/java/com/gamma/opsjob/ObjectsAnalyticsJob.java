@@ -173,9 +173,22 @@ public final class ObjectsAnalyticsJob implements Job {
         breakdown(out, t, "category", rollup.get("byCategory"));
         breakdown(out, t, "priority", rollup.get("byPriority"));
         nested(out, t, "cycle_time", rollup.get("cycleTime"), Map.of("count", "count", "avgMs", "avg_ms"));
-        nested(out, t, "impact", rollup.get("impact"),
-                Map.of("impactAmount", "impact_amount", "recordsAffected", "records_affected"));
+        nested(out, t, "impact", rollup.get("impact"), Map.of("recordsAffected", "records_affected"));
+        impactByCurrency(out, t, rollup.get("impact"));
         return out;
+    }
+
+    /**
+     * WS-10: one axis per currency, {@code impact.<ISO 4217>} (e.g. {@code impact.EUR}), keyed {@code count} /
+     * {@code suspected} / {@code confirmed} / {@code recovered} / {@code prevented} / {@code outstanding} — never
+     * one cross-currency total, which would add euros to dollars.
+     */
+    private static void impactByCurrency(List<Object[]> out, String type, Object impact) {
+        if (!(impact instanceof Map<?, ?> im) || !(im.get("byCurrency") instanceof Map<?, ?> byCurrency)) return;
+        byCurrency.forEach((currency, totals) -> {
+            if (totals instanceof Map<?, ?> m)
+                m.forEach((k, v) -> out.add(new Object[]{type, "impact." + currency, String.valueOf(k), num(v)}));
+        });
     }
 
     private static void breakdown(List<Object[]> out, String type, String axis, Object value) {

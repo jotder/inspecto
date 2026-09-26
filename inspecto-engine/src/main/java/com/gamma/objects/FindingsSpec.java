@@ -100,8 +100,10 @@ public record FindingsSpec(String objectType, List<Section> sections) {
         List<Option> dispositions = DISPOSITIONS.stream()
                 .map(d -> new Option(d, humanize(d))).toList();
         return new FindingsSpec(type == null ? "case" : type.name().toLowerCase(Locale.ROOT), List.of(
+                // WS-10 (ASSURE-IMPACT-LEDGER-1): the Case's money is its typed impact (attributes.impact,
+                // PUT /objects/{id}/impact), not a Findings field — an `impactAmount` here would be a parallel
+                // home for the same number.
                 section("disposition", "Disposition", "select", dispositions),
-                section("impactAmount", "Impact amount", "string", List.of()),
                 section("recordsAffected", "Records affected", "string", List.of()),
                 section("summary", "Summary", "multiline", List.of())));
     }

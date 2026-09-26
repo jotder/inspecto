@@ -51,6 +51,7 @@ final class AbsentObjectRoutes implements RouteModule {
             {"PUT",    "/objects/([^/]+)/findings"},
             {"PUT",    "/objects/([^/]+)/postmortem"},
             {"PUT",    "/objects/([^/]+)/category"},
+            {"PUT",    "/objects/([^/]+)/impact"},
             {"PATCH",  "/objects/([^/]+)"},
             {"GET",    "/objects/([^/]+)"},          // ⚠ catch-all — after every literal /objects/… above
             {"GET",    "/rca/templates"},

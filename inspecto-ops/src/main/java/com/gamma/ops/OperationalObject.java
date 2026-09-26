@@ -115,6 +115,9 @@ public record OperationalObject(String id, ObjectType objectType, String title, 
         m.put("correlationId", correlationId);
         m.put("attributes", attributes);
         m.put("watchers", watchers());
+        // WS-10: the typed impact with its DERIVED outstanding (confirmed − recovered), computed here on every
+        // read and never stored; absent when the object carries none.
+        Impact.of(this).ifPresent(i -> m.put("impact", i.toMap()));
         m.put("createdAt", createdAt);
         m.put("updatedAt", updatedAt);
         m.put("closedAt", closedAt);

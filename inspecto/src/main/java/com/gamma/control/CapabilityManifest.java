@@ -191,6 +191,8 @@ final class CapabilityManifest {
             // analyst can FINISH an Incident — each writes ONLY its one attribute and refuses any other key (422).
             new Entry("PUT", "/objects/([^/]+)/postmortem", Roles.CAN_WORK_INCIDENTS),
             new Entry("PUT", "/objects/([^/]+)/category", Roles.CAN_WORK_INCIDENTS),
+            // (WS-10, ASSURE-IMPACT-LEDGER-1) the typed financial impact — part of finishing an Incident or Case.
+            new Entry("PUT", "/objects/([^/]+)/impact", Roles.CAN_WORK_INCIDENTS),
             new Entry("POST", "/objects/([^/]+)/merge", Roles.CAN_ADMINISTER),
             new Entry("POST", "/objects/([^/]+)/split", Roles.CAN_ADMINISTER),
             new Entry("PATCH", "/objects/([^/]+)", Roles.CAN_ADMINISTER),

@@ -383,6 +383,25 @@ per-category counts into tall Parquet under `<dataDir>/ops_analytics/` as a `dat
 (2026-07-25); binding it as a Studio Dataset is unbuilt (§5). ⚠ **No committed `*_case_rule.toon` or
 `*_tag_rule.toon` exists.**
 
+**Impact (WS-10, `ASSURE-IMPACT-LEDGER-1`, 2026-09-26).** An Incident and a Case carry one typed financial
+impact, `com.gamma.ops.Impact`: four non-negative decimals — **suspected · confirmed · recovered · prevented** —
+in one ISO 4217 **currency** (required once any amount is set), plus free-text **period** (≤ 64) and **basis**
+(≤ 2000). Stored as the JSON blob `attributes.impact`, amounts as plain decimal strings (≤ 6 places, < 10^15), so
+no `double` ever touches a stored value. **`outstanding = confirmed − recovered` is derived on read and never
+stored**: `OperationalObject.toMap()` adds a top-level `impact` block with it on every read, and a body that
+sends `outstanding` is refused. Written only by `PUT /objects/{id}/impact {impact:{…}}` on `canWorkIncidents`
+(the `postmortem`/`category` narrow-route precedent — recording what an Incident cost is part of finishing it,
+and the `canAdminister` PATCH must not become the analyst's catch-all): `{}` clears it; 400 no/non-object
+`impact`; 422 an invalid value, any other body key, or an Alert/Task; **409 when the object is in its terminal
+state** (Incident `ARCHIVED`, Case `CLOSED` — its books are closed, reopen to change them); 404 unknown or
+out-of-scope. Audited as `OBJECT_ACTIVITY` `action: impact` with the stored value **`before` and `after`**
+and the request's actor. **On a Case this IS the Findings impact** — the built-in Findings spec dropped its
+`impactAmount` section and the route its flat `impactAmount` copy (only `recordsAffected` remains), so there
+is one home for the money, not two. ⚠ A deployment-authored `findings-spec` may still declare an `impactAmount`
+key; it is then an ordinary scalar in the blob that nothing sums. `analytics()` sums the typed impact **per
+currency** (`impact.byCurrency.<ISO>` = `count` + the four amounts + `outstanding`) — never across currencies —
+and `objects.analytics` samples it as axis `impact.<ISO>`.
+
 ### 3.6 Annotations — Notes and Tags
 
 Both address their subject as an **Annotation Target** `(targetKind, targetId)` from one shared vocabulary
@@ -533,6 +552,7 @@ earlier one, both appear.
 | 2026-09-26 (operator) | **Working an Incident or Case is its own capability, `canWorkIncidents`**: `ack` / `resolve` / `transition` / `assign` moved from `canAdminister` (2026-09-15, `ROUTE-UNGATED-DEFAULT-1` step 2b) to it, seeded to `operations`, `support`, `power` and `admin` (`super` holds everything). Merge / split / `PATCH /objects/{id}` / Case-Rule evaluate **stay `canAdminister`**. Those four routes record the authenticated Subject as the actor; a body `actor` counts only without one (Personal). The SPA shows the lifecycle verbs only with `LensService.canWorkIncidents()` (action node `incidents.work`), and Accept self-assigns through `/assign`, not the PATCH | Only Admin/Super held `canAdminister`, so a fraud analyst on `operations` could not close their own Case and `power` could not work an Incident at all. Moving an object's state is the analyst's daily work; reshaping which Incidents a Case holds, or editing its fields wholesale, is not. Pinned by `ControlApiTriageGateTest` (seeded-role Subjects: 401 / 403 `business` / 200 `operations`, and a Case OPEN → investigate → resolve with Disposition CONFIRMED audited under the Subject) |
 | 2026-09-26 (operator) | **Narrow postmortem + category routes on `canWorkIncidents`** (`INCIDENT-FINISH-GATE-1`, "narrow route"): `PUT /objects/{id}/postmortem` (body `{postmortem:{…}}` → `attributes.postmortem`, the JSON blob the I1 resolution gate reads) and `PUT /objects/{id}/category` (body `{category:"…"}` → `attributes.category`). Each writes ONLY its one key, refuses any other with 422 (400 for a missing/malformed value), runs behind the scope guard, and is audited as an `OBJECT_ACTIVITY` event (`action` = the key) under `ApiContext.actor`. The postmortem panel and Accept's categorise step call them; priority / severity / assignee / tags / escalate / team / target date stay on the `canAdminister` PATCH | Resolving needs the postmortem and Accept needs a category, so without these an analyst could move an Incident but not finish it. Following the `PUT /objects/{id}/findings` precedent keeps the PATCH from becoming the analyst's catch-all. Pinned by `ControlApiIncidentFinishGateTest` (401 / 403 `business` / 200 `operations`, a foreign key → 422, and IDENTIFIED → DIAGNOSING → RESOLVED with a postmortem by an `operations` Subject) |
 | 2026-09-26 | **The SPA shows each disposition control only with the capability its route takes** (`CASE-UI-GATE-LEFTOVERS-1`): Priority, an Incident's Escalate flag, Merge, Split and the Case team / target-date fields render only with `LensService.canAdminister()`. **A comment's `author` is the signed-in Subject** on `POST /objects/{id}/comments` and `POST /notes/{kind}/{id}/comments`; the body's `author` counts only with no Subject (Personal) | A control the server refuses is a dead button; a body field must not re-attribute a Subject's words, as it may not re-attribute a lifecycle move. ⚠ Tagging still rides the PATCH and still shows to everyone — not in this call |
+| 2026-09-26 | **Typed impact on Incident and Case, one home** (WS-10, `ASSURE-IMPACT-LEDGER-1`): `attributes.impact` via `PUT /objects/{id}/impact` on `canWorkIncidents`; `outstanding` derived on read; the Findings `impactAmount` section and flat copy retired; a terminal object's impact is closed (409) | A narrow PUT follows the postmortem / category / findings precedent, where extending the PATCH would hand the analyst `canAdminister`'s fields. A stored `outstanding` drifts the first time `recovered` changes without it. Two homes for a Case's money (Findings `impactAmount` + the typed block) would disagree the day one is edited. Freezing a terminal object keeps a closed ledger closed; recoveries on an Incident are recorded after `reopen` |
 
 ### Editions
 
@@ -711,6 +731,7 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 | `IncidentAccessTest` | the narrowed seam, dry-run opens nothing |
 | `AlertServicePersistenceTest` | fired alerts persisted as objects when the module is present |
 | `ControlApiFindingsSpecTest` | `GET /findings/{type}`, the `422` value gate, frontend-only keys refused |
+| `ControlApiImpactTest` | `PUT /objects/{id}/impact`: 401 / 403 `business` (before existence-hiding) / 400 / 422 (ten invalid bodies, an Alert) / 409 `ARCHIVED` then writable after `reopen` / 404; `outstanding` derived and never stored; audit `before`/`after` under the Subject; per-currency analytics. The Personal 503 is `NoOperationalObjectsShipInThePersonalBuildTest` |
 | `ControlApiObjectsTest` · `ControlApiObjectsPageTest` · `ControlApiScopedObjectsTest` | the create contract (≥1 link, `400`/`404`), paging, SEC-7d data scopes |
 | `ControlApiNoteRoutesTest` · `ControlApiTagRoutesTest` · `TagRuleTest` · `ObjectTagProjectionTest` · `TagAssignmentCoreTest` | Annotations: notes, tags as a projection, Tag Rules |
 | `IncidentPurgeTaskTest` · `RetentionSweepSeamTest` | `retention_days` required, dry-run, legal hold, dependents first |

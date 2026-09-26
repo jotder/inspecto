@@ -13,6 +13,7 @@ import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 
 import com.gamma.config.io.ConfigCodec;
+import com.gamma.ops.Impact;
 import com.gamma.ops.ObjectQuery;
 import com.gamma.ops.ObjectService;
 import com.gamma.objects.ObjectType;
@@ -101,6 +102,10 @@ public final class ObjectRoutes implements RouteModule {
         // any other key (422); priority / severity / assignee / tags stay on the canAdminister PATCH.
         api.put("/objects/([^/]+)/postmortem", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> savePostmortem(api, e, ApiContext.name(m), api.body(e)))));
         api.put("/objects/([^/]+)/category", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> saveCategory(api, e, ApiContext.name(m), api.body(e)))));
+        // (WS-10, ASSURE-IMPACT-LEDGER-1) the typed financial impact of an Incident or Case, on canWorkIncidents like
+        // postmortem / category: recording what an Incident cost is part of finishing it. Its own narrow PUT, not
+        // the canAdminister PATCH, for the same reason those two are.
+        api.put("/objects/([^/]+)/impact", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> saveImpact(api, e, ApiContext.name(m), api.body(e)))));
         api.patch("/objects/([^/]+)", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> patchObject(api, ApiContext.name(m), api.body(e)))));
         api.get("/objects/([^/]+)", scoped(api, (e, m) -> objectById(api, ApiContext.name(m))));
         api.get("/rca/templates", (e, m) -> rcaTemplateList(api));
@@ -770,14 +775,15 @@ public final class ObjectRoutes implements RouteModule {
         }
     }
 
-    /** The flat, queryable copies of Findings values the C4 case analytics roll-up sums (no blob parsing). */
-    private static final List<String> FINDINGS_FLAT_COPIES = List.of("impactAmount", "recordsAffected");
+    /** The flat, queryable copy of a Findings value the C4 case analytics roll-up sums (no blob parsing). The
+     *  Case's money is NOT one of them: it is the typed {@link Impact} ({@code PUT /objects/{id}/impact}, WS-10). */
+    private static final List<String> FINDINGS_FLAT_COPIES = List.of("recordsAffected");
 
     /**
      * {@code PUT /objects/{id}/findings} — save a Case's Findings values; body {@code {findings:{key: scalar…}}}
      * and NOTHING else (operator 2026-09-25: open as collaboration, so it must not carry disposition). Stores
      * the object as the canonical {@code attributes.findings} blob (D3) plus the flat
-     * {@code impactAmount}/{@code recordsAffected} copies ({@code ""} when absent — the rule the panel applied
+     * {@code recordsAffected} copy ({@code ""} when absent — the rule the panel applied
      * client-side until this route took the save over), judged exactly as the PATCH judges a blob → 422.
      * A missing/non-object {@code findings} → 400; any other key, or a non-scalar value → 422; unknown or
      * out-of-scope id → 404. Audited with the request's actor ({@link ApiContext#actor} — the authenticated
@@ -837,6 +843,35 @@ public final class ObjectRoutes implements RouteModule {
         return saveAttribute(api, ex, id, CATEGORY_ATTR, category.trim());
     }
 
+    /**
+     * {@code PUT /objects/{id}/impact} — replace an Incident's or Case's typed financial impact (WS-10); body
+     * {@code {impact:{suspected?, confirmed?, recovered?, prevented?, currency?, period?, basis?}}} and NOTHING
+     * else. {@code outstanding} is derived on read and refused here. Validated by {@link Impact#fromBody} → 422
+     * (so is any other key, and an Alert or Task); a missing/non-object {@code impact} → 400; an object in its
+     * terminal state → 409; unknown or out-of-scope id → 404. Audited with {@link ApiContext#actor}, the stored
+     * value before and after.
+     */
+    private Object saveImpact(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
+        if (!(body.get(Impact.ATTR) instanceof Map<?, ?> values))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'impact' as an object");
+        onlyKey(body, Impact.ATTR);
+        Impact impact;
+        try {
+            impact = Impact.fromBody(values);
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+        }
+        try {
+            return OpsEngine.of(api).saveImpact(id, impact, ApiContext.actor(ex)).toMap();
+        } catch (NoSuchElementException notFound) {
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
+        } catch (IllegalArgumentException wrongType) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, wrongType.getMessage());
+        } catch (IllegalStateException closed) {
+            throw new ApiException(409, ErrorCodes.CONFLICT, closed.getMessage());
+        }
+    }
+
     private static final String POSTMORTEM_ATTR = "postmortem";
     private static final String CATEGORY_ATTR = "category";
 
@@ -864,7 +899,7 @@ public final class ObjectRoutes implements RouteModule {
      * <p>Only {@code attributes.findings} is judged — the JSON blob the Findings panel writes, which D3 =
      * (a) (operator 2026-09-25) made the canonical home of Findings values. A patch that carries no blob
      * does not submit the form, so nothing is judged; top-level keys (the panel's flat
-     * {@code impactAmount}/{@code recordsAffected} copies, {@code tags}, …) are ordinary attributes.
+     * {@code recordsAffected} copy, {@code tags}, …) are ordinary attributes.
      *
      * <p>Resolved here rather than in {@code ObjectService} because the spec lives in the space's
      * {@code ComponentStore}, which is an edge concern — the engine stays store-agnostic. An unknown id is

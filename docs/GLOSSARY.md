@@ -743,11 +743,13 @@ marker. ⛔ never "consolidate/combine" in UI text.
 individually, tied back by a `SPLIT_FROM` trace link; the original keeps its remaining members.
 
 **Findings** — A Case's resolution artifact (the loose, business counterpart of the Incident
-**Postmortem**): **Disposition** + impact (amount, records/customers affected) + summary. A Case
+**Postmortem**): **Disposition** + **Impact** + records affected + summary. A Case
 also carries a **Team** (`assignees`, the lead stays `assignee`) and a loose-SLA **target date**
 (overdue hint only — no breach sweep, unlike the Incident's hard `dueAt` SLA).
 
-**Findings field** — One question the Findings panel asks (Disposition, Impact amount, a desk's own
+**Impact** — The typed money an **Incident** or **Case** stands for (WS-10): **suspected · confirmed · recovered · prevented** amounts in one ISO 4217 currency, with a period and a basis. **Outstanding** = confirmed − recovered, always derived, never stored or entered. On a Case it is the impact its **Findings** carry — one home, not a Findings field of its own. ⛔ never "loss" or "exposure" for the whole block (each is one of its amounts at most); ⛔ never "Impact amount" (the retired single field).
+
+**Findings field** — One question the Findings panel asks (Disposition, Records affected, a desk's own
 "Root cause category", …). A deployment's set of them is authored by the Case desk in the Cases
 pane's *Findings fields* dialog (D9, operator 2026-09-25). On the wire and in the stored
 `findings-spec` component a Findings field is a **`section`** — that word is the wire's only.

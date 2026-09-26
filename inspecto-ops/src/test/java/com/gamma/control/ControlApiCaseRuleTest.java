@@ -109,16 +109,18 @@ class ControlApiCaseRuleTest {
     void caseAnalyticsRollup(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null)) {
             TestOpsEngine.of(c.svc).open(ObjectType.CASE, "a", "d", "HIGH", "MAJOR", null, null, "k",
-                    Map.of("category", "Security / Data / Leak", "impactAmount", "1000", "recordsAffected", "50"));
+                    Map.of("category", "Security / Data / Leak", "impact", "{\"confirmed\":\"1000\",\"recovered\":\"250\",\"currency\":\"EUR\"}", "recordsAffected", "50"));
             TestOpsEngine.of(c.svc).open(ObjectType.CASE, "b", "d", "HIGH", "LOW", null, null, "k",
-                    Map.of("category", "Pipeline / Ingest / Parse", "impactAmount", "500"));
+                    Map.of("category", "Pipeline / Ingest / Parse", "impact", "{\"confirmed\":\"500\",\"currency\":\"EUR\"}"));
 
             JsonNode a = json(send(c.port, "GET", "/objects/analytics?type=CASE", null));
             assertEquals("CASE", a.get("type").asText());
             assertEquals(2, a.get("total").asInt());
             assertEquals(2, a.get("backlog").asInt(), "both cases are non-terminal");
             assertEquals(1, a.get("byCategory").get("Security").asInt());
-            assertEquals(1500.0, a.get("impact").get("impactAmount").asDouble(), 0.001);
+            JsonNode eur = a.get("impact").get("byCurrency").get("EUR");
+            assertEquals(1500.0, eur.get("confirmed").asDouble(), 0.001);
+            assertEquals(1250.0, eur.get("outstanding").asDouble(), 0.001, "confirmed - recovered, derived");
             assertEquals(50, a.get("impact").get("recordsAffected").asLong());
             assertEquals(400, send(c.port, "GET", "/objects/analytics?type=bogus", null).statusCode());
         }

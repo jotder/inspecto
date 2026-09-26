@@ -45,7 +45,7 @@ class ObjectsAnalyticsJobTest {
     private static ObjectService seeded() {
         ObjectService svc = new ObjectService(new InMemoryObjectStore());
         svc.open(ObjectType.INCIDENT, "one", "d", "HIGH", "CRITICAL", null, null, "corr",
-                Map.of("category", "Pipeline / Ingest", "impactAmount", "150.5", "recordsAffected", "20"));
+                Map.of("category", "Pipeline / Ingest", "impact", "{\"confirmed\":\"150.5\",\"currency\":\"EUR\"}", "recordsAffected", "20"));
         svc.open(ObjectType.INCIDENT, "two", "d", "HIGH", "LOW", null, null, "corr",
                 Map.of("category", "Pipeline / Parse"));
         svc.open(ObjectType.CASE, "a case", "d", "HIGH", "LOW", null, null, "corr", Map.of());
@@ -72,7 +72,9 @@ class ObjectsAnalyticsJobTest {
         assertEquals(1d, rows.get("INCIDENT|priority|CRITICAL"));
         assertEquals(1d, rows.get("INCIDENT|priority|LOW"));
         assertEquals(2d, rows.get("INCIDENT|category|Pipeline"), "breakdown is by L1 category");
-        assertEquals(150.5d, rows.get("INCIDENT|impact|impact_amount"), "value is DOUBLE, not a count");
+        assertEquals(150.5d, rows.get("INCIDENT|impact.EUR|confirmed"), "value is DOUBLE, not a count; one axis per currency");
+        assertEquals(150.5d, rows.get("INCIDENT|impact.EUR|outstanding"), "outstanding is derived, nothing recovered");
+        assertEquals(1d, rows.get("INCIDENT|impact.EUR|count"));
         assertEquals(20d, rows.get("INCIDENT|impact|records_affected"));
         assertEquals(0d, rows.get("INCIDENT|cycle_time|count"), "nothing closed yet");
         assertEquals(0d, rows.get("INCIDENT|cycle_time|avg_ms"));

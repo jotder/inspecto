@@ -87,7 +87,7 @@ the Case** — the same posture as comments and attachments. It has its own rout
 because `PATCH /objects/{id}` also edits priority / severity / assignee and stays `canAdminister`. The route
 sits behind the SEC-7d/ABAC scope guard (out-of-scope → 404, existence-hiding), accepts **only** a `findings`
 object (any other key → 422, so it cannot be used to change a disposition), validates against the effective
-findings-spec (422), writes only `attributes.findings` + its flat `impactAmount`/`recordsAffected` copies, and
+findings-spec (422), writes only `attributes.findings` + its flat `recordsAffected` copy, and
 audits an `OBJECT_ACTIVITY` `findings` event with the authenticated Subject as actor. Recorded as a
 `collaboration` exemption in `CapabilityManifest.EXEMPTIONS`; pinned by `ControlApiFindingsWriteTest` with a
 real scoped Subject lacking `canAdminister` (200 on a visible Case, 422 on `priority`, 404 out of scope, 422

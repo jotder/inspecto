@@ -108,6 +108,7 @@ class NoOperationalObjectsShipInThePersonalBuildTest {
             {"PUT", "/objects/id47/findings"},
             {"PUT", "/objects/id49/postmortem"},
             {"PUT", "/objects/id50/category"},
+            {"PUT", "/objects/id51/impact"},
             {"PATCH", "/objects/id48"},
             {"GET", "/objects/id19"},
             {"GET", "/rca/templates"},

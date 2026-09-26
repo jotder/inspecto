@@ -62,7 +62,7 @@ class ControlApiFindingsSpecTest {
         try (Ctx c = open(dir, null)) {
             JsonNode spec = json(send(c.port, "GET", "/findings/CASE", null));
             assertEquals("case", spec.get("objectType").asText());
-            assertEquals(List.of("disposition", "impactAmount", "recordsAffected", "summary"),
+            assertEquals(List.of("disposition", "recordsAffected", "summary"),
                     keys(spec));
             assertEquals(5, spec.get("sections").get(0).get("options").size());
             assertEquals(400, send(c.port, "GET", "/findings/bogus", null).statusCode());
@@ -89,7 +89,7 @@ class ControlApiFindingsSpecTest {
             assertEquals("LOSS", authored.get("sections").get(1).get("dependsOn").get("equals").asText());
 
             // A sibling type is untouched — one spec per ObjectType.
-            assertEquals(List.of("disposition", "impactAmount", "recordsAffected", "summary"),
+            assertEquals(List.of("disposition", "recordsAffected", "summary"),
                     keys(json(send(c.port, "GET", "/findings/INCIDENT", null))));
         }
     }
@@ -134,7 +134,7 @@ class ControlApiFindingsSpecTest {
 
             HttpResponse<String> r = send(c.port, "GET", "/findings/case", null);
             assertEquals(200, r.statusCode());
-            assertEquals(List.of("disposition", "impactAmount", "recordsAffected", "summary"), keys(json(r)));
+            assertEquals(List.of("disposition", "recordsAffected", "summary"), keys(json(r)));
         }
     }
 

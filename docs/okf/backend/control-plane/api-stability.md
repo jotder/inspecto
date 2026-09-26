@@ -319,6 +319,14 @@ above the generated commit list.
   unchanged — renaming it is a separate, unmade decision.
 
 **Operator-visible behaviour**
+- **Breaking + new route (2026-09-26, WS-10 `ASSURE-IMPACT-LEDGER-1`):** `PUT /objects/{id}/impact
+  {impact:{suspected?, confirmed?, recovered?, prevented?, currency?, period?, basis?}}` (`canWorkIncidents`)
+  records an Incident's or Case's typed financial impact; every object read gains a top-level `impact` block
+  with the derived `outstanding`. **`GET /objects/analytics` `impact.impactAmount` is gone** — replaced by
+  `impact.byCurrency.<ISO 4217>` (count + four amounts + outstanding); `recordsAffected` stays. The built-in
+  Findings spec no longer has an `impactAmount` section and `PUT /objects/{id}/findings` no longer writes an
+  `impactAmount` flat copy (it writes `recordsAffected` only). The `ops_analytics` sample replaces axis
+  `impact`/key `impact_amount` with axes `impact.<ISO>`.
 - **New route (additive, 2026-09-25, operator decision — Findings values are collaboration):**
   `PUT /objects/{id}/findings {findings:{key: scalar…}}` saves a Case's Findings values, **open to anyone who
   can see the object** (the SEC-7d/ABAC scope guard still answers 404) and recorded as a `collaboration`

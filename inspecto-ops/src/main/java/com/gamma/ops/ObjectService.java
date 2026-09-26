@@ -343,6 +343,42 @@ public final class ObjectService {
         return updated;
     }
 
+    /**
+     * Replace an Incident's or Case's typed financial {@link Impact} ({@code PUT /objects/{id}/impact}, WS-10) and
+     * audit it as an {@link EventType#OBJECT_ACTIVITY} {@code impact} event carrying the stored value
+     * {@code before} and {@code after} — a ledger change must say what it changed, not only that it happened.
+     * An empty {@code impact} clears it.
+     *
+     * @throws NoSuchElementException   if no object has this id
+     * @throws IllegalArgumentException if the object is not an Incident or a Case
+     * @throws IllegalStateException    if the object is in its terminal state (ARCHIVED / CLOSED) — its books
+     *                                  are closed; reopen it first
+     */
+    public OperationalObject saveImpact(String id, Impact impact, String actor) {
+        OperationalObject obj = require(id);
+        if (!Impact.TYPES.contains(obj.objectType()))
+            throw new IllegalArgumentException("impact is recorded on an Incident or a Case, not a " + obj.objectType());
+        if (workflow(obj.objectType()).isTerminal(obj.status()))
+            throw new IllegalStateException(obj.objectType() + " " + id + " is " + obj.status()
+                    + " — its impact is closed; reopen it to change the impact");
+        String before = obj.attributes().getOrDefault(Impact.ATTR, "");
+        String after = impact.toJson();
+        OperationalObject updated = store.update(
+                obj.withAttributes(Map.of(Impact.ATTR, after), System.currentTimeMillis()));
+        EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
+                .level(EventLevel.INFO)
+                .source(SOURCE)
+                .correlationId(obj.correlationId())
+                .message(obj.objectType() + " " + id + ": impact saved" + (actor == null ? "" : " by " + actor))
+                .attr("objectId", id)
+                .attr("objectType", obj.objectType().name())
+                .attr("action", Impact.ATTR)
+                .attr("before", before)
+                .attr("after", after)
+                .attr("actor", actor));
+        return updated;
+    }
+
     /** Convenience: acknowledge an object (the {@code ack} action). */
     public OperationalObject ack(String id, String actor) {
         return transition(id, "ack", actor);
@@ -378,11 +414,11 @@ public final class ObjectService {
      * A rollup over all objects of {@code type} (C4 — the business-lens numbers): totals, backlog
      * (non-terminal count), breakdowns by status / L1-category / priority, cycle-time stats over the
      * terminal objects ({@code closedAt − createdAt}), <b>MTTR</b> over the resolved ones
-     * ({@link #ATTR_RESOLVED_AT}{@code  − createdAt} — a different number, see that constant), and impact
-     * totals summed from the flat
-     * {@code impactAmount} / {@code recordsAffected} attributes (the queryable columns the Findings
-     * form writes alongside its JSON blob). Shaped as a JSON-ready map so the UI renders it directly
-     * and a later Studio-dataset binding can read the same surface.
+     * ({@link #ATTR_RESOLVED_AT}{@code  − createdAt} — a different number, see that constant), and the
+     * typed {@link Impact} (WS-10) summed <b>per currency</b> — amounts in different currencies are never
+     * added together — with {@code outstanding} derived per object, plus {@code recordsAffected} summed from
+     * the Findings' flat copy. Shaped as a JSON-ready map so the UI renders it directly and the
+     * {@code objects.analytics} Job can sample the same surface.
      */
     public Map<String, Object> analytics(ObjectType type) {
         Workflow wf = workflow(type);
@@ -398,7 +434,7 @@ public final class ObjectService {
         int mttrCount = 0;
         long mttdSum = 0;
         int mttdCount = 0;
-        double impactAmount = 0;
+        Map<String, Map<String, Object>> impactByCurrency = new java.util.TreeMap<>();
         long recordsAffected = 0;
         for (OperationalObject o : all) {
             bump(byStatus, o.status() == null ? "UNKNOWN" : o.status().toUpperCase(java.util.Locale.ROOT));
@@ -419,7 +455,7 @@ public final class ObjectService {
                 mttdSum += o.createdAt() - occurredAt;
                 mttdCount++;
             }
-            impactAmount += parseDoubleOr(o.attributes().get("impactAmount"), 0);
+            Impact.of(o).filter(i -> i.currency() != null).ifPresent(i -> addImpact(impactByCurrency, i));
             recordsAffected += parseEpoch(o.attributes().get("recordsAffected")); // long-or-0 parse
         }
         Map<String, Object> cycle = new LinkedHashMap<>();
@@ -446,7 +482,7 @@ public final class ObjectService {
         mttd.put("definition", "occurredAt (the triggering event's own time) \u2192 created (the object was opened). "
                 + "Objects with no recorded occurrence time are excluded from the mean");
         Map<String, Object> impact = new LinkedHashMap<>();
-        impact.put("impactAmount", impactAmount);
+        impact.put("byCurrency", impactByCurrency);
         impact.put("recordsAffected", recordsAffected);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("type", type.name());
@@ -462,6 +498,24 @@ public final class ObjectService {
         return out;
     }
 
+    /** Add one object's impact to its currency's totals ({@code count} + the four amounts + outstanding). */
+    private static void addImpact(Map<String, Map<String, Object>> byCurrency, Impact i) {
+        Map<String, Object> t = byCurrency.computeIfAbsent(i.currency(), c -> {
+            Map<String, Object> z = new LinkedHashMap<>();
+            z.put("count", 0);
+            for (String a : Impact.AMOUNTS) z.put(a, java.math.BigDecimal.ZERO);
+            z.put("outstanding", java.math.BigDecimal.ZERO);
+            return z;
+        });
+        t.merge("count", 1, (a, b) -> (Integer) a + (Integer) b);
+        for (String a : Impact.AMOUNTS) addAmount(t, a, i.amount(a));
+        addAmount(t, "outstanding", i.outstanding());
+    }
+
+    private static void addAmount(Map<String, Object> totals, String key, java.math.BigDecimal v) {
+        if (v != null) totals.put(key, ((java.math.BigDecimal) totals.get(key)).add(v));
+    }
+
     private static void bump(Map<String, Integer> m, String key) {
         m.merge(key, 1, Integer::sum);
     }
@@ -471,15 +525,6 @@ public final class ObjectService {
         if (category == null || category.isBlank()) return "UNCATEGORIZED";
         int slash = category.indexOf('/');
         return (slash < 0 ? category : category.substring(0, slash)).trim();
-    }
-
-    private static double parseDoubleOr(String s, double def) {
-        if (s == null || s.isBlank()) return def;
-        try {
-            return Double.parseDouble(s.trim());
-        } catch (NumberFormatException e) {
-            return def;
-        }
     }
 
     // ── assignment, watchers ─────────────────────────────────────────────────────────

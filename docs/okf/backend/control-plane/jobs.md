@@ -188,8 +188,9 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   * **Row shape is tall** — `(sampled_at TIMESTAMP, object_type, axis, "key", value DOUBLE)` — because the
     breakdown keys (status / L1-category / priority) are open-ended, so wide columns would be unstable across
     runs and spaces. `axis` ∈ `scalar` (total/backlog) · `status` · `category` · `priority` · `cycle_time`
-    (count/avg_ms) · `impact` (impact_amount/records_affected). `value` is DOUBLE because `impactAmount`
-    isn't a count. `key` is **quoted** in the DDL — a column name deliberately kept, quoted so no dialect's
+    (count/avg_ms) · `impact` (records_affected) · `impact.<ISO 4217>` (count / suspected / confirmed /
+    recovered / prevented / outstanding — one axis per currency, WS-10). `value` is DOUBLE because an impact
+    amount isn't a count. `key` is **quoted** in the DDL — a column name deliberately kept, quoted so no dialect's
     reserved-word list can bite (cf. the `day`/`trigger` gotchas in PROJECT_NOTES).
   * **Append per run, not full-refresh swap** — the `storage_report` catalog idiom (one timestamped file,
     readers glob the dir), *not* `MaterializeTask`'s stage/atomic-swap, because the time dimension is the

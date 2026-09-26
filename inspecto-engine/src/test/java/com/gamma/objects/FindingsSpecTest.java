@@ -25,7 +25,7 @@ class FindingsSpecTest {
         FindingsSpec spec = FindingsSpec.defaultFor(ObjectType.CASE);
 
         assertEquals("case", spec.objectType());
-        assertEquals(List.of("disposition", "impactAmount", "recordsAffected", "summary"),
+        assertEquals(List.of("disposition", "recordsAffected", "summary"),
                 spec.sections().stream().map(FindingsSpec.Section::key).toList());
 
         FindingsSpec.Section disposition = spec.sections().get(0);

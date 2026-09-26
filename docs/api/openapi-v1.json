@@ -8598,6 +8598,55 @@
         "x-optional-module" : true
       }
     },
+    "/objects/{objectId}/impact" : {
+      "put" : {
+        "tags" : [ "objects" ],
+        "summary" : "Replace an Incident's or Case's typed financial impact (WS-10)",
+        "operationId" : "putObjectsByObjectIdImpact",
+        "description" : "Gated on canWorkIncidents. Body {impact:{...}} and nothing else; {} clears the impact. Amounts are non-negative decimals (number or string, at most 6 decimal places); currency is an ISO 4217 code, required when any amount is set. outstanding = confirmed - recovered is derived on read (the object's top-level impact block) and refused here. 400 missing/non-object impact; 422 invalid impact, another key, or an Alert/Task; 409 the object is in its terminal state (ARCHIVED / CLOSED); 404 unknown or out-of-scope id. Audited as an OBJECT_ACTIVITY impact event with the stored value before and after.",
+        "parameters" : [ {
+          "name" : "objectId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "impact" ],
+                "additionalProperties" : false,
+                "properties" : {
+                  "impact" : {
+                    "type" : "object",
+                    "additionalProperties" : false,
+                    "properties" : {
+                      "suspected" : { "type" : [ "number", "string" ] },
+                      "confirmed" : { "type" : [ "number", "string" ] },
+                      "recovered" : { "type" : [ "number", "string" ] },
+                      "prevented" : { "type" : [ "number", "string" ] },
+                      "currency" : { "type" : "string", "pattern" : "^[A-Za-z]{3}$" },
+                      "period" : { "type" : "string", "maxLength" : 64 },
+                      "basis" : { "type" : "string", "maxLength" : 2000 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped operational object (see #/components/schemas/Envelope); data.impact carries the four amounts, currency, period, basis and the derived outstanding."
+          }
+        },
+        "x-optional-module" : true
+      }
+    },
     "/objects/{objectId}/category" : {
       "put" : {
         "tags" : [ "objects" ],
