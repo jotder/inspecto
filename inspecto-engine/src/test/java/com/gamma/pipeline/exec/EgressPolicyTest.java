@@ -83,6 +83,20 @@ class EgressPolicyTest {
         assertThrows(IllegalArgumentException.class, () -> EgressPolicy.Allowlist.of(List.of("0x0a000000/8")));
     }
 
+    /** Round-2 finding 3: EVERY answer is checked, not only the first — one internal answer refuses the host. */
+    @Test
+    void oneDeniedAnswerAmongSeveralRefusesTheHost() throws Exception {
+        InetAddress pub = InetAddress.ofLiteral("8.8.8.8"), pub2 = InetAddress.ofLiteral("1.1.1.1");
+        InetAddress loop = InetAddress.ofLiteral("127.0.0.1");
+        EgressPolicy.Refused r = assertThrows(EgressPolicy.Refused.class, () -> EgressPolicy.resolve("tickets.example",
+                EgressPolicy.Allowlist.EMPTY, h -> new InetAddress[] {pub, loop}));
+        assertTrue(r.getMessage().contains("127.0.0.1"), r.getMessage());
+        InetAddress to = EgressPolicy.resolve("tickets.example", EgressPolicy.Allowlist.EMPTY, h -> new InetAddress[] {pub, pub2});
+        assertTrue(to.equals(pub) || to.equals(pub2), "connects to a checked answer: " + to);
+        assertThrows(EgressPolicy.Refused.class, () -> EgressPolicy.resolve("tickets.example",
+                EgressPolicy.Allowlist.EMPTY, h -> new InetAddress[0]), "no answer is a refusal");
+    }
+
     @Test
     void resolveRefusesALoopbackLiteralUnlessItsRangeIsListed() throws Exception {
         assertThrows(EgressPolicy.Refused.class, () -> EgressPolicy.resolve("127.0.0.1", EgressPolicy.Allowlist.EMPTY));

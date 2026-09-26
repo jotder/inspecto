@@ -238,15 +238,31 @@ public final class EgressPolicy {
         }
     }
 
-    /**
-     * Resolve {@code host} ONCE and check EVERY address against the policy; returns the first address, which the
-     * caller must connect to. {@link Refused} names the host, the address and its class.
-     */
+    /** Name → addresses. {@link #SYSTEM} in production; a test gives a name the answers it needs. */
+    @FunctionalInterface
+    public interface Resolver {
+        InetAddress[] resolve(String host) throws UnknownHostException;
+    }
+
+    /** The platform resolver. */
+    public static final Resolver SYSTEM = InetAddress::getAllByName;
+
+    /** {@link #resolve(String, Allowlist, Resolver)} with the {@link #SYSTEM} resolver. */
     public static InetAddress resolve(String host, Allowlist allow) throws Refused {
+        return resolve(host, allow, SYSTEM);
+    }
+
+    /**
+     * Resolve {@code host} ONCE and check EVERY address against the policy — one denied answer refuses the whole
+     * host, since the platform may connect to any of them; returns the first (checked) address, which the caller
+     * must connect to. {@link Refused} names the host, the address and its class.
+     */
+    public static InetAddress resolve(String host, Allowlist allow, Resolver resolver) throws Refused {
         String bare = host.startsWith("[") ? host.substring(1, host.length() - 1) : host;
         InetAddress[] all;
         try {
-            all = InetAddress.getAllByName(bare);
+            all = resolver.resolve(bare);
+            if (all == null || all.length == 0) throw new UnknownHostException(bare);
         } catch (UnknownHostException e) {
             throw new Refused("the host '" + host + "' does not resolve");
         }

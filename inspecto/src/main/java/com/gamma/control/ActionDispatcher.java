@@ -55,6 +55,8 @@ final class ActionDispatcher {
     static volatile Executor executor = Executors.newVirtualThreadPerTaskExecutor();
     /** The outbound wire — the edition's transport; a test swaps in its own. */
     static volatile Supplier<WebhookSinkTransport> transport = WebhookSink::discoveredTransport;
+    /** Name resolution for the egress check — the platform's; a test gives its target a name and an address. */
+    static volatile EgressPolicy.Resolver resolver = EgressPolicy.SYSTEM;
 
     private ActionDispatcher() {}
 
@@ -161,7 +163,7 @@ final class ActionDispatcher {
             try {
                 // Resolve ONCE per attempt and check EVERY address; the wire connects to the checked one.
                 java.net.InetAddress to = EgressPolicy.resolve(endpoint.url().getHost().replaceAll("^\\[|\\]$", ""),
-                        EgressRoutes.allowlist(root));
+                        EgressRoutes.allowlist(root), resolver);
                 address = to.getHostAddress();
                 r = wire.exchange(method, endpoint.url(), to, endpoint.bearerToken(), endpoint.timeout(), json,
                         Map.of(IDEMPOTENCY_HEADER, key), ActionRequests.EXCERPT_CAP);
