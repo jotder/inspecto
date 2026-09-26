@@ -54,7 +54,7 @@ import java.util.regex.Pattern;
  */
 public final class EntityListRoutes implements RouteModule {
 
-    private static final Pattern LIST_ID = Pattern.compile("^[a-z0-9][a-z0-9_-]{0,63}$");
+    static final Pattern LIST_ID = Pattern.compile("^[a-z0-9][a-z0-9_-]{0,63}$");
     private static final List<String> PURPOSES = List.of("allow", "block", "watch", "exclusion");
     private static final int MAX_VALUES = 5_000;
     private static final int MAX_REASON = 1_000;
@@ -207,7 +207,7 @@ public final class EntityListRoutes implements RouteModule {
 
     // ── helpers ────────────────────────────────────────────────────────────────────────────────────────
 
-    private static EntityFactLog.Log read(EntityFactLog log) throws IOException {
+    static EntityFactLog.Log read(EntityFactLog log) throws IOException {
         try {
             return log.read();
         } catch (EntityFactLog.BrokenChainException broken) {
@@ -269,7 +269,7 @@ public final class EntityListRoutes implements RouteModule {
         return out;
     }
 
-    private static Optional<EntityTypes.EntityType> type(Path root, String id) {
+    static Optional<EntityTypes.EntityType> type(Path root, String id) {
         return LinkAnalysisSettings.forRoot(root).effectiveEntityTypes().stream().filter(t -> t.id().equals(id)).findFirst();
     }
 

@@ -168,9 +168,19 @@ export interface BranchingPatternResult {
 
 // ── LA-10: the Investigation object (`InvestigationRoutes`) ──────────────────────────────────────────────
 
-/** The seven ops the backend evaluates (`InvestigationRoutes.SHIPPED`). `seedBy`, `excludeBy`, `threshold` and
- *  `snapshot` are in the closed vocabulary but answer 422 "not implemented yet" — never offer them. */
-export type InvestigationOpName = 'seed' | 'expand' | 'exclude' | 'hide' | 'keep' | 'window' | 'annotate';
+/** The ops the backend evaluates (`InvestigationRoutes.SHIPPED`), plus LA-17's list-bound `excludeBy` / `seedBy`
+ *  (entity-model design §4.4.1). `threshold` and `snapshot` are in the closed vocabulary but answer 422 "not
+ *  implemented yet" — never offer them. */
+export type InvestigationOpName =
+    | 'seed'
+    | 'expand'
+    | 'exclude'
+    | 'hide'
+    | 'keep'
+    | 'window'
+    | 'annotate'
+    | 'excludeBy'
+    | 'seedBy';
 
 /** A rung's traversal direction (plan §2.4; `InvestigationRoutes.DIRECTIONS`). */
 export type ExpandDirection = 'either' | 'out' | 'in' | 'reciprocal';
@@ -252,7 +262,11 @@ export type InvestigationOpRequest =
     | { op: 'hide' | 'keep'; ids: string[] }
     /** LA-19: `note` ≤ 2000 chars; every id must be in the Working Set. ⛔ Never send `confidence` — its scale is
      *  undecided (D-U9) and the server refuses it with 422. */
-    | { op: 'annotate'; ids: string[]; note: string };
+    | { op: 'annotate'; ids: string[]; note: string }
+    /** LA-17 (§4.4.1): resolved at the Entity List's HEAD and sealed in the log — replay never re-reads the list.
+     *  Refused at append: unknown list 404 · retired list / its Entity Type not in force 409 · over 5 000 members 422. */
+    | { op: 'excludeBy'; listId: string; reason: string }
+    | { op: 'seedBy'; listId: string };
 
 /** What one step changed. Link changes are COUNTS only — the links themselves come from `/replay`. */
 export interface WorkingSetDelta {
@@ -280,10 +294,40 @@ export interface InvestigationStepResult {
     delta: WorkingSetDelta;
     /** True when this step's expand hit its row limit — the Working Set is then incomplete. */
     truncated: boolean;
-    /** On `exclude`: the ids a prior `keep` protected, so they were NOT excluded. */
+    /** On `exclude` / `excludeBy`: the ids a prior `keep` protected, so they were NOT excluded. */
     protected?: string[];
     read?: { rowCount: number; fingerprint: string; readAt: string };
     workingSet: WorkingSetSummary;
+    /** LA-17 `excludeBy` / `seedBy`: what the step resolved and did (§4.4.1). */
+    list?: EntityListStepReport;
+}
+
+/**
+ * What a list-bound op's step reports (§4.4.1; field names read off the in-flight `InvestigationRoutes.listResult`,
+ * which §4.4.1 does not name). Every field is optional — the SPA degrades to the log's own text line.
+ */
+export interface EntityListStepReport {
+    listId: string;
+    /** The fact-log position the list was resolved at — replay is pinned to it. */
+    atSeq?: number;
+    headHash?: string | null;
+    entityType?: string;
+    purpose?: EntityListPurpose;
+    /** How many members were sealed (a COUNT — the members themselves are never echoed for display). */
+    members?: number;
+    /** `excludeBy`: how many entities the step removed. */
+    removed?: number;
+    /** `seedBy`: how many raw ids the step seeded. */
+    seeded?: number;
+    /** Members that matched no entity (`excludeBy`) or no value of the bound columns (`seedBy`) — reported, not an
+     *  error. The backend may answer the keys or a count; the SPA only ever COUNTS them (see `unmatchedCount`). */
+    unmatched?: number | string[];
+}
+
+/** How many members a list op left unmatched, whichever shape the server answered. */
+export function unmatchedCount(r: EntityListStepReport | null | undefined): number {
+    const u = r?.unmatched;
+    return Array.isArray(u) ? u.length : (u ?? 0);
 }
 
 export interface InvestigationForkRequest {
@@ -380,7 +424,7 @@ export interface InvestigationLogEntry {
     at: string;
     op?: InvestigationOpName;
     /** The op's validated params: an expand's rung arrives resolved (defaults filled); a `window` op has no ids. */
-    params?: { ids?: string[]; entityType?: string | null; reason?: string; note?: string } & Omit<
+    params?: { ids?: string[]; entityType?: string | null; reason?: string; note?: string; listId?: string } & Omit<
         ExpandRung,
         'window'
     > & {

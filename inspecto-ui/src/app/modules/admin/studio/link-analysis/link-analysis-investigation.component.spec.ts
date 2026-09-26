@@ -4,7 +4,15 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { InvService, InvestigationCoverage, InvestigationLog, WorkingSet } from 'app/inspecto/api';
+import {
+    InvService,
+    InvestigationCoverage,
+    InvestigationLog,
+    LensService,
+    SessionService,
+    WorkingSet,
+} from 'app/inspecto/api';
+import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
 import { EntityProjection } from 'app/inspecto/graph';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -110,6 +118,8 @@ function create() {
         ),
         investigationCoverage: vi.fn(() => of(COVERAGE)),
         investigationMeasures: vi.fn(() => of({ head: { step: 2, workingSetHash: 'sha256:h2' }, measures: [] })),
+        // LA-17: the hosted Entity Lists section reads the Space's lists on creation.
+        listEntityLists: vi.fn(() => of({ lists: [], headSeq: 0, headHash: null })),
     };
     const widgets = { save: vi.fn((w: Widget) => of(w)) };
     TestBed.configureTestingModule({
@@ -119,6 +129,9 @@ function create() {
             InvestigationSessionStore,
             { provide: InvService, useValue: inv },
             { provide: WidgetsService, useValue: widgets },
+            { provide: SessionService, useValue: { geoLinkEnabled: signal(true) } },
+            { provide: LensService, useValue: { canManageIncidents: signal(true) } },
+            { provide: LinkAnalysisSettingsService, useValue: { limits: signal({ entityTypesInForce: [] }) } },
             // the data-table's real theme service walks up to GAMMA_APP_CONFIG — stub it, as its own spec does
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
         ],

@@ -33,6 +33,7 @@ import { RELATION_NOUN, pinBinding } from './working-set-widget';
 import { buildWidget } from '../widgets/widget-types';
 import { WidgetsService } from '../widgets/widgets.service';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
+import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
 import { LinkAnalysisTemplateMeasuresComponent } from './link-analysis-template-measures.component';
 import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set-rows.component';
 
@@ -40,7 +41,8 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
  * **Link Analysis — Investigation panel** (LA-10, SPA half). The right dock's Investigation tab: start an
  * Investigation over the current Entity/Link mapping, act on canvas entities with the five shipped ops, read
  * the ordered op log, undo, replay with a drift check, and re-order the steps into a FORK (D-E4). All state
- * lives in {@link InvestigationSessionStore}; this component is the view over it.
+ * lives in {@link InvestigationSessionStore}; this component is the view over it. The LA-17 Entity Lists section
+ * ({@link LinkAnalysisEntityListsComponent}) renders in both states — `excludeBy`/`seedBy` only while one is open.
  */
 @Component({
     selector: 'inspecto-link-analysis-investigation',
@@ -59,6 +61,7 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         LinkAnalysisDossierComponent,
+        LinkAnalysisEntityListsComponent,
         LinkAnalysisTemplateMeasuresComponent,
         LinkAnalysisWorkingSetRowsComponent,
     ],

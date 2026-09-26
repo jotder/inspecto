@@ -3,6 +3,7 @@ package com.gamma.geolink;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ComponentAccess;
+import com.gamma.control.EntityTypes;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.RowScope;
@@ -34,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.UnaryOperator;
@@ -51,8 +53,10 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  *   <li>{@code POST /inv/investigations} — create, bound to {@code {dataset, sourceCol, targetCol, linkKindCol?,
  *       timeCol?, timeColZone?}}.</li>
  *   <li>{@code POST /inv/investigations/{id}/ops} — append one op ({@code seed · expand · exclude · hide · keep ·
- *       window}); answers the Working Set DELTA and {@code truncated}. An {@code expand} is one hop-ladder rung
- *       (LA-13, plan §2.4) — see {@link #expandParams}.</li>
+ *       window · annotate · excludeBy · seedBy}); answers the Working Set DELTA and {@code truncated}. An
+ *       {@code expand} is one hop-ladder rung (LA-13, plan §2.4) — see {@link #expandParams}. The two Entity List
+ *       ops (LA-17) SEAL the list as it stands at the fact log's head — see {@link #sealList} and
+ *       {@link #seedRead}.</li>
  *   <li>{@code POST /inv/investigations/{id}/undo} — real undo: a log edit that reverts the latest op.</li>
  *   <li>{@code POST /inv/investigations/{id}/reorder} — re-ordering FORKS (D-E4): a new Investigation with explicit
  *       parent lineage; the original log, its Working Sets and any Artifact anchored to them are untouched.</li>
@@ -98,10 +102,17 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
 public final class InvestigationRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    /** The seven ops evaluated so far (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate}). */
-    private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window", "annotate");
+    /** The nine ops evaluated so far (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's two). */
+    private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window", "annotate",
+            "excludeBy", "seedBy");
+    /** The ops over a named Entity List (LA-17, design §4.4.1): they carry {@code listId}, never ids. */
+    static final Set<String> LIST_OPS = Set.of("excludeBy", "seedBy");
     /** The rest of the closed vocabulary (plan §2.2): named so they refuse as "not yet", never as "unknown". */
-    private static final Set<String> DEFERRED = Set.of("seedBy", "excludeBy", "threshold", "snapshot");
+    private static final Set<String> DEFERRED = Set.of("threshold", "snapshot");
+    /** A list op seals at most this many members (design §4.4.1: bounded like every other op payload). */
+    private static final int MAX_LIST_MEMBERS = 5_000;
+    /** {@code seedBy} reads at most this many distinct values per bound column — the {@code InvRoutes} row cap. */
+    static final int SEED_BY_DISTINCT_CAP = 20_000;
     /** An {@code expand} rung's traversal direction (plan §2.4). */
     private static final List<String> DIRECTIONS = List.of("either", "out", "in", "reciprocal");
     private static final int MAX_IDS = 1_000;
@@ -213,7 +224,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (op == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'op'");
         if (DEFERRED.contains(op))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is in the closed vocabulary but not implemented yet (LA-10 "
-                    + "LA-13 and LA-19 ship seed, expand, exclude, hide, keep, window, annotate)");
+                    + "LA-13, LA-19 and LA-17 ship seed, expand, exclude, hide, keep, window, annotate, excludeBy, seedBy)");
         if (!SHIPPED.contains(op))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is not in the closed op vocabulary");
         Map<String, Object> params = params(op, resolvePseudonyms(inv, body));
@@ -232,6 +243,11 @@ public final class InvestigationRoutes implements RouteModule {
             Map<String, Object> entry = entry(step, "op", ex);
             entry.put("op", op);
             entry.put("params", params);
+            if (LIST_OPS.contains(op)) {
+                Map<String, Object> list = sealList(inv.writeRoot(), String.valueOf(params.get("listId")), "");
+                entry.put("list", list);
+                if (op.equals("seedBy")) entry.put("read", seedRead(api, ex, inv, list));
+            }
             if (op.equals("expand")) {
                 List<String> frontier = ids.isEmpty() ? new ArrayList<>(before.entities.keySet()) : sorted(ids);
                 if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand — the Working Set is empty");
@@ -316,6 +332,10 @@ public final class InvestigationRoutes implements RouteModule {
             e.put("params", orig.get("params"));
             e.put("derivedFrom", Map.of("investigation", parent.id(), "step", from));
             if (orig.get("approval") != null) e.put("approval", orig.get("approval"));   // D-U7: approved in the parent
+            // LA-17: a list op keeps the list it sealed (a fork re-orders the method, it does not re-resolve it), and a
+            // seedBy's read — a DISTINCT over the whole Dataset — does not depend on the order, so it travels too.
+            if (orig.get("list") != null) e.put("list", orig.get("list"));
+            if ("seedBy".equals(orig.get("op"))) e.put("read", orig.get("read"));
             if ("expand".equals(orig.get("op"))) {
                 @SuppressWarnings("unchecked") Map<String, Object> p = (Map<String, Object>) orig.get("params");
                 List<String> named = strings(p.get("ids"));
@@ -405,6 +425,11 @@ public final class InvestigationRoutes implements RouteModule {
             requireBindings(h, op, params, "template step " + step + ": ");
             e.put("params", params);
             e.put("derivedFrom", body.get("derivedFrom"));
+            if (LIST_OPS.contains(op)) {   // LA-17: re-resolved at THIS moment's head — the method travels, not the membership
+                Map<String, Object> list = sealList(writeRoot, String.valueOf(params.get("listId")), "template step " + step + ": ");
+                e.put("list", list);
+                if (op.equals("seedBy")) e.put("read", seedRead(api, ex, inv, list));
+            }
             if (op.equals("expand")) {
                 List<String> frontier = new ArrayList<>(state.entities.keySet());
                 if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " expands an empty Working Set");
@@ -520,6 +545,9 @@ public final class InvestigationRoutes implements RouteModule {
             if ("undo".equals(e.get("kind")))
                 undoneBy.put(((Number) e.get("undoes")).intValue(), ((Number) e.get("step")).intValue());
         List<Map<String, Object>> entries = new ArrayList<>();
+        // How many entities each excludeBy removed is a property of the state it ran on, not of its log line.
+        List<Integer> counts = log.stream().anyMatch(e -> "excludeBy".equals(e.get("op")))
+                ? InvestigationEvaluator.entityCounts(log) : List.of();
         for (Map<String, Object> e : log.subList(0, Math.min(limit, log.size()))) {
             int step = ((Number) e.get("step")).intValue();
             Map<String, Object> out = new LinkedHashMap<>(e);
@@ -529,8 +557,11 @@ public final class InvestigationRoutes implements RouteModule {
                     summary.put(k, r.get(k));
                 out.put("read", summary);
             }
+            if (e.get("list") instanceof Map<?, ?> l) out.put("list", listSummary(l));   // ...and so do the sealed members
+            Integer removed = "excludeBy".equals(e.get("op"))
+                    ? (step == 1 ? 0 : counts.get(step - 2)) - counts.get(step - 1) : null;
             out.put("undoneBy", undoneBy.get(step));
-            out.put("text", step + ". " + render(e) + (undoneBy.containsKey(step)
+            out.put("text", step + ". " + render(e, removed) + (undoneBy.containsKey(step)
                     ? " (undone by step " + undoneBy.get(step) + ")" : ""));
             entries.add(out);
         }
@@ -568,6 +599,8 @@ public final class InvestigationRoutes implements RouteModule {
                     b.attr("investigationId", inv.id()).attr("step", step).attr("op", op);
                     if (read != null) b.attr("dataset", read.get("dataset")).attr("rows", read.get("rowCount"))
                             .attr("truncated", truncated).attr("fingerprint", read.get("fingerprint"));
+                    // LA-17: which list, at which fact — never its members (as ENTITY_LIST_CHANGED carries counts).
+                    if (e.get("list") instanceof Map<?, ?> l) b.attr("listId", l.get("listId")).attr("atSeq", l.get("atSeq"));
                     return b;
                 });
 
@@ -582,6 +615,7 @@ public final class InvestigationRoutes implements RouteModule {
             for (String i : strings(((Map<?, ?>) e.get("params")).get("ids"))) if (before.kept.contains(i)) kept.add(i);
             out.put("protected", kept);
         }
+        if (e.get("list") instanceof Map<?, ?> l) out.putAll(listResult(op, l, e, before, after));
         if (read != null) {
             Map<String, Object> r = new LinkedHashMap<>();
             r.put("rowCount", read.get("rowCount"));
@@ -768,6 +802,135 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /**
+     * LA-17 (design §4.4.1) — resolve Entity List {@code listId} at the identity fact log's HEAD and seal it:
+     * {@code {listId, atSeq, headHash, entityType, normaliser, purpose, masked, members[]}}, the members as they are now, so
+     * replay never re-reads the list. Refusals, in order: unknown list 404 · retired 409 · its Entity Type no longer
+     * in force 409 · more than {@link #MAX_LIST_MEMBERS} members 422. A broken fact chain is a 500.
+     */
+    private static Map<String, Object> sealList(Path writeRoot, String listId, String where) throws IOException {
+        EntityFactLog.Log head = EntityListRoutes.read(new EntityFactLog(writeRoot));
+        EntityRegistry.EntityList l = EntityRegistry.fold(head.facts(), head.headSeq()).get(listId);
+        if (l == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, where + "entity list '" + listId + "' not found");
+        if (l.retired()) throw new ApiException(409, ErrorCodes.CONFLICT, where + "entity list '" + listId + "' is retired");
+        EntityTypes.EntityType type = EntityListRoutes.type(writeRoot, l.entityType()).orElseThrow(() -> new ApiException(409,
+                ErrorCodes.CONFLICT, where + "entity list '" + listId + "' is of Entity Type '" + l.entityType()
+                        + "', which is no longer in force"));
+        if (l.members().size() > MAX_LIST_MEMBERS)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "entity list '" + listId + "' has "
+                    + l.members().size() + " members; a list op seals at most " + MAX_LIST_MEMBERS);
+        Map<String, Object> sealed = new LinkedHashMap<>();
+        sealed.put("listId", listId);
+        sealed.put("atSeq", head.headSeq());
+        sealed.put("headHash", head.headHash());
+        sealed.put("entityType", l.entityType());
+        sealed.put("normaliser", type.normaliser());
+        sealed.put("purpose", l.purpose());
+        sealed.put("masked", type.masked());   // the type's masking flag AS SEALED — EntityMasking reads only the log
+        sealed.put("members", new ArrayList<>(l.members()));
+        return sealed;
+    }
+
+    /**
+     * The sealed read behind a {@code seedBy} (design §4.4.1): the DISTINCT values of the bound {@code sourceCol} and
+     * {@code targetCol} over the Investigation's Dataset (R3 gate on the read, as {@link #read}), normalised in Java
+     * with the sealed list's normaliser, keeping the RAW values whose key is a member. Shaped like an expand's read —
+     * {@code {dataset, readAt, query, ids[], rowCount, fingerprint}}, the fingerprint over the ids — so the Dossier's
+     * integrity check covers it. Above {@link #SEED_BY_DISTINCT_CAP} distinct values in a column → 422, never a sample.
+     */
+    private Map<String, Object> seedRead(ApiContext api, HttpExchange ex, Inv inv, Map<String, Object> list) {
+        String dataset = inv.dataset();
+        String relationSql = InvRoutes.relationFor(api, ex, inv.writeRoot(), dataset);   // R3 gate on EVERY read
+        String normaliser = String.valueOf(list.get("normaliser"));
+        Set<String> members = new HashSet<>(strings(list.get("members")));
+        List<String> columns = new ArrayList<>(new LinkedHashSet<>(List.of(
+                String.valueOf(inv.header().get("sourceCol")), String.valueOf(inv.header().get("targetCol")))));
+        TreeSet<String> ids = new TreeSet<>();
+        for (String col : columns)
+            for (String v : distinctValues(dataset, relationSql, col, SEED_BY_DISTINCT_CAP))
+                if (members.contains(EntityTypes.normalise(normaliser, v))) ids.add(v);
+        Map<String, Object> query = new LinkedHashMap<>();
+        query.put("columns", columns);
+        query.put("distinctCap", SEED_BY_DISTINCT_CAP);
+        List<String> sealed = new ArrayList<>(ids);
+        Map<String, Object> read = new LinkedHashMap<>();
+        read.put("dataset", dataset);
+        read.put("readAt", Instant.now().toString());   // weak provenance — NOT a replay pin (D-E3)
+        read.put("query", query);
+        read.put("ids", sealed);
+        read.put("rowCount", sealed.size());
+        read.put("fingerprint", InvestigationEvaluator.sha256(canonical(sealed)));
+        return read;
+    }
+
+    /**
+     * The distinct non-null values of {@code col} (a validated header identifier) as text, at most {@code cap} —
+     * more is a 422 naming the cap. No value is ever inlined: the statement carries identifiers only.
+     */
+    static List<String> distinctValues(String dataset, String relationSql, String col, int cap) {
+        String c = SqlIdent.q(col);
+        String sql = "SELECT DISTINCT CAST(" + c + " AS VARCHAR) AS v FROM " + SqlIdent.q(dataset) + " WHERE " + c + " IS NOT NULL";
+        QueryExecutor.Result r;
+        try {
+            r = QueryExecutor.run(new QueryExecutor.Request(dataset, relationSql, sql, cap, 0, List.of(), List.of()));
+        } catch (SQLException | IOException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "seedBy over dataset '" + dataset + "' failed: " + e.getMessage());
+        }
+        if (r.truncated())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "seedBy reads at most " + cap + " distinct values per "
+                    + "column, and column '" + col + "' of dataset '" + dataset + "' has more — never a silent sample; "
+                    + "narrow the Dataset or seed the ids explicitly");
+        List<String> out = new ArrayList<>(r.rows().size());
+        for (Map<String, Object> row : r.rows()) out.add(String.valueOf(row.get("v")));
+        return out;
+    }
+
+    /** A sealed list as the log view shows it: everything but the members, which it counts (as the rows stay out). */
+    private static Map<String, Object> listSummary(Map<?, ?> l) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (var e : l.entrySet()) if (!"members".equals(e.getKey())) out.put(String.valueOf(e.getKey()), e.getValue());
+        out.put("size", strings(l.get("members")).size());
+        return out;
+    }
+
+    /**
+     * What a list op's step reports (design §4.4.1): the list it sealed, and — {@code excludeBy} — how many entities
+     * it removed, the kept ones it could not ({@code protected}) and the members that matched no admitted entity;
+     * {@code seedBy} — how many ids it seeded and the members that matched no value of the bound columns.
+     */
+    private static Map<String, Object> listResult(String op, Map<?, ?> l, Map<String, Object> e,
+                                                  InvestigationEvaluator.State before, InvestigationEvaluator.State after) {
+        String normaliser = String.valueOf(l.get("normaliser"));
+        List<String> members = strings(l.get("members"));
+        Set<String> matched = new HashSet<>();
+        Map<String, Object> list = new LinkedHashMap<>();
+        for (String k : List.of("listId", "atSeq", "headHash", "entityType", "purpose")) list.put(k, l.get(k));
+        list.put("members", members.size());
+        Map<String, Object> out = new LinkedHashMap<>();
+        if ("excludeBy".equals(op)) {
+            List<String> kept = new ArrayList<>();
+            for (String id : before.entities.keySet()) {
+                String key = EntityTypes.normalise(normaliser, id);
+                if (!members.contains(key)) continue;
+                matched.add(key);
+                if (before.kept.contains(id)) kept.add(id);
+            }
+            int removed = 0;
+            for (String id : before.entities.keySet()) if (!after.entities.containsKey(id)) removed++;
+            list.put("removed", removed);
+            out.put("protected", kept);
+        } else {
+            @SuppressWarnings("unchecked") List<String> ids = strings(((Map<String, Object>) e.get("read")).get("ids"));
+            for (String id : ids) matched.add(EntityTypes.normalise(normaliser, id));
+            list.put("seeded", ids.size());
+        }
+        List<String> unmatched = new ArrayList<>();
+        for (String m : members) if (!matched.contains(m)) unmatched.add(m);
+        list.put("unmatched", unmatched);
+        out.put("list", list);
+        return out;
+    }
+
+    /**
      * The bindings an op needs from the Investigation's header, checked at append (and at template
      * instantiation): {@code linkKinds} needs a link-kind column; a window, or {@code minDistinctDays}, needs a
      * time column.
@@ -785,6 +948,17 @@ public final class InvestigationRoutes implements RouteModule {
     /** Validate and normalise one op's parameters (422 on anything malformed). */
     private static Map<String, Object> params(String op, Map<String, Object> body) {
         Map<String, Object> p = new LinkedHashMap<>();
+        if (LIST_OPS.contains(op)) {   // LA-17: over a named Entity List, which the append seals — never over ids
+            if (body.containsKey("ids"))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + op + "' names an Entity List, not ids — send 'listId'");
+            String listId = ApiContext.str(body, "listId");
+            if (listId == null || !EntityListRoutes.LIST_ID.matcher(listId).matches())
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + op + "' requires 'listId', an Entity List id matching "
+                        + EntityListRoutes.LIST_ID.pattern());
+            p.put("listId", listId);
+            if (op.equals("excludeBy")) p.put("reason", exclusionReason(body, op));
+            return p;
+        }
         if (op.equals("window")) {   // no ids: an intensional op over time, not over entities
             Object w = body.get("window");
             if (w == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'window' requires 'window': an object, or \"full\" to clear it");
@@ -810,13 +984,7 @@ public final class InvestigationRoutes implements RouteModule {
                 p.put("entityType", type);
             }
             case "expand" -> expandParams(body, p);
-            case "exclude" -> {
-                String reason = ApiContext.str(body, "reason");
-                if (reason == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'exclude' requires a 'reason' — an exclusion "
-                        + "without one cannot be challenged");
-                if (reason.length() > 200) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reason' is at most 200 chars");
-                p.put("reason", reason);
-            }
+            case "exclude" -> p.put("reason", exclusionReason(body, op));
             case "annotate" -> {
                 String note = ApiContext.str(body, "note");
                 if (note == null || note.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'annotate' requires a 'note'");
@@ -830,6 +998,15 @@ public final class InvestigationRoutes implements RouteModule {
             default -> { }
         }
         return p;
+    }
+
+    /** An exclusion's required reason ({@code exclude}, {@code excludeBy}): one without it cannot be challenged. */
+    private static String exclusionReason(Map<String, Object> body, String op) {
+        String reason = ApiContext.str(body, "reason");
+        if (reason == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + op + "' requires a 'reason' — an exclusion "
+                + "without one cannot be challenged");
+        if (reason.length() > 200) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reason' is at most 200 chars");
+        return reason;
     }
 
     /**
@@ -910,9 +1087,12 @@ public final class InvestigationRoutes implements RouteModule {
         return z;
     }
 
-    /** The plain-language line for one step (plan §2.7: every op, including exclusions, with its reason). */
+    /**
+     * The plain-language line for one step (plan §2.7: every op, including exclusions, with its reason). {@code removed}
+     * is how many entities an {@code excludeBy} removed — a property of the state it ran on — and null otherwise.
+     */
     @SuppressWarnings("unchecked")
-    private static String render(Map<String, Object> e) {
+    private static String render(Map<String, Object> e, Integer removed) {
         if ("undo".equals(e.get("kind"))) return "Undid step " + e.get("undoes") + ".";
         Map<String, Object> p = (Map<String, Object>) e.get("params");
         List<String> ids = strings(p.get("ids"));
@@ -939,8 +1119,25 @@ public final class InvestigationRoutes implements RouteModule {
             case "hide" -> "Hid " + list(ids) + " from display (still traversed and counted).";
             case "keep" -> "Kept " + list(ids) + " (protected from later exclusion).";
             case "annotate" -> "Annotated " + list(ids) + gradeClause(p) + ": \"" + p.get("note") + "\"";
+            case "excludeBy" -> "Excluded " + removed + " entit" + (removed != null && removed == 1 ? "y" : "ies")
+                    + " on " + listClause(e) + " (reason: " + p.get("reason") + ").";
+            case "seedBy" -> {
+                Map<String, Object> r = (Map<String, Object>) e.get("read");
+                int n = strings(r.get("ids")).size();
+                yield "Seeded " + n + " entit" + (n == 1 ? "y" : "ies") + " of type "
+                        + ((Map<String, Object>) e.get("list")).get("entityType") + " from " + listClause(e)
+                        + " — the values of " + r.get("dataset") + " whose key is a member.";
+            }
             default -> "Applied " + e.get("op") + ".";
         };
+    }
+
+    /** {@code "Entity List `known-mules` (exclusion, 40 members, as of fact 17)"} — the sealed list a list op names. */
+    static String listClause(Map<String, Object> e) {
+        Map<?, ?> l = (Map<?, ?>) e.get("list");
+        int n = strings(l.get("members")).size();
+        return "Entity List `" + l.get("listId") + "` (" + l.get("purpose") + ", " + n + " member" + (n == 1 ? "" : "s")
+                + ", as of fact " + l.get("atSeq") + ")";
     }
 
     /** {@code " graded B2 (source usually reliable, information probably true)"} — empty when ungraded (D-U9). */

@@ -7,6 +7,8 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import com.gamma.control.EntityTypes;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -23,7 +25,7 @@ import java.util.TreeSet;
  * carries its SEALED read (the materialised rows, decision D-E3), so evaluating a log is a function of the log
  * alone and replays identically on any day, against any data.
  *
- * <p>The op semantics (plan §2.3), for the five ops this first slice ships:
+ * <p>The op semantics (plan §2.3), for the nine ops shipped so far:
  * <ul>
  *   <li>{@code seed {ids, entityType?}} — admits each id at hop 0 as its own seed. An already-admitted id keeps
  *       its original provenance; an EXCLUDED id is re-admitted, because a later explicit analyst op wins.</li>
@@ -43,6 +45,15 @@ import java.util.TreeSet;
  *       It re-filters nothing already admitted: a sealed row is a folded count with no timestamps left in it, and
  *       an earlier step's read is evidence as it was made. Each expand's rows are already in-window (the route
  *       resolves the window into the read), so the evaluator needs nothing more than to carry it.</li>
+ *   <li>{@code excludeBy {listId, reason}} (LA-17) — over the Entity List SEALED into the entry at append
+ *       ({@code list: {normaliser, members[], …}}; replay never re-reads the list). Members are normalised KEYS and
+ *       ids are raw column values, so an entity matches when {@code EntityTypes.normalise(normaliser, id)} is a
+ *       member. Every matching admitted entity is excluded exactly as {@code exclude} would (kept ones are
+ *       protected), and the member keys are remembered per normaliser, so a later {@code expand} never admits an
+ *       entity that matches them. An entity already in the Working Set is not blocked by a remembered key — only
+ *       an explicit later {@code seed}/{@code seedBy} or a {@code keep} can have put it there.</li>
+ *   <li>{@code seedBy {listId}} (LA-17) — seeds the SEALED {@code read.ids} (the raw values the route found
+ *       normalising to a member) exactly as {@code seed} does, with {@code entityType} = the list's type.</li>
  * </ul>
  * An {@code undo} log entry is NOT a vocabulary op — it is a log edit, recorded append-only, naming the step it
  * reverts. Undo always targets the latest effective op, so skipping undone steps is exactly equivalent to
@@ -83,6 +94,16 @@ final class InvestigationEvaluator {
         final TreeMap<String, List<Annotation>> annotations = new TreeMap<>();
         /** The window the latest {@code window} op set (LA-13), inherited by later expands; null = the full range. */
         Map<String, Object> window;
+        /** Entity List keys an {@code excludeBy} excluded (LA-17): normaliser → key → the step that excluded it. */
+        final TreeMap<String, TreeMap<String, Integer>> excludedKeys = new TreeMap<>();
+
+        /** Whether {@code id} is NOT in the Working Set and normalises to a key an {@code excludeBy} excluded. */
+        boolean blockedByKey(String id) {
+            if (excludedKeys.isEmpty() || entities.containsKey(id)) return false;
+            for (var k : excludedKeys.entrySet())
+                if (k.getValue().containsKey(EntityTypes.normalise(k.getKey(), id))) return true;
+            return false;
+        }
 
         /** The canonical, response-shaped view of this state. */
         Map<String, Object> toMap() {
@@ -136,6 +157,19 @@ final class InvestigationEvaluator {
                         as.add(m);
                     }
                 out.put("annotations", as);
+            }
+            // Only when present (LA-17): a state no excludeBy touched hashes exactly as it did before.
+            if (!excludedKeys.isEmpty()) {
+                List<Map<String, Object>> ks = new ArrayList<>();
+                for (var n : excludedKeys.entrySet())
+                    for (var k : n.getValue().entrySet()) {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("normaliser", n.getKey());
+                        m.put("key", k.getKey());
+                        m.put("step", k.getValue());
+                        ks.add(m);
+                    }
+                out.put("excludedKeys", ks);
             }
             return out;
         }
@@ -227,13 +261,9 @@ final class InvestigationEvaluator {
         Map<String, Object> p = entry.get("params") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
         List<String> ids = strings(p.get("ids"));
         switch (String.valueOf(entry.get("op"))) {
-            case "seed" -> {
-                String type = p.get("entityType") == null ? null : String.valueOf(p.get("entityType"));
-                for (String id : ids) {
-                    s.excluded.remove(id);
-                    s.entities.putIfAbsent(id, new Entity(id, type, 0, id, step));
-                }
-            }
+            case "seed" -> seed(s, ids, p.get("entityType") == null ? null : String.valueOf(p.get("entityType")), step);
+            case "seedBy" -> seed(s, strings(((Map<String, Object>) entry.get("read")).get("ids")),
+                    String.valueOf(((Map<String, Object>) entry.get("list")).get("entityType")), step);
             case "expand" -> {
                 Map<String, Object> read = (Map<String, Object>) entry.get("read");
                 Set<String> frontier = new HashSet<>(strings(((Map<String, Object>) read.get("query")).get("frontier")));
@@ -241,6 +271,7 @@ final class InvestigationEvaluator {
                     Map<String, Object> r = (Map<String, Object>) o;
                     String src = String.valueOf(r.get("source")), tgt = String.valueOf(r.get("target"));
                     if (s.excluded.containsKey(src) || s.excluded.containsKey(tgt)) continue;
+                    if (s.blockedByKey(src) || s.blockedByKey(tgt)) continue;   // excludeBy remembers keys
                     Entity from = frontier.contains(src) ? s.entities.get(src)
                             : frontier.contains(tgt) ? s.entities.get(tgt) : null;
                     if (from == null) continue;   // the frontier entity left the Working Set (fork re-order)
@@ -253,12 +284,18 @@ final class InvestigationEvaluator {
             }
             case "exclude" -> {
                 String reason = String.valueOf(p.get("reason"));
-                for (String id : ids) {
-                    if (s.kept.contains(id)) continue;   // keep protects it; the route reports it as protected
-                    s.entities.remove(id);
-                    s.hidden.remove(id);
-                    s.links.values().removeIf(l -> l.source().equals(id) || l.target().equals(id));
-                    s.excluded.put(id, new Exclusion(step, reason));
+                for (String id : ids) exclude(s, id, reason, step);
+            }
+            case "excludeBy" -> {
+                Map<String, Object> list = (Map<String, Object>) entry.get("list");
+                String normaliser = String.valueOf(list.get("normaliser"));
+                Set<String> members = new HashSet<>(strings(list.get("members")));
+                String reason = String.valueOf(p.get("reason"));
+                for (String id : new ArrayList<>(s.entities.keySet()))
+                    if (members.contains(EntityTypes.normalise(normaliser, id))) exclude(s, id, reason, step);
+                if (!members.isEmpty()) {   // an empty list remembers nothing — and leaves no empty entry in the hash
+                    TreeMap<String, Integer> keys = s.excludedKeys.computeIfAbsent(normaliser, k -> new TreeMap<>());
+                    for (String m : members) keys.putIfAbsent(m, step);
                 }
             }
             case "hide" -> {
@@ -278,6 +315,38 @@ final class InvestigationEvaluator {
             }
             default -> throw new IllegalStateException("op '" + entry.get("op") + "' in a sealed log is not evaluable");
         }
+    }
+
+    private static void seed(State s, List<String> ids, String type, int step) {
+        for (String id : ids) {
+            s.excluded.remove(id);
+            s.entities.putIfAbsent(id, new Entity(id, type, 0, id, step));
+        }
+    }
+
+    private static void exclude(State s, String id, String reason, int step) {
+        if (s.kept.contains(id)) return;   // keep protects it; the route reports it as protected
+        s.entities.remove(id);
+        s.hidden.remove(id);
+        s.links.values().removeIf(l -> l.source().equals(id) || l.target().equals(id));
+        s.excluded.put(id, new Exclusion(step, reason));
+    }
+
+    /**
+     * The entity count after each log position, as the append path saw it (PREFIX semantics, as {@link #evaluate}
+     * with hashes) — so a plain-language line can say how many entities an {@code excludeBy} removed without that
+     * count being stored in the log.
+     */
+    static List<Integer> entityCounts(List<Map<String, Object>> log) {
+        List<Integer> out = new ArrayList<>();
+        State s = new State();
+        for (int k = 0; k < log.size(); k++) {
+            Map<String, Object> e = log.get(k);
+            if ("op".equals(e.get("kind"))) apply(s, e);
+            else if ("undo".equals(e.get("kind"))) s = fold(log.subList(0, k + 1));
+            out.add(s.entities.size());
+        }
+        return out;
     }
 
     static List<String> strings(Object raw) {

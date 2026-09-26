@@ -1,5 +1,6 @@
 package com.gamma.geolink;
 
+import com.gamma.control.EntityTypes;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -53,6 +54,11 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  *         <li>if the bound Dataset's registry {@code columns[]} entry for the Investigation's {@code sourceCol} or
  *             {@code targetCol} carries {@code classification} MSISDN, IMSI or ACCOUNT — EVERY entity id, because
  *             an id does not record which column it was read from.</li>
+ *         <li>(LA-17) an Entity List op whose sealed list is of such a type — or whose Entity Type was sealed
+ *           {@code masked: true}, or sealed no flag at all (fail closed) — masks the list's member KEYS, a
+ *           {@code seedBy}'s sealed ids, and every id the log knows whose key under the list's normaliser is a
+ *           member — a raw {@code 0044 7700-900123} matched by the member {@code +447700900123} is the same
+ *           identifier, so masking one form and not the other would leak it.</li>
  *       </ol>
  *       Nothing else. An entity ADMITTED by an expand has no type, so a neighbour of a typed seed is NOT masked
  *       unless rule 2 applies; and no shipped Dataset declares such a column classification today, so on the
@@ -105,7 +111,11 @@ final class EntityMasking {
         String mode = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveMaskingMode();
         Set<String> universe = new TreeSet<>(extraIds);
         Set<String> typedSeeds = new TreeSet<>();
-        for (Map<String, Object> e : log) collect(e, universe, typedSeeds);
+        Map<String, Set<String>> typedKeys = new LinkedHashMap<>();   // normaliser → member keys of typed lists (LA-17)
+        for (Map<String, Object> e : log) collect(e, universe, typedSeeds, typedKeys);
+        for (var k : typedKeys.entrySet())
+            for (String id : universe)
+                if (k.getValue().contains(EntityTypes.normalise(k.getKey(), id))) typedSeeds.add(id);
         Set<String> masked;
         String basis;
         switch (mode) {
@@ -140,9 +150,24 @@ final class EntityMasking {
         return new EntityMasking(mode, basis, tokens);
     }
 
-    /** Every id a log entry names, and the ids its {@code seed} typed as a typed identifier. */
+    /** Every id a log entry names, the ids its {@code seed} typed as a typed identifier, and a typed list's keys. */
     @SuppressWarnings("unchecked")
-    private static void collect(Map<String, Object> e, Set<String> universe, Set<String> typedSeeds) {
+    private static void collect(Map<String, Object> e, Set<String> universe, Set<String> typedSeeds,
+                                Map<String, Set<String>> typedKeys) {
+        if (e.get("list") instanceof Map<?, ?> l) {   // LA-17: the sealed Entity List of an excludeBy / seedBy
+            List<String> members = strings(l.get("members"));
+            universe.addAll(members);
+            List<String> ids = e.get("read") instanceof Map<?, ?> r ? strings(r.get("ids")) : List.of();
+            universe.addAll(ids);
+            // Typed when the list's Entity Type was sealed as masked, when no flag was sealed (fail closed — the same
+            // stance EntityListRoutes takes for a type no longer in force), or when it is a D-U6 typed identifier.
+            if (!Boolean.FALSE.equals(l.get("masked"))
+                    || TYPED_IDENTIFIERS.contains(String.valueOf(l.get("entityType")).toUpperCase(Locale.ROOT))) {
+                typedSeeds.addAll(members);
+                typedSeeds.addAll(ids);
+                typedKeys.computeIfAbsent(String.valueOf(l.get("normaliser")), k -> new TreeSet<>()).addAll(members);
+            }
+        }
         if (e.get("params") instanceof Map<?, ?> p) {
             List<String> ids = strings(p.get("ids"));
             universe.addAll(ids);

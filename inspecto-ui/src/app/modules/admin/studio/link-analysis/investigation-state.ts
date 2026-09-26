@@ -134,3 +134,50 @@ export function investigationErrorMessage(err: unknown, fallback: string): strin
             return server;
     }
 }
+
+/**
+ * LA-17 — a readable message for an Entity List failure: the `/inv/entity-lists*` routes, and (`onInvestigation`)
+ * an `excludeBy` / `seedBy` step, where a 404 may be the list OR the Investigation. 409 is a retired list or one
+ * whose Entity Type is no longer in force; 422 carries the server's reason (a blank reason, a value empty after
+ * normalising, a list over 5 000 members …). 503 is a deployment state (no module / no write root), not a fault.
+ */
+export function entityListErrorMessage(err: unknown, fallback: string, onInvestigation = false): string {
+    const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
+    const server = apiErrorMessage(err, fallback);
+    switch (status) {
+        case 404:
+            return onInvestigation
+                ? 'The Entity List or the Investigation is not available (the server answers the same when either ' +
+                      'does not exist or is not yours). Server: ' +
+                      server
+                : 'This Entity List does not exist (any more). Server: ' + server;
+        case 403:
+            return (
+                'You are not allowed to change Entity Lists (it needs the Incident-management capability). Server: ' +
+                server
+            );
+        case 409:
+            return 'Refused — ' + server;
+        case 422:
+            return 'The server refused this: ' + server;
+        case 503:
+            return 'Entity Lists are not available here — the link-analysis module or a write root is missing.';
+        default:
+            return server;
+    }
+}
+
+/** The `maskingMode` pseudonym prefix (D-U6) — `masked:<16 hex>`. */
+const MASKED_PREFIX = 'masked:';
+
+/**
+ * LA-17 — what "add this node to an Entity List" may send. The members route takes RAW values and normalises them
+ * with the list's Entity Type, so a masked pseudonym would be stored AS a member (the server resolves pseudonyms
+ * only in an Investigation op's `ids`). Those are split out, never sent.
+ */
+export function listableIds(node: G6Node | null): { ids: string[]; masked: number } {
+    if (!node) return { ids: [], masked: 0 };
+    const raw = rawIdsOf(node);
+    const ids = raw.filter((v) => !v.startsWith(MASKED_PREFIX));
+    return { ids, masked: raw.length - ids.length };
+}

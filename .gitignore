@@ -77,6 +77,9 @@
 !/spaces/*/data/samples/
 !/spaces/*/data/samples/**
 /spaces/*/audit/
+# Link Analysis evidence (snapshots, Investigations, the Identity Fact log) is written under the Space's CONFIG root
+# (SnapshotStore / EntityFactLog resolve <write root>/audit/) — runtime state, never committed.
+/spaces/*/config/audit/
 /spaces/*/duckdb/
 /spaces/*/flows/
 # The UAT space is fully GENERATED (config cloned from spaces/demo by tools/seed-uat.ps1) — never commit it.

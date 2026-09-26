@@ -12,6 +12,7 @@ import {
 import {
     InvestigationRef,
     effectiveOpSteps,
+    entityListErrorMessage,
     investigationErrorMessage,
     truncatedSteps,
     workingSetToGraph,
@@ -131,10 +132,19 @@ export class InvestigationSessionStore {
     async apply(op: InvestigationOpRequest): Promise<boolean> {
         const id = this.activeId();
         if (!id) return false;
-        return this.run(`The ${op.op} step failed.`, async () => {
-            this.lastStep.set(await firstValueFrom(this.inv.appendInvestigationOp(id, op)));
-            await this.refresh(id);
-        });
+        // LA-17: a list-bound op's 404/409 is usually about the Entity List, not the Investigation.
+        const message =
+            op.op === 'excludeBy' || op.op === 'seedBy'
+                ? (err: unknown, fallback: string) => entityListErrorMessage(err, fallback, true)
+                : investigationErrorMessage;
+        return this.run(
+            `The ${op.op} step failed.`,
+            async () => {
+                this.lastStep.set(await firstValueFrom(this.inv.appendInvestigationOp(id, op)));
+                await this.refresh(id);
+            },
+            message,
+        );
     }
 
     async undo(): Promise<boolean> {
@@ -189,14 +199,18 @@ export class InvestigationSessionStore {
         this.workingSet.set(replay.workingSet);
     }
 
-    private async run(fallback: string, body: () => Promise<void>): Promise<boolean> {
+    private async run(
+        fallback: string,
+        body: () => Promise<void>,
+        message: (err: unknown, fallback: string) => string = investigationErrorMessage,
+    ): Promise<boolean> {
         this.busy.set(true);
         this.error.set('');
         try {
             await body();
             return true;
         } catch (err) {
-            this.error.set(investigationErrorMessage(err, fallback));
+            this.error.set(message(err, fallback));
             return false;
         } finally {
             this.busy.set(false);

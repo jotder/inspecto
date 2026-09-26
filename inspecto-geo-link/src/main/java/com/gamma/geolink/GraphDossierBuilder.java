@@ -68,12 +68,19 @@ final class GraphDossierBuilder {
         // Positions as they were at append time, and the integrity checks against every recorded hash.
         List<Map<String, Object>> failures = new ArrayList<>();
         List<Integer> entityCounts = new ArrayList<>();
+        Map<Integer, List<String>> removedBy = new TreeMap<>();   // what each excludeBy removed (LA-17), for G-E10
         InvestigationEvaluator.State state = new InvestigationEvaluator.State();
         for (int i = 0; i < log.size(); i++) {
             Map<String, Object> e = log.get(i);
             int step = i + 1;
+            List<String> had = new ArrayList<>(state.entities.keySet());
             if ("undo".equals(e.get("kind"))) state = InvestigationEvaluator.evaluate(log.subList(0, step), -1, null);
             else InvestigationEvaluator.apply(state, e);
+            if ("excludeBy".equals(e.get("op"))) {
+                List<String> gone = new ArrayList<>();
+                for (String id : had) if (!state.entities.containsKey(id)) gone.add(id);
+                removedBy.put(step, gone);
+            }
             entityCounts.add(state.entities.size());
             String now = state.hash();
             if (!now.equals(e.get("workingSetHash")))
@@ -93,7 +100,8 @@ final class GraphDossierBuilder {
                             + ", not the recorded " + doc.get("hash")));
             }
             if (e.get("read") instanceof Map<?, ?> r) {
-                String rows = sha256(canonical(r.get("rows")));
+                // A seedBy (LA-17) seals the ids it matched, where an expand seals its rows.
+                String rows = sha256(canonical("seedBy".equals(e.get("op")) ? r.get("ids") : r.get("rows")));
                 if (!rows.equals(r.get("fingerprint")))
                     failures.add(failure(step, "log.jsonl#" + step, "sealed rows hash to " + rows
                             + ", not the recorded fingerprint " + r.get("fingerprint")));
@@ -108,9 +116,9 @@ final class GraphDossierBuilder {
         dossier.put("summary", summary(in, header, state));
         dossier.put("topology", topology(state));
         dossier.put("scores", scores(in.snapshots(), snapshots));
-        List<Map<String, Object>> ledger = ledger(log, entityCounts);
+        List<Map<String, Object>> ledger = ledger(log, entityCounts, removedBy);
         dossier.put("ledger", ledger);
-        Map<String, Object> negative = negativeSpace(log, state, in.snapshots(), snapshots);
+        Map<String, Object> negative = negativeSpace(log, state, in.snapshots(), snapshots, removedBy);
         dossier.put("negativeSpace", negative);
         Map<String, Object> integrity = new LinkedHashMap<>();
         integrity.put("intact", failures.isEmpty());
@@ -123,7 +131,7 @@ final class GraphDossierBuilder {
         Map<String, Object> renderings = new LinkedHashMap<>();
         renderings.put("json", jsonRendering(header, log, negative));
         renderings.put("steps", stepsRendering(ledger, negative));
-        renderings.put("method", methodStatement(in, header, state, log, negative, integrity, manifest));
+        renderings.put("method", methodStatement(in, header, state, log, negative, integrity, manifest, removedBy));
         dossier.put("renderings", renderings);
 
         List<Map<String, Object>> entities = castList(ws.get("entities"));
@@ -341,7 +349,8 @@ final class GraphDossierBuilder {
         return m;
     }
 
-    private static List<Map<String, Object>> ledger(List<Map<String, Object>> log, List<Integer> entityCounts) {
+    private static List<Map<String, Object>> ledger(List<Map<String, Object>> log, List<Integer> entityCounts,
+                                                    Map<Integer, List<String>> removedBy) {
         Map<Integer, Integer> undoneBy = undoneBy(log);
         List<Map<String, Object>> out = new ArrayList<>();
         for (int i = 0; i < log.size(); i++) {
@@ -353,7 +362,7 @@ final class GraphDossierBuilder {
             row.put("author", e.get("author"));
             row.put("kind", e.get("kind"));
             row.put("op", "undo".equals(e.get("kind")) ? "undo" : e.get("op"));
-            row.put("text", render(e));
+            row.put("text", render(e, removedBy.get(step)));
             row.put("undoneBy", undoneBy.get(step));
             row.put("entitiesAfter", entityCounts.get(i));
             row.put("workingSetHash", e.get("workingSetHash"));
@@ -373,22 +382,26 @@ final class GraphDossierBuilder {
      * unassessed coverage; which measures exist over which set; and the unpinned Dataset version.
      */
     private static Map<String, Object> negativeSpace(List<Map<String, Object>> log, InvestigationEvaluator.State s,
-                                                     List<Snapshot> ids, List<Map<String, Object>> snaps) {
+                                                     List<Snapshot> ids, List<Map<String, Object>> snaps,
+                                                     Map<Integer, List<String>> removedBy) {
         List<Map<String, Object>> excluded = new ArrayList<>();
         for (var x : s.excluded.entrySet()) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", x.getKey());
             m.put("step", x.getValue().step());
             m.put("reason", x.getValue().reason());
-            m.put("author", log.get(x.getValue().step() - 1).get("author"));
-            // Only the extensional `exclude` ships (excludeBy is deferred), so every exclusion is a judgement.
-            m.put("basis", "analyst judgement (extensional exclude)");
+            Map<String, Object> by = log.get(x.getValue().step() - 1);
+            m.put("author", by.get("author"));
+            // An `exclude` is an analyst's judgement; an `excludeBy` (LA-17) applies a stated rule — a named list.
+            m.put("basis", "excludeBy".equals(by.get("op"))
+                    ? "stated rule (" + InvestigationRoutes.listClause(by) + ")"
+                    : "analyst judgement (extensional exclude)");
             excluded.add(m);
         }
         Map<Integer, Integer> undoneBy = undoneBy(log);
         List<Map<String, Object>> undone = new ArrayList<>();
         undoneBy.forEach((step, by) -> undone.add(Map.of("step", step, "undoneBy", by,
-                "text", render(log.get(step - 1)))));
+                "text", render(log.get(step - 1), removedBy.get(step)))));
         List<Map<String, Object>> truncated = new ArrayList<>();
         for (Map<String, Object> e : log)
             if (e.get("read") instanceof Map<?, ?> r && Boolean.TRUE.equals(r.get("truncated"))) {
@@ -435,6 +448,12 @@ final class GraphDossierBuilder {
                     read.put(k, r.get(k));
                 out.put("read", read);
             }
+            if (e.get("list") instanceof Map<?, ?> l) {   // LA-17: members counted — the log.jsonl artefact hashes them
+                Map<String, Object> list = new LinkedHashMap<>();
+                for (var x : l.entrySet()) if (!"members".equals(x.getKey())) list.put(String.valueOf(x.getKey()), x.getValue());
+                list.put("size", strings(l.get("members")).size());
+                out.put("list", list);
+            }
             entries.add(out);
         }
         Map<String, Object> bindings = new LinkedHashMap<>();
@@ -462,7 +481,8 @@ final class GraphDossierBuilder {
     /** The authority's rendering: a method statement assembled line by line from the log, closed by the custody hash. */
     private static String methodStatement(Input in, Map<String, Object> header, InvestigationEvaluator.State s,
                                           List<Map<String, Object>> log, Map<String, Object> negative,
-                                          Map<String, Object> integrity, Map<String, Object> manifest) {
+                                          Map<String, Object> integrity, Map<String, Object> manifest,
+                                          Map<Integer, List<String>> removedBy) {
         StringBuilder b = new StringBuilder();
         b.append("Method statement — Investigation ").append(in.id());
         if (header.get("title") != null) b.append(" (").append(header.get("title")).append(")");
@@ -488,7 +508,7 @@ final class GraphDossierBuilder {
         Map<Integer, Integer> undoneBy = undoneBy(log);
         for (int i = 0; i < log.size(); i++) {
             Map<String, Object> e = log.get(i);
-            b.append("  ").append(i + 1).append(". ").append(render(e));
+            b.append("  ").append(i + 1).append(". ").append(render(e, removedBy.get(i + 1)));
             if (undoneBy.containsKey(i + 1)) b.append(" (undone by step ").append(undoneBy.get(i + 1)).append(")");
             b.append(" — ").append(e.get("author")).append(", ").append(e.get("at")).append("\n");
         }
@@ -552,8 +572,9 @@ final class GraphDossierBuilder {
      * One step as a plain-language line. ⚠ Mirrors {@code InvestigationRoutes.render} with ONE deliberate
      * difference: an exclusion lists EVERY id (G-E10 — a narrative cannot omit an excluded entity), never
      * "and N more". Duplicated rather than shared to leave that class untouched under a parallel lane.
+     * {@code removed} is what an {@code excludeBy} removed (LA-17) — the state's, not the log line's — else null.
      */
-    static String render(Map<String, Object> e) {
+    static String render(Map<String, Object> e, List<String> removed) {
         if ("undo".equals(e.get("kind"))) return "Undid step " + e.get("undoes") + ".";
         Map<String, Object> p = e.get("params") instanceof Map<?, ?> m ? castMap(m) : Map.of();
         List<String> ids = strings(p.get("ids"));
@@ -582,6 +603,20 @@ final class GraphDossierBuilder {
             case "keep" -> "Kept " + head(ids) + " (protected from later exclusion).";
             case "annotate" -> "Annotated " + String.join(", ", ids) + InvestigationRoutes.gradeClause(p)
                     + ": \"" + p.get("note") + "\"";
+            case "excludeBy" -> {
+                List<String> gone = removed == null ? List.of() : removed;
+                yield "Excluded " + gone.size() + " entit" + (gone.size() == 1 ? "y" : "ies") + " on "
+                        + InvestigationRoutes.listClause(e) + " (reason: " + p.get("reason") + ")"
+                        + (gone.isEmpty() ? "." : ": " + String.join(", ", gone) + ".");
+            }
+            case "seedBy" -> {
+                Map<String, Object> r = castMap((Map<?, ?>) e.get("read"));
+                List<String> seeded = strings(r.get("ids"));
+                yield "Seeded " + seeded.size() + " entit" + (seeded.size() == 1 ? "y" : "ies") + " of type "
+                        + castMap((Map<?, ?>) e.get("list")).get("entityType") + " from " + InvestigationRoutes.listClause(e)
+                        + " — the values of " + r.get("dataset") + " read at " + r.get("readAt") + " whose key is a member"
+                        + (seeded.isEmpty() ? "." : ": " + head(seeded) + ".");
+            }
             default -> "Applied " + e.get("op") + ".";
         };
     }

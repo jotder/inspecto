@@ -613,9 +613,10 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   compared as epoch ms; a `slot` (`22:00–04:00` crosses midnight; start inclusive, end exclusive) and a `days`
   mask need an explicit IANA `timezone` and test the local day the EVENT fell on. `window` re-filters nothing
   already admitted — earlier sealed reads are evidence as made. Templates carry the whole rung; a `window`
-  becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ `threshold`, `seedBy`,
-  `excludeBy`, `annotate`, `snapshot`, calendar exclusions, comparison mode and time-respecting paths remain
-  deferred; the SPA types still say `limit` and offer no rung fields.
+  becomes a parameter (`kind: "window"`) whose default is the authored window. ⏳ `threshold`, `annotate`,
+  `snapshot`, calendar exclusions, comparison mode and time-respecting paths remain
+  deferred; the SPA types still say `limit` and offer no rung fields. `seedBy` / `excludeBy` shipped 2026-09-26
+  over Entity Lists (`LA-17`, design §4.4) — see the Entity Lists paragraph below.
 * **The Investigation tab drives it** (LA-10 SPA half, 2026-09-23): the right dock's third tab
   (`link-analysis-investigation.component` over the pane-provided `InvestigationSessionStore`, so the session
   survives the dock collapsing). *Start Investigation* needs a last run of ONE `entity-projection` mapping
@@ -727,6 +728,24 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   could be approved (2026-09-24). With the default `limit` of 2 000, a budget threshold below that refuses the
   canvas's initial load. The SPA has no dedicated state for that refusal; what it displays has
   not been checked.
+* **Entity Lists section** (LA-17 step 6, SPA half, 2026-09-26; `link-analysis-entity-lists.component` +
+  `link-analysis-entity-lists.dialogs`, hosted at the foot of the Investigation panel in BOTH its states). It reads
+  `GET /inv/entity-lists` and shows each list's title, purpose, Entity Type label (from the settings'
+  `entityTypesInForce`; a type no longer in force says so), size and a *Retired* status badge — ⛔ **never its
+  members**: they arrive masked per `maskingMode`, and member browsing is out of scope. *New list…* (`POST
+  /inv/entity-lists`: title, purpose, Entity Type, required reason; the id is left to the server to mint) keeps a
+  409/422 in the dialog. *Add selection* sends the selected canvas entity's RAW spellings (`rawIdsOf`) to `…/members`
+  `{add, reason}` and states `changed`; ⚠ the selection is `InvestigationSessionStore.selected`, which a canvas click
+  sets only **while an Investigation is open** — there is no multi-node selection. ⚠ `masked:<hex>` pseudonyms are
+  split out and never sent (`listableIds`): the members route would store the pseudonym as a member, since only an
+  Investigation op's `ids` resolve one. *Retire* is a warn-coloured reason dialog (the dialog is the confirm). On the
+  open Investigation, *Exclude by list* (reason ≤ 200, as `exclude`) and *Seed by list* append `{op:'excludeBy'|'seedBy',
+  listId}` through `store.apply`, so undo, replay and the log refresh are the existing op path; the notice reads the
+  step's nested `list.removed` / `list.seeded` and COUNTS `list.unmatched` (keys or a count — never displayed). List-op
+  failures go through `entityListErrorMessage(…, true)` because a 404 there may be the list OR the Investigation.
+  Writes are gated on `LensService.canManageIncidents()` (the rest of the panel still has no client gate — a 403 is
+  surfaced); the section renders nothing when `SessionService.geoLinkEnabled` is off (a deep link reaches the page
+  even though the nav hides it). A 503 is an explained info notice.
 * ✅ **The feed is INGESTED, not merely authored** (verified end to end 2026-09-23): 1 283/1 283 rows land
   across three Hive partitions, `rejected_files=0`, `rejected_rows=0`, `cast_failures=0`, and every row
   reconciles to the source PSV by `REC_SEQ` with zero value mismatches. `IMEI` keeps its leading zeros as

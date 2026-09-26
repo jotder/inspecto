@@ -1,6 +1,6 @@
 # LA-17 — Entity model: design (slice 1: Entity Types + Entity Lists)
 
-> **Status:** 🟡 APPROVED 2026-09-26 (D-M1..D-M8); steps 1–3 done, step 4 next. Parent backlog: [`link-analysis-backlog-plan.md`](link-analysis-backlog-plan.md)
+> **Status:** 🟡 APPROVED 2026-09-26 (D-M1..D-M8); steps 1–4 done, step 6 panel done; step 5 (masking via types) next. Parent backlog: [`link-analysis-backlog-plan.md`](link-analysis-backlog-plan.md)
 > row **LA-17** (§5, un-deferred 2026-09-24) and §2.6. Current knowledge: [`okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md).
 > When this plan and the code disagree, re-ground.
 
@@ -134,6 +134,70 @@ Following the `endpoint` skill's gate order (503 write root → 422 spec → 403
   pinned to the list as it was (D-E3 fingerprint stays sound).
 - Templates: a list-bound op **travels** with the template (D-E8); plain `exclude` still does not.
 
+#### 4.4.1 Op contract (fixed 2026-09-26 for step 4)
+The evaluator is pure over **sealed** reads (an `expand` carries its rows), so a list op seals what it resolved at
+append time and replay never re-reads the list:
+- Request `POST /inv/investigations/{id}/ops` `{op: "excludeBy" | "seedBy", listId, reason}` (`reason` required for
+  `excludeBy`, as for `exclude`). Resolved at the list's **head**; the log entry stores
+  `list: {listId, atSeq, headHash, entityType, normaliser, members[]}` — the members as they were.
+- Refusals at append: unknown list 404 · retired list 409 · the list's Entity Type not in force 409 · a list over
+  5 000 members 422 (bounded like every other op payload).
+- **`excludeBy`** — members are *normalised keys*, Investigation ids are *raw column values*, so the evaluator
+  excludes an entity when `EntityTypes.normalise(normaliser, id) ∈ members`: every admitted entity now, and every
+  entity a later `expand` would admit (remembered by key, the way `exclude` remembers ids). `keep` still protects,
+  reported as `protected`. The step reports how many entities it removed and how many members matched nothing.
+- **`seedBy`** — needs the raw values whose normalised form is a member, so the route reads
+  `SELECT DISTINCT` of the bound `sourceCol` and `targetCol` (the Investigation's Dataset and filter, bounded at
+  `MAX_LIMIT` distinct values per column — above it → 422 naming the cap, never a silent sample), normalises in
+  Java, and **seals** the matched raw ids beside `list` (`read: {ids[], fingerprint, readAt}`, like `expand`). The
+  evaluator then seeds those ids exactly as `seed` does, with `entityType` = the list's type. Members matching no
+  row are reported, not errors.
+- Undo, replay, reorder/fork and the Dossier treat both like any other op; the log line reads e.g. *"Excluded 12
+  entities on Entity List `known-mules` (exclusion, 40 members, as of fact 17)"*.
+- Templates: `excludeBy` / `seedBy` carry `{op, listId}` only; instantiating re-resolves at that moment's head
+  (method travels, the old membership does not).
+- Audit: the existing op event, plus `listId` and `atSeq` — never members.
+
+#### 4.4.2 As built (step 4, 2026-09-26) — readings of and deviations from §4.4.1
+- **Seal.** `list` also carries `purpose` (the log line names it). `atSeq`/`headHash` are the fact log's head seq and
+  head-fact hash at append. `params` is `{listId, reason}` (excludeBy) / `{listId}` (seedBy); `ids` on a list op → 422,
+  `listId` shape → 422. Refusal order: 404 · retired 409 · type not in force 409 · > 5 000 members 422.
+- **excludeBy records each entity it removes in `excluded`** (reason + step), exactly as `exclude` — so the Working Set's
+  `excluded` view, the expand SQL's prune and the Dossier's negative space (basis *"stated rule (Entity List …)"*) all see
+  them. Keys are remembered in a new state field `excludedKeys [{normaliser, key, step}]`, emitted only when non-empty, so
+  every pre-LA-17 hash is unchanged. ⚠ A remembered key the SQL cannot prune (normalisers are Java): a not-yet-admitted
+  matching entity still spends the expand budget and counts toward degree, and is dropped by the evaluator.
+- A remembered key does **not** block an entity already in the Working Set — only a later `seed`/`seedBy` (a later
+  explicit op wins, as `seed` re-admits an excluded id) or a `keep` can have put it there.
+- **seedBy.** No Investigation filter exists, so the read is `SELECT DISTINCT CAST(col AS VARCHAR) … WHERE col IS NOT NULL`
+  per bound column over the whole Dataset (R3 gate, default sandbox policy, identifiers only — no value inlined). Cap
+  `SEED_BY_DISTINCT_CAP` = 20 000 (`InvRoutes`' row cap); above it 422 naming column and cap (unit-tested in
+  `InvestigationSeedByReadTest` with a small cap). `read` = `{dataset, readAt, query:{columns, distinctCap}, ids[], rowCount,
+  fingerprint}`, fingerprint over `ids`; the Dossier's sealed-read integrity check hashes `ids` for a seedBy.
+  ⚠ `replay {reread}` re-checks expand reads only — a seedBy read is not drift-checked.
+- **Step result**: `list {listId, atSeq, headHash, entityType, purpose, members (count), removed | seeded, unmatched[keys]}`,
+  plus `protected` for excludeBy; excludeBy's `unmatched` = members no entity admitted *before* the step normalises to.
+- **Log / Dossier.** The log view and the Dossier's JSON rendering show `list` with `size` instead of `members`, and drop
+  `read.ids` (as sealed rows are dropped); the `log.jsonl#n` manifest artefact still hashes them. The removed count is
+  derived by evaluation (`InvestigationEvaluator.entityCounts`), never stored; the Dossier line names every removed id (G-E10).
+- **Gates.** Four-eyes is an expand budget/fan-out rule — list ops have neither, so none applies; purpose is create-time.
+- **Masking** (fixed after review): `sealList` also seals the Entity Type's `masked` flag in `list`, and `EntityMasking`
+  (still reading only the Investigation log) treats a list as typed when that flag is `true`, when it is **absent** (fail
+  closed), or when the type is a `TYPED_IDENTIFIERS` one. Under `typed` such a list masks its member keys (so
+  `list.unmatched` and `/replay`'s `excludedKeys`), the ids a seedBy sealed (delta, Dossier line), **and every id whose
+  key under the list's normaliser is a member** (a raw `0044 7700-900123` is the member `+447700900123` in another
+  form). A `masked: false` type stays raw. ⚠ The first cut checked only `TYPED_IDENTIFIERS`, so wallet / subscriber /
+  custom masked lists leaked raw keys. Tokens use the Investigation's key, not the list's.
+- An excludeBy over an empty list leaves no `excludedKeys` entry. A template-generated excludeBy reason clips the
+  template id to 100 chars so it stays within the 200-char reason cap.
+- **Templates** carry `{op, step, listId}`; at instantiate an excludeBy's reason is stated as
+  *"Entity List x (from template t)"* (the authored reason is case text); refusals are prefixed *"template step n:"*. A
+  template whose only seeding is a seedBy needs no seed parameter (the *no effective seed* 422 now also accepts a seedBy).
+- **Fork (reorder)** carries a list op's sealed `list` — and a seedBy's `read`, which does not depend on order — verbatim;
+  it does not re-resolve (expand still re-reads).
+- Tests: `ControlApiInvestigationEntityListOpsTest` (13, real HTTP), `InvestigationSeedByReadTest` (2).
+  `compliance/evidence/route-gating.md` regenerated (line numbers only).
+
 ### 4.5 SPA
 - `normalizeEntityKey(value, type?)` gains the typed normalisers from the shared fixture; typed ids `<type>:<key>`.
 - Toolbox: *Entity Lists* panel (list, create, add selection, `excludeBy` / `seedBy`). Masking of members as elsewhere.
@@ -162,7 +226,18 @@ Following the `endpoint` skill's gate order (503 write root → 422 spec → 403
 1. ✅ **DONE 2026-09-26** — GLOSSARY §11 terms + INDEX entry → verify: `tools/check-vocabulary.mjs` passes.
 2. ✅ **DONE 2026-09-26** — Entity Types in settings + normaliser parity fixture (Java + TS) → verify: `ConfigSpecs`/settings route tests, parity spec.
 3. ✅ **DONE 2026-09-26** — Fact log store + fold + `EntityListRoutes` → verify: real-HTTP `ControlApiEntityListTest` covering every gate.
-4. `excludeBy` / `seedBy` ops + template carry → verify: `InvestigationEvaluator` + template tests; replay pinned to `atSeq`.
+4. ✅ **DONE 2026-09-26** — `excludeBy` / `seedBy` ops + template carry (as built: §4.4.2) → verify: `InvestigationEvaluator` + template tests; replay pinned to `atSeq`.
 5. Masking via types (replace `TYPED_IDENTIFIERS`) → verify: `EntityMasking` tests incl. expand-admitted typed entity.
-6. SPA panel + typed normaliser → verify: vitest specs, preview drive.
+   Owed from the step-4 re-review (2026-09-26), all closed by this step: (a) a plain `seed {entityType: "wallet"}`
+   (or any masked type outside MSISDN/IMSI/ACCOUNT) is still UNMASKED under `typed` — the one known gap left;
+   (b) `EntityMasking` forces a type named msisdn/imsi/account to masked even when it says `masked: false`, while the
+   list route shows it raw — align on the type's flag; (c) the `typed` basis string and the class javadoc still say
+   entity typing is not built; (d) no unit test for the fail-closed branch (a sealed `list` with no `masked` key);
+   (e) no test of the list ops under `all`.
+6. 🟡 **PANEL DONE 2026-09-26** — SPA panel + typed normaliser → verify: vitest specs, preview drive.
+   Shipped: the *Entity Lists* section in the Investigation tab (`link-analysis-entity-lists.component.ts` + dialogs):
+   list · create · add the canvas selection · retire · *Exclude by list* / *Seed by list* on the open Investigation
+   (OKF `link-analysis.md`). Preview-driven 2026-09-26 against a rebuilt Enterprise bundle: create → `POST 201`, the
+   row reads *Watch · MSISDN · 0 members*, *Add selection* stays disabled until an Investigation is open.
+   Still owed: projection ids through `typedEntityKey` (`<type>:<key>`, D-M6), member browsing, the `at` read.
 7. `verification` subagent PASS; distill into OKF, move plan to archive when shipped.

@@ -53,10 +53,11 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  *   <li>{@code exclude}, {@code hide}, {@code keep}, {@code annotate} (LA-19) → DROPPED. They name entities of this one graph with an
  *       analyst's reason, which D-E8 keeps with the Investigation that made the call. Only their COUNT is listed
  *       under {@code dropped} — never the ids or the reason text, which are case data.</li>
- *   <li>Any other op is carried verbatim. Named reference lists travel with a template (D-E8), and the op that
- *       would carry one ({@code excludeBy} over a named list) lands there — ⚠ but today no such op can be in a log:
- *       {@code excludeBy} answers "not implemented yet" at append, and no persisted named list exists (LA-17 is
- *       deferred). So nothing is carried by that clause yet; the rule is in place for when one is.</li>
+ *   <li>{@code excludeBy}, {@code seedBy} (LA-17) → carried as {@code {op, listId}} ONLY: a named Entity List is
+ *       method (D-E8), its membership at authoring time is not. Neither the sealed members nor a seedBy's matched ids
+ *       nor the exclusion's reason text travel; instantiating re-resolves the list at the fact log's head AT THAT
+ *       MOMENT (design §4.4.1), and an excludeBy's reason is then stated as the template and list it came from.</li>
+ *   <li>Any other op is carried verbatim.</li>
  * </ul>
  *
  * <p><b>Store: {@link SnapshotStore}, not {@code ComponentStore}.</b> D-E2's one durable mechanism holds the method
@@ -134,6 +135,8 @@ public final class InvestigationTemplateRoutes implements RouteModule {
                 String name = "window" + (parameters.stream().filter(x -> "window".equals(x.get("kind"))).count() + 1);
                 parameters.add(ordered("name", name, "kind", "window", "default", p.get("window"), "step", step));
                 t.put("windowParam", name);
+            } else if (InvestigationRoutes.LIST_OPS.contains(op)) {
+                t.put("listId", p.get("listId"));   // the list by name — never its sealed members (see the class note)
             } else if (CASE_OPS.contains(op)) {
                 dropped.add(ordered("step", step, "op", op, "count", strings(p.get("ids")).size()));
                 t = null;
@@ -143,9 +146,10 @@ public final class InvestigationTemplateRoutes implements RouteModule {
             InvestigationEvaluator.apply(state, e);
             if (t != null) ops.add(t);
         }
-        if (parameters.stream().noneMatch(x -> "seed".equals(x.get("kind"))))
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "investigation '" + invId + "' has no effective seed step — nothing to "
-                    + "parameterise, so nothing to template");
+        // A seedBy seeds from a named list, so a method that starts from one needs no seed parameter (LA-17).
+        if (parameters.stream().noneMatch(x -> "seed".equals(x.get("kind"))) && ops.stream().noneMatch(x -> "seedBy".equals(x.get("op"))))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "investigation '" + invId + "' has no effective seed or seedBy step — "
+                    + "nothing to parameterise, so nothing to template");
 
         Map<String, Object> h = inv.header();
         Map<String, Object> doc = new LinkedHashMap<>();
@@ -225,6 +229,8 @@ public final class InvestigationTemplateRoutes implements RouteModule {
                         : declared == null ? null : declared.get("default");
                 op.put("window", w == null ? "full" : w);   // validated by the same params() an append uses
             }
+            if ("excludeBy".equals(op.get("op")))   // the authored reason is case text and did not travel
+                op.put("reason", "Entity List " + op.get("listId") + " (from template " + clip(templateId, 100) + ")");
             op.put("derivedFrom", ordered("template", templateId, "step", t.get("step")));
             ops.add(op);
         }
@@ -264,6 +270,12 @@ public final class InvestigationTemplateRoutes implements RouteModule {
         Path target = root.resolve(id + ".json").normalize();
         if (!target.startsWith(root) || target.getParent() == null || !target.getParent().equals(root))
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, "investigation template id escapes the template store");
+    }
+
+    /** {@code s} cut to at most {@code max} chars with an ellipsis — keeps a generated reason inside its 200-char cap
+     *  (a list id is ≤ 64 chars, a template id ≤ 128). */
+    private static String clip(String s, int max) {
+        return s.length() <= max ? s : s.substring(0, max - 1) + "…";
     }
 
     /** A small insertion-ordered map that, unlike {@code Map.of}, tolerates null values. */
