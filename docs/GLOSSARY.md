@@ -312,6 +312,14 @@ a job can re-run it with different values. A first-class Component kind (`rule-t
 and note it is **not** a fourth member of the triad above: it carries no engine, it is a stored query shape. The
 `:fieldValue` placeholder namespace is distinguished from `$`-Parameters and `${ENV:…}` secrets in §7.
 
+**Risk Score** *(added 2026-09-27, operator decision D-P1 — ASSURE-RISK-SCORE-1)* — An explainable 0–100 number
+per entity (subscriber, account, device, SIM, dealer, channel, partner, or free-form): `Σ weight × indicator`,
+each contribution held to its factor's cap, stored with its **factors** so every score is recomputable. The model
+is the `risk-score` Component kind (a **Type**); the per-entity row the `risk.score` Job writes is its instance.
+Not a fourth rule engine: it scores, and an ordinary Alert Rule over its scores Dataset raises the Incidents.
+⛔ Not the Link Analysis *suspicion score* (a client-side graph centrality composite), and ⛔ never "risk
+rating" / "fraud score" for this concept. As built: [`okf/backend/control-plane/risk-scores.md`](okf/backend/control-plane/risk-scores.md).
+
 **Consequence** — A **typed action a Decision Engine produces** (`route · tag · quarantine · drop · emit-signal ·
 create-alert · start-job · trigger-pipeline · render-widget · generate-report · invoke-api`), executed via the
 Execution / Signal networks. A consequence that targets a component `invokes` it (lineage edge). ⚠️ §6-proposed → **binding** (R5).

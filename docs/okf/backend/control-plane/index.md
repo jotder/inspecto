@@ -21,6 +21,9 @@ v1 contract, queries, observability, the job scheduler, and multi-space hosting.
   ever becoming an access grant.
 * [Events & metrics](events-metrics.md) - `EventLog` (synchronous bus), `MetricRegistry`, `StabilityGate`.
 * [Signal backbone](signal-backbone.md) - the canonical `Signal` envelope (`Ref`, 6-level `Severity`), projected to notification templating, AG-UI streaming, A2UI artifacts, agent context tools, and the gated agentic write path (`invoke` confirm-then-apply).
+* [Risk Scores](risk-scores.md) - the `risk-score` component kind, the `risk.score` Job writing the scores
+  Dataset (reproducible factors, `_latest` snapshot), `GET /risk-scores/{model}/{entityKey}`, and Incident
+  priority through a per-entity Alert Rule (ASSURE-RISK-SCORE-1).
 * [Jobs](jobs.md) - `JobService` cron/event/manual scheduling, the off-bus trigger handoff, and the
   v1 async run model (202 + `runId`).
 * [Job vs Pipeline Step — capability boundary](job-vs-step.md) - the full capability comparison behind the
