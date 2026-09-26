@@ -253,6 +253,8 @@ final class CapabilityManifest {
             // ControlApiRequirementTest.triageIsGatedButSubmissionIsOpen.
             new Entry("POST", "/requirements/([^/]+)/decision", Roles.CAN_TRIAGE_REQUIREMENTS),
             new Entry("POST", "/requirements/([^/]+)/deliver", Roles.CAN_TRIAGE_REQUIREMENTS),
+            // ASSURE-KPI-DEFINITIONS-1: creating a KPI from a delivered Requirement AUTHORS a component.
+            new Entry("POST", "/requirements/([^/]+)/kpi", Roles.CAN_AUTHOR_WORKBENCH),
             // AgentRoutes — agent GOVERNANCE, gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`). These decide
             // what the assistant is allowed to do and who signed off on it: the autonomy policy, the kill
             // switch, the approval decision that releases a mutating action, and the Case feedback that

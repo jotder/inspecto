@@ -269,6 +269,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/requirements` | exempt | self-service | `inspecto/src/main/java/com/gamma/control/RequirementRoutes.java:38` |
 | POST | `/requirements/([^/]+)/decision` | gated | `canTriageRequirements` | `inspecto/src/main/java/com/gamma/control/RequirementRoutes.java:39` |
 | POST | `/requirements/([^/]+)/deliver` | gated | `canTriageRequirements` | `inspecto/src/main/java/com/gamma/control/RequirementRoutes.java:41` |
+| POST | `/requirements/([^/]+)/kpi` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/RequirementRoutes.java:45` |
 | POST | `/rule-templates/([^/]+)/simulate` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/RuleRoutes.java:52` |
 | POST | `/runs` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:49` |
 | POST | `/runs/([^/]+)/drain` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:120` |

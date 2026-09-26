@@ -40,6 +40,10 @@ final class RequirementRoutes implements RouteModule {
                 (e, m) -> stamped(e, decide(api, ApiContext.name(m), api.body(e)))));
         api.post("/requirements/([^/]+)/deliver", ApiContext.withCapability("canTriageRequirements",
                 (e, m) -> stamped(e, deliver(api, ApiContext.name(m), api.body(e)))));
+        // ASSURE-KPI-DEFINITIONS-1: a delivered kpi Requirement can CREATE a KPI definition — an explicit action,
+        // never automatic. It authors a component, so it needs the authoring capability, not the triage one.
+        api.post("/requirements/([^/]+)/kpi", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> createKpi(api, e, ApiContext.name(m), api.body(e))));
     }
 
     /** SEC-7(b): declare the per-resource applicable set from the requirement's lifecycle state —
@@ -126,6 +130,75 @@ final class RequirementRoutes implements RouteModule {
         content.put("deliveredNote", ApiContext.str(body, "note"));
         content.put("deliveredAt", Instant.now().toString());
         return write(store, id, content);
+    }
+
+    private static final String KPI_TYPE = KpiRoutes.TYPE;
+
+    /**
+     * {@code POST /requirements/{id}/kpi} — create a KPI definition from a delivered {@code kpi} Requirement. The
+     * Requirement supplies what Business authored on it — {@code target}, {@code unit}, its {@code title}, and the
+     * good direction read off its {@code comparator} ({@code >=}/{@code >} → up, {@code <=}/{@code <} → down) —
+     * and the body supplies what only a Builder knows: {@code dataset}, {@code measure}, {@code timeField},
+     * {@code grain}, and optionally {@code id} (default: the Requirement's id), {@code comparison}, {@code bands},
+     * {@code format}, or a {@code direction} that overrides the comparator's. Body keys win.
+     *
+     * <p>Fail closed: write root unset → 503; unsafe id → 422; unknown Requirement → 404; not a {@code kpi}
+     * Requirement → 422; not {@code delivered}, or it already created one → 409; an invalid KPI or a Measure that
+     * does not exist for this author → 422; a KPI of that id already exists → 409. Then the maker-checker hold (the
+     * KPI is the governed write), the KPI written, and the Requirement stamped with {@code kpi: <id>}.
+     */
+    private Object createKpi(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String id, Map<String, Object> body)
+            throws IOException {
+        ComponentStore store = store(api);
+        Map<String, Object> req = RouteErrors.existing(store, TYPE, "requirement", id);
+        if (!"kpi".equals(req.get("kind")))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "requirement '" + id + "' is a "
+                    + req.get("kind") + " requirement, not a kpi one");
+        if (!"delivered".equals(req.get("status")))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "only a delivered requirement can create a KPI (status "
+                    + req.get("status") + ")");
+        if (req.get(KPI_TYPE) != null)
+            throw new ApiException(409, ErrorCodes.CONFLICT, "requirement '" + id + "' already created kpi '" + req.get(KPI_TYPE) + "'");
+
+        Map<String, Object> kpi = new LinkedHashMap<>();
+        kpi.put("title", req.get("title"));
+        putIfPresent(kpi, req, "target");
+        putIfPresent(kpi, req, "unit");
+        String direction = directionOf(req.get("comparator"));
+        if (direction != null) kpi.put("direction", direction);
+        kpi.putAll(body);
+        String kpiId = ApiContext.str(kpi, "id") == null ? id : ApiContext.str(kpi, "id");
+        kpi.remove("id");
+        kpi.put("requirement", id);
+        Map<String, Object> shaped = ComponentAccess.onCreate(ex, kpi);
+        try {
+            KpiRoutes.requireMeasure(api, ex, kpiId, shaped);
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+        }
+        if (RouteErrors.exists(store, KPI_TYPE, kpiId))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "kpi '" + kpiId + "' already exists");
+        Map<String, Object> proposed = new LinkedHashMap<>(shaped);
+        proposed.put("name", kpiId);   // what the store persists
+        PendingChanges.hold(api, ex, KPI_TYPE, kpiId, proposed, null);   // maker-checker: the KPI is the governed write
+        Map<String, Object> written;
+        try {
+            written = store.write(KPI_TYPE, kpiId, shaped).content();
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+        }
+        req.put(KPI_TYPE, kpiId);
+        write(store, id, req);
+        return written;
+    }
+
+    /** The KPI direction a Requirement's comparator states, or {@code null} when it states none. */
+    private static String directionOf(Object comparator) {
+        return switch (comparator == null ? "" : comparator.toString().trim()) {
+            case ">=", ">", "gte", "gt" -> "up";
+            case "<=", "<", "lte", "lt" -> "down";
+            default -> null;
+        };
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────────

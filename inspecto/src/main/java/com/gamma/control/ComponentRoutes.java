@@ -638,6 +638,8 @@ final class ComponentRoutes implements RouteModule {
                 stamped.put("name", id);
                 AlertRoutes.requireGroupingColumns(api, com.gamma.alert.AlertRule.fromMap(stamped));
             }
+            // ASSURE-KPI-DEFINITIONS-1: a KPI's Measure must exist, and be readable by its author, at save.
+            if (KpiRoutes.TYPE.equals(type)) KpiRoutes.requireMeasure(api, ex, id, content);
             // Maker-checker (ASSURE-MAKER-CHECKER-1): after validation, before the tag projection's side effects.
             Map<String, Object> stamped = new LinkedHashMap<>(content);
             stamped.put("name", id);   // what the store persists
@@ -770,6 +772,10 @@ final class ComponentRoutes implements RouteModule {
                         .map(f -> (f.fieldPath().isEmpty() ? "" : f.fieldPath() + ": ") + f.message())
                         .collect(java.util.stream.Collectors.joining("; ")));
         }
+
+        // ASSURE-KPI-DEFINITIONS-1: the structural half of a KPI (grain, ordered bands, known keys) — every door,
+        // bulk writers included. Whether its Dataset exists is KpiRoutes.requireMeasure, which needs the caller.
+        if ("kpi".equals(type)) com.gamma.query.KpiDefinition.fromMap(id, content);
 
         if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
     }

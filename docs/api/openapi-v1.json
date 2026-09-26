@@ -9082,6 +9082,50 @@
           "404" : { "description" : "No visible score for that model and entity." }
         }
       }
+    },
+    "/kpis/{kpiId}/value" : {
+      "get" : {
+        "tags" : [ "kpis" ],
+        "summary" : "GET /kpis/{kpiId}/value (generated skeleton)",
+        "operationId" : "getKpisByKpiIdValue",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "kpiId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/requirements/{requirementId}/kpi" : {
+      "post" : {
+        "tags" : [ "requirements" ],
+        "summary" : "POST /requirements/{requirementId}/kpi (generated skeleton)",
+        "operationId" : "postRequirementsByRequirementIdKpi",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "requirementId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   },
   "components" : {

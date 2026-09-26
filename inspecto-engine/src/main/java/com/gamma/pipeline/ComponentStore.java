@@ -98,7 +98,11 @@ public final class ComponentStore {
                     // server while the mock served them happily. Named `rule-template`, never bare `rule`
                     // (docs/GLOSSARY.md §0 — Rule is always qualified; the triad is Expectation /
                     // Decision Rule / Alert Rule, and this is none of them).
-                    "rule-template");
+                    "rule-template",
+                    // KPI definition (ASSURE-KPI-DEFINITIONS-1, WS-20): a Measure + target + good direction + RAG
+                    // bands + period grain + comparison period, which the KPI tile reads instead of hand-set Widget
+                    // inputs. Validated by com.gamma.query.KpiDefinition; evaluated by GET /kpis/{id}/value.
+                    "kpi");
 
     private static final String TOON = ".toon";
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
