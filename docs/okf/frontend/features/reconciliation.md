@@ -123,6 +123,15 @@ resolving a Break was a config write that 403'd too. As built:
     for an identity-only one), `lastSeenAt = firstSeenAt`, `recurrences` 0, no assignee
     (`ReconStateStoreTest.aStateFileWithoutTheCountersLoadsWithDefaults`). Mutation-checked: dropping the
     recurrence increment or the return-to-assignee turns `ReconBreaksTest` red.
+  * **SPA** — the per-Break view is the **Breaks page**, not the Board (the Board is the aggregate tree and
+    lists no Breaks). Every Break table there gains *Age* (server `ageDays`), *Seen* (`4 runs · recurred 1×`)
+    and *Assignee* columns, and an **Assign** row action (`ReconAssignDialog`, pre-filled with the current
+    assignee or the signed-in actor, trimmed, ≤ 200) shown only when `LensService.canOperateRuns()` — the
+    route's own gate. Assign sends the Break's note back unchanged, because a status change replaces it.
+    The overlay carries the counters and age of an `auto_closed` record, but not its status or assignee
+    (the live Break is open again until a run records its return). The **Board**'s age strip adds
+    *Assigned: N* and *Recurring: N* chips (`lifecycleCounts`, unresolved Breaks only). The status badge
+    reads `assigned` as the info tone, like `open`.
 * **SPA** — the Board runs the display comparison, then `ReconApiService.record(id)` (a failure toasts
   *"This run was not recorded"* with the server's reason and falls back to `state(id)`); its aging strip reads
   the recorded state. The Breaks page reads `state(id)` and overlays status/note **and `firstSeenAt`** (it
@@ -145,8 +154,10 @@ Four rules that are easy to get wrong and are each pinned by a test:
   sighting; reporting it as fresh makes the oldest untracked breaks look newest. `breakAgeDays` returns
   `null` and the UI shows an em-dash.
 * **Buckets are upper-exclusive**, so day 30 is `30-60` and lands in exactly one bucket.
-* **Aging counts OPEN breaks only.** Including resolved or auto-closed ones would make the backlog look
-  *older* the more of it you cleared.
+* **Aging counts UNRESOLVED breaks only** — `open` and, since `ASSURE-BREAK-LIFECYCLE-1`, `assigned`
+  (`isUnresolved`; owning a Break does not make it younger). Including resolved or auto-closed ones would make
+  the backlog look *older* the more of it you cleared. `breakAgeDays` prefers the server's `ageDays` and
+  derives from `firstSeenAt` only when the server sent none.
 
 ⚠ The rollup lives in `reconciliation-types.ts`, not in either component: two panes deriving the same
 histogram is how one concept ends up with two drifting definitions, and the "open only" rule is exactly

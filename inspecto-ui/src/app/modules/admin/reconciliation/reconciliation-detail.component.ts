@@ -7,7 +7,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, ReconApiService } from 'app/inspecto/api';
+import { MatDialog } from '@angular/material/dialog';
+import { apiErrorMessage, LensService, ReconApiService, SessionService } from 'app/inspecto/api';
 import { ReconRowsResult } from 'app/inspecto/api/recon.service';
 import { StatusBadgeComponent, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
@@ -36,6 +37,7 @@ import {
     ReconState,
 } from 'app/inspecto/reconciliation';
 import { ReconExecService } from './recon-exec.service';
+import { ReconAssignData, ReconAssignDialog } from './recon-assign.dialog';
 import { DatasetsService } from '../studio/datasets/datasets.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -81,6 +83,9 @@ export class ReconciliationDetailComponent implements OnInit {
     private reconApi = inject(ReconApiService);
     private router = inject(Router);
     private datasetsApi = inject(DatasetsService);
+    private dialog = inject(MatDialog);
+    private lens = inject(LensService);
+    private session = inject(SessionService);
 
     readonly recon = signal<Reconciliation | null>(null);
     /** The server-recorded run + Break lifecycle (R2-03); null until read. */
@@ -241,8 +246,9 @@ export class ReconciliationDetailComponent implements OnInit {
     });
 
     /**
-     * Live breaks with the recorded lifecycle overlaid. `firstSeenAt` always carries (the next recorded run
-     * keeps it too); an `auto_closed` record's status/note do not — the Break is live again, so it is open.
+     * Live breaks with the recorded lifecycle overlaid. `firstSeenAt` and the server's counters / age always
+     * carry (the next recorded run keeps them too); an `auto_closed` record's status/note/assignee do not — the
+     * Break is live again, so it is open until a run records its return.
      */
     readonly drillBreaks = computed<ReconBreak[]>(() => {
         const live = this.liveBreaks() ?? [];
@@ -250,8 +256,17 @@ export class ReconciliationDetailComponent implements OnInit {
         return live.map((b) => {
             const p = persisted.get(lifecycleId(b));
             if (!p) return b;
-            const aged = p.firstSeenAt ? { ...b, firstSeenAt: p.firstSeenAt } : b;
-            return p.status !== 'auto_closed' ? { ...aged, status: p.status, note: p.note } : aged;
+            const aged: ReconBreak = {
+                ...b,
+                ...(p.firstSeenAt ? { firstSeenAt: p.firstSeenAt } : {}),
+                ...(p.lastSeenAt ? { lastSeenAt: p.lastSeenAt } : {}),
+                ...(p.occurrences !== undefined ? { occurrences: p.occurrences } : {}),
+                ...(p.recurrences !== undefined ? { recurrences: p.recurrences } : {}),
+                ...(p.ageDays !== undefined ? { ageDays: p.ageDays } : {}),
+            };
+            return p.status !== 'auto_closed'
+                ? { ...aged, status: p.status, note: p.note, assignee: p.assignee }
+                : aged;
         });
     });
 
@@ -275,10 +290,46 @@ export class ReconciliationDetailComponent implements OnInit {
         return days === null ? '—' : `${days}d`;
     };
 
+    /** `3 runs · recurred 1×` — how often a recorded Break was seen, or an em-dash when no run recorded it. */
+    readonly seenText = (b: ReconBreak): string => {
+        if (b.occurrences === undefined) return '—';
+        const runs = `${b.occurrences} run${b.occurrences === 1 ? '' : 's'}`;
+        return b.recurrences ? `${runs} · recurred ${b.recurrences}×` : runs;
+    };
+
+    /**
+     * Age · Seen · Assignee — the recorded lifecycle (`ASSURE-BREAK-LIFECYCLE-1`), shared by every Break
+     * table. Age and Seen sort by the NUMBER (a string sort would put "9d" after "30d").
+     */
+    private readonly lifecycleColumns: ColDef<ReconBreak>[] = [
+        {
+            colId: 'age',
+            headerName: 'Age',
+            width: 100,
+            valueGetter: (p) => (p.data ? breakAgeDays(p.data) : null),
+            valueFormatter: (p) => (p.value === null || p.value === undefined ? '—' : `${p.value}d`),
+        },
+        {
+            colId: 'seen',
+            headerName: 'Seen',
+            width: 170,
+            headerTooltip: 'Recorded runs this break was present in; recurred = came back after auto-closing',
+            valueGetter: (p) => p.data?.occurrences ?? null,
+            valueFormatter: (p) => (p.data ? this.seenText(p.data) : '—'),
+        },
+        {
+            field: 'assignee',
+            headerName: 'Assignee',
+            width: 140,
+            valueFormatter: (p) => (p.value ? String(p.value) : '—'),
+        },
+    ];
+
     /** Key + impact + status (+ actions) — the shape of the two missing-side tables. */
     readonly missingColumns = computed<ColDef<ReconBreak>[]>(() => [
         { field: 'key', headerName: 'Key', flex: 1 },
         ...this.impactColumn(),
+        ...this.lifecycleColumns,
         {
             field: 'status',
             headerName: 'Status',
@@ -323,6 +374,7 @@ export class ReconciliationDetailComponent implements OnInit {
             valueGetter: (p) => (p.data ? this.recordsText(p.data) : ''),
         },
         ...this.impactColumn(),
+        ...this.lifecycleColumns,
         {
             field: 'status',
             headerName: 'Status',
@@ -348,14 +400,7 @@ export class ReconciliationDetailComponent implements OnInit {
             },
             { field: 'diff', headerName: 'Δ', width: 120, cellRenderer: varianceCell() },
             ...this.impactColumn(),
-            {
-                colId: 'age',
-                headerName: 'Age',
-                width: 100,
-                // Sorted by the NUMBER, rendered as text: a string sort would put "9d" after "30d".
-                valueGetter: (p) => (p.data ? breakAgeDays(p.data) : null),
-                valueFormatter: (p) => (p.value === null || p.value === undefined ? '—' : `${p.value}d`),
-            },
+            ...this.lifecycleColumns,
             {
                 field: 'status',
                 headerName: 'Status',
@@ -370,6 +415,14 @@ export class ReconciliationDetailComponent implements OnInit {
             icon: (b) => (b.status === 'resolved' ? 'heroicons_outline:arrow-uturn-left' : 'heroicons_outline:check'),
             hint: (b) => (b.status === 'resolved' ? 'Re-open' : 'Resolve'),
             onClick: (b) => this.toggleResolve(b),
+        },
+        {
+            icon: 'heroicons_outline:user-plus',
+            hint: (b) => (b.status === 'assigned' ? `Reassign (now ${b.assignee ?? '—'})` : 'Assign'),
+            // Same gate as the server's: the status route is `canOperateRuns`, so offering it to anyone else
+            // would only ever produce a 403.
+            visible: () => this.canAssign(),
+            onClick: (b) => this.assign(b),
         },
         {
             icon: 'heroicons_outline:exclamation-triangle',
@@ -699,6 +752,33 @@ export class ReconciliationDetailComponent implements OnInit {
      * Resolve / re-open one break — recorded server-side by identity (`POST /recon/{id}/breaks/status`,
      * `canOperateRuns`); a live Break no run has recorded yet is appended by the server on first touch.
      */
+    /** Assign rides the resolve route and its `canOperateRuns` gate (`ASSURE-BREAK-LIFECYCLE-1`). */
+    readonly canAssign = computed(() => this.lens.canOperateRuns());
+
+    /**
+     * Assign one Break to a named owner — recorded server-side (`status: assigned`). The note is sent back
+     * unchanged because a status change replaces it. It stays assigned across runs and returns to the same
+     * assignee if it recurs.
+     */
+    assign(b: ReconBreak): void {
+        const r = this.recon();
+        if (!r || !this.canAssign()) return;
+        const data: ReconAssignData = {
+            label: `${breakLabel(b.type)} · key "${b.key}"${b.column ? ` · ${b.column}` : ''}`,
+            assignee: b.assignee ?? this.session.actor() ?? '',
+        };
+        this.dialog
+            .open(ReconAssignDialog, { width: '420px', data })
+            .afterClosed()
+            .subscribe((assignee?: string) => {
+                if (!assignee) return;
+                this.reconApi.setBreakStatus(r.id, b, 'assigned', b.note ?? null, assignee).subscribe({
+                    next: (res) => this.state.set(withRecorded(this.state(), r.id, res.break)),
+                    error: (e) => this.toastr.error(apiErrorMessage(e, 'Could not assign the break')),
+                });
+            });
+    }
+
     async toggleResolve(b: ReconBreak): Promise<void> {
         const r = this.recon();
         if (!r) return;

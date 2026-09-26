@@ -104,6 +104,7 @@ export function statusTone(value: string | null | undefined): StatusTone {
             return 'warning';
         case 'INFO':
         case 'OPEN':
+        case 'ASSIGNED': // a Reconciliation Break someone owns — still open work
         case 'IDENTIFIED':
         case 'MINOR':
         case 'PENDING':

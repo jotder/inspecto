@@ -206,14 +206,16 @@ export class ReconApiService {
     }
 
     /**
-     * Resolve or re-open one Break by identity `(pair, type, key, column)` (`canOperateRuns`); a blank note
-     * clears it. A Break with no `pair` is sent as `AB`.
+     * Resolve, re-open or assign one Break by identity `(pair, type, key, column)` (`canOperateRuns`); a blank
+     * note clears it. `assigned` needs `assignee` — the server refuses it anywhere else. A Break with no `pair`
+     * is sent as `AB`.
      */
     setBreakStatus(
         reconciliation: string,
         b: Pick<ReconBreak, 'pair' | 'type' | 'key' | 'column'>,
-        status: 'resolved' | 'open',
+        status: 'resolved' | 'open' | 'assigned',
         note?: string | null,
+        assignee?: string | null,
     ): Observable<{ reconciliation: string; break: ReconBreak }> {
         return this.http.post<{ reconciliation: string; break: ReconBreak }>(
             apiUrl(`/recon/${encodeURIComponent(reconciliation)}/breaks/status`),
@@ -224,6 +226,7 @@ export class ReconApiService {
                 ...(b.column ? { column: b.column } : {}),
                 status,
                 ...(note ? { note } : {}),
+                ...(status === 'assigned' && assignee ? { assignee } : {}),
             },
         );
     }

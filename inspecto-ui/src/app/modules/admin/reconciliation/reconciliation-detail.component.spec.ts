@@ -6,7 +6,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
-import { ReconApiService } from 'app/inspecto/api';
+import { MatDialog } from '@angular/material/dialog';
+import { LensService, ReconApiService, SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import {
     breakId,
@@ -76,6 +77,10 @@ async function create(
         sets?: ReconBreakSets;
         rows?: ReturnType<typeof vi.fn>;
         datasets?: Partial<Dataset>[];
+        /** The Lens' `canOperateRuns` (the Assign gate); default true. */
+        canOperateRuns?: boolean;
+        /** What the Assign dialog closes with; when set, MatDialog is stubbed. */
+        dialogResult?: string;
     } = {},
 ) {
     const current: Reconciliation = { ...recon(), ...opts.patch };
@@ -84,9 +89,14 @@ async function create(
         of({ reconciliation: current.id, lastRunAt: opts.lastRunAt ?? null, runs: 1, breaks: opts.breaks ?? [] }),
     );
     // Echo the server: the Break by identity with the new status and (trimmed) note.
-    const setBreakStatus = vi.fn((_id: string, b: ReconBreak, status: 'resolved' | 'open', note?: string) =>
-        of({ reconciliation: current.id, break: { ...b, status, note: note || undefined } }),
+    const setBreakStatus = vi.fn(
+        (_id: string, b: ReconBreak, status: 'resolved' | 'open' | 'assigned', note?: string, assignee?: string) =>
+            of({
+                reconciliation: current.id,
+                break: { ...b, status, note: note || undefined, ...(assignee ? { assignee } : {}) },
+            }),
     );
+    const dialog = { open: vi.fn(() => ({ afterClosed: () => of(opts.dialogResult) })) };
     const breaks = vi.fn(
         async (r: Reconciliation, path?: Record<string, string> | null) =>
             opts.sets ?? reconBreakSets(r, opts.left ?? LEFT, opts.right ?? RIGHT, path),
@@ -123,16 +133,105 @@ async function create(
             { provide: ReconApiService, useValue: { promote, promoted, state, setBreakStatus } },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
+            { provide: LensService, useValue: { canOperateRuns: () => opts.canOperateRuns ?? true } },
+            { provide: SessionService, useValue: { actor: () => 'me' } },
         ],
     });
+    // The data-table injects the real MatDialog, so a plain provider would be silently ignored.
+    if (opts.dialogResult !== undefined) TestBed.overrideProvider(MatDialog, { useValue: dialog });
     const fixture = TestBed.createComponent(ReconciliationDetailComponent);
     fixture.detectChanges(); // ngOnInit — load + compute
     await fixture.whenStable();
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, save, breaks, promote, promoted, toastr, setBreakStatus };
+    return { fixture, c: fixture.componentInstance, save, breaks, promote, promoted, toastr, setBreakStatus, dialog };
 }
 
 describe('ReconciliationDetailComponent (Breaks page)', () => {
+    /** ASSURE-BREAK-LIFECYCLE-1: the recorded counters, server age and assignee overlay onto the live Break. */
+    it('shows the recorded age, occurrences, recurrence and assignee of a Break', async () => {
+        const { fixture, c } = await create({
+            breaks: [
+                {
+                    pair: 'AB',
+                    key: 'MEA · voice',
+                    type: 'missing_right',
+                    status: 'assigned',
+                    assignee: 'dana',
+                    firstSeenAt: '2026-07-01T00:00:00Z',
+                    lastSeenAt: '2026-09-01T00:00:00Z',
+                    occurrences: 4,
+                    recurrences: 1,
+                    ageDays: 87,
+                },
+            ],
+        });
+        const mea = c.missingA()[0];
+        expect(mea).toMatchObject({
+            status: 'assigned',
+            assignee: 'dana',
+            occurrences: 4,
+            recurrences: 1,
+            ageDays: 87,
+        });
+        expect(c.seenText(mea)).toBe('4 runs · recurred 1×');
+        expect(c.seenText(c.missingB()[0])).toBe('—');
+        expect(c.missingColumns().map((col) => col.colId ?? col.field)).toEqual(
+            expect.arrayContaining(['age', 'seen', 'assignee']),
+        );
+        await fixture.whenStable();
+        fixture.detectChanges();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('an auto-closed record overlays its counters but not its assignee — the live Break is open again', async () => {
+        const { c } = await create({
+            breaks: [
+                {
+                    pair: 'AB',
+                    key: 'MEA · voice',
+                    type: 'missing_right',
+                    status: 'auto_closed',
+                    assignee: 'dana',
+                    occurrences: 2,
+                    recurrences: 0,
+                },
+            ],
+        });
+        expect(c.missingA()[0]).toMatchObject({ status: 'open', occurrences: 2 });
+        expect(c.missingA()[0].assignee).toBeUndefined();
+    });
+
+    it('assigns a Break through the status route, keeping its note', async () => {
+        const { c, setBreakStatus, dialog, save } = await create({
+            dialogResult: 'lee',
+            breaks: [
+                { pair: 'AB', key: 'EU · data', type: 'value_break', column: 'amount', status: 'open', note: 'FX' },
+            ],
+        });
+        c.assign(c.valueBreaks()[0]);
+        expect(dialog.open).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ data: expect.objectContaining({ assignee: 'me' }) }),
+        );
+        expect(setBreakStatus).toHaveBeenCalledWith(
+            'med_vs_bill',
+            expect.objectContaining({ key: 'EU · data' }),
+            'assigned',
+            'FX',
+            'lee',
+        );
+        expect(c.valueBreaks()[0]).toMatchObject({ status: 'assigned', assignee: 'lee' });
+        expect(save).not.toHaveBeenCalled();
+    });
+
+    it('offers Assign only to a user who may operate runs — the route is canOperateRuns', async () => {
+        const { c, setBreakStatus } = await create({ canOperateRuns: false, dialogResult: 'lee' });
+        const assign = c.rowActions.find((a) => a.icon === 'heroicons_outline:user-plus')!;
+        expect(assign.visible!(c.valueBreaks()[0])).toBe(false);
+        c.assign(c.valueBreaks()[0]);
+        expect(setBreakStatus).not.toHaveBeenCalled();
+    });
+
     it('computes the three live record sets from the exec seam', async () => {
         const { fixture, c } = await create();
         expect(c.missingA().map((b) => b.key)).toEqual(['MEA · voice']);
@@ -688,6 +787,9 @@ describe('Duplicate keys — cardinality Breaks on the Breaks page', () => {
             'Repeated on',
             'Records',
             'Impact (SAR)',
+            'Age',
+            'Seen',
+            'Assignee',
             'Status',
         ]);
         const section = el(fixture).querySelector('[data-testid="duplicate-keys"]');

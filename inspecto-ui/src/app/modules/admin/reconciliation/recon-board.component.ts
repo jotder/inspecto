@@ -25,6 +25,7 @@ import {
     DEFAULT_BANDS,
     deltaPct,
     fmtMeasure,
+    lifecycleCounts,
     markBreachesExpanded,
     measureLabel,
     openAgeBuckets,
@@ -162,6 +163,8 @@ export class ReconBoardComponent implements OnInit {
      */
     readonly ageBuckets = computed(() => openAgeBuckets(this.state()?.breaks ?? []));
     readonly ageLabel = ageBucketLabel;
+    /** Unresolved Breaks someone owns, and those that came back after auto-closing (ASSURE-BREAK-LIFECYCLE-1). */
+    readonly lifecycle = computed(() => lifecycleCounts(this.state()?.breaks ?? []));
 
     readonly treeNodes = computed<TreeNode[]>(() => {
         const r = this.result();

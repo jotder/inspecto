@@ -36,6 +36,21 @@
                             {{ ageLabel(b.bucket) }}: <span class="font-semibold">{{ b.count }}</span>
                         </inspecto-chip>
                     }
+                    @if (lifecycle().assigned) {
+                        <inspecto-chip variant="outline" tone="primary" data-testid="board-assigned">
+                            Assigned: <span class="font-semibold">{{ lifecycle().assigned }}</span>
+                        </inspecto-chip>
+                    }
+                    @if (lifecycle().recurring) {
+                        <inspecto-chip
+                            variant="outline"
+                            tone="warning"
+                            data-testid="board-recurring"
+                            title="Open breaks that auto-closed on an earlier run and came back"
+                        >
+                            Recurring: <span class="font-semibold">{{ lifecycle().recurring }}</span>
+                        </inspecto-chip>
+                    }
                 </div>
             </div>
         }

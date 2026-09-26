@@ -173,6 +173,41 @@ describe('ReconBoardComponent', () => {
         ]);
     });
 
+    /** ASSURE-BREAK-LIFECYCLE-1: the server's age wins, assigned Breaks still age, and the strip counts them. */
+    it('ages assigned Breaks by the server age and shows the assigned and recurring counts', async () => {
+        const lifecycle: ReconState = {
+            ...RECORDED,
+            breaks: [
+                // the server says 45 days; the stamp alone would say ~0 — the server's number must win
+                {
+                    key: 'MEA · voice',
+                    type: 'missing_right',
+                    status: 'assigned',
+                    assignee: 'dana',
+                    firstSeenAt: new Date().toISOString(),
+                    ageDays: 45,
+                    occurrences: 5,
+                    recurrences: 2,
+                },
+                { key: 'APAC · sms', type: 'missing_left', status: 'open', ageDays: 3, occurrences: 1, recurrences: 0 },
+                // settled work: recurred once but resolved — not counted as recurring
+                { key: 'EU · data', type: 'value_break', column: 'amount', status: 'resolved', recurrences: 1 },
+            ],
+        };
+        const { fixture, c } = await create({ record: () => of(lifecycle) });
+        await vi.waitFor(() => expect(c.state()).toEqual(lifecycle));
+        fixture.detectChanges();
+        expect(c.ageBuckets()).toEqual([
+            { bucket: '0-30', count: 1 },
+            { bucket: '30-60', count: 1 },
+        ]);
+        expect(c.lifecycle()).toEqual({ assigned: 1, recurring: 1 });
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="board-assigned"]')?.textContent).toContain('Assigned: 1');
+        expect(el.querySelector('[data-testid="board-recurring"]')?.textContent).toContain('Recurring: 1');
+        await expectNoA11yViolations(el);
+    });
+
     it('toasts a run it could not record and keeps the last recorded lifecycle', async () => {
         const { c, toastr, state } = await create({
             record: () => throwError(() => ({ status: 403, error: { error: { message: 'requires canOperateRuns' } } })),

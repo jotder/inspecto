@@ -43,7 +43,8 @@ export const DEFAULT_BANDS: ReconBands = { warnPct: 1, breachPct: 2 };
  * one authored before the option existed.
  */
 export type BreakType = 'missing_left' | 'missing_right' | 'value_break' | 'cardinality_break';
-export type BreakStatus = 'open' | 'resolved' | 'auto_closed';
+/** `assigned` = an unresolved Break with an {@link ReconBreak.assignee} (`ASSURE-BREAK-LIFECYCLE-1`). */
+export type BreakStatus = 'open' | 'assigned' | 'resolved' | 'auto_closed';
 /** The anchor-relative pair a Break was found on: A vs B, or A vs C on a 3-way Reconciliation. */
 export type ReconPair = 'AB' | 'AC';
 
@@ -85,6 +86,21 @@ export interface ReconBreak {
      * than guessing, and the UI shows an em-dash — an invented age would read exactly like a measured one.
      */
     firstSeenAt?: string;
+    /**
+     * The recorded lifecycle's counters (`ASSURE-BREAK-LIFECYCLE-1`, server-side in `ReconBreaks.merge`) — all
+     * absent on a live Break no run has recorded. `occurrences` = recorded runs the Break was present in;
+     * `recurrences` = times it reappeared after auto-closing (it is then RE-OPENED, keeping `firstSeenAt`).
+     */
+    lastSeenAt?: string;
+    occurrences?: number;
+    recurrences?: number;
+    /** Who owns an `assigned` Break; kept on record when it resolves or auto-closes. */
+    assignee?: string;
+    /**
+     * Whole days an unresolved (`open` / `assigned`) Break has been broken — computed by the SERVER at read
+     * time, absent for a settled or unstamped Break. {@link breakAgeDays} prefers it.
+     */
+    ageDays?: number;
 }
 
 /**
@@ -191,6 +207,8 @@ export type AgeBucket = (typeof AGE_BUCKETS)[number];
  * and reporting it as fresh is the opposite of what an aging view is for.
  */
 export function breakAgeDays(b: ReconBreak, now: Date = new Date()): number | null {
+    // The server's age wins (ASSURE-BREAK-LIFECYCLE-1); the local derivation covers a stamp it did not age.
+    if (typeof b.ageDays === 'number') return b.ageDays;
     if (!b.firstSeenAt) return null;
     const seen = Date.parse(b.firstSeenAt);
     if (Number.isNaN(seen)) return null;
@@ -205,17 +223,38 @@ export function breakAgeDays(b: ReconBreak, now: Date = new Date()): number | nu
  * is exactly how one concept ends up with two drifting definitions, and the "open only" rule below is the
  * kind of thing that drifts first.
  *
- * Counts **open** breaks only: resolved and auto-closed breaks are settled work, and including them would
- * make the backlog look older the more of it you cleared.
+ * Counts **unresolved** (`open` / `assigned`) breaks only: resolved and auto-closed breaks are settled work,
+ * and including them would make the backlog look older the more of it you cleared. An assigned Break is still
+ * broken — owning it does not make it younger.
  */
 export function openAgeBuckets(breaks: ReconBreak[], now: Date = new Date()): { bucket: AgeBucket; count: number }[] {
     const counts = new Map<AgeBucket, number>();
     for (const b of breaks) {
-        if (b.status !== 'open') continue;
+        if (!isUnresolved(b)) continue;
         const bucket = ageBucketOf(b, now);
         counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
     }
     return AGE_BUCKETS.filter((b) => counts.has(b)).map((bucket) => ({ bucket, count: counts.get(bucket)! }));
+}
+
+/** An `open` or `assigned` Break — still broken, whoever owns it. */
+export function isUnresolved(b: Pick<ReconBreak, 'status'>): boolean {
+    return b.status === 'open' || b.status === 'assigned';
+}
+
+/**
+ * The recorded lifecycle's headline counts for the Board (`ASSURE-BREAK-LIFECYCLE-1`): unresolved Breaks with
+ * an assignee, and unresolved Breaks that have recurred at least once.
+ */
+export function lifecycleCounts(breaks: ReconBreak[]): { assigned: number; recurring: number } {
+    let assigned = 0,
+        recurring = 0;
+    for (const b of breaks) {
+        if (!isUnresolved(b)) continue;
+        if (b.status === 'assigned') assigned++;
+        if ((b.recurrences ?? 0) > 0) recurring++;
+    }
+    return { assigned, recurring };
 }
 
 /** Display label for an age bucket — `unknown` is spelled out rather than shown as a range. */
