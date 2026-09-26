@@ -27,13 +27,25 @@ import java.util.Set;
  * claim ({@code email} with {@code email_verified: true}), or {@code null}. It is the ONLY address a
  * per-user email notification may go to — never a caller-supplied one, because an editable address
  * would let any user route notifications (security ones included) to an arbitrary mailbox.
+ *
+ * <p><b>Display name (R2-16).</b> {@link #displayName()} is what to CALL the subject in the UI — the IdP's
+ * {@code name} claim, else {@code given_name}+{@code family_name}, else {@code preferred_username} — or
+ * {@code null}. <b>Display-only, untrusted text</b>: it identifies nobody, grants nothing, and must never
+ * be matched, logged as identity, or used in place of {@link #id()}.
  */
 public record Subject(String id, Set<String> capabilities, Set<String> dataScopes,
-                      Map<String, Object> attributes, String email) {
+                      Map<String, Object> attributes, String email, String displayName) {
 
     public Subject {
         attributes = attributes == null ? Map.of() : Map.copyOf(attributes);
         email = email == null || email.isBlank() ? null : email.trim();
+        displayName = displayName == null || displayName.isBlank() ? null : displayName.trim();
+    }
+
+    /** No display name — every pre-R2-16 caller. */
+    public Subject(String id, Set<String> capabilities, Set<String> dataScopes, Map<String, Object> attributes,
+                   String email) {
+        this(id, capabilities, dataScopes, attributes, email, null);
     }
 
     /** No verified email claim — every pre-§7 caller. */

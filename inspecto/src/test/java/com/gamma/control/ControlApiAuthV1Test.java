@@ -40,6 +40,8 @@ class ControlApiAuthV1Test {
         String auth = ex.getRequestHeaders().getFirst("Authorization");
         if ("Bearer valid".equals(auth)) return Optional.of(new Subject("jdoe", Set.of("canAuthorWorkbench", "canOperateRuns")));
         if ("Bearer limited".equals(auth)) return Optional.of(new Subject("guest", Set.of()));
+        if ("Bearer named".equals(auth))
+            return Optional.of(new Subject("f3a9-uuid", Set.of(), null, java.util.Map.of(), null, "Ana <b>Lopez</b>"));
         return Optional.empty();
     };
 
@@ -239,6 +241,21 @@ class ControlApiAuthV1Test {
             assertTrue(session.get("authenticated").asBoolean());
             assertEquals("jdoe", session.get("actor").asText());
             assertTrue(streamText(session.get("capabilities")).contains("canAuthorWorkbench"));
+            assertTrue(session.get("displayName").isNull(), "a Subject without a display name serves null");
+        }
+    }
+
+    /** R2-16: the signed-in subject's display name rides the bootstrap session block verbatim (display-only,
+     *  untrusted text — the SPA interpolates it), beside — never instead of — the actor id. */
+    @Test
+    void bootstrapSessionCarriesTheSubjectsDisplayName(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx c = open(cfg, root)) {
+            JsonNode session = V1Body.of(get(c.port, "/bootstrap", "Authorization", "Bearer named").body()).get("session");
+            assertEquals("f3a9-uuid", session.get("actor").asText(), "identity stays the subject id");
+            assertEquals("Ana <b>Lopez</b>", session.get("displayName").asText());
+            assertTrue(V1Body.of(get(c.port, "/bootstrap").body()).get("session").get("displayName").isNull(),
+                    "anonymous: no subject, no name");
         }
     }
 

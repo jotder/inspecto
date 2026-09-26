@@ -457,6 +457,37 @@ class OidcAuthenticatorTest {
         return authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt.serialize()).orElseThrow();
     }
 
+    // ── R2-16: the display name — name, else given+family, else preferred_username ──────────
+
+    @Test
+    void theDisplayNameFollowsTheStandardClaimsInPrecedenceOrder() throws Exception {
+        assertEquals("Ana Lopez", subjectWithClaims(Map.of("name", " Ana Lopez ", "given_name", "X",
+                "family_name", "Y", "preferred_username", "alopez")).displayName(), "name wins, trimmed");
+        assertEquals("Ana Lopez", subjectWithClaims(Map.of("given_name", "Ana", "family_name", "Lopez",
+                "preferred_username", "alopez")).displayName());
+        assertEquals("Ana", subjectWithClaims(Map.of("given_name", "Ana", "preferred_username", "alopez")).displayName());
+        assertEquals("Lopez", subjectWithClaims(Map.of("family_name", "Lopez")).displayName());
+        assertEquals("alopez", subjectWithClaims(Map.of("name", "  ", "preferred_username", "alopez")).displayName(),
+                "a blank name falls back to preferred_username");
+        assertEquals("alopez", subjectWithClaims(Map.of("name", List.of("not", "a", "string"),
+                "preferred_username", "alopez")).displayName(), "a non-string claim is ignored");
+        Subject bare = subjectWithClaims(Map.of());
+        assertNull(bare.displayName(), "no name claims ⇒ null, and the SPA shows the actor id");
+        assertEquals("ana", bare.id(), "the name never replaces the subject id");
+    }
+
+    private static Subject subjectWithClaims(Map<String, Object> extra) throws Exception {
+        JWTClaimsSet.Builder b = new JWTClaimsSet.Builder()
+                .issuer(ISSUER).subject("ana").audience(AUDIENCE)
+                .expirationTime(Date.from(Instant.now().plusSeconds(60)))
+                .claim("roles", List.of("operations"));
+        extra.forEach(b::claim);
+        SignedJWT jwt = new SignedJWT(
+                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(RSA_KEY.getKeyID()).build(), b.build());
+        jwt.sign(new RSASSASigner(RSA_KEY));
+        return authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt.serialize()).orElseThrow();
+    }
+
     @Test
     void withoutAnAllowlistSubjectAttributesStayEmpty() throws Exception {
         String jwt = token(Instant.now().plusSeconds(60), List.of("operations"), RSA_KEY, ISSUER, AUDIENCE, "ops");

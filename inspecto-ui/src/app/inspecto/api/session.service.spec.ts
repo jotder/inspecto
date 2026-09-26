@@ -319,6 +319,36 @@ describe('SessionService (W6d edition switch)', () => {
         expect(svc.actorName()).toBe('priya.n');
     });
 
+    // R2-16: a real OIDC session names the subject from bootstrap's `session.displayName` (the IdP's name
+    // claims); a Demo User's picker name still wins, and a blank/absent name falls back to the actor id.
+    it('actorName prefers the Demo User name, then the bootstrap session displayName, then the actor id', async () => {
+        svc.actor.set('f3a9-uuid');
+        svc.subjectDisplayName.set('Ana Lopez');
+        expect(svc.actorName()).toBe('Ana Lopez');
+        svc.subjectDisplayName.set('   ');
+        expect(svc.actorName()).toBe('f3a9-uuid');
+        svc.subjectDisplayName.set('Ana Lopez');
+        svc.demoUsers.set([{ id: 'f3a9-uuid', displayName: 'Demo Manager', title: 'Manager' }]);
+        expect(svc.actorName()).toBe('Demo Manager');
+    });
+
+    it('the post-sign-in bootstrap re-read carries session.displayName into actorName', async () => {
+        const done = svc.init();
+        httpMock.expectOne(`${base}/bootstrap`).flush({
+            features: { authMode: 'oidc' },
+            auth: { authorizeUrl: 'https://idp/authorize', clientId: 'spa-1' },
+        });
+        await tick();
+        httpMock.expectOne(`${base}/auth/refresh`).flush({ accessToken: 'at' });
+        await tick();
+        httpMock
+            .expectOne(`${base}/bootstrap`)
+            .flush({ session: { authenticated: true, actor: 'f3a9-uuid', displayName: 'Ana <b>Lopez</b>' } });
+        await done;
+        expect(svc.actor()).toBe('f3a9-uuid');
+        expect(svc.actorName()).toBe('Ana <b>Lopez</b>');
+    });
+
     // RP-Initiated Logout 1.0. Without this the Inspecto session ends but the IdP's SSO session does
     // not, so the next sign-in completes with no credential prompt (BACKLOG §5).
     it('logout redirects to the provider end_session_endpoint when one is configured', async () => {

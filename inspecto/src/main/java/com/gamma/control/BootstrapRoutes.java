@@ -188,6 +188,8 @@ final class BootstrapRoutes implements RouteModule {
         var subject = ApiContext.subject(ex);
         s.put("authenticated", subject.isPresent());
         s.put("actor", ApiContext.actor(ex));
+        // R2-16: display-only, untrusted — what the SPA CALLS the subject (null = show the actor id).
+        s.put("displayName", subject.map(Subject::displayName).orElse(null));
         s.put("capabilities", subject.map(sub -> List.copyOf(sub.capabilities())).orElse(List.of()));
         return s;
     }

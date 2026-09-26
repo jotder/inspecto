@@ -59,7 +59,7 @@ interface Bootstrap {
         events?: boolean;
         ops?: boolean;
     };
-    session?: { authenticated?: boolean; actor?: string; capabilities?: string[] };
+    session?: { authenticated?: boolean; actor?: string; displayName?: string | null; capabilities?: string[] };
     branding?: Partial<BootstrapBranding>;
     auth?: Partial<OidcConfig> & { demoUsers?: DemoUser[] };
 }
@@ -100,6 +100,12 @@ export class SessionService {
      * honour-system `appUser` placeholder, which is not a principal anyone should be shown as.
      */
     readonly actor = signal<string | null>(null);
+    /**
+     * R2-16: `bootstrap.session.displayName` — the IdP's `name` (else `given_name`+`family_name`, else
+     * `preferred_username`) for an AUTHENTICATED subject, else null. Display-only UNTRUSTED text: render it
+     * through interpolation only, never `innerHTML`, and never treat it as identity — that is {@link actor}.
+     */
+    readonly subjectDisplayName = signal<string | null>(null);
     readonly capabilities = signal<string[]>([]);
     /**
      * The deployment's branding, from the bootstrap payload rather than from {@link BrandingService}.
@@ -168,7 +174,7 @@ export class SessionService {
 
     /**
      * R2-16: what to CALL the signed-in subject — the Demo User's `displayName` when the picker entry has one,
-     * else the {@link actor} id itself (a real OIDC session carries no display name in `/bootstrap`). Null
+     * else the {@link subjectDisplayName} the IdP's claims gave, else the {@link actor} id itself. Null
      * exactly when {@link actor} is. The user menu and the Home greeting both read this; never re-derive it.
      */
     readonly actorName = computed(() => {
@@ -177,7 +183,9 @@ export class SessionService {
         return (
             this.demoUsers()
                 .find((u) => u.id === actor)
-                ?.displayName?.trim() || actor
+                ?.displayName?.trim() ||
+            this.subjectDisplayName()?.trim() ||
+            actor
         );
     });
 
@@ -353,6 +361,7 @@ export class SessionService {
         this.accessToken.set(null);
         this.authenticated.set(false);
         this.actor.set(null);
+        this.subjectDisplayName.set(null);
         this.capabilities.set([]);
         if (!this.router.url.startsWith('/sign-in')) void this.router.navigate(['/sign-in']);
     }
@@ -374,6 +383,7 @@ export class SessionService {
         const authenticated = boot.session?.authenticated ?? true;
         this.authenticated.set(authenticated);
         this.actor.set(authenticated ? (boot.session?.actor ?? null) : null);
+        this.subjectDisplayName.set(authenticated ? (boot.session?.displayName ?? null) : null);
         this.capabilities.set(boot.session?.capabilities ?? []);
     }
 }

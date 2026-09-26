@@ -160,7 +160,7 @@ public final class OidcAuthenticator implements Authenticator {
             ComponentAccess.heldRoles(ex, Set.copyOf(held));
             return Optional.of(new Subject(subjectId, Set.copyOf(capabilities),
                     RoleMapper.dataScopesFor(claims, rolesClaim, defs),
-                    attributes(claims, Roles.attributeClaims(ex)), verifiedEmail(claims)));
+                    attributes(claims, Roles.attributeClaims(ex)), verifiedEmail(claims), displayName(claims)));
         } catch (Exception e) {
             return Optional.empty();   // bad signature, wrong issuer/audience, expired, malformed — all 401
         }
@@ -173,6 +173,22 @@ public final class OidcAuthenticator implements Authenticator {
         Object email = claims.getClaim("email");
         Object verified = claims.getClaim("email_verified");
         return email instanceof String s && Boolean.TRUE.equals(verified) ? s : null;
+    }
+
+    /** R2-16: what to CALL the subject — {@code name}, else {@code given_name} + {@code family_name}, else
+     *  {@code preferred_username}, else {@code null}. Display-only and untrusted (the SPA renders it via
+     *  interpolation); it never affects who the subject IS or what it may do. Non-string claims are ignored. */
+    static String displayName(JWTClaimsSet claims) {
+        String name = stringClaim(claims, "name");
+        if (name != null) return name;
+        String given = stringClaim(claims, "given_name"), family = stringClaim(claims, "family_name");
+        if (given != null || family != null)
+            return given == null ? family : family == null ? given : given + " " + family;
+        return stringClaim(claims, "preferred_username");
+    }
+
+    private static String stringClaim(JWTClaimsSet claims, String name) {
+        return claims.getClaim(name) instanceof String s && !s.isBlank() ? s.trim() : null;
     }
 
     /** ABAC A1: only claims allowlisted in the space's {@code roles.toon} {@code identity.
