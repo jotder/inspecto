@@ -36,8 +36,9 @@ import java.util.stream.IntStream;
  * </ul>
  * Tolerance semantics are the SQL port of the UI's {@code withinTolerance} (reconciliation-types.ts,
  * locked 2026-07-03): {@code exact} | {@code absolute} | {@code percent} — percent is left-relative and a
- * zero left side requires exact equality. Row-level Break lifecycle (auto-close, preserved resolutions)
- * stays client-side per the C9 review-sheet contract; this service is stateless compute.
+ * zero left side requires exact equality. This service is stateless compute; the row-level Break lifecycle
+ * (auto-close, preserved resolutions, first-seen) is {@link ReconBreaks} + {@link ReconStateStore} since
+ * R2-03 (operator 2026-09-26 — it was client-side under C9).
  */
 public final class ReconService {
 

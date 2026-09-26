@@ -39,20 +39,64 @@ matched — is deliberately NOT built: the Incident attrs (`reconciliation`/`bre
 🔴 **Client seam, because the obvious one is dead.** `aggregateRecon`/`reconBreakSets` in
 `recon-board.ts` are an offline mirror of the backend with **no caller since the mock backend was removed
 (2026-08-31)**; they survive only as a parity mirror and are the most test-covered recon code in the SPA.
-The live path is `/recon/breaks` → **`breaksFromSets`** → the Break lifecycle. Wiring a new break type
-into the mirror would turn specs green and change nothing in the running app.
+The live path is `/recon/breaks` → **`breaksFromSets`** → the Breaks page, overlaid with the recorded
+lifecycle (below). Wiring a new break type into the mirror would turn specs green and change nothing in the
+running app.
+
+**Run + Break lifecycle are SERVER-SIDE operational state** (R2-03, **operator, 2026-09-26 — reverses C9**,
+which kept the lifecycle in the browser). Until then the Board merged the lifecycle client-side and saved
+`{…recon, breaks, lastRunAt}` through the whole-body `PUT /components/reconciliation/{id}`, gated
+`canAuthorWorkbench` — so a user holding only the `operations` role (`canOperateRuns`) got a **403 on every
+run**: nothing was recorded, the list read *"Last run: never"* and the Breaks page *"No first-seen date"*, and
+resolving a Break was a config write that 403'd too. As built:
+* **Store** — `ReconStateStore` (`inspecto-engine`, `com.gamma.query`): one JSON document per Reconciliation at
+  `<write-root>/recon-state/<id>.json` = `{reconciliation, lastRunAt, runs, breaks[]}` (a Break is the SPA's
+  `ReconBreak` shape). Atomic write (`AtomicFiles`), one lock for read-merge-write, **fail closed** (a corrupt
+  file is 503, never "never run"), the id a bare name and the file jailed with `PathJail.contains` against the
+  **write root** — not `recon-state/`, so a `recon-state` directory that is itself a link out is caught (403).
+  Deleting the `reconciliation` component deletes its state (a re-created id starts fresh). The mirror of
+  `expectation/BaselineProfileStore` and of an Expectation's `lastResult` split.
+* **Routes** (`ReconRoutes`): `GET /recon/{id}/state` and `GET /recon/state` (every saved Reconciliation's
+  `{reconciliation, lastRunAt, runs}`, capped 1000 with the true `total`) are ungated reads (no write-root
+  503; an unset root is 404/empty, like `/recon/promoted`). **`POST /recon/{id}/record`** and
+  **`POST /recon/{id}/breaks/status {type, key, column?, status: resolved|open, note?}`** are gated
+  **`canOperateRuns`** (`CapabilityManifest` group `// ReconRoutes`), like an Expectation's evaluation. Record
+  loads the SAVED Reconciliation and computes every A↔B Break itself (`ReconBreaks.compute`); status resolves /
+  re-opens by identity (a blank note clears it; an unrecorded live Break is appended identity-only; notes
+  ≤ 2000 chars; `auto_closed` is never a caller's to set). The authoring PUT stays `canAuthorWorkbench` and
+  knows nothing about state.
+* **Merge** — `ReconBreaks.merge`, a faithful port of the retired TS `mergeBreaks` (+ `breaksFromSets`/
+  `breakKeyOf` for the fresh set): new → `open` + `firstSeenAt = runAt`; still present → keeps `firstSeenAt`,
+  a `resolved` one stays resolved with its note; gone → `auto_closed`; already `auto_closed` and still gone →
+  dropped. ⚠ One deliberate widening: a still-present **open** Break keeps its note too (the TS dropped a
+  re-open note at the next run). 🔴 `keyText` must equal the browser's `String(value)` of the JSON — JavaScript
+  number spelling included (`1.0` → `"1"`, `1e-7` → `"1e-7"`) — or the Breaks page's overlay misses every
+  recorded Break; `ReconBreaksTest` pins it.
+* 🔴 **The 200-row fix.** The Board merged ONE `/recon/breaks` page (200 per set, `DEFAULT_BREAKS_LIMIT`), so
+  `mergeBreaks` auto-closed every recorded Break beyond it. Record is unpaged; a set larger than
+  `ReconStateStore.MAX_BREAKS` (50 000) is **refused (422), never recorded short** — truncating would
+  re-create exactly that defect. Pinned by `ControlApiReconStateTest.moreThanAPageOfBreaksIsRecorded…`.
+* **Scheduled runs record too** — `ReconRunJob` calls the same store after its Signal/Incident, best-effort:
+  a refusal is logged and named in the Job result (`— run not recorded: …`), never fails the run.
+* **SPA** — the Board runs the display comparison, then `ReconApiService.record(id)` (a failure toasts
+  *"This run was not recorded"* with the server's reason and falls back to `state(id)`); its aging strip reads
+  the recorded state. The Breaks page reads `state(id)` and overlays status/note **and `firstSeenAt`** (it
+  overlaid no stamp before, so every age read `—`); resolve/re-open calls `setBreakStatus`; Promote sends the
+  recorded `lastRunAt` as `runId`. The list's *Last run* reads `states()` (`—` when that read fails, never
+  "never"). `Reconciliation` no longer carries `breaks`/`lastRunAt`, and the config keys are gone from every
+  sample (`spaces/demo/…/orders_regional_recon.toon`); `BundleRoutes` no longer strips them (nothing to strip).
 
 **Aging** (`BREAK-AGING-1`, 2026-09-11). A Break carries `firstSeenAt`, stamped when it is first observed
-and **carried forward by `mergeBreaks` on every later run**. Age is derived from it and rolled up by
+and **carried forward by the server's merge on every later run**. Age is derived from it and rolled up by
 `openAgeBuckets` into **0–30 / 30–60 / 60–90 / 90+** days, rendered as a chip strip on the Board and on the
 Breaks page, plus an `Age` column on the Breaks grid. Before this a Break had a status but no time at all,
 so "how long has this been broken" was unanswerable.
 
 Four rules that are easy to get wrong and are each pinned by a test:
-* 🔴 **A fresh break arrives from the engine with NO stamp on every run**, so `mergeBreaks` must carry the
+* 🔴 **A fresh break arrives from the engine with NO stamp on every run**, so the merge must carry the
   previous one rather than re-stamp. Re-stamping resets every age to zero each run and the view then
   permanently reads *"everything is new"* — a plausible-looking display that is always wrong.
-* ⛔ **A missing stamp is `unknown`, never 0.** A Break persisted before this field existed has no first
+* ⛔ **A missing stamp is `unknown`, never 0.** A live Break no run has recorded yet has no first
   sighting; reporting it as fresh makes the oldest untracked breaks look newest. `breakAgeDays` returns
   `null` and the UI shows an em-dash.
 * **Buckets are upper-exclusive**, so day 30 is `30-60` and lands in exactly one bucket.
@@ -61,7 +105,7 @@ Four rules that are easy to get wrong and are each pinned by a test:
 
 ⚠ The rollup lives in `reconciliation-types.ts`, not in either component: two panes deriving the same
 histogram is how one concept ends up with two drifting definitions, and the "open only" rule is exactly
-what drifts first. ⚠ The Board writes ONE instant to both `mergeBreaks(…, runAt)` and `lastRunAt`.
+what drifts first. ⚠ A recorded run writes ONE instant to both the new Breaks' `firstSeenAt` and `lastRunAt`.
 
 * **Board** (`:id` default view) — the aggregate dimension-order tree on
   [`inspecto-tree-table`](../design-system/tree-table.md): unified dimension/measure selection, parents
@@ -76,7 +120,7 @@ what drifts first. ⚠ The Board writes ONE instant to both `mergeBreaks(…, ru
 * **Reusable** — a Reconciliation renders as a **Widget** and rides bundle export/template flows
   (DAT-7 P3); persisted as the `reconciliation` component kind with real backend routes
   `/recon/columns|run|breaks` (DAT-7 P0 — the query gate pattern from the Data Browser).
-* Runs are manual from the Board (no auto-refresh), **or scheduled**: the `recon.run` built-in Job Type
+* Runs are manual from the Board (no auto-refresh; each is recorded, above), **or scheduled**: the `recon.run` built-in Job Type
   (`ReconRunJob`, 2026-07-18) runs a saved `reconciliation` on a `cron:` and emits a `recon.run.completed`
   Signal carrying the Break counts (`WARNING` when any break exists) — it builds the identical
   `ReconService.Spec` the interactive route does, via the shared `ReconConfigLoader`. **A breach
@@ -144,8 +188,9 @@ TOTAL strip humanise too. The builder's view — side letter, Dataset id, raw co
 back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model reads `description` but
 `toContent` still does not write it back, so a Studio save of a Dataset likely drops it (pre-existing; not verified end-to-end).
 
-* ⚠ Not changed: the Board's lifecycle merge still persists the A↔B pair only, so C-side Breaks are live on the
-  Breaks page but never enter the persisted lifecycle (true of every Break type on a 3-way).
+* ⚠ Not changed: a recorded run still records the A↔B pair only (`ReconBreaks.compute`, as the Board always
+  did), so C-side Breaks are live on the Breaks page but never enter the recorded lifecycle (true of every Break
+  type on a 3-way) — their identity carries no side, so recording them would collide with the A↔B ones.
 
 As-built design (archived):
 [`reconciliation-board-design.md`](../../../archived-documents/plans-archive/reconciliation-board-design.md) ·

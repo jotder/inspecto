@@ -2,9 +2,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
-import { of } from 'rxjs';
+import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
+import { ReconApiService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { Reconciliation, ReconciliationsService } from 'app/inspecto/reconciliation';
@@ -17,17 +18,22 @@ const RECON: Reconciliation = {
     rightDataset: 'billing_cdr',
     keyColumns: ['id'],
     compareColumns: [],
-    breaks: [],
-    lastRunAt: null,
 };
 
-function create(list: Reconciliation[] = [RECON], dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) }))) {
+const NO_RUNS = () => of({ states: [], total: 0, truncated: false });
+
+function create(
+    list: Reconciliation[] = [RECON],
+    dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) })),
+    states: () => Observable<unknown> = NO_RUNS,
+) {
     TestBed.configureTestingModule({
         imports: [ReconciliationsComponent],
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
             { provide: ReconciliationsService, useValue: { list: () => of(list), create: () => of(RECON) } },
+            { provide: ReconApiService, useValue: { states } },
             { provide: ToastrService, useValue: { error: () => undefined } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
         ],
@@ -42,6 +48,34 @@ function create(list: Reconciliation[] = [RECON], dialogOpen = vi.fn(() => ({ af
 describe('ReconciliationsComponent', () => {
     it('loads reconciliations on init', () => {
         expect(create().fixture.componentInstance.reconciliations()).toEqual([RECON]);
+    });
+
+    // R2-03: "Last run" reads the server-RECORDED state, not a field of the config — an operations user's
+    // runs used to 403 on the config PUT, so the list said "never" for runs that had happened.
+    it("shows each row's last recorded run from the server state", () => {
+        const other: Reconciliation = { ...RECON, id: 'never_run' };
+        const states = () =>
+            of({
+                states: [
+                    { reconciliation: RECON.id, lastRunAt: '2026-09-26T08:00:00Z', runs: 3 },
+                    { reconciliation: 'never_run', lastRunAt: null, runs: 0 },
+                ],
+                total: 2,
+                truncated: false,
+            });
+        const c = create([RECON, other], undefined, states).fixture.componentInstance;
+        const last = c.columns.find((col) => col.field === 'lastRunAt')!;
+        const fmt = (v: unknown) => (last.valueFormatter as (p: { value: unknown }) => string)({ value: v });
+        expect(c.rows().map((r) => r.lastRunAt)).toEqual(['2026-09-26T08:00:00Z', null]);
+        expect(fmt(null)).toBe('never');
+        expect(fmt('2026-09-26T08:00:00Z')).not.toBe('never');
+    });
+
+    it('never claims "never" when the recorded state could not be read', () => {
+        const c = create([RECON], undefined, () => throwError(() => ({ status: 500 }))).fixture.componentInstance;
+        const last = c.columns.find((col) => col.field === 'lastRunAt')!;
+        expect(c.rows()[0].lastRunAt).toBeUndefined();
+        expect((last.valueFormatter as (p: { value: unknown }) => string)({ value: undefined })).toBe('—');
     });
 
     it('shows the empty state when there are none', () => {

@@ -209,6 +209,12 @@ final class CapabilityManifest {
             // PipelineHistoryRoutes — restoring a config version is a save (PIPELINE-CONFIG-HISTORY-1);
             // the list/read/diff reads carry no gate, like GET /pipelines/{name}/graph/raw.
             new Entry("POST", "/pipelines/([^/]+)/history/([^/]+)/restore", Roles.CAN_AUTHOR_WORKBENCH),
+            // ReconRoutes — R2-03 (operator 2026-09-26, reversing C9): recording a run and resolving / re-opening
+            // a Break write the Reconciliation's OPERATIONAL state, so they are operate acts like an Expectation's
+            // evaluation — never the canAuthorWorkbench config PUT that used to carry them. (/recon/promote is
+            // with the other Incident-creation routes at the top.)
+            new Entry("POST", "/recon/([^/]+)/record", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/recon/([^/]+)/breaks/status", Roles.CAN_OPERATE_RUNS),
             // RequirementRoutes
             // ⛔ `POST /requirements` is deliberately NOT here. The route-gating audit called it "an
             // inconsistency, not a judgement call" because its two siblings are gated — that is WRONG, and
@@ -383,7 +389,7 @@ final class CapabilityManifest {
             new Exemption("POST", "/assist/(.+)", "self-limiting", "the skill-intent catch-all; dispatch only, the skill's own tools gate"),
             // grounded one at a time 2026-09-15 (audit §5 GROUNDED)
             new Exemption("POST", "/spaces", "recovery-route", "gated IN the handler: canAdminister whenever at least one Space is hosted; a server hosting zero Spaces must still answer it without one or recovery is bricked — pinned by ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet (2026-09-17: the unconditional form let any authenticated caller create Spaces on a populated server)"),
-            new Exemption("POST", "/recon/run", "stateless-compute", "triggers nothing: computes and returns, persists nothing, dispatches no job"),
+            new Exemption("POST", "/recon/run", "stateless-compute", "triggers nothing: computes and returns, persists nothing, dispatches no job — recording the run is the separate canOperateRuns POST /recon/{id}/record (R2-03)"),
             new Exemption("POST", "/tags/assignments/([^/]+)/([^/]+)", "target-visibility-gated", "gated per TARGET via AnnotationTargets: 'can tag' must not become independent of 'can see' (TagRoutes)"),
             new Exemption("DELETE", "/tags/assignments/([^/]+)/([^/]+)/([^/]+)", "target-visibility-gated", "same comment as the assignment POST"),
             // Incident/Case triage — the COLLABORATION half (operator decision 2026-09-15): adding to the

@@ -16,8 +16,6 @@ const RECON: Reconciliation = {
     rightDataset: 'billing_daily',
     keyColumns: ['region'],
     compareColumns: [{ column: 'amount', toleranceType: 'percent', tolerance: 0.5 }],
-    breaks: [],
-    lastRunAt: null,
 };
 
 const RESULT = aggregateRecon(

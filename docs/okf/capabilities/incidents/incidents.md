@@ -236,19 +236,21 @@ deployment with no bridge-promoted objects reports count 0 — a true statement.
 MTTD tile with the server's own definition. ⚠ Still absent: **MTTA** — nothing stamps an acknowledged-at
 (`ack()` records no timestamp), so it needs its own seam before it could exist.
 
-### How a Break can be promoted when no Break is stored
+### How a Break is identified when it is promoted
 
-🔴 **Reconciliation is stateless compute.** `POST /recon/run` and `/recon/breaks` recompute from SQL on
-every call and persist nothing — a control probe for a domain `Break` type across the Java sources returns
-zero, and the only match is `ReconService.BreakSet`, a transient paged result with no id and no store. The
-C9 contract puts Break lifecycle on the **client** deliberately. So the Incident cannot hold a foreign key
-to a Break row; there is none.
+`POST /recon/run` and `/recon/breaks` recompute from SQL on every call and persist nothing. Until R2-03 the
+Break lifecycle lived only on the client (C9), so the Incident could not hold a foreign key to a Break row.
+⚠ **Since R2-03 (operator, 2026-09-26) recorded Breaks DO exist server-side** —
+`<write-root>/recon-state/<id>.json`, written by the `canOperateRuns` routes `POST /recon/{id}/record` and
+`/breaks/status` ([`reconciliation.md`](../../frontend/features/reconciliation.md)) — but a promote still
+does not look one up: the Breaks page promotes LIVE Breaks, possibly before any run recorded them.
 
 Instead the identity is **reconstructed from the request**: `(reconciliation, key)`, which is stable across
 runs because it is what the comparison itself keys on. That pair is the dedupe key, so promoting the same
-Break twice — by two operators, or after a nightly re-run — suppresses the second. ⛔ Do **not** "fix" this
-by persisting Breaks to make the reference real: the Incident is the durable artifact, and that is the
-design, not a shortcut.
+Break twice — by two operators, or after a nightly re-run — suppresses the second. The recorded state keys
+on the very same identity string (`ReconBreaks.identity`, which `ReconRoutes.breakIdentity` delegates to),
+so the two agree without a join, and `runId` is the recorded `lastRunAt`. The Incident stays the durable
+artifact of the escalation.
 
 Two consequences worth knowing before changing anything here:
 

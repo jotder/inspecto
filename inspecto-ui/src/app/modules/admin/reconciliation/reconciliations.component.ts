@@ -1,11 +1,11 @@
-import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { Router } from '@angular/router';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage } from 'app/inspecto/api';
+import { apiErrorMessage, ReconApiService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { escapeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
@@ -18,6 +18,9 @@ import {
 } from 'app/inspecto/reconciliation';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+
+/** A list row: the Reconciliation plus its last RECORDED run — `null` never run, `undefined` not known. */
+type ReconciliationRow = Reconciliation & { lastRunAt: string | null | undefined };
 
 /**
  * Reconciliation (C9) — the list of Dataset-vs-Dataset reconciliations; open one to run it and drill its
@@ -38,14 +41,26 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 })
 export class ReconciliationsComponent implements OnInit {
     private api = inject(ReconciliationsService);
+    private reconApi = inject(ReconApiService);
     private dialog = inject(MatDialog);
     private router = inject(Router);
     private toastr = inject(ToastrService);
 
     readonly reconciliations = signal<Reconciliation[]>([]);
     readonly loading = signal(false);
+    /** Reconciliation id → its last recorded run (R2-03, server-side state); null until read or on a failed read. */
+    private readonly lastRuns = signal<Record<string, string | null> | null>(null);
 
-    readonly columns: ColDef<Reconciliation>[] = [
+    /**
+     * The rows with their last recorded run. ⚠ A failed state read leaves the column `—`, never "never" —
+     * that would claim nothing ever ran.
+     */
+    readonly rows = computed<ReconciliationRow[]>(() => {
+        const runs = this.lastRuns();
+        return this.reconciliations().map((r) => ({ ...r, lastRunAt: runs ? (runs[r.id] ?? null) : undefined }));
+    });
+
+    readonly columns: ColDef<ReconciliationRow>[] = [
         {
             // R2-16: the readable title leads (sorted on it); the id follows as secondary text, and the quick
             // search matches either.
@@ -54,7 +69,7 @@ export class ReconciliationsComponent implements OnInit {
             flex: 2,
             valueGetter: (p) => (p.data ? reconciliationTitle(p.data) : ''),
             getQuickFilterText: (p) => (p.data ? `${reconciliationTitle(p.data)} ${p.data.id}` : ''),
-            cellRenderer: (p: ICellRendererParams<Reconciliation>) => {
+            cellRenderer: (p: ICellRendererParams<ReconciliationRow>) => {
                 if (!p.data) return '';
                 const title = reconciliationTitle(p.data);
                 const id =
@@ -71,11 +86,11 @@ export class ReconciliationsComponent implements OnInit {
             field: 'lastRunAt',
             headerName: 'Last run',
             width: 180,
-            valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : 'never'),
+            valueFormatter: (p) => (p.value === undefined ? '—' : p.value ? fmtDateTime(p.value) : 'never'),
         },
     ];
 
-    readonly rowActions: InspectoRowAction<Reconciliation>[] = [
+    readonly rowActions: InspectoRowAction<ReconciliationRow>[] = [
         { icon: 'heroicons_outline:arrow-right', hint: 'Open', onClick: (r) => this.open(r) },
         { icon: 'heroicons_outline:document-duplicate', hint: 'Duplicate', onClick: (r) => this.duplicate(r) },
     ];
@@ -86,6 +101,12 @@ export class ReconciliationsComponent implements OnInit {
 
     load(): void {
         this.loading.set(true);
+        // Independent of the list: a failed state read degrades the "Last run" column only.
+        this.reconApi.states().subscribe({
+            next: (res) =>
+                this.lastRuns.set(Object.fromEntries(res.states.map((s) => [s.reconciliation, s.lastRunAt]))),
+            error: () => this.lastRuns.set(null),
+        });
         this.api.list().subscribe({
             next: (r) => {
                 this.reconciliations.set(r);

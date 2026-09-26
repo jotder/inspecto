@@ -4,8 +4,10 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
+import com.gamma.query.ReconBreaks;
 import com.gamma.query.ReconConfigLoader;
 import com.gamma.query.ReconService;
+import com.gamma.query.ReconStateStore;
 import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
@@ -25,11 +27,17 @@ import static com.gamma.util.Values.intOr;
  * {@code POST /recon/breaks} (the paged Break sets, optionally scoped to a Board dimension path).
  * Each accepts a saved {@code reconciliation} component by {@code id} <em>or</em> an inline
  * {@code config} (the Board's draft mode). Authoring reuses the generic component CRUD
- * ({@code /components/reconciliation/{id}}); Break lifecycle (auto-close / preserved resolutions) stays
- * client-side per the C9 contract — these routes are stateless compute over {@link ReconService}.
- * The one exception is {@code POST /recon/promote} ({@code BREAK-INCIDENT-1}), which writes: it hands a
- * single Break to Ops as an {@code INCIDENT}, deduped on {@code (reconciliation, key)}. It is still not a
- * Break store — nothing about the Break is persisted, only the Incident that references it.
+ * ({@code /components/reconciliation/{id}}); those compute routes are stateless over {@link ReconService}.
+ *
+ * <p><b>Operational state</b> (R2-03, operator 2026-09-26 — <em>reversing</em> C9, which kept the Break
+ * lifecycle in the browser and wrote it back through the authoring PUT, so an operations-only user could never
+ * record a run): a run and the Break lifecycle live in {@link ReconStateStore}
+ * ({@code <write-root>/recon-state/<id>.json}), never in the config. {@code POST /recon/{id}/record} computes
+ * ALL Breaks of the saved Reconciliation server-side and merges them ({@link ReconBreaks#merge});
+ * {@code POST /recon/{id}/breaks/status} resolves / re-opens one; both are {@code canOperateRuns}, like an
+ * Expectation's evaluation. {@code GET /recon/{id}/state} and {@code GET /recon/state} read it.
+ * {@code POST /recon/promote} ({@code BREAK-INCIDENT-1}) hands a single Break to Ops as an {@code INCIDENT},
+ * deduped on the Break's identity.
  *
  * <p>Fail-closed: write root unset → 503; unknown reconciliation / dataset → 404; an unusable config
  * (dataset count, unsafe identifier, bad agg/tolerance, {@code ExpressionGuard}-rejected filter) or a
@@ -55,6 +63,14 @@ final class ReconRoutes implements RouteModule {
         api.post("/recon/promote", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> promote(api, api.body(e))));
         api.get("/recon/promoted", (e, m) -> promoted(api, ApiContext.query(e, "reconciliation")));
+        // R2-03 (operator 2026-09-26): a run and the Break lifecycle are SERVER-SIDE operational state, written
+        // by the operate capability — the authoring PUT (canAuthorWorkbench) never carries them any more.
+        api.get("/recon/state", (e, m) -> states(api));
+        api.get("/recon/([^/]+)/state", (e, m) -> state(api, ApiContext.name(m)));
+        api.post("/recon/([^/]+)/record", ApiContext.withCapability("canOperateRuns",
+                (e, m) -> record(api, ApiContext.name(m))));
+        api.post("/recon/([^/]+)/breaks/status", ApiContext.withCapability("canOperateRuns",
+                (e, m) -> breakStatus(api, ApiContext.name(m), api.body(e))));
     }
 
     // ── POST /recon/columns {datasets:[ids]} ────────────────────────────────────────
@@ -188,14 +204,14 @@ final class ReconRoutes implements RouteModule {
      * missing granularity, not the missing mechanism, and the two coexist on purpose: the Job says "this
      * reconciliation is breaching", an operator promoting here says "<em>this</em> Break is being worked".
      *
-     * <h3>Why a Break can be promoted at all, given it does not exist server-side</h3>
-     * 🔴 Reconciliation is <b>stateless compute</b> — {@code /recon/run} and {@code /recon/breaks} recompute
-     * from SQL on every call and persist nothing, so there is no stored Break row to carry a foreign key to.
-     * The identity is therefore reconstructed from the request: {@code (reconciliation, key)}, which is
-     * stable across runs because it is what the comparison itself keys on. That pair is the dedupe key, so
-     * promoting the same Break twice — from two operators, or after a re-run — suppresses the second rather
-     * than handing Ops a clone. ⛔ Do not "fix" this by persisting Breaks to make the reference real: the C9
-     * contract puts Break lifecycle on the client deliberately, and an Incident is the durable artifact.
+     * <h3>Why the identity comes from the request</h3>
+     * The identity is reconstructed from the request: {@code (reconciliation, key)}, which is stable across
+     * runs because it is what the comparison itself keys on. That pair is the dedupe key, so promoting the
+     * same Break twice — from two operators, or after a re-run — suppresses the second rather than handing
+     * Ops a clone. ⚠ Since R2-03 (2026-09-26) recorded Breaks DO exist server-side ({@link ReconStateStore}),
+     * but a promote still does not require one: the Breaks page promotes live Breaks, and the identity string
+     * ({@link ReconBreaks#identity}) is the one the recorded state keys on, so the two agree without a lookup.
+     * {@code runId} is the recorded {@code lastRunAt} the SPA sends.
      *
      * <p>🔴 <b>The dedupe grain is {@code (type, key, column)} — full parity with the client's
      * {@code breakId}</b> ({@code BREAK-DEDUPE-GRAIN-1}, decided 2026-09-15). It was the KEY alone until then,
@@ -356,12 +372,153 @@ final class ReconRoutes implements RouteModule {
      * Escaping {@code \} then {@code |} makes the rendering injective, so distinct triples stay distinct.
      */
     static String breakIdentity(String type, String key, String column) {
-        return esc(type) + '|' + esc(key) + '|' + esc(column == null ? "" : column);
+        // One Java definition, shared with the recorded lifecycle (R2-03) so the two cannot drift.
+        return ReconBreaks.identity(type, key, column);
     }
 
-    /** Escape a single identity part so {@code |} inside a value cannot be read as the separator. */
-    private static String esc(String part) {
-        return (part == null ? "" : part).replace("\\", "\\\\").replace("|", "\\|");
+    // ── operational state (R2-03) ───────────────────────────────────────────────────
+
+    /** Longest note a resolve / re-open may carry — a note is a sentence, not a document. */
+    private static final int MAX_NOTE = 2_000;
+    /** Hard cap on {@link #states}' list — a diagnostic read must not become an unbounded export. */
+    private static final int STATES_CAP = 1_000;
+
+    /**
+     * {@code GET /recon/{id}/state} → {@code {reconciliation, lastRunAt, runs, breaks[]}} — what the Board and
+     * the Breaks page read. Bounded by construction: a state never holds more than
+     * {@link ReconStateStore#MAX_BREAKS} Breaks. A read, so no write-root 503: an unset root means there is no
+     * registry, and "no such reconciliation" (404) is then the true answer, exactly as {@link #promoted}.
+     * 422 unsafe id · 404 unknown · 403 jail · 503 unreadable state.
+     */
+    private static Object state(ApiContext api, String rawId) {
+        String id = WriteGates.safeName(rawId, "reconciliation id");
+        Path root = api.writeRoot();
+        if (root == null || component(new ComponentStore(root.resolve("registry")), "reconciliation", id).isEmpty())
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + id + "'");
+        return readState(new ReconStateStore(root), id).toMap();
+    }
+
+    /**
+     * {@code GET /recon/state} → {@code {states:[{reconciliation, lastRunAt, runs}], total, truncated}} — one
+     * row per saved Reconciliation (never-run ones included, {@code lastRunAt: null}), for the list page's
+     * "Last run" column. Capped at {@link #STATES_CAP} with the TRUE {@code total}. No write root ⇒ empty.
+     */
+    private static Object states(ApiContext api) {
+        Path root = api.writeRoot();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        int total = 0;
+        if (root != null) {
+            ReconStateStore store = new ReconStateStore(root);
+            for (ComponentRegistry.Component c : new ComponentStore(root.resolve("registry")).list("reconciliation")) {
+                total++;
+                if (rows.size() >= STATES_CAP) continue;
+                ReconStateStore.State s = readState(store, c.name());
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("reconciliation", s.reconciliation());
+                row.put("lastRunAt", s.lastRunAt());
+                row.put("runs", s.runs());
+                rows.add(row);
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("states", rows);
+        out.put("total", total);
+        out.put("truncated", total > rows.size());
+        return out;
+    }
+
+    /**
+     * {@code POST /recon/{id}/record} (gated {@code canOperateRuns}) — record a run of the SAVED
+     * Reconciliation: compute ALL its A↔B Breaks server-side ({@link ReconBreaks#compute}, no page limit),
+     * merge them into the recorded state and stamp {@code lastRunAt}. Returns the new state.
+     *
+     * <p>🔴 <b>Unpaged on purpose.</b> The Board used to merge the first {@code /recon/breaks} page (200 per
+     * set) and so auto-closed every recorded Break beyond it. A run with more than
+     * {@link ReconStateStore#MAX_BREAKS} in one set is refused (422), never recorded short.
+     *
+     * <p>Gates, in order: 503 no write root · 422 unsafe id · 404 unknown reconciliation / dataset · 422
+     * unusable config · 403 jail · 422 too many Breaks / failing comparison · 503 sandbox or state unreadable.
+     */
+    private Object record(ApiContext api, String rawId) {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
+        String id = WriteGates.safeName(rawId, "reconciliation id");
+        ReconService.Spec spec = spec(api, Map.of("id", id));
+        ReconStateStore store = new ReconStateStore(writeRoot);
+        readState(store, id);   // jail + readability BEFORE the comparison runs, not after
+        List<ReconBreaks.Break> fresh;
+        try {
+            fresh = ReconBreaks.compute(spec, ReconStateStore.MAX_BREAKS);
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+        } catch (SQLException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+        } catch (IOException e) {
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + e.getMessage());
+        }
+        try {
+            return store.record(id, fresh, ReconStateStore.now()).toMap();
+        } catch (SecurityException jail) {
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, jail.getMessage());
+        } catch (IOException e) {
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "reconciliation state unavailable: " + e.getMessage());
+        }
+    }
+
+    /**
+     * {@code POST /recon/{id}/breaks/status {type, key, column?, status: resolved|open, note?}} (gated
+     * {@code canOperateRuns}) — resolve or re-open one Break by identity, replacing its note (blank clears
+     * it). A Break no run has recorded yet is appended identity-only. Returns {@code {reconciliation, break}}.
+     *
+     * <p>Gates, in order: 503 no write root · 422 unsafe id / bad type / non-string key / bad status / note
+     * too long · 404 unknown reconciliation · 403 jail · 422 state full · 503 state unreadable.
+     */
+    private static Object breakStatus(ApiContext api, String rawId, Map<String, Object> body) {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
+        String id = WriteGates.safeName(rawId, "reconciliation id");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        String type = ApiContext.str(b, "type");
+        if (type == null || !ReconBreaks.TYPES.contains(type))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "type must be one of " + ReconBreaks.TYPES + ", got '" + type + "'");
+        // ⚠ Not ApiContext.str: that reads a blank as absent, and a single NULL key column's key IS "".
+        if (!(b.get("key") instanceof String key))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'key' (the Break's key, as the Breaks page shows it)");
+        String column = ApiContext.str(b, "column");
+        String status = ApiContext.str(b, "status");
+        if (!ReconBreaks.RESOLVED.equals(status) && !ReconBreaks.OPEN.equals(status))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "status must be resolved|open, got '" + status + "'");
+        String note = ApiContext.str(b, "note");
+        note = note == null ? null : note.trim();
+        if (note != null && note.length() > MAX_NOTE)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "note is longer than " + MAX_NOTE + " characters");
+        if (component(new ComponentStore(writeRoot.resolve("registry")), "reconciliation", id).isEmpty())
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + id + "'");
+        ReconBreaks.Break updated;
+        try {
+            updated = new ReconStateStore(writeRoot).setStatus(id, type, key, column, status, note);
+        } catch (IllegalArgumentException full) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, full.getMessage());
+        } catch (SecurityException jail) {
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, jail.getMessage());
+        } catch (IOException e) {
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "reconciliation state unavailable: " + e.getMessage());
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("reconciliation", id);
+        out.put("break", updated.toMap());
+        return out;
+    }
+
+    /** Read one state, mapping the store's refusals: 403 jail escape, 422 unsafe id, 503 unreadable (fail closed). */
+    private static ReconStateStore.State readState(ReconStateStore store, String id) {
+        try {
+            return store.read(id);
+        } catch (SecurityException jail) {
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, jail.getMessage());
+        } catch (IllegalArgumentException unsafe) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, unsafe.getMessage());
+        } catch (IOException e) {
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "reconciliation state unavailable: " + e.getMessage());
+        }
     }
 
     // ── spec assembly ───────────────────────────────────────────────────────────────

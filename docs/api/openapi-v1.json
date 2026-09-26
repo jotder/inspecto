@@ -8454,6 +8454,86 @@
           }
         }
       }
+    },
+    "/recon/state" : {
+      "get" : {
+        "tags" : [ "recon" ],
+        "summary" : "GET /recon/state (generated skeleton)",
+        "operationId" : "getReconState",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/recon/{reconId}/state" : {
+      "get" : {
+        "tags" : [ "recon" ],
+        "summary" : "GET /recon/{reconId}/state (generated skeleton)",
+        "operationId" : "getReconByReconIdState",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "reconId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/recon/{reconId}/record" : {
+      "post" : {
+        "tags" : [ "recon" ],
+        "summary" : "POST /recon/{reconId}/record (generated skeleton)",
+        "operationId" : "postReconByReconIdRecord",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "reconId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/recon/{reconId}/breaks/status" : {
+      "post" : {
+        "tags" : [ "recon" ],
+        "summary" : "POST /recon/{reconId}/breaks/status (generated skeleton)",
+        "operationId" : "postReconByReconIdBreaksStatus",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "reconId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
     }
   },
   "components" : {

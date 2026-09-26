@@ -24,7 +24,6 @@ function setup() {
                     rightDataset: 'billing_cdr',
                     keyColumns: ['id'],
                     compareColumns: [],
-                    breaks: [],
                 },
             },
         ]),
@@ -45,15 +44,15 @@ describe('ReconciliationsService', () => {
         );
     });
 
-    it('saves (updates) an existing reconciliation via PUT', () => {
+    it('saves (updates) an existing reconciliation via PUT — its config only, never run state (R2-03)', () => {
         const { svc, update } = setup();
-        const r = { ...buildReconciliation('x', 'a', 'b', ['id'], []), lastRunAt: '2026-07-03T00:00:00Z' };
+        const r = buildReconciliation('x', 'a', 'b', ['id'], []);
         svc.save(r).subscribe();
-        expect(update).toHaveBeenCalledWith(
-            'reconciliation',
-            r.id,
-            expect.objectContaining({ lastRunAt: '2026-07-03T00:00:00Z' }),
-        );
+        expect(update).toHaveBeenCalledWith('reconciliation', r.id, expect.objectContaining({ leftDataset: 'a' }));
+        // the last run and the Break lifecycle are server-recorded operational state, not config
+        const body = update.mock.calls[0][2];
+        expect(body).not.toHaveProperty('breaks');
+        expect(body).not.toHaveProperty('lastRunAt');
     });
 
     it('a save writes back the keys the model does not carry, and a cleared modelled key stays cleared', () => {
@@ -74,7 +73,6 @@ describe('ReconciliationsService', () => {
                         filters: { hlr: "status <> 'X'" },
                         cardinality: 'one-to-one',
                         includeRecordCount: true,
-                        breaks: [],
                     },
                 },
             ]) as never,
@@ -200,7 +198,6 @@ describe('ReconciliationsService', () => {
                         rightDataset: 'cbs',
                         keyColumns: ['msisdn'],
                         compareColumns: [{ column: 'monthly_fee_sar', toleranceType: 'absolute', tolerance: 0.01 }],
-                        breaks: [],
                     },
                 },
             ]),

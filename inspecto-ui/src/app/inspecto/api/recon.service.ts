@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ReconBreakSets, ReconRunResult } from 'app/inspecto/reconciliation/recon-board';
+import { ReconBreak, ReconState } from 'app/inspecto/reconciliation/reconciliation-types';
 import { apiUrl, toParams } from './api-base';
 
 /** One dataset's column inventory as `/recon/columns` reports it. */
@@ -79,6 +80,20 @@ export interface ReconPromoteResult {
 export interface ReconPromotedResult {
     reconciliation: string;
     promoted: Record<string, string>;
+    total: number;
+    truncated: boolean;
+}
+
+/** One row of `GET /recon/state` — a saved Reconciliation's last recorded run (`null` = never recorded). */
+export interface ReconStateSummary {
+    reconciliation: string;
+    lastRunAt: string | null;
+    runs: number;
+}
+
+/** `GET /recon/state` — capped; `total` is the TRUE count and `truncated` says the list was cut. */
+export interface ReconStatesResult {
+    states: ReconStateSummary[];
     total: number;
     truncated: boolean;
 }
@@ -168,5 +183,38 @@ export class ReconApiService {
             ...(column ? { column } : {}),
             ...(runId ? { runId } : {}),
         });
+    }
+
+    // ── operational state (R2-03): the last run + the Break lifecycle, recorded server-side ──────────
+
+    /** The recorded run + Break lifecycle of one SAVED Reconciliation. */
+    state(reconciliation: string): Observable<ReconState> {
+        return this.http.get<ReconState>(apiUrl(`/recon/${encodeURIComponent(reconciliation)}/state`));
+    }
+
+    /** Every saved Reconciliation's last recorded run — the list page's "Last run" column. */
+    states(): Observable<ReconStatesResult> {
+        return this.http.get<ReconStatesResult>(apiUrl('/recon/state'));
+    }
+
+    /**
+     * Record a run of the SAVED Reconciliation (`canOperateRuns`): the server computes every Break itself —
+     * no page limit — merges the lifecycle and stamps the run. Returns the new state.
+     */
+    record(reconciliation: string): Observable<ReconState> {
+        return this.http.post<ReconState>(apiUrl(`/recon/${encodeURIComponent(reconciliation)}/record`), {});
+    }
+
+    /** Resolve or re-open one Break by identity (`canOperateRuns`); a blank note clears it. */
+    setBreakStatus(
+        reconciliation: string,
+        b: Pick<ReconBreak, 'type' | 'key' | 'column'>,
+        status: 'resolved' | 'open',
+        note?: string | null,
+    ): Observable<{ reconciliation: string; break: ReconBreak }> {
+        return this.http.post<{ reconciliation: string; break: ReconBreak }>(
+            apiUrl(`/recon/${encodeURIComponent(reconciliation)}/breaks/status`),
+            { type: b.type, key: b.key, ...(b.column ? { column: b.column } : {}), status, ...(note ? { note } : {}) },
+        );
     }
 }

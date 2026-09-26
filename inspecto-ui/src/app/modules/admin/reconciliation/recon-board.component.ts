@@ -8,7 +8,7 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ColDef } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage } from 'app/inspecto/api';
+import { apiErrorMessage, ReconApiService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { FlatTreeRow, TreeNode, TreeTableComponent } from 'app/inspecto/tree-table';
@@ -19,7 +19,6 @@ import {
     bandTone,
     BoardSide,
     boardColumns,
-    breaksFromSets,
     buildBoardTree,
     comparedSides,
     datasetLabels,
@@ -28,11 +27,11 @@ import {
     fmtMeasure,
     markBreachesExpanded,
     measureLabel,
-    mergeBreaks,
     openAgeBuckets,
     Reconciliation,
     ReconciliationsService,
     ReconRunResult,
+    ReconState,
     reconciliationTitle,
     SideKey,
 } from 'app/inspecto/reconciliation';
@@ -79,6 +78,7 @@ interface TotalLine {
 })
 export class ReconBoardComponent implements OnInit {
     private reconApi = inject(ReconciliationsService);
+    private stateApi = inject(ReconApiService);
     private exec = inject(ReconExecService);
     private route = inject(ActivatedRoute);
     private router = inject(Router);
@@ -90,6 +90,8 @@ export class ReconBoardComponent implements OnInit {
 
     readonly recon = signal<Reconciliation | null>(null);
     readonly result = signal<ReconRunResult | null>(null);
+    /** The server-recorded run + Break lifecycle (R2-03) — what the aging strip reads. */
+    readonly state = signal<ReconState | null>(null);
     readonly loading = signal(true);
     readonly running = signal(false);
     readonly breachesOnly = signal(false);
@@ -157,7 +159,7 @@ export class ReconBoardComponent implements OnInit {
      * page, so "how long has this been broken" belongs here as well as on the Breaks page. Same shared
      * rollup as the Breaks page, so the two can never disagree.
      */
-    readonly ageBuckets = computed(() => openAgeBuckets(this.recon()?.breaks ?? []));
+    readonly ageBuckets = computed(() => openAgeBuckets(this.state()?.breaks ?? []));
     readonly ageLabel = ageBucketLabel;
 
     readonly treeNodes = computed<TreeNode[]>(() => {
@@ -225,36 +227,31 @@ export class ReconBoardComponent implements OnInit {
     }
 
     /**
-     * Run the aggregate comparison AND refresh the persisted Break lifecycle (the locked C9 semantics:
-     * fresh breaks merge with the previous run — re-matched keys auto-close, manual resolutions carry
-     * forward). The Board run is the one full-scope run, so the merge happens here; the Breaks page is
-     * a live viewer. A failed lifecycle save degrades gracefully — the Board still renders.
+     * Run the aggregate comparison, then RECORD the run (R2-03): the server computes every Break of the saved
+     * Reconciliation itself, merges the locked lifecycle (re-matched keys auto-close, resolutions and
+     * first-seen stamps carry forward) and stamps the run — gated `canOperateRuns`, so an operations-only
+     * user records it too. A failed record is toasted and the Board keeps the last RECORDED lifecycle.
      */
     async run(): Promise<void> {
         const r = this.recon();
         if (!r || this.running()) return;
         this.running.set(true);
         try {
-            const [result, sets] = await Promise.all([this.exec.run(r), this.exec.breaks(r)]);
-            this.result.set(result);
-            // ONE instant for both: a break first seen on this run must carry exactly the run's own
-            // timestamp, not one a few milliseconds later (BREAK-AGING-1).
-            const runAt = new Date().toISOString();
-            const updated: Reconciliation = {
-                ...r,
-                breaks: mergeBreaks(r.breaks, breaksFromSets(r, sets), runAt),
-                lastRunAt: runAt,
-            };
-            this.reconApi.save(updated).subscribe({
-                next: () => this.recon.set(updated),
-                error: (e) => this.toastr.error(apiErrorMessage(e, 'Could not persist the break lifecycle')),
-            });
+            this.result.set(await this.exec.run(r));
         } catch (e) {
             this.result.set(null);
             this.toastr.error(apiErrorMessage(e, 'Reconciliation run failed'));
+            return;
         } finally {
             this.running.set(false);
         }
+        this.stateApi.record(r.id).subscribe({
+            next: (s) => this.state.set(s),
+            error: (e) => {
+                this.toastr.error(apiErrorMessage(e, 'This run was not recorded'));
+                this.stateApi.state(r.id).subscribe({ next: (s) => this.state.set(s), error: () => undefined });
+            },
+        });
     }
 
     edit(): void {

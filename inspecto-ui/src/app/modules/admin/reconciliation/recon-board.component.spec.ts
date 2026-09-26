@@ -2,17 +2,18 @@ import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router, convertToParamMap } from '@angular/router';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
+import { ReconApiService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import {
     aggregateRecon,
     Reconciliation,
     ReconciliationsService,
-    reconBreakSets,
     ReconRunResult,
+    ReconState,
 } from 'app/inspecto/reconciliation';
 import { ReconBoardComponent } from './recon-board.component';
 import { ReconExecService } from './recon-exec.service';
@@ -26,8 +27,29 @@ const RECON: Reconciliation = {
     rightDataset: 'billing_daily',
     keyColumns: ['region', 'product'],
     compareColumns: [{ column: 'amount', toleranceType: 'percent', tolerance: 0.5 }],
-    breaks: [],
-    lastRunAt: null,
+};
+
+/** What `POST /recon/{id}/record` answers: the server-merged lifecycle, one Break 100 days old. */
+const DAY = 86_400_000;
+const RECORDED: ReconState = {
+    reconciliation: 'med_vs_bill',
+    lastRunAt: '2026-09-26T08:00:00.000Z',
+    runs: 4,
+    breaks: [
+        {
+            key: 'MEA · voice',
+            type: 'missing_right',
+            status: 'open',
+            firstSeenAt: new Date(Date.now() - 100 * DAY).toISOString(),
+        },
+        {
+            key: 'EU · data',
+            type: 'value_break',
+            column: 'amount',
+            status: 'resolved',
+            firstSeenAt: '2026-09-01T00:00:00Z',
+        },
+    ],
 };
 
 const LEFT = [
@@ -42,11 +64,19 @@ const RIGHT = [
 const RESULT = aggregateRecon(RECON, LEFT, RIGHT);
 
 async function create(
-    opts: { patch?: Partial<Reconciliation>; result?: ReconRunResult; datasets?: Partial<Dataset>[] } = {},
+    opts: {
+        patch?: Partial<Reconciliation>;
+        result?: ReconRunResult;
+        datasets?: Partial<Dataset>[];
+        record?: () => Observable<ReconState>;
+    } = {},
 ) {
     const recon: Reconciliation = { ...RECON, ...opts.patch };
     const navigate = vi.fn();
     const save = vi.fn((r: Reconciliation) => of(r));
+    const record = vi.fn(opts.record ?? (() => of(RECORDED)));
+    const state = vi.fn(() => of({ ...RECORDED, runs: 3 }));
+    const toastr = { success: vi.fn(), error: vi.fn() };
     TestBed.configureTestingModule({
         imports: [ReconBoardComponent],
         providers: [
@@ -57,16 +87,11 @@ async function create(
                 useValue: { navigate, createUrlTree: () => ({}), serializeUrl: () => '', events: EMPTY },
             },
             { provide: ReconciliationsService, useValue: { get: () => of(recon), save } },
-            {
-                provide: ReconExecService,
-                useValue: {
-                    run: vi.fn(async () => opts.result ?? RESULT),
-                    breaks: vi.fn(async () => reconBreakSets(RECON, LEFT, RIGHT)),
-                },
-            },
+            { provide: ReconApiService, useValue: { record, state } },
+            { provide: ReconExecService, useValue: { run: vi.fn(async () => opts.result ?? RESULT) } },
             { provide: DatasetsService, useValue: { list: () => of(opts.datasets ?? []) } },
             { provide: MatDialog, useValue: { open: vi.fn() } },
-            { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
+            { provide: ToastrService, useValue: toastr },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
         ],
     });
@@ -78,7 +103,7 @@ async function create(
     // commit the rendered board.
     await vi.waitFor(() => expect(c.result()).not.toBeNull());
     fixture.detectChanges();
-    return { fixture, c, navigate, save };
+    return { fixture, c, navigate, save, record, state, toastr };
 }
 
 describe('ReconBoardComponent', () => {
@@ -104,14 +129,31 @@ describe('ReconBoardComponent', () => {
         ]);
     });
 
-    it('a run refreshes the persisted break lifecycle (C9 merge semantics)', async () => {
-        const { c, save } = await create();
-        expect(save).toHaveBeenCalledTimes(1);
-        const persisted = save.mock.calls[0][0] as Reconciliation;
-        // MEA/voice only in A + EU/data amount outside 0.5% — both fresh, both open.
-        expect(persisted.breaks.map((b) => b.type).sort()).toEqual(['missing_right', 'value_break']);
-        expect(persisted.lastRunAt).toBeTruthy();
-        expect(c.recon()?.breaks).toHaveLength(2);
+    /**
+     * R2-03: a run is RECORDED server-side (`canOperateRuns`), never saved through the authoring PUT — an
+     * operations-only user got a 403 there and no run was ever recorded.
+     */
+    it('records the run server-side and never saves the config', async () => {
+        const { fixture, c, save, record } = await create();
+        await vi.waitFor(() => expect(c.state()).not.toBeNull());
+        fixture.detectChanges();
+        expect(record).toHaveBeenCalledWith('med_vs_bill');
+        expect(save).not.toHaveBeenCalled();
+        expect(c.state()?.runs).toBe(4);
+        // the aging strip reads the RECORDED lifecycle: one open Break, 100 days old (the resolved one is settled)
+        expect(c.ageBuckets()).toEqual([{ bucket: '90+', count: 1 }]);
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('90+ days');
+    });
+
+    it('toasts a run it could not record and keeps the last recorded lifecycle', async () => {
+        const { c, toastr, state } = await create({
+            record: () => throwError(() => ({ status: 403, error: { error: { message: 'requires canOperateRuns' } } })),
+        });
+        await vi.waitFor(() => expect(c.state()).not.toBeNull());
+        expect(toastr.error).toHaveBeenCalled();
+        expect(state).toHaveBeenCalledWith('med_vs_bill');
+        expect(c.state()?.runs).toBe(3);
+        expect(c.result()).not.toBeNull(); // the Board itself still renders
     });
 
     it('the details action navigates to the Breaks page with the encoded path', async () => {

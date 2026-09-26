@@ -88,8 +88,6 @@ describe('ReconciliationFormDialog', () => {
                                 { column: 'cost_usd', agg: 'count', toleranceType: 'percent', tolerance: 0.5 },
                             ],
                             bands: { warnPct: 0.5, breachPct: 3 },
-                            breaks: [],
-                            lastRunAt: null,
                         },
                     },
                 },

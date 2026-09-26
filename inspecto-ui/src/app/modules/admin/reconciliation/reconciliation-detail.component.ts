@@ -32,7 +32,7 @@ import {
     ReconBreak,
     reconCardinality,
     reconciliationTitle,
-    resolveBreak,
+    ReconState,
 } from 'app/inspecto/reconciliation';
 import { ReconExecService } from './recon-exec.service';
 import { DatasetsService } from '../studio/datasets/datasets.service';
@@ -45,9 +45,10 @@ import { fmtDateTime } from 'app/inspecto/format';
  * Breaks page (`/reconciliation/:id/breaks?path=…`) — the record sets behind one Board cell: three
  * tables (only in A / only in B / matched-but-different), computed live at the recon grain by
  * {@link ReconExecService} (server DuckDB, or the offline mirror under mock Studio) and optionally
- * scoped to a Board dimension path. The persisted Break lifecycle overlays by identity — resolve /
- * re-open persists here; auto-close happens on the Board's full-scope run (C9 semantics unchanged).
- * The grouped tree stays as a display toggle. Design §5.
+ * scoped to a Board dimension path. The server-RECORDED Break lifecycle (R2-03, `GET /recon/{id}/state`)
+ * overlays by identity — resolve / re-open is `POST /recon/{id}/breaks/status`; auto-close happens when a
+ * run is recorded (the Board, or the scheduled `recon.run` Job). The grouped tree stays as a display toggle.
+ * Design §5.
  */
 @Component({
     selector: 'app-reconciliation-detail',
@@ -80,6 +81,8 @@ export class ReconciliationDetailComponent implements OnInit {
     private datasetsApi = inject(DatasetsService);
 
     readonly recon = signal<Reconciliation | null>(null);
+    /** The server-recorded run + Break lifecycle (R2-03); null until read. */
+    readonly state = signal<ReconState | null>(null);
     readonly loading = signal(true);
     readonly computing = signal(false);
     readonly lastEvaluated = signal<Date | null>(new Date());
@@ -220,20 +223,25 @@ export class ReconciliationDetailComponent implements OnInit {
         this.selectedId.set(null);
     }
 
-    /** Persisted break status/note by identity. */
+    /** Recorded break status/note/first-seen by identity. */
     private readonly persistedById = computed(() => {
         const m = new Map<string, ReconBreak>();
-        for (const b of this.recon()?.breaks ?? []) m.set(breakId(b), b);
+        for (const b of this.state()?.breaks ?? []) m.set(breakId(b), b);
         return m;
     });
 
-    /** Live breaks with the persisted lifecycle overlaid. */
+    /**
+     * Live breaks with the recorded lifecycle overlaid. `firstSeenAt` always carries (the next recorded run
+     * keeps it too); an `auto_closed` record's status/note do not — the Break is live again, so it is open.
+     */
     readonly drillBreaks = computed<ReconBreak[]>(() => {
         const live = this.liveBreaks() ?? [];
         const persisted = this.persistedById();
         return live.map((b) => {
             const p = persisted.get(breakId(b));
-            return p && p.status !== 'auto_closed' ? { ...b, status: p.status, note: p.note } : b;
+            if (!p) return b;
+            const aged = p.firstSeenAt ? { ...b, firstSeenAt: p.firstSeenAt } : b;
+            return p.status !== 'auto_closed' ? { ...aged, status: p.status, note: p.note } : aged;
         });
     });
 
@@ -552,6 +560,7 @@ export class ReconciliationDetailComponent implements OnInit {
                 this.recon.set(r);
                 this.loading.set(false);
                 this.loadPromoted(r.id);
+                this.loadState(r.id);
                 void this.compute();
             },
             error: (e) => {
@@ -576,6 +585,17 @@ export class ReconciliationDetailComponent implements OnInit {
             error: (e) => {
                 if (e?.status === 503) this.incidentsUnavailable.set(true);
             },
+        });
+    }
+
+    /**
+     * Read the recorded lifecycle. A failure toasts: without it every Break would read as open and ageless,
+     * which is a wrong answer, not a missing hint.
+     */
+    private loadState(reconId: string): void {
+        this.reconApi.state(reconId).subscribe({
+            next: (s) => this.state.set(s),
+            error: (e) => this.toastr.error(apiErrorMessage(e, 'Could not load the recorded Break lifecycle')),
         });
     }
 
@@ -636,7 +656,8 @@ export class ReconciliationDetailComponent implements OnInit {
             ))
         )
             return;
-        this.reconApi.promote(r.id, b.key, b.type, b.column ?? null, r.lastRunAt ?? null).subscribe({
+        // The run is the last RECORDED one (R2-03) — the evidence Ops can trace back to.
+        this.reconApi.promote(r.id, b.key, b.type, b.column ?? null, this.state()?.lastRunAt ?? null).subscribe({
             next: (res) => {
                 // ⚠ `incidentId` is null exactly when `deduped` — the dedupe seam suppresses without naming
                 // the survivor — so a re-read is the only way to learn which Incident covers this Break.
@@ -659,7 +680,10 @@ export class ReconciliationDetailComponent implements OnInit {
         });
     }
 
-    /** Resolve / re-open one break — persisted by identity (a fresh live break is appended on first touch). */
+    /**
+     * Resolve / re-open one break — recorded server-side by identity (`POST /recon/{id}/breaks/status`,
+     * `canOperateRuns`); a live Break no run has recorded yet is appended by the server on first touch.
+     */
     async toggleResolve(b: ReconBreak): Promise<void> {
         const r = this.recon();
         if (!r) return;
@@ -672,16 +696,22 @@ export class ReconciliationDetailComponent implements OnInit {
             ))
         )
             return;
-        const known = this.persistedById().has(breakId(b));
-        const breaks = known
-            ? resolveBreak(r.breaks, b, resolving)
-            : [...r.breaks, { ...b, status: resolving ? ('resolved' as const) : ('open' as const) }];
-        const updated: Reconciliation = { ...r, breaks };
-        this.api.save(updated).subscribe({
-            next: () => this.recon.set(updated),
+        this.reconApi.setBreakStatus(r.id, b, resolving ? 'resolved' : 'open').subscribe({
+            next: (res) => this.state.set(withRecorded(this.state(), r.id, res.break)),
             error: (e) => this.toastr.error(apiErrorMessage(e, 'Could not update the break')),
         });
     }
+}
+
+/** `state` with `b` replacing every recorded Break of its identity, or appended when it had none. */
+function withRecorded(state: ReconState | null, reconciliation: string, b: ReconBreak): ReconState {
+    const base = state ?? { reconciliation, lastRunAt: null, runs: 0, breaks: [] };
+    const id = breakId(b);
+    const known = base.breaks.some((x) => breakId(x) === id);
+    return {
+        ...base,
+        breaks: known ? base.breaks.map((x) => (breakId(x) === id ? b : x)) : [...base.breaks, b],
+    };
 }
 
 function breakLabel(type: string): string {

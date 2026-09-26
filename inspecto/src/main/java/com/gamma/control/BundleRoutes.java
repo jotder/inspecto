@@ -173,7 +173,9 @@ final class BundleRoutes implements RouteModule {
                 missing.add(refMap(kind, id));
                 continue;
             }
-            Map<String, Object> content = exportContent(kind, raw);
+            // A bundle carries configuration, not operational history — and a Reconciliation's run state is no
+            // longer in its config at all (R2-03, recon-state/), so every kind exports its stored content verbatim.
+            Map<String, Object> content = raw;
             // LA-21 / D-E6: a Live Working Set Widget cannot leave its Space — the copy that leaves is Frozen at its pin.
             if ("widget".equals(kind) && WorkingSetWidgets.isLive(content)) {
                 content = WorkingSetWidgets.frozenCopy(content);
@@ -262,7 +264,7 @@ final class BundleRoutes implements RouteModule {
                 row.put("status", "missing");
             } else {
                 String originHash = ApiContext.str(ref, "originHash");   // carried from export; absent on v1/older bundles
-                String targetHash = "sha256:" + ContentHash.of(exportContent(kind, existing));
+                String targetHash = "sha256:" + ContentHash.of(existing);
                 row.put("targetHash", targetHash);
                 // present-but-different only when the ref carried an origin hash to disagree with
                 row.put("status", originHash != null && !originHash.equals(targetHash) ? "different" : "satisfied");
@@ -844,21 +846,8 @@ final class BundleRoutes implements RouteModule {
     }
 
     /**
-     * A bundle carries <b>configuration</b>, not operational history: a reconciliation's run state
-     * ({@code breaks}, {@code lastRunAt}) is stripped at export — the target starts a fresh Break
-     * lifecycle. Every other kind exports verbatim.
-     */
-    private static Map<String, Object> exportContent(String kind, Map<String, Object> content) {
-        if (!"reconciliation".equals(kind)) return content;
-        Map<String, Object> sanitized = new LinkedHashMap<>(content);
-        sanitized.remove("breaks");
-        sanitized.remove("lastRunAt");
-        return sanitized;
-    }
-
-    /**
      * Stamp each external {@code requires} ref with the source instance's {@code originHash} — its stored
-     * content hash, computed exactly like an item's ({@link ContentHash} over {@link #exportContent}) — when
+     * content hash, computed exactly like an item's ({@link ContentHash} over the stored content) — when
      * the ref resolves on this instance. That lets the target's {@code preview} tell {@code satisfied} from
      * present-but-{@code different}: the required dependency exists on the target but at a different version.
      * Refs that don't resolve here (or of an unsupported kind) travel hash-less and stay {@code satisfied}/
@@ -871,7 +860,7 @@ final class BundleRoutes implements RouteModule {
             String kind = ApiContext.str(ref, "kind"), id = ApiContext.str(ref, "id");
             BundleSource src = kind != null && supported(kind) ? sourceFor(api, kind) : null;
             Map<String, Object> raw = (src == null || id == null) ? null : src.get(id).orElse(null);
-            if (raw != null) row.put("originHash", "sha256:" + ContentHash.of(exportContent(kind, raw)));
+            if (raw != null) row.put("originHash", "sha256:" + ContentHash.of(raw));
             out.add(row);
         }
         return out;

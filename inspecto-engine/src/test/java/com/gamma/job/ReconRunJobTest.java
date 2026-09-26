@@ -100,6 +100,48 @@ class ReconRunJobTest {
         assertEquals(1, incidentCount(objects), "deduped to one open Incident per reconciliation");
     }
 
+    /**
+     * R2-03: a scheduled run records into the SAME operational state the Board's record route writes, so it
+     * ages and auto-closes Breaks — before this a scheduled run left "Last run: never" and aged nothing.
+     */
+    @Test
+    void aScheduledRunRecordsTheBreakLifecycle(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        Path dataDir = dir.resolve("data");
+        seedStore(dataDir, "orders_a", "VALUES ('EU','voice',100.0),('EU','data',118.0),('MEA','voice',10.0)");
+        seedStore(dataDir, "orders_b", "VALUES ('EU','voice',100.0),('EU','data',114.0),('APAC','sms',7.0)");
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        store.write("dataset", "a_ds", Map.of("physicalRef", "orders_a"));
+        store.write("dataset", "b_ds", Map.of("physicalRef", "orders_b"));
+        store.write("reconciliation", "orders_recon", Map.of(
+                "datasets", List.of("a_ds", "b_ds"),
+                "keyColumns", List.of("region", "product"),
+                "compareColumns", List.of(Map.of("column", "amount", "toleranceType", "percent", "tolerance", 0.5))));
+        System.setProperty("assist.write.root", writeRoot.toString());
+        JobConfig cfg = new JobConfig("nightly_recon", "recon.run", null, null, true, false,
+                Map.of("reconciliation", "orders_recon"), null, null);
+        ReconRunJob job = new ReconRunJob(cfg, dataDir.toString(), () -> null);
+
+        JobResult first = job.run(new CapturingContext(Map.of("reconciliation", "orders_recon")));
+        assertFalse(first.message().contains("not recorded"), first.message());
+        com.gamma.query.ReconStateStore.State s1 = new com.gamma.query.ReconStateStore(writeRoot).read("orders_recon");
+        assertEquals(1, s1.runs());
+        assertNotNull(s1.lastRunAt());
+        assertEquals(3, s1.breaks().size());
+        assertTrue(s1.breaks().stream().allMatch(b -> "open".equals(b.status()) && s1.lastRunAt().equals(b.firstSeenAt())),
+                "every Break is new, stamped with the run's own instant");
+
+        // MEA disappears from A: its Break auto-closes on the next scheduled run; the others keep their sighting
+        seedStore(dataDir, "orders_a", "VALUES ('EU','voice',100.0),('EU','data',118.0)");
+        job.run(new CapturingContext(Map.of("reconciliation", "orders_recon")));
+        com.gamma.query.ReconStateStore.State s2 = new com.gamma.query.ReconStateStore(writeRoot).read("orders_recon");
+        assertEquals(2, s2.runs());
+        assertEquals("auto_closed", s2.breaks().stream().filter(b -> b.key().equals("MEA · voice")).findFirst()
+                .orElseThrow().status());
+        assertTrue(s2.breaks().stream().filter(b -> !b.key().equals("MEA · voice"))
+                .allMatch(b -> s1.lastRunAt().equals(b.firstSeenAt())), "carried Breaks keep their first sighting");
+    }
+
     private static int incidentCount(com.gamma.objects.FakeObjectAccess objects) {
         return (int) objects.opened.stream()
                 .filter(o -> o.kind() == com.gamma.objects.ObjectType.INCIDENT).count();

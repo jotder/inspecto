@@ -38,15 +38,13 @@ const RIGHT = [
     { region: 'APAC', product: 'sms', amount: 7 },
 ];
 
-const recon = (breaks: ReconBreak[] = []): Reconciliation => ({
+const recon = (): Reconciliation => ({
     id: 'med_vs_bill',
     name: 'Mediation vs Billing',
     leftDataset: 'mediation_daily',
     rightDataset: 'billing_daily',
     keyColumns: ['region', 'product'],
     compareColumns: [{ column: 'amount', toleranceType: 'percent', tolerance: 0.5 }],
-    breaks,
-    lastRunAt: null,
 });
 
 /** A `/recon/rows` answer — the raw rows behind one key. */
@@ -66,7 +64,9 @@ const ROWS = {
 async function create(
     opts: {
         path?: string;
+        /** The server-RECORDED lifecycle (`GET /recon/{id}/state`, R2-03). */
         breaks?: ReconBreak[];
+        lastRunAt?: string | null;
         promote?: ReturnType<typeof vi.fn>;
         promoted?: ReturnType<typeof vi.fn>;
         patch?: Partial<Reconciliation>;
@@ -78,8 +78,15 @@ async function create(
         datasets?: Partial<Dataset>[];
     } = {},
 ) {
-    let current: Reconciliation = { ...recon(opts.breaks ?? []), ...opts.patch };
-    const save = vi.fn((r: Reconciliation) => ((current = r), of(r)));
+    const current: Reconciliation = { ...recon(), ...opts.patch };
+    const save = vi.fn((r: Reconciliation) => of(r));
+    const state = vi.fn(() =>
+        of({ reconciliation: current.id, lastRunAt: opts.lastRunAt ?? null, runs: 1, breaks: opts.breaks ?? [] }),
+    );
+    // Echo the server: the Break by identity with the new status and (trimmed) note.
+    const setBreakStatus = vi.fn((_id: string, b: ReconBreak, status: 'resolved' | 'open', note?: string) =>
+        of({ reconciliation: current.id, break: { ...b, status, note: note || undefined } }),
+    );
     const breaks = vi.fn(
         async (r: Reconciliation, path?: Record<string, string> | null) =>
             opts.sets ?? reconBreakSets(r, opts.left ?? LEFT, opts.right ?? RIGHT, path),
@@ -113,7 +120,7 @@ async function create(
             { provide: ReconExecService, useValue: { breaks, rows: opts.rows ?? vi.fn(async () => ROWS) } },
             { provide: DatasetsService, useValue: { list: () => of(opts.datasets ?? []) } },
             { provide: ToastrService, useValue: toastr },
-            { provide: ReconApiService, useValue: { promote, promoted } },
+            { provide: ReconApiService, useValue: { promote, promoted, state, setBreakStatus } },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
         ],
@@ -122,7 +129,7 @@ async function create(
     fixture.detectChanges(); // ngOnInit — load + compute
     await fixture.whenStable();
     fixture.detectChanges();
-    return { fixture, c: fixture.componentInstance, save, breaks, promote, promoted, toastr };
+    return { fixture, c: fixture.componentInstance, save, breaks, promote, promoted, toastr, setBreakStatus };
 }
 
 describe('ReconciliationDetailComponent (Breaks page)', () => {
@@ -149,17 +156,50 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         expect(c.valueBreaks()).toHaveLength(1);
     });
 
-    it('overlays the persisted lifecycle and resolve/re-open persists by identity', async () => {
-        const { c, save } = await create();
+    /**
+     * R2-03: a resolve / re-open is the server's `canOperateRuns` status route, never a config save — the
+     * authoring PUT 403'd for an operations-only user, so a Break could not be resolved by the people working it.
+     */
+    it('resolves and re-opens a Break through the status route, never a config save', async () => {
+        const { c, save, setBreakStatus } = await create();
         const vb = c.valueBreaks()[0];
         expect(vb.status).toBe('open');
 
-        await c.toggleResolve(vb); // first touch appends the live break as resolved
-        expect(save).toHaveBeenCalledTimes(1);
+        await c.toggleResolve(vb); // first touch: the server appends the live Break as resolved
+        expect(setBreakStatus).toHaveBeenCalledWith(
+            'med_vs_bill',
+            expect.objectContaining({ key: 'EU · data' }),
+            'resolved',
+        );
         expect(c.valueBreaks()[0].status).toBe('resolved');
 
-        await c.toggleResolve(c.valueBreaks()[0]); // re-open via resolveBreak on the persisted entry
+        await c.toggleResolve(c.valueBreaks()[0]); // re-open replaces the recorded entry by identity
+        expect(setBreakStatus).toHaveBeenLastCalledWith('med_vs_bill', expect.anything(), 'open');
         expect(c.valueBreaks()[0].status).toBe('open');
+        expect(c.state()?.breaks).toHaveLength(1);
+        expect(save).not.toHaveBeenCalled();
+    });
+
+    it('toasts a status change the server refused and leaves the Break as it was', async () => {
+        const { c, setBreakStatus, toastr } = await create();
+        setBreakStatus.mockReturnValueOnce(throwError(() => ({ status: 403 })));
+        await c.toggleResolve(c.valueBreaks()[0]);
+        expect(toastr.error).toHaveBeenCalled();
+        expect(c.valueBreaks()[0].status).toBe('open');
+    });
+
+    it('overlays the recorded first sighting, so the Breaks page ages what the Board recorded', async () => {
+        const firstSeenAt = new Date(Date.now() - 45 * 86_400_000).toISOString();
+        const { c } = await create({
+            breaks: [{ key: 'EU · data', type: 'value_break', column: 'amount', status: 'open', firstSeenAt }],
+        });
+        expect(c.valueBreaks()[0].firstSeenAt).toBe(firstSeenAt);
+        expect(c.ageText(c.valueBreaks()[0])).toBe('45d');
+        // MEA/APAC are live but unrecorded — no sighting, so 'unknown', never 0 days
+        expect(c.ageBuckets()).toEqual([
+            { bucket: '30-60', count: 1 },
+            { bucket: 'unknown', count: 2 },
+        ]);
     });
 
     // ── BREAK-INCIDENT-1: promote a Break to an Incident ──────────────────────────────
@@ -173,6 +213,18 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         expect(promote).toHaveBeenCalledWith('med_vs_bill', 'EU · data', 'value_break', 'amount', null);
         expect(toastr.success).toHaveBeenCalled();
         expect(c.isPromoted(vb)).toBe(true);
+    });
+
+    it('names the last RECORDED run as the promoted evidence', async () => {
+        const { c, promote } = await create({ lastRunAt: '2026-09-26T08:00:00.000Z' });
+        await c.promote(c.valueBreaks()[0]);
+        expect(promote).toHaveBeenCalledWith(
+            'med_vs_bill',
+            'EU · data',
+            'value_break',
+            'amount',
+            '2026-09-26T08:00:00.000Z',
+        );
     });
 
     it('reports a deduped promotion as information, never as an error', async () => {

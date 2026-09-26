@@ -1,12 +1,13 @@
 import { Injectable, inject } from '@angular/core';
 import { Observable, map } from 'rxjs';
 import { ComponentsService } from 'app/inspecto/api';
-import { CompareColumn, ReconBreak, Reconciliation, ReconciliationConfig } from './reconciliation-types';
+import { CompareColumn, Reconciliation, ReconciliationConfig } from './reconciliation-types';
 
 /**
  * Reconciliation store — persists {@link Reconciliation}s through the component registry as the
- * `reconciliation` component type (mock-served today). Mirrors `rules.service.ts`/`datasets.service.ts` —
- * a reconciliation is "just a component" whose body carries the match config + the last run's breaks.
+ * `reconciliation` component type. Mirrors `rules.service.ts`/`datasets.service.ts` — a reconciliation is
+ * "just a component" whose body carries the match config ONLY: its last run and Break lifecycle are
+ * operational state the server records (`ReconApiService.state` / `record`, R2-03), never written here.
  */
 @Injectable({ providedIn: 'root' })
 export class ReconciliationsService {
@@ -46,8 +47,6 @@ const MODELLED = [
     'keyColumns',
     'compareColumns',
     'bands',
-    'breaks',
-    'lastRunAt',
 ];
 
 function toContent(r: Reconciliation): Record<string, unknown> {
@@ -64,8 +63,6 @@ function toContent(r: Reconciliation): Record<string, unknown> {
         keyColumns: r.keyColumns,
         compareColumns: r.compareColumns,
         ...(r.bands ? { bands: r.bands } : {}),
-        breaks: r.breaks,
-        lastRunAt: r.lastRunAt ?? null,
     };
 }
 
@@ -89,8 +86,6 @@ function fromContent(name: string, content: Record<string, unknown>): Reconcilia
         keyColumns: (c.keyColumns as string[]) ?? [],
         compareColumns: (c.compareColumns as CompareColumn[]) ?? [],
         bands: c.bands,
-        breaks: (c.breaks as ReconBreak[]) ?? [],
-        lastRunAt: c.lastRunAt ?? null,
         raw: content,
     };
 }

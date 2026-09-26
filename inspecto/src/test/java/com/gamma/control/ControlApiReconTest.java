@@ -392,12 +392,15 @@ class ControlApiReconTest {
         }
     }
 
-    /** P3: reconciliations travel in Metadata Bundles — config only, run state stripped at export. */
+    /**
+     * P3: reconciliations travel in Metadata Bundles — config only. Since R2-03 the run state is not in the
+     * config at all (it lives in {@code recon-state/}), so a recorded run cannot leak into an export.
+     */
     @Test
-    void bundleExportStripsRunStateAndRoundTrips(@TempDir Path root) throws Exception {
+    void bundleExportCarriesNoRunStateAndRoundTrips(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
-            // give the stored recon some run state that must NOT travel
-            HttpResponse<String> run = postJson(c.port, "/spaces/s1/recon/run", "{\"id\":\"orders_recon\"}");
+            // record a run: its state must NOT travel
+            HttpResponse<String> run = postJson(c.port, "/spaces/s1/recon/orders_recon/record", "{}");
             assertEquals(200, run.statusCode(), run.body());
 
             HttpResponse<String> exported = postJson(c.port, "/spaces/s1/bundle/export",
@@ -409,8 +412,8 @@ class ControlApiReconTest {
             for (JsonNode item : bundle.get("items"))
                 if ("reconciliation".equals(item.get("kind").asText())) recon = item;
             assertNotNull(recon, "reconciliation item exported");
-            assertNull(recon.get("content").get("breaks"), "run state stripped");
-            assertNull(recon.get("content").get("lastRunAt"), "run state stripped");
+            assertNull(recon.get("content").get("breaks"), "no run state in the config");
+            assertNull(recon.get("content").get("lastRunAt"), "no run state in the config");
             assertEquals("a_ds", recon.get("content").get("datasets").get(0).asText());
 
             // import the exported bundle back under a new id → lands in the registry and runs

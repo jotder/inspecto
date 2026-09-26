@@ -6,11 +6,9 @@ import {
     breakId,
     breakAgeDays,
     datasetLabels,
-    mergeBreaks,
     matchedKeyCount,
     reconciliationTitle,
     ReconBreak,
-    resolveBreak,
     runReconciliation,
     summarize,
     withinTolerance,
@@ -70,74 +68,21 @@ describe('runReconciliation', () => {
     });
 });
 
-describe('mergeBreaks (lifecycle)', () => {
-    it('auto-closes a previous break that is gone this run', () => {
-        const prev: ReconBreak[] = [{ key: '4', type: 'missing_right', status: 'open' }];
-        const fresh: ReconBreak[] = []; // key 4 now matches
-        const merged = mergeBreaks(prev, fresh);
-        expect(merged).toHaveLength(1);
-        expect(merged[0].status).toBe('auto_closed');
-    });
-
-    it('preserves a manual resolution when the break still exists', () => {
-        const prev: ReconBreak[] = [
-            { key: '3', type: 'value_break', column: 'cost_usd', status: 'resolved', note: 'known FX gap' },
-        ];
-        const fresh: ReconBreak[] = [{ key: '3', type: 'value_break', column: 'cost_usd', status: 'open' }];
-        const merged = mergeBreaks(prev, fresh);
-        expect(merged[0].status).toBe('resolved');
-        expect(merged[0].note).toBe('known FX gap');
-    });
-
-    it('drops previously auto-closed breaks that are still gone (bounded history)', () => {
-        const prev: ReconBreak[] = [{ key: '9', type: 'missing_left', status: 'auto_closed' }];
-        expect(mergeBreaks(prev, [])).toHaveLength(0);
-    });
-});
-
+// ⚠ The lifecycle MERGE (auto-close, preserved resolutions, carried first-seen) moved server-side in R2-03 —
+// its tests are `ReconBreaksTest` (inspecto-engine) and `ControlApiReconStateTest`. What stays here is how
+// the SPA reads the recorded stamps.
 describe('break aging (BREAK-AGING-1)', () => {
     const DAY = 86_400_000;
     const at = (iso: string) => new Date(iso);
 
-    it('stamps a genuinely new break with the run instant', () => {
-        const merged = mergeBreaks(
-            [],
-            [{ key: '4', type: 'missing_right', status: 'open' }],
-            '2026-09-01T00:00:00.000Z',
-        );
-        expect(merged[0].firstSeenAt).toBe('2026-09-01T00:00:00.000Z');
-    });
-
-    /**
-     * The row's own acceptance, and the defect the implementation must avoid: a fresh break arrives from
-     * the engine with NO stamp on every run, so re-stamping a carried one would reset its age to zero
-     * every run and the aging view would permanently read "everything is new".
-     */
-    it('a break carried across three runs keeps its FIRST first-seen', () => {
-        const fresh: ReconBreak[] = [{ key: '3', type: 'value_break', column: 'cost_usd', status: 'open' }];
-        const run1 = mergeBreaks([], fresh, '2026-07-01T00:00:00.000Z');
-        const run2 = mergeBreaks(run1, fresh, '2026-08-01T00:00:00.000Z');
-        const run3 = mergeBreaks(run2, fresh, '2026-09-01T00:00:00.000Z');
-
-        expect(run3).toHaveLength(1);
-        expect(run3[0].firstSeenAt).toBe('2026-07-01T00:00:00.000Z');
-        expect(breakAgeDays(run3[0], at('2026-09-01T00:00:00.000Z'))).toBe(62);
-    });
-
-    it('keeps the stamp across a manual resolution, so aging survives triage', () => {
-        const fresh: ReconBreak[] = [{ key: '3', type: 'value_break', status: 'open' }];
-        const run1 = mergeBreaks([], fresh, '2026-07-01T00:00:00.000Z');
-        const resolved = resolveBreak(run1, run1[0], true, 'known FX gap');
-        const run2 = mergeBreaks(resolved, fresh, '2026-09-01T00:00:00.000Z');
-
-        expect(run2[0].status).toBe('resolved');
-        expect(run2[0].firstSeenAt).toBe('2026-07-01T00:00:00.000Z');
-    });
-
-    it('stamps a break persisted before the field existed, rather than leaving it ageless forever', () => {
-        const legacy: ReconBreak[] = [{ key: '3', type: 'value_break', status: 'open' }]; // no firstSeenAt
-        const merged = mergeBreaks(legacy, legacy, '2026-09-01T00:00:00.000Z');
-        expect(merged[0].firstSeenAt).toBe('2026-09-01T00:00:00.000Z');
+    it('ages a break from its recorded first sighting', () => {
+        const b: ReconBreak = {
+            key: '3',
+            type: 'value_break',
+            status: 'open',
+            firstSeenAt: '2026-07-01T00:00:00.000Z',
+        };
+        expect(breakAgeDays(b, at('2026-09-01T00:00:00.000Z'))).toBe(62);
     });
 
     it('reports no age at all for a break with no stamp — never zero', () => {
@@ -184,14 +129,7 @@ describe('break aging (BREAK-AGING-1)', () => {
     });
 });
 
-describe('resolveBreak + summarize', () => {
-    it('resolves a break by identity', () => {
-        const breaks: ReconBreak[] = [{ key: '3', type: 'value_break', column: 'cost_usd', status: 'open' }];
-        const out = resolveBreak(breaks, breaks[0], true, 'accepted variance');
-        expect(out[0].status).toBe('resolved');
-        expect(out[0].note).toBe('accepted variance');
-    });
-
+describe('summarize', () => {
     it('summarize counts by status/type, excluding auto-closed from type tallies', () => {
         const breaks: ReconBreak[] = [
             { key: '3', type: 'value_break', status: 'open' },
@@ -208,11 +146,11 @@ describe('resolveBreak + summarize', () => {
 });
 
 describe('buildReconciliation', () => {
-    it('slugs the name into an id and starts empty', () => {
+    it('slugs the name into an id and carries config only — no run state (R2-03)', () => {
         const r = buildReconciliation('Switch vs Billing', 'switch_cdr', 'billing_cdr', ['id'], [COST_ABS]);
         expect(r.id).toMatch(/^switch_vs_billing_[a-z0-9]{4}$/);
-        expect(r.breaks).toEqual([]);
-        expect(r.lastRunAt).toBeNull();
+        expect(r).not.toHaveProperty('breaks');
+        expect(r).not.toHaveProperty('lastRunAt');
     });
 });
 

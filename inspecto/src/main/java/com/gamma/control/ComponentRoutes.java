@@ -413,6 +413,17 @@ final class ComponentRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
+        // R2-03: a Reconciliation's run state lives beside the registry, not in the component — delete it with
+        // the component, or a re-created Reconciliation of the same id would inherit its Breaks.
+        if ("reconciliation".equals(type)) {
+            try {
+                new com.gamma.query.ReconStateStore(api.writeRoot()).delete(id);
+            } catch (IllegalArgumentException unsafe) {
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, unsafe.getMessage());
+            } catch (SecurityException jail) {
+                throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, jail.getMessage());
+            }
+        }
         return Map.of("type", type, "id", id, "deleted", true, "fileRemoved", removed);
     }
 

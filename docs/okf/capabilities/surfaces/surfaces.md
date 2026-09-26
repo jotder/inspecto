@@ -387,14 +387,17 @@ Fail-closed everywhere else: no write root is a 503, a bad body a 422, a duplica
 out-of-lifecycle transition a 409.
 
 **Reconciliation and Breaks.** Three stateless compute routes accept either a saved reconciliation or an
-inline draft. ⚠ **The Break lifecycle is client-side by contract**: after each run the browser merges the
-new breaks with the stored ones, carrying a manually resolved break's status and note forward — and since
-`BREAK-AGING-1` (2026-09-11) its **`firstSeenAt`** stamp, which is what makes age reportable at all — and
-marking a break that has disappeared as auto-closed, then writes the merged list back **inside the
-reconciliation component's own document** through the generic component route. There is **no Break store
-and no resolve route**. ⚠ Since `BREAK-INCIDENT-1` there IS one write route in this family,
-`POST /recon/promote`, but it does not break the contract: it stores an **Incident**, never a Break. A scheduled job runs the same reconciliation on a cron and opens a deduplicated
-incident when breaks appear.
+inline draft. 🔴 **The Break lifecycle is SERVER-side operational state since R2-03 (operator, 2026-09-26 —
+reversing the C9 "client-side by contract" decision).** Under C9 the browser merged each run into the stored
+breaks and wrote the list back **inside the reconciliation component's own document** through the
+`canAuthorWorkbench` component PUT, so an operations-only user could never record a run or resolve a Break.
+Now `POST /recon/{id}/record` (the server computes every Break of the saved reconciliation — no 200-row page —
+and merges: resolutions and **`firstSeenAt`** carry forward, a vanished break auto-closes) and
+`POST /recon/{id}/breaks/status` (resolve / re-open) are gated **`canOperateRuns`** and write
+`<write-root>/recon-state/<id>.json`; `GET /recon/{id}/state` and `GET /recon/state` read it. The config
+carries no run state at all. `POST /recon/promote` stores an **Incident**. A scheduled job runs the same
+reconciliation on a cron, records its run the same way, and opens a deduplicated incident when breaks
+appear. Detail: [`reconciliation.md`](../../frontend/features/reconciliation.md).
 
 ## 4. Decisions (dated one-liners)
 
@@ -540,7 +543,7 @@ test suite, with one board row between them. Everything in §5.2 is consequently
 | Deriving the Lens from the server | **Not done, by design** | the Lens is presentation; the server publishes capabilities, and conflating the two would make a view preference a permission |
 | Relying on a hidden control as a permission | **⛔ Refused** | a pane that needs read-only enforces it twice — hidden *and* method-guarded |
 | Gating requirement **submission** on a capability | **Refused** | Business must be able to ask; only triage and delivery are gated |
-| A dedicated Break store or resolve route | **Not built, by contract** | the Break lifecycle is a client merge persisted inside the reconciliation document |
+| A dedicated Break store or resolve route | **Built 2026-09-26 (R2-03, operator — reverses C9)** | the client merge wrote run state through the authoring PUT, so an operations-only user could never record a run; now `recon-state/` + the `canOperateRuns` record / status routes |
 | Curating menus under the authoring capability | **Split 2026-07-25** | a menu change is user-visible, not a build act |
 | Colour contrast in the automated gate | **Refused (cannot run)** | jsdom does not paint; contrast lives in the manual audit and the token gate |
 | Page-level axe rules against component fixtures | **Refused as meaningless** | they belong to a route-level browser pass |

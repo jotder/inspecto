@@ -6,8 +6,9 @@
  *
  * Semantics locked with the product owner 2026-07-03: match rows by `keyColumns`; for each
  * `compareColumns` entry apply an exact / absolute / percent tolerance before flagging a value break; a
- * break **auto-closes** when its key re-matches within tolerance on a later run (see {@link mergeBreaks}),
- * while manual resolutions are preserved across runs.
+ * break **auto-closes** when its key re-matches within tolerance on a later run, while manual resolutions
+ * are preserved across runs. Since R2-03 (operator 2026-09-26) that lifecycle is applied SERVER-side
+ * (`ReconBreaks.merge`) and recorded as {@link ReconState} — never in the config.
  */
 
 export type ToleranceType = 'exact' | 'absolute' | 'percent';
@@ -67,15 +68,30 @@ export interface ReconBreak {
     /** Manual-resolution note (preserved across re-runs). */
     note?: string;
     /**
-     * ISO instant this break was FIRST observed, carried across every later run by {@link mergeBreaks}
-     * (`BREAK-AGING-1`, 2026-09-11). Age is derived from it — a break has a status but, before this,
-     * carried no time at all, so "how long has this been broken" was unanswerable.
+     * ISO instant this break was FIRST observed, carried across every later run by the server's lifecycle
+     * merge (`BREAK-AGING-1`, 2026-09-11; server-side since R2-03). Age is derived from it — a break has a
+     * status but, before this, carried no time at all, so "how long has this been broken" was unanswerable.
      *
-     * ⚠ Optional on purpose, and it must stay optional: reconciliations persisted before this field
-     * existed carry breaks without it. {@link breakAgeDays} returns `null` rather than guessing, and the
-     * UI shows an em-dash — an invented age would read exactly like a measured one.
+     * ⚠ Optional on purpose, and it must stay optional: a live Break no run has recorded yet, and one a
+     * status change appended before any run saw it, carry none. {@link breakAgeDays} returns `null` rather
+     * than guessing, and the UI shows an em-dash — an invented age would read exactly like a measured one.
      */
     firstSeenAt?: string;
+}
+
+/**
+ * A Reconciliation's recorded OPERATIONAL state (R2-03, operator 2026-09-26 — reversing C9, which kept it in
+ * the browser and wrote it back through the authoring PUT, so an operations-only user could never record a
+ * run). Kept server-side in `recon-state/<id>.json`, written by `POST /recon/{id}/record` and
+ * `POST /recon/{id}/breaks/status` (both `canOperateRuns`), read by `GET /recon/{id}/state`.
+ */
+export interface ReconState {
+    reconciliation: string;
+    /** The last recorded run, or `null` when none was ever recorded. */
+    lastRunAt: string | null;
+    runs: number;
+    /** The recorded lifecycle — A↔B only on a 3-way Reconciliation. */
+    breaks: ReconBreak[];
 }
 
 /**
@@ -110,9 +126,6 @@ export interface ReconciliationConfig {
     compareColumns: CompareColumn[];
     /** Board severity bands (defaults to {@link DEFAULT_BANDS} when absent). */
     bands?: ReconBands;
-    /** Last run's breaks, kept for the lifecycle merge (auto-close / preserved manual resolutions). */
-    breaks: ReconBreak[];
-    lastRunAt?: string | null;
 }
 
 export interface Reconciliation extends ReconciliationConfig {
@@ -223,20 +236,20 @@ function keyOf(row: Record<string, unknown>, keyColumns: string[]): string {
 /**
  * Escape one identity part so a `|` inside a value cannot be read as the separator.
  *
- * ⚠ Mirror of `ReconRoutes.esc` — see {@link breakId}.
+ * ⚠ Mirror of `ReconBreaks.esc` (engine) — see {@link breakId}.
  */
 function escPart(part: string): string {
     return part.replace(/\\/g, '\\\\').replace(/\|/g, '\\|');
 }
 
 /**
- * Stable identity for a break — `(type, key, column)` — used by {@link mergeBreaks} **and as the server's
- * Incident dedupe grain** (`BREAK-DEDUPE-GRAIN-1`).
+ * Stable identity for a break — `(type, key, column)` — the key the server's recorded lifecycle merges and
+ * overlays by (R2-03) **and the server's Incident dedupe grain** (`BREAK-DEDUPE-GRAIN-1`).
  *
- * ⛔ **One contract with the backend.** `ReconRoutes.breakIdentity()` renders the byte-identical string into
- * the `breakId` attribute it dedupes promotions on and indexes `GET /recon/promoted` by; the detail component
- * looks its own Breaks up in that map with this value. Changing either spelling alone silently empties the
- * map, and every Break would read as un-promoted.
+ * ⛔ **One contract with the backend.** `ReconBreaks.identity()` (engine; `ReconRoutes.breakIdentity()`
+ * delegates to it) renders the byte-identical string: the recorded state is matched to the live Breaks by it,
+ * and it is the `breakId` attribute promotions dedupe on and `GET /recon/promoted` indexes by. Changing
+ * either spelling alone silently empties both overlays — every Break would read as open and un-promoted.
  *
  * 🔴 **Why the parts are escaped, and why this does not use `KEY_SEP`.** `KEY_SEP` is `''` and belongs to
  * {@link keyOf}, which composes `b.key` itself out of the key columns' values — so a key routinely contains
@@ -264,7 +277,7 @@ export function withinTolerance(left: unknown, right: unknown, c: CompareColumn)
 
 /**
  * Compute the fresh break set for a run. Every returned break is `open` — lifecycle (auto-close, preserved
- * manual resolutions) is applied separately by {@link mergeBreaks} against the previous run.
+ * manual resolutions) is applied separately, server-side, against the previous recorded run.
  */
 export function runReconciliation(
     config: Pick<ReconciliationConfig, 'keyColumns' | 'compareColumns'>,
@@ -301,51 +314,6 @@ export function runReconciliation(
         if (!leftByKey.has(key)) breaks.push({ key, type: 'missing_left', status: 'open' });
     }
     return breaks;
-}
-
-/**
- * Merge a fresh run's breaks with the previous run's, per the locked lifecycle:
- * - a fresh break whose identity was **manually resolved** last run stays `resolved` (with its note);
- * - a previous open/resolved break that is **no longer present** (the key now matches within tolerance)
- *   becomes `auto_closed` for this run's report;
- * - previously `auto_closed` breaks that are still gone are dropped (bounded history).
- *
- * <p>Since `BREAK-AGING-1` it also carries {@link ReconBreak.firstSeenAt}: a break whose identity was
- * present last run keeps the stamp it already had, and a genuinely new one is stamped `now`. That is the
- * whole aging mechanism — ⛔ **a fresh break arrives from the engine with no stamp on every run**, so
- * re-stamping a carried break here would reset its age to zero on every single run and the aging view
- * would permanently read "everything is new".
- *
- * @param now injected so a test can pin it; a caller passes the run instant it also writes to `lastRunAt`
- */
-export function mergeBreaks(
-    previous: ReconBreak[],
-    fresh: ReconBreak[],
-    now: string = new Date().toISOString(),
-): ReconBreak[] {
-    const prevById = new Map(previous.map((b) => [breakId(b), b]));
-    const freshIds = new Set(fresh.map(breakId));
-
-    const carried = fresh.map((b) => {
-        const p = prevById.get(breakId(b));
-        // A previously-seen break keeps its original sighting; one the previous run never recorded a
-        // stamp for (persisted before this field existed) is stamped now — the best honest answer.
-        const firstSeenAt = p ? (p.firstSeenAt ?? now) : now;
-        const withAge = { ...b, firstSeenAt };
-        return p && p.status === 'resolved' ? { ...withAge, status: 'resolved' as const, note: p.note } : withAge;
-    });
-    const autoClosed = previous
-        .filter((p) => (p.status === 'open' || p.status === 'resolved') && !freshIds.has(breakId(p)))
-        .map((p) => ({ ...p, status: 'auto_closed' as const }));
-    return [...carried, ...autoClosed];
-}
-
-/** Manually resolve (or re-open) a break by identity, preserving everything else. */
-export function resolveBreak(breaks: ReconBreak[], target: ReconBreak, resolved: boolean, note?: string): ReconBreak[] {
-    const id = breakId(target);
-    return breaks.map((b) =>
-        breakId(b) === id ? { ...b, status: resolved ? 'resolved' : 'open', note: note?.trim() || undefined } : b,
-    );
 }
 
 /** Roll a break set up into the report cards. */
@@ -416,7 +384,5 @@ export function buildReconciliation(
         rightDataset,
         keyColumns,
         compareColumns,
-        breaks: [],
-        lastRunAt: null,
     };
 }

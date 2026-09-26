@@ -7,8 +7,10 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
+import com.gamma.query.ReconBreaks;
 import com.gamma.query.ReconConfigLoader;
 import com.gamma.query.ReconService;
+import com.gamma.query.ReconStateStore;
 import com.gamma.signal.Severity;
 
 import java.nio.file.Path;
@@ -29,6 +31,12 @@ import java.util.function.Supplier;
  * a scheduled reconciliation's breaks enter the triage workflow rather than only the signal ledger. The
  * the seam is resolved through a supplier (it is wired onto the {@code JobService} after this
  * built-in is constructed); a {@code null} supplier value leaves the Job signal-only.
+ *
+ * <p>Every run is also RECORDED into the Reconciliation's operational state ({@link ReconStateStore}, R2-03) —
+ * the same merge the Board's {@code POST /recon/{id}/record} route applies — so a scheduled run ages and
+ * auto-closes Breaks exactly as a manual one does. Recording is best-effort: a refusal (too many Breaks, an
+ * unreadable state file) is logged and named in the result message, never fails the run (the Signal is
+ * already the durable ledger fact).
  *
  * <p>Follows the built-in convention of constructor-injected {@code dataDir} plus reading the component
  * registry from {@link com.gamma.pipeline.SpaceConfigRoot} at run time — THIS space's config root, not
@@ -99,10 +107,27 @@ final class ReconRunJob implements Job {
         ctx.signals().emit("recon.run.completed", breaks > 0 ? Severity.WARN : Severity.INFO, payload);
         ctx.log().info("reconciliation complete", "reconciliation", reconId, "breaks", breaks);
         if (breaks > 0) openIncident(ctx, reconId, missingLeft, missingRight, valueBreak, breaks);
+        String notRecorded = recordRun(ctx, writeRoot, reconId, spec);
 
         return JobResult.ok("recon.run '" + reconId + "': " + breaks + " break(s) ("
-                + missingLeft + " missing-left, " + missingRight + " missing-right, " + valueBreak + " value-break)",
+                + missingLeft + " missing-left, " + missingRight + " missing-right, " + valueBreak + " value-break)"
+                + (notRecorded == null ? "" : " — run not recorded: " + notRecorded),
                 (System.nanoTime() - t0) / 1_000_000L);
+    }
+
+    /**
+     * Record this run into the Reconciliation's state (R2-03). Returns {@code null} when recorded, else the
+     * reason it was not — best-effort, like {@link #openIncident}, but never silent.
+     */
+    private static String recordRun(JobContext ctx, Path writeRoot, String reconId, ReconService.Spec spec) {
+        try {
+            new ReconStateStore(writeRoot).record(reconId,
+                    ReconBreaks.compute(spec, ReconStateStore.MAX_BREAKS), ReconStateStore.now());
+            return null;
+        } catch (Exception e) {
+            ctx.log().warn("could not record the reconciliation run", "reconciliation", reconId, "error", e.getMessage());
+            return e.getMessage();
+        }
     }
 
     /**
