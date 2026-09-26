@@ -153,6 +153,10 @@ export const appRoutes: Route[] = [
             { path: 'assist', loadChildren: () => import('app/modules/admin/assist/assist.routes') },
             { path: 'agent-chat', loadChildren: () => import('app/modules/admin/agent-chat/agent-chat.routes') },
             { path: 'approvals', loadChildren: () => import('app/modules/admin/approvals/approvals.routes') }, // AGT-5 P3 approvals inbox
+            {
+                path: 'pending-changes',
+                loadChildren: () => import('app/modules/admin/pending-changes/pending-changes.routes'),
+            }, // ASSURE-MAKER-CHECKER-1
             { path: 'autonomy', loadChildren: () => import('app/modules/admin/autonomy/autonomy.routes') }, // AGT-5 P4 autonomy dashboard
             { path: 'learning', loadChildren: () => import('app/modules/admin/learning/learning.routes') }, // AGT-5 P5 learning dashboard
             { path: 'notification-center', redirectTo: 'settings/notifications' },

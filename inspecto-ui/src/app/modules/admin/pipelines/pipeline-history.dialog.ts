@@ -14,6 +14,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoDialogResizeDirective } from 'app/inspecto/components/dialog-resize.directive';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoLineDiffComponent } from 'app/inspecto/components/line-diff.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 
 export interface PipelineHistoryData {
@@ -43,6 +44,7 @@ export type HistoryCompare = 'previous' | 'current';
         InspectoAlertComponent,
         InspectoDialogResizeDirective,
         InspectoEmptyStateComponent,
+        InspectoLineDiffComponent,
         InspectoSkeletonComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -100,31 +102,7 @@ export type HistoryCompare = 'previous' | 'current';
                             }}</inspecto-alert>
                         } @else if (diff(); as d) {
                             <p class="text-secondary text-sm" aria-live="polite">{{ summary() }}</p>
-                            <div
-                                class="diff overflow-auto rounded border font-mono text-xs"
-                                role="region"
-                                aria-label="Diff"
-                            >
-                                @for (l of d.lines; track $index) {
-                                    @switch (l.op) {
-                                        @case ('remove') {
-                                            <del class="line block text-red-700 no-underline dark:text-red-400"
-                                                ><span aria-hidden="true">- </span>{{ l.text }}</del
-                                            >
-                                        }
-                                        @case ('add') {
-                                            <ins class="line block text-green-700 no-underline dark:text-green-400"
-                                                ><span aria-hidden="true">+ </span>{{ l.text }}</ins
-                                            >
-                                        }
-                                        @default {
-                                            <span class="line text-secondary block"
-                                                ><span aria-hidden="true">&nbsp; </span>{{ l.text }}</span
-                                            >
-                                        }
-                                    }
-                                }
-                            </div>
+                            <inspecto-line-diff [diff]="d" />
                         } @else {
                             <inspecto-skeleton [lines]="6" />
                         }
@@ -153,14 +131,6 @@ export type HistoryCompare = 'previous' | 'current';
             .version:focus-visible {
                 outline: 2px solid var(--gamma-primary);
                 outline-offset: 1px;
-            }
-            .diff {
-                border-color: var(--gamma-border);
-                max-height: 60vh;
-            }
-            .line {
-                white-space: pre;
-                padding: 0 0.5rem;
             }
         `,
     ],

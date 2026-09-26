@@ -231,6 +231,12 @@ export class LensService {
      *  the server lets save it. Client-side it gates only that editor today. */
     readonly canManageIncidents = computed(() => this.identityCapability('canManageIncidents', 'incidents.manage'));
 
+    /** May decide a Pending Change — approve or decline a held config change (`ASSURE-MAKER-CHECKER-1`,
+     *  `POST /pending-changes/{id}/approve | decline`). RBAC: Admin, Super. {@link identityCapability}: the
+     *  `admin` seed holds it and qualifies for no non-Business lens. The server adds the kind's own
+     *  `approverCapability` and four-eyes — this only decides whether the buttons show. */
+    readonly canApproveChanges = computed(() => this.identityCapability('canApproveChanges', 'changes.approve'));
+
     /** May WORK an Incident or Case through its lifecycle — the `ack` / `resolve` / `transition` / `assign`
      *  routes, which left {@link canAdminister} for this narrower grant (operator, 2026-09-26). RBAC:
      *  Operations, Support, Power, Admin, Super. It gates the lifecycle verbs on the Incidents / Case Manager

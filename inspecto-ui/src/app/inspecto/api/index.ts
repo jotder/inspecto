@@ -27,6 +27,7 @@ export * from './config.service';
 export * from './assist.service';
 export * from './agent.service';
 export * from './approvals.service';
+export * from './pending-changes.service';
 export * from './autonomy.service';
 export * from './learning.service';
 export * from './alerts.service';

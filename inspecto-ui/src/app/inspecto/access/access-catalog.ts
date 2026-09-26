@@ -28,6 +28,16 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             label: 'Author Workbench content (create / edit / delete)',
         },
     ],
+    'pending-changes': [
+        {
+            // ASSURE-MAKER-CHECKER-1: approve / decline a held config change. The server adds the kind's own
+            // approverCapability and four-eyes on top; denying this here only hides the buttons.
+            id: 'changes.approve',
+            kind: 'action',
+            capability: 'canApproveChanges',
+            label: 'Decide Pending Changes (approve / decline)',
+        },
+    ],
     runs: [
         {
             id: 'runs.operate',
@@ -314,6 +324,7 @@ export const LENS_NAV_SCOPE: Record<Lens, string[]> = {
         'alerts',
         'incidents',
         'approvals',
+        'pending-changes',
         'learning',
         'tags',
         'platform-group',
@@ -352,6 +363,7 @@ export const LENS_NAV_SCOPE: Record<Lens, string[]> = {
         'alerts',
         'incidents',
         'approvals',
+        'pending-changes',
         'autonomy',
         'learning',
         'cases',

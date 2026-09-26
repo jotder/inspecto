@@ -1,0 +1,103 @@
+<div class="flex min-w-0 flex-auto flex-col p-6 md:p-8">
+    <inspecto-page-header
+        title="Pending Changes"
+        subtitle="Config changes this Space's approval policy holds for a second person. Read the diff, then approve to apply it or decline it."
+        [inset]="false"
+    >
+        <ng-container actions>
+            <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh">
+                <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
+            </button>
+        </ng-container>
+    </inspecto-page-header>
+
+    <mat-button-toggle-group
+        class="mt-4 self-start"
+        aria-label="Which changes to list"
+        [value]="filter()"
+        (change)="setFilter($event.value)"
+    >
+        <mat-button-toggle value="pending">Waiting</mat-button-toggle>
+        <mat-button-toggle value="all">All</mat-button-toggle>
+    </mat-button-toggle-group>
+
+    @if (error()) {
+        <inspecto-alert class="mt-4" variant="error" title="Could not load the Pending Changes">{{
+            error()
+        }}</inspecto-alert>
+    } @else {
+        <div class="mt-4">
+            <inspecto-data-table
+                stateKey="pending-changes"
+                exportName="pending-changes"
+                [rows]="changes()"
+                [columns]="columnDefs"
+                [loading]="loading()"
+                (rowClick)="open($event)"
+                noRowsTitle="No changes waiting"
+                noRowsHint="When this Space's approval policy holds a change, it appears here for a second person to review."
+            />
+        </div>
+    }
+
+    @if (selected(); as c) {
+        <section class="bg-card mt-6 rounded-2xl p-6 shadow" aria-labelledby="pc-title">
+            <div class="flex items-start gap-3">
+                <div class="min-w-0 flex-1">
+                    <h2 id="pc-title" class="text-lg font-semibold">{{ c.operation }} {{ c.kind }} '{{ c.name }}'</h2>
+                    <p class="text-secondary text-sm">
+                        Proposed by {{ c.author }} on {{ c.createdAt | date: 'medium' }} · expires
+                        {{ c.expiresAt | date: 'medium' }}
+                        @if (c.fourEyes) {
+                            · a different person must decide
+                        }
+                    </p>
+                </div>
+                <inspecto-status-badge [value]="c.status" />
+                <button mat-icon-button (click)="close()" aria-label="Close the change">
+                    <mat-icon [svgIcon]="'heroicons_outline:x-mark'"></mat-icon>
+                </button>
+            </div>
+
+            @if (c.reason) {
+                <p class="mt-3 text-sm"><span class="font-semibold">Reason:</span> {{ c.reason }}</p>
+            }
+            @if (c.decidedBy) {
+                <p class="text-secondary mt-1 text-sm">
+                    {{ c.status }} by {{ c.decidedBy }} on {{ c.decidedAt | date: 'medium' }}
+                    @if (c.decisionReason) {
+                        — {{ c.decisionReason }}
+                    }
+                </p>
+            }
+
+            <h3 class="mt-4 text-sm font-semibold">What it changes</h3>
+            @if (diffError()) {
+                <inspecto-alert variant="error" title="Could not load the diff">{{ diffError() }}</inspecto-alert>
+            } @else if (diff(); as d) {
+                <p class="text-secondary mb-2 text-sm" aria-live="polite">{{ diffSummary() }}</p>
+                <inspecto-line-diff [diff]="d" label="Diff of the Pending Change" />
+            } @else {
+                <inspecto-skeleton [lines]="6" />
+            }
+
+            @if (decideError()) {
+                <inspecto-alert class="mt-4" variant="error" title="Not decided">{{ decideError() }}</inspecto-alert>
+            }
+
+            @if (canDecide()) {
+                <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-start">
+                    <mat-form-field class="flex-1" subscriptSizing="dynamic">
+                        <mat-label>Reason (optional)</mat-label>
+                        <input matInput [formControl]="reason" maxlength="500" />
+                        @if (reason.hasError('maxlength')) {
+                            <mat-error>At most 500 characters.</mat-error>
+                        }
+                    </mat-form-field>
+                    <button mat-stroked-button color="warn" [disabled]="deciding()" (click)="decline()">Decline</button>
+                    <button mat-flat-button color="primary" [disabled]="deciding()" (click)="approve()">Approve</button>
+                </div>
+            }
+        </section>
+    }
+</div>

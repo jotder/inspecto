@@ -86,6 +86,7 @@ export function statusTone(value: string | null | undefined): StatusTone {
         case 'REJECTED':
         case 'UNREACHABLE':
         case 'DENIED':
+        case 'DECLINED': // a Pending Change closed unapplied (ASSURE-MAKER-CHECKER-1)
         case 'REVOKED':
         case 'RED': // RAG — KPI below its red threshold (TM Forum scorecard convention)
         case 'CONFIRMED': // leakage / fraud case — loss confirmed, recovery pending
@@ -99,6 +100,7 @@ export function statusTone(value: string | null | undefined): StatusTone {
         case 'QUARANTINE':
         case 'QUARANTINED':
         case 'EXPIRED':
+        case 'STALE': // a Pending Change whose base moved underneath it
         case 'AMBER': // RAG — between target and the red threshold
         case 'INVESTIGATING':
             return 'warning';
@@ -118,6 +120,7 @@ export function statusTone(value: string | null | undefined): StatusTone {
         case 'HEALTHY':
         case 'REACHABLE':
         case 'RESOLVED':
+        case 'APPROVED':
         case 'CLOSED':
         case 'ACTIVE':
         case 'LIVE':
