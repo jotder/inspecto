@@ -46,6 +46,12 @@ the real ControlApi.
   open objects directly via `ObjectService.open`, bypassing the route. **Bootstrap consequence:** the first
   object in an empty space must come from an auto-creation path — there is nothing to link to yet, so the
   dialog shows a "no existing objects to link to" hint and blocks manual creation until one exists.
+* **Lifecycle verbs are gated on `canWorkIncidents`** (operator, 2026-09-26) — Accept / Resolve / Reopen /
+  Archive, the Case workflow verbs (toolbar, detail panel, `/objects/{id}` page) render only with
+  `LensService.canWorkIncidents()` (identity capability, action node `incidents.work`), the grant the server
+  demands on `ack` / `resolve` / `transition` / `assign`. Accept self-assigns through `POST /objects/{id}/assign`,
+  not the `canAdminister` PATCH. ⚠ Priority, the Incident Escalate flag, tagging and merge are not these verbs
+  and keep their own gates (the PATCH and merge are `canAdminister` server-side, not hidden client-side).
 * **Triage is optimistic** — every bulk verb (accept / resolve / archive / reopen / escalate /
   prioritize / tag / case actions) patches the loaded rows + open detail to the expected post-state,
   then reconciles each row with the authoritative server object; failures reload

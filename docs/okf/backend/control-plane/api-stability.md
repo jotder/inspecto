@@ -84,6 +84,13 @@ above the generated commit list.
   shared grid through `PUT /notifications/preferences` must move to `/default`. The feed, SSE frames and
   unread count hide a category the caller turned in-app off for. Personal is unchanged (the PUT writes the
   single grid).
+- **Breaking (Professional/Enterprise, 2026-09-26):** `POST /objects/{id}/ack`, `/resolve`, `/transition` and
+  `/assign` require the new **`canWorkIncidents`** instead of `canAdminister` (403 `PERMISSION_DENIED`
+  otherwise). The seeded `operations`, `support`, `power` and `admin` roles hold it; an **authored
+  `roles.toon`** that gave a role `canAdminister` so it could work Incidents must add `canWorkIncidents`.
+  With an authenticated Subject those four routes record the Subject as the actor and ignore a body `actor`.
+  Merge, split, `PATCH /objects/{id}` and the Case-Rule evaluate are unchanged (`canAdminister`). Personal
+  (no authenticator) is unchanged.
 - **Breaking (every edition):** `X-Forwarded-For` is **ignored by default** — the client IP recorded in the
   audit trail and used as the unauthenticated rate-limit key is the socket peer unless the peer is listed
   in the new `-Dcontrol.trustedProxies` (IPs/CIDRs), and then the right-most untrusted hop wins, not the

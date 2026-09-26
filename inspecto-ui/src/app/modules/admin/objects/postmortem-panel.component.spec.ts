@@ -3,7 +3,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { FindingsSpecDef, ObjectsService, OperationalObject } from 'app/inspecto/api';
+import { FindingsSpecDef, ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
@@ -234,6 +234,29 @@ describe('PostmortemPanelComponent', () => {
         fixture.componentRef.setInput('object', { ...INCIDENT, status: 'IDENTIFIED' });
         fixture.detectChanges();
         expect(c.quickActions.map((a) => a.id)).toContain('accept');
+    });
+
+    // Operator, 2026-09-26: the lifecycle verbs ride POST /objects/{id}/transition, gated canWorkIncidents —
+    // so they render for exactly the subjects the server lets move the object. Escalate on an Incident is a
+    // flag edit (the PATCH), not a move, and is not this capability's to hide.
+    it('hides the lifecycle verbs from a signed-in subject without canWorkIncidents', () => {
+        const { c } = create();
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canOperateRuns']);
+        expect(c.quickActions.map((a) => a.id)).toEqual(['escalate']);
+        session.capabilities.set(['canWorkIncidents']);
+        expect(c.quickActions.map((a) => a.id)).toEqual(['resolve', 'archive', 'escalate']);
+    });
+
+    it('offers a Case no workflow verb at all without canWorkIncidents', () => {
+        const { c } = create({ ...INCIDENT, id: 'c3', objectType: 'CASE', status: 'INVESTIGATING', attributes: {} });
+        const session = TestBed.inject(SessionService);
+        session.authMode.set('oidc');
+        session.capabilities.set(['canManageIncidents']);
+        expect(c.quickActions).toEqual([]);
+        session.capabilities.set(['canWorkIncidents']);
+        expect(c.quickActions.map((a) => a.id).sort()).toEqual(['escalate', 'resolve']);
     });
 
     it('renders with no a11y violations', async () => {

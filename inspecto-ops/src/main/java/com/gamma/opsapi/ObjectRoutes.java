@@ -60,20 +60,25 @@ public final class ObjectRoutes implements RouteModule {
         // the caller's dataScopes answers 404, indistinguishable from absence (existence-hiding).
         //
         // ROUTE-UNGATED-DEFAULT-1, step 2b (operator decision 2026-09-15): triage is daily operator work,
-        // but changing an Incident's DISPOSITION is administrative. So the state-changing routes — ack /
-        // resolve / transition / assign / merge / split, the PATCH that edits priority, severity and
-        // assignee, and the Case-Rule evaluate that groups Incidents into a Case — are gated on
-        // `canAdminister`; comment / attach / link / RCA-seed stay open as collaboration and are recorded
-        // as such in CapabilityManifest.EXEMPTIONS. ⚠ The capability gate wraps the scope guard, so a
-        // caller lacking the capability gets 403 before existence-hiding gets to answer 404.
+        // but changing an Incident's DISPOSITION is administrative. So the state-changing routes — merge /
+        // split, the PATCH that edits priority, severity and assignee, and the Case-Rule evaluate that
+        // groups Incidents into a Case — are gated on `canAdminister`; comment / attach / link / RCA-seed
+        // stay open as collaboration and are recorded as such in CapabilityManifest.EXEMPTIONS. ⚠ The
+        // capability gate wraps the scope guard, so a caller lacking the capability gets 403 before
+        // existence-hiding gets to answer 404.
+        // (operator, 2026-09-26) ack / resolve / transition / assign moved from `canAdminister` to the
+        // narrower `canWorkIncidents` (operations / support / power / admin in Roles.SEED): moving an
+        // Incident or Case through its lifecycle is the analyst's own work — before this an `operations`
+        // Subject could not close their own Case. Merge / split / PATCH / Case-Rule evaluate stay
+        // `canAdminister`. These four record the authenticated Subject as the actor when there is one.
         // ✅ `POST /objects` (create) is gated by `canManageIncidents` (operator, 2026-09-16) — the same
         // answer as `POST /recon/promote`, deliberately: both perform the one act of OPENING an Incident,
         // and a second precedent for one concept is what the call was made to avoid. ⚠ Distinct from the
-        // `canAdminister` gates on ack/resolve below: opening is triage, resolving is administration.
-        api.post("/objects/([^/]+)/ack", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "ack", null, api.body(e)))));
-        api.post("/objects/([^/]+)/resolve", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "resolve", null, api.body(e)))));
-        api.post("/objects/([^/]+)/transition", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> transitionFromBody(api, ApiContext.name(m), api.body(e)))));
-        api.post("/objects/([^/]+)/assign", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> assign(api, ApiContext.name(m), api.body(e)))));
+        // `canWorkIncidents` gates on ack/resolve below: opening an Incident and working it are two names.
+        api.post("/objects/([^/]+)/ack", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "ack", null, actorOf(e, api.body(e))))));
+        api.post("/objects/([^/]+)/resolve", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "resolve", null, actorOf(e, api.body(e))))));
+        api.post("/objects/([^/]+)/transition", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transitionFromBody(api, e, ApiContext.name(m), api.body(e)))));
+        api.post("/objects/([^/]+)/assign", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> assign(api, e, ApiContext.name(m), api.body(e)))));
         api.post("/objects/([^/]+)/links", scoped(api, (e, m) -> createLink(api, e, ApiContext.name(m), api.body(e))));
         api.get("/objects/([^/]+)/links", scoped(api, (e, m) -> toLinkMaps(OpsEngine.of(api).linksOf(ApiContext.name(m)))));
         api.delete("/objects/([^/]+)/links", scoped(api, (e, m) -> deleteLink(api, ApiContext.name(m), e)));
@@ -101,9 +106,11 @@ public final class ObjectRoutes implements RouteModule {
         // on the generic /components CRUD (docs/superpower/findings-spec-plan.md §3.3).
         api.get("/findings/([^/]+)", (e, m) -> findingsSpecOf(api, ApiContext.name(m)));
         // Rule-raised cases (C5): auto-group Incidents into a Case. CRUD is capability-gated (config);
-        // evaluate mutates objects (an operational action, like transition) — and since 2026-09-15 a
-        // transition is `canAdminister`, so evaluate takes the same gate. ⚠ The route-gating audit had
-        // filed it under "read-shaped POST"; it opens a Case, so that bucket was wrong for it.
+        // evaluate mutates objects (an operational action, like transition) — and since 2026-09-15 it is
+        // `canAdminister`. ⚠ It STAYS there after transition moved to `canWorkIncidents` (operator,
+        // 2026-09-26): evaluate decides which Incidents a Case holds, like merge / split, not one move of
+        // one object. ⚠ The route-gating audit had filed it under "read-shaped POST"; it opens a Case, so
+        // that bucket was wrong for it.
         api.get("/cases/rules", (e, m) -> OpsEngine.of(api).caseRules().stream().map(CaseRule::toMap).toList());
         api.post("/cases/rules", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> saveCaseRule(api, api.body(e))));
         api.delete("/cases/rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> deleteCaseRule(api, ApiContext.name(m))));
@@ -703,14 +710,25 @@ public final class ObjectRoutes implements RouteModule {
     }
 
     /**
-     * {@code POST /objects/{id}/assign} — assign to a person: body {@code {assignee, actor?}}.
-     * A missing assignee → 400; an unknown object → 404.
+     * {@code POST /objects/{id}/assign} — assign to a person: body {@code {assignee, actor?}} ({@code actor}
+     * only counts with no authenticated Subject — {@link #actorOf}). A missing assignee → 400; an unknown
+     * object → 404.
      */
-    private Object assign(ApiContext api, String id, Map<String, Object> body) {
+    private Object assign(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
         String assignee = ApiContext.str(body, "assignee");
         if (assignee == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'assignee'");
         return RouteErrors.mapCaseErrors(
-                () -> OpsEngine.of(api).assign(id, assignee, ApiContext.str(body, "actor")).toMap());
+                () -> OpsEngine.of(api).assign(id, assignee, actorOf(ex, body)).toMap());
+    }
+
+    /**
+     * The actor an object's own history records for a lifecycle move: the authenticated {@link Subject} when
+     * the request has one — a body field must not re-attribute a Subject's act, now that analysts hold
+     * {@code canWorkIncidents} (operator, 2026-09-26) — else the body's {@code actor}, the Personal edition's
+     * honour-system value, unchanged.
+     */
+    private static String actorOf(HttpExchange ex, Map<String, Object> body) {
+        return ApiContext.subject(ex).map(Subject::id).orElseGet(() -> ApiContext.str(body, "actor"));
     }
 
     /**
@@ -816,19 +834,20 @@ public final class ObjectRoutes implements RouteModule {
         return out;
     }
 
-    /** {@code POST /objects/{id}/ack|resolve} — a fixed-action transition; {@code actor} from the body. */
-    private Object transition(ApiContext api, String id, String action, String target, Map<String, Object> body) {
-        return doTransition(api, id, action, target, ApiContext.str(body, "actor"));
+    /** {@code POST /objects/{id}/ack|resolve} — a fixed-action transition; {@code actor} per {@link #actorOf}. */
+    private Object transition(ApiContext api, String id, String action, String target, String actor) {
+        return doTransition(api, id, action, target, actor);
     }
 
-    /** {@code POST /objects/{id}/transition} — body {@code {action}} or {@code {status|to}} (+ optional {@code actor}). */
-    private Object transitionFromBody(ApiContext api, String id, Map<String, Object> body) {
+    /** {@code POST /objects/{id}/transition} — body {@code {action}} or {@code {status|to}} (+ optional
+     *  {@code actor}, per {@link #actorOf}). */
+    private Object transitionFromBody(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
         String action = ApiContext.str(body, "action");
         String target = ApiContext.str(body, "status");
         if (target == null) target = ApiContext.str(body, "to");
         if (action == null && target == null)
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'action' or 'status'");
-        return doTransition(api, id, action, target, ApiContext.str(body, "actor"));
+        return doTransition(api, id, action, target, actorOf(ex, body));
     }
 
     /** Apply a lifecycle transition, mapping the service's exceptions to 404 (unknown id) / 422 (illegal move). */

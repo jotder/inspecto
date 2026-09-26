@@ -171,14 +171,17 @@ final class CapabilityManifest {
             new Entry("DELETE", "/cases/rules/([^/]+)", Roles.CAN_AUTHOR_WORKBENCH),
             // ObjectRoutes — Incident/Case TRIAGE, gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1` step 2b).
             // Operator decision: triage is daily work, but changing an Incident's disposition is
-            // administrative — so the state-changing routes take `canAdminister`, and comment / attach /
+            // administrative — so the state-changing routes took `canAdminister`, and comment / attach /
             // link / RCA-seed stay open as collaboration (see EXEMPTIONS). Case-Rule evaluate opens a Case,
             // which the audit had mis-bucketed as read-shaped. `POST /objects` (create) took `canManageIncidents`
             // on 2026-09-16 (it said PENDING here until 2026-09-17; PENDING_OPERATOR_CALLS has been empty since).
-            new Entry("POST", "/objects/([^/]+)/ack", Roles.CAN_ADMINISTER),
-            new Entry("POST", "/objects/([^/]+)/resolve", Roles.CAN_ADMINISTER),
-            new Entry("POST", "/objects/([^/]+)/transition", Roles.CAN_ADMINISTER),
-            new Entry("POST", "/objects/([^/]+)/assign", Roles.CAN_ADMINISTER),
+            // (operator, 2026-09-26) ack / resolve / transition / assign moved from `canAdminister` to the
+            // narrower `canWorkIncidents` (operations / support / power / admin), so an analyst can work and
+            // close their own Case; merge / split / PATCH / Case-Rule evaluate stay `canAdminister`.
+            new Entry("POST", "/objects/([^/]+)/ack", Roles.CAN_WORK_INCIDENTS),
+            new Entry("POST", "/objects/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS),
+            new Entry("POST", "/objects/([^/]+)/transition", Roles.CAN_WORK_INCIDENTS),
+            new Entry("POST", "/objects/([^/]+)/assign", Roles.CAN_WORK_INCIDENTS),
             new Entry("POST", "/objects/([^/]+)/merge", Roles.CAN_ADMINISTER),
             new Entry("POST", "/objects/([^/]+)/split", Roles.CAN_ADMINISTER),
             new Entry("PATCH", "/objects/([^/]+)", Roles.CAN_ADMINISTER),

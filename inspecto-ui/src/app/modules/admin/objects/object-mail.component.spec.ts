@@ -43,6 +43,8 @@ interface CreateOpts {
     type?: 'INCIDENT' | 'CASE';
     list?: Observable<OperationalObject[]>;
     workflow?: Observable<WorkflowDef>;
+    /** Signed in with exactly these grants (arms `authMode: 'oidc'`, where capabilities are enforced client-side). */
+    capabilities?: string[];
 }
 
 async function create(opts: CreateOpts = {}) {
@@ -54,6 +56,7 @@ async function create(opts: CreateOpts = {}) {
         findingsSpec: vi.fn(() => throwError(() => new Error('offline'))),
         update: vi.fn((id: string) => of(OBJECTS.find((o) => o.id === id))),
         transition: vi.fn((id: string) => of(OBJECTS.find((o) => o.id === id))),
+        assign: vi.fn((id: string) => of(OBJECTS.find((o) => o.id === id))),
         addComment: vi.fn(() => of({})),
         tags: vi.fn(() => of([{ name: 'billing', createdAt: 1 }])),
         tagRules: vi.fn(() => of([])),
@@ -86,7 +89,12 @@ async function create(opts: CreateOpts = {}) {
     // ⚠ Armed here because the coverage baseline caught what no assertion did — the spec still
     // PASSED while the template it exists to exercise fell to 2.2%: it asserts on component
     // state, not on rendered output, so the gated branch was invisible to it.
-    TestBed.inject(SessionService).opsEnabled.set(true);
+    const session = TestBed.inject(SessionService);
+    session.opsEnabled.set(true);
+    if (opts.capabilities) {
+        session.authMode.set('oidc');
+        session.capabilities.set(opts.capabilities);
+    }
     const fixture = TestBed.createComponent(ObjectMailComponent);
     fixture.detectChanges(); // ngOnInit → reload()
     return { fixture, c: fixture.componentInstance, api };
@@ -152,8 +160,34 @@ describe('ObjectMailComponent', () => {
             attributes: { category: 'Security / Access / Expired credentials' },
         });
         c.accept([categorized]);
-        expect(api.update).toHaveBeenCalledWith('i9', { assignee: 'operator' });
+        // POST /assign (canWorkIncidents), not the canAdminister PATCH — an analyst may accept an unassigned one.
+        expect(api.assign).toHaveBeenCalledWith('i9', 'operator', 'operator');
+        expect(api.update).not.toHaveBeenCalled();
         expect(api.transition).toHaveBeenCalledWith('i9', 'accept', 'operator');
+    });
+
+    // ── the lifecycle verbs show for exactly the subjects the server lets move an object (canWorkIncidents) ──
+    it('offers the Incident lifecycle verbs only to a subject holding canWorkIncidents', async () => {
+        const { c, fixture } = await create({ capabilities: ['canOperateRuns'] });
+        c.onSelection([OBJECTS[0]] as unknown as Record<string, unknown>[]); // IDENTIFIED
+        const ids = (): string[] => c.bulkActions().map((a) => a.id);
+        for (const verb of ['accept', 'resolve', 'reopen', 'archive']) expect(ids()).not.toContain(verb);
+        expect(ids()).toContain('tag'); // collaboration stays
+        TestBed.inject(SessionService).capabilities.set(['canWorkIncidents']);
+        fixture.detectChanges();
+        expect(ids()).toEqual(expect.arrayContaining(['accept', 'resolve', 'reopen', 'archive']));
+    });
+
+    it('offers the Case workflow verbs only to a subject holding canWorkIncidents', async () => {
+        const { c } = await create({
+            type: 'CASE',
+            list: of([kase('c1', 'OPEN')]),
+            capabilities: ['canManageIncidents'],
+        });
+        c.onSelection([kase('c1', 'OPEN')] as unknown as Record<string, unknown>[]);
+        expect(c.bulkActions().some((a) => a.id.startsWith('case:'))).toBe(false);
+        TestBed.inject(SessionService).capabilities.set(['canWorkIncidents']);
+        expect(c.bulkActions().map((a) => a.id)).toContain('case:investigate');
     });
 
     it('prioritize patches every selected object', async () => {

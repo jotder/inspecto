@@ -44,10 +44,11 @@ class ControlApiScopedObjectsTest {
         // canManageIncidents: same reason, 2026-09-16 — `POST /objects` (opening an Incident) gained its own
         // capability, and the gate wraps the scope guard, so without it the create-with-links case would
         // answer 403 before existence-hiding ever got to answer 404, testing the wrong thing.
+        // canWorkIncidents: same reason, 2026-09-26 — `/assign` moved from canAdminister to it.
         if ("Bearer fraud".equals(auth))
-            return Optional.of(new Subject("ana", Set.of("canOperateRuns", "canAdminister", "canManageIncidents"), Set.of("fraud")));
+            return Optional.of(new Subject("ana", Set.of("canOperateRuns", "canAdminister", "canManageIncidents", "canWorkIncidents"), Set.of("fraud")));
         if ("Bearer all".equals(auth))
-            return Optional.of(new Subject("root", Set.of("canOperateRuns", "canAdminister", "canManageIncidents")));   // dataScopes null = unscoped
+            return Optional.of(new Subject("root", Set.of("canOperateRuns", "canAdminister", "canManageIncidents", "canWorkIncidents")));   // dataScopes null = unscoped
         return Optional.empty();
     };
 

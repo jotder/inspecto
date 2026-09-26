@@ -20,7 +20,14 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { concatMap } from 'rxjs';
-import { apiErrorMessage, FindingsSpecDef, ObjectsService, OperationalObject, WorkflowDef } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    FindingsSpecDef,
+    LensService,
+    ObjectsService,
+    OperationalObject,
+    WorkflowDef,
+} from 'app/inspecto/api';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -78,6 +85,8 @@ export class PostmortemPanelComponent {
     private toastr = inject(ToastrService);
     private fb = inject(FormBuilder);
     private confirm = inject(InspectoConfirmService);
+    /** The lifecycle verbs ride `POST /objects/{id}/transition` — `canWorkIncidents` (operator, 2026-09-26). */
+    private canWork = inject(LensService).canWorkIncidents;
 
     /** Member roll-up from the Contents section (cases only) — feeds the soft close-gate (C1). */
     readonly memberRollup = signal<MemberRollup>({ total: 0, open: 0 });
@@ -173,15 +182,17 @@ export class PostmortemPanelComponent {
      */
     get quickActions(): { id: string; label: string }[] {
         const s = displayStatus(this.object());
+        const work = this.canWork(); // the lifecycle verbs; an Incident's Escalate is a flag edit, not a move
         if (this.isIncident) {
             const out: { id: string; label: string }[] = [];
-            if (s === 'IDENTIFIED') out.push({ id: 'accept', label: 'Accept' });
-            if (s === 'IDENTIFIED' || s === 'DIAGNOSING') out.push({ id: 'resolve', label: 'Resolve' });
-            if (s !== 'ARCHIVED') out.push({ id: 'archive', label: 'Archive' });
-            if (s === 'RESOLVED' || s === 'ARCHIVED') out.push({ id: 'reopen', label: 'Reopen' });
+            if (work && s === 'IDENTIFIED') out.push({ id: 'accept', label: 'Accept' });
+            if (work && (s === 'IDENTIFIED' || s === 'DIAGNOSING')) out.push({ id: 'resolve', label: 'Resolve' });
+            if (work && s !== 'ARCHIVED') out.push({ id: 'archive', label: 'Archive' });
+            if (work && (s === 'RESOLVED' || s === 'ARCHIVED')) out.push({ id: 'reopen', label: 'Reopen' });
             out.push({ id: 'escalate', label: isEscalated(this.object()) ? 'De-escalate' : 'Escalate' });
             return out;
         }
+        if (!work) return [];
         const wf = this.workflow() ?? DEFAULT_CASE_WORKFLOW;
         const out: { id: string; label: string }[] = [];
         for (const t of wf.transitions) {

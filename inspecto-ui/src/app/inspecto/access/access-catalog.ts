@@ -62,6 +62,15 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             capability: 'canManageIncidents',
             label: 'Manage Incidents and Cases (author Findings fields)',
         },
+        {
+            // Operator, 2026-09-26: ack / resolve / transition / assign left canAdminister for this grant. It
+            // gates the lifecycle verbs on BOTH the Incidents and the Case Manager panes (one mail component),
+            // hung beside its sibling rather than duplicated per pane — one node per Capability.
+            id: 'incidents.work',
+            kind: 'action',
+            capability: 'canWorkIncidents',
+            label: 'Work Incidents and Cases (accept / resolve / move / assign)',
+        },
     ],
     catalog: [
         {

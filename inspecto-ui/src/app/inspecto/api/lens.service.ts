@@ -218,9 +218,8 @@ export class LensService {
      *  qualifies for no non-Business lens, so a lens-scoped administration grant would be evaluated false
      *  client-side for exactly the subject the server authorizes — the bootstrap deadlock again.
      *
-     *  ⚠ Deliberately coarse, and deliberately NOT the gate for Incident/Case triage: triage is day-to-day
-     *  support work, and whether it needs a capability at all is an open product question
-     *  (`docs/superpower/route-gating-audit.md` §6b). Do not widen this one to cover it. */
+     *  ⚠ Deliberately coarse, and deliberately NOT the gate for working Incidents/Cases: that is
+     *  {@link canWorkIncidents} (operator, 2026-09-26). Do not widen this one to cover it. */
     readonly canAdminister = computed(() => this.identityCapability('canAdminister', 'space.administer'));
 
     /** May manage Incidents and Cases — the grant the backend puts on opening an Incident/Case, promoting a
@@ -231,6 +230,16 @@ export class LensService {
      *  non-Business lens — lens-scoping it would hide the Findings-fields editor from exactly the people
      *  the server lets save it. Client-side it gates only that editor today. */
     readonly canManageIncidents = computed(() => this.identityCapability('canManageIncidents', 'incidents.manage'));
+
+    /** May WORK an Incident or Case through its lifecycle — the `ack` / `resolve` / `transition` / `assign`
+     *  routes, which left {@link canAdminister} for this narrower grant (operator, 2026-09-26). RBAC:
+     *  Operations, Support, Power, Admin, Super. It gates the lifecycle verbs on the Incidents / Case Manager
+     *  panes and the object detail page; merge, priority and the other `PATCH`-backed edits stay
+     *  `canAdminister` server-side.
+     *
+     *  {@link identityCapability}, as {@link canManageIncidents} is: the `admin` seed holds it and qualifies
+     *  for no non-Business lens, so a lens-scoped grant would hide the verbs from a subject the server allows. */
+    readonly canWorkIncidents = computed(() => this.identityCapability('canWorkIncidents', 'incidents.work'));
 
     /** Set the preferred lens and persist it across reloads. A lens outside {@link allowedLenses}
      *  is remembered but not activated (the switcher never offers one). */

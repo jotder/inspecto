@@ -98,11 +98,10 @@ public final class Roles {
      * (which has no precedent for this act): both routes perform the SAME act, and lending them a
      * neighbouring capability would have set two different precedents for one concept.
      *
-     * <p>⚠ Distinct from the {@code canAdminister} transitions already on {@code /objects/{id}/ack} and
-     * {@code /resolve}: this gates <em>opening</em> an Incident, which anyone triaging data quality does,
-     * while acknowledging and resolving one is an installation-administration act. ⛔ Do not widen this to
-     * cover those — the audit's whole finding was that one coarse capability had to stand in for names
-     * that did not exist, and this is one of the names.
+     * <p>⚠ Distinct from {@link #CAN_WORK_INCIDENTS}, which gates <em>working</em> one (ack / resolve /
+     * transition / assign): this gates <em>opening</em> an Incident. ⛔ Do not widen either to cover the
+     * other — the audit's whole finding was that one coarse capability had to stand in for names that did
+     * not exist, and these are two of the names.
      *
      * <p>⚠ Still open: {@code POST /expectations/evaluate} and {@code /expectations/{id}/evaluate} are
      * exempt as read-shaped, with a recorded caveat that a breach MAY open an Incident. Now that this
@@ -111,6 +110,21 @@ public final class Roles {
      * consequence of this one.
      */
     public static final String CAN_MANAGE_INCIDENTS    = "canManageIncidents";
+
+    /**
+     * <b>Working</b> an Incident or a Case through its lifecycle — {@code POST /objects/{id}/ack},
+     * {@code /resolve}, {@code /transition} and {@code /assign} (operator decision 2026-09-26). Those four sat
+     * on {@link #CAN_ADMINISTER} from 2026-09-15 ({@code ROUTE-UNGATED-DEFAULT-1} step 2b), which only Admin and
+     * Super hold, so a fraud analyst on {@code operations} could not close their own Case and {@code power}
+     * could not work an Incident at all. Granted to {@code operations}, {@code support}, {@code power} and
+     * {@code admin} in {@link #SEED} ({@code super} holds everything).
+     *
+     * <p>⛔ Deliberately NOT the rest of the object surface: merge, split, the {@code PATCH} that edits
+     * priority / severity / assignee / attributes, and the Case-Rule evaluate that groups Incidents into a
+     * Case stay {@link #CAN_ADMINISTER}. Moving a Case's state is daily work; reshaping which Incidents it
+     * holds, or editing its fields wholesale, is not.
+     */
+    public static final String CAN_WORK_INCIDENTS      = "canWorkIncidents";
 
     /**
      * Revealing a MASKED entity id in a Link Analysis Investigation ({@code POST /inv/investigations/{id}/reveal},
@@ -168,8 +182,9 @@ public final class Roles {
 
     private static Map<String, Def> seed() {
         Set<String> builder = Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_REQUEST_SHARES);
-        // Opening an Incident is triage work, so Operations/Support get it with their run duties.
-        Set<String> ops = Set.of(CAN_OPERATE_RUNS, CAN_REQUEST_SHARES, CAN_MANAGE_INCIDENTS);
+        // Opening an Incident is triage work, so Operations/Support get it with their run duties — and working
+        // one (ack / resolve / transition / assign) since 2026-09-26, so an analyst can close their own Case.
+        Set<String> ops = Set.of(CAN_OPERATE_RUNS, CAN_REQUEST_SHARES, CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS);
         Map<String, Def> m = new LinkedHashMap<>();
         m.put("pipeline-developer", new Def(builder, null));
         m.put("app-developer", new Def(builder, null));
@@ -180,9 +195,10 @@ public final class Roles {
         // Admin (and Super, which holds everything) — NOT with the analyst roles that own Investigations.
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
                 CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER,
-                CAN_MANAGE_INCIDENTS, CAN_REVEAL_LINK_ENTITIES, CAN_APPROVE_LINK_EXPANSIONS), null));
+                CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS, CAN_REVEAL_LINK_ENTITIES, CAN_APPROVE_LINK_EXPANSIONS), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,
-                CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_MANAGE_INCIDENTS), null));
+                CAN_REQUEST_SHARES, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_MANAGE_INCIDENTS,
+                CAN_WORK_INCIDENTS), null));
         m.put("super", new Def(KNOWN_CAPABILITIES, null));
         m.put("business", new Def(Set.of(CAN_TRIAGE_REQUIREMENTS), null));
         return java.util.Collections.unmodifiableMap(m);   // keeps seed iteration order

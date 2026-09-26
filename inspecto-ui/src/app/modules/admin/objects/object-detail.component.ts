@@ -24,6 +24,7 @@ import {
     apiErrorMessage,
     EventRow,
     EventsService,
+    LensService,
     SessionService,
     NodeKind,
     ObjectGraph,
@@ -89,6 +90,8 @@ export class ObjectDetailComponent implements OnInit {
     private api = inject(ObjectsService);
     private eventsApi = inject(EventsService);
     private session = inject(SessionService);
+    /** The lifecycle buttons ride `POST /objects/{id}/transition` — `canWorkIncidents` (operator, 2026-09-26). */
+    private canWork = inject(LensService).canWorkIncidents;
 
     /**
      * `bootstrap.features.events` — the correlation timeline reads the optional `inspecto-events` module
@@ -166,7 +169,7 @@ export class ObjectDetailComponent implements OnInit {
     };
 
     get actions(): string[] {
-        if (!this.obj()) return [];
+        if (!this.obj() || !this.canWork()) return [];
         return (
             ObjectDetailComponent.TRANSITIONS[this.obj().objectType]?.[(this.obj().status ?? '').toUpperCase()] ?? []
         );

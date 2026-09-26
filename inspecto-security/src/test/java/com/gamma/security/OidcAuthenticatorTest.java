@@ -194,12 +194,15 @@ class OidcAuthenticatorTest {
         //                           and could not be gated at all — no capability meant "administrator")
         //   canRevealLinkEntities / canApproveLinkExpansions — LA-19, 2026-09-24 (reveal a masked entity id;
         //                           approve another analyst's over-threshold expansion)
+        //   canWorkIncidents      — operator, 2026-09-26 (ack / resolve / transition / assign an Incident or
+        //                           Case left canAdminister for this narrower grant)
         String jwt = token(Instant.now().plusSeconds(60), List.of("admin"), RSA_KEY, ISSUER, AUDIENCE, "root");
         Subject admin = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt).orElseThrow();
         assertEquals(Set.of(Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_CONFIGURE_ACCESS,
                 Roles.CAN_APPROVE_SHARES, Roles.CAN_TRIAGE_REQUIREMENTS,
                 Roles.CAN_OFFER_DATASETS, Roles.CAN_CURATE_MENUS, Roles.CAN_MANAGE_INCIDENTS,
-                Roles.CAN_ADMINISTER, Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_APPROVE_LINK_EXPANSIONS),
+                Roles.CAN_WORK_INCIDENTS, Roles.CAN_ADMINISTER, Roles.CAN_REVEAL_LINK_ENTITIES,
+                Roles.CAN_APPROVE_LINK_EXPANSIONS),
                 admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
                 "canAuthorWorkbench stays Builder-only");
@@ -214,8 +217,10 @@ class OidcAuthenticatorTest {
         assertTrue(ana.scoped());
         assertEquals(Set.of("fraud"), ana.dataScopes());
         // canManageIncidents joined the ops grant 2026-09-16: opening an Incident is triage work, which is
-        // what this role does. The assertion still pins the CASE role as granting nothing of its own.
-        assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES, Roles.CAN_MANAGE_INCIDENTS),
+        // what this role does — and canWorkIncidents 2026-09-26 (operator): working it to closure too.
+        // The assertion still pins the CASE role as granting nothing of its own.
+        assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES, Roles.CAN_MANAGE_INCIDENTS,
+                        Roles.CAN_WORK_INCIDENTS),
                 ana.capabilities(), "case role grants no capability");
 
         String plain = token(Instant.now().plusSeconds(60), List.of("operations"), RSA_KEY, ISSUER, AUDIENCE, "ops");
@@ -298,7 +303,8 @@ class OidcAuthenticatorTest {
                         Roles.CAN_CONFIGURE_ACCESS, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_OFFER_DATASETS,
                         Roles.CAN_REQUEST_SHARES, Roles.CAN_APPROVE_SHARES, Roles.CAN_CURATE_MENUS,
                         Roles.CAN_ADMINISTER,    // ROUTE-UNGATED-DEFAULT-1, 2026-09-15 — the eleventh
-                        Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_APPROVE_LINK_EXPANSIONS),  // LA-19, 2026-09-24
+                        Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_APPROVE_LINK_EXPANSIONS,  // LA-19, 2026-09-24
+                        Roles.CAN_WORK_INCIDENTS),   // operator, 2026-09-26
                 subject.get().capabilities());
     }
 
@@ -506,7 +512,8 @@ class OidcAuthenticatorTest {
         Subject olly = authenticateWithHeaders(gatewayAuthenticator(),
                 Map.of("X-JWT-Assertion", assertion), null).orElseThrow();
         assertEquals("olly", olly.id());
-        assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES, Roles.CAN_MANAGE_INCIDENTS),
+        assertEquals(Set.of(Roles.CAN_OPERATE_RUNS, Roles.CAN_REQUEST_SHARES, Roles.CAN_MANAGE_INCIDENTS,
+                        Roles.CAN_WORK_INCIDENTS),
                 olly.capabilities());
     }
 

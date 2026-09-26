@@ -116,6 +116,22 @@ describe('LensService', () => {
         expect(service.canManageIncidents()).toBe(true);
     });
 
+    // Operator, 2026-09-26: working an Incident/Case (ack / resolve / transition / assign) left canAdminister
+    // for its own grant. Identity, like canManageIncidents — the admin seed holds it and qualifies for no
+    // non-Business lens — and NOT implied by canAdminister: the server demands this exact capability.
+    it('canWorkIncidents is granted only to a subject holding it, and survives the business lens', () => {
+        const session = TestBed.inject(SessionService);
+        const service = TestBed.inject(LensService);
+        session.authMode.set('oidc');
+        service.selectLens('business');
+
+        session.capabilities.set(['canAdminister', 'canManageIncidents']);
+        expect(service.canWorkIncidents()).toBe(false);
+
+        session.capabilities.set(['canWorkIncidents']);
+        expect(service.canWorkIncidents()).toBe(true);
+    });
+
     // Off-OIDC there is no identity to justify the exemption — granted() is true for everyone — so the
     // lens stays the only signal and the Business "View as" preview keeps hiding authoring affordances.
     it('identity capabilities are still lens-suppressed in honor-system mode', () => {

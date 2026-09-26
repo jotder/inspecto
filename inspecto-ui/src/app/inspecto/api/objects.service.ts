@@ -321,6 +321,18 @@ export class ObjectsService {
         return this.http.put<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/findings`), { findings });
     }
 
+    /**
+     * Assign an object to a person — POST /objects/{id}/assign (`canWorkIncidents`, operator 2026-09-26), the
+     * narrower route than the `canAdminister` {@link update} for exactly this edit. The server records the
+     * signed-in Subject as the actor when there is one; `actor` counts only without one (Personal).
+     */
+    assign(id: string, assignee: string, actor?: string): Observable<OperationalObject> {
+        return this.http.post<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/assign`), {
+            assignee,
+            actor,
+        });
+    }
+
     /** Apply a workflow action (e.g. assign / start / resolve / close / investigate / escalate). */
     transition(id: string, action: string, actor?: string): Observable<OperationalObject> {
         return this.http.post<OperationalObject>(apiUrl(`/objects/${encodeURIComponent(id)}/transition`), {

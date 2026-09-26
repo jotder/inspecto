@@ -25,12 +25,12 @@ import { ToastrService } from 'ngx-toastr';
 import {
     apiErrorMessage,
     FindingsSpecDef,
+    LensService,
     ObjectsService,
     OperationalObject,
     optimisticMutate,
     Tag,
     TagRule,
-    UpdateObject,
     WorkflowDef,
     SessionService,
 } from 'app/inspecto/api';
@@ -125,6 +125,13 @@ export class ObjectMailComponent implements OnInit {
      * but a bookmark still lands here, so the pane explains itself rather than 503-toasting.
      */
     readonly opsEnabled = inject(SessionService).opsEnabled;
+    /**
+     * May this caller work an object through its lifecycle — Accept / Resolve / Reopen / Archive and the Case
+     * workflow verbs, which ride `POST /objects/{id}/transition` and `/assign` (`canWorkIncidents`, operator
+     * 2026-09-26). Those verbs render only when this holds, so they show for exactly the users the server lets
+     * use them.
+     */
+    readonly canWork = inject(LensService).canWorkIncidents;
     private dialog = inject(MatDialog);
     private confirm = inject(InspectoConfirmService);
     private toastr = inject(ToastrService);
@@ -256,7 +263,8 @@ export class ObjectMailComponent implements OnInit {
     readonly bulkActions = computed<BulkAction[]>(() => {
         const n = this.selected().length;
         const a: BulkAction[] = [];
-        if (this.isIncident) {
+        const work = this.canWork(); // the lifecycle verbs — canWorkIncidents (operator, 2026-09-26)
+        if (this.isIncident && work) {
             a.push({ id: 'accept', label: 'Accept', icon: 'heroicons_outline:check', disabled: !this.canAccept() });
         }
         for (const p of this.priorities) {
@@ -270,27 +278,29 @@ export class ObjectMailComponent implements OnInit {
                 icon: 'heroicons_outline:arrow-trending-up',
                 disabled: !this.canEscalate(),
             });
-            a.push({
-                id: 'resolve',
-                label: 'Resolve',
-                icon: 'heroicons_outline:paper-airplane',
-                disabled: !this.canResolve(),
-            });
-            a.push({
-                id: 'reopen',
-                label: 'Reopen',
-                icon: 'heroicons_outline:arrow-uturn-left',
-                disabled: !this.canReopen(),
-            });
-            a.push({
-                id: 'archive',
-                label: 'Archive',
-                icon: 'heroicons_outline:archive-box',
-                disabled: !this.canArchive(),
-                destructive: true,
-            });
+            if (work) {
+                a.push({
+                    id: 'resolve',
+                    label: 'Resolve',
+                    icon: 'heroicons_outline:paper-airplane',
+                    disabled: !this.canResolve(),
+                });
+                a.push({
+                    id: 'reopen',
+                    label: 'Reopen',
+                    icon: 'heroicons_outline:arrow-uturn-left',
+                    disabled: !this.canReopen(),
+                });
+                a.push({
+                    id: 'archive',
+                    label: 'Archive',
+                    icon: 'heroicons_outline:archive-box',
+                    disabled: !this.canArchive(),
+                    destructive: true,
+                });
+            }
         } else {
-            for (const c of this.caseActions()) {
+            for (const c of work ? this.caseActions() : []) {
                 a.push({ id: 'case:' + c, label: this.stateLabel(c), disabled: !n });
             }
             a.push({
@@ -615,7 +625,8 @@ export class ObjectMailComponent implements OnInit {
     /**
      * Accept: Identified → Diagnosing. The 3-layer categorization is enforced here — when any
      * target has no category yet, one categorize dialog collects it (applied to the uncategorized
-     * targets); unassigned targets are assigned to me.
+     * targets); unassigned targets are assigned to me through `POST /objects/{id}/assign`
+     * (`canWorkIncidents`), not the `canAdminister` PATCH, so an analyst can accept an unassigned Incident.
      */
     accept(targets = this.selected().filter((o) => displayStatus(o) === 'IDENTIFIED')): void {
         targets = targets.filter((o) => displayStatus(o) === 'IDENTIFIED');
@@ -625,12 +636,12 @@ export class ObjectMailComponent implements OnInit {
             this.bulk(
                 targets,
                 (o) => {
-                    const patch: UpdateObject = {};
-                    if (!o.assignee) patch.assignee = this.me;
-                    if (!objectCategory(o) && category) patch.attributes = { category };
-                    const needsPatch = patch.assignee !== undefined || patch.attributes !== undefined;
-                    return (needsPatch ? this.api.update(o.id, patch) : of(o)).pipe(
-                        switchMap(() => this.api.transition(o.id, 'accept', this.me)),
+                    const me = this.me;
+                    const categorize$ =
+                        !objectCategory(o) && category ? this.api.update(o.id, { attributes: { category } }) : of(o);
+                    return categorize$.pipe(
+                        switchMap(() => (o.assignee ? of(o) : this.api.assign(o.id, me, me))),
+                        switchMap(() => this.api.transition(o.id, 'accept', me)),
                     );
                 },
                 `Accepted ${targets.length} — now Diagnosing`,
