@@ -48,7 +48,7 @@ The bid plan's "today" column dates from 2026-09-24. Re-checked by grepping symb
 | WS-24 | Action Requests | NOT STARTED | `DecisionRoutes.java`: `invoke-api` still records a stub Signal. |
 | WS-20 | KPI definitions | **SHIPPED** 2026-09-27 (`ASSURE-KPI-DEFINITIONS-1`; residuals `ASSURE-KPI-DEFINITIONS-RESIDUALS-1`; as-built in `okf/capabilities/studio/studio.md` §3.6) — was PARTIAL | UIE-1…4 (`f0217d21b`) gave the tile format, target and compare (`kpi.component.ts`). Left: a server-side KPI definition (Measure + target + bands + period + comparison period). |
 | WS-22 | Explainable risk score | SHIPPED 2026-09-27 | `risk-score` kind + `risk.score` Job; truth in `okf/backend/control-plane/risk-scores.md`. |
-| WS-25 | Tamper-evident audit | NOT STARTED | 2026-09-26 made the trail correct and durable (`AuditTrail.java`, `1de1dadd5`); no hash chain, no verify route. |
+| WS-25 | Tamper-evident audit | **SHIPPED** 2026-09-27 (`ASSURE-AUDIT-CHAIN-1`; residuals `ASSURE-AUDIT-CHAIN-RESIDUALS-1`) | Per-Space hash chain, chained MAC-signed anchors, `GET /audit/verify`, acknowledged-break rebaseline; truth in `okf/backend/control-plane/events-metrics.md`. |
 | WS-21 | Near-real-time ingest | PARTIAL | scan-driven Kafka loop hardened (`STREAM-CONSUMER-1`, design archived); no push route, no continuous lane, never run against a real broker. |
 | WS-17 | SQL access for BI tools | NOT STARTED | no Postgres publication. |
 | WS-27 | Excel export + attachments | PARTIAL | an xlsx writer already ships: DuckDB's `excel` extension, staged offline (BACKLOG *D-8 XLSX export*, `PipelineDocumentXlsxTest`). `ReportJob.java` does not use it yet (json / csv / png / pdf); mail has no attachments. |
@@ -90,7 +90,7 @@ Turns findings into controlled action. Order is forced: lists need approval, dis
 |---|---|---|---|
 | 3.1 | ✅ **SHIPPED 2026-09-27** (`ASSURE-KPI-DEFINITIONS-1`; residuals `ASSURE-KPI-DEFINITIONS-RESIDUALS-1`) — **WS-20 KPI definitions** — a server-side KPI (Measure + target + bands + period + comparison period); the tile reads it instead of hand-set inputs; a delivered `kpi` Requirement can create one | 4–6 | the widget half shipped (UIE-1…4) |
 | 3.2 | ✅ **SHIPPED 2026-09-27** — **WS-22 Explainable Risk Score** — weighted-factor component per entity type; `score = Σ weight × indicator`, 0–100, with `factors[]`; feeds Incident priority and, above a threshold, a watch Entity List through 2.1 | 4–6 | **Job form**, not a Step (Step Processor hold) |
-| 3.3 | **WS-25 Tamper-evident audit** — `prevHash` / `hash` chained per Space with a daily anchor; `GET /audit/verify` names the first bad record | 3–5 | masking stays out (D-P8) |
+| 3.3 | ✅ **SHIPPED 2026-09-27** (`ASSURE-AUDIT-CHAIN-1`; residuals `ASSURE-AUDIT-CHAIN-RESIDUALS-1`) — **WS-25 Tamper-evident audit** — `prevHash` / `hash` chained per Space with a daily anchor; `GET /audit/verify` names the first bad record | 3–5 | masking stays out (D-P8) |
 
 ### Wave 4 — integration and operability · ≈ 18–30 eng-wk
 
