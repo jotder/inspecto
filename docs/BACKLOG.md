@@ -13,8 +13,9 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **48<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** —
+> **48<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 22<!--count:backlog-p2--> × P2 · 26<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ↔ **48 on 2026-09-27**: P2 `ASSURE-KPI-DEFINITIONS-1` closed (wave 3.1 shipped); residuals re-filed as P3 `ASSURE-KPI-DEFINITIONS-RESIDUALS-1`.
 > ↔ **48 on 2026-09-27**: P2 `ASSURE-RISK-SCORE-1` closed (wave 3.2 shipped); residuals re-filed as P3 `ASSURE-RISK-SCORE-RESIDUALS-1`.
 > ↔ **48 on 2026-09-27**: P2 `ASSURE-ACTION-REQUESTS-1` closed (wave 2.3 shipped); residuals re-filed as P3 `ASSURE-ACTION-REQUESTS-RESIDUALS-1`.
 > ⬆ **47 → 48 on 2026-09-27**: filed P2 `WEBHOOK-EGRESS-POLICY-1` — the Action Request egress policy is not applied to the `sink.webhook` Step or the webhook notification channel.
@@ -49,8 +50,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 23<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 25<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 22<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 26<!--count:backlog-p3--> P3 rows are mostly a list of things
 > deliberately NOT being built, and reading all 48<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
@@ -83,7 +84,7 @@ rank.
 
 | State | P2 rows |
 |---|---|
-| **Startable now** — no gate, no owed decision | assurance wave 2 (wave 1 has shipped; `ASSURE-MAKER-CHECKER-1` ✅ shipped 2026-09-27): `ASSURE-ACTION-REQUESTS-1` ✅ shipped 2026-09-27; `ASSURE-ENTITY-LISTS-1` ⏸ on hold for Link Analysis. Assurance wave 3, in flight: `ASSURE-KPI-DEFINITIONS-1` (§3.6) · `ASSURE-RISK-SCORE-1` ✅ shipped 2026-09-27 · `ASSURE-AUDIT-CHAIN-1` (§3.8) |
+| **Startable now** — no gate, no owed decision | assurance wave 2 (wave 1 has shipped; `ASSURE-MAKER-CHECKER-1` ✅ shipped 2026-09-27): `ASSURE-ACTION-REQUESTS-1` ✅ shipped 2026-09-27; `ASSURE-ENTITY-LISTS-1` ⏸ on hold for Link Analysis. Assurance wave 3: `ASSURE-KPI-DEFINITIONS-1` ✅ shipped 2026-09-27 · `ASSURE-RISK-SCORE-1` ✅ shipped 2026-09-27 · `ASSURE-AUDIT-CHAIN-1` (§3.8) |
 | **Decisions owed (design written)** — each has a design doc in `superpower/` (2026-09-24); its calls are indexed in §1 | Platform Services Stage 2/3 (§3.2) · `findings-spec` acceptance session with a Case-desk lead (§3.9) · cross-Space consequence (§3.5, ⏸ on hold until D10 is named) |
 | **Blocked** — on evidence, a host, an upstream or the operator | `DEPLOY-SERVICE-WRAPPER-1` (a run on two hosts, access details owed in §1) · Postgres multi-user (needs a Postgres) · intake-cap default (a soak) · Completeness KPI (§2 hold) · `SPACES-FROM-PARTITION-MAP-1` (ingress routing absent) · AGT-5 dry-run seam (upstream) · D-8 XLSX residual (one `package.ps1` run) · Branch-aware residuals (each waits for a real need) · Consignment addressing (waits for a consumer) · `D8-SES-SNS-1` (SES/SNS adapter ON HOLD by operator 2026-09-25; per-user preferences need a call) · `AUTHORING-REDESIGN-1` (e) (an operator decision, §3.1) |
 
@@ -235,7 +236,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 ### 3.6 Analytics — Queries, BI, Studio & Export
 
-- **P2** · `ASSURE-KPI-DEFINITIONS-1` — **a KPI is a server-side definition, not tile inputs (WS-20, wave 3.1 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** UIE-1…4 gave the tile format, target and compare (`inspecto-ui/src/app/inspecto/viz/plugins/kpi.component.ts`), but the target, bands and comparison are hand-set per Widget. Build a KPI component kind (Measure + target + good direction + bands + period + comparison period) that the tile reads; a delivered `kpi` Requirement can create one; KPI packs ship inside Space Templates.
+- **P3** · `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` — **residuals of KPI definitions** (✅ `ASSURE-KPI-DEFINITIONS-1` shipped 2026-09-27: the `kpi` component, `GET /kpis/{id}/value` in an explicit timezone, the tile bound by `kpiId`, `POST /requirements/{id}/kpi`; as-built in [`okf/capabilities/studio/studio.md`](okf/capabilities/studio/studio.md) §3.6). Left: (1) KPI packs inside Space Templates; (2) a bundle-imported KPI is checked only structurally, not that its Dataset exists and its `timeField` is a date/timestamp; (3) the two routes are skeleton operations in `docs/api/openapi-v1.json`, with no request/response schemas; (4) the Requirements UI has no button for the create-KPI action; (5) there is no Space timezone setting, so a KPI without its own `timezone` always evaluates in UTC.
 
 - **P3** · `ASSURE-BREAK-RECURRENCE-REACH-1` — **a Break that stays absent for two or more runs comes back as a NEW Break, not a recurrence.** Residual of `ASSURE-BREAK-LIFECYCLE-1` (✅ shipped 2026-09-26: per-Break `lastSeenAt`, `occurrences`, `recurrences`, server-side `ageDays`, an `assigned` status with assignee on `POST /recon/{id}/breaks/status`; as-built in `okf/frontend/features/reconciliation.md`). The bounded-history rule in `inspecto-engine/src/main/java/com/gamma/query/ReconBreaks.java` drops an auto-closed Break after one further absent run, so recurrence only counts a Break that returns on the very next run. Widening it needs a retention call (keep auto-closed records N days or N runs) — a Reconciliation with rotating keys would otherwise keep every key it ever saw. Build when someone asks for longer recurrence.
 
