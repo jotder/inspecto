@@ -45,6 +45,7 @@ async function create(overrides: Partial<Record<keyof ActionRequestsService, unk
         approve: vi.fn(() => of({ ...DETAIL, status: 'succeeded', approver: 'checker-1', attempts: 1 })),
         decline: vi.fn(() => of({ ...DETAIL, status: 'declined' })),
         retry: vi.fn(() => of({ ...DETAIL, status: 'succeeded', attempts: 4 })),
+        markFailed: vi.fn(() => of({ ...DETAIL, status: 'failed' })),
         ...overrides,
     } as unknown as ActionRequestsService;
     TestBed.configureTestingModule({
@@ -73,6 +74,17 @@ const buttons = (el: HTMLElement): string[] =>
     Array.from(el.querySelectorAll('button')).map((b) => (b.textContent ?? '').trim());
 
 describe('ActionRequestsComponent', () => {
+    it('a request stuck in dispatched offers Mark as failed', async () => {
+        const { fixture, api } = await create({ get: vi.fn(() => of({ ...DETAIL, status: 'dispatched' })) });
+        const c = fixture.componentInstance;
+        c.open({ id: REQ.id });
+        fixture.detectChanges();
+        expect(buttons(fixture.nativeElement)).toContain('Mark as failed');
+        await c.markFailed();
+        expect(api.markFailed).toHaveBeenCalledWith(REQ.id);
+        expect(c.selected()?.status).toBe('failed');
+    });
+
     it('lists the waiting requests on init', async () => {
         const { fixture, api } = await create();
         expect(api.list).toHaveBeenCalledWith({ status: 'pending' });

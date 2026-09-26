@@ -24,6 +24,7 @@ import java.util.Set;
  *   POST /action-requests/{id}/approve                     four-eyes approve → dispatched               (canApproveChanges)
  *   POST /action-requests/{id}/decline                     four-eyes decline                            (canApproveChanges)
  *   POST /action-requests/{id}/retry                       re-dispatch a failed one, SAME idempotency key (canApproveChanges)
+ *   POST /action-requests/{id}/mark-failed                 a request stuck in dispatched → failed, so it can be retried
  * </pre>
  *
  * <p><b>Create gates, in order</b>: {@code canWorkIncidents} (the route) → write root 503 → the body 422 (unknown
@@ -61,6 +62,8 @@ final class ActionRequestRoutes implements RouteModule {
                 (e, m) -> decide(api, e, ApiContext.name(m), false, api.body(e))));
         api.post("/action-requests/([^/]+)/retry", ApiContext.withCapability("canApproveChanges",
                 (e, m) -> retry(api, e, ApiContext.name(m), api.body(e))));
+        api.post("/action-requests/([^/]+)/mark-failed", ApiContext.withCapability("canApproveChanges",
+                (e, m) -> markFailed(api, e, ApiContext.name(m), api.body(e))));
     }
 
     // ── reads ───────────────────────────────────────────────────────────────────────────────────
@@ -335,6 +338,64 @@ final class ActionRequestRoutes implements RouteModule {
         }
         ActionDispatcher.submit(root, id);
         return current(root, id);
+    }
+
+    static final String PROP_STUCK_AFTER_MINUTES = "action.dispatch.stuckAfterMinutes";
+
+    /** How long a request must sit in {@code dispatched} with no progress before an operator may mark it failed. */
+    static long stuckAfterMinutes() {
+        return Math.max(0L, Long.getLong(PROP_STUCK_AFTER_MINUTES, 15L));
+    }
+
+    /**
+     * Verification finding 7 — a request left in {@code dispatched} (the process stopped mid-dispatch) is not
+     * resumed at boot: nothing is ever re-sent automatically. An operator ({@code canApproveChanges}; not four-eyes —
+     * this sends nothing and changes no content) moves it to {@code failed} once it has made no progress for
+     * {@link #stuckAfterMinutes} (default 15, {@code -Daction.dispatch.stuckAfterMinutes}); a retry then re-sends it
+     * under the SAME idempotency key, which is what lets a receiver drop a delivery it did get. Audited.
+     */
+    @SuppressWarnings("unchecked")
+    private Object markFailed(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+        Path root = subjectAndRoot(api, ex, "marking");
+        String by = ApiContext.actor(ex);
+        synchronized (ActionRequests.lock()) {
+            Map<String, Object> rec = gated(api, ex, root, id, body);
+            if (!ActionRequests.DISPATCHED.equals(rec.get("status")))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "action request '" + id + "' is " + rec.get("status")
+                        + " — only a request stuck in dispatched can be marked failed");
+            java.time.Instant last = java.time.Instant.EPOCH;
+            if (rec.get("history") instanceof List<?> h && !h.isEmpty() && h.get(h.size() - 1) instanceof Map<?, ?> step)
+                last = later(last, step.get("at"));
+            if (rec.get("lastResponse") instanceof Map<?, ?> lr) last = later(last, lr.get("at"));
+            long idle = java.time.Duration.between(last, java.time.Instant.now()).toMinutes();
+            if (idle < stuckAfterMinutes())
+                throw new ApiException(409, ErrorCodes.CONFLICT, "action request '" + id + "' last progressed " + idle
+                        + " minute(s) ago — it can be marked failed after " + stuckAfterMinutes() + " minute(s) without progress");
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("status", null);
+            resp.put("bodyExcerpt", null);
+            resp.put("error", "marked failed by " + by + " after " + idle + " minute(s) stuck in dispatched — "
+                    + "delivery was never confirmed; a retry re-sends it under the same idempotency key");
+            resp.put("attempt", rec.get("attempts"));
+            resp.put("at", ActionRequests.now());
+            rec.put("lastResponse", resp);
+            rec.put("decisionReason", ApiContext.str(body, "reason"));
+            ActionRequests.transition(rec, ActionRequests.FAILED, by);
+            rec.put("completedAt", ActionRequests.now());
+            ActionRequests.save(root, rec);
+            ActionRequests.audit(by, ApiContext.actorType(ex), "action-request.marked-failed",
+                    id + " marked failed by " + by + " after " + idle + " minute(s) stuck in dispatched", rec);
+        }
+        return current(root, id);
+    }
+
+    private static java.time.Instant later(java.time.Instant a, Object at) {
+        try {
+            java.time.Instant b = java.time.Instant.parse(String.valueOf(at));
+            return b.isAfter(a) ? b : a;
+        } catch (RuntimeException unparseable) {
+            return a;
+        }
     }
 
     private static Map<String, Object> current(Path root, String id) throws IOException {

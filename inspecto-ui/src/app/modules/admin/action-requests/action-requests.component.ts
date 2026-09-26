@@ -73,6 +73,8 @@ export class ActionRequestsComponent implements OnInit {
 
     readonly canDecide = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'pending');
     readonly canRetry = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'failed');
+    /** A request left in `dispatched` (the server stopped mid-send) can be marked failed; the server enforces the idle time. */
+    readonly canMarkFailed = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'dispatched');
 
     readonly columnDefs: ColDef<ActionRequest>[] = [
         {
@@ -170,7 +172,15 @@ export class ActionRequestsComponent implements OnInit {
         this.decide('retry');
     }
 
-    private decide(verdict: 'approve' | 'decline' | 'retry'): void {
+    async markFailed(): Promise<void> {
+        const ok = await this.confirm.confirm(
+            'Mark this request failed? Its delivery was never confirmed. Nothing is sent now; a retry re-sends it under the same idempotency key.',
+            'Mark as failed?',
+        );
+        if (ok) this.decide('mark-failed');
+    }
+
+    private decide(verdict: 'approve' | 'decline' | 'retry' | 'mark-failed'): void {
         const r = this.selected();
         if (!r) return;
         if (this.reason.invalid) {
@@ -185,7 +195,9 @@ export class ActionRequestsComponent implements OnInit {
                 ? this.api.approve(r.id, reason)
                 : verdict === 'decline'
                   ? this.api.decline(r.id, reason)
-                  : this.api.retry(r.id);
+                  : verdict === 'retry'
+                    ? this.api.retry(r.id)
+                    : this.api.markFailed(r.id);
         call.subscribe({
             next: (d) => {
                 this.deciding.set(false);
@@ -196,12 +208,7 @@ export class ActionRequestsComponent implements OnInit {
             error: (err) => {
                 this.deciding.set(false);
                 // The server's own words: four-eyes, an integrity failure, a status that moved on.
-                this.decideError.set(
-                    apiErrorMessage(
-                        err,
-                        `The Action Request could not be ${verdict === 'retry' ? 'retried' : verdict + 'd'}`,
-                    ),
-                );
+                this.decideError.set(apiErrorMessage(err, 'The Action Request could not be updated'));
                 this.load();
             },
         });

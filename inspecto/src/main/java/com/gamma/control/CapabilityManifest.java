@@ -60,6 +60,7 @@ final class CapabilityManifest {
             new Entry("POST", "/action-requests/([^/]+)/approve", Roles.CAN_APPROVE_CHANGES),
             new Entry("POST", "/action-requests/([^/]+)/decline", Roles.CAN_APPROVE_CHANGES),
             new Entry("POST", "/action-requests/([^/]+)/retry", Roles.CAN_APPROVE_CHANGES),
+            new Entry("POST", "/action-requests/([^/]+)/mark-failed", Roles.CAN_APPROVE_CHANGES),
             // AccessRoutes
             new Entry("PUT", "/access/roles", Roles.CAN_CONFIGURE_ACCESS),
             new Entry("PUT", "/access/policies", Roles.CAN_CONFIGURE_ACCESS),

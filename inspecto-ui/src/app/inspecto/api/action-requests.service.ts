@@ -116,9 +116,14 @@ export class ActionRequestsService {
         return this.decide(id, 'retry');
     }
 
+    /** A request stuck in `dispatched` (never confirmed) → `failed`, so it can be retried under the same key. */
+    markFailed(id: string): Observable<ActionRequestDetail> {
+        return this.decide(id, 'mark-failed');
+    }
+
     private decide(
         id: string,
-        verb: 'approve' | 'decline' | 'retry',
+        verb: 'approve' | 'decline' | 'retry' | 'mark-failed',
         reason?: string,
     ): Observable<ActionRequestDetail> {
         return this.http.post<ActionRequestDetail>(

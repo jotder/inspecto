@@ -147,6 +147,13 @@
                     <button mat-flat-button color="primary" [disabled]="deciding()" (click)="approve()">Approve</button>
                 </div>
             }
+            @if (canMarkFailed()) {
+                <div class="mt-4 flex justify-end">
+                    <button mat-stroked-button color="warn" [disabled]="deciding()" (click)="markFailed()">
+                        Mark as failed
+                    </button>
+                </div>
+            }
             @if (canRetry()) {
                 <div class="mt-4 flex justify-end">
                     <button mat-flat-button color="primary" [disabled]="deciding()" (click)="retry()">Retry</button>

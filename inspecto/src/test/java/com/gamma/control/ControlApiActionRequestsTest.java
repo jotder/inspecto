@@ -275,7 +275,8 @@ class ControlApiActionRequestsTest {
         try (Ctx c = open(cfg, tmp, true)) {
             for (String path : List.of("/action-requests/ar-20260101000000-abcdef/approve",
                     "/action-requests/ar-20260101000000-abcdef/decline",
-                    "/action-requests/ar-20260101000000-abcdef/retry")) {
+                    "/action-requests/ar-20260101000000-abcdef/retry",
+                    "/action-requests/ar-20260101000000-abcdef/mark-failed")) {
                 assertEquals(403, send(c, "POST", path, "{}", ANALYST2).statusCode(), path);
                 assertEquals(404, send(c, "POST", path, "{}", CHECKER).statusCode(), path);
             }
@@ -313,6 +314,38 @@ class ControlApiActionRequestsTest {
             assertTrue(approve.body().contains("integrity"), approve.body());
             assertEquals(409, send(c, "POST", "/action-requests/" + id + "/retry", "{}", CHECKER).statusCode());
             assertTrue(keys.isEmpty(), "a tampered record is never dispatched");
+        }
+    }
+
+    /** Verification finding 7: a request stuck in dispatched can be marked failed — by an operator, never at boot. */
+    @Test
+    void aRequestStuckInDispatchedCanBeMarkedFailedAndRetriedUnderTheSameKey(@TempDir Path cfg, @TempDir Path tmp)
+            throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String id = propose(c, incident(c));
+            assertEquals(409, send(c, "POST", "/action-requests/" + id + "/mark-failed", "{}", CHECKER).statusCode(),
+                    "a pending request is not stuck");
+            synchronized (ActionRequests.lock()) {   // as a process stop leaves it: dispatched, never finished
+                Map<String, Object> rec = ActionRequests.read(c.root, id);
+                ActionRequests.transition(rec, ActionRequests.APPROVED, "checker-1");
+                ActionRequests.transition(rec, ActionRequests.DISPATCHED, "system");
+                ActionRequests.save(c.root, rec);
+            }
+            HttpResponse<String> early = send(c, "POST", "/action-requests/" + id + "/mark-failed", "{}", CHECKER);
+            assertEquals(409, early.statusCode(), "not idle long enough under the default: " + early.body());
+            assertEquals(403, send(c, "POST", "/action-requests/" + id + "/mark-failed", "{}", ANALYST2).statusCode());
+            System.setProperty(ActionRequestRoutes.PROP_STUCK_AFTER_MINUTES, "0");
+            try {
+                JsonNode marked = data(send(c, "POST", "/action-requests/" + id + "/mark-failed", "{}", SELF), 200);
+                assertEquals("failed", marked.get("status").asText(), "not four-eyes: the author may do it");
+                assertTrue(marked.at("/lastResponse/error").asText().contains("stuck in dispatched"));
+            } finally {
+                System.clearProperty(ActionRequestRoutes.PROP_STUCK_AFTER_MINUTES);
+            }
+            assertTrue(keys.isEmpty(), "marking sends nothing");
+            JsonNode retried = data(send(c, "POST", "/action-requests/" + id + "/retry", "{}", CHECKER), 200);
+            assertEquals("succeeded", retried.get("status").asText());
+            assertEquals(List.of(id), keys, "re-sent under the same idempotency key");
         }
     }
 
