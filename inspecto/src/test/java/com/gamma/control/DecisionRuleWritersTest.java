@@ -52,6 +52,8 @@ class DecisionRuleWritersTest {
             Map.entry("NotificationRoutes#writeRule", FIXED_KIND + " (notification-rule)"),
             Map.entry("NotificationRoutes#deleteRule", FIXED_KIND + " (notification-rule)"),
             Map.entry("RequirementRoutes#write", FIXED_KIND + " (requirement)"),
+            Map.entry("RequirementRoutes#createKpi", FIXED_KIND + " (kpi — the constant KPI_TYPE = KpiRoutes.TYPE; the "
+                    + "request body supplies only the KPI's content and id, never the kind)"),
             Map.entry("PipelineListRoutes#deletePipeline", FIXED_KIND + " (authored-pipeline)"),
             Map.entry("PipelineRenameRoutes#rewriteDatasetRefs", FIXED_KIND + " (dataset)"),
             Map.entry("PipelineRenameRoutes#rewriteAlertRules", FIXED_KIND + " (alert-rule)"),
