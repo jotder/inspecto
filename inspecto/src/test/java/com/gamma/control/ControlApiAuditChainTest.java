@@ -139,6 +139,40 @@ class ControlApiAuditChainTest {
         }
     }
 
+    private HttpResponse<String> rebaseline(Ctx c, String body, String auth) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port
+                + "/api/v1/audit/anchors/rebaseline")).header("Content-Type", "application/json");
+        if (auth != null) b.header("Authorization", auth);
+        return client.send(b.POST(BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
+    }
+
+    /** POST /audit/anchors/rebaseline: gated, reason required, refused over a healthy chain, a signed break over a
+     *  broken one — and verify then names it. */
+    @Test
+    void rebaselineIsGatedNeedsAReasonAndOnlyActsOnABrokenChain(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, true)) {
+            String body = "{\"reason\":\"forged row found in INC-7\"}";
+            assertEquals(401, rebaseline(c, body, null).statusCode());
+            assertEquals(403, rebaseline(c, body, "Bearer viewer").statusCode());
+            assertEquals(422, rebaseline(c, "{}", "Bearer admin").statusCode());
+            // (409 over a healthy chain: AuditVerifierTest — an attempt counts against the rate limit)
+
+            Event first = c.svc().events().chainPage(1, 1).get(0);
+            c.svc().events().append(new Event("forged-1", first.ts(), first.level(), first.type(), first.source(),
+                    first.pipeline(), first.correlationId(), "mallory", first.attributes(), first.payload()));
+            HttpResponse<String> made = rebaseline(c, body, "Bearer admin");
+            assertEquals(200, made.statusCode(), made.body());
+            JsonNode b = V1Body.of(made.body());
+            assertEquals("break", b.get("kind").asText());
+            assertEquals("forged row found in INC-7", b.get("reason").asText());
+            assertTrue(b.get("problem").asText().startsWith("duplicate"), b.toString());
+            assertEquals(429, rebaseline(c, body, "Bearer admin").statusCode(), "rate-limited");
+
+            JsonNode v = V1Body.of(send(c, "GET", "/audit/verify?from=1", "Bearer admin").body());
+            assertEquals("acknowledged-break", v.get("firstBad").get("reason").asText(), v.toString());
+        }
+    }
+
     @Test
     void aSeqRangeThatIsNotOneIsA400(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, true)) {

@@ -67,36 +67,85 @@ final class AuditAnchors {
     /** The least time between two on-demand anchors for one Space. */
     static final long ON_DEMAND_MIN_INTERVAL_MS = 10_000;
 
-    /** One stored anchor and whether its MAC verifies against this Space's key. */
+    /** One stored anchor and whether its MAC verifies against this Space's key. {@code extra} holds a BREAK anchor's
+     *  own fields (reason, problem, lastGoodMac, lastGoodSeq); empty otherwise. */
     record Anchor(String kind, String day, long firstSeq, long lastSeq, String lastHash, long count,
-                  long createdAt, String prevAnchorMac, String mac, boolean macValid) {
+                  long createdAt, String prevAnchorMac, String mac, boolean macValid, Map<String, Object> extra) {
         Map<String, Object> toMap() {
             Map<String, Object> m = fields(kind, day, firstSeq, lastSeq, lastHash, count, createdAt, prevAnchorMac);
+            m.putAll(extra);
             m.put("mac", mac);
             m.put("integrity", macValid ? "valid" : "invalid");
             return m;
         }
+
+        boolean isBreak() {
+            return BREAK.equals(kind);
+        }
     }
 
-    /** The whole anchor file: the anchors that parsed, in file order, and the 1-based numbers of lines that did not. */
-    record AnchorFile(List<Anchor> anchors, List<Integer> unreadableLines, boolean exists) {
-        static final AnchorFile NONE = new AnchorFile(List.of(), List.of(), false);
+    /** The kind of the anchor {@code POST /audit/anchors/rebaseline} writes. */
+    static final String BREAK = "break";
 
-        /** The first integrity problem of the file itself, or {@code null}: unreadable lines, a bad MAC, a broken link
-         *  between two anchors, or a gap/overlap between their ranges. */
+    /**
+     * The durable "anchoring started" record, beside the key: the first anchor of the current anchor file and the
+     * latest anchor written. Once it exists the young-install grace is gone for good — a missing or truncated
+     * anchor file is ALWAYS a failure. ⚠ It is as strong as the secrets directory: whoever can write there can
+     * also read the key, so it stops deletion of the anchor file, not a key holder (the off-box export does).
+     */
+    record Started(long firstSeq, String firstMac, String latestMac) {}
+
+    static final String STARTED_FILE = "audit-anchoring.json";
+
+    /** The whole anchor file: the anchors that parsed, in file order, the 1-based numbers of lines that did not,
+     *  and the "anchoring started" record ({@code null} before the first anchor was ever written). */
+    record AnchorFile(List<Anchor> anchors, List<Integer> unreadableLines, boolean exists, Started started) {
+        static final AnchorFile NONE = new AnchorFile(List.of(), List.of(), false, null);
+
+        /** The seq the current anchor epoch starts at: a leading BREAK anchor's new start, else 1. */
+        long epochStart() {
+            return !anchors.isEmpty() && anchors.get(0).isBreak() && anchors.get(0).macValid()
+                    ? anchors.get(0).firstSeq() : 1;
+        }
+
+        Anchor epochBreak() {
+            return epochStart() > 1 || (!anchors.isEmpty() && anchors.get(0).isBreak()) ? anchors.get(0) : null;
+        }
+
+        /** The first integrity problem of the file itself, or {@code null}: a missing or truncated file once
+         *  anchoring has started, unreadable lines, a bad MAC, a broken link between two anchors, or a gap/overlap
+         *  between their ranges. A leading BREAK anchor opens the file: its prevAnchorMac names the last good
+         *  anchor of the file it replaced, not a line of this one. */
         AuditVerifier.Bad firstProblem() {
+            if (!unreadableLines.isEmpty())
+                return new AuditVerifier.Bad(0, "anchor-unreadable", "the anchor file has unreadable line(s) "
+                        + unreadableLines);
+            if (started != null) {
+                if (anchors.isEmpty() && unreadableLines.isEmpty())
+                    return new AuditVerifier.Bad(0, "anchor-file-missing", "anchoring started (first anchor "
+                            + "at seq " + started.firstSeq() + ") but the anchor file is " + (exists ? "empty" : "missing"));
+                if (!anchors.isEmpty() && (!started.firstMac().equals(anchors.get(0).mac())
+                        || anchors.stream().noneMatch(a -> started.latestMac().equals(a.mac()))))
+                    return new AuditVerifier.Bad(0, "anchor-file-truncated", "the anchor file does not hold the first "
+                            + "and latest anchors the anchoring record names (lines were removed or the file replaced)");
+            }
             if (!unreadableLines.isEmpty())
                 return new AuditVerifier.Bad(0, "anchor-unreadable", "the anchor file has unreadable line(s) "
                         + unreadableLines);
             String prevMac = "";
             long prevLast = -1;
-            for (Anchor a : anchors) {
+            for (int i = 0; i < anchors.size(); i++) {
+                Anchor a = anchors.get(i);
                 if (!a.macValid())
                     return new AuditVerifier.Bad(a.lastSeq(), "anchor-mismatch", "the anchor for " + a.day()
                             + " ending at seq " + a.lastSeq() + " does not carry a valid MAC");
-                if (!prevMac.equals(a.prevAnchorMac()))
+                boolean opening = i == 0 && a.isBreak();
+                if (!opening && !prevMac.equals(a.prevAnchorMac()))
                     return new AuditVerifier.Bad(a.lastSeq(), "anchor-chain-broken", "the anchor for " + a.day()
                             + " does not link onto the anchor before it (one was removed, reordered or replaced)");
+                if (a.isBreak() && !opening)
+                    return new AuditVerifier.Bad(a.lastSeq(), "anchor-chain-broken", "a break anchor is not the first "
+                            + "line of the anchor file");
                 if (prevLast >= 0 && a.firstSeq() != prevLast + 1)
                     return new AuditVerifier.Bad(a.lastSeq(), "anchor-chain-broken", "the anchor for " + a.day()
                             + " starts at seq " + a.firstSeq() + ", not at " + (prevLast + 1));
@@ -119,15 +168,23 @@ final class AuditAnchors {
         return PendingChanges.keyFile(root).getParent().resolve(FILE);
     }
 
+    static Path startedFile(Path root) {
+        return PendingChanges.keyFile(root).getParent().resolve(STARTED_FILE);
+    }
+
     /** The anchors that parsed (convenience for callers that only list them). */
     static List<Anchor> read(Path root) throws IOException {
         return readFile(root).anchors();
     }
 
+    private static final java.util.Set<String> BASE_KEYS = java.util.Set.of("v", "kind", "day", "firstSeq",
+            "lastSeq", "lastHash", "count", "createdAt", "prevAnchorMac");
+
     /** Every line of the anchor file — a line that does not parse is RECORDED, never skipped. */
     static AnchorFile readFile(Path root) throws IOException {
+        Started started = readStarted(root);
         Path f = file(root);
-        if (!Files.isRegularFile(f)) return AnchorFile.NONE;
+        if (!Files.isRegularFile(f)) return new AnchorFile(List.of(), List.of(), false, started);
         List<Anchor> out = new ArrayList<>();
         List<Integer> bad = new ArrayList<>();
         List<String> lines = Files.readAllLines(f, StandardCharsets.UTF_8);
@@ -145,12 +202,54 @@ final class AuditAnchors {
             String expected = mac(root, m);
             boolean ok = claimed instanceof String c && java.security.MessageDigest.isEqual(
                     c.getBytes(StandardCharsets.UTF_8), expected.getBytes(StandardCharsets.UTF_8));
+            Map<String, Object> extra = new LinkedHashMap<>(m);
+            extra.keySet().removeAll(BASE_KEYS);
             out.add(new Anchor(str(m.get("kind")), str(m.get("day")), num(m.get("firstSeq")), num(m.get("lastSeq")),
                     str(m.get("lastHash")), num(m.get("count")), num(m.get("createdAt")),
                     m.get("prevAnchorMac") == null ? null : m.get("prevAnchorMac").toString(),
-                    claimed == null ? null : claimed.toString(), ok));
+                    claimed == null ? null : claimed.toString(), ok, Map.copyOf(extra)));
         }
-        return new AnchorFile(List.copyOf(out), List.copyOf(bad), true);
+        return new AnchorFile(List.copyOf(out), List.copyOf(bad), true, started);
+    }
+
+    private static Started readStarted(Path root) throws IOException {
+        Path f = startedFile(root);
+        if (!Files.isRegularFile(f)) return null;
+        Map<String, Object> m;
+        try {
+            m = ApiContext.JSON.readValue(Files.readAllBytes(f), MAP);
+        } catch (IOException unreadable) {
+            // an unreadable record still means anchoring started: fail closed with nothing to match
+            return new Started(-1, "", "");
+        }
+        return new Started(num(m.get("firstSeq")), str(m.get("firstMac")), str(m.get("latestMac")));
+    }
+
+    /** Record an anchor in the "anchoring started" record: created first-writer-wins and owner-only on the first
+     *  anchor ever; its latestMac replaced atomically after every later one (a {@code restart} replaces both). */
+    private static void recordStarted(Path root, Anchor a, boolean restart) throws IOException {
+        Path f = startedFile(root);
+        Started now = readStarted(root);
+        Map<String, Object> m = new LinkedHashMap<>();
+        boolean fresh = now == null || restart;
+        m.put("firstSeq", fresh ? a.firstSeq() : now.firstSeq());
+        m.put("firstMac", fresh ? a.mac() : now.firstMac());
+        m.put("latestMac", a.mac());
+        byte[] body = ApiContext.JSON.writeValueAsBytes(m);
+        if (now == null) {
+            try {
+                createOwnerOnly(f, true);
+                Files.write(f, body, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+                return;
+            } catch (java.nio.file.FileAlreadyExistsException raced) {
+                // another writer created it first; fall through to replace its latestMac
+            }
+        }
+        Path tmp = f.resolveSibling(STARTED_FILE + ".tmp");
+        Files.deleteIfExists(tmp);
+        createOwnerOnly(tmp, true);
+        Files.write(tmp, body, StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING);
+        Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING, java.nio.file.StandardCopyOption.ATOMIC_MOVE);
     }
 
     // -- the scheduled day-boundary roll --
@@ -220,7 +319,7 @@ final class AuditAnchors {
                 curDay[0] = d;
                 prev[0] = e;
                 return true;
-            }, today, false);
+            }, new AuditVerifier.Policy(today, false, null));
             if (failed[0] != null) throw failed[0];
             if (!r.ok()) {
                 log.error("Audit chain does not verify at seq {} ({}); anchors stop before it", r.bad().seq(),
@@ -268,7 +367,7 @@ final class AuditAnchors {
             Event[] tip = {null};
             AuditVerifier.Result r = AuditVerifier.verify(store, AnchorFile.NONE,
                     last == null ? null : last.lastSeq() + 1, AuditChain.seq(head), Long.MAX_VALUE,
-                    e -> { tip[0] = e; return true; }, today, false);
+                    e -> { tip[0] = e; return true; }, new AuditVerifier.Policy(today, false, null));
             if (!r.ok())
                 throw new ApiException(409, ErrorCodes.CONFLICT, "the audit chain does not verify at seq "
                         + r.bad().seq() + " (" + r.bad().reason() + "): " + r.bad().detail());
@@ -303,6 +402,7 @@ final class AuditAnchors {
                         + "operator resolves it");
             return null;
         }
+        if (last.isBreak() && last.lastSeq() < 1) return last;   // a break over an empty chain names no record
         List<Event> at = store.chainPage(last.lastSeq(), 1);
         if (at.isEmpty() || AuditChain.seq(at.get(0)) != last.lastSeq()
                 || !last.lastHash().equals(AuditChain.storedHash(at.get(0)))
@@ -315,25 +415,101 @@ final class AuditAnchors {
     private static Anchor append(Path root, String kind, LocalDate day, long firstSeq, Event lastRec, String prevMac)
             throws IOException {
         long lastSeq = AuditChain.seq(lastRec);
-        Map<String, Object> m = fields(kind, day.toString(), firstSeq, lastSeq, AuditChain.storedHash(lastRec),
-                lastSeq - firstSeq + 1, System.currentTimeMillis(), prevMac);
+        return write(root, fields(kind, day.toString(), firstSeq, lastSeq, AuditChain.storedHash(lastRec),
+                lastSeq - firstSeq + 1, System.currentTimeMillis(), prevMac), Map.of(), false);
+    }
+
+    /** MAC and append one anchor line (a {@code rotate} starts a NEW file with it, moving the old one aside), then
+     *  bring the "anchoring started" record up to date. */
+    private static Anchor write(Path root, Map<String, Object> base, Map<String, Object> extra, boolean rotate)
+            throws IOException {
+        Map<String, Object> m = new LinkedHashMap<>(base);
+        m.putAll(extra);
         Map<String, Object> normal = ApiContext.JSON.readValue(ApiContext.JSON.writeValueAsBytes(m), MAP);
         String mac = mac(root, normal);
         normal.put("mac", mac);
         Path f = file(root);
         Files.createDirectories(f.getParent());
-        createOwnerOnly(f);
+        if (rotate && Files.exists(f))
+            Files.move(f, f.resolveSibling("audit-anchors." + System.currentTimeMillis() + ".replaced.jsonl"));
+        createOwnerOnly(f, false);
         try (FileChannel ch = FileChannel.open(f, StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
             ch.write(ByteBuffer.wrap((ContentHash.canonicalJson(normal) + "\n").getBytes(StandardCharsets.UTF_8)));
             ch.force(true);
         }
-        return new Anchor(kind, day.toString(), firstSeq, lastSeq, AuditChain.storedHash(lastRec),
-                lastSeq - firstSeq + 1, num(normal.get("createdAt")), prevMac, mac, true);
+        Map<String, Object> ex = new LinkedHashMap<>(normal);
+        ex.keySet().removeAll(BASE_KEYS);
+        ex.remove("mac");
+        Anchor a = new Anchor(str(normal.get("kind")), str(normal.get("day")), num(normal.get("firstSeq")),
+                num(normal.get("lastSeq")), str(normal.get("lastHash")), num(normal.get("count")),
+                num(normal.get("createdAt")), str(normal.get("prevAnchorMac")), mac, true, Map.copyOf(ex));
+        recordStarted(root, a, rotate);
+        return a;
     }
 
-    /** Create the file owner-only (POSIX {@code rw-------}, else an owner-only ACL) — the key's own permissions. */
-    private static void createOwnerOnly(Path f) throws IOException {
-        if (Files.exists(f)) return;
+    // -- rebaseline: the acknowledged break --
+
+    private static final ConcurrentHashMap<Path, Long> LAST_REBASELINE = new ConcurrentHashMap<>();
+    static final long REBASELINE_MIN_INTERVAL_MS = 60_000;
+
+    /**
+     * {@code POST /audit/anchors/rebaseline}: when — and ONLY when — verify reports a problem, start a new anchor
+     * epoch with a signed BREAK anchor that records the operator's reason, the problem found, the last good anchor
+     * and the new start seq (the head + 1). The old anchor file is moved aside (kept, never deleted). Nothing is
+     * repaired: rows before the new start are simply no longer covered by the current epoch, and verify names the
+     * break whenever a range reaches back over it.
+     *
+     * @throws ApiException 409 when the chain and anchors verify (nothing to rebaseline); 429 within a minute of the
+     *         last rebaseline for this Space
+     */
+    static Anchor rebaseline(EventStore store, Path root, String reason, AuditVerifier.Policy policy) throws IOException {
+        Path key = root.toAbsolutePath().normalize();
+        long now = System.currentTimeMillis();
+        Long prior = LAST_REBASELINE.get(key);
+        if (prior != null && now - prior < REBASELINE_MIN_INTERVAL_MS)
+            throw new ApiException(429, ErrorCodes.RATE_LIMITED, "a rebaseline was made for this Space "
+                    + (now - prior) / 1000 + " s ago");
+        LAST_REBASELINE.put(key, now);
+        synchronized (lock(root)) {
+            AnchorFile file = readFile(root);
+            AuditVerifier.Result r = AuditVerifier.verify(store, file, null, null, Long.MAX_VALUE, e -> true, policy);
+            if (r.ok())
+                throw new ApiException(409, ErrorCodes.CONFLICT, "the audit chain and its anchors verify; there is "
+                        + "nothing to rebaseline");
+            // the last anchor of the file's valid prefix
+            Anchor lastGood = null;
+            String prevMac = "";
+            for (int i = 0; i < file.anchors().size(); i++) {
+                Anchor a = file.anchors().get(i);
+                if (!a.macValid() || (!(i == 0 && a.isBreak()) && !prevMac.equals(a.prevAnchorMac()))) break;
+                lastGood = a;
+                prevMac = a.mac();
+            }
+            Event head = store.chainHead();
+            long newStart = head == null ? 1 : AuditChain.seq(head) + 1;
+            Map<String, Object> base = fields(BREAK, policy.today().toString(), newStart, newStart - 1,
+                    head == null ? "" : AuditChain.storedHash(head), 0, now,
+                    lastGood == null ? "" : lastGood.mac());
+            Map<String, Object> extra = new LinkedHashMap<>();
+            extra.put("reason", reason);
+            extra.put("problem", r.bad().reason() + " at seq " + r.bad().seq() + ": " + r.bad().detail());
+            extra.put("lastGoodSeq", lastGood == null ? 0 : lastGood.lastSeq());
+            Anchor a = write(root, base, extra, true);
+            log.warn("Audit anchors REBASELINED for {} at seq {}: {} (problem: {})", key, newStart, reason,
+                    extra.get("problem"));
+            return a;
+        }
+    }
+
+    /** Test seam: forget the rebaseline rate limit for {@code root}. */
+    static void resetRebaselineLimit(Path root) {
+        LAST_REBASELINE.remove(root.toAbsolutePath().normalize());
+    }
+
+    /** Create the file owner-only (POSIX {@code rw-------}, else an owner-only ACL) — the key's own permissions.
+     *  With {@code mustBeNew}, an existing file is a {@code FileAlreadyExistsException} (first writer wins). */
+    private static void createOwnerOnly(Path f, boolean mustBeNew) throws IOException {
+        if (!mustBeNew && Files.exists(f)) return;
         boolean posix = f.getFileSystem().supportedFileAttributeViews().contains("posix");
         try {
             if (posix) {
@@ -344,6 +520,7 @@ final class AuditAnchors {
                 com.gamma.util.SpaceSecretKeys.ownerOnlyAcl(f);
             }
         } catch (java.nio.file.FileAlreadyExistsException raced) {
+            if (mustBeNew) throw raced;
             // another writer created it; it did so owner-only too
         }
     }

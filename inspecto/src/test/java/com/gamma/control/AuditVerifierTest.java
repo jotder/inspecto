@@ -69,7 +69,7 @@ class AuditVerifierTest {
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
             // anchors not REQUIRED here: most tests work on a fixed past day; anchor-missing has its own test
             return AuditVerifier.verify(store, AuditAnchors.readFile(s.config()), from, to, max, e -> true,
-                    LocalDate.now(java.time.ZoneOffset.UTC), false);
+                    new AuditVerifier.Policy(LocalDate.now(java.time.ZoneOffset.UTC), false, null));
         }
     }
 
@@ -253,8 +253,11 @@ class AuditVerifierTest {
             return out;
         });
         Files.delete(anchorsFile);
+        byte[] started = Files.readAllBytes(AuditAnchors.startedFile(s.config()));
+        Files.delete(AuditAnchors.startedFile(s.config()));   // as if this Space had never anchored
         assertTrue(verify(s).ok(), "without the anchor, a recomputed chain verifies — the documented limit");
         Files.write(anchorsFile, anchors);
+        Files.write(AuditAnchors.startedFile(s.config()), started);
         assertBad(verify(s), 10, "anchor-mismatch");
     }
 
@@ -351,10 +354,16 @@ class AuditVerifierTest {
     @Test
     void aDeletedAnchorBreaksTheAnchorChain(@TempDir Path dir) throws Exception {
         Space s = twoAnchoredDays(dir);
+        emit(s, T0 + 2 * DAY, T0 + 2 * DAY + 1);                         // day 3: seq 11..12
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            AuditAnchors.roll(store, s.config(), LocalDate.of(2026, 9, 23));
+        }
         Path f = AuditAnchors.file(s.config());
         List<String> lines = Files.readAllLines(f, StandardCharsets.UTF_8);
-        Files.write(f, List.of(lines.get(1)), StandardCharsets.UTF_8);   // the first anchor removed
-        assertBad(verify(s), 10, "anchor-chain-broken");
+        assertEquals(3, lines.size());
+        // the MIDDLE anchor removed: the first and latest the anchoring record names are still there
+        Files.write(f, List.of(lines.get(0), lines.get(2)), StandardCharsets.UTF_8);
+        assertBad(verify(s), 12, "anchor-chain-broken");
     }
 
     @Test
@@ -391,7 +400,7 @@ class AuditVerifierTest {
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
             AuditAnchors.roll(store, s.config(), LocalDate.of(2026, 9, 21));   // day 1 only
             AuditVerifier.Result r = AuditVerifier.verify(store, AuditAnchors.readFile(s.config()), null, null,
-                    Long.MAX_VALUE, e -> true, LocalDate.of(2026, 9, 25), true);
+                    Long.MAX_VALUE, e -> true, new AuditVerifier.Policy(LocalDate.of(2026, 9, 25), true, null));
             assertBad(r, 3, "anchor-missing");
         }
     }
@@ -401,8 +410,95 @@ class AuditVerifierTest {
         Space s = twoAnchoredDays(dir);
         rewrite(s, all -> all.stream().filter(e -> seq(e) > 2).toList());   // seq 1..2 of day 1 gone, 3..5 remain
         assertBad(verify(s), 1, "truncated-before-anchor");
-        // whereas retention removes the WHOLE day: that is not a failure
+    }
+
+    private static AuditVerifier.Result verifyWithCutoff(Space s, LocalDate cutoff) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            return AuditVerifier.verify(store, AuditAnchors.readFile(s.config()), null, null, Long.MAX_VALUE,
+                    e -> true, new AuditVerifier.Policy(LocalDate.of(2026, 9, 22), false, cutoff));
+        }
+    }
+
+    /** Only the configured event retention may take anchored rows: day 1 (2026-09-20) wholly gone is retention
+     *  only when the cutoff is AFTER it; with no prune configured, or a cutoff at or before it, it is truncation. */
+    @Test
+    void aWhollyRemovedAnchoredDayIsRetentionOnlyBeforeTheConfiguredCutoff(@TempDir Path dir) throws Exception {
+        Space s = twoAnchoredDays(dir);
         rewrite(s, all -> all.stream().filter(e -> seq(e) > 5).toList());
+        assertBad(verifyWithCutoff(s, null), 1, "truncated-before-anchor");
+        assertBad(verifyWithCutoff(s, LocalDate.of(2026, 9, 20)), 1, "truncated-before-anchor");
+        AuditVerifier.Result pruned = verifyWithCutoff(s, LocalDate.of(2026, 9, 21));
+        assertTrue(pruned.ok(), String.valueOf(pruned.bad()));
+    }
+
+    // ── the durable "anchoring started" record ─────────────────────────────────────────────────────────────
+
+    @Test
+    void onceAnchoringHasStartedAMissingAnchorFileIsAlwaysRefused(@TempDir Path dir) throws Exception {
+        Space s = space(dir);
+        long now = System.currentTimeMillis();
+        emit(s, now - 2000, now - 1000);                                  // young rows: the grace would apply
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            AuditAnchors.resetRateLimit(s.config());
+            assertTrue(AuditAnchors.onDemand(store, s.config()).created());
+        }
+        assertTrue(Files.exists(AuditAnchors.startedFile(s.config())));
+        Files.delete(AuditAnchors.file(s.config()));
+        emit(s, now);
+        assertBad(verify(s), 0, "anchor-file-missing");
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            AuditAnchors.resetRateLimit(s.config());
+            assertEquals(409, assertThrows(ApiException.class, () -> AuditAnchors.onDemand(store, s.config())).status,
+                    "the young-install grace ends with the first anchor");
+        }
+    }
+
+    @Test
+    void aTruncatedAnchorFileIsRefusedEvenWhenWhatRemainsChains(@TempDir Path dir) throws Exception {
+        Space s = twoAnchoredDays(dir);
+        Path f = AuditAnchors.file(s.config());
+        Files.write(f, List.of(Files.readAllLines(f, StandardCharsets.UTF_8).get(0)), StandardCharsets.UTF_8);
+        assertBad(verify(s), 0, "anchor-file-truncated");
+    }
+
+    // ── rebaseline: the acknowledged break ─────────────────────────────────────────────────────────────────
+
+    private static AuditAnchors.Anchor rebaseline(Space s, String reason) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            AuditAnchors.resetRebaselineLimit(s.config());
+            return AuditAnchors.rebaseline(store, s.config(), reason,
+                    new AuditVerifier.Policy(LocalDate.of(2026, 9, 22), false, null));
+        }
+    }
+
+    @Test
+    void aRebaselineIsASignedBreakThatVerifyNamesAndNeverPassesOver(@TempDir Path dir) throws Exception {
+        Space s = twoAnchoredDays(dir);
+        assertEquals(409, assertThrows(ApiException.class, () -> rebaseline(s, "no reason to")).status,
+                "a healthy chain is never rebaselined");
+        Path f = AuditAnchors.file(s.config());
+        Files.write(f, List.of(Files.readAllLines(f, StandardCharsets.UTF_8).get(0), "{garbled"),
+                StandardCharsets.UTF_8);
+        AuditAnchors.Anchor b = rebaseline(s, "disk fault on 2026-09-22, INC-42");
+        assertEquals("break", b.kind());
+        assertEquals(11, b.firstSeq(), "the new epoch starts after the head");
+        assertEquals("disk fault on 2026-09-22, INC-42", b.extra().get("reason"));
+        assertTrue(String.valueOf(b.extra().get("problem")).startsWith("anchor-unreadable"), b.extra().toString());
+        assertEquals(5L, ((Number) b.extra().get("lastGoodSeq")).longValue());
+        try (var files = Files.list(f.getParent())) {
+            assertTrue(files.anyMatch(p -> p.getFileName().toString().endsWith(".replaced.jsonl")),
+                    "the broken file is kept, moved aside");
+        }
+        assertTrue(verify(s).ok(), "the current epoch verifies: " + verify(s).bad());
+        assertBad(verify(s, 1L, null, Long.MAX_VALUE), 11, "acknowledged-break");
+        // and anchoring continues on the new epoch
+        emit(s, T0 + 2 * DAY, T0 + 2 * DAY + 1);
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            assertEquals(1, AuditAnchors.roll(store, s.config(), LocalDate.of(2026, 9, 23)));
+        }
+        List<AuditAnchors.Anchor> a = AuditAnchors.read(s.config());
+        assertEquals(b.mac(), a.get(1).prevAnchorMac());
+        assertEquals(11, a.get(1).firstSeq());
         assertTrue(verify(s).ok(), String.valueOf(verify(s).bad()));
     }
 

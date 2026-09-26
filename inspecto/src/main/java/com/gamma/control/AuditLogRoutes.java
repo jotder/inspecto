@@ -52,6 +52,9 @@ final class AuditLogRoutes implements RouteModule {
         api.get("/audit/verify", ApiContext.withCapability("canAdminister", (e, m) -> verify(api, e)));
         api.get("/audit/anchors", ApiContext.withCapability("canAdminister", (e, m) -> anchors(api, e)));
         api.post("/audit/anchors", ApiContext.withCapability("canAdminister", (e, m) -> anchorNow(api)));
+        // The operator's acknowledged break: never a repair — a signed BREAK anchor naming the problem and a reason.
+        api.post("/audit/anchors/rebaseline", ApiContext.withCapability("canAdminister",
+                (e, m) -> rebaseline(api, api.body(e))));
     }
 
     /** The most chain records one {@code /audit/verify} walks; past it the result says {@code complete: false}
@@ -78,7 +81,7 @@ final class AuditLogRoutes implements RouteModule {
         AuditAnchors.AnchorFile anchors = root == null ? AuditAnchors.AnchorFile.NONE : AuditAnchors.readFile(root);
         java.util.Map<String, Object> out = new java.util.LinkedHashMap<>(AuditVerifier.verify(
                 api.service().events(), anchors, from, to, MAX_VERIFY, e -> true,
-                java.time.LocalDate.now(java.time.ZoneOffset.UTC), root != null).toMap());
+                policy(api, root)).toMap());
         out.put("anchors", root == null ? "unavailable" : "checked");
         return out;
     }
@@ -107,6 +110,35 @@ final class AuditLogRoutes implements RouteModule {
         out.put("created", done.created());
         out.put("anchor", done.anchor() == null ? null : done.anchor().toMap());
         return out;
+    }
+
+    /** Today, whether anchors are expected (a key exists only with a write root), and the configured event retention
+     *  cutoff — the shortest enabled {@code event_prune} window, or none. */
+    private static AuditVerifier.Policy policy(ApiContext api, Path root) {
+        java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
+        java.time.LocalDate cutoff = api.service().jobService()
+                .map(com.gamma.job.JobService::eventRetentionDays)
+                .filter(java.util.OptionalLong::isPresent)
+                .map(d -> today.minusDays(d.getAsLong()))
+                .orElse(null);
+        return new AuditVerifier.Policy(today, root != null, cutoff);
+    }
+
+    /** The longest rebaseline reason accepted. */
+    static final int REASON_MAX = 500;
+
+    /**
+     * {@code POST /audit/anchors/rebaseline {reason}} — the operator's acknowledged break over a chain or anchor
+     * file that does not verify ({@link AuditAnchors#rebaseline}). 503 without a write root, 422 without a reason,
+     * 409 when there is nothing to rebaseline, 429 more than once a minute.
+     */
+    private static Object rebaseline(ApiContext api, java.util.Map<String, Object> body) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "audit anchor rebaseline");
+        Object r = body == null ? null : body.get("reason");
+        if (!(r instanceof String reason) || reason.isBlank() || reason.length() > REASON_MAX)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "reason is required: a non-blank string of at most " + REASON_MAX + " characters");
+        return AuditAnchors.rebaseline(api.service().events(), root, reason.trim(), policy(api, root)).toMap();
     }
 
     /** A positive seq query parameter, or {@code null} when absent; anything else is a 400. */

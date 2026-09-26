@@ -86,6 +86,7 @@ final class CapabilityManifest {
             new Entry("GET", "/audit/verify", Roles.CAN_ADMINISTER),
             new Entry("GET", "/audit/anchors", Roles.CAN_ADMINISTER),
             new Entry("POST", "/audit/anchors", Roles.CAN_ADMINISTER),
+            new Entry("POST", "/audit/anchors/rebaseline", Roles.CAN_ADMINISTER),
             // BiRoutes
             new Entry("POST", "/bi/templates/([^/]+)/apply", Roles.CAN_AUTHOR_WORKBENCH),
             // BundleRoutes

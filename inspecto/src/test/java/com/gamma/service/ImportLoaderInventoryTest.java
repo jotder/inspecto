@@ -87,6 +87,8 @@ class ImportLoaderInventoryTest {
         ALLOWED.put("audit-anchors.jsonl", "the signed audit anchors (AuditAnchors, ASSURE-AUDIT-CHAIN-1) in "
                 + "<config root>.secrets/ beside the Pending Change key — a SIBLING of the config tree, so no import "
                 + "reaches it; each line is MAC'd, so a planted one reads as integrity: invalid");
+        ALLOWED.put("audit-anchoring.json", "the durable \"anchoring started\" record (AuditAnchors) in "
+                + "<config root>.secrets/ beside the key — a SIBLING of the config tree, so no import reaches it");
         for (String p : List.of("reference.key", "inspecto.idempotency.key"))
             ALLOWED.put(p, NOT_A_FILE);
     }

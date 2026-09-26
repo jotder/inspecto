@@ -1619,6 +1619,21 @@ public final class JobService implements AutoCloseable {
 
     // ── Control API surface ──────────────────────────────────────────────────────
 
+    /** The shortest {@code retention_days} of any ENABLED {@code event_prune} maintenance job, or empty when none
+     *  is configured — the cutoff below which audit rows may legitimately be gone (ASSURE-AUDIT-CHAIN-1). */
+    public java.util.OptionalLong eventRetentionDays() {
+        long min = Long.MAX_VALUE;
+        for (JobConfig c : configs) {
+            if (!c.enabled() || !"maintenance".equals(c.type()) || !"event_prune".equals(c.opt("task", ""))) continue;
+            try {
+                min = Math.min(min, Long.parseLong(c.opt("retention_days", "")));
+            } catch (NumberFormatException unset) {
+                // an event_prune without a valid window refuses to run, so it prunes nothing
+            }
+        }
+        return min == Long.MAX_VALUE ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(min);
+    }
+
     /** List every configured job with its schedule, last outcome and next fire time. */
     public List<JobView> jobs() {
         List<JobView> out = new ArrayList<>();

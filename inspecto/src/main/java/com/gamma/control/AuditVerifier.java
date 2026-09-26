@@ -40,6 +40,12 @@ final class AuditVerifier {
 
     private AuditVerifier() {}
 
+    /**
+     * What the walk is judged against: today's UTC date, whether every finished day must be anchored (a Space
+     * with a key), and the configured event retention cutoff ({@code null} when no {@code event_prune} runs).
+     */
+    record Policy(LocalDate today, boolean requireAnchors, LocalDate retentionCutoff) {}
+
     /** Records fetched per store read. */
     static final int PAGE = 1000;
 
@@ -91,14 +97,17 @@ final class AuditVerifier {
      *                   (the anchor roll uses it to stop at today)
      */
     static Result verify(EventStore store, AuditAnchors.AnchorFile anchorFile, Long from, Long to, long maxRecords,
-                         Predicate<Event> onGood, LocalDate today, boolean requireAnchors) {
+                         Predicate<Event> onGood, Policy policy) {
+        LocalDate today = policy.today();
+        boolean requireAnchors = policy.requireAnchors();
         List<AuditAnchors.Anchor> anchors = anchorFile.anchors();
         Event head = store.chainHead();
         long headSeq = head == null ? 0 : AuditChain.seq(head);
         long anchoredTo = anchors.stream().mapToLong(AuditAnchors.Anchor::lastSeq).max().orElse(0);
         List<Event> firstRec = store.chainPage(1, 1);
         long lowest = firstRec.isEmpty() ? 1 : AuditChain.seq(firstRec.get(0));
-        long start = from != null ? from : lowest;
+        long epoch = anchorFile.epochStart();
+        long start = from != null ? from : Math.max(lowest, epoch);
         long end = to != null ? to : Math.max(headSeq, anchoredTo);
         boolean complete = true;
         Long next = null;
@@ -118,16 +127,29 @@ final class AuditVerifier {
         Bad fileBad = anchorFile.firstProblem();
         if (fileBad != null) return fail.apply(fileBad);
 
+        // ---- a range reaching back over an acknowledged break is never ok over the gap ----
+        if (epoch > 1 && start < epoch) {
+            AuditAnchors.Anchor b = anchorFile.anchors().get(0);
+            return fail.apply(new Bad(epoch, "acknowledged-break", "the anchors were rebaselined at seq " + epoch
+                    + " on " + b.day() + " (reason: " + b.extra().get("reason") + "; problem: "
+                    + b.extra().get("problem") + "); rows before it are outside the current anchor epoch"));
+        }
+
         // ---- anchors that end BELOW the first retained record (from = the lowest): the anchored rows are gone.
         // Retention removes whole old days, so an anchor whose day is wholly before the first retained record's
         // day is what a prune leaves behind; one whose day still has retained rows was truncated.
-        if (from == null && !firstRec.isEmpty()) {
-            LocalDate firstDay = AuditAnchors.day(firstRec.get(0));
+        // Only the configured event retention (an event_prune job's retention_days) may remove anchored rows, and
+        // only days before its cutoff: an anchored day at or after the cutoff — or ANY anchored day when no prune
+        // is configured — whose rows are gone was truncated.
+        if (from == null) {
+            LocalDate cutoff = policy.retentionCutoff();
             for (AuditAnchors.Anchor a : anchors)
-                if (a.firstSeq() < lowest && !LocalDate.parse(a.day()).isBefore(firstDay))
+                if (!a.isBreak() && a.count() > 0 && (firstRec.isEmpty() || a.firstSeq() < lowest)
+                        && (cutoff == null || !LocalDate.parse(a.day()).isBefore(cutoff)))
                     return fail.apply(new Bad(a.firstSeq(), "truncated-before-anchor", "the anchor for " + a.day()
-                            + " covers seq " + a.firstSeq() + ".." + a.lastSeq() + " but the trail now starts at seq "
-                            + lowest + ", inside a day that still has rows"));
+                            + " covers seq " + a.firstSeq() + ".." + a.lastSeq() + " but those rows are gone; "
+                            + (cutoff == null ? "no event retention is configured"
+                            : "the retention cutoff is " + cutoff)));
         }
 
         // ---- audit rows that are NOT on the chain, written since it began: every one is a hole ----

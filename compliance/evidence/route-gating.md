@@ -104,6 +104,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/assist/settings` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:53` |
 | POST | `/assist/settings/test` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/AssistRoutes.java:51` |
 | POST | `/audit/anchors` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java:54` |
+| POST | `/audit/anchors/rebaseline` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/AuditLogRoutes.java:56` |
 | POST | `/auth/exchange` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:38` |
 | POST | `/auth/logout` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:40` |
 | POST | `/auth/refresh` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:39` |
