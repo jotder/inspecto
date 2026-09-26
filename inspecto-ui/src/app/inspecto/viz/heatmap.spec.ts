@@ -8,6 +8,7 @@ import {
     rampColor,
     sequentialLevel,
     statusCellTone,
+    worstCell,
 } from './heatmap';
 import { HEATMAP_MAX_CELLS, HEATMAP_PLUGIN } from './plugins';
 import { allViz } from './viz-registry';
@@ -132,6 +133,19 @@ describe('heatmap — status scale', () => {
             statusBadgeClasses('FAIL'),
         );
     });
+    it('a cell folds to its WORST status by tone severity, not alphabetically; numbers keep max / min', () => {
+        expect(worstCell('Warning', 'Fail', 'max')).toBe('Fail');
+        expect(worstCell('Amber', 'Red', 'min')).toBe('Red');
+        expect(worstCell('Pass', 'whatever', 'max')).toBe('Pass');
+        expect(worstCell(null, 'Pass', 'max')).toBe('Pass');
+        expect(worstCell('Pass', null, 'min')).toBe('Pass');
+        expect(worstCell(null, 'whatever', 'max')).toBe('whatever');
+        expect(worstCell(null, 3, 'min')).toBe(3);
+        // One tone, two words: the same answer whichever row came first.
+        expect(worstCell('FAILED', 'Fail', 'max')).toBe(worstCell('Fail', 'FAILED', 'max'));
+        expect(worstCell(3, 7, 'max')).toBe(7);
+        expect(worstCell(3, 7, 'min')).toBe(3);
+    });
 });
 
 describe('HEATMAP_PLUGIN', () => {
@@ -180,6 +194,79 @@ describe('HEATMAP_PLUGIN', () => {
         expect(p.heatmap?.rowLabel).toBe('Control');
         expect(p.heatmap?.columnLabel).toBe('Event date');
         expect(p.labels).toEqual(['A', 'B']);
+    });
+
+    describe("a status column on the status scale shows each cell's WORST status", () => {
+        const statusValues = (agg: 'max' | 'min') => ({ ...values, value: [{ field: 'status', agg }] });
+        const ctx = {
+            datasetId: 'control_runs',
+            sourceName: 'control_runs',
+            options: { heatmap: { scale: 'status' as const } },
+        };
+
+        it("queries each cell's distinct statuses (count), ordered, under the cell ceiling", () => {
+            const q = HEATMAP_PLUGIN.buildQuery(statusValues('max'), ctx);
+            expect(q.groupBy).toEqual(['control', 'event_date', 'status']);
+            expect(q.grains).toEqual({ event_date: 'day' });
+            expect(q.measures.map((m) => m.id)).toEqual(['count']);
+            expect(q.orderBy?.map((o) => o.field)).toEqual(['control', 'event_date', 'status']);
+            expect(q.limit).toBe(HEATMAP_MAX_CELLS);
+        });
+
+        it('Pass + Warning + Fail in one cell reads Fail (alphabetical max would say Warning)', () => {
+            const rows = ['Fail', 'Pass', 'Warning'].map((status) => ({
+                control: 'A',
+                event_date: 'd1',
+                status,
+                count: 1,
+            }));
+            rows.push({ control: 'A', event_date: 'd2', status: 'Pass', count: 3 });
+            const p = HEATMAP_PLUGIN.transformProps(rows, statusValues('max'));
+            expect(p.heatmap?.cells).toEqual([['Fail', 'Pass']]);
+        });
+
+        it('RAG Green + Amber + Red reads Red under min too (alphabetical min would say Amber)', () => {
+            const rows = ['Amber', 'Green', 'Red'].map((status) => ({
+                control: 'A',
+                event_date: 'd1',
+                status,
+                count: 1,
+            }));
+            expect(HEATMAP_PLUGIN.transformProps(rows, statusValues('min')).heatmap?.cells).toEqual([['Red']]);
+        });
+
+        it('a result at the ceiling blanks its last cell, which may be cut mid-way, rather than show a wrong worst', () => {
+            const rows: Record<string, unknown>[] = Array.from({ length: HEATMAP_MAX_CELLS - 1 }, (_, i) => ({
+                control: 'A',
+                event_date: `d${i}`,
+                status: 'Pass',
+                count: 1,
+            }));
+            rows.push({ control: 'B', event_date: 'd0', status: 'Pass', count: 1 });
+            const p = HEATMAP_PLUGIN.transformProps(rows, statusValues('max'));
+            expect(p.heatmap?.rows).toEqual(['A']);
+            expect(p.heatmap?.cells[0][0]).toBe('Pass');
+        });
+
+        it('a numeric heatmap, or max on another scale, queries exactly as before', () => {
+            const plain = { groupBy: ['control', 'event_date'], limit: HEATMAP_MAX_CELLS };
+            const sum = HEATMAP_PLUGIN.buildQuery(values, ctx);
+            expect(sum).toMatchObject(plain);
+            expect(sum.measures.map((m) => m.id)).toEqual(['sum_breaks']);
+            expect(sum).toEqual(
+                HEATMAP_PLUGIN.buildQuery(values, { datasetId: 'control_runs', sourceName: 'control_runs' }),
+            );
+            const seq = { ...ctx, options: { heatmap: { scale: 'sequential' as const } } };
+            const max = HEATMAP_PLUGIN.buildQuery(statusValues('max'), seq);
+            expect(max).toMatchObject(plain);
+            expect(max.measures.map((m) => m.id)).toEqual(['max_status']);
+            // …and its rows (the server's aggregate) pivot as before.
+            const p = HEATMAP_PLUGIN.transformProps(
+                [{ control: 'A', event_date: 'd1', max_status: 'Warning' }],
+                statusValues('max'),
+            );
+            expect(p.heatmap?.cells).toEqual([['Warning']]);
+        });
     });
 
     it('an incomplete mapping yields no matrix', () => {

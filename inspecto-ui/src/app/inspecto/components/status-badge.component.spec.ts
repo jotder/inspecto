@@ -8,6 +8,7 @@ import {
     StatusBadgeVariant,
     statusBadgeClasses,
     statusBadgeHtml,
+    statusSeverity,
     statusToneSchemeClasses,
 } from './status-badge.component';
 
@@ -98,6 +99,14 @@ describe('StatusBadgeComponent', () => {
         expect(classSet(b)).toEqual(classSet(a));
         expect(classSet(b.querySelector('span'))).toEqual(classSet(a.querySelector('span')));
         expect(b.textContent).toBe('Passed');
+    });
+
+    it('ranks statuses by tone severity, never alphabetically: error > warning > info > success > unknown', () => {
+        const ranked = ['Fail', 'Warning', 'Open', 'Pass', 'whatever'].map(statusSeverity);
+        expect([...ranked].sort((a, b) => b - a)).toEqual(ranked);
+        expect(new Set(ranked).size).toBe(5);
+        expect(statusSeverity('Red')).toBeGreaterThan(statusSeverity('Amber'));
+        expect(statusSeverity('Amber')).toBeGreaterThan(statusSeverity('Green'));
     });
 
     it('has no axe violations in the dot variant', async () => {

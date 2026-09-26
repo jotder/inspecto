@@ -680,7 +680,12 @@ src/app/
 - **Heatmap Visualization Type (`vizType: heatmap`) → `viz/heatmap.ts` + `viz/plugins/heatmap.{plugin,component}.ts`**
   (2026-09-25; gallery: `/design` ▸ *More visualization types*). Channels `rows` × `columns` + one `value`; a real
   `<table>` coloured by `options.heatmap.scale` — `sequential` / `diverging` (`midpoint`) as `rgba(var(--gamma-primary|warn-rgb), a)`
-  ramps, `status` via `statusBadgeClasses()` (numbers vs `options.kpi.target`); a cell click drills on its row AND its column:
+  ramps, `status` via `statusBadgeClasses()` (numbers vs `options.kpi.target`). ⚠ **A status cell shows its WORST
+  status, never `max()`/`min()` of the text** — that is alphabetical (Fail < Pass < Warning, Amber < Green < Red).
+  On the `status` scale a plain `max`/`min` value groups by the value field too (`count` measure) and `transformProps`
+  folds each cell with `worstCell()` by `statusSeverity()` (`status-badge.component.ts` — the ONE tone-severity order:
+  error > warning > info > success > unknown); rows = Σ cells × distinct values under `HEATMAP_MAX_CELLS`, and a
+  result AT the ceiling blanks its last (possibly cut) cell. Other scales/aggregates query unchanged (2026-09-26). A cell click drills on its row AND its column:
   viz-render's `(cellClick)` → widget-host's `onCellClick` emits ONE `DrillEvent` whose `and` carries the column pair,
   and `DashboardViewStore.onDrill` toggles the pair as a unit (all present ⇒ remove both; otherwise the pair REPLACES any `=` condition on
   those fields, so another cell moves the selection; other conditions untouched).

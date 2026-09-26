@@ -130,6 +130,18 @@ export function statusTone(value: string | null | undefined): StatusTone {
     }
 }
 
+/**
+ * How bad each tone is, worst first: error > warning > info > success > neutral. Neutral (a word this file does not
+ * know) ranks lowest, so an unrecognised value never masks a known status. Rank by THIS, never by the word itself —
+ * alphabetically Fail < Pass < Warning and Amber < Green < Red, so a `max()`/`min()` over status text is not "worst".
+ */
+const TONE_SEVERITY: Record<StatusTone, number> = { error: 4, warning: 3, info: 2, success: 1, neutral: 0 };
+
+/** The severity of a status token (higher = worse) — see {@link TONE_SEVERITY}. */
+export function statusSeverity(value: string | null | undefined): number {
+    return TONE_SEVERITY[statusTone(value)];
+}
+
 /** Tailwind color classes (no geometry) for a status token — for ag-Grid/innerHTML renderers. */
 export function statusBadgeClasses(value: string | null | undefined): string {
     return TONE_CLASSES[statusTone(value)];

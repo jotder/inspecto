@@ -1,4 +1,9 @@
-import { StatusTone, statusBadgeClasses, statusTone } from 'app/inspecto/components/status-badge.component';
+import {
+    StatusTone,
+    statusBadgeClasses,
+    statusSeverity,
+    statusTone,
+} from 'app/inspecto/components/status-badge.component';
 import { Better } from './target-status';
 
 /**
@@ -53,13 +58,15 @@ function cellValue(v: unknown): HeatmapValue {
 /**
  * Pivot grouped rows (`rowField`, `columnField`, `valueKey`) into a matrix. Row and column labels are sorted by label
  * (numeric-aware, so `2` < `10` and ISO dates read in calendar order). A pair with no source row is `null` — an empty
- * cell, never a zero nobody measured.
+ * cell, never a zero nobody measured. With `reduce`, several source rows for one pair fold into one value (the status
+ * scale's worst-of, {@link worstCell}); without it the last row wins.
  */
 export function pivotHeatmap(
     rows: readonly Record<string, unknown>[],
     rowField: string,
     columnField: string,
     valueKey: string,
+    reduce?: (a: HeatmapValue, b: HeatmapValue) => HeatmapValue,
 ): HeatmapMatrix {
     const rowSet = new Set<string>();
     const colSet = new Set<string>();
@@ -69,7 +76,9 @@ export function pivotHeatmap(
         const ck = str(r[columnField]);
         rowSet.add(rk);
         colSet.add(ck);
-        at.set(JSON.stringify([rk, ck]), cellValue(r[valueKey]));
+        const key = JSON.stringify([rk, ck]);
+        const v = cellValue(r[valueKey]);
+        at.set(key, reduce && at.has(key) ? reduce(at.get(key)!, v) : v);
     }
     const sorted = (s: Set<string>): string[] => [...s].sort(byLabel.compare);
     const rowLabels = sorted(rowSet);
@@ -79,6 +88,22 @@ export function pivotHeatmap(
         columns,
         cells: rowLabels.map((rk) => columns.map((ck) => at.get(JSON.stringify([rk, ck])) ?? null)),
     };
+}
+
+/**
+ * Fold two values of one cell into the one the `status` scale shows: of two status words the WORSE by the shared tone
+ * severity ({@link statusSeverity}: Fail over Warning over Pass, Red over Amber over Green — never alphabetical), a tie
+ * broken by label so the result is independent of row order; of two numbers the `agg` (`max` / `min`) the Widget
+ * picked; an empty value never wins over a real one.
+ */
+export function worstCell(a: HeatmapValue, b: HeatmapValue, agg: 'max' | 'min'): HeatmapValue {
+    if (a == null) return b;
+    if (b == null) return a;
+    if (typeof a === 'number' && typeof b === 'number') return agg === 'max' ? Math.max(a, b) : Math.min(a, b);
+    const sa = statusSeverity(String(a));
+    const sb = statusSeverity(String(b));
+    if (sa !== sb) return sa > sb ? a : b;
+    return byLabel.compare(String(a), String(b)) <= 0 ? a : b;
 }
 
 /** The numeric extent of a matrix, or `null` when it holds no number. */
