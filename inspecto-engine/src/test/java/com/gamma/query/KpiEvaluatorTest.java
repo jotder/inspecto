@@ -86,13 +86,49 @@ class KpiEvaluatorTest {
     }
 
     @Test
-    void theCompiledStatementIsTheMeasureCompilersWithTypedDateLiterals() {
+    void theWindowIsCutByTypedTimestamptzLiteralsInTheKpisZone() {
         KpiDefinition k = KpiDefinition.fromMap("k", Map.of("dataset", "orders", "measure", "sum(amount)",
-                "timeField", "order_date", "grain", "month"));
+                "timeField", "order_date", "grain", "month", "timezone", "Asia/Kolkata"));
         String sql = KpiEvaluator.sql(k, k.current(AS_OF));
-        assertEquals("SELECT SUM(\"amount\") AS \"sum_amount\" FROM \"orders\" WHERE \"order_date\" >= '2026-08-01'"
-                + " AND \"order_date\" < '2026-08-14' LIMIT 1", sql);
-        assertTrue(com.gamma.sql.SqlGuard.check(sql).isEmpty());
+        assertEquals("WITH \"__kpi_window\" AS (SELECT * FROM \"orders\" WHERE \"order_date\" >= TIMESTAMPTZ"
+                + " '2026-08-01 00:00:00+05:30' AND \"order_date\" < TIMESTAMPTZ '2026-08-14 00:00:00+05:30')"
+                + " SELECT SUM(\"amount\") AS \"sum_amount\" FROM \"__kpi_window\" LIMIT 1", sql);
+        assertTrue(com.gamma.sql.SqlGuard.check(sql).isEmpty(), () -> com.gamma.sql.SqlGuard.check(sql).toString());
+    }
+
+    /** One order at 2026-02-28 20:00Z — 1 March 01:30 in Kolkata, still 28 February in UTC. */
+    private static final String TZ_RELATION = """
+            SELECT * FROM (VALUES (TIMESTAMPTZ '2026-02-28 20:00:00+00', 5.0)) AS t(order_ts, amount)""";
+
+    private static Double dayValue(String zone, String asOf) throws Exception {
+        return KpiEvaluator.evaluate(KpiDefinition.fromMap("k", Map.of("dataset", "orders", "measure", "sum(amount)",
+                "timeField", "order_ts", "grain", "day", "timezone", zone)), TZ_RELATION, LocalDate.parse(asOf)).value();
+    }
+
+    @Test
+    void aTimestamptzRowFallsInTheDayOfTheKpisZoneNotTheHosts() throws Exception {
+        assertEquals(5.0, dayValue("Asia/Kolkata", "2026-03-01"));
+        assertNull(dayValue("Asia/Kolkata", "2026-02-28"));
+        assertEquals(5.0, dayValue("UTC", "2026-02-28"));
+        assertNull(dayValue("UTC", "2026-03-01"));
+    }
+
+    @Test
+    void aDateColumnIsCutOnTheZonesLocalDays() throws Exception {
+        String rel = "SELECT * FROM (VALUES (DATE '2026-03-01', 5.0)) AS t(d, amount)";
+        KpiDefinition k = KpiDefinition.fromMap("k", Map.of("dataset", "orders", "measure", "sum(amount)",
+                "timeField", "d", "grain", "day", "timezone", "Asia/Kolkata"));
+        assertEquals(5.0, KpiEvaluator.evaluate(k, rel, LocalDate.parse("2026-03-01")).value());
+        assertNull(KpiEvaluator.evaluate(k, rel, LocalDate.parse("2026-02-28")).value());
+    }
+
+    @Test
+    void anOffsetOrUnknownZoneIsRefused() {
+        for (String z : java.util.List.of("+05:30", "Mars/Olympus", "UTC+1"))
+            assertThrows(IllegalArgumentException.class, () -> KpiDefinition.fromMap("k", Map.of("dataset", "o",
+                    "measure", "count", "timeField", "d", "grain", "day", "timezone", z)), z);
+        assertEquals(java.time.ZoneId.of("UTC"), KpiDefinition.fromMap("k", Map.of("dataset", "o", "measure", "count",
+                "timeField", "d", "grain", "day")).zone(), "absent ⇒ UTC");
     }
 
     @Test

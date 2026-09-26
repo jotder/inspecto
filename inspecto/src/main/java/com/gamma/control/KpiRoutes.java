@@ -15,8 +15,6 @@ import java.nio.file.Path;
 import java.sql.SQLException;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeParseException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -62,7 +60,7 @@ final class KpiRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "kpi '" + id + "' is invalid: " + bad.getMessage());
         }
-        LocalDate asOf = asOf(ApiContext.query(ex, "asOf"));
+        LocalDate asOf = asOf(ApiContext.query(ex, "asOf"), kpi.zone());
         Map<String, Object> dataset = readableDataset(ex, store, kpi.dataset());
         if (dataset == null)
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "kpi '" + id + "': no dataset '" + kpi.dataset() + "'");
@@ -92,6 +90,7 @@ final class KpiRoutes implements RouteModule {
         out.put("comparison", kpi.comparison().wire());
         out.put("direction", kpi.direction().wire());
         out.put("asOf", asOf.toString());
+        out.put("timezone", kpi.zone().getId());
         out.put("period", window(r.window()));
         out.put("value", r.value());
         out.put("comparisonPeriod", window(r.comparisonWindow()));
@@ -116,14 +115,20 @@ final class KpiRoutes implements RouteModule {
         return m;
     }
 
-    /** {@code YYYY-MM-DD}, or an ISO instant read as its UTC date; absent ⇒ today (UTC). 400 otherwise. */
-    private static LocalDate asOf(String raw) {
-        if (raw == null || raw.isBlank()) return LocalDate.now(ZoneOffset.UTC);
+    /**
+     * {@code YYYY-MM-DD}, or an ISO instant read as its date in the KPI's zone; absent means today in that zone.
+     * 400 otherwise.
+     */
+    static LocalDate asOf(String raw, java.time.ZoneId zone) {
+        LocalDate today = LocalDate.now(zone);
+        if (raw == null || raw.isBlank()) return today;
+        LocalDate d;
         try {
-            return raw.length() == 10 ? LocalDate.parse(raw) : Instant.parse(raw).atZone(ZoneOffset.UTC).toLocalDate();
-        } catch (DateTimeParseException bad) {
+            d = raw.length() == 10 ? LocalDate.parse(raw) : Instant.parse(raw).atZone(zone).toLocalDate();
+        } catch (java.time.format.DateTimeParseException bad) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "asOf must be YYYY-MM-DD or an ISO instant, got '" + raw + "'");
         }
+        return d;
     }
 
     /**

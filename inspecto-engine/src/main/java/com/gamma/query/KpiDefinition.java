@@ -32,7 +32,7 @@ import static com.gamma.util.Values.trimToNull;
  */
 public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure measure, String measureText,
                             String timeField, Grain grain, Comparison comparison, Direction direction,
-                            Double target, Bands bands) {
+                            Double target, Bands bands, java.time.ZoneId zone) {
 
     /** The period a KPI is cut on. Wider than {@link MeasureCompiler#GRAINS} (a grouping grain) on purpose. */
     public enum Grain {
@@ -87,12 +87,12 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
     /** RAG. {@code null} from {@link #rag} means "no status" (no value, or neither target nor bands). */
     public enum Rag { GREEN, AMBER, RED }
 
-    /** A half-open date window {@code [from, to)}. */
+    /** A half-open date window {@code [from, to)}, in the KPI's {@link #zone()}: it starts and ends at local midnight there. */
     public record Window(LocalDate from, LocalDate to) {}
 
     /** The keys a {@code kpi} component may carry; anything else is refused, never silently dropped. */
     static final Set<String> KEYS = Set.of("name", "title", "description", "dataset", "measure", "timeField",
-            "grain", "comparison", "direction", "target", "bands", "unit", "format", "owner", "shares", "requirement");
+            "grain", "comparison", "direction", "target", "bands", "unit", "format", "owner", "shares", "requirement", "timezone");
 
     /**
      * Validate a stored or proposed {@code kpi} content. {@code name} is the component id.
@@ -127,7 +127,24 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
             throw new IllegalArgumentException("kpi 'format' must be an object");
         if (m.get("unit") != null && !(m.get("unit") instanceof String))
             throw new IllegalArgumentException("kpi 'unit' must be text");
-        return new KpiDefinition(name, dataset, measure, measureText, timeField, grain, comparison, direction, target, bands);
+        return new KpiDefinition(name, dataset, measure, measureText, timeField, grain, comparison, direction, target, bands,
+                zone(trimToNull(m.get("timezone"))));
+    }
+
+    /** A region zone name (never an offset form), default UTC — the zone a KPI's periods are cut in. */
+    private static final java.util.regex.Pattern ZONE_NAME = java.util.regex.Pattern.compile("[A-Za-z]+(/[A-Za-z0-9_+-]+)*");
+
+    /** The default zone. A region id ("UTC"), not ZoneOffset.UTC, whose id "Z" DuckDB does not know. */
+    public static final java.time.ZoneId UTC = java.time.ZoneId.of("UTC");
+
+    private static java.time.ZoneId zone(String s) {
+        if (s == null) return UTC;
+        try {
+            if (ZONE_NAME.matcher(s).matches()) return java.time.ZoneId.of(s);
+        } catch (java.time.DateTimeException ignored) {
+            // fall through to the refusal
+        }
+        throw new IllegalArgumentException("kpi 'timezone' must be an IANA zone name such as Asia/Kolkata, got '" + s + "'");
     }
 
     private static Grain grain(String s) {

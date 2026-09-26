@@ -25,11 +25,28 @@ public final class KpiEvaluator {
     public record Result(KpiDefinition.Window window, Double value, KpiDefinition.Window comparisonWindow,
                          Double comparisonValue, Double delta, Double deltaPct, KpiDefinition.Rag rag, String tone) {}
 
-    /** The compiled SELECT for one window — package-visible so a test can read what runs. */
+    /** The CTE the window's rows are cut into, named so it cannot collide with a Dataset id. */
+    private static final String WINDOW = "__kpi_window";
+    private static final java.time.format.DateTimeFormatter TSTZ =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ssxxx");
+
+    /**
+     * The compiled statement for one window — package-visible so a test can read what runs. The window is cut in a
+     * CTE by two typed {@code TIMESTAMPTZ} literals (local midnight in the KPI's zone, with its offset), and the
+     * Measure is {@link MeasureCompiler}'s own SELECT over that CTE. With the session TimeZone set to the same zone
+     * ({@link #run}), a DATE, TIMESTAMP or TIMESTAMPTZ column is compared on the same instants wherever it runs.
+     */
     static String sql(KpiDefinition kpi, KpiDefinition.Window w) {
-        return MeasureCompiler.compile(new MeasureCompiler.Spec(kpi.dataset(), List.of(kpi.measure()), List.of(),
-                Map.of(), List.of(new MeasureCompiler.Filter(kpi.timeField(), ">=", w.from().toString()),
-                        new MeasureCompiler.Filter(kpi.timeField(), "<", w.to().toString())), List.of(), 1));
+        String col = com.gamma.util.SqlIdent.q(kpi.timeField());
+        String measure = MeasureCompiler.compile(new MeasureCompiler.Spec(WINDOW, List.of(kpi.measure()), List.of(),
+                Map.of(), List.of(), List.of(), 1));
+        return "WITH " + com.gamma.util.SqlIdent.q(WINDOW) + " AS (SELECT * FROM " + com.gamma.util.SqlIdent.q(kpi.dataset())
+                + " WHERE " + col + " >= TIMESTAMPTZ '" + instant(kpi, w.from()) + "' AND " + col + " < TIMESTAMPTZ '"
+                + instant(kpi, w.to()) + "') " + measure;
+    }
+
+    private static String instant(KpiDefinition kpi, LocalDate d) {
+        return d.atStartOfDay(kpi.zone()).format(TSTZ);
     }
 
     /**
@@ -55,7 +72,7 @@ public final class KpiEvaluator {
         if (!findings.isEmpty())
             throw new IllegalArgumentException("compiled KPI query failed the SQL safety check: " + findings.get(0).message());
         QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(kpi.dataset(), relationSql, sql, 1, 0,
-                List.of(), List.of()));
+                List.of(), List.of()), com.gamma.sql.SqlSandboxPolicy.defaultPolicy(), kpi.zone());
         if (r.rows().isEmpty()) return null;
         return r.rows().get(0).get(kpi.measure().id()) instanceof Number n ? n.doubleValue() : null;
     }

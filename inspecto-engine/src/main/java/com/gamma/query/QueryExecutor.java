@@ -166,9 +166,24 @@ public final class QueryExecutor {
      * tighter than the JVM-wide default (LA-11's traversal carries a per-route query timeout).
      */
     public static Result run(Request req, SqlSandboxPolicy policy) throws SQLException, IOException {
+        return run(req, policy, null);
+    }
+
+    /**
+     * {@link #run(Request, SqlSandboxPolicy)} with the DuckDB session {@code TimeZone} set explicitly first — DuckDB
+     * otherwise follows the HOST zone, so a TIMESTAMPTZ comparison or a DATE→TIMESTAMPTZ cast would depend on
+     * where the server runs. {@code null} keeps the session default (every other caller).
+     */
+    public static Result run(Request req, SqlSandboxPolicy policy, java.time.ZoneId timeZone)
+            throws SQLException, IOException {
         long t0 = System.nanoTime();
         try (SqlSandbox sandbox = SqlSandbox.open(policy)) {
             Connection conn = sandbox.connection();
+            if (timeZone != null) {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("SET TimeZone = '" + timeZone.getId().replace("'", "''") + "'");
+                }
+            }
             // Trusted registration: the ONLY place file-reading SQL runs (unsealed). The user query below
             // was SqlGuard-checked upstream, so it cannot itself read files.
             attachSharedCatalog(conn);
