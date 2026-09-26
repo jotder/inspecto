@@ -40,6 +40,15 @@ export const KPI_DEFINITION_ATTRIBUTES: AttributeSpec[] = [
         ],
     },
     {
+        key: 'timezone',
+        label: 'Time zone',
+        type: 'string',
+        tier: 'optional',
+        required: false,
+        placeholder: 'UTC',
+        help: 'The IANA zone the periods are cut in, e.g. Asia/Kolkata. Blank: UTC.',
+    },
+    {
         key: 'comparison',
         label: 'Compare with',
         type: 'select',
@@ -137,6 +146,8 @@ export function toKpiContent(v: Record<string, unknown>): KpiDefinition {
         const amber = num(v['amber']);
         if (green !== undefined && amber !== undefined) out.bands = { green, amber };
     }
+    const timezone = String(v['timezone'] ?? '').trim();
+    if (timezone) out.timezone = timezone;
     const unit = String(v['unit'] ?? '').trim();
     if (unit) out.unit = unit;
     return out;

@@ -73,7 +73,7 @@ export class KpiDefinitionDialog {
         const content = toKpiContent(this.schemaForm.value());
         // Keys this form does not ask (format, owner, shares, requirement, …) ride through an edit untouched.
         const kept = { ...(this.existing?.content ?? {}) };
-        for (const k of ['title', 'bands', 'target', 'unit']) delete kept[k];
+        for (const k of ['title', 'bands', 'target', 'unit', 'timezone']) delete kept[k];
         const body = { ...kept, ...content } as Record<string, unknown>;
         this.saving.set(true);
         this.refusal.set(null);
