@@ -237,6 +237,56 @@ public final class PendingChanges {
                         + "' for approval, and " + why + " — make the change on its own so it can be approved");
     }
 
+    /**
+     * Whether the Space whose config root is {@code configRoot} holds changes to {@code kind} for approval —
+     * for a writer outside any request (the agent's fix drafts), which has no exchange to hold and must simply
+     * not write a governed component.
+     */
+    public static boolean governs(Path configRoot, String kind) {
+        return ApprovalPolicy.forRoot(configRoot).ruleFor(kind) != null;
+    }
+
+    /**
+     * {@link #holdRefusing} for a writer that lands raw config files (the Space bundle import): each
+     * config-relative path is classified to its kind ({@link #kindOfConfigPath}); under a policy holding any
+     * kind, a path that cannot be classified is refused too — it could be a governed config.
+     */
+    public static void holdRefusingPaths(ApiContext api, java.util.Collection<String> relPaths, String why) {
+        ApprovalPolicy policy = ApprovalPolicy.forRoot(api.writeRoot());
+        if (!policy.holdsAnything()) return;
+        List<String> governed = new ArrayList<>();
+        for (String p : relPaths) {
+            String kind = kindOfConfigPath(p);
+            if (kind == null || policy.ruleFor(kind) != null)
+                governed.add(p + " (" + (kind == null ? "unclassified" : kind) + ")");
+        }
+        if (!governed.isEmpty())
+            throw new ApiException(409, ErrorCodes.CONFLICT, "this Space's approval policy holds changes for approval, and "
+                    + why + " — it would write " + governed + " without one; make each change on its own so it can be approved");
+    }
+
+    /**
+     * The policy kind a config-relative file is, or {@code null} when it cannot be told: a registry component
+     * by its type directory, else by the house filename conventions ({@code _pipeline.toon}, {@code _enrich.toon},
+     * {@code _job.toon} / {@code jobs/}, a schema's {@code _mapping.csv} / {@code _structure.csv}). A bare
+     * {@code <name>.toon} (how a schema or meta config is written) is NOT classified — it is ambiguous.
+     */
+    static String kindOfConfigPath(String relPath) {
+        String p = relPath.replace('\\', '/');
+        String[] parts = p.split("/");
+        if (parts.length >= 3 && "registry".equals(parts[0])) {
+            for (String type : com.gamma.pipeline.ComponentStore.WRITABLE_TYPES)
+                if (com.gamma.pipeline.ComponentRegistry.dirForType(type).map(parts[1]::equals).orElse(false)) return type;
+            return "connections".equals(parts[1]) ? "connection" : null;
+        }
+        String file = parts[parts.length - 1];
+        if (file.endsWith("_pipeline.toon")) return "pipeline";
+        if (file.endsWith("_enrich.toon")) return "enrichment";
+        if (file.endsWith("_job.toon") || (parts.length >= 2 && "jobs".equals(parts[0]))) return "job";
+        if (file.endsWith("_mapping.csv") || file.endsWith("_structure.csv")) return "schema";
+        return null;
+    }
+
     // ── the store ───────────────────────────────────────────────────────────────────────────────
 
     static Map<String, Object> summary(Map<String, Object> rec) {

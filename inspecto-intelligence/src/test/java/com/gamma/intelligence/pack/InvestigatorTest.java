@@ -103,6 +103,20 @@ class InvestigatorTest {
         assertTrue(c.fixDraftRefs().isEmpty());
     }
 
+    /** ASSURE-MAKER-CHECKER-1 finding 4: a draft never OVERWRITES a component whose kind the policy holds. */
+    @Test
+    void aFixDraftNeverOverwritesAGovernedComponent(@TempDir Path dir) throws Exception {
+        ComponentStore components = new ComponentStore(dir.resolve("registry"));
+        components.write("expectation", "amt-nonneg-fix", Map.of("expr", "AMT >= 5", "severity", "warn"));
+        java.nio.file.Files.writeString(dir.resolve("approval.toon"), "approval:\n  expectation:\n    required: true\n");
+        CollectorService svc = new CollectorService(List.of(), 3600, 1);
+        StubLlmGateway gateway = StubLlmGateway.builder().defaultReplyText(RCA_JSON).build();
+        TriageRun c = new Investigator(svc, components, List::of, gateway).investigate(new Incident("incident:2",
+                Map.of("type", "pipeline.batch.failed"), Map.of("sinceMinutes", WIDE_WINDOW)));
+        assertTrue(c.fixDraftRefs().isEmpty(), "held kind: the draft is not written over the live component");
+        assertEquals("AMT >= 5", components.get("expectation", "amt-nonneg-fix").orElseThrow().content().get("expr"));
+    }
+
     @Test
     void fixDraftIsNotPersistedWhenNoComponentWriteRootIsConfigured(@TempDir Path dir) {
         CollectorService svc = new CollectorService(List.of(), 3600, 1);

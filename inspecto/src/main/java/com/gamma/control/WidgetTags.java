@@ -92,6 +92,18 @@ public final class WidgetTags {
      *
      * @return how many widget components were actually rewritten
      */
+    /**
+     * Maker-checker (`ASSURE-MAKER-CHECKER-1` verification finding 4): a tag change that would re-project
+     * these widgets' {@code tags} writes the widget components, so under an approval policy on {@code widget}
+     * it is refused (409) — a projection cannot be one Pending Change. Call it BEFORE the edges change: after
+     * the edge is stored, refusing the re-projection would leave the chips disagreeing with the edges.
+     */
+    public static void refuseUnderPolicy(ApiContext api, Collection<String> widgetIds) {
+        if (widgetIds.isEmpty()) return;
+        PendingChanges.holdRefusing(api, List.of(KIND),
+                "this tag change would rewrite the tags of widget(s) " + widgetIds);
+    }
+
     public static int reproject(ApiContext api, Collection<String> widgetIds) {
         if (widgetIds.isEmpty() || api.writeRoot() == null) return 0;
         // Nothing to re-project without the operational-object module (EDG-01 cell 7).

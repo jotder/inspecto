@@ -161,6 +161,18 @@ public final class Investigator {
         if (cfg instanceof Map<?, ?> m) m.forEach((ck, cv) -> content.put(String.valueOf(ck), cv));
         content.put("status", "draft");        // L1: draft, never applied by the agent
         content.put("authoredBy", "agent:rca"); // actor audit stamped into the component itself
+        // ASSURE-MAKER-CHECKER-1 (verification finding 4): a draft must never OVERWRITE a component whose kind
+        // this Space's approval policy holds — that would change governed config with no Pending Change. A new
+        // draft id is still written (nothing governed exists under it to change).
+        try {
+            if (components.exists(k, i) && components.root().getParent() != null
+                    && com.gamma.control.PendingChanges.governs(components.root().getParent(), k)) {
+                log.info("Fix draft for {}/{} not persisted: the component exists and its kind is held for approval", k, i);
+                return List.of();
+            }
+        } catch (IllegalArgumentException unknownKind) {
+            // not a writable kind — the write below refuses it the same way it always did
+        }
         try {
             components.write(k, i, content);
             return List.of("component:" + k + "/" + i);

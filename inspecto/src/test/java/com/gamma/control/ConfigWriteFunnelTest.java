@@ -162,6 +162,127 @@ class ConfigWriteFunnelTest {
         assertTrue(stale.isEmpty(), () -> "NO_HOLD rows that no longer name a config-writing route: " + stale);
     }
 
+    // ── the repo-wide writer inventory (verification finding 4) ───────────────────────────────────
+
+    /**
+     * A config write in ANY class, route or not: a {@code ComponentStore}-shaped write/delete (a receiver
+     * named {@code *store*} / {@code *components*}), a raw bundle unpack, or an Entity Fact log append. The
+     * route-level test above follows a handler only within its own file, so a write delegated to another class
+     * (the {@code /import} unpack, the widget tag re-projection, the agent's fix drafts) hid there. This test
+     * does not start from routes at all: EVERY such call site in every module must sit in a method that reaches
+     * the maker-checker hold itself, or be on {@link #WRITERS} with the reason it need not.
+     */
+    private static final Pattern WRITER = Pattern.compile(
+            "(?i)\\b\\w*(store|components)\\w*(\\(\\w*\\))?\\.(write|delete)\\(|BundleImporter\\.writeConfig\\(|new EntityFactLog\\(");
+    private static final Pattern HELD = Pattern.compile(
+            "PendingChanges\\.(hold\\w*|governs)\\(|WidgetTags\\.refuseUnderPolicy\\(|refuseGovernedDependents\\(");
+
+    private static final String HELPER = "a shared write helper — every ROUTE that reaches it holds first "
+            + "(everyConfigWritingRouteReachesTheMakerCheckerHoldOrIsExempt)";
+    private static final String NOT_GOVERNED = "writes a kind ApprovalPolicy.GOVERNABLE excludes";
+    private static final String MACHINE = "a machine write by a Job / the engine, not a human change — "
+            + "maker-checker holds human config changes only";
+
+    private static final String ENTITY_FACTS = "the Identity Fact log behind Entity Lists (LA-17): an append-only, "
+            + "hash-chained, reason-carrying log of analyst facts under audit/, not a ComponentStore kind — not "
+            + "governable, and reserved from every import (ReservedConfigPaths audit/)";
+
+    /** Writer sites ({@code SimpleClass#method}) that do not reach the hold themselves, each with its reason. */
+    static final Map<String, String> WRITERS = new TreeMap<>(Map.ofEntries(
+            Map.entry("AccessRoutes#write", HELPER), Map.entry("AlertRoutes#write", HELPER),
+            Map.entry("BundleRoutes#write", HELPER + "; /bundle/import refuses (holdRefusing) before any item"),
+            Map.entry("DecisionRoutes#write", HELPER), Map.entry("ExpectationRoutes#write", HELPER),
+            Map.entry("DecisionRoutes#simulate", "a lastSimulation RESULT stamp (archive=false) — operating, not authoring"),
+            Map.entry("ExpectationRoutes#runAndPersist", "a lastResult RESULT stamp (archive=false) — operating, not authoring"),
+            Map.entry("NotificationRoutes#write", "channel: " + NOT_GOVERNED),
+            Map.entry("NotificationRoutes#deleteChannel", "channel: " + NOT_GOVERNED),
+            Map.entry("NotificationRoutes#writeRule", "notification-rule: " + NOT_GOVERNED),
+            Map.entry("NotificationRoutes#deleteRule", "notification-rule: " + NOT_GOVERNED),
+            Map.entry("RequirementRoutes#write", "requirement: " + NOT_GOVERNED),
+            Map.entry("PipelineListRoutes#deletePipeline", "a grandfathered PipelineStore graph (authored-pipeline) — "
+                    + "not a governable kind; read-only apart from this delete"),
+            Map.entry("PipelineRenameRoutes#rewriteComponentTargets", "rename's dependent rewrite — refused up front "
+                    + "under a policy on the dependent's kind (refuseGovernedDependents)"),
+            Map.entry("PipelineRenameRoutes#rewriteDatasetRefs", "as rewriteComponentTargets"),
+            Map.entry("PipelineRenameRoutes#rewriteAlertRules", "as rewriteComponentTargets"),
+            Map.entry("WidgetTags#reproject", "the widget tags PROJECTION — every tag route refuses first "
+                    + "(WidgetTags.refuseUnderPolicy) before the edge moves; component writes project inside the hold"),
+            Map.entry("SpaceManager#createFromBundle", "seeds a brand-new Space (canAdminister) — no policy, role "
+                    + "table or component exists there yet to go around"),
+            Map.entry("ObjectService#discard", "an operational object (Incident / Case), not config"),
+            Map.entry("ObjectService#purge", "an operational object (Incident / Case), not config"),
+            Map.entry("ConsignmentIngestor#parkSource", "the ingest manifest store — operational state, not config"),
+            Map.entry("ConsignmentIngestor#finalizeSource", "the ingest manifest store — operational state, not config"),
+            Map.entry("BackupTask#catalogRow", MACHINE + " (a catalog RESULT stamp, archive=false)"),
+            Map.entry("StorageReportTask#storageCatalog", MACHINE + " (a catalog RESULT stamp, archive=false)"),
+            Map.entry("ObjectsAnalyticsJob#run", MACHINE + " (a catalog RESULT stamp, archive=false)"),
+            Map.entry("MaterializeTask#run", MACHINE + " (the Materialize Job restates its job-owned provenance keys "
+                    + "on its target Dataset)"),
+            Map.entry("EntityListRoutes#list", ENTITY_FACTS), Map.entry("EntityListRoutes#one", ENTITY_FACTS),
+            Map.entry("EntityListRoutes#create", ENTITY_FACTS), Map.entry("EntityListRoutes#members", ENTITY_FACTS),
+            Map.entry("EntityListRoutes#retire", ENTITY_FACTS)
+    ));
+
+    @Test
+    void everyConfigWriterRepoWideReachesTheHoldOrIsOnTheInventory() throws IOException {
+        Map<String, Boolean> sites = new TreeMap<>();
+        Path reactor = Path.of("..").toAbsolutePath().normalize();
+        try (Stream<Path> siblings = Files.list(reactor)) {
+            for (Path sibling : siblings.filter(Files::isDirectory).sorted().toList()) {
+                Path src = sibling.resolve(Path.of("src", "main", "java"));
+                if (!Files.isDirectory(src)) continue;
+                try (Stream<Path> files = Files.walk(src)) {
+                    for (Path f : files.filter(p -> p.toString().endsWith(".java")).sorted().toList())
+                        writerSites(f, sites);
+                }
+            }
+        }
+        assertTrue(sites.containsKey("DataSourceRoutes#importBundle") && sites.containsKey("ComponentRoutes#writeComponent"),
+                "the writer scan went blind — signals drifted from the code: " + sites.keySet());
+        Set<String> open = new LinkedHashSet<>();
+        for (Map.Entry<String, Boolean> e : sites.entrySet())
+            if (!e.getValue() && !WRITERS.containsKey(e.getKey())) open.add(e.getKey());
+        assertTrue(open.isEmpty(), () -> "config writers that neither reach the maker-checker hold in the same "
+                + "method nor sit on WRITERS with a reason:\n  " + String.join("\n  ", open));
+        Set<String> stale = new LinkedHashSet<>(WRITERS.keySet());
+        stale.removeAll(sites.keySet());
+        assertTrue(stale.isEmpty(), () -> "WRITERS rows that name no writer site any more: " + stale);
+        Set<String> heldButListed = new LinkedHashSet<>();
+        for (String k : WRITERS.keySet()) if (Boolean.TRUE.equals(sites.get(k))) heldButListed.add(k);
+        assertTrue(heldButListed.isEmpty(), () -> "WRITERS rows that now reach the hold — drop them: " + heldButListed);
+    }
+
+    private static void writerSites(Path f, Map<String, Boolean> out) throws IOException {
+        String text = withoutComments(Files.readString(f));
+        Matcher w = WRITER.matcher(text);
+        if (!w.find()) return;
+        String cls = f.getFileName().toString().replaceFirst("\\.java$", "");
+        List<int[]> spans = new java.util.ArrayList<>();
+        List<String> names = new java.util.ArrayList<>();
+        Matcher m = METHOD.matcher(text);
+        while (m.find()) {
+            if (KEYWORDS.contains(m.group(1))) continue;
+            int open = m.end() - 1, depth = 0, end = text.length();
+            for (int i = open; i < text.length(); i = skip(text, i) + 1) {
+                char c = text.charAt(i);
+                if (c == '{') depth++;
+                else if (c == '}' && --depth == 0) { end = i; break; }
+            }
+            spans.add(new int[] {m.start(), end});
+            names.add(m.group(1));
+        }
+        w.reset();
+        while (w.find()) {
+            int best = -1;   // the innermost method whose span holds the site
+            for (int i = 0; i < spans.size(); i++)
+                if (spans.get(i)[0] <= w.start() && w.start() <= spans.get(i)[1]
+                        && (best < 0 || spans.get(i)[0] > spans.get(best)[0])) best = i;
+            String key = cls + "#" + (best < 0 ? "?" : names.get(best));
+            boolean held = best >= 0 && HELD.matcher(text.substring(spans.get(best)[0], spans.get(best)[1])).find();
+            out.merge(key, held, Boolean::logicalAnd);
+        }
+    }
+
     /** The four S0 routes by name, so "the scan went blind to them" cannot pass as "they are fine". */
     @Test
     void theFourPipelineEditsAreSeenAsConfigWritersAndPassSaveGate() throws IOException {

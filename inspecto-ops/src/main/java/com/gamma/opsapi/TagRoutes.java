@@ -143,6 +143,7 @@ public final class TagRoutes implements RouteModule {
             if (com.gamma.objects.AnnotationKinds.OBJECT.equals(targetKind)) {
                 OpsEngine.of(api).applyTag(targetId, tag, actor);
             } else {
+                if ("widget".equals(targetKind)) WidgetTags.refuseUnderPolicy(api, List.of(targetId));   // before the edge
                 OpsEngine.of(api).tagAssignments()
                         .add(com.gamma.objects.TagAssignment.of(tag, targetKind, targetId, actor));
                 // A widget's `tags` array is the same kind of projection (D7 (c)) — the chips on its
@@ -169,6 +170,7 @@ public final class TagRoutes implements RouteModule {
                 removed = OpsEngine.of(api).tagAssignments().tagsOf(targetKind, targetId).contains(tag);
                 OpsEngine.of(api).removeTag(targetId, tag);   // also re-projects the CSV
             } else {
+                if ("widget".equals(targetKind)) WidgetTags.refuseUnderPolicy(api, List.of(targetId));   // before the edge
                 removed = OpsEngine.of(api).tagAssignments().remove(tag, targetKind, targetId);
                 WidgetTags.reproject(api, List.of(targetId));   // drop the chip too, not just the edge
             }
@@ -221,6 +223,7 @@ public final class TagRoutes implements RouteModule {
         // ObjectService moves the registry entry, the edges and the OBJECT CSVs; the component-side
         // projections are ours, because the engine has no ComponentStore (see WidgetTags).
         List<String> widgets = WidgetTags.targetsOf(api, from);
+        WidgetTags.refuseUnderPolicy(api, widgets);   // maker-checker: before the tag file or any edge moves
         ObjectService.TagVocabularyChange changed;
         try {
             persist(api, target, Map.of("tag", Map.of("name", to.trim(),
@@ -256,6 +259,7 @@ public final class TagRoutes implements RouteModule {
     private Object deleteTag(ApiContext api, String name) throws IOException {
         WriteGates.requireWriteRoot(api, "tag write");
         List<String> widgets = WidgetTags.targetsOf(api, name);   // before the edges are removed
+        WidgetTags.refuseUnderPolicy(api, widgets);                 // maker-checker, before anything moves
         ObjectService.TagVocabularyChange changed;
         try {
             changed = OpsEngine.of(api).deleteTag(name);

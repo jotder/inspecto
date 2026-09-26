@@ -86,6 +86,11 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
         return r != null && r.required() ? r : null;
     }
 
+    /** Whether this policy holds ANY kind — an import that cannot classify a file refuses under it. */
+    boolean holdsAnything() {
+        return failedClosed || rules.values().stream().anyMatch(Rule::required);
+    }
+
     Map<String, Object> toMap() {
         Map<String, Object> kinds = new LinkedHashMap<>();
         rules.forEach((k, r) -> kinds.put(k, r.toMap()));

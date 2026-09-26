@@ -357,4 +357,43 @@ class ControlApiTagRoutesTest {
         else b.method(method, BodyPublishers.noBody());
         return client.send(b.build(), BodyHandlers.ofString());
     }
+
+    /**
+     * ASSURE-MAKER-CHECKER-1 verification finding 4: tagging re-projects a widget's `tags` — a write of the widget
+     * component outside /components. Under an approval policy on `widget` every tag change that would rewrite a
+     * widget is refused (409) BEFORE the edge moves; a tag change touching no widget is unaffected.
+     */
+    @Test
+    void underAPolicyOnWidgetsATagChangeThatRewritesAWidgetIsRefused(@TempDir Path dir) throws Exception {
+        Authenticators.forTest(ex -> "Bearer builder".equals(ex.getRequestHeaders().getFirst("Authorization"))
+                ? java.util.Optional.of(new Subject("builder-1", java.util.Set.of("canAuthorWorkbench")))
+                : java.util.Optional.empty());
+        Path cfg = dir.resolve("cfg");
+        try (Ctx c = open(dir, cfg)) {
+            assertEquals(200, authed(c, "POST", "/components/widget", "{\"id\":\"usage\",\"vizType\":\"bar\",\"tags\":[\"ra\"]}").statusCode());
+            authed(c, "POST", "/tags", "{\"name\":\"fraud\"}");
+            Files.writeString(cfg.resolve("approval.toon"), "approval:\n  widget:\n    required: true\n");
+
+            HttpResponse<String> assign = authed(c, "POST", "/tags/assignments/widget/usage", "{\"tag\":\"fraud\"}");
+            assertEquals(409, assign.statusCode(), assign.body());
+            assertEquals(409, authed(c, "DELETE", "/tags/assignments/widget/usage/ra", null).statusCode());
+            assertEquals(409, authed(c, "POST", "/tags/ra/rename", "{\"to\":\"revenue-assurance\"}").statusCode());
+            assertEquals(409, authed(c, "DELETE", "/tags/ra", null).statusCode());
+            JsonNode edges = json(authed(c, "GET", "/tags/assignments/widget/usage", null)).get("tags");
+            assertEquals(1, edges.size(), "no edge moved");
+            assertEquals("ra", edges.get(0).asText());
+            assertEquals(200, authed(c, "POST", "/tags/fraud/rename", "{\"to\":\"fraud-x\"}").statusCode(),
+                    "a tag on no widget still renames");
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    private HttpResponse<String> authed(Ctx c, String method, String path, String body) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path))
+                .header("Authorization", "Bearer builder");
+        if (body != null) b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
+        else b.method(method, BodyPublishers.noBody());
+        return client.send(b.build(), BodyHandlers.ofString());
+    }
 }
