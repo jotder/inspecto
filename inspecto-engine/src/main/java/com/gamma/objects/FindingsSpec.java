@@ -86,9 +86,13 @@ public record FindingsSpec(String objectType, List<Section> sections) {
 
     // ── the built-in default (today's hardcoded panel, as data) ──────────────────
 
-    /** The disposition ladder shipped in {@code mail-model.ts} ({@code CASE_DISPOSITIONS}). */
-    private static final List<String> DISPOSITIONS =
-            List.of("CONFIRMED", "FALSE_POSITIVE", "RECOVERED", "WRITTEN_OFF", "INCONCLUSIVE");
+    /**
+     * The built-in Disposition ladder (GLOSSARY §9): the choices a Case's default Findings offer AND the only
+     * values an Incident may resolve with ({@code ObjectService}, WS-10). {@code DUPLICATE} and
+     * {@code ACCEPTED_RISK} joined the original five on 2026-09-26 ({@code ASSURE-IMPACT-LEDGER-1}).
+     */
+    public static final List<String> DISPOSITIONS = List.of("CONFIRMED", "FALSE_POSITIVE", "RECOVERED",
+            "WRITTEN_OFF", "INCONCLUSIVE", "DUPLICATE", "ACCEPTED_RISK");
 
     /**
      * The built-in Findings shape — exactly what the panel renders today, so an unconfigured deployment

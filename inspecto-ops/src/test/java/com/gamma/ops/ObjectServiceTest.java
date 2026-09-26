@@ -97,7 +97,8 @@ class ObjectServiceTest {
 
     // ── Phase 3: INCIDENT lifecycle + SLA sweep ────────────────────────────────────────
 
-    /** A complete I1 postmortem blob (timeline + cause analysis + actions), paired with {@code ATTR_DUE_AT}. */
+    /** A complete I1 postmortem blob (timeline + cause analysis + actions), paired with {@code ATTR_DUE_AT} and the
+     *  Disposition WS-10 requires — everything an Incident needs to resolve. */
     private static Map<String, String> completePostmortemAttrs(long dueAt) {
         Map<String, Object> postmortem = Map.of(
                 "timeline", List.of(Map.of("time", "10:00", "text", "detected")),
@@ -105,7 +106,47 @@ class ObjectServiceTest {
                 "actions", List.of(Map.of("done", false, "text", "patch job", "owner", "alice", "due", "")));
         return Map.of(
                 "postmortem", JsonAttributes.toPayloadJson(postmortem),
-                ObjectService.ATTR_DUE_AT, Long.toString(dueAt));
+                ObjectService.ATTR_DUE_AT, Long.toString(dueAt),
+                ObjectService.ATTR_DISPOSITION, "CONFIRMED");
+    }
+
+    /** WS-10: an Incident resolves only with a Disposition from the ladder — given with the move or already set. */
+    @Test
+    void anIncidentResolvesOnlyWithADispositionFromTheLadder() {
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        Map<String, String> noDisposition = new java.util.HashMap<>(completePostmortemAttrs(System.currentTimeMillis() + 60_000));
+        noDisposition.remove(ObjectService.ATTR_DISPOSITION);
+        OperationalObject o = svc.open(ObjectType.INCIDENT, "late feed", "d", "HIGH", "MAJOR", null, null, "c", noDisposition);
+
+        IllegalStateException missing = assertThrows(IllegalStateException.class,
+                () -> svc.transition(o.id(), "resolve", "alice"));
+        assertTrue(missing.getMessage().contains("disposition"), missing.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> svc.transition(o.id(), "resolve", "alice", "MAYBE"),
+                "off the ladder");
+        assertEquals("IDENTIFIED", svc.get(o.id()).orElseThrow().status(), "a refused resolve writes nothing");
+        assertNull(svc.get(o.id()).orElseThrow().attributes().get(ObjectService.ATTR_DISPOSITION));
+
+        OperationalObject resolved = svc.transition(o.id(), "resolve", "alice", "accepted_risk");
+        assertEquals("RESOLVED", resolved.status());
+        assertEquals("ACCEPTED_RISK", resolved.attributes().get(ObjectService.ATTR_DISPOSITION), "normalised to the ladder's spelling");
+
+        // reopened and resolved again, the recorded Disposition still satisfies the gate
+        svc.transition(o.id(), "reopen", "alice");
+        assertEquals("RESOLVED", svc.transitionTo(o.id(), "RESOLVED", "alice").status());
+    }
+
+    /** A Disposition rides only an Incident's resolve: a Case keeps its Disposition in its Findings. */
+    @Test
+    void aDispositionIsRefusedOnAnyOtherMove() {
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        OperationalObject inc = svc.open(ObjectType.INCIDENT, "x", "d", "HIGH", "MAJOR", null, null, "c", Map.of());
+        assertThrows(IllegalArgumentException.class, () -> svc.transition(inc.id(), "accept", "a", "CONFIRMED"));
+        OperationalObject cs = svc.open(ObjectType.CASE, "y", "d", "HIGH", "MAJOR", null, null, "c", Map.of());
+        svc.transition(cs.id(), "investigate", "a");
+        IllegalArgumentException onCase = assertThrows(IllegalArgumentException.class,
+                () -> svc.transition(cs.id(), "resolve", "a", "CONFIRMED"));
+        assertTrue(onCase.getMessage().contains("Findings"), onCase.getMessage());
+        assertEquals("RESOLVED", svc.transition(cs.id(), "resolve", "a").status(), "a Case still resolves without one (soft, §6.2)");
     }
 
     @Test

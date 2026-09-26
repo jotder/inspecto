@@ -122,7 +122,7 @@ class ControlApiObjectsTest {
             String postmortem = "{\"timeline\":[{\"time\":\"10:00\",\"text\":\"detected\"}],"
                     + "\"causeAnalysis\":[\"root cause found\"],"
                     + "\"actions\":[{\"done\":false,\"text\":\"patch job\",\"owner\":\"alice\",\"due\":\"\"}]}";
-            Map<String, Object> patchBody = Map.of("attributes", Map.of("postmortem", postmortem));
+            Map<String, Object> patchBody = Map.of("attributes", Map.of("postmortem", postmortem, "disposition", "RECOVERED"));
             send(c.port, "PATCH", "/objects/" + id, JSON.writeValueAsString(patchBody));
             assertEquals("RESOLVED", transition(c.port, id, "resolve"));
             JsonNode archived = json(send(c.port, "POST", "/objects/" + id + "/transition",

@@ -165,9 +165,17 @@ class ControlApiIncidentFinishGateTest {
 
                 HttpResponse<String> pm = send(c.port, "PUT", "/objects/" + id + "/postmortem", POSTMORTEM, "operations");
                 assertEquals(200, pm.statusCode(), pm.body());
-                HttpResponse<String> resolve = send(c.port, "POST", "/objects/" + id + "/transition",
+                // WS-10: the postmortem is not enough — an Incident resolves with a Disposition from the ladder
+                HttpResponse<String> noDisposition = send(c.port, "POST", "/objects/" + id + "/transition",
                         "{\"action\":\"resolve\"}", "operations");
+                assertEquals(422, noDisposition.statusCode(), noDisposition.body());
+                assertTrue(noDisposition.body().contains("disposition"), noDisposition.body());
+                assertEquals(422, send(c.port, "POST", "/objects/" + id + "/resolve",
+                        "{\"disposition\":\"MAYBE\"}", "operations").statusCode(), "off the ladder");
+                HttpResponse<String> resolve = send(c.port, "POST", "/objects/" + id + "/transition",
+                        "{\"action\":\"resolve\",\"disposition\":\"FALSE_POSITIVE\"}", "operations");
                 assertEquals(200, resolve.statusCode(), resolve.body());
+                assertEquals("FALSE_POSITIVE", V1Body.of(resolve.body()).get("attributes").get("disposition").asText());
             } finally {
                 c.svc.eventLog().removeSubscriber(sub);
             }

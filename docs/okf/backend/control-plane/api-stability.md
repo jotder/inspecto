@@ -327,6 +327,10 @@ above the generated commit list.
   Findings spec no longer has an `impactAmount` section and `PUT /objects/{id}/findings` no longer writes an
   `impactAmount` flat copy (it writes `recordsAffected` only). The `ops_analytics` sample replaces axis
   `impact`/key `impact_amount` with axes `impact.<ISO>`.
+- **Breaking (2026-09-26, WS-10):** resolving an **Incident** (`POST /objects/{id}/resolve`, `/transition`)
+  now needs a **Disposition** — body `disposition` from `CONFIRMED · FALSE_POSITIVE · RECOVERED · WRITTEN_OFF ·
+  INCONCLUSIVE · DUPLICATE · ACCEPTED_RISK`, or one already on `attributes.disposition` — else **422** naming
+  `disposition`. A `disposition` on any other move → 422. The Findings default ladder gains the last two values.
 - **New route (additive, 2026-09-25, operator decision — Findings values are collaboration):**
   `PUT /objects/{id}/findings {findings:{key: scalar…}}` saves a Case's Findings values, **open to anyone who
   can see the object** (the SEC-7d/ABAC scope guard still answers 404) and recorded as a `collaboration`

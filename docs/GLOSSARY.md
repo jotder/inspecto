@@ -756,8 +756,14 @@ pane's *Findings fields* dialog (D9, operator 2026-09-25). On the wire and in th
 ⛔ never "section" or "question" in UI text; ⛔ never "finding" (singular) for it — a *finding* /
 `ConfigFinding` is a validator problem, which the dialog calls a **problem**.
 
-**Disposition** — The decided outcome a Case resolves with (built-in ladder: confirmed ·
-false-positive · recovered · written-off · inconclusive). ⛔ never "verdict/outcome" in UI text.
+**Disposition** — The decided outcome an **Incident** or a **Case** resolves with (built-in ladder:
+confirmed · false-positive · recovered · written-off · inconclusive · duplicate · accepted-risk; wire values
+`CONFIRMED` … `ACCEPTED_RISK`). **Required to resolve an Incident** (422 without one — it rides the resolve,
+stored as `attributes.disposition`); on a Case it is a Findings value and stays a soft prompt. *Duplicate* =
+the same problem is tracked by another object; *accepted-risk* = real, and knowingly left in place. Confirmed
+and Recovered are the same words the SPA's case-state tones use; *Closed – no loss* is a Case state, not a
+Disposition (a false-positive usually ends there). ⛔ never "verdict/outcome" in UI text. *(duplicate and
+accepted-risk added, and required on Incident resolve, 2026-09-26 — `ASSURE-IMPACT-LEDGER-1`.)*
 
 **Case Rule** — A saved search that **auto-groups Incidents into a Case** (C5): when ≥ *threshold*
 Incidents match its filter within a *window*, they are grouped under one Case (opened, or attached

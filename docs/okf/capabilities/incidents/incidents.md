@@ -339,7 +339,11 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
 - **The resolution pattern is a hard gate server-side** (I1, 2026-07-24): `ObjectService.commit`
   (`:1311-1316`) rejects `INCIDENT → RESOLVED` unless `attributes.postmortem` holds a non-blank **timeline**
   entry, a **cause analysis** entry (`causeAnalysis[]` + `causeMethod`, "5 Whys" default), a **corrective
-  action**, and `dueAt` is set (`incidentResolutionGaps`, `:1342-1349`). The UI's `postmortemGaps` soft-warn
+  action**, `dueAt` is set, **and `attributes.disposition` holds a ladder value** (WS-10, 2026-09-26)
+  (`incidentResolutionGaps`). The Disposition rides the resolve itself — `POST /objects/{id}/resolve` or
+  `/transition` body `disposition` (case-insensitive, stored in the ladder's spelling); an off-ladder value,
+  or a `disposition` on any move but an Incident's resolve (a Case's lives in its Findings) → 422. A reopened
+  Incident keeps its Disposition, so re-resolving needs none. The UI's `postmortemGaps` soft-warn
   is a *mirror* of the same four checks, not the gate. ⚠ `objects.md` and the archived design still call
   the backend gate "a follow-up"; it shipped.
 - **SLA and escalation.** `dueAt` / `dueInMinutes` at creation; the sweep (`sweepIncidentSla`,
@@ -364,7 +368,8 @@ A Case's **Contents** are the Incidents it `CONTAINS` — links, never an `attri
 `MERGED_INTO` link and marker (`ObjectService.java:993-1021`); **Split** carves members into a new Case tied
 back by `SPLIT_FROM` (`:1052-1083`). Comments and attachments stay where they happened. A **Team** is
 `attributes.assignees` (the lead stays `assignee`); **Findings** = **Disposition** (`confirmed ·
-false-positive · recovered · written-off · inconclusive`) + impact + summary, with a *soft* no-disposition
+false-positive · recovered · written-off · inconclusive · duplicate · accepted-risk` —
+`FindingsSpec.DISPOSITIONS`, the ladder Incidents resolve with too) + impact + summary, with a *soft* no-disposition
 prompt on resolve and a *soft* open-member warning on close (both deliberately not hard gates).
 
 **Findings sections are deployment-authored** (D6 / C3, 2026-07-26): a `findings-spec` `ComponentStore`
@@ -553,6 +558,7 @@ earlier one, both appear.
 | 2026-09-26 (operator) | **Narrow postmortem + category routes on `canWorkIncidents`** (`INCIDENT-FINISH-GATE-1`, "narrow route"): `PUT /objects/{id}/postmortem` (body `{postmortem:{…}}` → `attributes.postmortem`, the JSON blob the I1 resolution gate reads) and `PUT /objects/{id}/category` (body `{category:"…"}` → `attributes.category`). Each writes ONLY its one key, refuses any other with 422 (400 for a missing/malformed value), runs behind the scope guard, and is audited as an `OBJECT_ACTIVITY` event (`action` = the key) under `ApiContext.actor`. The postmortem panel and Accept's categorise step call them; priority / severity / assignee / tags / escalate / team / target date stay on the `canAdminister` PATCH | Resolving needs the postmortem and Accept needs a category, so without these an analyst could move an Incident but not finish it. Following the `PUT /objects/{id}/findings` precedent keeps the PATCH from becoming the analyst's catch-all. Pinned by `ControlApiIncidentFinishGateTest` (401 / 403 `business` / 200 `operations`, a foreign key → 422, and IDENTIFIED → DIAGNOSING → RESOLVED with a postmortem by an `operations` Subject) |
 | 2026-09-26 | **The SPA shows each disposition control only with the capability its route takes** (`CASE-UI-GATE-LEFTOVERS-1`): Priority, an Incident's Escalate flag, Merge, Split and the Case team / target-date fields render only with `LensService.canAdminister()`. **A comment's `author` is the signed-in Subject** on `POST /objects/{id}/comments` and `POST /notes/{kind}/{id}/comments`; the body's `author` counts only with no Subject (Personal) | A control the server refuses is a dead button; a body field must not re-attribute a Subject's words, as it may not re-attribute a lifecycle move. ⚠ Tagging still rides the PATCH and still shows to everyone — not in this call |
 | 2026-09-26 | **Typed impact on Incident and Case, one home** (WS-10, `ASSURE-IMPACT-LEDGER-1`): `attributes.impact` via `PUT /objects/{id}/impact` on `canWorkIncidents`; `outstanding` derived on read; the Findings `impactAmount` section and flat copy retired; a terminal object's impact is closed (409) | A narrow PUT follows the postmortem / category / findings precedent, where extending the PATCH would hand the analyst `canAdminister`'s fields. A stored `outstanding` drifts the first time `recovered` changes without it. Two homes for a Case's money (Findings `impactAmount` + the typed block) would disagree the day one is edited. Freezing a terminal object keeps a closed ledger closed; recoveries on an Incident are recorded after `reopen` |
+| 2026-09-26 | **An Incident resolves only with a Disposition** (WS-10): the ladder gains `DUPLICATE` and `ACCEPTED_RISK` (one list, `FindingsSpec.DISPOSITIONS`, shared by Cases' Findings); the value rides the resolve body and is gated in `ObjectService.commit` beside I1 | Resolved-with-no-outcome Incidents make every found / recovered / prevented KPI unreadable. Gated in `commit` so no route or caller can bypass it, as I1 is. Case stays soft (§6.2) — not in scope of the call |
 
 ### Editions
 
@@ -625,7 +631,9 @@ representation beside the `CONTAINS` links the glossary, the UI and the correlat
 
 Case close with open members, and Case resolve without a Disposition, are **soft warnings** by decision
 ("revisit only if insufficient"). Incident resolution is the deliberate exception: I1 made the four-section
-postmortem a **server-side `422`**, because a UI-only check is bypassed by the API. ⚠ Two current docs
+postmortem a **server-side `422`**, because a UI-only check is bypassed by the API, and WS-10 (2026-09-26)
+added the Disposition to the same gate — every money KPI reads a resolved Incident's outcome, so an Incident
+with none cannot count as resolved. The Case's Disposition stays soft: it was not part of that call. ⚠ Two current docs
 (`objects.md`, the archived `case-management-design.md`) still describe the backend gate as a follow-up;
 `PROJECT_NOTES.md` and `ObjectService.commit` are right.
 

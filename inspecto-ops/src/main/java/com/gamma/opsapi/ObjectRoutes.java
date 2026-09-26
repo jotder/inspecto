@@ -76,8 +76,8 @@ public final class ObjectRoutes implements RouteModule {
         // answer as `POST /recon/promote`, deliberately: both perform the one act of OPENING an Incident,
         // and a second precedent for one concept is what the call was made to avoid. ⚠ Distinct from the
         // `canWorkIncidents` gates on ack/resolve below: opening an Incident and working it are two names.
-        api.post("/objects/([^/]+)/ack", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "ack", null, actorOf(e, api.body(e))))));
-        api.post("/objects/([^/]+)/resolve", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "resolve", null, actorOf(e, api.body(e))))));
+        api.post("/objects/([^/]+)/ack", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transition(api, ApiContext.name(m), "ack", null, actorOf(e, api.body(e)), null))));
+        api.post("/objects/([^/]+)/resolve", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> { Map<String, Object> b = api.body(e); return transition(api, ApiContext.name(m), "resolve", null, actorOf(e, b), ApiContext.str(b, "disposition")); })));
         api.post("/objects/([^/]+)/transition", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> transitionFromBody(api, e, ApiContext.name(m), api.body(e)))));
         api.post("/objects/([^/]+)/assign", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> assign(api, e, ApiContext.name(m), api.body(e)))));
         api.post("/objects/([^/]+)/links", scoped(api, (e, m) -> createLink(api, e, ApiContext.name(m), api.body(e))));
@@ -929,28 +929,29 @@ public final class ObjectRoutes implements RouteModule {
         return out;
     }
 
-    /** {@code POST /objects/{id}/ack|resolve} — a fixed-action transition; {@code actor} per {@link #actorOf}. */
-    private Object transition(ApiContext api, String id, String action, String target, String actor) {
-        return doTransition(api, id, action, target, actor);
+    /** {@code POST /objects/{id}/ack|resolve} — a fixed-action transition; {@code actor} per {@link #actorOf}.
+     *  Resolve takes an optional {@code disposition} (WS-10: an Incident needs one → else 422). */
+    private Object transition(ApiContext api, String id, String action, String target, String actor, String disposition) {
+        return doTransition(api, id, action, target, actor, disposition);
     }
 
     /** {@code POST /objects/{id}/transition} — body {@code {action}} or {@code {status|to}} (+ optional
-     *  {@code actor}, per {@link #actorOf}). */
+     *  {@code actor}, per {@link #actorOf}, and {@code disposition} for an Incident's resolve, WS-10). */
     private Object transitionFromBody(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
         String action = ApiContext.str(body, "action");
         String target = ApiContext.str(body, "status");
         if (target == null) target = ApiContext.str(body, "to");
         if (action == null && target == null)
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'action' or 'status'");
-        return doTransition(api, id, action, target, actorOf(ex, body));
+        return doTransition(api, id, action, target, actorOf(ex, body), ApiContext.str(body, "disposition"));
     }
 
     /** Apply a lifecycle transition, mapping the service's exceptions to 404 (unknown id) / 422 (illegal move). */
-    private Object doTransition(ApiContext api, String id, String action, String target, String actor) {
+    private Object doTransition(ApiContext api, String id, String action, String target, String actor, String disposition) {
         try {
             OperationalObject updated = (action != null)
-                    ? OpsEngine.of(api).transition(id, action, actor)
-                    : OpsEngine.of(api).transitionTo(id, target, actor);
+                    ? OpsEngine.of(api).transition(id, action, actor, disposition)
+                    : OpsEngine.of(api).transitionTo(id, target, actor, disposition);
             return updated.toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());

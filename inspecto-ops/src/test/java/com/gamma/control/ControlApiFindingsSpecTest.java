@@ -64,7 +64,7 @@ class ControlApiFindingsSpecTest {
             assertEquals("case", spec.get("objectType").asText());
             assertEquals(List.of("disposition", "recordsAffected", "summary"),
                     keys(spec));
-            assertEquals(5, spec.get("sections").get(0).get("options").size());
+            assertEquals(7, spec.get("sections").get(0).get("options").size());
             assertEquals(400, send(c.port, "GET", "/findings/bogus", null).statusCode());
         }
     }

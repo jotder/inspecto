@@ -107,6 +107,10 @@ public final class ObjectService {
     public static final String ATTR_ENTITY_KEY = "entityKey";
     public static final String ATTR_ENTITY_DATASET = "entityDataset";
 
+    /** An Incident's Disposition (WS-10), one of {@link com.gamma.objects.FindingsSpec#DISPOSITIONS} — set with the
+     *  resolve that needs it. A Case's Disposition is instead a value of its Findings blob. */
+    public static final String ATTR_DISPOSITION = "disposition";
+
     /**
      * {@code true} when {@code o} is under legal hold ({@link #ATTR_LEGAL_HOLD}) and must therefore
      * <b>never</b> be purged by the MNT-14 retention sweep, however long its retention window has been
@@ -267,12 +271,24 @@ public final class ObjectService {
      * @throws IllegalStateException  if the action is not legal from the current state
      */
     public OperationalObject transition(String id, String action, String actor) {
+        return transition(id, action, actor, null);
+    }
+
+    /**
+     * As {@link #transition(String, String, String)}, recording {@code disposition} with the move: an Incident
+     * resolves only with a Disposition from {@link com.gamma.objects.FindingsSpec#DISPOSITIONS} (WS-10) — the one
+     * given here, else one already on {@code attributes.disposition}. {@code null} supplies none.
+     *
+     * @throws IllegalArgumentException if a disposition is given off the ladder, or for anything but an Incident
+     *                                  moving to {@code RESOLVED}
+     */
+    public OperationalObject transition(String id, String action, String actor, String disposition) {
         OperationalObject obj = require(id);
         Workflow wf = workflow(obj.objectType());
         String target = wf.apply(obj.status(), action).orElseThrow(() -> new IllegalStateException(
                 "illegal transition: '" + action + "' from " + obj.status()
                         + " (" + obj.objectType() + ")"));
-        return commit(obj, wf, target, action, actor);
+        return commit(obj, wf, target, action, actor, disposition);
     }
 
     /**
@@ -280,12 +296,17 @@ public final class ObjectService {
      * persist, and emit an {@link EventType#OBJECT_ACTIVITY} event.
      */
     public OperationalObject transitionTo(String id, String targetState, String actor) {
+        return transitionTo(id, targetState, actor, null);
+    }
+
+    /** As {@link #transitionTo(String, String, String)} with a {@code disposition} — see {@link #transition(String, String, String, String)}. */
+    public OperationalObject transitionTo(String id, String targetState, String actor, String disposition) {
         OperationalObject obj = require(id);
         Workflow wf = workflow(obj.objectType());
         if (!wf.allows(obj.status(), targetState))
             throw new IllegalStateException("illegal transition: " + obj.status() + " -> " + targetState
                     + " (" + obj.objectType() + ")");
-        return commit(obj, wf, targetState, "transition", actor);
+        return commit(obj, wf, targetState, "transition", actor, disposition);
     }
 
     /**
@@ -904,7 +925,7 @@ public final class ObjectService {
         // (already ASSIGNED, or a type without one) the assignee change alone stands.
         Workflow wf = workflow(obj.objectType());
         if (wf.apply(updated.status(), "assign").isPresent())
-            return commit(updated, wf, wf.apply(updated.status(), "assign").get(), "assign", actor);
+            return commit(updated, wf, wf.apply(updated.status(), "assign").get(), "assign", actor, null);
         return updated;
     }
 
@@ -1481,8 +1502,20 @@ public final class ObjectService {
     }
 
     private OperationalObject commit(OperationalObject obj, Workflow wf, String target,
-                                     String action, String actor) {
-        if (obj.objectType() == ObjectType.INCIDENT && "RESOLVED".equalsIgnoreCase(target)) {
+                                     String action, String actor, String disposition) {
+        boolean resolvingIncident = obj.objectType() == ObjectType.INCIDENT && "RESOLVED".equalsIgnoreCase(target);
+        if (disposition != null) {
+            // WS-10: a Disposition rides the Incident's resolve and nothing else — a Case's lives in its Findings.
+            if (!resolvingIncident)
+                throw new IllegalArgumentException("a disposition is recorded when an Incident is resolved"
+                        + (obj.objectType() == ObjectType.CASE ? " — a Case's Disposition is part of its Findings" : ""));
+            String d = disposition.trim().toUpperCase(java.util.Locale.ROOT);
+            if (!com.gamma.objects.FindingsSpec.DISPOSITIONS.contains(d))
+                throw new IllegalArgumentException("disposition '" + disposition + "' is not one of "
+                        + com.gamma.objects.FindingsSpec.DISPOSITIONS);
+            obj = obj.withAttributes(Map.of(ATTR_DISPOSITION, d), obj.updatedAt());
+        }
+        if (resolvingIncident) {
             List<String> gaps = incidentResolutionGaps(obj);
             if (!gaps.isEmpty())
                 throw new IllegalStateException(
@@ -1525,6 +1558,10 @@ public final class ObjectService {
         if (!anyEntryNonBlank(Values.listAt(pm, "actions"), "text")) gaps.add("corrective actions");
         String dueAt = obj.attributes().get(ATTR_DUE_AT);
         if (dueAt == null || dueAt.isBlank()) gaps.add("SLA");
+        // WS-10: an Incident resolves with a decided outcome from the ladder, never without one.
+        String disposition = obj.attributes().get(ATTR_DISPOSITION);   // List.of(...).contains(null) throws
+        if (disposition == null || !com.gamma.objects.FindingsSpec.DISPOSITIONS.contains(disposition))
+            gaps.add("disposition");
         return gaps;
     }
 

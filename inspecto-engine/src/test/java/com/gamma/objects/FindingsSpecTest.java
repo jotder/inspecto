@@ -30,7 +30,7 @@ class FindingsSpecTest {
 
         FindingsSpec.Section disposition = spec.sections().get(0);
         assertEquals("select", disposition.type());
-        assertEquals(5, disposition.options().size(), "the CASE_DISPOSITIONS ladder");
+        assertEquals(7, disposition.options().size(), "the GLOSSARY §9 Disposition ladder (+ DUPLICATE, ACCEPTED_RISK, WS-10)");
         assertEquals("CONFIRMED", disposition.options().get(0).value());
         assertEquals("False positive", disposition.options().get(1).label(), "humanized for display");
 
