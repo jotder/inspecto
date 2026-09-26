@@ -19,8 +19,12 @@ import java.util.Map;
  * {@code <write-root>/recon-state/<reconciliationId>.json}:
  * <pre>
  *   { "reconciliation": "&lt;id&gt;", "lastRunAt": "&lt;ISO instant&gt;" | null, "runs": n,
- *     "breaks": [ { pair, key, keyValues?, type, column?, leftValue?, rightValue?, diff?, status, note?, firstSeenAt? } ] }
+ *     "breaks": [ { pair, key, keyValues?, type, column?, leftValue?, rightValue?, diff?, status, note?, firstSeenAt?,
+ *                   lastSeenAt?, occurrences, recurrences, assignee? } ] }
  * </pre>
+ * {@code status} is {@code open | assigned | resolved | auto_closed}. A document written before
+ * {@code ASSURE-BREAK-LIFECYCLE-1} (no counters, no assignee) reads with defaults — see
+ * {@link ReconBreaks.Break#fromMap}. {@code ageDays} is never stored: {@link State#toWire} derives it at read time.
  *
  * <p>🔴 <b>Why it left the config.</b> The lifecycle used to be merged in the browser and written back
  * through the whole-body {@code PUT /components/reconciliation/{id}}, which is gated {@code canAuthorWorkbench}
@@ -65,6 +69,15 @@ public final class ReconStateStore {
             m.put("breaks", list);
             return m;
         }
+
+        /** {@link #toMap} with every Break's read-time {@code ageDays} ({@link ReconBreaks.Break#toWire}) — the read routes' shape. */
+        public Map<String, Object> toWire(java.time.Instant now) {
+            Map<String, Object> m = toMap();
+            List<Map<String, Object>> list = new ArrayList<>(breaks.size());
+            for (ReconBreaks.Break b : breaks) list.add(b.toWire(now));
+            m.put("breaks", list);
+            return m;
+        }
     }
 
     /** A run instant as the SPA writes one ({@code toISOString}'s millisecond precision), for {@link #record}. */
@@ -94,16 +107,18 @@ public final class ReconStateStore {
     }
 
     /**
-     * Resolve ({@code status = resolved}) or re-open ({@code open}) one Break by identity, replacing its note
-     * ({@code null} clears it). {@code pair} ({@link ReconBreaks#PAIR_AB} / {@link ReconBreaks#PAIR_AC}) is part
-     * of the identity — resolving an A↔C Break leaves the same-key A↔B one as it was. A Break no run has
-     * recorded yet is appended identity-only — the Breaks page can act on a live Break before the Board
-     * records one. Returns the updated Break.
+     * Resolve ({@code status = resolved}), re-open ({@code open}) or assign ({@code assigned}, to
+     * {@code assignee}) one Break by identity, replacing its note ({@code null} clears it). {@code pair}
+     * ({@link ReconBreaks#PAIR_AB} / {@link ReconBreaks#PAIR_AC}) is part of the identity — resolving an A↔C
+     * Break leaves the same-key A↔B one as it was. The assignee: {@code assigned} sets it, {@code resolved}
+     * keeps the one on record (who owned it), {@code open} clears it. A Break no run has recorded yet is
+     * appended identity-only — the Breaks page can act on a live Break before the Board records one. Returns
+     * the updated Break. Occurrences, sightings and recurrences are the runs' to change, never this.
      *
      * @throws IllegalArgumentException the state already holds {@link #MAX_BREAKS} and this would append
      */
     public ReconBreaks.Break setStatus(String reconciliationId, String pair, String type, String key, String column,
-                                       String status, String note) throws IOException {
+                                       String status, String note, String assignee) throws IOException {
         synchronized (LOCK) {
             State prev = load(reconciliationId);
             String id = ReconBreaks.lifecycleId(pair, type, key, column);
@@ -111,7 +126,7 @@ public final class ReconStateStore {
             ReconBreaks.Break updated = null;
             for (ReconBreaks.Break b : prev.breaks()) {
                 if (b.id().equals(id)) {
-                    b = b.withStatus(status, note);
+                    b = b.withStatus(status, note).withAssignee(assigneeAfter(status, b.assignee(), assignee));
                     updated = b;
                 }
                 breaks.add(b);
@@ -120,7 +135,8 @@ public final class ReconStateStore {
                 if (breaks.size() >= MAX_BREAKS)
                     throw new IllegalArgumentException("reconciliation '" + reconciliationId + "' already records "
                             + MAX_BREAKS + " Breaks — record a run before changing a Break it has not seen");
-                updated = ReconBreaks.Break.identityOnly(pair, type, key, column, status, note);
+                updated = ReconBreaks.Break.identityOnly(pair, type, key, column, status, note,
+                        assigneeAfter(status, null, assignee));
                 breaks.add(updated);
             }
             save(new State(reconciliationId, prev.lastRunAt(), prev.runs(), breaks));
@@ -136,6 +152,12 @@ public final class ReconStateStore {
     }
 
     // ── internals ─────────────────────────────────────────────────────────────
+
+    /** {@link #setStatus}'s assignee rule: assign sets it, resolve keeps it, re-open clears it. */
+    private static String assigneeAfter(String status, String recorded, String requested) {
+        if (ReconBreaks.ASSIGNED.equals(status)) return requested;
+        return ReconBreaks.RESOLVED.equals(status) ? recorded : null;
+    }
 
     @SuppressWarnings("unchecked")
     private State load(String reconciliationId) throws IOException {

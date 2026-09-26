@@ -652,8 +652,11 @@ shipped C6 scheduled-export Job.)*
 produces **Breaks**. The core Revenue-Assurance / Financial-Audit workload. *(Added Wave 0, 2026-07-02.)*
 
 **Break** — One unmatched or mismatched record found by a Reconciliation, typed **missing-left |
-missing-right | value-break**. Lifecycle `open → resolved | auto-closed`: a Break **auto-closes** when its
-key re-matches within tolerance on a later run; manual resolutions (with a note) are preserved across runs.
+missing-right | value-break**. Lifecycle `open → assigned → resolved | auto-closed`: a Break **auto-closes** when its
+key re-matches within tolerance on a later run; manual resolutions (with a note) and assignments (an
+`assignee`) are preserved across runs. A Break that auto-closed and reappears is **re-opened** (the same
+Break, a **recurrence**), not a new one. *(`assigned`, occurrences and recurrence added 2026-09-26,
+`ASSURE-BREAK-LIFECYCLE-1` — as built: `okf/frontend/features/reconciliation.md`.)*
 Breaks can raise **Incidents** (future). *(Lifecycle locked with the product owner 2026-07-03, shipped as
 C9 — `archived-documents/superpower-reviews/reconciliation.md`.)*
 

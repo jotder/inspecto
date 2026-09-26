@@ -85,10 +85,99 @@ class ReconBreaksTest {
 
     @Test
     void aBreakRecordedWithoutAStampIsStampedByTheNextRun() {
-        ReconBreaks.Break appended = ReconBreaks.Break.identityOnly("AB", "value_break", "EU · data", "amount", "resolved", null);
+        ReconBreaks.Break appended = ReconBreaks.Break.identityOnly("AB", "value_break", "EU · data", "amount", "resolved", null, null);
         List<ReconBreaks.Break> merged = ReconBreaks.merge(List.of(appended), List.of(open("value_break", "EU · data", "amount")), RUN2);
         assertEquals(RUN2, merged.get(0).firstSeenAt());
         assertEquals("resolved", merged.get(0).status());
+    }
+
+    // ── occurrence, recurrence, assignment, ageing (ASSURE-BREAK-LIFECYCLE-1) ──────
+
+    private static final String RUN3 = "2026-09-01T00:00:00Z";
+
+    @Test
+    void aBreakPresentAgainCountsASecondOccurrenceAndAdvancesLastSeen() {
+        List<ReconBreaks.Break> fresh = List.of(open("value_break", "EU · data", "amount"));
+        ReconBreaks.Break first = ReconBreaks.merge(List.of(), fresh, RUN1).get(0);
+        assertEquals(1, first.occurrences());
+        assertEquals(RUN1, first.lastSeenAt());
+
+        ReconBreaks.Break second = ReconBreaks.merge(List.of(first), fresh, RUN2).get(0);
+        assertEquals(2, second.occurrences());
+        assertEquals(RUN2, second.lastSeenAt(), "lastSeenAt advances");
+        assertEquals(RUN1, second.firstSeenAt(), "firstSeenAt does not");
+        assertEquals(0, second.recurrences(), "present on consecutive runs is not a recurrence");
+    }
+
+    /** Reopen-vs-new: the lifecycle id is deterministic, so the same id again IS the same Break — re-opened. */
+    @Test
+    void aBreakThatAutoClosedAndReappearsIsReopenedAndCountsARecurrence() {
+        List<ReconBreaks.Break> fresh = List.of(open("missing_right", "MEA · voice", null));
+        List<ReconBreaks.Break> run1 = ReconBreaks.merge(List.of(), fresh, RUN1);
+        List<ReconBreaks.Break> run2 = ReconBreaks.merge(run1, List.of(), RUN2);
+        assertEquals("auto_closed", run2.get(0).status());
+        assertEquals(1, run2.get(0).occurrences(), "an absent run is not an occurrence");
+        assertEquals(RUN1, run2.get(0).lastSeenAt());
+
+        List<ReconBreaks.Break> run3 = ReconBreaks.merge(run2, fresh, RUN3);
+        assertEquals(1, run3.size(), "one record per lifecycle id — re-opened, not duplicated");
+        ReconBreaks.Break back = run3.get(0);
+        assertEquals("open", back.status());
+        assertEquals(1, back.recurrences());
+        assertEquals(2, back.occurrences());
+        assertEquals(RUN1, back.firstSeenAt(), "ageing runs from the FIRST sighting");
+        assertEquals(RUN3, back.lastSeenAt());
+    }
+
+    @Test
+    void anAssignedBreakStaysAssignedAutoClosesWithItsAssigneeAndARecurrenceReturnsToThem() {
+        List<ReconBreaks.Break> fresh = List.of(open("value_break", "EU · data", "amount"));
+        ReconBreaks.Break assigned = ReconBreaks.merge(List.of(), fresh, RUN1).get(0)
+                .withStatus("assigned", "billing to check").withAssignee("dana");
+
+        ReconBreaks.Break stillThere = ReconBreaks.merge(List.of(assigned), fresh, RUN2).get(0);
+        assertEquals("assigned", stillThere.status());
+        assertEquals("dana", stillThere.assignee());
+        assertEquals("billing to check", stillThere.note());
+
+        ReconBreaks.Break gone = ReconBreaks.merge(List.of(stillThere), List.of(), RUN3).get(0);
+        assertEquals("auto_closed", gone.status(), "an assigned Break that disappears still auto-closes");
+        assertEquals("dana", gone.assignee(), "and keeps its assignee on record");
+
+        ReconBreaks.Break recurred = ReconBreaks.merge(List.of(gone), fresh, "2026-10-01T00:00:00Z").get(0);
+        assertEquals("assigned", recurred.status());
+        assertEquals("dana", recurred.assignee());
+        assertEquals(1, recurred.recurrences());
+    }
+
+    @Test
+    void ageDaysCountsWholeDaysOfAnUnresolvedBreakOnly() {
+        java.time.Instant now = java.time.Instant.parse(RUN1).plus(java.time.Duration.ofHours(60));
+        ReconBreaks.Break openBreak = open("missing_left", "k", null).withFirstSeenAt(RUN1);
+        assertEquals(2L, openBreak.ageDays(now));
+        assertEquals(2L, openBreak.toWire(now).get("ageDays"));
+        assertEquals(2L, openBreak.withStatus("assigned", null).withAssignee("dana").ageDays(now));
+
+        ReconBreaks.Break resolved = openBreak.withStatus("resolved", "ok");
+        assertNull(resolved.ageDays(now), "settled work has no age");
+        assertFalse(resolved.toWire(now).containsKey("ageDays"));
+        assertNull(openBreak.withStatus("auto_closed", null).ageDays(now));
+        assertNull(open("missing_left", "k", null).ageDays(now), "no first sighting ⇒ no age, never 0");
+        assertFalse(openBreak.toMap().containsKey("ageDays"), "age is derived at read time, never persisted");
+    }
+
+    @Test
+    void aBreakRecordedBeforeTheCountersReadsWithDefaults() {
+        Map<String, Object> legacy = new LinkedHashMap<>(Map.of("pair", "AB", "key", "k", "type", "missing_left",
+                "status", "resolved", "firstSeenAt", RUN1));
+        ReconBreaks.Break b = ReconBreaks.Break.fromMap(legacy);
+        assertEquals(1, b.occurrences());
+        assertEquals(RUN1, b.lastSeenAt());
+        assertEquals(0, b.recurrences());
+        assertNull(b.assignee());
+
+        legacy.remove("firstSeenAt");
+        assertEquals(0, ReconBreaks.Break.fromMap(legacy).occurrences(), "an identity-only one no run has seen");
     }
 
     // ── identity (one contract with the SPA's breakId and the promote dedupe) ───────

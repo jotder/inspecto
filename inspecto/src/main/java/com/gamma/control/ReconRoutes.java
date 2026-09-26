@@ -13,6 +13,7 @@ import com.gamma.util.DuckDbUtil;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -34,8 +35,8 @@ import static com.gamma.util.Values.intOr;
  * record a run): a run and the Break lifecycle live in {@link ReconStateStore}
  * ({@code <write-root>/recon-state/<id>.json}), never in the config. {@code POST /recon/{id}/record} computes
  * ALL Breaks of the saved Reconciliation server-side and merges them ({@link ReconBreaks#merge});
- * {@code POST /recon/{id}/breaks/status} resolves / re-opens one; both are {@code canOperateRuns}, like an
- * Expectation's evaluation. {@code GET /recon/{id}/state} and {@code GET /recon/state} read it.
+ * {@code POST /recon/{id}/breaks/status} resolves / re-opens / assigns one; both are {@code canOperateRuns},
+ * like an Expectation's evaluation. {@code GET /recon/{id}/state} and {@code GET /recon/state} read it.
  * {@code POST /recon/promote} ({@code BREAK-INCIDENT-1}) hands a single Break to Ops as an {@code INCIDENT},
  * deduped on the Break's identity.
  *
@@ -380,12 +381,16 @@ final class ReconRoutes implements RouteModule {
 
     /** Longest note a resolve / re-open may carry — a note is a sentence, not a document. */
     private static final int MAX_NOTE = 2_000;
+    /** Longest assignee an assign may carry — a user or team name, not a sentence. */
+    private static final int MAX_ASSIGNEE = 200;
     /** Hard cap on {@link #states}' list — a diagnostic read must not become an unbounded export. */
     private static final int STATES_CAP = 1_000;
 
     /**
      * {@code GET /recon/{id}/state} → {@code {reconciliation, lastRunAt, runs, breaks[]}} — what the Board and
-     * the Breaks page read. Bounded by construction: a state never holds more than
+     * the Breaks page read. Each Break carries its recorded {@code occurrences} / {@code recurrences} /
+     * {@code lastSeenAt} / {@code assignee} and the read-time {@code ageDays} (unresolved Breaks only,
+     * {@link ReconBreaks.Break#ageDays}). Bounded by construction: a state never holds more than
      * {@link ReconStateStore#MAX_BREAKS} Breaks. A read, so no write-root 503: an unset root means there is no
      * registry, and "no such reconciliation" (404) is then the true answer, exactly as {@link #promoted}.
      * 422 unsafe id · 404 unknown · 403 jail · 503 unreadable state.
@@ -395,7 +400,7 @@ final class ReconRoutes implements RouteModule {
         Path root = api.writeRoot();
         if (root == null || component(new ComponentStore(root.resolve("registry")), "reconciliation", id).isEmpty())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + id + "'");
-        return readState(new ReconStateStore(root), id).toMap();
+        return readState(new ReconStateStore(root), id).toWire(Instant.now());
     }
 
     /**
@@ -458,7 +463,8 @@ final class ReconRoutes implements RouteModule {
             throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + e.getMessage());
         }
         try {
-            return store.record(id, fresh, ReconStateStore.now()).toMap();
+            String runAt = ReconStateStore.now();
+            return store.record(id, fresh, runAt).toWire(Instant.parse(runAt));
         } catch (SecurityException jail) {
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, jail.getMessage());
         } catch (IOException e) {
@@ -467,15 +473,18 @@ final class ReconRoutes implements RouteModule {
     }
 
     /**
-     * {@code POST /recon/{id}/breaks/status {pair?, type, key, column?, status: resolved|open, note?}} (gated
-     * {@code canOperateRuns}) — resolve or re-open one Break by identity {@code (pair, type, key, column)},
-     * replacing its note (blank clears it). {@code pair} is {@code AB} (the default, as a pair-less recorded
-     * Break reads) or {@code AC}, which only a 3-way Reconciliation has. A Break no run has recorded yet is
-     * appended identity-only. Returns {@code {reconciliation, break}}.
+     * {@code POST /recon/{id}/breaks/status {pair?, type, key, column?, status: resolved|open|assigned, note?,
+     * assignee?}} (gated {@code canOperateRuns}) — resolve, re-open or assign one Break by identity
+     * {@code (pair, type, key, column)}, replacing its note (blank clears it). {@code assigned} requires an
+     * {@code assignee} and only it accepts one (resolve keeps the recorded assignee, re-open clears it —
+     * {@link ReconStateStore#setStatus}). ⚠ Assign rides THIS route and its gate on purpose: it is the same
+     * act on the same record as resolve, so it needs no new route or capability. {@code pair} is {@code AB}
+     * (the default, as a pair-less recorded Break reads) or {@code AC}, which only a 3-way Reconciliation has.
+     * A Break no run has recorded yet is appended identity-only. Returns {@code {reconciliation, break}}.
      *
      * <p>Gates, in order: 503 no write root · 422 unsafe id / bad pair / bad type / non-string key / bad
-     * status / note too long · 404 unknown reconciliation · 422 AC on a 2-way Reconciliation · 403 jail ·
-     * 422 state full · 503 state unreadable.
+     * status / assignee missing, misplaced or too long / note too long · 404 unknown reconciliation · 422 AC on
+     * a 2-way Reconciliation · 403 jail · 422 state full · 503 state unreadable.
      */
     private static Object breakStatus(ApiContext api, String rawId, Map<String, Object> body) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
@@ -492,8 +501,17 @@ final class ReconRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'key' (the Break's key, as the Breaks page shows it)");
         String column = ApiContext.str(b, "column");
         String status = ApiContext.str(b, "status");
-        if (!ReconBreaks.RESOLVED.equals(status) && !ReconBreaks.OPEN.equals(status))
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "status must be resolved|open, got '" + status + "'");
+        if (!ReconBreaks.RESOLVED.equals(status) && !ReconBreaks.OPEN.equals(status) && !ReconBreaks.ASSIGNED.equals(status))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "status must be resolved|open|assigned, got '" + status + "'");
+        String assignee = ApiContext.str(b, "assignee");
+        assignee = assignee == null ? null : assignee.trim();
+        boolean assigning = ReconBreaks.ASSIGNED.equals(status);
+        if (assigning && (assignee == null || assignee.isEmpty()))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "status assigned needs an 'assignee'");
+        if (!assigning && assignee != null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'assignee' is accepted only with status assigned");
+        if (assignee != null && assignee.length() > MAX_ASSIGNEE)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "assignee is longer than " + MAX_ASSIGNEE + " characters");
         String note = ApiContext.str(b, "note");
         note = note == null ? null : note.trim();
         if (note != null && note.length() > MAX_NOTE)
@@ -505,7 +523,7 @@ final class ReconRoutes implements RouteModule {
                     + "' compares two Datasets — it has no A vs C Breaks");
         ReconBreaks.Break updated;
         try {
-            updated = new ReconStateStore(writeRoot).setStatus(id, pair, type, key, column, status, note);
+            updated = new ReconStateStore(writeRoot).setStatus(id, pair, type, key, column, status, note, assignee);
         } catch (IllegalArgumentException full) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, full.getMessage());
         } catch (SecurityException jail) {
@@ -515,7 +533,7 @@ final class ReconRoutes implements RouteModule {
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("reconciliation", id);
-        out.put("break", updated.toMap());
+        out.put("break", updated.toWire(Instant.now()));
         return out;
     }
 

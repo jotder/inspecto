@@ -52,17 +52,58 @@ class ReconStateStoreTest {
         ReconStateStore store = new ReconStateStore(root);
         store.record("orders", List.of(open("value_break", "EU", "amount")), "2026-07-01T00:00:00Z");
 
-        ReconBreaks.Break resolved = store.setStatus("orders", "AB", "value_break", "EU", "amount", "resolved", "FX gap");
+        ReconBreaks.Break resolved = store.setStatus("orders", "AB", "value_break", "EU", "amount", "resolved", "FX gap", null);
         assertEquals("resolved", resolved.status());
         assertEquals("FX gap", resolved.note());
         assertEquals("2026-07-01T00:00:00Z", resolved.firstSeenAt(), "a status change keeps the sighting");
 
-        ReconBreaks.Break appended = store.setStatus("orders", "AB", "missing_left", "APAC", null, "resolved", null);
+        ReconBreaks.Break appended = store.setStatus("orders", "AB", "missing_left", "APAC", null, "resolved", null, null);
         assertNull(appended.firstSeenAt());
         ReconStateStore.State s = store.read("orders");
         assertEquals(2, s.breaks().size());
         assertEquals(1, s.runs(), "a status change is not a run");
         assertEquals("2026-07-01T00:00:00Z", s.lastRunAt());
+    }
+
+    @Test
+    void anAssignmentPersistsAcrossARunAndResolveKeepsTheAssigneeWhileReopenClearsIt(@TempDir Path root) throws Exception {
+        ReconStateStore store = new ReconStateStore(root);
+        store.record("orders", List.of(open("value_break", "EU", "amount")), "2026-07-01T00:00:00Z");
+        ReconBreaks.Break assigned = store.setStatus("orders", "AB", "value_break", "EU", "amount", "assigned", null, "dana");
+        assertEquals("assigned", assigned.status());
+        assertEquals(1, assigned.occurrences(), "a status change is not an occurrence");
+
+        ReconBreaks.Break afterRun = store.record("orders", List.of(open("value_break", "EU", "amount")),
+                "2026-08-01T00:00:00Z").breaks().get(0);
+        assertEquals("assigned", afterRun.status());
+        assertEquals("dana", afterRun.assignee());
+        assertEquals(2, afterRun.occurrences());
+        assertEquals("dana", new ReconStateStore(root).read("orders").breaks().get(0).assignee(), "persisted");
+
+        assertEquals("dana", store.setStatus("orders", "AB", "value_break", "EU", "amount", "resolved", "fixed", null).assignee(),
+                "resolving keeps who owned it");
+        assertNull(store.setStatus("orders", "AB", "value_break", "EU", "amount", "open", null, null).assignee(),
+                "re-opening clears it");
+    }
+
+    /** A state file written before ASSURE-BREAK-LIFECYCLE-1 — no counters, no assignee — loads, then counts on. */
+    @Test
+    void aStateFileWithoutTheCountersLoadsWithDefaults(@TempDir Path root) throws Exception {
+        Files.createDirectories(root.resolve("recon-state"));
+        Files.writeString(root.resolve("recon-state").resolve("orders.json"), """
+                {"reconciliation":"orders","lastRunAt":"2026-07-01T00:00:00Z","runs":1,
+                 "breaks":[{"pair":"AB","key":"EU","type":"value_break","column":"amount","status":"open",
+                            "firstSeenAt":"2026-07-01T00:00:00Z"}]}""");
+        ReconStateStore store = new ReconStateStore(root);
+        ReconBreaks.Break legacy = store.read("orders").breaks().get(0);
+        assertEquals(1, legacy.occurrences());
+        assertEquals("2026-07-01T00:00:00Z", legacy.lastSeenAt());
+
+        ReconBreaks.Break next = store.record("orders", List.of(open("value_break", "EU", "amount")),
+                "2026-08-01T00:00:00Z").breaks().get(0);
+        assertEquals(2, next.occurrences());
+        assertEquals("2026-08-01T00:00:00Z", next.lastSeenAt());
+        assertEquals("2026-07-01T00:00:00Z", next.firstSeenAt());
     }
 
     @Test

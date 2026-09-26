@@ -12,7 +12,7 @@ timestamp: 2026-07-16T00:00:00Z
 Route `/reconciliation` (Business + Builder lenses). Vocabulary is locked
 ([`GLOSSARY.md`](../../../GLOSSARY.md) §7): a **Reconciliation** compares **Datasets** on key columns
 with per-column tolerances; a **Break** is
-`missing_left | missing_right | value_break | cardinality_break` with an `open/resolved/auto_closed`
+`missing_left | missing_right | value_break | cardinality_break` with an `open/assigned/resolved/auto_closed`
 lifecycle (auto-close on re-match within tolerance). Never a parallel "comparison" concept.
 
 **Cardinality is an ASSERTION, not a matching strategy** (`RECON-CARDINALITY-1` tier 1, 2026-09-12). A
@@ -59,7 +59,7 @@ resolving a Break was a config write that 403'd too. As built:
 * **Routes** (`ReconRoutes`): `GET /recon/{id}/state` and `GET /recon/state` (every saved Reconciliation's
   `{reconciliation, lastRunAt, runs}`, capped 1000 with the true `total`) are ungated reads (no write-root
   503; an unset root is 404/empty, like `/recon/promoted`). **`POST /recon/{id}/record`** and
-  **`POST /recon/{id}/breaks/status {pair?, type, key, column?, status: resolved|open, note?}`** are gated
+  **`POST /recon/{id}/breaks/status {pair?, type, key, column?, status: resolved|open|assigned, note?, assignee?}`** are gated
   **`canOperateRuns`** (`CapabilityManifest` group `// ReconRoutes`), like an Expectation's evaluation. Record
   loads the SAVED Reconciliation and computes every Break of every pair itself (`ReconBreaks.compute`); status
   resolves / re-opens by identity (`pair` defaults to `AB`, `AC` on a 2-way Reconciliation is 422; a blank note
@@ -95,6 +95,34 @@ resolving a Break was a config write that 403'd too. As built:
   `(type, key, column)`, no pair — so promoting the same key/type/column from both tabs yields ONE Incident.
 * **Scheduled runs record too** — `ReconRunJob` calls the same store after its Signal/Incident, best-effort:
   a refusal is logged and named in the Job result (`— run not recorded: …`), never fails the run.
+* **Occurrences, recurrence, ageing, assignment** (`ASSURE-BREAK-LIFECYCLE-1`, 2026-09-26). Each recorded
+  Break also carries `lastSeenAt`, `occurrences` (recorded runs it was present in), `recurrences` and an
+  optional `assignee`; the status set is now `open | assigned | resolved | auto_closed`. Rules
+  (`ReconBreaks.merge`, class note):
+  * every run a Break is present in adds one occurrence and stamps `lastSeenAt = runAt`; a status change is
+    neither a run nor an occurrence;
+  * 🔴 **an auto-closed Break that reappears is RE-OPENED, not new.** The lifecycle id is deterministic and
+    the state holds one record per id, so the same id again can only be the same Break: it keeps its
+    `firstSeenAt` (age runs from the FIRST sighting) and counts `recurrences + 1`. ⚠ Recurrence is countable
+    only while the auto-closed record survives — the bounded-history rule still drops one that stays gone a
+    further run, so a Break that returns after **two or more** absent runs is a new Break (`recurrences 0`).
+    Widening that window is an open call (it trades recurrence reach against state size; a Reconciliation
+    with rotating keys would otherwise accumulate every key it ever saw);
+  * `assigned` = an unresolved Break with an `assignee`. It stays assigned while present, **auto-closes like
+    any other when it disappears, keeping the assignee on record**, and a Break with an assignee that
+    reappears comes back `assigned` to that assignee (a recurrence returns to its owner). Resolve keeps the
+    assignee; re-open (`open`) clears it;
+  * **ageing is server-side and read-time**: `ageDays` = whole days `now − firstSeenAt` for an `open` or
+    `assigned` Break, absent otherwise and for an unstamped one (never 0). It is added by
+    `State.toWire` / `Break.toWire` on `GET /recon/{id}/state`, `POST /recon/{id}/record` and the status
+    route's `break` — never persisted;
+  * **assign rides the resolve route and its gate** — `POST /recon/{id}/breaks/status {…, status: assigned,
+    assignee}`, `canOperateRuns`; no new route or capability. `assigned` needs a non-blank `assignee`
+    (≤ 200 chars, trimmed) and only `assigned` accepts one (422 otherwise);
+  * **legacy state files load**: a Break written before this reads `occurrences` 1 when a run stamped it (0
+    for an identity-only one), `lastSeenAt = firstSeenAt`, `recurrences` 0, no assignee
+    (`ReconStateStoreTest.aStateFileWithoutTheCountersLoadsWithDefaults`). Mutation-checked: dropping the
+    recurrence increment or the return-to-assignee turns `ReconBreaksTest` red.
 * **SPA** — the Board runs the display comparison, then `ReconApiService.record(id)` (a failure toasts
   *"This run was not recorded"* with the server's reason and falls back to `state(id)`); its aging strip reads
   the recorded state. The Breaks page reads `state(id)` and overlays status/note **and `firstSeenAt`** (it

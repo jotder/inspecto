@@ -3,6 +3,8 @@ package com.gamma.query;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.sql.SQLException;
+import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -29,12 +31,29 @@ import java.util.Set;
  *   <li>a Break not seen last run is {@code open} and stamped {@code firstSeenAt = runAt};</li>
  *   <li>a Break still present keeps its {@code firstSeenAt} (⛔ never re-stamped — that would reset every age
  *       to zero on every run), and a {@code resolved} one stays resolved with its note;</li>
- *   <li>an {@code open}/{@code resolved} Break no longer present becomes {@code auto_closed}; one that was
+ *   <li>an {@code open}/{@code assigned}/{@code resolved} Break no longer present becomes {@code auto_closed}; one that was
  *       already {@code auto_closed} and is still gone is dropped (bounded history).</li>
  * </ul>
  * ⚠ One deliberate widening over the TS: a still-present {@code open} Break keeps its note too (the operator's
  * R2-03 statement "still present → keep status/note/firstSeenAt"). The TS dropped it, which made a re-open
  * note vanish at the next run.
+ *
+ * <p><b>Occurrence, recurrence and assignment</b> ({@code ASSURE-BREAK-LIFECYCLE-1}, 2026-09-26):
+ * <ul>
+ *   <li>every run a Break is present in counts one {@code occurrence} and stamps {@code lastSeenAt = runAt};</li>
+ *   <li>🔴 <b>a Break that auto-closed and reappears is RE-OPENED, not new.</b> Its lifecycle id
+ *       ({@link #lifecycleId}) is deterministic — {@code (pair, type, key, column)} — and the state holds one
+ *       record per id, so "the same id again" can only be the same Break. It keeps its {@code firstSeenAt}
+ *       (ageing runs from the FIRST sighting) and counts one {@code recurrence}. ⚠ Recurrence is only
+ *       countable while the auto-closed record survives: one that stays gone for a further run is dropped
+ *       (the bounded history above), so a Break that returns after two or more absent runs is a NEW Break;</li>
+ *   <li>{@code assigned} is an unresolved Break with an {@code assignee}. It stays assigned while present,
+ *       auto-closes like any other when it disappears (the assignee stays on record), and a Break with an
+ *       assignee that reappears comes back {@code assigned} to that assignee — a recurrence returns to its
+ *       owner. Resolving keeps the assignee (who owned it); re-opening ({@code open}) clears it.</li>
+ * </ul>
+ * Ageing ({@link Break#ageDays}) is derived at read time, never stored: whole days from {@code firstSeenAt}
+ * for an unresolved ({@code open} / {@code assigned}) Break, {@code null} otherwise.
  */
 public final class ReconBreaks {
 
@@ -43,6 +62,8 @@ public final class ReconBreaks {
     public static final String OPEN = "open";
     public static final String RESOLVED = "resolved";
     public static final String AUTO_CLOSED = "auto_closed";
+    /** An unresolved Break someone owns — carries an {@link Break#assignee}. */
+    public static final String ASSIGNED = "assigned";
 
     /** The four Break types, in the order {@link #fromSets} emits them. */
     public static final List<String> TYPES = List.of("missing_right", "missing_left", "cardinality_break", "value_break");
@@ -61,22 +82,29 @@ public final class ReconBreaks {
      * One recorded Break — the shape of the SPA's {@code ReconBreak}. {@code pair} is the anchor-relative pair
      * it was found on ({@link #PAIR_AB} / {@link #PAIR_AC}) and is part of its {@link #id() identity}, so an
      * A↔B and an A↔C Break on the same key and column are two Breaks with two lifecycles. {@code keyValues}, {@code column},
-     * {@code leftValue}, {@code rightValue}, {@code diff}, {@code note} and {@code firstSeenAt} are optional
-     * ({@code null} = absent, and omitted from {@link #toMap}).
+     * {@code leftValue}, {@code rightValue}, {@code diff}, {@code note}, {@code firstSeenAt}, {@code lastSeenAt} and
+     * {@code assignee} are optional ({@code null} = absent, and omitted from {@link #toMap}). {@code occurrences}
+     * counts the recorded runs the Break was present in; {@code recurrences} the times it reappeared after
+     * auto-closing (see the class note).
      */
     public record Break(String pair, String key, Map<String, Object> keyValues, String type, String column,
                         Object leftValue, Object rightValue, Double diff, String status, String note,
-                        String firstSeenAt) {
+                        String firstSeenAt, String lastSeenAt, int occurrences, int recurrences, String assignee) {
 
         /** A fresh, {@code open} Break carrying no note and no stamp. */
         static Break fresh(String key, Map<String, Object> keyValues, String type, String column,
                            Object leftValue, Object rightValue, Double diff) {
-            return new Break(PAIR_AB, key, keyValues, type, column, leftValue, rightValue, diff, OPEN, null, null);
+            return new Break(PAIR_AB, key, keyValues, type, column, leftValue, rightValue, diff, OPEN, null, null,
+                    null, 0, 0, null);
         }
 
-        /** An identity-only Break — what a status change on a Break no run has recorded yet appends. */
-        public static Break identityOnly(String pair, String type, String key, String column, String status, String note) {
-            return new Break(pair, key, null, type, column, null, null, null, status, note, null);
+        /**
+         * An identity-only Break — what a status change on a Break no run has recorded yet appends. No run has
+         * seen it, so it carries no stamps and zero occurrences.
+         */
+        public static Break identityOnly(String pair, String type, String key, String column, String status, String note,
+                                         String assignee) {
+            return new Break(pair, key, null, type, column, null, null, null, status, note, null, null, 0, 0, assignee);
         }
 
         /** {@link ReconBreaks#lifecycleId} of this Break — pair included. */
@@ -86,15 +114,45 @@ public final class ReconBreaks {
 
         /** This Break on {@code newPair}. */
         public Break withPair(String newPair) {
-            return new Break(newPair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, firstSeenAt);
+            return new Break(newPair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, firstSeenAt,
+                    lastSeenAt, occurrences, recurrences, assignee);
         }
 
+        /** This Break with a new status and note; the assignee is kept (see {@link #withAssignee}). */
         public Break withStatus(String newStatus, String newNote) {
-            return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, newStatus, newNote, firstSeenAt);
+            return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, newStatus, newNote, firstSeenAt,
+                    lastSeenAt, occurrences, recurrences, assignee);
+        }
+
+        public Break withAssignee(String newAssignee) {
+            return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, firstSeenAt,
+                    lastSeenAt, occurrences, recurrences, newAssignee);
         }
 
         Break withFirstSeenAt(String stamp) {
-            return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, stamp);
+            return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, stamp,
+                    lastSeenAt, occurrences, recurrences, assignee);
+        }
+
+        /** This Break as seen on the run at {@code runAt}: first/last sighting and the two counters. */
+        Break sighted(String first, String runAt, int occurrenceCount, int recurrenceCount) {
+            return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, first,
+                    runAt, occurrenceCount, recurrenceCount, assignee);
+        }
+
+        /**
+         * Whole days an UNRESOLVED ({@code open} / {@code assigned}) Break has been broken — {@code now} minus
+         * {@code firstSeenAt}, floored, never negative. {@code null} for a settled Break, and for one with no (or
+         * an unparsable) first sighting: ⛔ never "0" — an unstamped Break is not a new one.
+         */
+        public Long ageDays(Instant now) {
+            if (!OPEN.equals(status) && !ASSIGNED.equals(status)) return null;
+            if (firstSeenAt == null) return null;
+            try {
+                return Math.max(0, (now.toEpochMilli() - Instant.parse(firstSeenAt).toEpochMilli()) / 86_400_000L);
+            } catch (DateTimeParseException bad) {
+                return null;
+            }
         }
 
         /** The wire/persisted shape, absent fields omitted (the SPA reads a missing field as undefined). */
@@ -111,13 +169,28 @@ public final class ReconBreaks {
             m.put("status", status);
             if (note != null) m.put("note", note);
             if (firstSeenAt != null) m.put("firstSeenAt", firstSeenAt);
+            if (lastSeenAt != null) m.put("lastSeenAt", lastSeenAt);
+            m.put("occurrences", occurrences);
+            m.put("recurrences", recurrences);
+            if (assignee != null) m.put("assignee", assignee);
+            return m;
+        }
+
+        /** {@link #toMap} plus the read-time {@code ageDays} ({@link #ageDays}; absent when {@code null}). */
+        public Map<String, Object> toWire(Instant now) {
+            Map<String, Object> m = toMap();
+            Long age = ageDays(now);
+            if (age != null) m.put("ageDays", age);
             return m;
         }
 
         /**
          * Read a persisted Break back; throws {@link IllegalArgumentException} on a shape it cannot trust.
          * ⚠ A Break with no {@code pair} was recorded before pairs existed (R2-03 recorded A↔B only), so it
-         * reads as {@link #PAIR_AB} — the migration rule; an unknown pair is untrusted.
+         * reads as {@link #PAIR_AB} — the migration rule; an unknown pair is untrusted. A Break recorded before
+         * {@code ASSURE-BREAK-LIFECYCLE-1} has no counters: it reads {@code occurrences} 1 when a run stamped it
+         * ({@code firstSeenAt} present; 0 for an identity-only one), {@code lastSeenAt = firstSeenAt},
+         * {@code recurrences} 0 and no assignee.
          */
         @SuppressWarnings("unchecked")
         public static Break fromMap(Map<String, Object> m) {
@@ -131,10 +204,14 @@ public final class ReconBreaks {
                 throw new IllegalArgumentException("a recorded Break's pair must be one of " + PAIRS + ": " + m);
             Object kv = m.get("keyValues");
             Object diff = m.get("diff");
+            String first = str(m.get("firstSeenAt"));
+            String last = m.get("lastSeenAt") == null ? first : str(m.get("lastSeenAt"));
+            int occurrences = m.get("occurrences") instanceof Number n ? n.intValue() : first == null ? 0 : 1;
+            int recurrences = m.get("recurrences") instanceof Number n ? n.intValue() : 0;
             return new Break(pair, key, kv instanceof Map<?, ?> km ? new LinkedHashMap<>((Map<String, Object>) km) : null,
                     type, str(m.get("column")), m.get("leftValue"), m.get("rightValue"),
                     diff instanceof Number n ? n.doubleValue() : null, status, str(m.get("note")),
-                    str(m.get("firstSeenAt")));
+                    first, last, occurrences, recurrences, str(m.get("assignee")));
         }
 
         private static String str(Object v) {
@@ -315,16 +392,29 @@ public final class ReconBreaks {
         List<Break> out = new ArrayList<>(fresh.size());
         for (Break b : fresh) {
             Break p = prevById.get(b.id());
+            if (p == null) {
+                out.add(b.sighted(runAt, runAt, 1, 0));
+                continue;
+            }
             // A previously-recorded Break keeps its original sighting; one recorded without a stamp (appended by
             // a status change before any run saw it) is stamped now — the best honest answer.
-            Break carried = b.withFirstSeenAt(p == null || p.firstSeenAt() == null ? runAt : p.firstSeenAt());
-            if (p != null && RESOLVED.equals(p.status())) carried = carried.withStatus(RESOLVED, p.note());
-            else if (p != null && OPEN.equals(p.status()) && p.note() != null) carried = carried.withStatus(OPEN, p.note());
+            boolean recurred = AUTO_CLOSED.equals(p.status());
+            Break carried = b.sighted(p.firstSeenAt() == null ? runAt : p.firstSeenAt(), runAt,
+                    p.occurrences() + 1, p.recurrences() + (recurred ? 1 : 0));
+            if (recurred) {
+                // Re-opened, not new (class note): back to its assignee when it has one, else open; note dropped.
+                if (p.assignee() != null) carried = carried.withStatus(ASSIGNED, null).withAssignee(p.assignee());
+            } else if (RESOLVED.equals(p.status()) || ASSIGNED.equals(p.status())) {
+                carried = carried.withStatus(p.status(), p.note()).withAssignee(p.assignee());
+            } else if (OPEN.equals(p.status()) && p.note() != null) {
+                carried = carried.withStatus(OPEN, p.note());
+            }
             out.add(carried);
         }
         for (Break p : previous)
-            if ((OPEN.equals(p.status()) || RESOLVED.equals(p.status())) && !freshIds.contains(p.id()))
-                out.add(p.withStatus(AUTO_CLOSED, p.note()));
+            if ((OPEN.equals(p.status()) || RESOLVED.equals(p.status()) || ASSIGNED.equals(p.status()))
+                    && !freshIds.contains(p.id()))
+                out.add(p.withStatus(AUTO_CLOSED, p.note()));   // the assignee stays on record
         return out;
     }
 

@@ -253,6 +253,103 @@ class ControlApiReconStateTest {
         }
     }
 
+    // ── occurrences, recurrence, ageing, assignment (ASSURE-BREAK-LIFECYCLE-1) ───────
+
+    /**
+     * A state R2-03 wrote (no counters) is recorded over: a still-present Break counts its second occurrence and
+     * advances {@code lastSeenAt}, an auto-closed one that reappears is re-opened with a recurrence, and the reads
+     * carry the server-computed {@code ageDays} of the unresolved ones only.
+     */
+    @Test
+    void aRunCountsOccurrencesAndRecurrencesAndTheReadsCarryTheAge(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            writeState(c, "orders_recon", 3, List.of(
+                    rec("missing_right", "MEA · voice", null, "open", null),
+                    rec("missing_left", "APAC · sms", null, "auto_closed", null),
+                    rec("value_break", "EU · data", "amount", "resolved", "FX")));
+            long before = java.time.temporal.ChronoUnit.DAYS.between(java.time.Instant.parse(OLD), java.time.Instant.now());
+
+            JsonNode s = V1Body.of(send(c, "POST", "/spaces/s1/recon/orders_recon/record", null).body());
+            String runAt = s.get("lastRunAt").asText();
+            JsonNode present = find(s, "MEA · voice");
+            assertEquals(2, present.get("occurrences").asInt(), "legacy 1 + this run");
+            assertEquals(runAt, present.get("lastSeenAt").asText());
+            assertEquals(OLD, present.get("firstSeenAt").asText());
+            assertEquals(0, present.get("recurrences").asInt());
+            long age = present.get("ageDays").asLong();
+            assertTrue(age >= before && age <= before + 1, "age " + age + " ≈ days since " + OLD);
+
+            JsonNode back = find(s, "APAC · sms");
+            assertEquals("open", back.get("status").asText(), "re-opened, not a new Break");
+            assertEquals(1, back.get("recurrences").asInt());
+            assertEquals(OLD, back.get("firstSeenAt").asText());
+
+            assertNull(find(s, "EU · data").get("ageDays"), "a resolved Break has no age");
+
+            JsonNode read = V1Body.of(send(c, "GET", "/spaces/s1/recon/orders_recon/state", null).body());
+            assertEquals(age, find(read, "MEA · voice").get("ageDays").asLong(), "the read route carries it too");
+            assertEquals(2, find(read, "MEA · voice").get("occurrences").asInt());
+        }
+    }
+
+    @Test
+    void anAssignmentSurvivesARunAndADisappearanceAutoClosesKeepingTheAssignee(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            writeState(c, "orders_recon", 1, List.of(rec("missing_left", "LATAM · voice", null, "open", null)));
+            String url = "/spaces/s1/recon/orders_recon/breaks/status";
+            HttpResponse<String> r = send(c, "POST", url,
+                    "{\"type\":\"missing_left\",\"key\":\"LATAM · voice\",\"status\":\"assigned\",\"assignee\":\" dana \"}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode b = V1Body.of(r.body()).get("break");
+            assertEquals("assigned", b.get("status").asText());
+            assertEquals("dana", b.get("assignee").asText(), "trimmed");
+            assertTrue(b.has("ageDays"), "an assigned Break is unresolved, so it ages");
+
+            assertEquals(200, send(c, "POST", url,
+                    "{\"type\":\"value_break\",\"key\":\"EU · data\",\"column\":\"amount\",\"status\":\"assigned\",\"assignee\":\"lee\"}").statusCode());
+            JsonNode s = V1Body.of(send(c, "POST", "/spaces/s1/recon/orders_recon/record", null).body());
+            JsonNode kept = find(s, "EU · data");
+            assertEquals("assigned", kept.get("status").asText(), "an assignment persists across a run");
+            assertEquals("lee", kept.get("assignee").asText());
+            JsonNode gone = find(s, "LATAM · voice");
+            assertEquals("auto_closed", gone.get("status").asText(), "an assigned Break that is gone still auto-closes");
+            assertEquals("dana", gone.get("assignee").asText(), "with its assignee on record");
+        }
+    }
+
+    @Test
+    void anAssignValidatesItsAssignee(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String url = "/spaces/s1/recon/orders_recon/breaks/status";
+            assertEquals(422, send(c, "POST", url, "{\"type\":\"missing_left\",\"key\":\"k\",\"status\":\"assigned\"}").statusCode(),
+                    "assigned needs an assignee");
+            assertEquals(422, send(c, "POST", url, "{\"type\":\"missing_left\",\"key\":\"k\",\"status\":\"assigned\",\"assignee\":\"  \"}").statusCode());
+            assertEquals(422, send(c, "POST", url, "{\"type\":\"missing_left\",\"key\":\"k\",\"status\":\"resolved\",\"assignee\":\"dana\"}").statusCode(),
+                    "only assigned accepts an assignee");
+            assertEquals(422, send(c, "POST", url, "{\"type\":\"missing_left\",\"key\":\"k\",\"status\":\"assigned\",\"assignee\":\""
+                    + "x".repeat(201) + "\"}").statusCode());
+            assertFalse(Files.exists(c.config.resolve("recon-state").resolve("orders_recon.json")), "a refusal writes nothing");
+        }
+    }
+
+    /** Assign rides the resolve route and its gate — proven with a real Subject, without which the gate is a no-op. */
+    @Test
+    void assigningNeedsCanOperateRunsLikeResolving(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            Authenticators.forTest(SEED_ROLES);
+            String url = "/spaces/s1/recon/orders_recon/breaks/status";
+            String assign = "{\"type\":\"missing_left\",\"key\":\"APAC · sms\",\"status\":\"assigned\",\"assignee\":\"dana\"}";
+            assertEquals(401, send(c, "POST", url, assign).statusCode(), "no credential");
+            assertEquals(403, send(c, "POST", url, assign, "Authorization", "Bearer developer").statusCode());
+            assertFalse(Files.exists(c.config.resolve("recon-state").resolve("orders_recon.json")), "a refusal writes nothing");
+
+            HttpResponse<String> ok = send(c, "POST", url, assign, "Authorization", "Bearer ops");
+            assertEquals(200, ok.statusCode(), ok.body());
+            JsonNode s = V1Body.of(send(c, "GET", "/spaces/s1/recon/orders_recon/state", null, "Authorization", "Bearer ops").body());
+            assertEquals("dana", find(s, "APAC · sms").get("assignee").asText());
+        }
+    }
+
     // ── a 3-way Reconciliation records its A↔C Breaks too ─────────────────────────────
 
     @Test
