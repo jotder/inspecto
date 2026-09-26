@@ -181,7 +181,34 @@ timestamp: 2026-07-16T00:00:00Z
     a walk starting above seq 1 reports `fromGenesis: false` rather than a break. A local administrator can read
     the key and re-sign; exporting the anchors off the box is the answer to both. Anchors are not backed up
     (`BackupTask` skips `*.secrets`), so a restored store verifies without them.
-  - **Residuals (not built):** a `DbEventStore` shared by several pods gets one chain per process interleaved in
+  - 🔴 **Hardened after an independent verification FAILED the first cut (2026-09-27, same day):**
+    - *No silent holes.* A row that cannot be linked (unreadable head, hash failure) is stored marked
+      `audit_unlinked=true`, with an ERROR event and `inspecto_audit_unlinked_total`; verify counts every
+      chainable row without a seq written since the chain began → `unlinked`. One corrupt `.parquet` used to
+      break the glob read, unlink every later row and still verify: chain reads now fall back to one query PER
+      FILE, keep answering, and verify fails with `unreadable-file` naming it.
+    - *The anchors are a chain.* Each anchor carries `prevAnchorMac` in its MAC input and must start at the
+      previous `lastSeq + 1`; a garbled line (`anchor-unreadable`), a removed or reordered anchor
+      (`anchor-chain-broken`) and a finished day (before yesterday) no anchor covers (`anchor-missing`) all
+      fail. The file is created owner-only like the key. The roll and `POST /audit/anchors` REFUSE (409) over a
+      broken file, and over a missing or empty one while the chain holds rows that should already be anchored —
+      a deleted file is never silently re-signed; an operator resolves it (⚠ there is no reset route: moving
+      the file aside is a manual, visible act). An anchor whose rows were cut from the front of a day that still
+      has rows is `truncated-before-anchor`; an anchor whose whole day is gone is what retention leaves, not a
+      failure.
+    - *Bounded work.* The roll runs on a control-plane schedule (every 10 min, once per UTC day per Space,
+      backing off 5 min → 6 h after a failure) — never on a request; `POST /audit/anchors` is limited to one per
+      10 s per Space (429); both walk only from the last anchor. `DbEventStore` keeps the seq in an indexed
+      `audit_seq` column. ⚠ The Parquet store still scans every file per chain page (the seq lives in the
+      attributes JSON) — a large store makes a verify slow, not unbounded in memory.
+    - *One writer per directory.* The first link takes an OS lock on `<events>/.chain-writer.lock`; a second
+      EventLog or process on the same directory is refused and its rows land marked unlinked. A carried row the
+      incoming store already holds is not re-linked on a store swap, and verify fails one eventId at two seqs
+      (`duplicate-event`).
+    - ⛔ **On-box anchors do not defend against anyone who holds the key** (a local administrator can rewrite
+      the store and re-sign every anchor). The defence against that party is the OFF-box copy: export
+      `GET /audit/anchors` on a schedule to storage the Space's administrators cannot write, and compare.
+  - **Residuals (not built):** a scheduled off-box anchor export target; a `DbEventStore` shared by several pods gets one chain per process interleaved in
     one table (verifies as duplicates) and serves the chain reads through the `EventStore` keyset-walk defaults
     (linear per page); no offline checker tool ships (the JSON `/audit/export` carries every hashed field);
     per decision D-P8, classification-driven masking of audit rows and read auditing beyond what exists stay

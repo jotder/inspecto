@@ -97,11 +97,13 @@ control as "immutability".
 | Every `AUDIT` / `ACCESS_DENIED` record carries `audit_seq`, `audit_prev_hash` and `audit_hash` (SHA-256 over a canonical encoding, prevHash included), in one total order per Space | `inspecto-event/src/main/java/com/gamma/event/AuditChain.java`; linked in `EventLog.emit` under one monitor with the append |
 | An edit, deletion, insertion, reordering or tail truncation is named by seq and reason | `GET /audit/verify` → `inspecto/src/main/java/com/gamma/control/AuditVerifier.java`; each case tampered directly in the Parquet store in `AuditVerifierTest` |
 | Each finished UTC day is pinned by an HMAC-SHA256 anchor kept outside every import, export, Exchange and backup, and exportable off the box | `inspecto/src/main/java/com/gamma/control/AuditAnchors.java`; `GET /audit/anchors`; `<config root>.secrets/audit-anchors.jsonl` |
+| No audit row leaves the chain silently: an unlinkable row is marked, counted and announced, a corrupt store file is reported, a second writer on one directory is refused | `AuditChainTest`, `AuditVerifierTest` (`unlinked`, `unreadable-file`, `duplicate-event`) |
+| The anchor file is verified end to end (each anchor MACs the previous one); a garbled, removed or missing anchor fails, and nothing is re-signed over it | `AuditVerifierTest` (`anchor-chain-broken`, `anchor-unreadable`, `anchor-missing`, missing file refused) |
 | A restart or a hard-kill journal replay neither forks nor duplicates the chain | `AuditChainTest` (restart, abandoned store replayed, already-flushed journal) |
 
 🔴 **What it does NOT give, stated so it is not overclaimed:** a chain rewritten end to end after the
 last anchor verifies (SHA-256 needs no key — only an anchor catches it); records deleted from the front
 are indistinguishable from retention (`fromGenesis: false`); a local administrator can read the key and
-re-sign anchors — so the anchors must be exported off the box to be evidence against that party; anchors
+re-sign EVERY anchor (the anchor file is itself chained and owner-only, but that does not stop a key holder) — so on-box anchors are no evidence against that party and must be exported off the box on a schedule; anchors
 are not in backups; records stored before 2026-09-27 are outside the chain. ⛔ Cite it as
 **tamper-evident**, never as tamper-proof or non-repudiable.
