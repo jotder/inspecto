@@ -89,7 +89,8 @@ was refused) and `okf/backend/control-plane/queries.md` §3.3–§3.5. *(Provena
   release-notes draft say the D11 pair `memory_limit=2GB` + `maxConcurrentRuns=4` is "on by default";
   `BACKLOG.md` GAP-4 says only the concurrency half is; `DuckDbUtil.memoryLimit` resolves config → served
   `scheduler.toon` → `-Dprocessing.duckdb.memory_limit` → **DuckDB's own default** with no numeric fallback,
-  and no `scheduler.toon` ships. The board is right. Both pages corrected with this spec.
+  and no `scheduler.toon` ships. The board is right. Both pages corrected with this spec. ✅ **Closed
+  2026-09-26 (GAP-4):** the chain now ends at `DuckDbUtil.defaultMemoryLimit()` (40 % RAM ÷ 4, ≥ 1 GiB).
 - **The Postgres store count was stated as 6, 7, 10 and 11 across one page.** Measured: `OperationalDb.Family`
   is **fifteen** families (twelve until 2026-09-12, when D6 added `EVENTS` and B1 added `RUN_LEASE`;
   `INBOX_REGISTRY` followed on 2026-09-13);
@@ -302,7 +303,8 @@ proof, and the two defects it surfaced (a broken committed job, a space that doe
 `DuckDbUtil` (`inspecto-util/src/main/java/com/gamma/util/DuckDbUtil.java`): driver load, `tempDbFile`,
 `applyDuckDbSettings` (`temp_directory`, `memory_limit`, `max_temp_directory_size`), **`memoryLimit()`
 precedence = per-config → the served `scheduler.toon` value → `-Dprocessing.duckdb.memory_limit` → DuckDB's
-own ≈80 %-of-RAM default** (no numeric fallback in code — §2), `effectiveWorkerThreads` (cores ÷ batch
+code default `defaultMemoryLimit()`** (40 % RAM ÷ 4, ≥ 1 GiB — GAP-4, 2026-09-26; until then DuckDB's own
+≈80 %), `effectiveWorkerThreads` (cores ÷ batch
 concurrency, against oversubscription), `buildCopyOptions` (PARQUET → SNAPPY). The D11 pair (2026-08-26):
 `maxConcurrentRuns` **defaults to 4** (`JobService.java:184`); `memory_limit` is **served, not mirrored** —
 `GET|PUT /system/scheduler` owns it with `file > property > default` provenance and a portable, anchored
@@ -498,7 +500,6 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 
 | Item | Board id | What remains |
 |---|---|---|
-| DuckDB `memory_limit` **default** (GAP-4) | `BACKLOG.md` §3 *Deployment topology gaps* | Only the concurrency half of D11 defaults on; no `scheduler.toon` ships |
 | **Postgres multi-user** — pool, `browseConnection()`, schema-per-Space, `TriageRunStore`, the three uncovered stores, a concurrency test | `BACKLOG.md` §3 *Postgres multi-user* (PARKED by §6); `EDITIONS.md` OPS-03 | |
 | `graph` / `spatial` / `search` / `api` query types; more `$`-resolvers | `BACKLOG.md` §3 *Queries / BI* (P3) | Deliberately not built |
 | §7.4 rollup cache (deliberately unbuilt); `generation` deleted 2026-09-24 | `okf/backend/engine/db-layer.md` §3.9 — no board row | Until read-time aggregation is measurably slow |
@@ -527,7 +528,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 |---|---|---|
 | **The Query Library never calls `POST /queries/{id}/run`** | zero callers in `inspecto-ui/src/app`; `queries.component.ts` → `DatasetRowsService.sql()` → `/db/query` | Server-side parameter resolution (`$current_user`, `$role`), the Result Set descriptor and the 500/10 000 limits are unreachable from the product; `DAT-3` is a Must whose client half is absent |
 | **No UI triggers `materialize`**; no committed job schedules one | `DatasetKind.materialized` "for completeness"; no `materialize` job in `spaces/` | `DAT-4` is reachable only by hand-authoring a maintenance job |
-| **`memory_limit` has no default in code** while two pages say it does | `DuckDbUtil.memoryLimit` → DuckDB default; `BACKLOG.md` GAP-4 | Corrected in both pages with this spec; the board row stays |
+| **`memory_limit` had no default in code** while two pages said it did | `DuckDbUtil.memoryLimit` → DuckDB default; `BACKLOG.md` GAP-4 | Corrected in both pages with this spec; ✅ GAP-4 then shipped a code default 2026-09-26 |
 | **The SCD2 Reference engine is unbuilt** behind an authorable `load: scd2` | `ProcessorCatalog` `transform.dim.scd2` PLANNED | A config value the engine accepts and does not honour |
 | **`DuckLakeRegistrar` has no test**; the warehouse runbook has no code | `inspecto-etl` test tree; `warehouse_setup.sql` at the repo root | `SP-SNK-03` is ✅ on the board for a registrar nothing exercises |
 | **The Postgres test covers 9 of 12 families** and the page said 6, 7 and 10 | `PostgresStateStoreTest` methods | Corrected with this spec; the three uncovered stores are `DbDedupLedger`, `DbAcquisitionLedger`, `DbDeliveryReceiptStore` |

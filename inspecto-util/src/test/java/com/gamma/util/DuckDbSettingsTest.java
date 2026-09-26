@@ -113,7 +113,7 @@ class DuckDbSettingsTest {
     }
 
     @Test
-    void applyGlobalDuckDbSettingsIsNoOpWhenNoPropertiesSet(@TempDir Path dir) throws Exception {
+    void applyGlobalDuckDbSettingsAppliesTheCodeDefaultWhenNoPropertiesSet(@TempDir Path dir) throws Exception {
         DuckDbUtil.loadDriver();
         File db = DuckDbUtil.tempDbFile("duckdb_test_", dir);
         String priorMem = System.getProperty(DuckDbUtil.PROP_MEMORY_LIMIT);
@@ -126,11 +126,21 @@ class DuckDbSettingsTest {
             System.clearProperty(DuckDbUtil.PROP_MAX_TEMP_DIRECTORY_SIZE);
             System.clearProperty(DuckDbUtil.PROP_THREADS);
             try (Connection conn = DuckDbUtil.openConnection(db)) {
-                String defaultMem = currentSetting(conn, "memory_limit");
-                // The "zero behaviour change when unset" guarantee: nothing is SET, DuckDB keeps its default.
-                assertDoesNotThrow(() -> DuckDbUtil.applyGlobalDuckDbSettings(conn));
-                assertEquals(defaultMem, currentSetting(conn, "memory_limit"),
-                        "no -D properties → DuckDB's own default (~80% RAM) is left untouched");
+                String duckDbOwnMem = currentSetting(conn, "memory_limit");
+                String duckDbOwnTmp = currentSetting(conn, "temp_directory");
+                String duckDbOwnThreads = currentSetting(conn, "threads");
+                DuckDbUtil.applyGlobalDuckDbSettings(conn);
+                // GAP-4: memory_limit is never left on DuckDB's ~80%-of-RAM default — the code default applies.
+                assertEquals(echoOf(DuckDbUtil.defaultMemoryLimit()), currentSetting(conn, "memory_limit"),
+                        "no -D properties → the GAP-4 code default caps the connection");
+                assertNotEquals(duckDbOwnMem, currentSetting(conn, "memory_limit"),
+                        "the code default must differ from DuckDB's own ~80% default");
+                // The other three stay opt-in, and spill stays beside the scratch file — never the CWD.
+                assertEquals(duckDbOwnTmp, currentSetting(conn, "temp_directory"));
+                assertEquals(duckDbOwnThreads, currentSetting(conn, "threads"));
+                assertEquals(Path.of(db.getAbsolutePath() + ".tmp").normalize(),
+                        Path.of(currentSetting(conn, "temp_directory")).toAbsolutePath().normalize(),
+                        "a file-backed scratch DB spills to <dbfile>.tmp, inside the scratch dir");
             }
         } finally {
             restore(DuckDbUtil.PROP_MEMORY_LIMIT, priorMem);
@@ -221,10 +231,50 @@ class DuckDbSettingsTest {
             assertNull(DuckDbUtil.installedMemoryLimit(), "blank clears rather than storing whitespace");
             assertEquals("512MB", DuckDbUtil.memoryLimit(null));
             System.clearProperty(DuckDbUtil.PROP_MEMORY_LIMIT);
-            assertNull(DuckDbUtil.memoryLimit(null), "neither set → DuckDB's own default is left alone");
+            assertEquals(DuckDbUtil.defaultMemoryLimit(), DuckDbUtil.memoryLimit(null),
+                    "neither set → the GAP-4 code default, never null (DuckDB's ~80% per instance)");
         } finally {
             DuckDbUtil.installMemoryLimit(null);
             restore(DuckDbUtil.PROP_MEMORY_LIMIT, prior);
+        }
+    }
+
+    // ── GAP-4: the memory_limit code default ─────────────────────────────────────────
+
+    @Test
+    void defaultMemoryLimitIsFortyPercentOfRamOverFourInstancesFlooredAtOneGib() {
+        long gib = 1L << 30;
+        assertEquals("3276MiB", DuckDbUtil.defaultMemoryLimit(32 * gib), "32 GiB × 0.40 ÷ 4");
+        assertEquals("26214MiB", DuckDbUtil.defaultMemoryLimit(256 * gib), "scales with the host");
+        assertEquals("1638MiB", DuckDbUtil.defaultMemoryLimit(16 * gib));
+        assertEquals("1024MiB", DuckDbUtil.defaultMemoryLimit(8 * gib), "8 GiB → 819 MiB, floored at 1 GiB");
+        assertEquals("1024MiB", DuckDbUtil.defaultMemoryLimit(0), "unknown RAM → the floor");
+    }
+
+    @Test
+    void theJvmPropertyOverridesTheCodeDefaultOnTheConnection(@TempDir Path dir) throws Exception {
+        DuckDbUtil.loadDriver();
+        File db = DuckDbUtil.tempDbFile("duckdb_test_", dir);
+        String prior = System.getProperty(DuckDbUtil.PROP_MEMORY_LIMIT);
+        try {
+            System.setProperty(DuckDbUtil.PROP_MEMORY_LIMIT, "1536MiB");
+            try (Connection conn = DuckDbUtil.openConnection(db)) {
+                DuckDbUtil.applyGlobalDuckDbSettings(conn);
+                assertEquals(echoOf("1536MiB"), currentSetting(conn, "memory_limit"),
+                        "a deployment's -Dprocessing.duckdb.memory_limit wins over the code default");
+            }
+        } finally {
+            restore(DuckDbUtil.PROP_MEMORY_LIMIT, prior);
+            DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** DuckDB's own echo of {@code SET memory_limit=value} (its format is version-dependent). */
+    private static String echoOf(String value) throws Exception {
+        try (Connection c = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+             Statement st = c.createStatement()) {
+            st.execute("SET memory_limit='" + value + "'");
+            return currentSetting(c, "memory_limit");
         }
     }
 

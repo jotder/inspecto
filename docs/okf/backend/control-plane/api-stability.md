@@ -388,7 +388,8 @@ above the generated commit list.
 - The token picker's preview is the server's evaluation, not a client-side guess.
 - New default-on cap: `-Djobs.maxConcurrentRuns=4` (D11), editable under Settings ▸ Scheduler ▸ Resource caps, where
   DuckDB `memory_limit` is also served (`2GB` is the measured recommendation, **not a shipped default** — GAP-4;
-  this line said "default-on caps … `memory_limit=2GB`" until 2026-09-08).
+  this line said "default-on caps … `memory_limit=2GB`" until 2026-09-08). Since 2026-09-26 (GAP-4) an
+  unconfigured `duckdbMemoryLimit` is served as the computed code default (40 % RAM ÷ 4, ≥ 1 GiB), not `null`.
 - The event store prunes by whole day partitions once an `event_prune` maintenance job exists (COMPLY-3);
   releases are SBOM'd and signed in CI only (COMPLY-1/2).
 

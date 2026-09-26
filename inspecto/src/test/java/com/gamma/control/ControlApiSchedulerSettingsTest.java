@@ -456,8 +456,11 @@ class ControlApiSchedulerSettingsTest {
             assertEquals("default", sys.get("maxConcurrentJobRunsSource").asText());
             assertEquals(4, sys.get("maxConcurrentJobRuns").asInt(), "D11's default bound");
             assertEquals("default", sys.get("duckdbMemoryLimitSource").asText());
-            assertTrue(sys.get("duckdbMemoryLimit").isNull(),
-                    "no stored value and no -D → null, so the UI shows DuckDB's own default");
+            assertEquals(com.gamma.job.JobService.DEFAULT_MAX_CONCURRENT_RUNS,
+                    com.gamma.util.DuckDbUtil.DEFAULT_CONCURRENT_INSTANCES,
+                    "the memory default divides RAM across the Run bound's default — the pair must move together");
+            assertEquals(com.gamma.util.DuckDbUtil.defaultMemoryLimit(), sys.get("duckdbMemoryLimit").asText(),
+                    "no stored value and no -D → the GAP-4 code default is served, so the cap in force is visible");
 
             // PUT the pair; both persist and the memory_limit becomes the use-time owner.
             HttpResponse<String> put = send(c.port, "PUT", "/system/scheduler",

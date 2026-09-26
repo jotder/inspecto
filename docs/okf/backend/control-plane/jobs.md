@@ -60,8 +60,8 @@ replays a single missed cron fire for `catch_up: true` jobs from the durable `jo
 
 **Total-concurrency bound (ON by default since 2026-08-26 — BACKLOG D11).** The bound now ships at **4**
 (`JobService.DEFAULT_MAX_CONCURRENT_RUNS`), as the other half of the DuckDB `memory_limit` pair — ⚠ whose
-*memory* half has **no code default** (`DuckDbUtil.memoryLimit(null)` is `null`, no `scheduler.toon` ships; BACKLOG GAP-4;
-this line said "the `memory_limit=2GB` default" until 2026-09-08):
+*memory* half gained its code default only on 2026-09-26 (GAP-4: 40 % RAM ÷ 4, ≥ 1 GiB — the 4 is this
+bound's default; this line said "the `memory_limit=2GB` default" until 2026-09-08):
 total memory exposure is `memory_limit` x concurrent Runs, so an unbounded Run count makes any
 per-instance cap meaningless. **It is owned by the server configuration** — `scheduler.toon` →
 `GET/PUT /system/scheduler`, installed via `JobService.setMaxConcurrentRuns` at boot and on a PUT — and

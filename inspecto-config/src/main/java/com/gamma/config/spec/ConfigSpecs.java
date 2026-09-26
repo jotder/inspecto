@@ -320,7 +320,7 @@ public final class ConfigSpecs {
                 FieldSpec.of("processing.duckdb.temp_directory", "DuckDB scratch dir", FieldType.FILEPATH,
                         "Directory for the per-batch temp DB and DuckDB spill; defaults to dirs.temp (never the system /tmp). Point at the roomiest disk for very large files."),
                 FieldSpec.of("processing.duckdb.memory_limit", "DuckDB memory limit", FieldType.STRING,
-                        "RAM cap per worker connection (DuckDB size string, e.g. '16GB'); beyond it DuckDB spills to temp_directory. Blank = DuckDB default (~80% RAM)."),
+                        "RAM cap per worker connection (DuckDB size string, e.g. '16GB'); beyond it DuckDB spills to temp_directory. Blank = the server value, else 40% of RAM / 4 (min 1 GiB); '80%' = DuckDB's own default."),
                 FieldSpec.of("processing.duckdb.max_temp_directory_size", "DuckDB spill cap", FieldType.STRING,
                         "Hard cap on spill size (e.g. '900GB') so a runaway query fails fast instead of filling the disk."),
                 FieldSpec.withDefault("processing.chunking.max_file_bytes", "Auto-chunk threshold (bytes)", FieldType.LONG, 8_589_934_592L,

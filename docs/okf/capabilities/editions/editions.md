@@ -30,7 +30,7 @@ supersedes-rows: REQUIREMENTS §3.16 PKG-1 through PKG-4, and EDITIONS OPS-07 (t
 > earlier attempt to archive the plan was reverted. It is **superseded by operator decision** the same day:
 > a plan whose decisions are signed, whose design is distilled and whose open items are filed is
 > provenance, and the **board** owns the remainder. Phases 0–5 are still unbuilt — that is now §3 P2
-> *Deployment topology gaps* and `SPEC-DEPLOY-ROWS-1`, not a reason for the document to stay current.
+> `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (was *Deployment topology gaps*) and `SPEC-DEPLOY-ROWS-1`, not a reason for the document to stay current.
 >
 > ✅ **The loudest finding in this area was not about editions at all — and is now fixed (2026-09-09).**
 > The bill of materials that ships inside every signed bundle **declared the wrong module set** — four
@@ -563,6 +563,11 @@ acceptance row failed. These six are reproduced rather than summarised.
 
 ⚠ **`memory_limit` ≈ 25–50 % RAM ÷ concurrency is the sizing rule**, and it is the only stated guidance
 anywhere for a knob whose absent 2 GB "default" has been asserted in seven documents (§5.3).
+✅ **GAP-4 closed 2026-09-26 (session decision): the rule is now the code default** — unset,
+`memory_limit` = 40 % of the RAM the JVM sees ÷ 4 (the Run bound's default), floored at 1 GiB, so the
+D11 pair's worst case is ~40 % of the host. A deployment that raises `maxConcurrentRuns` or runs many
+concurrent batches must lower `memory_limit` itself (`-Dprocessing.duckdb.memory_limit` or Settings ▸
+Scheduler); the divisor is fixed, not live. Reasoning and scope: `okf/backend/engine/duckdb.md`.
 
 #### Failure → tier response (§5)
 
@@ -708,7 +713,8 @@ Nothing a shift can close from this checkout.
 
 ### 5.2 Tracked and actionable
 
-* **The deployment gap ledger** — service wrappers, the embedded-database memory cap default, surge
+* **The deployment gap ledger** — service wrappers, the embedded-database memory cap default (✅ closed
+  2026-09-26, GAP-4), surge
   admission, the vault and key-management provider, launcher token-line debris, and the thirteen archived
   documents a broken permission silently drops from every bundle. **Phases 0 through 5 are all unbuilt.**
 
@@ -718,7 +724,7 @@ Nothing a shift can close from this checkout.
 design was distilled into §§3.9–§3.13 when this spec was written, but its **deliverable table was not** —
 so `SCR-1` through `SCR-11` appeared nowhere outside the plan, and archiving it would have lost the
 definition of "done" for every unbuilt script. Board rows: `SPEC-DEPLOY-ROWS-1` (the family) and
-§3's *Deployment topology gaps* (`GAP-3`/`GAP-9`/`GAP-10`).
+§3's `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (was *Deployment topology gaps*) (`GAP-3`/`GAP-9`/`GAP-10`).
 
 | ID | Deliverable | Tier | Acceptance |
 |---|---|---|---|
@@ -835,7 +841,8 @@ citations elsewhere in this spec still resolve.
     header and the signed clarification call it the shipped 2 GB value, its own re-grounded gap note says
     the resolver returns nothing and the gap is still open, and the decision row still reads "needs product
     call". The gap note is the correct one. **A signed decision currently describes a default that does not
-    exist**, which makes the signature undischarged work rather than a settled question.
+    exist**, which makes the signature undischarged work rather than a settled question. ✅ Discharged
+    2026-09-26: GAP-4 shipped a computed default (40 % RAM ÷ 4, ≥ 1 GiB), not the 2 GB the row names.
 19. ⚠ **The deployment plan's Enterprise topology still calls the packaging flavour pending**, and its
     deliverable row still names a blocker that is gone; the same file's gap ledger records it shipped.
 20. ⚠ **Two preflight rows and one deliverable describe dropping the database driver into a library

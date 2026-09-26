@@ -141,7 +141,8 @@ installed. Five framings of one absent default.
 installed: 2 GB was ~2.2× the highest observed peak, and the finding that matters is that peak memory does
 **not** scale with input on this path — what a cap governs is the blocking operators, and they **hard-fail
 instead of spilling**. An aggressive cap turns working jobs into failing ones. That is why no default is
-defensible without knowing the host.
+defensible without knowing the host. ✅ **Closed 2026-09-26 (GAP-4)** by a default that does know it: 40 %
+of the JVM-visible RAM ÷ 4, floored at 1 GiB (`DuckDbUtil.defaultMemoryLimit`).
 
 ### 2.5 "The only bound" is stale in three documents and in the code
 

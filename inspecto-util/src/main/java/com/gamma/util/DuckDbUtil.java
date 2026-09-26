@@ -209,15 +209,54 @@ public final class DuckDbUtil {
      * Resolve the effective {@code memory_limit} for a connection, in the precedence the settings tier
      * documents: the per-pipeline {@code configured} value wins (narrower scope), else the server
      * configuration's installed value ({@code file}), else {@code -Dprocessing.duckdb.memory_limit}
-     * ({@code property}, a bootstrap default consulted only when nothing is installed), else {@code null}
-     * ⇒ DuckDB's own default.
+     * ({@code property}, a bootstrap default consulted only when nothing is installed), else the code
+     * default {@link #defaultMemoryLimit()} (GAP-4). Never {@code null}: an unconfigured connection is
+     * capped, never left on DuckDB's own ~80%-of-RAM-per-instance default. To restore DuckDB's own
+     * behaviour, configure {@code 80%} explicitly at any tier.
      */
     public static String memoryLimit(String configured) {
         if (notBlank(configured)) return configured;
         String installed = installedMemoryLimit;
         if (notBlank(installed)) return installed;
         String p = System.getProperty(PROP_MEMORY_LIMIT);
-        return notBlank(p) ? p : null;
+        return notBlank(p) ? p : defaultMemoryLimit();
+    }
+
+    /**
+     * How many capped DuckDB instances the {@link #defaultMemoryLimit()} budget is divided across. Mirrors
+     * {@code JobService.DEFAULT_MAX_CONCURRENT_RUNS} (4), the other half of BACKLOG D11's pair. It is a
+     * FIXED divisor, not the live semaphore: the Run bound is operator-changeable and the batch-ingest
+     * path has its own limiter (the 2026-07-25 reason a cap computed from the semaphores was declined).
+     */
+    public static final int DEFAULT_CONCURRENT_INSTANCES = 4;
+
+    /** The share of host RAM the default budgets for ALL capped instances together — the middle of
+     *  {@code editions.md}'s sizing rule ({@code memory_limit ≈ 25–50 % RAM ÷ concurrency}). */
+    static final double DEFAULT_RAM_FRACTION = 0.40;
+
+    /** The floor: the 2026-07-27 measurement put the blocking-operator OOM cliff between 512MB and 1GB,
+     *  so a default below 1 GiB would turn working jobs into failing ones on a small host. */
+    static final long DEFAULT_MEMORY_FLOOR_BYTES = 1L << 30;
+
+    /**
+     * The code default for {@code memory_limit} (GAP-4): 40% of the RAM this JVM can see (the container
+     * limit under a cgroup) ÷ {@link #DEFAULT_CONCURRENT_INSTANCES}, floored at 1 GiB, as a whole-MiB
+     * DuckDB size string. A 32 GiB host ⇒ {@code 3276MiB}; an 8 GiB host ⇒ the {@code 1024MiB} floor.
+     */
+    public static String defaultMemoryLimit() {
+        return defaultMemoryLimit(physicalMemoryBytes());
+    }
+
+    /** {@link #defaultMemoryLimit()} for a given RAM size; {@code <= 0} (unknown) ⇒ the floor. */
+    static String defaultMemoryLimit(long totalRamBytes) {
+        long share = (long) (Math.max(0L, totalRamBytes) * DEFAULT_RAM_FRACTION) / DEFAULT_CONCURRENT_INSTANCES;
+        return Math.max(DEFAULT_MEMORY_FLOOR_BYTES, share) / (1024L * 1024L) + "MiB";
+    }
+
+    /** Total RAM visible to this JVM (the container limit under a cgroup), or {@code 0} if unknown. */
+    private static long physicalMemoryBytes() {
+        return java.lang.management.ManagementFactory.getOperatingSystemMXBean()
+                instanceof com.sun.management.OperatingSystemMXBean os ? os.getTotalMemorySize() : 0L;
     }
 
     /**
@@ -227,7 +266,10 @@ public final class DuckDbUtil {
      * enrichment ({@code EnrichmentEngine}) scratch DBs, which would otherwise open fully uncapped while
      * the batch-ingest path caps its own connections. Every property is opt-in: unset ⇒ no {@code SET}/
      * {@code PRAGMA} is issued ⇒ DuckDB keeps its own defaults, so behaviour is unchanged unless an
-     * operator sets the flags (one knob then caps all three paths).
+     * operator sets the flags (one knob then caps all three paths). ⚠ Except {@code memory_limit}, which
+     * is never left unset: {@link #memoryLimit} ends at the GAP-4 code default. Both callers open a
+     * file-backed scratch database, so an over-limit query spills to {@code <dbfile>.tmp} beside it —
+     * never the CWD (an in-memory {@code jdbc:duckdb:} would spill to {@code ./.tmp}).
      *
      * <p>{@code memory_limit} resolves through {@link #memoryLimit} so the server configuration's
      * installed value (BACKLOG D11) wins over the {@code -D} bootstrap default. ⚠ Preview / dry-run

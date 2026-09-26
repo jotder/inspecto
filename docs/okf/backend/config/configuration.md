@@ -592,14 +592,14 @@ config blocks under `processing` make the engine handle big files without touchi
 processing:
   duckdb:
     temp_directory: temp/<data_source>      # where the temp DB + DuckDB spill live (default: dirs.temp)
-    memory_limit: "16GB"                     # RAM cap before spilling (default: DuckDB's own ~80% RAM)
+    memory_limit: "16GB"                     # RAM cap before spilling (default: 40% of RAM ÷ 4, min 1 GiB)
     max_temp_directory_size: "900GB"         # cap spill so a runaway query fails fast, not the disk
 ```
 
 | Key | Default | Effect |
 |---|---|---|
 | `temp_directory` | `dirs.temp` | Directory for the per-batch temp database **and** DuckDB's spill scratch. **As of 3.10.0 the engine no longer uses the system `/tmp`** — scratch defaults to the pipeline's `dirs.temp` (on the data volume). Set this to override (point at the roomiest/fastest disk). |
-| `memory_limit` | DuckDB default (~80% RAM) | RAM cap per worker connection (DuckDB size string, e.g. `"16GB"`). Lower it to leave headroom for other work; DuckDB spills to `temp_directory` beyond it. |
+| `memory_limit` | **40 % of RAM ÷ 4, floored at 1 GiB** (GAP-4, 2026-09-26) | RAM cap per worker connection (DuckDB size string, e.g. `"16GB"`, or DuckDB's proportional `"80%"`). Precedence: this key > the served `scheduler.toon` value > `-Dprocessing.duckdb.memory_limit` > the code default `DuckDbUtil.defaultMemoryLimit()` (a 32 GiB host ⇒ `3276MiB`; 8 GiB ⇒ `1024MiB`). Set `"80%"` to get DuckDB's own per-instance default back. DuckDB spills to `temp_directory` beyond it. |
 | `max_temp_directory_size` | DuckDB default | Hard cap on spill size — a pathological query fails fast instead of filling the disk. |
 
 > **This is usually the only change needed for a large single file.** With scratch on a roomy data

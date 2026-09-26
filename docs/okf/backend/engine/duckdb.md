@@ -20,6 +20,25 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   derives per-batch `duckdb_threads`: `0` (default) with batch concurrency > 1 → `max(1, cores/concurrency)`;
   explicit `N` honored verbatim; `-1` → DuckDB's per-core default. Avoids the threads×cores oversubscription
   stall; `ConfigValidator` warns when explicit `threads × duckdb_threads` exceeds the core count.
+* **GAP-4 CLOSED 2026-09-26 — `memory_limit` now has a CODE default (session decision).**
+  `DuckDbUtil.memoryLimit` no longer ends at `null`: its last fallback is `DuckDbUtil.defaultMemoryLimit()` =
+  **40 % of the RAM the JVM can see (`OperatingSystemMXBean.getTotalMemorySize`, the cgroup limit in a
+  container) ÷ `DEFAULT_CONCURRENT_INSTANCES` (4), floored at 1 GiB**, as a whole-MiB string (32 GiB ⇒
+  `3276MiB`, 16 GiB ⇒ `1638MiB`, 8 GiB ⇒ `1024MiB`). Why this shape: 40 % is the middle of `editions.md`'s
+  sizing rule (*25–50 % RAM ÷ concurrency*); 4 is the Run bound's code default
+  (`JobService.DEFAULT_MAX_CONCURRENT_RUNS`, pinned equal by `ControlApiSchedulerSettingsTest`), a FIXED
+  divisor — not the live semaphore, which the 2026-07-25 call rejected; the 1 GiB floor is the 2026-07-27
+  measurement's OOM cliff (512MB killed the blocking operators). A fixed `2GB` was not chosen: it overcommits
+  an 8 GiB T1 host at 4 Runs and needlessly spills a large one. Override at any tier (per-pipeline key,
+  `scheduler.toon`, `-Dprocessing.duckdb.memory_limit`); `80%` restores DuckDB's own behaviour. `GET
+  /system/scheduler` serves the computed value with source `default`. ⚠ **Scope: the three paths that already
+  resolved a limit** (`ConsignmentIngestStrategy.configure`, `PipelineJobRunner`, `EnrichmentEngine`). All
+  three are file-backed scratch databases, so spill lands in `<dbfile>.tmp` beside them — never the CWD.
+  The ~15 in-memory `DriverManager.getConnection("jdbc:duckdb:")` opens (the compaction / materialize /
+  storage / SQL-template job tasks, `ParquetEventStore`, `ObjectsAnalyticsJob`, …) are still uncapped:
+  an in-memory database's `temp_directory` is `.tmp` **relative to the CWD** (probed on 1.5.2.1), so capping
+  one without a Space-root spill directory would move its spill into the working directory. That residual is
+  `BACKLOG.md` `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1`. `SqlSandbox` keeps its own 1GB cap.
 * **Memory / spill caps (opt-in; one knob for every scratch connection).** `DuckDbUtil.applyDuckDbSettings`
   sets `memory_limit` / `temp_directory` (spill) / `max_temp_directory_size` when a value is configured;
   unset ⇒ DuckDB's own default (≈ 80% RAM **per instance** — the aggregate-overcommit hazard under
@@ -30,12 +49,13 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   `-Dprocessing.duckdb.memory_limit` / `.temp_directory` / `.max_temp_directory_size` / `.threads`; the
   batch path honors the same globals as a fallback (`DuckDbUtil.globalOr`), so a single
   `-Dprocessing.duckdb.memory_limit` caps every DuckDB scratch connection uniformly. **All opt-in** — with
-  no config or `-D` value set nothing is issued and behavior is unchanged. Set these on high-concurrency /
+  no config or `-D` value set nothing is issued and behavior is unchanged — ⚠ **except `memory_limit`
+  since GAP-4 (2026-09-26), which falls back to the code default above.** Set these on high-concurrency /
   multi-tenant boxes to prevent overcommit, and pair with `temp_directory` so an over-limit query spills to
   disk instead of OOM-ing. (Preview / dry-run connections — `ComponentPreview`, `PipelineDryRun`, enrichment
   `preview` — run over bounded samples and are deliberately left uncapped.)
-* **D11 SHIPPED 2026-08-26 — 🔴 HALF-ON: `maxConcurrentRuns=4` is a CODE default; `memory_limit` has
-  NO default at all** (corrected 2026-09-09 — this headline read “the pair is `memory_limit=2GB` +
+* **D11 SHIPPED 2026-08-26 — HALF-ON until GAP-4 closed it 2026-09-26: `maxConcurrentRuns=4` is a CODE
+  default; `memory_limit` had NO default at all** (corrected 2026-09-09 — this headline read “the pair is `memory_limit=2GB` +
   `maxConcurrentRuns=4`”, so a skimmer took away a shipped 2GB cap). `DuckDbUtil.memoryLimit(null)`
   returns `null`, no `scheduler.toon` ships, and the committed corpus sets the key to `""`. 2GB was the
   MEASURED recommendation (§below), never an installed default — BACKLOG GAP-4 is still open. Both are
