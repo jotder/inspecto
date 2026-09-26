@@ -201,7 +201,7 @@ class ControlApiInvestigationOversightTest {
             assertEquals(1, seeded.at("/masking/masked").asInt());
             post(c, OPS, "{\"op\":\"expand\"}");
 
-            // Only the typed seed is masked: its expand neighbours carry no type (entity typing, LA-17, is not built).
+            // Only the typed seed is masked: its expand neighbours are typed only by their column, and it is unclassified.
             assertEquals(Set.of(token, B, C), entityIds(c, null));
             JsonNode log = get(c, "/inv/investigations/case-a/log");
             assertFalse(log.toString().contains(A), "the log names the typed seed only by its pseudonym: " + log);
@@ -254,6 +254,57 @@ class ControlApiInvestigationOversightTest {
             JsonNode ws = get(c, "/inv/investigations/case-a/working-set");
             assertTrue(ws.at("/masking/basis").asText().contains("[caller]"), ws.toString());
             for (JsonNode r : ws.get("rows")) assertTrue(r.get("entityId").asText().startsWith("masked:"), ws.toString());
+        }
+    }
+
+    /**
+     * LA-17 step 5: under {@code typed} a seed is masked when its {@code entityType} names a MASKED in-force Entity
+     * Type — any of them, not only MSISDN / IMSI / ACCOUNT — or names no in-force type at all (fail closed).
+     */
+    @Test
+    void typedMasksASeedWhoseEntityTypeIsMaskedOrUnknownAndNoneMasksNothing(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            post(c, "/inv/investigations", CREATE);
+            JsonNode wallet = post(c, OPS, "{\"op\":\"seed\",\"ids\":[\"" + A + "\"],\"entityType\":\"wallet\"}");
+            assertTrue(wallet.at("/delta/admitted/0").asText().startsWith("masked:"), "wallet is masked by default: " + wallet);
+            JsonNode handset = post(c, OPS, "{\"op\":\"seed\",\"ids\":[\"" + B + "\"],\"entityType\":\"handset\"}");
+            assertEquals(B, handset.at("/delta/admitted/0").asText(), "handset is masked:false by default: " + handset);
+            JsonNode unknown = post(c, OPS, "{\"op\":\"seed\",\"ids\":[\"" + C + "\"],\"entityType\":\"badge\"}");
+            assertTrue(unknown.at("/delta/admitted/0").asText().startsWith("masked:"),
+                    "an entityType naming no in-force Entity Type fails closed: " + unknown);
+            assertEquals(2, unknown.at("/masking/masked").asInt(), unknown.toString());
+            String basis = unknown.at("/masking/basis").asText();
+            assertTrue(basis.startsWith("typed: ids whose Entity Type is masked"), basis);
+            assertFalse(basis.contains("not built"), basis);
+
+            settings(c, "masking_mode: none\n");
+            assertEquals(Set.of(A, B, C), entityIds(c, null), "none masks nothing, typed or not");
+        }
+    }
+
+    /**
+     * LA-17 step 5: a bound column's registry {@code classification} is typed by the in-force Entity Type claiming it —
+     * {@code IMEI} (the imei type, masked) masks every id; {@code HANDSET} (masked:false) masks none.
+     */
+    @Test
+    void aColumnClassificationIsTypedByTheEntityTypeClaimingIt(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, Map.of("view", "calls_view",
+                "columns", List.of(Map.of("name", "callee", "classification", " imei "))))) {
+            post(c, "/inv/investigations", CREATE);
+            post(c, OPS, "{\"op\":\"seed\",\"ids\":[\"" + A + "\"]}");
+            post(c, OPS, "{\"op\":\"expand\"}");
+            JsonNode ws = get(c, "/inv/investigations/case-a/working-set");
+            assertTrue(ws.at("/masking/basis").asText().contains("[callee]")
+                    && ws.at("/masking/basis").asText().contains("[imei]"), ws.toString());
+            for (JsonNode r : ws.get("rows")) assertTrue(r.get("entityId").asText().startsWith("masked:"), ws.toString());
+        }
+        try (Ctx c = open(cfg, root.resolve("handset"), Map.of("view", "calls_view",
+                "columns", List.of(Map.of("name", "caller", "classification", "HANDSET"))))) {
+            post(c, "/inv/investigations", CREATE);
+            post(c, OPS, "{\"op\":\"seed\",\"ids\":[\"" + A + "\"]}");
+            post(c, OPS, "{\"op\":\"expand\"}");
+            assertEquals(Set.of(A, B, C), entityIds(c, null), "a masked:false type's column stays raw");
         }
     }
 

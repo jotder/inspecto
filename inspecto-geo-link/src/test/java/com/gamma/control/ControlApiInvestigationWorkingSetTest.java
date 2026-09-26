@@ -16,6 +16,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -113,6 +114,7 @@ class ControlApiInvestigationWorkingSetTest {
             assertEquals(0, empty.get("total").asInt());
             assertEquals(0, empty.at("/head/step").asInt());
 
+            Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\n");   // LA-17 step 5: subscriber is a masked Entity Type; masking is not under test here
             post(c, "/inv/investigations/case-a/ops", "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"subscriber\"}");
             post(c, "/inv/investigations/case-a/ops", "{\"op\":\"expand\"}");
             post(c, "/inv/investigations/case-a/ops", "{\"op\":\"expand\"}");

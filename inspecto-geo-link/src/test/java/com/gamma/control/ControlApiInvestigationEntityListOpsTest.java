@@ -455,6 +455,58 @@ class ControlApiInvestigationEntityListOpsTest {
         }
     }
 
+    /** LA-17 step 5 (e): under {@code all} a list op masks its members, the remembered keys and the unmatched members. */
+    @Test
+    void listOpsUnderAllMaskMembersExcludedKeysAndUnmatched(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            settings(c, "masking_mode: all\n");
+            list(c, "mules", "exclusion", "+447700900123", "+447700900555");
+            data(post(c, "/inv/investigations", CREATE), 200);
+            op(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"]}");
+            op(c, "case-a", "{\"op\":\"expand\"}");
+            HttpResponse<String> excluded = post(c, "/inv/investigations/case-a/ops", EXCLUDE_BY);
+            JsonNode x = data(excluded, 200);
+            assertTrue(x.at("/delta/removed/0").asText().matches("masked:[0-9a-f]{16}"), x.toString());
+            assertTrue(x.at("/list/unmatched/0").asText().matches("masked:[0-9a-f]{16}"), x.toString());
+            HttpResponse<String> replayed = post(c, "/inv/investigations/case-a/replay", "{}");
+            JsonNode keys = data(replayed, 200).at("/workingSet/excludedKeys");
+            assertEquals(2, keys.size(), replayed.body());
+            for (JsonNode k : keys) assertTrue(k.get("key").asText().startsWith("masked:"), replayed.body());
+            HttpResponse<String> listed = send(c, "GET", "/inv/entity-lists/mules", null);
+            for (JsonNode m : data(listed, 200).get("members")) assertTrue(m.asText().startsWith("masked:"), listed.body());
+            String all = String.join("\n", excluded.body(), replayed.body(), listed.body(),
+                    send(c, "GET", "/inv/investigations/case-a/log", null).body());
+            assertFalse(all.contains("900123") || all.contains("900555"), all);
+        }
+    }
+
+    /**
+     * LA-17 step 5 (b): the Entity Type's {@code masked} flag is the one truth. A Space that redefines {@code msisdn} as
+     * {@code masked: false} sees its ids RAW under {@code typed} — in the Investigation (a seed typed MSISDN, an
+     * excludeBy over an msisdn list) exactly as on the Entity List route. (Before step 5 the Investigation forced
+     * msisdn / imsi / account masked whatever the type said.)
+     */
+    @Test
+    void anMsisdnTypeRedefinedAsUnmaskedStaysRawInTheInvestigationAndOnTheListRoute(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            data(send(c, "PUT", "/settings/link-analysis", "{\"maskingMode\":\"typed\",\"entityTypes\":[{\"id\":\"msisdn\","
+                    + "\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":false,\"classifications\":[\"MSISDN\"]}]}"), 200);
+            list(c, "mules", "exclusion", "+447700900123", "+447700900555");
+            assertEquals(List.of("+447700900123", "+447700900555"),
+                    texts(data(send(c, "GET", "/inv/entity-lists/mules", null), 200).get("members")));
+            data(post(c, "/inv/investigations", CREATE), 200);
+            JsonNode seeded = op(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"MSISDN\"}");
+            assertEquals("alice", seeded.at("/delta/admitted/0").asText(), seeded.toString());
+            assertEquals(0, seeded.at("/masking/masked").asInt(), seeded.toString());
+            op(c, "case-a", "{\"op\":\"expand\"}");
+            JsonNode x = op(c, "case-a", EXCLUDE_BY);
+            assertEquals(List.of(MULE), texts(x.at("/delta/removed")));
+            assertEquals(List.of("+447700900555"), texts(x.at("/list/unmatched")));
+            assertEquals(0, x.at("/masking/masked").asInt(), x.toString());
+        }
+    }
+
     /** Review nit: an excludeBy over an EMPTY list leaves no {@code excludedKeys} entry, so the state hashes as without it. */
     @Test
     void anExcludeByOverAnEmptyListRemembersNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {

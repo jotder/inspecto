@@ -114,6 +114,7 @@ class ControlApiInvestigationTemplateTest {
     void aTemplateCarriesTheMethodAndLeavesTheAnalystsJudgementsBehind(@TempDir Path cfg, @TempDir Path root)
             throws Exception {
         try (Ctx c = open(cfg, root)) {
+            Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\n");   // LA-17 step 5: subscriber is a masked Entity Type; masking is not under test here
             post(c, "/inv/investigations", CREATE);
             ops(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"subscriber\"}", "{\"op\":\"expand\"}",
                     "{\"op\":\"exclude\",\"ids\":[\"bob\"],\"reason\":\"marketing\"}", "{\"op\":\"expand\"}",

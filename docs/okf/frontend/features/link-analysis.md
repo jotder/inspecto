@@ -718,8 +718,9 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   basis* field (the server answers 422 without one) and the template *Instantiate* form carries the same required
   field; the value is sealed in the header and shown in the Dossier, never enforced. Entity ids in every
   Investigation response may arrive MASKED as `masked:<16 hex>` per the Space's `maskingMode` (default `typed`:
-  ids seeded with `entityType` MSISDN / IMSI / ACCOUNT, or every id when a bound Dataset column is classified as
-  one); the panel shows the pseudonym as given and may send it back in an op's `ids` — the server resolves it.
+  ids whose Entity Type is `masked` — seeded with such an `entityType` or one naming no type in force, on or matched
+  by an Entity List of such a type, or every id when a bound Dataset column's classification maps to such a type;
+  LA-17 step 5, 2026-09-26); the panel shows the pseudonym as given and may send it back in an op's `ids` — the server resolves it.
   ⚠ The panel has NO UI yet for `POST …/reveal`, for approving/denying a pending expand, or for rendering an expand
   answered `{status:"pending"}` (only reachable when a Space sets a four-eyes threshold).
   ⚠ When a Space sets a four-eyes threshold, every stateless graph read — the projection that loads the canvas

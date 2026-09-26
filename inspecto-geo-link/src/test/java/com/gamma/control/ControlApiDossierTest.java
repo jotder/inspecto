@@ -95,6 +95,7 @@ class ControlApiDossierTest {
 
     /** seed alice → expand → exclude bob (reason) → hide carol: four steps, one exclusion. */
     private void build(Ctx c) throws Exception {
+        Files.writeString(c.root().resolve("link-analysis.toon"), "masking_mode: none\n");   // LA-17 step 5: subscriber is a masked Entity Type; masking is not under test here
         data(post(c, "/inv/investigations", CREATE));
         data(post(c, "/inv/investigations/case-a/ops", "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"subscriber\"}"));
         data(post(c, "/inv/investigations/case-a/ops", "{\"op\":\"expand\"}"));

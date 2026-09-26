@@ -21,7 +21,6 @@ import java.util.Comparator;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
@@ -47,23 +46,26 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  *   <li>{@code none} — nothing is masked.</li>
  *   <li>{@code all} — every entity id the Investigation knows (every id an op named, every endpoint of every sealed
  *       read row, every frontier/exclusion id) — plus, in a Dossier, every node id of an embedded snapshot.</li>
- *   <li>{@code typed} (the DEFAULT) — typed identifiers: {@link #TYPED_IDENTIFIERS}. ⚠ Entity typing (LA-17) is NOT
- *       built, so "typed" is decided from the only type marks that exist TODAY, and masks exactly this:
+ *   <li>{@code typed} (the DEFAULT) — an id is masked when its <b>Entity Type</b> is masked (LA-17 step 5). The types
+ *       are the Space's in force ({@code LinkAnalysisSettings.effectiveEntityTypes()}); a type's {@code masked} flag is
+ *       the one truth, exactly as {@link EntityListRoutes} reads it. An id's type is resolved, in order:
  *       <ol>
- *         <li>any id SEEDED with {@code entityType} MSISDN, IMSI or ACCOUNT (case-insensitive) — per entity; and</li>
- *         <li>if the bound Dataset's registry {@code columns[]} entry for the Investigation's {@code sourceCol} or
- *             {@code targetCol} carries {@code classification} MSISDN, IMSI or ACCOUNT — EVERY entity id, because
- *             an id does not record which column it was read from.</li>
- *         <li>(LA-17) an Entity List op whose sealed list is of such a type — or whose Entity Type was sealed
- *           {@code masked: true}, or sealed no flag at all (fail closed) — masks the list's member KEYS, a
- *           {@code seedBy}'s sealed ids, and every id the log knows whose key under the list's normaliser is a
- *           member — a raw {@code 0044 7700-900123} matched by the member {@code +447700900123} is the same
- *           identifier, so masking one form and not the other would leak it.</li>
+ *         <li>an Entity List op ({@code excludeBy} / {@code seedBy}) — the flag its sealed {@code list} carries, so a
+ *             replay reads what was in force at the op; a list that sealed NO flag is masked (fail closed). Such a list
+ *             masks its member KEYS, a {@code seedBy}'s sealed ids, and every id the log knows whose key under the
+ *             list's normaliser is a member — a raw {@code 0044 7700-900123} matched by the member
+ *             {@code +447700900123} is the same identifier, so masking one form and not the other would leak it;</li>
+ *         <li>a {@code seed}'s {@code entityType} — the in-force type whose id equals it case-insensitively
+ *             ({@code MSISDN} is {@code msisdn}); an {@code entityType} naming NO in-force type is masked (fail
+ *             closed) — per entity;</li>
+ *         <li>the bound Dataset's registry {@code columns[]} {@code classification} of the Investigation's
+ *             {@code sourceCol} / {@code targetCol} — the in-force type whose {@code classifications[]} contains it
+ *             (case-insensitive, trimmed); when that type is masked, EVERY entity id is masked, because an id does
+ *             not record which column it was read from. A classification no type claims leaves the column untyped.</li>
  *       </ol>
- *       Nothing else. An entity ADMITTED by an expand has no type, so a neighbour of a typed seed is NOT masked
- *       unless rule 2 applies; and no shipped Dataset declares such a column classification today, so on the
- *       shipped demo data {@code typed} masks only seeds typed by the analyst. The schema-file
- *       {@code raw.fields[].classification} is not consulted: nothing resolves a Dataset to its schema file.</li>
+ *       Nothing else. An entity ADMITTED by an expand is typed only through rule 3, so a neighbour of a typed seed
+ *       is NOT masked unless its column's type is. The schema-file {@code raw.fields[].classification} is not
+ *       consulted: nothing resolves a Dataset to its schema file.</li>
  * </ul>
  *
  * <p><b>How.</b> A masked id becomes {@code masked:<16 hex>} — an HMAC-SHA256 of the id under a random per-Investigation
@@ -75,8 +77,6 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  */
 final class EntityMasking {
 
-    /** The typed identifiers {@code typed} masks — the D-U6 list. */
-    static final Set<String> TYPED_IDENTIFIERS = Set.of("MSISDN", "IMSI", "ACCOUNT");
     /** Response keys whose values are prose that may mention an id inline. */
     private static final Set<String> FREE_TEXT = Set.of("text", "note", "reason", "method", "steps", "purpose", "title");
     static final String TOKEN_PREFIX = "masked:";
@@ -108,11 +108,13 @@ final class EntityMasking {
 
     static EntityMasking of(InvestigationRoutes.Inv inv, List<Map<String, Object>> log, Collection<String> extraIds)
             throws IOException {
-        String mode = LinkAnalysisSettings.forRoot(inv.writeRoot()).effectiveMaskingMode();
+        LinkAnalysisSettings settings = LinkAnalysisSettings.forRoot(inv.writeRoot());
+        String mode = settings.effectiveMaskingMode();
+        List<EntityTypes.EntityType> types = settings.effectiveEntityTypes();
         Set<String> universe = new TreeSet<>(extraIds);
         Set<String> typedSeeds = new TreeSet<>();
-        Map<String, Set<String>> typedKeys = new LinkedHashMap<>();   // normaliser → member keys of typed lists (LA-17)
-        for (Map<String, Object> e : log) collect(e, universe, typedSeeds, typedKeys);
+        Map<String, Set<String>> typedKeys = new LinkedHashMap<>();   // normaliser → member keys of masked lists (LA-17)
+        for (Map<String, Object> e : log) collect(e, types, universe, typedSeeds, typedKeys);
         for (var k : typedKeys.entrySet())
             for (String id : universe)
                 if (k.getValue().contains(EntityTypes.normalise(k.getKey(), id))) typedSeeds.add(id);
@@ -128,17 +130,18 @@ final class EntityMasking {
                 basis = "every entity id (maskingMode all)";
             }
             default -> {
-                List<String> typedCols = typedColumns(inv);
-                if (!typedCols.isEmpty()) {
+                Map<String, String> maskedCols = maskedColumns(inv, types);
+                if (!maskedCols.isEmpty()) {
                     masked = universe;
-                    basis = "typed: bound column(s) " + typedCols + " are classified as a typed identifier "
-                            + TYPED_IDENTIFIERS.stream().sorted().toList() + ", and an id does not record which "
-                            + "column it was read from, so every entity id is masked";
+                    basis = "typed: bound column(s) " + List.copyOf(maskedCols.keySet()) + " are classified as masked "
+                            + "Entity Type(s) " + maskedCols.values().stream().distinct().toList() + ", and an id does "
+                            + "not record which column it was read from, so every entity id is masked";
                 } else {
                     masked = typedSeeds;
-                    basis = "typed: entities seeded with entityType " + TYPED_IDENTIFIERS.stream().sorted().toList()
-                            + "; no bound column is classified as a typed identifier, and entities admitted by an "
-                            + "expand carry no type (entity typing, LA-17, is not built)";
+                    basis = "typed: ids whose Entity Type is masked — seeded with a masked entityType (or one naming "
+                            + "no Entity Type in force), or a member of or matched by an Entity List of a masked type; "
+                            + "no bound column is classified as a masked Entity Type, so entities an expand admitted "
+                            + "are otherwise not masked";
                 }
             }
         }
@@ -150,19 +153,23 @@ final class EntityMasking {
         return new EntityMasking(mode, basis, tokens);
     }
 
-    /** Every id a log entry names, the ids its {@code seed} typed as a typed identifier, and a typed list's keys. */
+    /** Every id a log entry names, the ids it types as a masked Entity Type, and a masked list's keys. */
     @SuppressWarnings("unchecked")
-    private static void collect(Map<String, Object> e, Set<String> universe, Set<String> typedSeeds,
-                                Map<String, Set<String>> typedKeys) {
+    private static void collect(Map<String, Object> e, List<EntityTypes.EntityType> types, Set<String> universe,
+                                Set<String> typedSeeds, Map<String, Set<String>> typedKeys) {
         if (e.get("list") instanceof Map<?, ?> l) {   // LA-17: the sealed Entity List of an excludeBy / seedBy
             List<String> members = strings(l.get("members"));
             universe.addAll(members);
             List<String> ids = e.get("read") instanceof Map<?, ?> r ? strings(r.get("ids")) : List.of();
             universe.addAll(ids);
-            // Typed when the list's Entity Type was sealed as masked, when no flag was sealed (fail closed — the same
-            // stance EntityListRoutes takes for a type no longer in force), or when it is a D-U6 typed identifier.
-            if (!Boolean.FALSE.equals(l.get("masked"))
-                    || TYPED_IDENTIFIERS.contains(String.valueOf(l.get("entityType")).toUpperCase(Locale.ROOT))) {
+            // Masked when the list's Entity Type was sealed as masked, when no flag was sealed, OR when the type is
+            // masked TODAY or no longer in force (fail closed either way — the list route reads today's type, so a Space
+            // that tightens a type must not keep an old Investigation showing that list raw). Render-time only, so
+            // replay determinism is untouched.
+            String listType = String.valueOf(l.get("entityType"));
+            boolean maskedNow = types.stream().filter(t -> t.id().equalsIgnoreCase(listType)).findFirst()
+                    .map(EntityTypes.EntityType::masked).orElse(true);
+            if (!Boolean.FALSE.equals(l.get("masked")) || maskedNow) {
                 typedSeeds.addAll(members);
                 typedSeeds.addAll(ids);
                 typedKeys.computeIfAbsent(String.valueOf(l.get("normaliser")), k -> new TreeSet<>()).addAll(members);
@@ -171,9 +178,13 @@ final class EntityMasking {
         if (e.get("params") instanceof Map<?, ?> p) {
             List<String> ids = strings(p.get("ids"));
             universe.addAll(ids);
-            if ("seed".equals(e.get("op")) && p.get("entityType") != null
-                    && TYPED_IDENTIFIERS.contains(String.valueOf(p.get("entityType")).toUpperCase(Locale.ROOT)))
-                typedSeeds.addAll(ids);
+            if ("seed".equals(e.get("op")) && p.get("entityType") != null) {
+                String named = String.valueOf(p.get("entityType"));
+                // An entityType naming no in-force Entity Type is masked (fail closed).
+                if (types.stream().filter(t -> t.id().equalsIgnoreCase(named)).findFirst()
+                        .map(EntityTypes.EntityType::masked).orElse(true))
+                    typedSeeds.addAll(ids);
+            }
         }
         if (e.get("read") instanceof Map<?, ?> r) {
             if (r.get("query") instanceof Map<?, ?> q) {
@@ -189,19 +200,23 @@ final class EntityMasking {
         }
     }
 
-    /** The Investigation's bound source/target columns the Dataset's registry {@code columns[]} classify as typed. */
-    private static List<String> typedColumns(InvestigationRoutes.Inv inv) {
+    /** The Investigation's bound source/target columns whose registry {@code columns[]} {@code classification} is
+     *  claimed by a MASKED in-force Entity Type — column name → type id. A classification no type claims is untyped. */
+    private static Map<String, String> maskedColumns(InvestigationRoutes.Inv inv, List<EntityTypes.EntityType> types) {
         Map<String, Object> ds = new ComponentStore(inv.writeRoot().resolve("registry")).get("dataset", inv.dataset())
                 .map(ComponentRegistry.Component::content).orElse(Map.of());
-        List<String> out = new ArrayList<>();
+        Map<String, String> out = new LinkedHashMap<>();
         if (!(ds.get("columns") instanceof List<?> cols)) return out;
         for (String bound : List.of("sourceCol", "targetCol")) {
             Object name = inv.header().get(bound);
             for (Object o : cols)
                 if (o instanceof Map<?, ?> c && name != null && String.valueOf(name).equalsIgnoreCase(String.valueOf(c.get("name")))
-                        && c.get("classification") != null
-                        && TYPED_IDENTIFIERS.contains(String.valueOf(c.get("classification")).trim().toUpperCase(Locale.ROOT)))
-                    out.add(String.valueOf(name));
+                        && c.get("classification") != null) {
+                    String cls = String.valueOf(c.get("classification")).trim();
+                    types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(cls)))
+                            .findFirst().filter(EntityTypes.EntityType::masked)
+                            .ifPresent(t -> out.put(String.valueOf(name), t.id()));
+                }
         }
         return out;
     }

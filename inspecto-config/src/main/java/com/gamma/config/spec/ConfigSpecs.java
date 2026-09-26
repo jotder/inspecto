@@ -1192,8 +1192,8 @@ public final class ConfigSpecs {
                         "Nodes above which suspicion score alone refuses (D-S3); absent = the shipped default."),
                 FieldSpec.enumField("masking_mode", "Entity masking", LINK_ANALYSIS_MASKING_MODES,
                         LINK_ANALYSIS_MASKING_MODES.get(0),
-                        "Which entity ids Investigation responses mask (D-U6): typed = typed identifiers "
-                                + "(MSISDN, IMSI, ACCOUNT), all = every entity id, none = nothing."),
+                        "Which entity ids Investigation responses mask (D-U6): typed = ids whose Entity Type "
+                                + "is masked (entity_types[].masked), all = every entity id, none = nothing."),
                 FieldSpec.of("four_eyes_budget_above", "Four-eyes budget threshold", FieldType.INT,
                         "An expand whose row budget exceeds this waits for a second person's approval (D-U7); "
                                 + "absent = no budget threshold."),

@@ -135,6 +135,7 @@ class ControlApiInvestigationsTest {
             assertTrue(Files.isRegularFile(invDir(root, "case-a").resolve("header.json")),
                     "D-E2: the Investigation lives in the snapshot store");
 
+            Files.writeString(root.resolve("link-analysis.toon"), "masking_mode: none\n");   // LA-17 step 5: subscriber is a masked Entity Type; masking is not under test here
             JsonNode seeded = op(c, "case-a", "{\"op\":\"seed\",\"ids\":[\"alice\"],\"entityType\":\"subscriber\"}");
             assertEquals(1, seeded.get("step").asInt());
             assertEquals("alice", seeded.at("/delta/admitted/0").asText());

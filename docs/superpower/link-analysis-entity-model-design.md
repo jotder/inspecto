@@ -1,6 +1,6 @@
 # LA-17 — Entity model: design (slice 1: Entity Types + Entity Lists)
 
-> **Status:** 🟡 APPROVED 2026-09-26 (D-M1..D-M8); steps 1–4 done, step 6 panel done; step 5 (masking via types) next. Parent backlog: [`link-analysis-backlog-plan.md`](link-analysis-backlog-plan.md)
+> **Status:** 🟡 APPROVED 2026-09-26 (D-M1..D-M8); steps 1–5 done, step 6 panel done. Parent backlog: [`link-analysis-backlog-plan.md`](link-analysis-backlog-plan.md)
 > row **LA-17** (§5, un-deferred 2026-09-24) and §2.6. Current knowledge: [`okf/frontend/features/link-analysis.md`](../okf/frontend/features/link-analysis.md).
 > When this plan and the code disagree, re-ground.
 
@@ -227,7 +227,25 @@ append time and replay never re-reads the list:
 2. ✅ **DONE 2026-09-26** — Entity Types in settings + normaliser parity fixture (Java + TS) → verify: `ConfigSpecs`/settings route tests, parity spec.
 3. ✅ **DONE 2026-09-26** — Fact log store + fold + `EntityListRoutes` → verify: real-HTTP `ControlApiEntityListTest` covering every gate.
 4. ✅ **DONE 2026-09-26** — `excludeBy` / `seedBy` ops + template carry (as built: §4.4.2) → verify: `InvestigationEvaluator` + template tests; replay pinned to `atSeq`.
-5. Masking via types (replace `TYPED_IDENTIFIERS`) → verify: `EntityMasking` tests incl. expand-admitted typed entity.
+5. ✅ **DONE 2026-09-26** — Masking via types (replace `TYPED_IDENTIFIERS`) → verify: `EntityMasking` tests incl. expand-admitted typed entity.
+   **As built.** `TYPED_IDENTIFIERS` is gone; under `typed` an id is masked when its Entity Type is masked, the types
+   being `LinkAnalysisSettings.effectiveEntityTypes()`. Resolution order: (1) a list op's sealed `list.masked` (absent ⇒
+   masked, fail closed) **OR** today's type for `list.entityType` masked or no longer in force — so a Space that
+   tightens a type after the op cannot leave an old Investigation showing that list raw while the list route masks it
+   (review fix 2026-09-26; render-time only, replay unaffected); (2) a `seed`'s `entityType` →
+   the in-force type whose id equals it case-insensitively, and an `entityType` naming no in-force type ⇒ masked (fail
+   closed); (3) the bound Dataset's registry `columns[].classification` of `sourceCol`/`targetCol` → the in-force type
+   claiming it (trimmed, case-insensitive) → when masked, every id (an id records no column); a classification no type
+   claims stays untyped. The type's flag is the one truth (as `EntityListRoutes`): no msisdn/imsi/account override.
+   ⚠ **Behaviour change:** with the default types imsi/msisdn/account stay masked, but `subscriber`, `imei` and
+   `wallet` seeds/columns are now masked too, and a seed whose `entityType` is not an in-force type is masked (was raw
+   unless one of the three); a Space redefining `msisdn` as `masked:false` now sees it raw. ⚠ Asymmetry, by design: an
+   unknown seed `entityType` fails CLOSED, but a column classification no type claims stays raw (fails OPEN) — so a
+   Space whose custom `entity_types` drops the `MSISDN` classification un-masks a column that used to be masked. Four non-masking tests that
+   seed `subscriber` now set `masking_mode: none`. Tests: `EntityMaskingTest` (2, fail-closed + sealed `false`),
+   `ControlApiInvestigationOversightTest` +2 (wallet/unknown/handset seeds, basis text, `none`; IMEI/HANDSET columns),
+   `ControlApiInvestigationEntityListOpsTest` +2 (`all` masks members/excludedKeys/unmatched; msisdn `masked:false` raw
+   on both the Investigation and the list route). `ConfigSpecs` `masking_mode` description updated.
    Owed from the step-4 re-review (2026-09-26), all closed by this step: (a) a plain `seed {entityType: "wallet"}`
    (or any masked type outside MSISDN/IMSI/ACCOUNT) is still UNMASKED under `typed` — the one known gap left;
    (b) `EntityMasking` forces a type named msisdn/imsi/account to masked even when it says `masked: false`, while the
