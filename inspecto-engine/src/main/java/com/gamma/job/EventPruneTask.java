@@ -37,6 +37,15 @@ final class EventPruneTask {
         if (dryRun)
             return JobResult.ok("event_prune[dry-run]: would remove " + n + " day-partition(s) before " + cutoff
                     + " (retention " + days + "d)", (System.nanoTime() - t0) / 1_000_000L);
+        // ASSURE-AUDIT-CHAIN-1: record what was ACTUALLY removed, as an AUDIT row on the chain (so it is linked,
+        // anchored and verified like every other). /audit/verify accepts anchored rows being gone ONLY for days
+        // before the cutoff a verified prune record names — a configured-but-unrun job accounts for nothing.
+        host.attachedEventLog().ifPresent(log -> log.emit(com.gamma.event.Event.builder(com.gamma.event.EventType.AUDIT)
+                .source("job").message("event_prune removed " + n + " day-partition(s) before " + cutoff)
+                .actor("job:" + cfg.name()).actorType("system")
+                .action("events.pruned").actionCategory("retention")
+                .target("job", cfg.name())
+                .attr("prune_before", cutoff).attr("partitions_removed", n).attr("retention_days", days)));
         return JobResult.ok("event_prune: removed " + n + " day-partition(s) before " + cutoff
                 + " (retention " + days + "d)", (System.nanoTime() - t0) / 1_000_000L);
     }

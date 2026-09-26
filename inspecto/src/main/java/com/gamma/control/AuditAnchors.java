@@ -99,8 +99,8 @@ final class AuditAnchors {
 
     /** The whole anchor file: the anchors that parsed, in file order, the 1-based numbers of lines that did not,
      *  and the "anchoring started" record ({@code null} before the first anchor was ever written). */
-    record AnchorFile(List<Anchor> anchors, List<Integer> unreadableLines, boolean exists, Started started) {
-        static final AnchorFile NONE = new AnchorFile(List.of(), List.of(), false, null);
+    record AnchorFile(List<Anchor> anchors, List<Integer> unreadableLines, boolean exists, Started started, Path root) {
+        static final AnchorFile NONE = new AnchorFile(List.of(), List.of(), false, null, null);
 
         /** The seq the current anchor epoch starts at: a leading BREAK anchor's new start, else 1. */
         long epochStart() {
@@ -182,9 +182,12 @@ final class AuditAnchors {
 
     /** Every line of the anchor file — a line that does not parse is RECORDED, never skipped. */
     static AnchorFile readFile(Path root) throws IOException {
-        Started started = readStarted(root);
-        Path f = file(root);
-        if (!Files.isRegularFile(f)) return new AnchorFile(List.of(), List.of(), false, started);
+        return readFileAt(root, file(root), readStarted(root));
+    }
+
+    /** {@link #readFile} over a given anchor file — a replaced one, for the prior epochs. */
+    static AnchorFile readFileAt(Path root, Path f, Started started) throws IOException {
+        if (!Files.isRegularFile(f)) return new AnchorFile(List.of(), List.of(), false, started, root);
         List<Anchor> out = new ArrayList<>();
         List<Integer> bad = new ArrayList<>();
         List<String> lines = Files.readAllLines(f, StandardCharsets.UTF_8);
@@ -209,7 +212,7 @@ final class AuditAnchors {
                     m.get("prevAnchorMac") == null ? null : m.get("prevAnchorMac").toString(),
                     claimed == null ? null : claimed.toString(), ok, Map.copyOf(extra)));
         }
-        return new AnchorFile(List.copyOf(out), List.copyOf(bad), true, started);
+        return new AnchorFile(List.copyOf(out), List.copyOf(bad), true, started, root);
     }
 
     private static Started readStarted(Path root) throws IOException {
@@ -416,12 +419,12 @@ final class AuditAnchors {
             throws IOException {
         long lastSeq = AuditChain.seq(lastRec);
         return write(root, fields(kind, day.toString(), firstSeq, lastSeq, AuditChain.storedHash(lastRec),
-                lastSeq - firstSeq + 1, System.currentTimeMillis(), prevMac), Map.of(), false);
+                lastSeq - firstSeq + 1, System.currentTimeMillis(), prevMac), Map.of(), null);
     }
 
     /** MAC and append one anchor line (a {@code rotate} starts a NEW file with it, moving the old one aside), then
      *  bring the "anchoring started" record up to date. */
-    private static Anchor write(Path root, Map<String, Object> base, Map<String, Object> extra, boolean rotate)
+    private static Anchor write(Path root, Map<String, Object> base, Map<String, Object> extra, String rotateTo)
             throws IOException {
         Map<String, Object> m = new LinkedHashMap<>(base);
         m.putAll(extra);
@@ -430,8 +433,7 @@ final class AuditAnchors {
         normal.put("mac", mac);
         Path f = file(root);
         Files.createDirectories(f.getParent());
-        if (rotate && Files.exists(f))
-            Files.move(f, f.resolveSibling("audit-anchors." + System.currentTimeMillis() + ".replaced.jsonl"));
+        if (rotateTo != null && Files.exists(f)) Files.move(f, f.resolveSibling(rotateTo));
         createOwnerOnly(f, false);
         try (FileChannel ch = FileChannel.open(f, StandardOpenOption.WRITE, StandardOpenOption.APPEND)) {
             ch.write(ByteBuffer.wrap((ContentHash.canonicalJson(normal) + "\n").getBytes(StandardCharsets.UTF_8)));
@@ -443,7 +445,7 @@ final class AuditAnchors {
         Anchor a = new Anchor(str(normal.get("kind")), str(normal.get("day")), num(normal.get("firstSeq")),
                 num(normal.get("lastSeq")), str(normal.get("lastHash")), num(normal.get("count")),
                 num(normal.get("createdAt")), str(normal.get("prevAnchorMac")), mac, true, Map.copyOf(ex));
-        recordStarted(root, a, rotate);
+        recordStarted(root, a, rotateTo != null);
         return a;
     }
 
@@ -462,7 +464,8 @@ final class AuditAnchors {
      * @throws ApiException 409 when the chain and anchors verify (nothing to rebaseline); 429 within a minute of the
      *         last rebaseline for this Space
      */
-    static Anchor rebaseline(EventStore store, Path root, String reason, AuditVerifier.Policy policy) throws IOException {
+    static Anchor rebaseline(EventStore store, Path root, String reason, AuditVerifier.Policy policy, String by)
+            throws IOException {
         Path key = root.toAbsolutePath().normalize();
         long now = System.currentTimeMillis();
         Long prior = LAST_REBASELINE.get(key);
@@ -472,7 +475,10 @@ final class AuditAnchors {
         LAST_REBASELINE.put(key, now);
         synchronized (lock(root)) {
             AnchorFile file = readFile(root);
-            AuditVerifier.Result r = AuditVerifier.verify(store, file, null, null, Long.MAX_VALUE, e -> true, policy);
+            // judged on the CURRENT epoch: an earlier, already acknowledged break is not a new problem
+            AuditVerifier.Policy current = new AuditVerifier.Policy(policy.today(), policy.requireAnchors(),
+                    policy.retentionCutoff(), true, policy.retentionSource());
+            AuditVerifier.Result r = AuditVerifier.verify(store, file, null, null, Long.MAX_VALUE, e -> true, current);
             if (r.ok())
                 throw new ApiException(409, ErrorCodes.CONFLICT, "the audit chain and its anchors verify; there is "
                         + "nothing to rebaseline");
@@ -494,11 +500,65 @@ final class AuditAnchors {
             extra.put("reason", reason);
             extra.put("problem", r.bad().reason() + " at seq " + r.bad().seq() + ": " + r.bad().detail());
             extra.put("lastGoodSeq", lastGood == null ? 0 : lastGood.lastSeq());
-            Anchor a = write(root, base, extra, true);
+            extra.put("by", by);
+            // the file this break replaces is KEPT and pinned by digest: verify checks it as the prior epoch
+            Path old = file(root);
+            String rotateTo = "audit-anchors." + now + ".replaced.jsonl";
+            if (Files.exists(old)) {
+                extra.put("replacedFile", rotateTo);
+                extra.put("replacedSha256", sha256(old));
+            }
+            Anchor a = write(root, base, extra, rotateTo);
             log.warn("Audit anchors REBASELINED for {} at seq {}: {} (problem: {})", key, newStart, reason,
                     extra.get("problem"));
             return a;
         }
+    }
+
+    static String sha256(Path f) throws IOException {
+        try {
+            return java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(f)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * The acknowledged breaks, newest first, walking back through each break's replaced anchor file — which must
+     * still exist with the digest the break recorded. Fills {@code breaks}; returns the first problem, or null.
+     */
+    static AuditVerifier.Bad priorEpochs(AnchorFile file, List<Map<String, Object>> breaks) {
+        AnchorFile cur = file;
+        for (int guard = 0; guard < 1000 && cur.root() != null && !cur.anchors().isEmpty()
+                && cur.anchors().get(0).isBreak(); guard++) {
+            Anchor b = cur.anchors().get(0);
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("at", b.firstSeq());
+            m.put("day", b.day());
+            m.put("reason", b.extra().get("reason"));
+            m.put("problem", b.extra().get("problem"));
+            m.put("lastGoodSeq", b.extra().get("lastGoodSeq"));
+            m.put("by", b.extra().get("by"));
+            m.put("replacedFile", b.extra().get("replacedFile"));
+            breaks.add(m);
+            Object name = b.extra().get("replacedFile");
+            if (name == null) return null;
+            Path prior = file(cur.root()).resolveSibling(name.toString());
+            try {
+                if (!Files.isRegularFile(prior))
+                    return new AuditVerifier.Bad(b.firstSeq(), "prior-epoch-missing", "the anchor file the break at seq "
+                            + b.firstSeq() + " replaced (" + name + ") is gone");
+                if (!sha256(prior).equals(b.extra().get("replacedSha256")))
+                    return new AuditVerifier.Bad(b.firstSeq(), "prior-epoch-altered", "the anchor file the break at seq "
+                            + b.firstSeq() + " replaced (" + name + ") no longer has the digest the break recorded");
+                cur = readFileAt(cur.root(), prior, null);
+            } catch (IOException e) {
+                return new AuditVerifier.Bad(b.firstSeq(), "prior-epoch-missing", "could not read " + name + ": "
+                        + e.getMessage());
+            }
+        }
+        return null;
     }
 
     /** Test seam: forget the rebaseline rate limit for {@code root}. */

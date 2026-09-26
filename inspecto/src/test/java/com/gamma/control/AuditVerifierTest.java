@@ -412,23 +412,45 @@ class AuditVerifierTest {
         assertBad(verify(s), 1, "truncated-before-anchor");
     }
 
-    private static AuditVerifier.Result verifyWithCutoff(Space s, LocalDate cutoff) throws Exception {
+    private static AuditVerifier.Result verifyWith(Space s, LocalDate configuredCutoff, boolean currentEpochOnly)
+            throws Exception {
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
             return AuditVerifier.verify(store, AuditAnchors.readFile(s.config()), null, null, Long.MAX_VALUE,
-                    e -> true, new AuditVerifier.Policy(LocalDate.of(2026, 9, 22), false, cutoff));
+                    e -> true, new AuditVerifier.Policy(LocalDate.of(2026, 9, 22), false, configuredCutoff,
+                            currentEpochOnly, configuredCutoff == null ? "none configured" : "event_prune retention_days=1"));
         }
     }
 
-    /** Only the configured event retention may take anchored rows: day 1 (2026-09-20) wholly gone is retention
-     *  only when the cutoff is AFTER it; with no prune configured, or a cutoff at or before it, it is truncation. */
+    /** A chained prune record, as EventPruneTask writes it. */
+    private static void pruneRecord(Space s, long ts, LocalDate before) {
+        try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
+            EventLog log = EventLog.create();
+            log.installStore(store);
+            log.emit(Event.builder(EventType.AUDIT).ts(ts).source("job").message("event_prune")
+                    .actor("job:retention").action(AuditVerifier.PRUNE_ACTION)
+                    .attr(AuditVerifier.PRUNE_BEFORE, before));
+        }
+    }
+
+    /** Only what a prune ACTUALLY removed — a chained prune record — accounts for anchored rows being gone. A
+     *  {@code retention_days: 1} job that is configured but never ran accounts for nothing. */
     @Test
-    void aWhollyRemovedAnchoredDayIsRetentionOnlyBeforeTheConfiguredCutoff(@TempDir Path dir) throws Exception {
+    void aRemovedAnchoredDayIsRetentionOnlyWhenAPruneRecordAccountsForIt(@TempDir Path dir) throws Exception {
         Space s = twoAnchoredDays(dir);
-        rewrite(s, all -> all.stream().filter(e -> seq(e) > 5).toList());
-        assertBad(verifyWithCutoff(s, null), 1, "truncated-before-anchor");
-        assertBad(verifyWithCutoff(s, LocalDate.of(2026, 9, 20)), 1, "truncated-before-anchor");
-        AuditVerifier.Result pruned = verifyWithCutoff(s, LocalDate.of(2026, 9, 21));
+        rewrite(s, all -> all.stream().filter(e -> seq(e) > 5).toList());   // day 1 removed from the front
+        AuditVerifier.Result configuredOnly = verifyWith(s, LocalDate.of(2026, 9, 21), false);
+        assertBad(configuredOnly, 1, "truncated-before-anchor");
+        @SuppressWarnings("unchecked") Map<String, Object> ret = (Map<String, Object>) configuredOnly.extra().get("retention");
+        assertEquals("event_prune retention_days=1", ret.get("configuredSource"), "the cutoff's source is reported");
+
+        pruneRecord(s, T0 + DAY + 20_000, LocalDate.of(2026, 9, 20));      // removed only days BEFORE day 1
+        assertBad(verifyWith(s, null, false), 1, "truncated-before-anchor");
+        pruneRecord(s, T0 + DAY + 30_000, LocalDate.of(2026, 9, 21));      // removed day 1
+        AuditVerifier.Result pruned = verifyWith(s, null, false);
         assertTrue(pruned.ok(), String.valueOf(pruned.bad()));
+        @SuppressWarnings("unchecked") Map<String, Object> r2 = (Map<String, Object>) pruned.extra().get("retention");
+        assertEquals("prune-record", r2.get("source"));
+        assertEquals("2026-09-21", r2.get("prunedBefore"));
     }
 
     // ── the durable "anchoring started" record ─────────────────────────────────────────────────────────────
@@ -467,12 +489,14 @@ class AuditVerifierTest {
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
             AuditAnchors.resetRebaselineLimit(s.config());
             return AuditAnchors.rebaseline(store, s.config(), reason,
-                    new AuditVerifier.Policy(LocalDate.of(2026, 9, 22), false, null));
+                    new AuditVerifier.Policy(LocalDate.of(2026, 9, 22), false, null), "admin-1");
         }
     }
 
+    /** A rebaseline is NEVER invisible: the default verify is not ok while any break exists — it is acknowledged,
+     *  with the breaks listed; only ?epoch=current may report ok, and it still lists them. */
     @Test
-    void aRebaselineIsASignedBreakThatVerifyNamesAndNeverPassesOver(@TempDir Path dir) throws Exception {
+    void aRebaselineIsASignedBreakThatVerifyNamesAndNeverReportsPlainOk(@TempDir Path dir) throws Exception {
         Space s = twoAnchoredDays(dir);
         assertEquals(409, assertThrows(ApiException.class, () -> rebaseline(s, "no reason to")).status,
                 "a healthy chain is never rebaselined");
@@ -483,15 +507,24 @@ class AuditVerifierTest {
         assertEquals("break", b.kind());
         assertEquals(11, b.firstSeq(), "the new epoch starts after the head");
         assertEquals("disk fault on 2026-09-22, INC-42", b.extra().get("reason"));
+        assertEquals("admin-1", b.extra().get("by"));
         assertTrue(String.valueOf(b.extra().get("problem")).startsWith("anchor-unreadable"), b.extra().toString());
         assertEquals(5L, ((Number) b.extra().get("lastGoodSeq")).longValue());
-        try (var files = Files.list(f.getParent())) {
-            assertTrue(files.anyMatch(p -> p.getFileName().toString().endsWith(".replaced.jsonl")),
-                    "the broken file is kept, moved aside");
-        }
-        assertTrue(verify(s).ok(), "the current epoch verifies: " + verify(s).bad());
+
+        AuditVerifier.Result whole = verifyWith(s, null, false);
+        assertBad(whole, 11, "acknowledged-break");
+        assertEquals(true, whole.extra().get("acknowledged"));
+        assertEquals(11L, whole.extra().get("epochStart"));
+        @SuppressWarnings("unchecked") List<Map<String, Object>> breaks = (List<Map<String, Object>>) whole.extra().get("breaks");
+        assertEquals(1, breaks.size());
+        assertEquals("disk fault on 2026-09-22, INC-42", breaks.get(0).get("reason"));
+        assertEquals("admin-1", breaks.get(0).get("by"));
+        AuditVerifier.Result current = verifyWith(s, null, true);
+        assertTrue(current.ok(), "the current epoch alone: " + current.bad());
+        assertEquals(1, ((List<?>) current.extra().get("breaks")).size(), "…and still says so");
         assertBad(verify(s, 1L, null, Long.MAX_VALUE), 11, "acknowledged-break");
-        // and anchoring continues on the new epoch
+
+        // anchoring continues on the new epoch
         emit(s, T0 + 2 * DAY, T0 + 2 * DAY + 1);
         try (ParquetEventStore store = new ParquetEventStore(s.events(), 1000, 0, 100)) {
             assertEquals(1, AuditAnchors.roll(store, s.config(), LocalDate.of(2026, 9, 23)));
@@ -499,7 +532,24 @@ class AuditVerifierTest {
         List<AuditAnchors.Anchor> a = AuditAnchors.read(s.config());
         assertEquals(b.mac(), a.get(1).prevAnchorMac());
         assertEquals(11, a.get(1).firstSeq());
-        assertTrue(verify(s).ok(), String.valueOf(verify(s).bad()));
+        assertTrue(verifyWith(s, null, true).ok(), String.valueOf(verifyWith(s, null, true).bad()));
+        assertFalse(verifyWith(s, null, false).ok());
+    }
+
+    /** The replaced anchor file is the prior epoch: kept, pinned by digest, and checked. */
+    @Test
+    void theReplacedAnchorFileIsVerifiedAsThePriorEpoch(@TempDir Path dir) throws Exception {
+        Space s = twoAnchoredDays(dir);
+        Path f = AuditAnchors.file(s.config());
+        Files.write(f, List.of(Files.readAllLines(f, StandardCharsets.UTF_8).get(0), "{garbled"),
+                StandardCharsets.UTF_8);
+        AuditAnchors.Anchor b = rebaseline(s, "disk fault");
+        Path replaced = f.resolveSibling(String.valueOf(b.extra().get("replacedFile")));
+        assertTrue(Files.exists(replaced));
+        Files.writeString(replaced, "edited\n", StandardCharsets.UTF_8, java.nio.file.StandardOpenOption.APPEND);
+        assertBad(verifyWith(s, null, true), 11, "prior-epoch-altered");
+        Files.delete(replaced);
+        assertBad(verifyWith(s, null, true), 11, "prior-epoch-missing");
     }
 
     @Test

@@ -54,7 +54,7 @@ final class AuditLogRoutes implements RouteModule {
         api.post("/audit/anchors", ApiContext.withCapability("canAdminister", (e, m) -> anchorNow(api)));
         // The operator's acknowledged break: never a repair — a signed BREAK anchor naming the problem and a reason.
         api.post("/audit/anchors/rebaseline", ApiContext.withCapability("canAdminister",
-                (e, m) -> rebaseline(api, api.body(e))));
+                (e, m) -> rebaseline(api, e, api.body(e))));
     }
 
     /** The most chain records one {@code /audit/verify} walks; past it the result says {@code complete: false}
@@ -81,7 +81,7 @@ final class AuditLogRoutes implements RouteModule {
         AuditAnchors.AnchorFile anchors = root == null ? AuditAnchors.AnchorFile.NONE : AuditAnchors.readFile(root);
         java.util.Map<String, Object> out = new java.util.LinkedHashMap<>(AuditVerifier.verify(
                 api.service().events(), anchors, from, to, MAX_VERIFY, e -> true,
-                policy(api, root)).toMap());
+                policy(api, root, "current".equals(ApiContext.query(ex, "epoch")))).toMap());
         out.put("anchors", root == null ? "unavailable" : "checked");
         return out;
     }
@@ -114,14 +114,14 @@ final class AuditLogRoutes implements RouteModule {
 
     /** Today, whether anchors are expected (a key exists only with a write root), and the configured event retention
      *  cutoff — the shortest enabled {@code event_prune} window, or none. */
-    private static AuditVerifier.Policy policy(ApiContext api, Path root) {
+    private static AuditVerifier.Policy policy(ApiContext api, Path root, boolean currentEpochOnly) {
         java.time.LocalDate today = java.time.LocalDate.now(java.time.ZoneOffset.UTC);
-        java.time.LocalDate cutoff = api.service().jobService()
-                .map(com.gamma.job.JobService::eventRetentionDays)
-                .filter(java.util.OptionalLong::isPresent)
-                .map(d -> today.minusDays(d.getAsLong()))
-                .orElse(null);
-        return new AuditVerifier.Policy(today, root != null, cutoff);
+        java.util.OptionalLong days = api.service().jobService()
+                .map(com.gamma.job.JobService::eventRetentionDays).orElse(java.util.OptionalLong.empty());
+        java.time.LocalDate cutoff = days.isPresent() ? today.minusDays(days.getAsLong()) : null;
+        // reported only: truncation is judged by the chained prune records, never by what is merely configured
+        String source = days.isPresent() ? "event_prune retention_days=" + days.getAsLong() : "none configured";
+        return new AuditVerifier.Policy(today, root != null, cutoff, currentEpochOnly, source);
     }
 
     /** The longest rebaseline reason accepted. */
@@ -132,13 +132,26 @@ final class AuditLogRoutes implements RouteModule {
      * file that does not verify ({@link AuditAnchors#rebaseline}). 503 without a write root, 422 without a reason,
      * 409 when there is nothing to rebaseline, 429 more than once a minute.
      */
-    private static Object rebaseline(ApiContext api, java.util.Map<String, Object> body) throws IOException {
+    private static Object rebaseline(ApiContext api, HttpExchange ex, java.util.Map<String, Object> body)
+            throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "audit anchor rebaseline");
         Object r = body == null ? null : body.get("reason");
         if (!(r instanceof String reason) || reason.isBlank() || reason.length() > REASON_MAX)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
                     "reason is required: a non-blank string of at most " + REASON_MAX + " characters");
-        return AuditAnchors.rebaseline(api.service().events(), root, reason.trim(), policy(api, root)).toMap();
+        String actor = ApiContext.actor(ex);
+        AuditAnchors.Anchor b = AuditAnchors.rebaseline(api.service().events(), root, reason.trim(),
+                policy(api, root, false), actor);
+        // its OWN audit event, chained like every other, carrying what the break records (beside the generic
+        // POST row the dispatch seam writes)
+        com.gamma.event.EventLog.current().emit(com.gamma.event.Event.builder(EventType.AUDIT)
+                .source("audit").message(actor + " audit.rebaseline at seq " + b.firstSeq() + ": " + reason.trim())
+                .actor(actor).actorType(ApiContext.actorType(ex))
+                .action("audit.rebaseline").actionCategory("configuration")
+                .target("audit-anchors", String.valueOf(b.firstSeq()))
+                .attr("reason", reason.trim()).attr("problem", b.extra().get("problem"))
+                .attr("lastGoodSeq", b.extra().get("lastGoodSeq")).attr("breakMac", b.mac()));
+        return b.toMap();
     }
 
     /** A positive seq query parameter, or {@code null} when absent; anything else is a 400. */

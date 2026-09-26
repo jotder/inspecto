@@ -170,6 +170,21 @@ class ControlApiAuditChainTest {
 
             JsonNode v = V1Body.of(send(c, "GET", "/audit/verify?from=1", "Bearer admin").body());
             assertEquals("acknowledged-break", v.get("firstBad").get("reason").asText(), v.toString());
+            // the DEFAULT verify is never plain ok after a break; ?epoch=current may be, and still lists the break
+            JsonNode d = V1Body.of(send(c, "GET", "/audit/verify", "Bearer admin").body());
+            assertFalse(d.get("ok").asBoolean(), d.toString());
+            assertTrue(d.get("acknowledged").asBoolean(), d.toString());
+            assertEquals("admin-1", d.get("breaks").get(0).get("by").asText(), d.toString());
+            JsonNode cur = V1Body.of(send(c, "GET", "/audit/verify?epoch=current", "Bearer admin").body());
+            assertEquals(1, cur.get("breaks").size(), cur.toString());
+            // and the rebaseline is its OWN chained audit event
+            JsonNode rows = V1Body.of(send(c, "GET", "/audit/search?type=AUDIT&limit=200", "Bearer admin").body());
+            JsonNode own = null;
+            for (JsonNode r : rows) if ("audit.rebaseline".equals(r.get("attributes").path("action").asText())) own = r;
+            assertNotNull(own, rows.toString());
+            assertEquals("forged row found in INC-7", own.get("attributes").get("reason").asText());
+            assertEquals("admin-1", own.get("attributes").get("actor").asText());
+            assertTrue(own.get("attributes").has("audit_seq"), "chained");
         }
     }
 

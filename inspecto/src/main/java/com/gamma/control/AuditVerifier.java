@@ -44,7 +44,12 @@ final class AuditVerifier {
      * What the walk is judged against: today's UTC date, whether every finished day must be anchored (a Space
      * with a key), and the configured event retention cutoff ({@code null} when no {@code event_prune} runs).
      */
-    record Policy(LocalDate today, boolean requireAnchors, LocalDate retentionCutoff) {}
+    record Policy(LocalDate today, boolean requireAnchors, LocalDate retentionCutoff, boolean currentEpochOnly,
+                  String retentionSource) {
+        Policy(LocalDate today, boolean requireAnchors, LocalDate retentionCutoff) {
+            this(today, requireAnchors, retentionCutoff, false, null);
+        }
+    }
 
     /** Records fetched per store read. */
     static final int PAGE = 1000;
@@ -63,10 +68,16 @@ final class AuditVerifier {
     /**
      * The walk's result. {@code checked} records passed; {@code lastSeq}/{@code lastHash} is the last of them;
      * {@code complete} is false when {@code maxRecords} stopped the walk before {@code to}, and {@code next} is the
-     * seq to resume from.
+     * seq to resume from. {@code extra} carries {@code acknowledged}, {@code breaks}, {@code epochStart} and
+     * {@code retention}.
      */
     record Result(long from, long to, long checked, boolean fromGenesis, boolean complete, Long next,
-                  long lastSeq, String lastHash, int anchorsChecked, Bad bad) {
+                  long lastSeq, String lastHash, int anchorsChecked, Bad bad, Map<String, Object> extra) {
+        Result(long from, long to, long checked, boolean fromGenesis, boolean complete, Long next,
+               long lastSeq, String lastHash, int anchorsChecked, Bad bad) {
+            this(from, to, checked, fromGenesis, complete, next, lastSeq, lastHash, anchorsChecked, bad, Map.of());
+        }
+
         boolean ok() { return bad == null; }
 
         Map<String, Object> toMap() {
@@ -82,22 +93,50 @@ final class AuditVerifier {
             m.put("lastHash", lastHash);
             m.put("anchorsChecked", anchorsChecked);
             m.put("firstBad", bad == null ? null : bad.toMap());
+            m.putAll(extra);
             return m;
         }
     }
 
+    /** The audit action a prune records ({@code EventPruneTask}), and the attribute naming its cutoff day. */
+    static final String PRUNE_ACTION = "events.pruned";
+    static final String PRUNE_BEFORE = "prune_before";
+
     /**
-     * Verify {@code [from, to]} (inclusive; {@code from = null} = the lowest seq the store holds, {@code to = null}
-     * = the head, or the highest anchored seq when an anchor claims more than the store holds), walking at most
-     * {@code maxRecords} records.
+     * Verify {@code [from, to]} (inclusive; {@code from = null} = the lowest seq of the current anchor epoch,
+     * {@code to = null} = the head, or the highest anchored seq when an anchor claims more than the store holds),
+     * walking at most {@code maxRecords} records.
      *
-     * @param anchors    the Space's anchors with their MAC verdict; only those whose range ends inside the walk
-     *                   are checked
-     * @param onGood     called with each record that passed, in seq order; returning false stops the walk there
-     *                   (the anchor roll uses it to stop at today)
+     * <p>🔴 <b>A rebaseline is never invisible.</b> Whenever a BREAK anchor exists, the result carries
+     * {@code acknowledged: true}, the {@code breaks} (every epoch back through the replaced anchor files) and
+     * {@code epochStart}, and is NOT ok — unless the caller asked for the current epoch alone
+     * ({@link Policy#currentEpochOnly}), and even then {@code breaks} is reported. Each replaced anchor file must
+     * still exist with the digest its break recorded ({@code prior-epoch-missing} / {@code prior-epoch-altered}).
+     *
+     * @param onGood called with each record that passed, in seq order; returning false stops the walk there
      */
     static Result verify(EventStore store, AuditAnchors.AnchorFile anchorFile, Long from, Long to, long maxRecords,
                          Predicate<Event> onGood, Policy policy) {
+        Map<String, Object> info = new LinkedHashMap<>();
+        List<Map<String, Object>> breaks = new ArrayList<>();
+        Bad prior = AuditAnchors.priorEpochs(anchorFile, breaks);
+        Result r = walk(store, anchorFile, from, to, maxRecords, onGood, policy, info);
+        Bad bad = r.bad();
+        if (bad == null && prior != null) bad = prior;
+        long epoch = anchorFile.epochStart();
+        if (bad == null && !breaks.isEmpty() && !policy.currentEpochOnly())
+            bad = new Bad(epoch, "acknowledged-break", breaks.size() + " acknowledged break(s); the latest at seq "
+                    + epoch + " (reason: " + breaks.get(0).get("reason") + "). The current epoch alone is checked by "
+                    + "?epoch=current; the whole trail is never reported ok across a break");
+        info.put("acknowledged", !breaks.isEmpty());
+        info.put("breaks", breaks);
+        info.put("epochStart", epoch);
+        return new Result(r.from(), r.to(), r.checked(), r.fromGenesis(), r.complete(), r.next(), r.lastSeq(),
+                r.lastHash(), r.anchorsChecked(), bad, info);
+    }
+
+    private static Result walk(EventStore store, AuditAnchors.AnchorFile anchorFile, Long from, Long to,
+                               long maxRecords, Predicate<Event> onGood, Policy policy, Map<String, Object> info) {
         LocalDate today = policy.today();
         boolean requireAnchors = policy.requireAnchors();
         List<AuditAnchors.Anchor> anchors = anchorFile.anchors();
@@ -122,8 +161,12 @@ final class AuditVerifier {
         final Long n0 = next;
         java.util.function.Function<Bad, Result> fail =
                 b -> new Result(s0, e0, 0, fromGenesis, c0, n0, s0 - 1, null, 0, b);
+        Map<String, Object> retention = new LinkedHashMap<>();
+        retention.put("configuredCutoff", policy.retentionCutoff() == null ? null : policy.retentionCutoff().toString());
+        retention.put("configuredSource", policy.retentionSource());
+        info.put("retention", retention);
 
-        // ---- the anchor FILE first: unreadable lines, MACs, the anchor chain, contiguity ----
+        // ---- the anchor FILE first: missing/truncated, unreadable lines, MACs, the anchor chain, contiguity ----
         Bad fileBad = anchorFile.firstProblem();
         if (fileBad != null) return fail.apply(fileBad);
 
@@ -133,23 +176,6 @@ final class AuditVerifier {
             return fail.apply(new Bad(epoch, "acknowledged-break", "the anchors were rebaselined at seq " + epoch
                     + " on " + b.day() + " (reason: " + b.extra().get("reason") + "; problem: "
                     + b.extra().get("problem") + "); rows before it are outside the current anchor epoch"));
-        }
-
-        // ---- anchors that end BELOW the first retained record (from = the lowest): the anchored rows are gone.
-        // Retention removes whole old days, so an anchor whose day is wholly before the first retained record's
-        // day is what a prune leaves behind; one whose day still has retained rows was truncated.
-        // Only the configured event retention (an event_prune job's retention_days) may remove anchored rows, and
-        // only days before its cutoff: an anchored day at or after the cutoff — or ANY anchored day when no prune
-        // is configured — whose rows are gone was truncated.
-        if (from == null) {
-            LocalDate cutoff = policy.retentionCutoff();
-            for (AuditAnchors.Anchor a : anchors)
-                if (!a.isBreak() && a.count() > 0 && (firstRec.isEmpty() || a.firstSeq() < lowest)
-                        && (cutoff == null || !LocalDate.parse(a.day()).isBefore(cutoff)))
-                    return fail.apply(new Bad(a.firstSeq(), "truncated-before-anchor", "the anchor for " + a.day()
-                            + " covers seq " + a.firstSeq() + ".." + a.lastSeq() + " but those rows are gone; "
-                            + (cutoff == null ? "no event retention is configured"
-                            : "the retention cutoff is " + cutoff)));
         }
 
         // ---- audit rows that are NOT on the chain, written since it began: every one is a hole ----
@@ -185,6 +211,8 @@ final class AuditVerifier {
         long lastSeq = start - 1;
         String lastHash = expectedPrev;
         boolean stopped = false;
+        LocalDate prunedBefore = null;
+        int pruneRecords = 0;
         java.util.Map<String, Long> seenIds = new java.util.HashMap<>();
         Cursor records = new Cursor(store, start, end);
         Event cur = records.next();
@@ -200,6 +228,16 @@ final class AuditVerifier {
                         + ", a finished day no anchor covers");
             if (bad != null)
                 return new Result(start, end, checked, fromGenesis, complete, next, lastSeq, lastHash, anchorIdx, bad);
+            // a VERIFIED prune record: the only thing that may account for anchored rows being gone
+            if (PRUNE_ACTION.equals(cur.attributes().get(com.gamma.event.AuditAttrs.ACTION))) {
+                try {
+                    LocalDate d = LocalDate.parse(cur.attributes().get(PRUNE_BEFORE));
+                    if (prunedBefore == null || d.isAfter(prunedBefore)) prunedBefore = d;
+                    pruneRecords++;
+                } catch (RuntimeException malformed) {
+                    // a prune row without a readable cutoff accounts for nothing
+                }
+            }
             seenIds.put(cur.eventId(), s);
             while (anchorIdx < inRange.size() && inRange.get(anchorIdx).lastSeq() == s) anchorIdx++;
             checked++;
@@ -214,11 +252,26 @@ final class AuditVerifier {
             }
             cur = ahead;
         }
+        retention.put("prunedBefore", prunedBefore == null ? null : prunedBefore.toString());
+        retention.put("pruneRecords", pruneRecords);
+        retention.put("source", prunedBefore == null ? "none" : "prune-record");
         if (!stopped && anchorIdx < inRange.size()) {
             AuditAnchors.Anchor a = inRange.get(anchorIdx);
             return new Result(start, end, checked, fromGenesis, complete, next, lastSeq, lastHash, anchorIdx,
                     new Bad(expected, "missing", "the anchor for " + a.day() + " covers seq " + a.firstSeq() + ".."
                             + a.lastSeq() + " but the trail ends at seq " + (expected - 1)));
+        }
+        // ---- anchored rows gone from the FRONT (from = the lowest). Only what a prune ACTUALLY removed — a chained,
+        // verified events.pruned record naming its cutoff — accounts for them; a configured-but-unrun job does not.
+        if (from == null && !stopped) {
+            for (AuditAnchors.Anchor a : anchors)
+                if (!a.isBreak() && a.count() > 0 && (firstRec.isEmpty() || a.firstSeq() < lowest)
+                        && (prunedBefore == null || !LocalDate.parse(a.day()).isBefore(prunedBefore)))
+                    return new Result(start, end, checked, fromGenesis, complete, next, lastSeq, lastHash, anchorIdx,
+                            new Bad(a.firstSeq(), "truncated-before-anchor", "the anchor for " + a.day() + " covers seq "
+                                    + a.firstSeq() + ".." + a.lastSeq() + " but those rows are gone, and "
+                                    + (prunedBefore == null ? "no prune record accounts for any removal"
+                                    : "the latest prune record removed only days before " + prunedBefore)));
         }
         List<String> unreadable = store.unreadableUnits();
         if (!unreadable.isEmpty())

@@ -180,6 +180,32 @@ class MaintenanceLibraryTest {
         }
     }
 
+    /** ASSURE-AUDIT-CHAIN-1: a prune records what it ACTUALLY removed as a chained AUDIT row, the only thing
+     *  /audit/verify accepts as the reason anchored rows are gone. */
+    @Test
+    void eventPruneRecordsWhatItRemovedOnTheAuditChain(@TempDir Path audit, @TempDir Path events) throws Exception {
+        long aged = System.currentTimeMillis() - Duration.ofDays(400).toMillis();
+        try (var store = new com.gamma.event.ParquetEventStore(events, 1000, 0, 100);
+             com.gamma.util.Scheduler s = new com.gamma.util.Scheduler();
+             JobService js = new JobService(List.of(), new com.gamma.etl.ConsignmentEventBus(), s, null, audit.toString())) {
+            com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
+            log.installStore(store);
+            store.append(com.gamma.event.Event.builder(com.gamma.event.EventType.LOG).ts(aged).message("aged").build());
+            store.flush();
+            js.eventStore(store);
+            js.eventLog(log);
+            new MaintenanceJob(job(Map.of("task", "event_prune", "retention_days", "365")), null, audit.toString(),
+                    null, js).run();
+            var rec = store.chainPage(1, 10).stream()
+                    .filter(e -> "events.pruned".equals(e.attributes().get(com.gamma.event.AuditAttrs.ACTION)))
+                    .findFirst().orElseThrow(() -> new AssertionError("no prune record on the chain"));
+            assertEquals(java.time.LocalDate.now(java.time.ZoneOffset.UTC).minusDays(365).toString(),
+                    rec.attributes().get("prune_before"));
+            assertEquals("1", rec.attributes().get("partitions_removed"));
+            assertTrue(com.gamma.event.AuditChain.seq(rec) > 0, "linked onto the chain");
+        }
+    }
+
     // ── partition_prune (per-date retention for a sink store, 2026-09-06) ────────
 
     private static Path seedDay(Path store, int y, int m, int d, String file) throws Exception {

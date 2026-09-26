@@ -1502,6 +1502,12 @@ public final class JobService implements AutoCloseable {
         this.eventStore = store;
     }
 
+    /** This space's EventLog ({@link #eventLog(EventLog)}) — where {@code event_prune} records what it removed, ON
+     *  the audit chain. */
+    Optional<EventLog> attachedEventLog() {
+        return Optional.ofNullable(eventLog);
+    }
+
     /** The delivery receipts the {@code receipt_prune} maintenance task prunes, or empty when the host
      *  never attached a store. */
     public Optional<com.gamma.notify.DeliveryReceiptStore> deliveryReceiptStore() {
