@@ -317,7 +317,8 @@ export class VizRenderComponent {
         // UIE-2: colour by meaning (status tones) then by name, so "Fail" is red everywhere and a series keeps its
         // colour across widgets. An explicitly chosen non-default palette (monochrome) keeps positional colours.
         const positional = !!this.renderOptions()?.palette && this.renderOptions()?.palette !== 'categorical';
-        const colorsFor = (labels: readonly string[]): string[] => (positional ? labels.map((_, i) => color(i)) : seriesColors(labels));
+        const colorsFor = (labels: readonly string[]): string[] =>
+            positional ? labels.map((_, i) => color(i)) : seriesColors(labels);
         // Display only: a NULL/empty category drew as an unlabelled bar. Clicks still emit the raw label
         // (onElementClick reads sortedProps), so drill-down keeps filtering on the real value.
         const shown = p.labels.map(categoryLabel);
@@ -428,7 +429,9 @@ export class VizRenderComponent {
         // UIE-4: the value axis reads compact ("2.5M") and tooltips read the widget's format, not raw floats.
         const fmt = opts?.format;
         const cartesian = !isGauge && !isPie && type !== 'scatter' && type !== 'bubble';
-        const valueTicks = cartesian ? { ticks: { callback: (v: string | number) => formatAxisTick(Number(v), fmt) } } : {};
+        const valueTicks = cartesian
+            ? { ticks: { callback: (v: string | number) => formatAxisTick(Number(v), fmt) } }
+            : {};
         const tooltip = isGauge
             ? undefined
             : {
@@ -619,6 +622,7 @@ export class VizRenderComponent {
                   format: this.renderOptions()?.format,
                   target: this.renderOptions()?.kpi?.target,
                   better: this.renderOptions()?.kpi?.better ?? 'higher',
+                  kpiId: this.renderOptions()?.kpi?.kpiId,
                   size: this.kpiSize(),
               }
             : this.viewBinding() === undefined

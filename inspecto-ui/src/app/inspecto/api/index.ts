@@ -39,6 +39,7 @@ export * from './tags.service';
 export * from './connections.service';
 export * from './connection-probe.service';
 export * from './components.service';
+export * from './kpis.service';
 export * from './dataset-registration.service';
 export * from './parsers.service';
 export * from './icon-map.service';

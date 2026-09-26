@@ -168,9 +168,10 @@ export interface VizRenderOptions {
     /** Table only: columns rendered as status badges. Default: columns named status / severity / rag. */
     badgeColumns?: string[];
     /** UIE-1, KPI and (UIE-8) Gauge: the target, and which direction is good. Both state on / off target in words and tone;
-     *  the KPI colours its delta the same way, the Gauge draws good / bad zones. `better` defaults to `higher`. The Waterfall reads `better` alone: with
+     *  the KPI colours its delta the same way, the Gauge draws good / bad zones. `better` defaults to `higher`. `kpiId` (KPI only, ASSURE-KPI-DEFINITIONS-1) binds the
+     *  tile to a KPI definition, whose target / direction / bands / format / comparison then win over these inputs. The Waterfall reads `better` alone: with
      *  `lower`, a decrease is the good (success-toned) step. */
-    kpi?: { target?: number; better?: 'higher' | 'lower' };
+    kpi?: { target?: number; better?: 'higher' | 'lower'; kpiId?: string };
     /** KPI trend only: the delta compares the last point with the point `compareBack` steps earlier (default 1). */
     trend?: { compareBack?: number };
     /** Progress list only: how many rows show before "+N more" (default: `limit`, else 10), and the value a full bar

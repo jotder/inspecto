@@ -26,6 +26,8 @@ export type ComponentType =
     | 'link-analysis-view'
     | 'geo-map-view'
     | 'pattern-pack'
+    // A KPI definition (ASSURE-KPI-DEFINITIONS-1) — the KPI tile binds to one by `kpiId`.
+    | 'kpi'
     // The Case desk's Findings fields (one per ObjectType, id = the lowercased type). Authored ONLY from the
     // Cases pane's Findings-fields dialog, never the Components pane (D8) — and its writes are gated on
     // `canManageIncidents`, not `canAuthorWorkbench` (D1).

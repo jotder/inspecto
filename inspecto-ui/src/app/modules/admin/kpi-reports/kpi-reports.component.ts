@@ -5,7 +5,15 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { Router, RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, JobDetail, JobsService, LensService } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    ComponentDef,
+    ComponentsService,
+    JobDetail,
+    JobsService,
+    LensService,
+} from 'app/inspecto/api';
+import { KpiDefinitionDialog } from './kpi-definition.dialog';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
@@ -46,6 +54,7 @@ interface ReportJobParams {
 export class KpiReportsComponent implements OnInit {
     private dashboardsApi = inject(DashboardsService);
     private jobsApi = inject(JobsService);
+    private componentsApi = inject(ComponentsService);
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
@@ -55,6 +64,8 @@ export class KpiReportsComponent implements OnInit {
     readonly dashboards = signal<Dashboard[]>([]);
     readonly reportJobs = signal<JobDetail[]>([]);
     readonly loading = signal(true);
+    /** KPI definitions (ASSURE-KPI-DEFINITIONS-1) — a KPI tile binds to one by `kpiId`. A failed read is an empty list. */
+    readonly kpiDefinitions = signal<ComponentDef[]>([]);
     /** True when the dashboards fetch itself failed — distinguishes a load error from a genuinely
      *  empty gallery so the template can offer Retry instead of the "create one" empty state. */
     readonly loadError = signal(false);
@@ -85,6 +96,24 @@ export class KpiReportsComponent implements OnInit {
             },
         });
         this.loadReportDetails();
+        this.componentsApi.list('kpi').subscribe({
+            next: (k) => this.kpiDefinitions.set([...k].sort((a, b) => a.name.localeCompare(b.name))),
+            error: () => this.kpiDefinitions.set([]),
+        });
+    }
+
+    /** Create (no argument) or edit a KPI definition; a save reloads the list. */
+    openKpiDefinition(existing?: ComponentDef): void {
+        this.dialog
+            .open(KpiDefinitionDialog, { data: { existing }, width: '640px' })
+            .afterClosed()
+            .subscribe((saved) => {
+                if (saved) this.load();
+            });
+    }
+
+    kpiTitle(k: ComponentDef): string {
+        return String(k.content['title'] ?? k.name);
     }
 
     /** The list projection omits `params` (dashboardId/format/recipients) — fetch full detail per job. */

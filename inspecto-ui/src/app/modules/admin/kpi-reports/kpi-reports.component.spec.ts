@@ -5,7 +5,7 @@ import { provideRouter } from '@angular/router';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { JobDetail, JobsService, LensService } from 'app/inspecto/api';
+import { ComponentDef, ComponentsService, JobDetail, JobsService, LensService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
@@ -30,7 +30,13 @@ const REPORT_JOB: JobDetail = {
 };
 
 function create(
-    opts: { dashboards?: Dashboard[]; reportJobs?: JobDetail[]; canAuthor?: boolean; dashboardsError?: boolean } = {},
+    opts: {
+        dashboards?: Dashboard[];
+        reportJobs?: JobDetail[];
+        canAuthor?: boolean;
+        dashboardsError?: boolean;
+        kpis?: ComponentDef[];
+    } = {},
 ) {
     const dashboards = opts.dashboards ?? DASHBOARDS;
     const reportJobs = opts.reportJobs ?? [];
@@ -68,6 +74,7 @@ function create(
                 useValue: { list: () => (opts.dashboardsError ? throwError(() => new Error('boom')) : of(dashboards)) },
             },
             { provide: JobsService, useValue: jobsApi },
+            { provide: ComponentsService, useValue: { list: () => of(opts.kpis ?? []) } },
             { provide: MatDialog, useValue: { open: vi.fn() } },
             { provide: ToastrService, useValue: toastr },
             { provide: InspectoConfirmService, useValue: {} },
@@ -80,6 +87,32 @@ function create(
 }
 
 describe('KpiReportsComponent', () => {
+    it('lists KPI definitions and opens the editor from them (ASSURE-KPI-DEFINITIONS-1)', async () => {
+        const kpi = {
+            type: 'kpi',
+            name: 'refunds',
+            ref: 'kpi/refunds',
+            content: { title: 'Refund exposure' },
+        } as ComponentDef;
+        const { fixture } = create({ kpis: [kpi] });
+        const el = fixture.nativeElement as HTMLElement;
+        const edit = el.querySelector('[aria-label="Edit KPI definition Refund exposure"]') as HTMLButtonElement;
+        expect(edit).toBeTruthy();
+        const dialog = TestBed.inject(MatDialog) as unknown as { open: ReturnType<typeof vi.fn> };
+        dialog.open.mockReturnValue({ afterClosed: () => of(undefined) });
+        edit.click();
+        expect(dialog.open.mock.calls[0][1].data.existing).toBe(kpi);
+        expect(
+            Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('New KPI definition')),
+        ).toBe(true);
+        await expectNoA11yViolations(el);
+    });
+
+    it('hides KPI authoring from a caller who cannot author', () => {
+        const el = create({ canAuthor: false }).fixture.nativeElement as HTMLElement;
+        expect(el.textContent).not.toContain('New KPI definition');
+    });
+
     it('lists saved dashboards as gallery cards with tile/filter counts', () => {
         const text = create().fixture.nativeElement.textContent as string;
         expect(text).toContain('cdr_overview');

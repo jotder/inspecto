@@ -5,7 +5,36 @@
         [terms]="['Dashboard', 'Widget', 'Measure']"
         [inset]="false"
         class="mb-6"
-    />
+    >
+        @if (lens.canAuthorWorkbench()) {
+            <ng-container actions>
+                <button mat-flat-button color="primary" type="button" (click)="openKpiDefinition()">
+                    New KPI definition
+                </button>
+            </ng-container>
+        }
+    </inspecto-page-header>
+
+    @if (kpiDefinitions().length) {
+        <section class="mb-6" aria-labelledby="kpi-definitions-heading">
+            <h2 id="kpi-definitions-heading" class="mb-2 text-lg font-semibold">KPI definitions</h2>
+            <ul class="flex flex-wrap gap-2">
+                @for (k of kpiDefinitions(); track k.name) {
+                    <li>
+                        <button
+                            mat-stroked-button
+                            type="button"
+                            [disabled]="!lens.canAuthorWorkbench()"
+                            [attr.aria-label]="'Edit KPI definition ' + kpiTitle(k)"
+                            (click)="openKpiDefinition(k)"
+                        >
+                            {{ kpiTitle(k) }}
+                        </button>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
 
     @if (loading()) {
         <inspecto-skeleton [lines]="3" height="4rem" />
