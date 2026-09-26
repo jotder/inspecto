@@ -6,10 +6,11 @@ import { ColumnMeta, ColumnType, QueryModel, compileSql, dbColumnType } from 'ap
 
 /**
  * The **rows seam**: what a Dataset's `sourceName` actually resolves to. It is the real store, read over
- * `/db/table` (or `/db/query` when the dataset embeds a Query Core model, compiled by {@link compileSql})
- * — EXCEPT a saved Dataset with calculated columns (DAT-5), which is read as its server-side relation over
- * `GET /datasets/{id}/rows`: the raw store has no calculated column, so no screen could type, count or
- * offer one from it. That relation is also exactly what `/bi/query` evaluates, so the page and the
+ * `/db/table` (or `/db/query` when the dataset embeds a Query Core model: its hand-edited `sqlOverride`,
+ * else the model compiled by {@link compileSql}) — EXCEPT a saved Dataset with calculated columns (DAT-5) or
+ * a virtual Dataset's saved `sql` (VIRTUAL-DATASET-SQL-1), which is read as its server-side relation over
+ * `GET /datasets/{id}/rows`: the raw store has no calculated column and the client cannot evaluate DuckDB
+ * SQL, so no screen could otherwise type, count or offer those columns. That relation is also exactly what `/bi/query` evaluates, so the page and the
  * aggregate agree.
  *
  * This is the layer under {@link DatasetResultService}: that one runs a {@link QuerySpec} over
@@ -43,7 +44,7 @@ export class DatasetRowsService {
                 error: 'This Dataset names no store, so its rows cannot be read. Set its source.',
             });
         const key = `${ds.sourceName}|${limit}|${ds.query ? JSON.stringify(ds.query) : ''}|${
-            readsRelation(ds) ? `${ds.id}:${JSON.stringify(ds.calculated)}` : ''
+            readsRelation(ds) ? `${ds.id}:${ds.sql ?? ''}:${JSON.stringify(ds.calculated)}` : ''
         }`;
         const cached = this.cache.get(key);
         if (cached) return cached;
@@ -99,20 +100,23 @@ export class DatasetRowsService {
         this.cache.clear();
     }
 
-    /** Live: the real store over `/db/query` (a virtual dataset's model), the Dataset's relation over
-     *  `/datasets/{id}/rows` (a saved Dataset with calculated columns), or `/db/table` (everything else). */
+    /** Live: the Dataset's relation over `/datasets/{id}/rows` (a saved Dataset with `sql` or calculated
+     *  columns), the real store over `/db/query` (an embedded Query Core model), or `/db/table` (the rest). */
     private async remoteRows(ds: RowSourceRef, limit: number): Promise<DatasetRows> {
         const declared = declaredColumns(ds);
         try {
             const res = await firstValueFrom(
-                ds.query
-                    ? this.db.query({
-                          table: ds.sourceName,
-                          sql: compileSql(ds.query, { name: ds.sourceName, rows: [], columns: declared }),
-                          limit,
-                      })
-                    : readsRelation(ds)
-                      ? this.db.datasetRows(ds.id!, limit)
+                readsRelation(ds)
+                    ? this.db.datasetRows(ds.id!, limit)
+                    : ds.query
+                      ? this.db.query({
+                            table: ds.sourceName,
+                            // A hand-edited SQL IS the model's query; compiling the builder half dropped it.
+                            sql:
+                                ds.query.sqlOverride?.trim() ||
+                                compileSql(ds.query, { name: ds.sourceName, rows: [], columns: declared }),
+                            limit,
+                        })
                       : this.db.table({ name: ds.sourceName, limit }),
             );
             return fromDbResult(res, declared);
@@ -156,15 +160,18 @@ export interface RowSourceRef {
     id?: string;
     /** Row-level calculated columns (DAT-5); present ⇒ the raw store cannot serve them. */
     calculated?: readonly { name: string; expr: string }[];
+    /** A virtual Dataset's saved SQL; with {@link id}, the page is read as its server-side relation. */
+    sql?: string | null;
 }
 
 /**
  * Read `ds` as its server-side relation rather than its raw store: a SAVED Dataset (it has an id the
- * server can resolve) with calculated columns and no embedded Query Core model (that path compiles its
- * own SQL over the store and keeps precedence, as before).
+ * server can resolve) that carries its virtual `sql` (the server evaluates exactly that text), or one with
+ * calculated columns and no embedded Query Core model (that path compiles its own SQL over the store).
  */
 function readsRelation(ds: RowSourceRef): boolean {
-    return !ds.query && !!ds.id && !!ds.calculated?.length;
+    if (!ds.id) return false;
+    return !!ds.sql?.trim() || (!ds.query && !!ds.calculated?.length);
 }
 
 /**

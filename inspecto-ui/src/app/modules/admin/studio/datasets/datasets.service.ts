@@ -83,6 +83,7 @@ function toContent(d: Dataset): Record<string, unknown> {
         kind: d.kind,
         sourceName: d.sourceName,
         query: d.query ?? null,
+        sql: d.sql ?? null,
         physicalRef: d.physicalRef ?? null,
         columns: d.columns,
         measures: d.measures,
@@ -114,6 +115,7 @@ function fromContent(name: string, content: Record<string, unknown>): Dataset {
             (isSharedRef(content['physicalRef'] as string) ? '' : ((content['physicalRef'] as string) ?? '')) ||
             '',
         query: (content['query'] as Dataset['query']) ?? null,
+        sql: (content['sql'] as string | null) ?? null,
         physicalRef: (content['physicalRef'] as string | null) ?? null,
         columns: (content['columns'] as DatasetColumn[]) ?? [],
         measures: (content['measures'] as NamedMeasure[]) ?? [],

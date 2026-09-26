@@ -140,6 +140,80 @@ describe('DatasetEditorComponent', () => {
         expect(nav).toHaveBeenCalledWith(['/catalog/datasets']);
     });
 
+    it('a virtual dataset saves the SQL the panel shows as `sql` — the relation the server reads', async () => {
+        const save = vi.fn((d: Dataset) => of(d));
+        const fixture = create(save);
+        fixture.detectChanges();
+        await vi.waitFor(() => expect(fixture.componentInstance.sourceNames().length).toBeGreaterThan(0));
+        vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);
+        const c = fixture.componentInstance;
+        const sql = `SELECT strptime(msisdn, '%Y') AS y FROM "cdr"`;
+        c.onQueryChange({
+            model: { projection: '*', where: { kind: 'group', op: 'AND', items: [] }, sqlOverride: sql },
+            sql,
+        });
+        c.form.controls.name.setValue('cdr_years');
+        c.save();
+        expect(save.mock.calls[0][0]).toMatchObject({ kind: 'virtual', sourceName: 'cdr', sql });
+
+        // a physical dataset carries no SQL, whatever the panel last showed
+        save.mockClear();
+        c.form.controls.kind.setValue('physical');
+        c.save();
+        expect(save.mock.calls[0][0].sql).toBeNull();
+    });
+
+    it('"Run on server" previews the SQL in DuckDB and re-tags the columns from its result', async () => {
+        const rowsSeam = {
+            ...seam(),
+            sql: vi.fn(() =>
+                Promise.resolve({
+                    rows: [{ y: '2020-01-01' }],
+                    columns: [{ name: 'y', type: 'date' }],
+                    truncated: false,
+                }),
+            ),
+        };
+        const fixture = create(
+            vi.fn((d: Dataset) => of(d)),
+            [],
+            null,
+            rowsSeam,
+        );
+        fixture.detectChanges();
+        await vi.waitFor(() => expect(fixture.componentInstance.form.controls.sourceName.value).toBe('cdr'));
+        const c = fixture.componentInstance;
+        await c.onRunOnServer(`SELECT strptime(msisdn, '%Y') AS y FROM "cdr"`);
+        expect(rowsSeam.sql).toHaveBeenCalledWith('cdr', `SELECT strptime(msisdn, '%Y') AS y FROM "cdr"`);
+        expect(c.querySource().rows).toEqual([{ y: '2020-01-01' }]);
+        expect(c.columns()).toEqual([{ name: 'y', type: 'date', role: 'temporal' }]);
+        expect(c.runError()).toBeNull();
+    });
+
+    it('a failed server run is explained on screen and leaves the columns alone', async () => {
+        const rowsSeam = {
+            ...seam(),
+            sql: vi.fn(() =>
+                Promise.resolve({ rows: [], columns: [], truncated: false, error: 'SQL failed the safety check' }),
+            ),
+        };
+        const fixture = create(
+            vi.fn((d: Dataset) => of(d)),
+            [],
+            null,
+            rowsSeam,
+        );
+        fixture.detectChanges();
+        await vi.waitFor(() => expect(fixture.componentInstance.form.controls.sourceName.value).toBe('cdr'));
+        const c = fixture.componentInstance;
+        const before = c.columns();
+        await c.onRunOnServer(`SELECT * FROM read_csv('x')`);
+        expect(c.runError()).toBe('SQL failed the safety check');
+        expect(c.columns()).toEqual(before);
+        fixture.detectChanges();
+        expect(fixture.nativeElement.textContent).toContain('SQL failed the safety check');
+    });
+
     it('does not save when the name is empty', () => {
         const save = vi.fn((d: Dataset) => of(d));
         const fixture = create(save);

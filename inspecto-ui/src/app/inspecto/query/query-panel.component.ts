@@ -41,7 +41,13 @@ export class QueryPanelComponent implements AfterViewInit {
         this._source.set(s);
     }
 
+    /** Opt-in "Run on server" (forwarded to the table): the host runs the SQL on its backend and feeds the
+     *  result back through `source.rows` — for SQL the in-browser engine cannot run (DuckDB functions). */
+    @Input() serverRun = false;
+
     @Output() queryChange = new EventEmitter<QueryChange>();
+    /** "Run on server" was pressed — the SQL to execute against the host's backend. */
+    @Output() runOnServer = new EventEmitter<string>();
 
     readonly rows = computed(() => this._source().rows);
     readonly columnMeta = computed(() => this._source().columns);

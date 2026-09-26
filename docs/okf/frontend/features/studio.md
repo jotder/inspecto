@@ -48,6 +48,26 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   counts or lists must say so (the drill-through drawer and the Queries preview both do). Before this,
   every consumer did a synchronous `SAMPLE_SOURCES[name]` lookup, so a live deployment showed sample data
   or nothing.
+* **A virtual Dataset is its SQL (2026-09-26, `VIRTUAL-DATASET-SQL-1`).** A `kind: virtual` Dataset
+  saves the SQL the editor last showed — builder-generated or hand-edited — as a top-level **`sql`** key
+  beside `sourceName`; `query` (the Query Core model) only re-seeds the editor. The server reads `sql` as
+  the Dataset's relation in `DatasetRelation`: the text passes `SqlGuard` on **every read** (the store name
+  is the one trusted relation, after the path jail), then `WITH "<sourceName>" AS (<the physicalRef read of
+  that store>) SELECT * FROM (<sql>) AS __virtual`, with calculated columns wrapped on top as for any
+  Dataset. So `/datasets/{id}/rows`, `/bi/query`, materialize, reports and Reconciliation all read it, and
+  `DatasetRowsService` reads a saved Dataset carrying `sql` through `/datasets/{id}/rows`. The editor's
+  `<inspecto-query-panel [serverRun]="true">` offers **Run on server** (`POST /db/query`, DuckDB — the
+  in-browser AlaSQL Run has no `strptime`), and a successful run re-tags the columns from the SQL's result.
+  Before this, every server reader refused a virtual Dataset ("must declare a 'view' or a 'physicalRef'"),
+  and `compileSql` silently dropped a hand-edited `sqlOverride` from row previews (it is now preferred).
+  **Session decision (2026-09-26):** persist the SQL rather than compile the builder model in Java — one
+  compiler (the TS one), and the text previewed is the text BI evaluates; a second Java compiler of the
+  model would be a hand-kept mirror. ⚠ A virtual Dataset saved before this has no `sql` and still 422s on
+  the server (no compat shim): open it and Save. ⛔ `sql` beside a `view` or `physicalRef` is refused as
+  ambiguous. ⚠ The SQL can read only its own `sourceName` — any other relation is not in scope and 422s.
+  ⚠ A store rename rewrites `sourceName` but not the SQL text (`VIRTUAL-DATASET-SQL-RENAME-1`).
+  ⚠ The editor preview reads the store the `/db/query` way (CSV too); the saved relation reads it the
+  `physicalRef` way (Parquet under `storeReadRoot`) — the same for every pipeline-shaped store.
 * ⛔ **The sample-row folds must stay — but not for the reason this bullet used to give.** Since the mock
   backend was deleted they are **not** offline arms: a backend failure surfaces. They are retained under
   decision `MOCK-DEAD-COMPUTE-1` (2026-08-31) as the **reference folds** the live paths are asserted to

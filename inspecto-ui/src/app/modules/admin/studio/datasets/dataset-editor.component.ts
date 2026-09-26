@@ -140,10 +140,17 @@ export class DatasetEditorComponent implements OnInit {
 
     /** One page of the picked store, through the rows seam — the real store live, its sample offline. */
     private readonly page = signal<DatasetRows | null>(null);
-    /** The Query Core source for the embedded panel — that page's rows + the columns behind them. */
+    /** The virtual dataset's SQL as the panel last showed it — saved as `sql`, the relation the server reads. */
+    readonly sql = signal<string | null>(null);
+    /** The last "Run on server" result — shown in place of the store page until the source changes. */
+    private readonly runResult = signal<DatasetRows | null>(null);
+    /** Why the last "Run on server" failed (SqlGuard refusal, DuckDB error). */
+    readonly runError = signal<string | null>(null);
+    /** The Query Core source for the embedded panel — the store page (or the server run's rows) + the
+     *  store's columns, which the filter builder types its conditions against. */
     readonly querySource = computed<QuerySource>(() => ({
         name: this.sourceName(),
-        rows: this.page()?.rows ?? [],
+        rows: this.runResult()?.rows ?? this.page()?.rows ?? [],
         columns: this.inferredColumns(),
     }));
     private readonly inferredColumns = computed<ColumnMeta[]>(() => this.page()?.columns ?? []);
@@ -194,9 +201,12 @@ export class DatasetEditorComponent implements OnInit {
     /** A new store pick: re-read its page, re-infer the column tagger, and drop the old view model. */
     private async onSourcePicked(name: string): Promise<void> {
         this.sourceName.set(name);
+        this.runResult.set(null);
+        this.runError.set(null);
         await this.loadPage(name);
         this.columns.set(inferRoles(this.inferredColumns()));
         this.model.set(null);
+        this.sql.set(null);
     }
 
     /** The space's stores. An unreadable catalog is reported, never shown as "this space has none". */
@@ -312,11 +322,33 @@ export class DatasetEditorComponent implements OnInit {
         this.calculated.set(d.calculated);
         this.measures.set(d.measures);
         this.model.set(d.query ?? null);
+        this.sql.set(d.sql ?? null);
         this.ready.set(true);
     }
 
     onQueryChange(change: QueryChange): void {
         this.model.set(change.model);
+        this.sql.set(change.sql);
+    }
+
+    /**
+     * "Run on server": the SQL over the real store in DuckDB (`POST /db/query`, SqlGuard-checked) — the
+     * same engine the saved Dataset is read with, so a DuckDB function (`strptime`) previews exactly as BI
+     * will evaluate it. The in-browser Run cannot. A success re-tags the columns from what the SQL returns
+     * (roles already set on a surviving column are kept): a virtual dataset's columns are its SQL's.
+     */
+    async onRunOnServer(sql: string): Promise<void> {
+        const store = this.sourceName();
+        if (!store || !sql.trim()) return;
+        this.runError.set(null);
+        const res = await this.datasetRows.sql(store, sql);
+        if (res.error) {
+            this.runError.set(res.error);
+            return;
+        }
+        this.runResult.set(res);
+        const saved = new Map(this.columns().map((c) => [c.name, c]));
+        this.columns.set(inferRoles(res.columns).map((c) => saved.get(c.name) ?? c));
     }
 
     onColumnsChange(cols: DatasetColumn[]): void {
@@ -390,6 +422,7 @@ export class DatasetEditorComponent implements OnInit {
         const kind = this.form.controls.kind.value;
         const ds = buildDataset(name, kind, this.form.controls.sourceName.value, {
             query: kind === 'virtual' ? this.model() : null,
+            sql: kind === 'virtual' ? this.sql() : null,
             physicalRef: kind === 'virtual' ? null : this.form.controls.physicalRef.value || null,
             columns: this.columns(),
             measures: this.measures(),

@@ -106,6 +106,82 @@ class DatasetRelationTest {
                 () -> DatasetRelation.relationSql(Map.of("name", "x"), Path.of("/data"), null));
     }
 
+    // ── virtual Dataset authored as SQL (VIRTUAL-DATASET-SQL-1) ─────────────────────
+
+    /**
+     * The defect: a {@code kind: virtual} Dataset carries its SQL and a {@code sourceName} but neither a
+     * {@code view} nor a {@code physicalRef}, so every server reader (BI query, Dataset rows, reports,
+     * materialize) refused it. The SQL is EXECUTED here, with a DuckDB-only function the in-browser
+     * preview could not run, a trailing ';' and a trailing line comment — the wrap must survive both.
+     */
+    @Test
+    void virtualSqlReadsItsSourceStore(@TempDir Path root) throws Exception {
+        writeParquet(root.resolve("matches"), "m.parquet",
+                "SELECT * FROM (VALUES ('April 05, 2020', 3), ('May 06, 2020', 1)) AS t(\"DATE\", runs)");
+        Map<String, Object> ds = Map.of("kind", "virtual", "sourceName", "matches",
+                "sql", "SELECT strptime(\"DATE\", '%B %d, %Y')::DATE AS match_date, runs FROM matches WHERE runs > 1; -- big ones");
+
+        String sql = DatasetRelation.relationSql(ds, root, null);
+
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT match_date, runs FROM (" + sql + ")")) {
+            assertTrue(rs.next(), "the authored SQL's rows come back: " + sql);
+            assertEquals("2020-04-05", rs.getString("match_date"));
+            assertEquals(3, rs.getInt("runs"));
+            assertFalse(rs.next(), "the authored WHERE applied");
+        }
+    }
+
+    @Test
+    void virtualSqlCarriesCalculatedColumns(@TempDir Path root) throws Exception {
+        writeParquet(root.resolve("cdr"), "a.parquet", "SELECT 2 AS n");
+        String sql = DatasetRelation.relationSql(Map.of("kind", "virtual", "sourceName", "cdr",
+                "sql", "SELECT n * 10 AS big FROM cdr",
+                "calculated", List.of(Map.of("name", "bigger", "expr", "big + 1"))), root, null);
+        try (Connection conn = JdbcDrivers.connect("jdbc:duckdb:");
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT big, bigger FROM (" + sql + ")")) {
+            assertTrue(rs.next());
+            assertEquals(20, rs.getInt("big"));
+            assertEquals(21, rs.getInt("bigger"));
+        }
+    }
+
+    /** The SQL is the caller's text, so it passes SqlGuard before it is ever embedded in the trusted relation. */
+    @Test
+    void virtualSqlFailsClosedThroughSqlGuard() {
+        for (String bad : List.of(
+                "SELECT * FROM read_csv('C:/secrets.csv')",       // a file-reading function
+                "SELECT * FROM 'C:/secrets.parquet'",             // a replacement scan of a file literal
+                "SELECT 1; DROP TABLE x",                         // a second statement
+                "DELETE FROM cdr")) {                             // not a read
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> DatasetRelation.relationSql(Map.of("kind", "virtual", "sourceName", "cdr", "sql", bad),
+                            Path.of("/data"), null), bad);
+            assertTrue(e.getMessage().contains("safety check"), e.getMessage());
+        }
+    }
+
+    @Test
+    void virtualSqlNeedsASourceStore() {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                () -> DatasetRelation.relationSql(Map.of("kind", "virtual", "sql", "SELECT 1"), Path.of("/data"), null));
+        assertTrue(e.getMessage().contains("sourceName"), e.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> DatasetRelation.relationSql(
+                Map.of("kind", "virtual", "sourceName", "../etc", "sql", "SELECT 1"), Path.of("/data"), null),
+                "the source store is path-jailed like a physicalRef");
+    }
+
+    /** Two declared relations is ambiguous — refused, never resolved by key order. */
+    @Test
+    void sqlBesideAViewOrPhysicalRefRejected() {
+        assertThrows(IllegalArgumentException.class, () -> DatasetRelation.relationSql(
+                Map.of("physicalRef", "cdr", "sourceName", "cdr", "sql", "SELECT 1"), Path.of("/data"), null));
+        assertThrows(IllegalArgumentException.class, () -> DatasetRelation.relationSql(
+                Map.of("view", "v", "sourceName", "cdr", "sql", "SELECT 1"), Path.of("/data"), null));
+    }
+
     // ── calculated columns (DAT-5) ────────────────────────────────────────────────
 
     @Test

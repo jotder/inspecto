@@ -248,6 +248,51 @@ class ControlApiDbBrowserTest {
         }
     }
 
+    /**
+     * VIRTUAL-DATASET-SQL-1, end to end over HTTP: the SQL the Dataset editor previews over
+     * {@code POST /db/query} is saved as the Dataset's {@code sql}, and the SAME text then serves
+     * {@code GET /datasets/{id}/rows} and {@code POST /bi/query} — both of which 422'd a virtual Dataset
+     * before ("dataset must declare a 'view' or a 'physicalRef'"). SQL that fails SqlGuard is a 422.
+     */
+    @Test
+    void virtualDatasetAuthoredAsSqlServesRowsAndBiQuery(@TempDir Path root) throws Exception {
+        String sql = "SELECT id, upper(name) AS who FROM orders WHERE id > 1 ORDER BY id";
+        try (Ctx c = open(root)) {
+            // 1. the editor's preview: the authored SQL over the store
+            HttpResponse<String> preview = postJson(c.port, "/spaces/s1/db/query",
+                    JSON.writeValueAsString(Map.of("table", "orders", "sql", sql)));
+            assertEquals(200, preview.statusCode(), preview.body());
+            assertEquals(2, V1Body.of(preview.body()).get("rows").size());
+
+            // 2. saved — the shape the Studio editor writes
+            ComponentStore reg = new ComponentStore(root.resolve("s1").resolve("config").resolve("registry"));
+            reg.write("dataset", "big_orders", Map.of("kind", "virtual", "sourceName", "orders", "sql", sql));
+
+            // 3a. the Dataset's rows are the SQL's rows
+            HttpResponse<String> rows = get(c.port, "/spaces/s1/datasets/big_orders/rows");
+            assertEquals(200, rows.statusCode(), rows.body());
+            JsonNode data = V1Body.of(rows.body()).get("rows");
+            assertEquals(2, data.size());
+            assertEquals("BOB", data.get(0).get("who").asText(), "a SQL-derived column is served");
+
+            // 3b. BI aggregates over the SQL-derived column
+            HttpResponse<String> bi = postJson(c.port, "/spaces/s1/bi/query",
+                    "{\"dataset\":\"big_orders\",\"measures\":[{\"agg\":\"count\"}],\"groupBy\":[\"who\"],"
+                            + "\"orderBy\":[{\"field\":\"who\",\"dir\":\"asc\"}]}");
+            assertEquals(200, bi.statusCode(), bi.body());
+            JsonNode groups = V1Body.of(bi.body()).get("rows");
+            assertEquals(2, groups.size());
+            assertEquals("BOB", groups.get(0).get("who").asText());
+
+            // 4. fail-closed: the saved SQL is SqlGuard-checked on every read
+            reg.write("dataset", "sneaky", Map.of("kind", "virtual", "sourceName", "orders",
+                    "sql", "SELECT * FROM read_csv('" + root.toString().replace("\\", "/") + "/x.csv')"));
+            HttpResponse<String> refused = get(c.port, "/spaces/s1/datasets/sneaky/rows");
+            assertEquals(422, refused.statusCode(), refused.body());
+            assertTrue(refused.body().contains("safety check"), refused.body());
+        }
+    }
+
     @Test
     void writeRootDisabledIs503(@TempDir Path cfg) throws Exception {
         // Legacy single-space harness with no -Dassist.write.root → writeRoot() is null → 503.

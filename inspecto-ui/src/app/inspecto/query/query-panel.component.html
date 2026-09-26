@@ -4,5 +4,7 @@
     [columnMeta]="columnMeta()"
     [sourceName]="sourceName()"
     [initialModel]="initialModel"
+    [serverRun]="serverRun"
     (queryModelChange)="queryChange.emit($event)"
+    (runOnServer)="runOnServer.emit($event)"
 />

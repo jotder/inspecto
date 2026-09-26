@@ -58,8 +58,14 @@ export interface DatasetConfig {
     kind: DatasetKind;
     /** Logical source table the dataset reads from (the Query Core `FROM`). */
     sourceName: string;
-    /** Virtual datasets embed the Query Core model (projection + nested AND/OR filter). */
+    /** Virtual datasets embed the Query Core model (projection + nested AND/OR filter) — the editor's state. */
     query?: QueryModel | null;
+    /**
+     * A virtual dataset's SQL — the text the editor last showed (hand-edited or builder-generated), which
+     * the server evaluates as the Dataset's relation over `sourceName` (SqlGuard-checked on every read).
+     * `query` only re-seeds the editor; `sql` is what BI, Widgets and Dataset rows read.
+     */
+    sql?: string | null;
     /** Physical/materialized datasets point at a catalog table / parquet path / cache id. */
     physicalRef?: string | null;
     columns: DatasetColumn[];
@@ -106,6 +112,7 @@ export function buildDataset(
         kind,
         sourceName,
         query: body?.query ?? null,
+        sql: body?.sql ?? null,
         physicalRef: body?.physicalRef ?? null,
         columns: body?.columns ?? [],
         measures: body?.measures ?? [],

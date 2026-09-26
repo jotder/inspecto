@@ -52,6 +52,18 @@ describe('QueryPanelComponent', () => {
         expect(t.filterOpen()).toBe(true);
     });
 
+    it('forwards "Run on server": off by default, and the pressed SQL reaches the host', async () => {
+        const f = await create();
+        expect(table(f).serverRun()).toBe(false);
+        f.componentRef.setInput('serverRun', true);
+        f.detectChanges();
+        expect(table(f).serverRun()).toBe(true);
+        const ran: string[] = [];
+        f.componentInstance.runOnServer.subscribe((sql) => ran.push(sql));
+        table(f).onRunSqlBackend('SELECT 1');
+        expect(ran).toEqual(['SELECT 1']);
+    });
+
     it("re-emits the embedded table's queryModelChange as queryChange", async () => {
         const f = await create();
         const emitted: { model: QueryModel; sql: string }[] = [];

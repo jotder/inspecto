@@ -300,7 +300,7 @@ final class ContractVerdicts {
                 String id0 = id;
                 Map<String, Object> now = ctx.datasets.stream().filter(c -> c.name().equals(id0))
                         .map(ComponentRegistry.Component::content).findFirst().orElse(Map.of());
-                List<String> contractKeys = List.of("physicalRef", "sourceName", "columns", "calculated");
+                List<String> contractKeys = List.of("physicalRef", "sourceName", "sql", "columns", "calculated");
                 Map<String, Object> was = before;
                 boolean contract = was == null
                         || contractKeys.stream().anyMatch(k -> !Objects.equals(was.get(k), now.get(k)));
@@ -308,7 +308,7 @@ final class ContractVerdicts {
                 for (Reads r : readers(ctx, id)) {
                     if (r.reader().startsWith("dataset:")) continue;
                     ctx.out.add(new Verdict(Tier.REVALIDATE, subject, null, r.reader(), "Dataset '" + id
-                            + "' changed its physicalRef / sourceName / columns / calculated; that edit is not "
+                            + "' changed its physicalRef / sourceName / sql / columns / calculated; that edit is not "
                             + "diffed column by column"));
                 }
             }

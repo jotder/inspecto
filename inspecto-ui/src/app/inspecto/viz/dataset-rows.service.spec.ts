@@ -148,6 +148,25 @@ describe('DatasetRowsService — a Dataset with calculated columns (DAT-5)', () 
     });
 });
 
+describe('DatasetRowsService — a virtual Dataset authored as SQL (VIRTUAL-DATASET-SQL-1)', () => {
+    const SQL = `SELECT strptime("DATE", '%B %d,%Y') AS d FROM "matches"`;
+
+    it("reads a saved virtual Dataset's SQL as its server relation — even beside its builder model", async () => {
+        const { svc, table, query, datasetRows } = setup();
+        await svc.rows({ id: 'by_date', sourceName: 'matches', query: premiumOnly(), sql: SQL }, 50);
+        expect(datasetRows).toHaveBeenCalledWith('by_date', 50);
+        expect(query).not.toHaveBeenCalled();
+        expect(table).not.toHaveBeenCalled();
+    });
+
+    it('an unsaved model carrying a hand-edited sqlOverride posts THAT SQL, not the compiled builder', async () => {
+        const { svc, query, datasetRows } = setup();
+        await svc.rows({ sourceName: 'matches', query: { ...premiumOnly(), sqlOverride: SQL } });
+        expect(datasetRows).not.toHaveBeenCalled();
+        expect((query.mock.calls[0][0] as { sql: string }).sql).toBe(SQL);
+    });
+});
+
 describe('DatasetRowsService — a Dataset with no source', () => {
     // MOCK-GONE-1(b): a blank sourceName used to build `GET /db/table?limit=1` with NO `name`.
     it('refuses without a request, and says why instead of rendering an empty grid', async () => {

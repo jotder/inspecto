@@ -91,10 +91,17 @@
     @if (isVirtual() && ready()) {
         <section class="mt-6">
             <h2 class="mb-2 text-lg font-semibold">Query</h2>
+            @if (runError(); as err) {
+                <inspecto-alert variant="error" title="The query failed on the server" class="mb-3 block">
+                    {{ err }}
+                </inspecto-alert>
+            }
             <inspecto-query-panel
                 [initialModel]="model()"
                 [source]="querySource()"
+                [serverRun]="true"
                 (queryChange)="onQueryChange($event)"
+                (runOnServer)="onRunOnServer($event)"
             />
         </section>
     }
