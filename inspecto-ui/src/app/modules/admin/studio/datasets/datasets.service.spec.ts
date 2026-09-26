@@ -67,6 +67,13 @@ describe('DatasetsService', () => {
         expect(datasets[0].sourceName).toBe('');
     });
 
+    it('reads the stored description (a Reconciliation side label, R2-16)', () => {
+        const { svc } = setup({ name: 'crm_subscribers', kind: 'physical', description: 'CRM subscriber extract' });
+        let datasets: { description?: string }[] = [];
+        svc.list().subscribe((d) => (datasets = d));
+        expect(datasets[0].description).toBe('CRM subscriber extract');
+    });
+
     it('a cross-space shared ref is NOT a local store name', () => {
         // `shared/<owner>/<item>` is resolved server-side; passing it to /db/table as a table would 404.
         const { svc } = setup({ name: 'bound', kind: 'physical', physicalRef: 'shared/partner/orders' });

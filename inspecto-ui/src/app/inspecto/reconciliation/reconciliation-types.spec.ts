@@ -5,8 +5,10 @@ import {
     ageBucketOf,
     breakId,
     breakAgeDays,
+    datasetLabels,
     mergeBreaks,
     matchedKeyCount,
+    reconciliationTitle,
     ReconBreak,
     resolveBreak,
     runReconciliation,
@@ -252,5 +254,27 @@ describe('breakId — the server-shared Break identity', () => {
         expect(breakId(b('value_break', 'k', 'c'))).not.toBe(breakId(b('missing_left', 'k', 'c')));
         expect(breakId(b('value_break', 'k', 'c'))).not.toBe(breakId(b('value_break', 'k2', 'c')));
         expect(breakId(b('value_break', 'k', 'c'))).not.toBe(breakId(b('value_break', 'k', 'c2')));
+    });
+});
+
+describe('datasetLabels — a Reconciliation side reads by its Dataset (R2-16)', () => {
+    it('prefers the description, then the name, then the id — the reconciliationTitle order', () => {
+        expect(
+            datasetLabels([
+                { id: 'crm_subscribers', name: 'crm_subscribers', description: 'CRM subscriber extract (synthetic)' },
+                { id: 'cbs', name: 'CBS subscribers', description: '   ' },
+                { id: 'bare', name: '' },
+            ]),
+        ).toEqual({
+            crm_subscribers: 'CRM subscriber extract (synthetic)',
+            cbs: 'CBS subscribers',
+            bare: 'bare',
+        });
+        // the same fallback chain as the Reconciliation's own title helper
+        expect(reconciliationTitle({ id: 'r', name: 'Name', description: '  ' })).toBe('Name');
+    });
+
+    it('omits a Dataset it was not given, so callers fall back to the id', () => {
+        expect(datasetLabels([])['crm_subscribers']).toBeUndefined();
     });
 });

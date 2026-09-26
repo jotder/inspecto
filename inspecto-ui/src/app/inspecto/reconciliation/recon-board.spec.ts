@@ -5,12 +5,14 @@ import {
     aggregateRecon,
     bandCell,
     bandFor,
+    boardColumns,
     buildBoardTree,
     comparedSides,
     decodePath,
     deltaPct,
     encodePath,
     markBreachesExpanded,
+    measureLabel,
     RECON_RECORDS,
     reconBreakSets,
     ReconRunResult,
@@ -528,5 +530,76 @@ describe('duplicate keys — cardinality and the impact of the extra copies', ()
 
     it('breakImpacts leaves the cardinality set alone, so a value break at the same key keeps its own impact', () => {
         expect(breakImpacts(SUBS, sets)).toEqual({ m9: 50 });
+    });
+});
+
+describe('boardColumns — readable headers (R2-16)', () => {
+    const TELCO = {
+        keyColumns: ['offer_id'],
+        compareColumns: [{ column: 'monthly_fee_sar', toleranceType: 'exact', tolerance: 0 } as CompareColumn],
+    };
+    const result = aggregateRecon(
+        TELCO,
+        [{ offer_id: 'o1', monthly_fee_sar: 149 }],
+        [{ offer_id: 'o1', monthly_fee_sar: 99 }],
+    );
+    const heads = (cols: ReturnType<typeof boardColumns>) => cols.map((c) => c.headerName);
+
+    it('names each side by its Dataset label and humanises the measure, the ids riding in the tooltip', () => {
+        const cols = boardColumns(result, undefined, {
+            includeValues: true,
+            sides: {
+                a: { id: 'crm_subscribers', label: 'CRM subscriber extract' },
+                b: { id: 'cbs_subscribers', label: 'CBS subscriber extract' },
+            },
+        });
+        expect(heads(cols)).toEqual([
+            'CRM subscriber extract · Monthly fee (SAR)',
+            'CBS subscriber extract · Monthly fee (SAR)',
+            'Δ% Monthly fee (SAR)',
+            'CRM subscriber extract · Records',
+            'CBS subscriber extract · Records',
+            'Δ% Records',
+        ]);
+        expect(cols.map((c) => c.headerTooltip)).toEqual([
+            'A = crm_subscribers · monthly_fee_sar',
+            'B = cbs_subscribers · monthly_fee_sar',
+            'Δ% of B = cbs_subscribers vs A = crm_subscribers · monthly_fee_sar',
+            'A = crm_subscribers · record count',
+            'B = cbs_subscribers · record count',
+            'Δ% of B = cbs_subscribers vs A = crm_subscribers · record count',
+        ]);
+    });
+
+    it('falls back to the side letter when no side is named (the dashboard widget tile)', () => {
+        expect(heads(boardColumns(result, undefined, { includeValues: true }))).toEqual([
+            'A · Monthly fee (SAR)',
+            'B · Monthly fee (SAR)',
+            'Δ% Monthly fee (SAR)',
+            'A · Records',
+            'B · Records',
+            'Δ% Records',
+        ]);
+        expect(heads(boardColumns(result))).toEqual(['Δ% Monthly fee (SAR)', 'Δ% Records']);
+    });
+
+    it('names the side on a 3-way Δ% header', () => {
+        const three = aggregateRecon(
+            TELCO,
+            [{ offer_id: 'o1', monthly_fee_sar: 149 }],
+            [{ offer_id: 'o1', monthly_fee_sar: 99 }],
+            [{ offer_id: 'o1', monthly_fee_sar: 149 }],
+        );
+        expect(heads(boardColumns(three, undefined, { sides: { c: { id: 'gl', label: 'General ledger' } } }))).toEqual([
+            'Δ% B · Monthly fee (SAR)',
+            'Δ% General ledger · Monthly fee (SAR)',
+            'Δ% B · Records',
+            'Δ% General ledger · Records',
+        ]);
+    });
+
+    it('reads the implicit COUNT(*) as Records', () => {
+        expect(measureLabel(RECON_RECORDS)).toBe('Records');
+        expect(measureLabel('monthly_fee_sar')).toBe('Monthly fee (SAR)');
     });
 });

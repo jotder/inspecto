@@ -96,6 +96,7 @@ function fromContent(name: string, content: Record<string, unknown>): Dataset {
     return {
         id: name,
         name: (content['name'] as string) ?? name,
+        ...(typeof content['description'] === 'string' ? { description: content['description'] } : {}),
         kind: (content['kind'] as DatasetKind) ?? 'virtual',
         // ⛔ Never default this to an INVENTED source name. The old `?? 'data'` named a key that did
         // not exist, so a dataset written without a sourceName read `[]` rows in every consumer and was

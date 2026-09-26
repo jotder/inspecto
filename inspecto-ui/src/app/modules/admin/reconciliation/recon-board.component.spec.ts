@@ -16,6 +16,8 @@ import {
 } from 'app/inspecto/reconciliation';
 import { ReconBoardComponent } from './recon-board.component';
 import { ReconExecService } from './recon-exec.service';
+import { DatasetsService } from '../studio/datasets/datasets.service';
+import { Dataset } from '../studio/datasets/dataset-types';
 
 const RECON: Reconciliation = {
     id: 'med_vs_bill',
@@ -39,7 +41,9 @@ const RIGHT = [
 ];
 const RESULT = aggregateRecon(RECON, LEFT, RIGHT);
 
-async function create(opts: { patch?: Partial<Reconciliation>; result?: ReconRunResult } = {}) {
+async function create(
+    opts: { patch?: Partial<Reconciliation>; result?: ReconRunResult; datasets?: Partial<Dataset>[] } = {},
+) {
     const recon: Reconciliation = { ...RECON, ...opts.patch };
     const navigate = vi.fn();
     const save = vi.fn((r: Reconciliation) => of(r));
@@ -60,6 +64,7 @@ async function create(opts: { patch?: Partial<Reconciliation>; result?: ReconRun
                     breaks: vi.fn(async () => reconBreakSets(RECON, LEFT, RIGHT)),
                 },
             },
+            { provide: DatasetsService, useValue: { list: () => of(opts.datasets ?? []) } },
             { provide: MatDialog, useValue: { open: vi.fn() } },
             { provide: ToastrService, useValue: { success: () => undefined, error: () => undefined } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
@@ -150,7 +155,7 @@ describe('ReconBoardComponent — title rule and duplicate keys', () => {
         expect(c.title()).toBe('Mediation vs Billing — daily revenue');
         expect(el.querySelector('h1')?.textContent).toContain('Mediation vs Billing — daily revenue');
         expect(el.querySelector('h1')?.textContent).not.toContain('Mediation vs Billing ·');
-        expect(el.textContent).toContain('Mediation vs Billing · A mediation_daily');
+        expect(el.textContent).toContain('Mediation vs Billing · A: mediation_daily');
     });
 
     it('falls back to the name, without repeating it in the subtitle', async () => {
@@ -176,6 +181,62 @@ describe('ReconBoardComponent — title rule and duplicate keys', () => {
 
     it('renders the duplicate-key counts with no a11y violations', async () => {
         const { fixture } = await create({ result: withCardinality(), patch: { description: 'Subscriber status' } });
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('ReconBoardComponent — readable side and column names (R2-16)', () => {
+    const DATASETS: Partial<Dataset>[] = [
+        { id: 'mediation_daily', name: 'mediation_daily', description: 'Mediation daily extract' },
+        { id: 'billing_daily', name: 'Billing daily' },
+    ];
+    const heads = (c: ReconBoardComponent) => c.treeColumns().map((col) => col.headerName);
+    const BANDS = ' · tree Region › Product · bands ok < 1% · warn 1–2% · breach > 2%';
+
+    it('names the sides by their Dataset and humanises the columns', async () => {
+        const { fixture, c } = await create({ datasets: DATASETS });
+        expect(c.subtitle()).toBe('A: Mediation daily extract ⇄ B: Billing daily' + BANDS);
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain(
+            'A: Mediation daily extract ⇄ B: Billing daily',
+        );
+        expect(heads(c)).toEqual([
+            'Mediation daily extract · Amount',
+            'Billing daily · Amount',
+            'Δ% Amount',
+            'Mediation daily extract · Records',
+            'Billing daily · Records',
+            'Δ% Records',
+        ]);
+        // the builder's ids stay one hover away
+        expect(c.treeColumns()[0].headerTooltip).toBe('A = mediation_daily · amount');
+        expect(c.keyColumnsLabel()).toBe('Region › Product');
+    });
+
+    it('falls back to the Dataset id when the Dataset is not found', async () => {
+        const { c } = await create();
+        expect(c.subtitle()).toBe('A: mediation_daily ⇄ B: billing_daily' + BANDS);
+        expect(heads(c)).toEqual([
+            'mediation_daily · Amount',
+            'billing_daily · Amount',
+            'Δ% Amount',
+            'mediation_daily · Records',
+            'billing_daily · Records',
+            'Δ% Records',
+        ]);
+    });
+
+    it('humanises the TOTAL strip measures', async () => {
+        const { c } = await create();
+        expect(c.totalLines().map((t) => t.label)).toEqual(['Amount', 'Records']);
+    });
+
+    it('titles through reconciliationTitle — a blank description falls back to the name', async () => {
+        const { c } = await create({ patch: { description: '   ' } });
+        expect(c.title()).toBe('Mediation vs Billing');
+    });
+
+    it('renders the named sides with no a11y violations', async () => {
+        const { fixture } = await create({ datasets: DATASETS });
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });

@@ -17,21 +17,27 @@ import {
     bandFor,
     bandGlyph,
     bandTone,
+    BoardSide,
     boardColumns,
     breaksFromSets,
     buildBoardTree,
     comparedSides,
+    datasetLabels,
     DEFAULT_BANDS,
     deltaPct,
     fmtMeasure,
     markBreachesExpanded,
+    measureLabel,
     mergeBreaks,
     openAgeBuckets,
     Reconciliation,
     ReconciliationsService,
     ReconRunResult,
-    RECON_RECORDS,
+    reconciliationTitle,
+    SideKey,
 } from 'app/inspecto/reconciliation';
+import { humanizeColumn } from 'app/inspecto/viz/column-label';
+import { DatasetsService } from '../studio/datasets/datasets.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { ReconExecService } from './recon-exec.service';
 import { ReconciliationFormDialog, ReconciliationFormResult } from './reconciliation-form.dialog';
@@ -78,6 +84,7 @@ export class ReconBoardComponent implements OnInit {
     private router = inject(Router);
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
+    private datasetsApi = inject(DatasetsService);
 
     private tree = viewChild(TreeTableComponent);
 
@@ -86,11 +93,45 @@ export class ReconBoardComponent implements OnInit {
     readonly loading = signal(true);
     readonly running = signal(false);
     readonly breachesOnly = signal(false);
+    /** Dataset id → readable label, read once on open (R2-16); empty until then, so sides show their ids. */
+    readonly datasetNames = signal<Record<string, string>>({});
 
     readonly bands = computed(() => this.recon()?.bands ?? DEFAULT_BANDS);
 
     /** The Breaks page's title rule (UIE-10): the business description, falling back to the name (a code). */
-    readonly title = computed(() => this.recon()?.description || this.recon()?.name || '');
+    readonly title = computed(() => {
+        const r = this.recon();
+        return r ? reconciliationTitle(r) : '';
+    });
+
+    /** Each side named by its Dataset's readable label, falling back to the id (R2-16). */
+    readonly sides = computed<Partial<Record<SideKey, BoardSide>>>(() => {
+        const r = this.recon();
+        if (!r) return {};
+        const names = this.datasetNames();
+        const side = (id: string): BoardSide => ({ id, label: names[id] || id });
+        return {
+            a: side(r.leftDataset),
+            b: side(r.rightDataset),
+            ...(r.thirdDataset ? { c: side(r.thirdDataset) } : {}),
+        };
+    });
+
+    readonly keyColumnsLabel = computed(() => (this.recon()?.keyColumns ?? []).map(humanizeColumn).join(' › '));
+
+    readonly subtitle = computed(() => {
+        const r = this.recon();
+        if (!r) return '';
+        const s = this.sides();
+        const b = this.bands();
+        return (
+            (this.title() !== r.name ? r.name + ' · ' : '') +
+            `A: ${s.a?.label} ⇄ B: ${s.b?.label}` +
+            (s.c ? ` ⇄ C: ${s.c.label}` : '') +
+            ` · tree ${this.keyColumnsLabel()}` +
+            ` · bands ok < ${b.warnPct}% · warn ${b.warnPct}–${b.breachPct}% · breach > ${b.breachPct}%`
+        );
+    });
 
     /**
      * Duplicate-key (cardinality Break) counts per compared side — present only when the server reports them,
@@ -128,7 +169,7 @@ export class ReconBoardComponent implements OnInit {
 
     readonly treeColumns = computed<ColDef[]>(() => {
         const r = this.result();
-        return r ? boardColumns(r, this.bands(), { includeValues: true }) : [];
+        return r ? boardColumns(r, this.bands(), { includeValues: true, sides: this.sides() }) : [];
     });
 
     readonly totalLines = computed<TotalLine[]>(() => {
@@ -137,7 +178,7 @@ export class ReconBoardComponent implements OnInit {
         const sides = comparedSides(r);
         const lines: TotalLine[] = [];
         for (const m of r.measures) {
-            const label = m === RECON_RECORDS ? 'records' : m;
+            const label = measureLabel(m);
             const a = r.totals.a[m];
             for (const s of sides) {
                 const v = (s === 'c' ? r.totals.c : r.totals.b)?.[m] ?? null;
@@ -166,6 +207,10 @@ export class ReconBoardComponent implements OnInit {
 
     ngOnInit(): void {
         const id = this.route.snapshot.paramMap.get('id') ?? '';
+        // Labels only: a failed read leaves the sides named by their ids.
+        this.datasetsApi
+            .list()
+            .subscribe({ next: (d) => this.datasetNames.set(datasetLabels(d)), error: () => undefined });
         this.reconApi.get(id).subscribe({
             next: (r) => {
                 this.recon.set(r);

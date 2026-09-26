@@ -3,7 +3,7 @@
         <!-- Header -->
         <inspecto-page-header
             [title]="title()"
-            [subtitle]="'Breaks · ' + r.name + ' · A ' + r.leftDataset + ' vs B ' + r.rightDataset"
+            [subtitle]="'Breaks · ' + r.name + ' · A: ' + leftLabel() + ' vs B: ' + rightLabel()"
             [backLink]="['/reconciliation', r.id]"
             [backLabel]="title()"
             [terms]="['Reconciliation', 'Break']"
@@ -165,8 +165,11 @@
             <div class="mt-6 flex flex-col gap-6">
                 @if (missingA().length) {
                     <section aria-label="Only in A">
-                        <h2 class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider">
-                            Only in A — {{ recon()?.leftDataset }} ({{ missingA().length }})
+                        <h2
+                            class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider"
+                            [title]="'A = ' + r.leftDataset"
+                        >
+                            Only in A — {{ leftLabel() }} ({{ missingA().length }})
                         </h2>
                         <inspecto-data-table
                             tier="standard"
@@ -182,7 +185,10 @@
                 }
                 @if (missingB().length) {
                     <section aria-label="Only in compared side">
-                        <h2 class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider">
+                        <h2
+                            class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wider"
+                            [title]="sideLetter() + ' = ' + sideDatasetId()"
+                        >
                             Only in {{ side() === 'c' ? 'C' : 'B' }} — {{ sideDataset() }} ({{ missingB().length }})
                         </h2>
                         <inspecto-data-table
@@ -297,8 +303,8 @@
                         <thead>
                             <tr class="text-secondary text-left">
                                 <th scope="col" class="pr-6 font-medium">Field</th>
-                                <th scope="col" class="pr-6 font-medium">{{ r.leftDataset }}</th>
-                                <th scope="col" class="font-medium">{{ sideDataset() }}</th>
+                                <th scope="col" class="pr-6 font-medium" [title]="r.leftDataset">{{ leftLabel() }}</th>
+                                <th scope="col" class="font-medium" [title]="sideDatasetId()">{{ sideDataset() }}</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -315,8 +321,8 @@
                     <p class="text-secondary mt-3 text-sm">
                         {{
                             b.type === 'missing_right'
-                                ? 'Only in ' + r.leftDataset + ' — no matching record in ' + sideDataset() + '.'
-                                : 'Only in ' + sideDataset() + ' — no matching record in ' + r.leftDataset + '.'
+                                ? 'Only in ' + leftLabel() + ' — no matching record in ' + sideDataset() + '.'
+                                : 'Only in ' + sideDataset() + ' — no matching record in ' + leftLabel() + '.'
                         }}
                     </p>
                 }
@@ -332,7 +338,7 @@
                     <h2 class="text-secondary text-xs font-semibold uppercase tracking-wider">
                         Rows behind {{ shown.label }}
                         <span class="text-hint ml-1 normal-case tracking-normal"
-                            >{{ shown.result.a.rowCount }} on {{ r.leftDataset }} · {{ shown.result.b.rowCount }} on
+                            >{{ shown.result.a.rowCount }} on {{ leftLabel() }} · {{ shown.result.b.rowCount }} on
                             {{ sideDataset() }}
                             @if (shown.result.a.truncated || shown.result.b.truncated) {
                                 (capped)

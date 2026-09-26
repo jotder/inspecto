@@ -128,6 +128,24 @@ export function reconciliationTitle(r: Pick<Reconciliation, 'id' | 'name' | 'des
     return r.description?.trim() || r.name?.trim() || r.id;
 }
 
+/** What a side label needs of a Dataset — the Studio `Dataset` satisfies it. */
+export interface DatasetLabelSource {
+    id: string;
+    name?: string;
+    description?: string;
+}
+
+/**
+ * Dataset id → the readable label a Reconciliation side is shown by (R2-16): the Dataset's description,
+ * else its name, else its id — the same order as {@link reconciliationTitle}. A side whose Dataset is not
+ * in the list is absent here; callers fall back to the id.
+ */
+export function datasetLabels(datasets: readonly DatasetLabelSource[]): Record<string, string> {
+    const out: Record<string, string> = {};
+    for (const d of datasets) out[d.id] = d.description?.trim() || d.name?.trim() || d.id;
+    return out;
+}
+
 export interface ReconSummary {
     leftRows: number;
     rightRows: number;

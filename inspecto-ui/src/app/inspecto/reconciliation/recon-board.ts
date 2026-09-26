@@ -1,5 +1,6 @@
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { TreeNode } from 'app/inspecto/tree-table';
+import { humanizeColumn } from 'app/inspecto/viz/column-label';
 import {
     CompareColumn,
     DEFAULT_BANDS,
@@ -645,34 +646,63 @@ export function fmtMeasure(v: unknown): string {
 
 const measureCell = (p: { value: unknown }): string => fmtMeasure(p.value);
 
+/** How a Board side is named in its column headers (R2-16): a readable label, and the Dataset id for the tooltip. */
+export interface BoardSide {
+    label: string;
+    id: string;
+}
+
+/** A Board measure as a reader says it: the implicit COUNT(*) is "Records", a column is humanised. */
+export function measureLabel(measure: string): string {
+    return measure === RECON_RECORDS ? 'Records' : humanizeColumn(measure);
+}
+
 /**
  * The Board's aligned value columns for a run result: per measure, the anchor value, then per compared
  * side its value + a banded Δ% column. Δ% headers name the side only when there is more than one
  * (3-way). {@code includeValues:false} yields the compact Δ%-only set for the dashboard widget tile.
+ * {@code sides} names each side by its Dataset (default: the side letter); the letter, Dataset id and raw
+ * column name ride in each header's tooltip.
  */
 export function boardColumns(
     result: ReconRunResult,
     bands: ReconBands = DEFAULT_BANDS,
-    opts: { includeValues?: boolean } = {},
+    opts: { includeValues?: boolean; sides?: Partial<Record<SideKey, BoardSide>> } = {},
 ): ColDef[] {
     const sides = comparedSides(result);
     const multi = sides.length > 1;
     const values = opts.includeValues ?? false;
+    const label = (s: SideKey) => opts.sides?.[s]?.label || s.toUpperCase();
+    // The builder's view — side letter, Dataset id and raw column — stays one hover away (R2-16).
+    const code = (s: SideKey) => {
+        const id = opts.sides?.[s]?.id;
+        return id ? `${s.toUpperCase()} = ${id}` : s.toUpperCase();
+    };
     const cols: ColDef[] = [];
     for (const m of result.measures) {
-        const label = m === RECON_RECORDS ? 'records' : m;
-        if (values) cols.push({ field: `a_${m}`, headerName: `A ${label}`, width: 120, valueFormatter: measureCell });
+        const measure = measureLabel(m);
+        const raw = m === RECON_RECORDS ? 'record count' : m;
+        if (values)
+            cols.push({
+                field: `a_${m}`,
+                headerName: `${label('a')} · ${measure}`,
+                headerTooltip: `${code('a')} · ${raw}`,
+                width: 120,
+                valueFormatter: measureCell,
+            });
         for (const s of sides) {
             if (values)
                 cols.push({
                     field: `${s}_${m}`,
-                    headerName: `${s.toUpperCase()} ${label}`,
+                    headerName: `${label(s)} · ${measure}`,
+                    headerTooltip: `${code(s)} · ${raw}`,
                     width: 120,
                     valueFormatter: measureCell,
                 });
             cols.push({
                 field: `pct_${s}_${m}`,
-                headerName: `Δ%${multi ? s.toUpperCase() : ''} ${label}`,
+                headerName: multi ? `Δ% ${label(s)} · ${measure}` : `Δ% ${measure}`,
+                headerTooltip: `Δ% of ${code(s)} vs ${code('a')} · ${raw}`,
                 width: values ? 120 : 130,
                 cellRenderer: bandCell(s, bands),
             });

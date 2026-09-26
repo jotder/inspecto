@@ -3,24 +3,7 @@
         <!-- Header -->
         <inspecto-page-header
             [title]="title()"
-            [subtitle]="
-                (title() !== r.name ? r.name + ' · ' : '') +
-                'A ' +
-                r.leftDataset +
-                ' ⇄ B ' +
-                r.rightDataset +
-                ' · tree ' +
-                r.keyColumns.join(' › ') +
-                ' · bands ok < ' +
-                bands().warnPct +
-                '% · warn ' +
-                bands().warnPct +
-                '–' +
-                bands().breachPct +
-                '% · breach > ' +
-                bands().breachPct +
-                '%'
-            "
+            [subtitle]="subtitle()"
             backLink="/reconciliation"
             backLabel="Reconciliation"
             [terms]="['Reconciliation', 'Dataset', 'Measure']"
@@ -111,7 +94,7 @@
                     </button>
                 </div>
                 <inspecto-tree-table
-                    [treeHeader]="recon()?.keyColumns?.join(' › ') ?? 'Dimension'"
+                    [treeHeader]="keyColumnsLabel() || 'Dimension'"
                     exportName="reconciliation-board"
                     [nodes]="treeNodes()"
                     [columns]="treeColumns()"

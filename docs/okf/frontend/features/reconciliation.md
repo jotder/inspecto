@@ -132,6 +132,18 @@ CBS bills twice were invisible. Now:
   `summary.pairs[].byType.cardinality_break` (the server sends it only when a cardinality is declared); per pair
   because the flat summary mirrors A↔B and RA-C01's duplicates sit on C. The Board's `<h1>` now follows the
   Breaks page's rule — `description`, falling back to `name` — with the name (the code) leading the subtitle.
+  All three screens now title through the one helper `reconciliationTitle` (description → name → id).
+
+**Readable side and column names** (R2-16, 2026-09-26). The Board and Breaks page name each side by its
+Dataset's `datasetLabels` label — the Dataset's `description`, else its `name`, else its id (the
+`reconciliationTitle` order) — read ONCE on open through `DatasetsService.list()` (no cached Dataset read exists
+in the SPA; a failed read leaves the ids). Board columns read `<side label> · <measure>` / `Δ% <measure>`, the
+measure through the shared `humanizeColumn` (`measureLabel`: the COUNT(*) is "Records"); the tree header and the
+TOTAL strip humanise too. The builder's view — side letter, Dataset id, raw column — rides in each header's
+`headerTooltip` and in a `title` on the Breaks page's record-set headings. `boardColumns` without `sides` falls
+back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model reads `description` but
+`toContent` still does not write it back, so a Studio save of a Dataset likely drops it (pre-existing; not verified end-to-end).
+
 * ⚠ Not changed: the Board's lifecycle merge still persists the A↔B pair only, so C-side Breaks are live on the
   Breaks page but never enter the persisted lifecycle (true of every Break type on a 3-way).
 

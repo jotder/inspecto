@@ -19,6 +19,8 @@ import {
 } from 'app/inspecto/reconciliation';
 import { fieldDiff, ReconciliationDetailComponent } from './reconciliation-detail.component';
 import { ReconExecService, serverConfig } from './recon-exec.service';
+import { DatasetsService } from '../studio/datasets/datasets.service';
+import { Dataset } from '../studio/datasets/dataset-types';
 import { formatNumber } from 'app/inspecto/viz/number-format';
 import { fmtDateTime } from 'app/inspecto/format';
 
@@ -73,6 +75,7 @@ async function create(
         /** A literal `/recon/breaks` payload instead of the offline mirror (which carries no `impact`). */
         sets?: ReconBreakSets;
         rows?: ReturnType<typeof vi.fn>;
+        datasets?: Partial<Dataset>[];
     } = {},
 ) {
     let current: Reconciliation = { ...recon(opts.breaks ?? []), ...opts.patch };
@@ -108,6 +111,7 @@ async function create(
             },
             { provide: ReconciliationsService, useValue: { get: () => of(current), save } },
             { provide: ReconExecService, useValue: { breaks, rows: opts.rows ?? vi.fn(async () => ROWS) } },
+            { provide: DatasetsService, useValue: { list: () => of(opts.datasets ?? []) } },
             { provide: ToastrService, useValue: toastr },
             { provide: ReconApiService, useValue: { promote, promoted } },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
@@ -608,6 +612,47 @@ describe('Duplicate keys — cardinality Breaks on the Breaks page', () => {
 
     it('renders the Duplicate keys table with no a11y violations', async () => {
         const { fixture } = await create({ sets, patch: SUBS });
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+});
+
+describe('ReconciliationDetailComponent — readable side names (R2-16)', () => {
+    const DATASETS: Partial<Dataset>[] = [
+        { id: 'mediation_daily', name: 'mediation_daily', description: 'Mediation daily extract' },
+        { id: 'billing_daily', name: 'Billing daily' },
+    ];
+    const squash = (el: HTMLElement) => (el.textContent ?? '').replace(/\s+/g, ' ');
+    const onlyInA = (el: HTMLElement) => el.querySelector('section[aria-label="Only in A"] h2') as HTMLElement;
+
+    it('names the sides by their Dataset in the subtitle, the Field diff and the record-set headings', async () => {
+        const { fixture, c } = await create({ datasets: DATASETS });
+        const el = fixture.nativeElement as HTMLElement;
+        expect(squash(el)).toContain('Breaks · Mediation vs Billing · A: Mediation daily extract vs B: Billing daily');
+        const diff = c.valueColumns().find((d) => d.colId === 'fieldDiff')!;
+        expect(diff.headerName).toBe('Field diff (Mediation daily extract → Billing daily)');
+        expect(diff.headerTooltip).toBe('A = mediation_daily → B = billing_daily');
+        expect(onlyInA(el).textContent?.trim()).toBe('Only in A — Mediation daily extract (1)');
+        expect(onlyInA(el).title).toBe('A = mediation_daily');
+        expect(c.treeColumns().map((t) => t.headerName)).toContain('Billing daily');
+    });
+
+    it('falls back to the Dataset id when the Dataset is not found', async () => {
+        const { fixture, c } = await create();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(squash(el)).toContain('Breaks · Mediation vs Billing · A: mediation_daily vs B: billing_daily');
+        expect(onlyInA(el).textContent?.trim()).toBe('Only in A — mediation_daily (1)');
+        expect(c.valueColumns().find((d) => d.colId === 'fieldDiff')?.headerName).toBe(
+            'Field diff (mediation_daily → billing_daily)',
+        );
+    });
+
+    it('titles through reconciliationTitle — a blank description falls back to the name', async () => {
+        const { c } = await create({ patch: { description: '   ' } });
+        expect(c.title()).toBe('Mediation vs Billing');
+    });
+
+    it('renders the named sides with no a11y violations', async () => {
+        const { fixture } = await create({ datasets: DATASETS });
         await expectNoA11yViolations(fixture.nativeElement);
     });
 });

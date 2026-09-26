@@ -73,6 +73,8 @@ export interface DatasetConfig {
 export interface Dataset extends DatasetConfig {
     id: string;
     name: string;
+    /** The stored business description, read-only here (R2-16: a Reconciliation side's readable label). */
+    description?: string;
 }
 
 /**

@@ -22,6 +22,7 @@ import {
     breakId,
     breakImpacts,
     breaksFromSets,
+    datasetLabels,
     decodePath,
     duplicateImpacts,
     oneSides,
@@ -30,9 +31,11 @@ import {
     ReconciliationsService,
     ReconBreak,
     reconCardinality,
+    reconciliationTitle,
     resolveBreak,
 } from 'app/inspecto/reconciliation';
 import { ReconExecService } from './recon-exec.service';
+import { DatasetsService } from '../studio/datasets/datasets.service';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { formatNumber, NumberFormat } from 'app/inspecto/viz/number-format';
@@ -74,6 +77,7 @@ export class ReconciliationDetailComponent implements OnInit {
     private confirm = inject(InspectoConfirmService);
     private reconApi = inject(ReconApiService);
     private router = inject(Router);
+    private datasetsApi = inject(DatasetsService);
 
     readonly recon = signal<Reconciliation | null>(null);
     readonly loading = signal(true);
@@ -124,15 +128,25 @@ export class ReconciliationDetailComponent implements OnInit {
     /** The compared side of the anchor-relative pair — 'b' always, 'c' when the recon is 3-way. */
     readonly side = signal<'b' | 'c'>('b');
     readonly threeWay = computed(() => !!this.recon()?.thirdDataset);
-    /** Human label of the compared side's dataset (for the section headers). */
-    readonly sideDataset = computed(() =>
+    /** Dataset id → readable label, read once on open (R2-16); empty until then, so sides show their ids. */
+    readonly datasetNames = signal<Record<string, string>>({});
+    private readonly datasetLabel = (id: string): string => this.datasetNames()[id] || id;
+    /** Readable labels of the anchor (A) and right (B) Datasets — the id when the Dataset has none. */
+    readonly leftLabel = computed(() => this.datasetLabel(this.recon()?.leftDataset ?? 'A'));
+    readonly rightLabel = computed(() => this.datasetLabel(this.recon()?.rightDataset ?? 'B'));
+    /** The compared side's Dataset id (for tooltips) and its readable label (for the section headers). */
+    readonly sideDatasetId = computed(() =>
         this.side() === 'c' ? (this.recon()?.thirdDataset ?? 'C') : (this.recon()?.rightDataset ?? 'B'),
     );
+    readonly sideDataset = computed(() => this.datasetLabel(this.sideDatasetId()));
 
     readonly viewMode = signal<'tables' | 'grouped'>('tables');
 
     /** UIE-10: the page title is the Reconciliation's business description; its id is a code. */
-    readonly title = computed(() => this.recon()?.description || this.recon()?.name || '');
+    readonly title = computed(() => {
+        const r = this.recon();
+        return r ? reconciliationTitle(r) : '';
+    });
 
     // ── UIE-10: monetary impact per Break ────────────────────────────────────────────────
     /** Break key → impact, from the last compute. Empty when the Reconciliation declares no impact. */
@@ -256,7 +270,7 @@ export class ReconciliationDetailComponent implements OnInit {
     ]);
 
     /** The compared side's letter — the rows carry roles a/b, but on a 3-way "A vs C" the compared side is C. */
-    private readonly sideLetter = computed(() => (this.side() === 'c' ? 'C' : 'B'));
+    readonly sideLetter = computed(() => (this.side() === 'c' ? 'C' : 'B'));
 
     /** `A 1 · C 2` — the record count per side at a duplicate key (the Break's evidence). */
     readonly recordsText = (b: ReconBreak): string =>
@@ -266,12 +280,11 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly duplicatedSideText = (b: ReconBreak): string => {
         const card = this.cardinality();
         if (!card) return '—';
-        const r = this.recon();
         const names: string[] = [];
         for (const s of oneSides(card)) {
             const n = Number(s === 'a' ? b.leftValue : b.rightValue);
             if (n > 1)
-                names.push(s === 'a' ? `A — ${r?.leftDataset ?? ''}` : `${this.sideLetter()} — ${this.sideDataset()}`);
+                names.push(s === 'a' ? `A — ${this.leftLabel()}` : `${this.sideLetter()} — ${this.sideDataset()}`);
         }
         return names.join(', ') || '—';
     };
@@ -307,7 +320,8 @@ export class ReconciliationDetailComponent implements OnInit {
             {
                 // UIE-10: the field-level diff, `field: A → B`, named by the two Datasets it compares.
                 colId: 'fieldDiff',
-                headerName: `Field diff (${r?.leftDataset || 'A'} → ${this.sideDataset()})`,
+                headerName: `Field diff (${this.leftLabel()} → ${this.sideDataset()})`,
+                headerTooltip: `A = ${r?.leftDataset ?? ''} → ${this.sideLetter()} = ${this.sideDatasetId()}`,
                 flex: 1,
                 minWidth: 220,
                 valueGetter: (p) => (p.data ? fieldDiff(p.data) : ''),
@@ -413,13 +427,15 @@ export class ReconciliationDetailComponent implements OnInit {
             { field: 'column', headerName: 'Column', width: 150, valueFormatter: (p) => p.value ?? '—' },
             {
                 field: 'leftValue',
-                headerName: r?.leftDataset || 'Left',
+                headerName: r ? this.leftLabel() : 'Left',
+                headerTooltip: r?.leftDataset,
                 flex: 1,
                 valueFormatter: (p) => fmtVal(p.value),
             },
             {
                 field: 'rightValue',
-                headerName: r?.rightDataset || 'Right',
+                headerName: r ? this.rightLabel() : 'Right',
+                headerTooltip: r?.rightDataset,
                 flex: 1,
                 valueFormatter: (p) => fmtVal(p.value),
             },
@@ -527,6 +543,10 @@ export class ReconciliationDetailComponent implements OnInit {
     ngOnInit(): void {
         const id = this.route.snapshot.paramMap.get('id') ?? '';
         this.path.set(decodePath(this.route.snapshot.queryParamMap.get('path')));
+        // Labels only: a failed read leaves the sides named by their ids.
+        this.datasetsApi
+            .list()
+            .subscribe({ next: (d) => this.datasetNames.set(datasetLabels(d)), error: () => undefined });
         this.api.get(id).subscribe({
             next: (r) => {
                 this.recon.set(r);
