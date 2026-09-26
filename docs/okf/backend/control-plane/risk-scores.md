@@ -137,30 +137,39 @@ Real-HTTP coverage with an armed Subject is in `ControlApiRiskScoreTest`.
 objects (SEC-7d), and nothing scopes Dataset rows. The route applies that rule to the model's optional
 `dataScope`.
 
-### Masking (render time)
+### Masking — evidence at WRITE time, the key raw (operator decision 2026-09-27)
 
-🔴 Before this rule, `evidence` returned raw source values (up to 8 columns × 3 rows) and the raw entity
-key to anyone holding `canWorkIncidents`. `RiskScoreMasking` now masks on the way out. The stored scores
-Dataset stays raw, so every score stays recomputable; masking touches no number.
+Operator decision, 2026-09-27, under the standing "go with recommendations":
 
-- **What is sensitive.** A column is sensitive when its Dataset's registry `columns[].classification` is
-  `MSISDN`, `IMSI`, `ACCOUNT` or `PII` (case-insensitive). This is the same source Link Analysis's typed
-  masking reads.
-- **The entity key** is masked when **any** factor's key column is sensitive, because a key does not
-  record which Dataset it came from.
-- **An evidence value** is masked when its column is sensitive in that factor's Dataset.
-- **The pseudonym** is `masked:<16 hex>`, an HMAC-SHA256 under a random per-Space key
-  (`<dataDir>/.risk-score-mask.key`, created on first use, never served). It is stable across requests.
-- The response carries a `masking` block naming the masked columns.
+- **The entity key stays raw.** This matches every per-entity Alert and Incident key in the platform, and
+  access to it is governed by `canWorkIncidents` and data scopes. Platform-wide key masking is deferred
+  decision **D-P8**. The read route masks nothing, so every surface shows the same key.
+- **Classified evidence is masked at write time.** It is the widening: an Incident carries only a key and a
+  value, while evidence copies source rows. The `risk.score` Job (`EvidenceMasker`, applied inside
+  `RiskScoreEvaluator.evaluate`) stores the token and never the raw value, for any evidence column whose
+  Dataset registry `columns[].classification` is `MSISDN`, `IMSI`, `ACCOUNT` or `PII` (case-insensitive).
+  No reader can see such a value raw: not the read route, an Alert or Incident, a Widget, or the DB browser
+  over `risk_scores_<id>(_latest)`.
+
+🔴 The first version masked only in the GET route. The Job wrote raw evidence into the Dataset, and every
+other reader bypassed the route.
+
+- **Token.** `masked:<16 hex>`, an HMAC-SHA256 under the Space's key
+  `<config root>.secrets/.risk-score-mask.key`. That is the same secrets directory as the Pending Change
+  key. `SpaceSecretKeys` gives both keys one creation rule: `CREATE_NEW` first-writer-wins, owner-only
+  (POSIX `rw-------` or a one-entry ACL), and a read retry. `BackupTask` skips `*.secrets`, `PathJail`
+  refuses to resolve into it, and `.gitignore` ignores it. No route serves it.
+- ⚠ **Tokens are deterministic per Space, across models.** The same value masks to the same token in every
+  model, so tokens *link* records. That is useful for correlation, and it is a disclosure.
+- ⚠ **A leak of that one key exposes every masked value.** Anyone holding it can enumerate the value space,
+  a phone-number range for instance, and invert the tokens.
+- Masking touches no number, so every score stays recomputable.
+- An evidence value written before a column was classified stays raw. Re-run the Job to rewrite `_latest`.
+  History files keep what they were written with.
+- A column the registry leaves unclassified is not masked.
 
 ⛔ **There is no reveal.** Link Analysis's audited reveal (`EntityMasking`, `canRevealLinkEntities`) is bound
-to an Investigation's sealed log in the optional `inspecto-geo-link` module. The core cannot reach it, and
-a Risk Score has no Investigation to bind one to. A masked value simply stays masked.
-
-⚠ Two limits remain:
-- The caller looks a score up by its **raw** key. That key is the Incident's `key.entity_key`, which the
-  Alert already stores raw, and the envelope's `links.self` echoes the caller's own request path.
-- A column the registry leaves unclassified is not masked.
+to an Investigation in the optional `inspecto-geo-link` module. A masked evidence value simply stays masked.
 
 ## UI
 
@@ -178,6 +187,7 @@ A 404 renders nothing.
 
 - **The watch Entity List is not fed.** "Above a threshold → watch Entity List" waits on
   `ASSURE-ENTITY-LISTS-1`, which is on hold.
+- **Entity-key masking is D-P8** (deferred). The key is raw on every surface.
 - There is no authoring pane: models are written through `/components/risk-score`.
 - An indicator is a Measure. There is no free-form arithmetic expression, and no reference to a saved
   Measure component, because none exists.

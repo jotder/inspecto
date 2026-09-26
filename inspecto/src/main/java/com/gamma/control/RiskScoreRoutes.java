@@ -90,20 +90,20 @@ final class RiskScoreRoutes implements RouteModule {
         if (r.rows().isEmpty()) throw notFound(modelId, entityKey);
         Map<String, Object> row = r.rows().get(0);
 
-        RiskScoreMasking masking = RiskScoreMasking.of(registry, dataRoot, model);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("model", modelId);
         out.put("entityType", row.get("entity_type"));
-        out.put("entityKey", masking.entityKey(String.valueOf(row.get("entity_key"))));
+        // The entity key is raw, like every per-entity Alert and Incident key (platform-wide masking = D-P8);
+        // classified evidence was masked at WRITE time by the Job (EvidenceMasker), so nothing is masked here.
+        out.put("entityKey", row.get("entity_key"));
         out.put("score", row.get("score"));
         out.put("high", row.get("high"));
         out.put("highThreshold", model.highThreshold());
         out.put("modelVersion", row.get("model_version"));
         out.put("runId", row.get("run_id"));
         out.put("scoredAt", String.valueOf(row.get("scored_at")));
-        out.put("factors", masking.factors(JSON.readValue(String.valueOf(row.get("factors")),
-                new TypeReference<List<Map<String, Object>>>() {})));
-        out.put("masking", masking.basis());
+        out.put("factors", JSON.readValue(String.valueOf(row.get("factors")),
+                new TypeReference<List<Map<String, Object>>>() {}));
         return out;
     }
 

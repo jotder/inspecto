@@ -244,34 +244,43 @@ class ControlApiRiskScoreTest {
     }
 
     @Test
-    void classifiedKeysAndEvidenceAreMaskedAndTheScoreStaysRecomputable(@TempDir Path root) throws Exception {
+    void evidenceIsMaskedAtWriteTimeTheKeyIsRawAndNoRouteServesTheMaskKey(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             // msisdn is classified MSISDN, topup_id PII; status is not classified.
-            new ComponentStore(c.config.resolve("registry")).write("dataset", "topups", Map.of("physicalRef", "topups",
+            ComponentStore store = new ComponentStore(c.config.resolve("registry"));
+            store.write("dataset", "topups", Map.of("physicalRef", "topups",
                     "columns", List.of(Map.of("name", "msisdn", "classification", "msisdn"),
                             Map.of("name", "topup_id", "classification", "PII"),
                             Map.of("name", "status"))));
             Map<String, Object> m = model(null);
-            new ComponentStore(c.config.resolve("registry")).write("risk-score", "subs", m);
+            store.write("risk-score", "subs", m);
             RiskScoreModel model = RiskScoreModel.fromMap("subs", m);
-            RiskScoreEvaluator.write(c.data, model, "v", "r1", Instant.now(), List.of(RiskScorer.score(model, "447700900123",
-                    Map.of("failed", 1.0, "spend", 10.0),
-                    Map.of("failed", List.of(Map.of("topup_id", "t-secret"))))));
+            var run = com.gamma.risk.RiskScoreEvaluator.evaluate(model, id -> com.gamma.query.DatasetRelation.relationSql(
+                    store.get("dataset", id).orElseThrow().content(), c.data, null),
+                    com.gamma.risk.EvidenceMasker.of(store, c.config, model));
+            RiskScoreEvaluator.write(c.data, model, "v", "r1", Instant.now(), run.scored());
 
-            HttpResponse<String> r = send(c.port, "GET", "/spaces/s1/risk-scores/subs/447700900123", null, "analyst");
+            HttpResponse<String> r = send(c.port, "GET", "/spaces/s1/risk-scores/subs/m1", null, "analyst");
             assertEquals(200, r.statusCode(), r.body());
-            // Only the envelope's links.self echoes the caller's OWN request path; the payload never carries it.
             JsonNode d = V1Body.of(r.body());
-            assertFalse(d.toString().contains("447700900123"), "the raw MSISDN never leaves: " + d);
-            assertFalse(r.body().contains("t-secret"), "nor the PII evidence value: " + r.body());
-            assertTrue(d.get("entityKey").asText().startsWith("masked:"));
+            assertEquals("m1", d.get("entityKey").asText(), "the entity key is raw, like every Alert key (D-P8)");
+            assertFalse(r.body().contains("\"t1\""), "the PII evidence value was never stored: " + r.body());
             assertTrue(d.get("factors").get(0).get("evidence").get(0).get("topup_id").asText().startsWith("masked:"));
-            assertTrue(d.get("masking").get("entityKeyMasked").asBoolean());
-            assertEquals(d.get("entityKey").asText(), V1Body.of(send(c.port, "GET",
-                    "/spaces/s1/risk-scores/subs/447700900123", null, "analyst").body()).get("entityKey").asText(),
-                    "the pseudonym is stable");
             List<Map<String, Object>> factors = JSON.convertValue(d.get("factors"), new TypeReference<>() {});
             assertEquals(d.get("score").asDouble(), RiskScorer.recompute(factors), 1e-9, "masking touches no number");
+
+            // The key sits in <config>.secrets/ — no route serves it, by any spelling that could reach it.
+            Path key = c.config.resolveSibling("config.secrets").resolve(".risk-score-mask.key");
+            assertTrue(Files.isRegularFile(key), "created beside the config root");
+            String hex = Files.readString(key).trim();
+            for (String path : List.of("/spaces/s1/config/risk-score/..%2F..%2Fconfig.secrets%2F.risk-score-mask.key",
+                    "/spaces/s1/db/table?store=..%2Fconfig.secrets", "/spaces/s1/db/table?store=.risk-score-mask.key",
+                    "/spaces/s1/export", "/spaces/s1/db/catalog")) {
+                HttpResponse<String> probe = send(c.port, "GET", path, null, "analyst");
+                assertFalse(probe.body().contains(hex), path + " served the mask key");
+                assertFalse(probe.body().contains(".risk-score-mask.key") && probe.statusCode() == 200
+                        && path.contains("catalog"), path + " lists the key file");
+            }
         }
     }
 

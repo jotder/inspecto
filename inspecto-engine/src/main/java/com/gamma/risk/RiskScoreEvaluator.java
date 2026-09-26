@@ -70,8 +70,9 @@ public final class RiskScoreEvaluator {
      *
      * @param relationSql Dataset id → its trusted relation SQL ({@code DatasetRelation.relationSql}); throws
      *                    {@link IllegalArgumentException} for an unknown Dataset
+     * @param masker      masks classified evidence values before they are stored ({@link EvidenceMasker})
      */
-    public static Run evaluate(RiskScoreModel model, Function<String, String> relationSql)
+    public static Run evaluate(RiskScoreModel model, Function<String, String> relationSql, EvidenceMasker masker)
             throws SQLException, IOException {
         Map<String, Map<String, Double>> values = new TreeMap<>();              // entity → factor → value
         Map<String, Map<String, List<Map<String, Object>>>> evidence = new LinkedHashMap<>();
@@ -104,7 +105,8 @@ public final class RiskScoreEvaluator {
                             .computeIfAbsent(f.id(), x -> new ArrayList<>());
                     if (rows.size() >= EVIDENCE_PER_ENTITY) continue;
                     Map<String, Object> shown = new LinkedHashMap<>();
-                    for (String c : f.evidence()) shown.put(c, row.get(c));
+                    // Masked HERE, before anything is stored: a classified value never reaches the scores Dataset.
+                    for (String c : f.evidence()) shown.put(c, masker.mask(f.dataset(), c, row.get(c)));
                     rows.add(shown);
                 }
             }

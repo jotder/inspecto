@@ -77,7 +77,7 @@ final class RiskScoreJobType implements JobTypeProvider {
                         .orElseThrow(() -> new IllegalArgumentException("risk-score '" + modelId
                                 + "' names unknown dataset '" + datasetId + "'"));
                 return DatasetRelation.relationSql(ds, data, views);
-            });
+            }, com.gamma.risk.EvidenceMasker.of(store, writeRoot, model));
             Instant now = Instant.now();
             String version = RiskScoreEvaluator.version(content);
             RiskScoreEvaluator.write(data, model, version, ctx.runId(), now, run.scored());
