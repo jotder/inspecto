@@ -2,14 +2,15 @@ import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { of, throwError } from 'rxjs';
+import { Observable, of, Subject, throwError } from 'rxjs';
 import { describe, expect, it, vi, type Mock } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { ObjectsService, OperationalObject, SessionService } from 'app/inspecto/api';
+import { ObjectsService, OperationalObject, SessionService, WorkflowDef } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
+import { DEFAULT_CASE_WORKFLOW } from './mail-model';
 import { ObjectMailComponent } from './object-mail.component';
 
 function incident(id: string, status: string, extra: Partial<OperationalObject> = {}): OperationalObject {
@@ -34,9 +35,23 @@ const OBJECTS: OperationalObject[] = [
     incident('i5', 'ARCHIVED'),
 ];
 
-async function create() {
+function kase(id: string, status: string): OperationalObject {
+    return { ...incident(id, status), objectType: 'CASE', title: `Case ${id}` };
+}
+
+interface CreateOpts {
+    type?: 'INCIDENT' | 'CASE';
+    list?: Observable<OperationalObject[]>;
+    workflow?: Observable<WorkflowDef>;
+}
+
+async function create(opts: CreateOpts = {}) {
+    const type = opts.type ?? 'INCIDENT';
     const api = {
-        list: vi.fn(() => of(OBJECTS)),
+        list: vi.fn(() => opts.list ?? of(OBJECTS)),
+        // CASE only: an erroring workflow fetch keeps the built-in DEFAULT_CASE_WORKFLOW (the pane's fallback).
+        workflow: vi.fn(() => opts.workflow ?? throwError(() => new Error('offline'))),
+        findingsSpec: vi.fn(() => throwError(() => new Error('offline'))),
         update: vi.fn((id: string) => of(OBJECTS.find((o) => o.id === id))),
         transition: vi.fn((id: string) => of(OBJECTS.find((o) => o.id === id))),
         addComment: vi.fn(() => of({})),
@@ -56,7 +71,9 @@ async function create() {
             {
                 provide: ActivatedRoute,
                 useValue: {
-                    snapshot: { data: { type: 'INCIDENT', title: 'Incidents', subtitle: '' } },
+                    snapshot: {
+                        data: { type, title: type === 'CASE' ? 'Case Manager' : 'Incidents', subtitle: '' },
+                    },
                     queryParamMap: of(convertToParamMap({})),
                 },
             },
@@ -180,6 +197,85 @@ describe('ObjectMailComponent', () => {
 
     it('renders the 3-pane shell with no a11y violations', async () => {
         const { fixture } = await create();
+        fixture.detectChanges();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    // ── folder vocabulary: Incident and Case are distinct concepts (GLOSSARY §9) ─────────────────
+    /** The rendered folder-nav labels, in display order (folder buttons carry an aria-label; tag buttons don't). */
+    function folderLabels(el: HTMLElement): string[] {
+        return [...el.querySelectorAll('nav[aria-label="Folders"] > button[aria-label]')].map(
+            (b) => b.querySelector('span')?.textContent?.trim() ?? '',
+        );
+    }
+
+    it('names the pinned folder for the Incidents pane — "My Incidents", never "My Cases"', async () => {
+        const { fixture } = await create();
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(folderLabels(el)[0]).toBe('My Incidents');
+        expect(el.textContent).not.toContain('My Cases');
+    });
+
+    it('names the pinned folder for the Case Manager pane — "My Cases"', async () => {
+        const { fixture } = await create({ type: 'CASE', list: of([kase('c1', 'OPEN')]) });
+        fixture.detectChanges();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(folderLabels(el)[0]).toBe('My Cases');
+        expect(el.textContent).not.toContain('My Incidents');
+        expect(el.textContent).toContain('New case');
+    });
+
+    // ── landing folder: never open on an empty folder while others hold items ───────────────────
+    it('lands on the first non-empty folder when the default (Open) is empty', async () => {
+        // The telco demo: Open 0 · Investigating 1 · Resolved 1 — the analyst landed on "Nothing in Open".
+        const { c } = await create({
+            type: 'CASE',
+            list: of([kase('c1', 'RESOLVED'), kase('c2', 'INVESTIGATING')]),
+        });
+        expect(c.folderId()).toBe('investigating'); // display order, not load order
+        expect(c.rows().map((o) => o.id)).toEqual(['c2']);
+    });
+
+    it('keeps the default folder while it has items, even when an earlier folder (My Cases) has some', async () => {
+        const mine = { ...kase('c1', 'INVESTIGATING'), assignee: 'operator' };
+        const { c } = await create({ type: 'CASE', list: of([mine, kase('c2', 'OPEN')]) });
+        expect(c.counts().get('mine')).toBe(1);
+        expect(c.folderId()).toBe('open');
+    });
+
+    it('falls back to the default folder when every folder is empty', async () => {
+        const { c } = await create({ type: 'CASE', list: of([]) });
+        expect(c.folderId()).toBe('open');
+    });
+
+    it('re-lands when the served workflow (the case folder set) arrives after the list', async () => {
+        const wf$ = new Subject<WorkflowDef>();
+        const { c } = await create({ type: 'CASE', list: of([kase('c1', 'TRIAGE')]), workflow: wf$ });
+        expect(c.folderId()).toBe('open'); // built-in folders: nothing matches TRIAGE yet
+        wf$.next({
+            type: 'CASE',
+            initial: 'NEW',
+            states: ['NEW', 'TRIAGE', 'DONE'],
+            terminal: ['DONE'],
+            transitions: [],
+        });
+        expect(c.folderId()).toBe('triage');
+    });
+
+    it('an explicit folder choice made before the list lands always wins', async () => {
+        const list$ = new Subject<OperationalObject[]>();
+        const wf$ = new Subject<WorkflowDef>();
+        const { c } = await create({ type: 'CASE', list: list$, workflow: wf$ });
+        c.selectFolder('open'); // the operator deliberately opens the (empty) Open folder
+        list$.next([kase('c1', 'INVESTIGATING')]);
+        expect(c.folderId()).toBe('open');
+        wf$.next({ ...DEFAULT_CASE_WORKFLOW });
+        expect(c.folderId()).toBe('open');
+    });
+
+    it('renders the Case Manager landing with no a11y violations', async () => {
+        const { fixture } = await create({ type: 'CASE', list: of([kase('c1', 'INVESTIGATING')]) });
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
     });

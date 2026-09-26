@@ -425,7 +425,7 @@ explained `<inspecto-alert>` ("Operational objects not installed"), never a toas
 ### 3.11 The UI seam
 
 One `ObjectMailComponent` serves `/incidents` and `/cases` by route data — a Gmail-metaphor 3-pane shell
-(folders My Cases / Escalated / Identified / Diagnosing / Resolved / Archived + Tags · list · detail) reading
+(folders My Incidents — My Cases on `/cases` — / Escalated / Identified / Diagnosing / Resolved / Archived + Tags · list · detail) reading
 `GET /workflows/{type}` rather than hard-coding transitions. Triage is **optimistic** (every bulk verb
 patches rows to the expected post-state, then reconciles with the server object); merge / split / create are
 request → refetch. `/alerts` (`AlertsComponent`) lists fired alerts and Alert Rules with a manual Evaluate

@@ -160,7 +160,14 @@ export class ObjectMailComponent implements OnInit {
     // ── state ─────────────────────────────────────────────────────────────────────
     readonly objects = signal<OperationalObject[]>([]);
     readonly loading = signal(false);
-    readonly folderId = signal(this.isIncident ? 'identified' : 'open');
+    readonly folderId = signal(this.defaultFolderId());
+    /**
+     * True once the operator picks a folder or tag. There is no folder in the URL and no remembered
+     * choice, so a click is the only explicit choice — and it always beats the landing below.
+     */
+    private folderChosen = false;
+    /** Set by the first successful list load — the counts {@link landFolder} reads come from that one call. */
+    private listLoaded = false;
     readonly tagFilter = signal<string | null>(null);
     readonly selected = signal<OperationalObject[]>([]);
     readonly detail = signal<OperationalObject | null>(null);
@@ -424,7 +431,8 @@ export class ObjectMailComponent implements OnInit {
             this.api.workflow('CASE').subscribe({
                 next: (wf) => {
                     this.workflowDef.set(wf);
-                    if (!this.folders().some((f) => f.id === this.folderId()))
+                    if (this.listLoaded) this.landFolder();
+                    else if (!this.folders().some((f) => f.id === this.folderId()))
                         this.folderId.set(wf.initial.toLowerCase());
                 },
                 error: () => undefined,
@@ -464,6 +472,10 @@ export class ObjectMailComponent implements OnInit {
                 this.selected.set([]);
                 const open = this.detail();
                 if (open) this.detail.set(o.find((x) => x.id === open.id) ?? null);
+                if (!this.listLoaded) {
+                    this.listLoaded = true;
+                    this.landFolder();
+                }
             },
             error: () => {
                 this.objects.set([]);
@@ -487,13 +499,38 @@ export class ObjectMailComponent implements OnInit {
         });
     }
 
+    /** The landing folder when nothing has items: the Inbox (Identified) / the workflow's initial state. */
+    private defaultFolderId(): string {
+        return this.isIncident ? 'identified' : this.workflowDef().initial.toLowerCase();
+    }
+
+    /**
+     * Land on a folder with something in it, unless the operator already chose one. The default wins
+     * while it has items; otherwise the first non-empty folder in display order; all empty → the
+     * default. The counts are client-side over the one list fetch, so this costs no extra request.
+     * Runs once after the first load (and again if the workflow — the case folder set — lands later),
+     * never on a refresh, so a triage-then-Refresh does not move the operator.
+     */
+    private landFolder(): void {
+        if (this.folderChosen) return;
+        const counts = this.counts();
+        const def = this.defaultFolderId();
+        if (counts.get(def)) {
+            this.folderId.set(def);
+            return;
+        }
+        this.folderId.set(this.folders().find((f) => counts.get(f.id))?.id ?? def);
+    }
+
     // ── nav interactions ──────────────────────────────────────────────────────────
     selectFolder(id: string): void {
+        this.folderChosen = true;
         this.folderId.set(id);
         this.tagFilter.set(null);
     }
 
     selectTag(tag: string): void {
+        this.folderChosen = true;
         this.tagFilter.set(this.tagFilter() === tag ? null : tag);
     }
 

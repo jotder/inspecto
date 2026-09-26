@@ -15,10 +15,18 @@ route data (`incidents.routes.ts` / `cases.routes.ts`), the canonical
 ([`GLOSSARY.md`](../../../GLOSSARY.md) §9) — never "Issue". Backed by `ObjectsService`; offline via the
 the real ControlApi.
 
-* **Mail shell** — Gmail-metaphor 3 panes: folder nav (My Cases / Escalated / Identified / Diagnosing /
+* **Mail shell** — Gmail-metaphor 3 panes: folder nav (My Incidents / Escalated / Identified / Diagnosing /
   Resolved / Archived + Tags) · list · detail panel; both side panes resize via the shared
   `InspectoSplitDirective`. High volume loads honestly via the data-table's
   [Load more strip](../design-system/data-table.md).
+  * The pinned "assigned to me" folder is named per type by `mineFolder()` in `mail-model.ts` — **My
+    Incidents** on `/incidents`, **My Cases** on `/cases`. ⚠ It was one literal "My Cases" on both panes
+    until 2026-09-26 (telco demo review): Incident and Case are distinct concepts (GLOSSARY §9).
+  * **Landing folder** — with no explicit choice (there is no folder in the URL and none remembered, so
+    only a click counts), the pane lands on the default (Identified / the workflow's `initial`) while it has
+    items, else the first non-empty folder in display order, else the default. Counts are client-side over
+    the one list fetch — no per-folder request. It runs once after the first load (and again when the
+    served CASE workflow lands after the list), never on Refresh; a folder or tag click always wins.
 * **Lifecycle** — `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED` (+ reopen → Diagnosing); priority
   ladder Critical · Major · Minor · Low. The UI reads **`GET /workflows/{type}`** (BFS-ordered states)
   instead of hardcoding transitions, so TOON-overridden workflows drive the same panes. Resolve requires

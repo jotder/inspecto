@@ -55,7 +55,7 @@ export function isEscalated(o: OperationalObject): boolean {
         : o.attributes?.['escalated'] === 'true';
 }
 
-/** "Me" for the My Cases folder — the auth-free Personal edition has no session identity. */
+/** "Me" for the My Incidents / My Cases folder — the auth-free Personal edition has no session identity. */
 export function currentOperator(): string {
     return localStorage.getItem('inspecto.operator') || 'operator';
 }
@@ -243,14 +243,23 @@ export interface MailFolder {
 
 const notArchived = (o: OperationalObject): boolean => !['ARCHIVED', 'CLOSED'].includes(displayStatus(o));
 
-/** Important → My Cases · Starred → Escalated · Inbox → Identified · Draft → Diagnosing · Sent → Resolved · Trash → Archived. */
-export const INCIDENT_FOLDERS: MailFolder[] = [
-    {
+/**
+ * The pinned "assigned to me" folder, named for the pane's object type (`'Incidents'` → "My Incidents").
+ * ⚠ Per type because Incident and Case are distinct concepts (GLOSSARY §9): a shared literal "My Cases"
+ * leaked onto the Incidents pane (seen in the telco demo review).
+ */
+export function mineFolder(plural: string): MailFolder {
+    return {
         id: 'mine',
-        label: 'My Cases',
+        label: `My ${plural}`,
         icon: 'heroicons_outline:user',
         match: (o, me) => o.assignee === me && notArchived(o),
-    },
+    };
+}
+
+/** Important → My Incidents · Starred → Escalated · Inbox → Identified · Draft → Diagnosing · Sent → Resolved · Trash → Archived. */
+export const INCIDENT_FOLDERS: MailFolder[] = [
+    mineFolder('Incidents'),
     {
         id: 'escalated',
         label: 'Escalated',
@@ -350,12 +359,7 @@ export function stateLabel(state: string): string {
  */
 export function caseFoldersFrom(wf: WorkflowDef): MailFolder[] {
     return [
-        {
-            id: 'mine',
-            label: 'My Cases',
-            icon: 'heroicons_outline:user',
-            match: (o, me) => o.assignee === me && notArchived(o),
-        },
+        mineFolder('Cases'),
         ...wf.states.map(
             (state): MailFolder => ({
                 id: state.toLowerCase(),
