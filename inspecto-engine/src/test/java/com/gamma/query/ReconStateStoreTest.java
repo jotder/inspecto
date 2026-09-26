@@ -52,12 +52,12 @@ class ReconStateStoreTest {
         ReconStateStore store = new ReconStateStore(root);
         store.record("orders", List.of(open("value_break", "EU", "amount")), "2026-07-01T00:00:00Z");
 
-        ReconBreaks.Break resolved = store.setStatus("orders", "value_break", "EU", "amount", "resolved", "FX gap");
+        ReconBreaks.Break resolved = store.setStatus("orders", "AB", "value_break", "EU", "amount", "resolved", "FX gap");
         assertEquals("resolved", resolved.status());
         assertEquals("FX gap", resolved.note());
         assertEquals("2026-07-01T00:00:00Z", resolved.firstSeenAt(), "a status change keeps the sighting");
 
-        ReconBreaks.Break appended = store.setStatus("orders", "missing_left", "APAC", null, "resolved", null);
+        ReconBreaks.Break appended = store.setStatus("orders", "AB", "missing_left", "APAC", null, "resolved", null);
         assertNull(appended.firstSeenAt());
         ReconStateStore.State s = store.read("orders");
         assertEquals(2, s.breaks().size());

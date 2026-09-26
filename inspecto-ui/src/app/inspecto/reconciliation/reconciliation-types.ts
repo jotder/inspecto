@@ -44,9 +44,17 @@ export const DEFAULT_BANDS: ReconBands = { warnPct: 1, breachPct: 2 };
  */
 export type BreakType = 'missing_left' | 'missing_right' | 'value_break' | 'cardinality_break';
 export type BreakStatus = 'open' | 'resolved' | 'auto_closed';
+/** The anchor-relative pair a Break was found on: A vs B, or A vs C on a 3-way Reconciliation. */
+export type ReconPair = 'AB' | 'AC';
 
 /** One reconciliation discrepancy for a single key (and, for value breaks, a single compare column). */
 export interface ReconBreak {
+    /**
+     * The pair this Break belongs to — part of its recorded identity ({@link lifecycleId}), so an A-vs-B and an
+     * A-vs-C Break on one key and column resolve and age independently. Absent reads as `AB`: a Break recorded
+     * before pairs existed was an A-vs-B one (the server applies the same rule to its state file).
+     */
+    pair?: ReconPair;
     key: string;
     /**
      * The key as the server spelled it — one value per key column — so a follow-up call (the raw rows
@@ -90,7 +98,7 @@ export interface ReconState {
     /** The last recorded run, or `null` when none was ever recorded. */
     lastRunAt: string | null;
     runs: number;
-    /** The recorded lifecycle — A↔B only on a 3-way Reconciliation. */
+    /** The recorded lifecycle — both pairs on a 3-way Reconciliation, each Break carrying its `pair`. */
     breaks: ReconBreak[];
 }
 
@@ -260,6 +268,22 @@ function escPart(part: string): string {
  */
 export function breakId(b: ReconBreak): string {
     return `${escPart(b.type)}|${escPart(b.key)}|${escPart(b.column ?? '')}`;
+}
+
+/** A Break's pair — `AB` when it carries none. */
+export function pairOf(b: Pick<ReconBreak, 'pair'>): ReconPair {
+    return b.pair ?? 'AB';
+}
+
+/**
+ * A Break's RECORDED-lifecycle identity — `(pair, type, key, column)` — what the Breaks page overlays the
+ * recorded status / note / first-seen by. It is {@link breakId} with the pair in front.
+ *
+ * ⛔ One contract with the backend's `ReconBreaks.lifecycleId()`, which renders the byte-identical string.
+ * ⚠ The Incident dedupe grain stays {@link breakId} (no pair) — promotions are keyed by that, not this.
+ */
+export function lifecycleId(b: ReconBreak): string {
+    return `${escPart(pairOf(b))}|${breakId(b)}`;
 }
 
 /** True when `left` and `right` agree within the column's tolerance (non-numeric ⇒ exact string compare). */

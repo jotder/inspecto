@@ -147,6 +147,25 @@ describe('ReconBoardComponent', () => {
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('90+ days');
     });
 
+    it('counts the open Breaks of BOTH pairs of a 3-way Reconciliation in the aging strip', async () => {
+        const old = new Date(Date.now() - 100 * DAY).toISOString();
+        const recent = new Date(Date.now() - 10 * DAY).toISOString();
+        const threeWay: ReconState = {
+            ...RECORDED,
+            breaks: [
+                { pair: 'AB', key: 'MEA · voice', type: 'missing_right', status: 'open', firstSeenAt: old },
+                { pair: 'AC', key: 'MEA · voice', type: 'missing_right', status: 'open', firstSeenAt: recent },
+                { pair: 'AC', key: 'EU · data', type: 'value_break', column: 'amount', status: 'resolved' },
+            ],
+        };
+        const { c } = await create({ patch: { thirdDataset: 'crm_daily' }, record: () => of(threeWay) });
+        await vi.waitFor(() => expect(c.state()).toEqual(threeWay));
+        expect(c.ageBuckets()).toEqual([
+            { bucket: '0-30', count: 1 },
+            { bucket: '90+', count: 1 },
+        ]);
+    });
+
     it('toasts a run it could not record and keeps the last recorded lifecycle', async () => {
         const { c, toastr, state } = await create({
             record: () => throwError(() => ({ status: 403, error: { error: { message: 'requires canOperateRuns' } } })),

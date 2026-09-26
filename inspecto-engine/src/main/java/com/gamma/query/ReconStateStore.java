@@ -19,7 +19,7 @@ import java.util.Map;
  * {@code <write-root>/recon-state/<reconciliationId>.json}:
  * <pre>
  *   { "reconciliation": "&lt;id&gt;", "lastRunAt": "&lt;ISO instant&gt;" | null, "runs": n,
- *     "breaks": [ { key, keyValues?, type, column?, leftValue?, rightValue?, diff?, status, note?, firstSeenAt? } ] }
+ *     "breaks": [ { pair, key, keyValues?, type, column?, leftValue?, rightValue?, diff?, status, note?, firstSeenAt? } ] }
  * </pre>
  *
  * <p>🔴 <b>Why it left the config.</b> The lifecycle used to be merged in the browser and written back
@@ -95,16 +95,18 @@ public final class ReconStateStore {
 
     /**
      * Resolve ({@code status = resolved}) or re-open ({@code open}) one Break by identity, replacing its note
-     * ({@code null} clears it). A Break no run has recorded yet is appended identity-only — the Breaks page
-     * can act on a live Break before the Board records one. Returns the updated Break.
+     * ({@code null} clears it). {@code pair} ({@link ReconBreaks#PAIR_AB} / {@link ReconBreaks#PAIR_AC}) is part
+     * of the identity — resolving an A↔C Break leaves the same-key A↔B one as it was. A Break no run has
+     * recorded yet is appended identity-only — the Breaks page can act on a live Break before the Board
+     * records one. Returns the updated Break.
      *
      * @throws IllegalArgumentException the state already holds {@link #MAX_BREAKS} and this would append
      */
-    public ReconBreaks.Break setStatus(String reconciliationId, String type, String key, String column,
+    public ReconBreaks.Break setStatus(String reconciliationId, String pair, String type, String key, String column,
                                        String status, String note) throws IOException {
         synchronized (LOCK) {
             State prev = load(reconciliationId);
-            String id = ReconBreaks.identity(type, key, column);
+            String id = ReconBreaks.lifecycleId(pair, type, key, column);
             List<ReconBreaks.Break> breaks = new ArrayList<>(prev.breaks().size() + 1);
             ReconBreaks.Break updated = null;
             for (ReconBreaks.Break b : prev.breaks()) {
@@ -118,7 +120,7 @@ public final class ReconStateStore {
                 if (breaks.size() >= MAX_BREAKS)
                     throw new IllegalArgumentException("reconciliation '" + reconciliationId + "' already records "
                             + MAX_BREAKS + " Breaks — record a run before changing a Break it has not seen");
-                updated = ReconBreaks.Break.identityOnly(type, key, column, status, note);
+                updated = ReconBreaks.Break.identityOnly(pair, type, key, column, status, note);
                 breaks.add(updated);
             }
             save(new State(reconciliationId, prev.lastRunAt(), prev.runs(), breaks));

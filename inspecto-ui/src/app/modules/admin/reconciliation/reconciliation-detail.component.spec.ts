@@ -290,6 +290,66 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         expect(c.valueBreaks()[0].note).toBe('known billing lag');
     });
 
+    /**
+     * A 3-way Reconciliation records its A-vs-C Breaks too, and the "A vs C" tab overlays them — by the
+     * LIFECYCLE identity, pair included, so the A-vs-B record on the same key and column never bleeds across.
+     * (The exec stub answers the same sets for either side, so both tabs show the same live `EU · data` Break.)
+     */
+    it('overlays the recorded state per pair on a 3-way Reconciliation, and resolves an A vs C Break as AC', async () => {
+        const abSeen = new Date(Date.now() - 45 * 86_400_000).toISOString();
+        const acSeen = new Date(Date.now() - 5 * 86_400_000).toISOString();
+        const { c, breaks, setBreakStatus } = await create({
+            patch: { thirdDataset: 'crm_daily' },
+            breaks: [
+                {
+                    key: 'EU · data',
+                    type: 'value_break',
+                    column: 'amount',
+                    status: 'resolved',
+                    note: 'B lag',
+                    firstSeenAt: abSeen,
+                },
+                {
+                    pair: 'AC',
+                    key: 'EU · data',
+                    type: 'value_break',
+                    column: 'amount',
+                    status: 'open',
+                    firstSeenAt: acSeen,
+                },
+            ],
+        });
+        // A vs B: the pair-less record reads as AB
+        expect(c.valueBreaks()[0]).toMatchObject({
+            pair: 'AB',
+            status: 'resolved',
+            note: 'B lag',
+            firstSeenAt: abSeen,
+        });
+
+        c.setSide('c');
+        await vi.waitFor(() => expect(c.computing()).toBe(false));
+        expect(breaks).toHaveBeenLastCalledWith(expect.anything(), c.path(), null, 'c');
+        expect(c.valueBreaks()[0]).toMatchObject({ pair: 'AC', status: 'open', firstSeenAt: acSeen });
+        expect(c.valueBreaks()[0].note).toBeUndefined();
+        expect(c.ageText(c.valueBreaks()[0])).toBe('5d');
+
+        await c.toggleResolve(c.valueBreaks()[0]);
+        expect(setBreakStatus).toHaveBeenCalledWith('med_vs_bill', expect.objectContaining({ pair: 'AC' }), 'resolved');
+        expect(c.valueBreaks()[0].status).toBe('resolved');
+        expect(c.state()?.breaks).toHaveLength(2);
+
+        // and the A-vs-B record is exactly as it was
+        c.setSide('b');
+        await vi.waitFor(() => expect(c.computing()).toBe(false));
+        expect(c.valueBreaks()[0]).toMatchObject({
+            pair: 'AB',
+            status: 'resolved',
+            note: 'B lag',
+            firstSeenAt: abSeen,
+        });
+    });
+
     it('renders with no a11y violations', async () => {
         const { fixture } = await create();
         await expectNoA11yViolations(fixture.nativeElement);

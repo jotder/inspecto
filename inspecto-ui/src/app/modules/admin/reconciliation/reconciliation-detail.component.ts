@@ -25,6 +25,7 @@ import {
     datasetLabels,
     decodePath,
     duplicateImpacts,
+    lifecycleId,
     oneSides,
     openAgeBuckets,
     Reconciliation,
@@ -223,10 +224,13 @@ export class ReconciliationDetailComponent implements OnInit {
         this.selectedId.set(null);
     }
 
-    /** Recorded break status/note/first-seen by identity. */
+    /**
+     * Recorded break status/note/first-seen by LIFECYCLE identity — pair included, so the "A vs C" tab
+     * overlays the recorded A-vs-C Breaks and never the A-vs-B one on the same key and column.
+     */
     private readonly persistedById = computed(() => {
         const m = new Map<string, ReconBreak>();
-        for (const b of this.state()?.breaks ?? []) m.set(breakId(b), b);
+        for (const b of this.state()?.breaks ?? []) m.set(lifecycleId(b), b);
         return m;
     });
 
@@ -238,7 +242,7 @@ export class ReconciliationDetailComponent implements OnInit {
         const live = this.liveBreaks() ?? [];
         const persisted = this.persistedById();
         return live.map((b) => {
-            const p = persisted.get(breakId(b));
+            const p = persisted.get(lifecycleId(b));
             if (!p) return b;
             const aged = p.firstSeenAt ? { ...b, firstSeenAt: p.firstSeenAt } : b;
             return p.status !== 'auto_closed' ? { ...aged, status: p.status, note: p.note } : aged;
@@ -613,9 +617,12 @@ export class ReconciliationDetailComponent implements OnInit {
         const r = this.recon();
         if (!r || this.computing()) return;
         this.computing.set(true);
+        const side = this.side();
         try {
-            const sets = await this.exec.breaks(r, this.path(), null, this.side());
-            this.liveBreaks.set(breaksFromSets(r, sets));
+            const sets = await this.exec.breaks(r, this.path(), null, side);
+            // Tagged with the pair they were computed on — the recorded state holds both pairs of a 3-way.
+            const pair = side === 'c' ? 'AC' : 'AB';
+            this.liveBreaks.set(breaksFromSets(r, sets).map((b) => ({ ...b, pair })));
             this.impacts.set(breakImpacts(r, sets));
             this.dupImpacts.set(duplicateImpacts(r, sets));
             this.lastEvaluated.set(new Date());
@@ -703,14 +710,14 @@ export class ReconciliationDetailComponent implements OnInit {
     }
 }
 
-/** `state` with `b` replacing every recorded Break of its identity, or appended when it had none. */
+/** `state` with `b` replacing every recorded Break of its lifecycle identity, or appended when it had none. */
 function withRecorded(state: ReconState | null, reconciliation: string, b: ReconBreak): ReconState {
     const base = state ?? { reconciliation, lastRunAt: null, runs: 0, breaks: [] };
-    const id = breakId(b);
-    const known = base.breaks.some((x) => breakId(x) === id);
+    const id = lifecycleId(b);
+    const known = base.breaks.some((x) => lifecycleId(x) === id);
     return {
         ...base,
-        breaks: known ? base.breaks.map((x) => (breakId(x) === id ? b : x)) : [...base.breaks, b],
+        breaks: known ? base.breaks.map((x) => (lifecycleId(x) === id ? b : x)) : [...base.breaks, b],
     };
 }
 

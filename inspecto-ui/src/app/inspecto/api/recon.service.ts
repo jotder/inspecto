@@ -205,16 +205,26 @@ export class ReconApiService {
         return this.http.post<ReconState>(apiUrl(`/recon/${encodeURIComponent(reconciliation)}/record`), {});
     }
 
-    /** Resolve or re-open one Break by identity (`canOperateRuns`); a blank note clears it. */
+    /**
+     * Resolve or re-open one Break by identity `(pair, type, key, column)` (`canOperateRuns`); a blank note
+     * clears it. A Break with no `pair` is sent as `AB`.
+     */
     setBreakStatus(
         reconciliation: string,
-        b: Pick<ReconBreak, 'type' | 'key' | 'column'>,
+        b: Pick<ReconBreak, 'pair' | 'type' | 'key' | 'column'>,
         status: 'resolved' | 'open',
         note?: string | null,
     ): Observable<{ reconciliation: string; break: ReconBreak }> {
         return this.http.post<{ reconciliation: string; break: ReconBreak }>(
             apiUrl(`/recon/${encodeURIComponent(reconciliation)}/breaks/status`),
-            { type: b.type, key: b.key, ...(b.column ? { column: b.column } : {}), status, ...(note ? { note } : {}) },
+            {
+                pair: b.pair ?? 'AB',
+                type: b.type,
+                key: b.key,
+                ...(b.column ? { column: b.column } : {}),
+                status,
+                ...(note ? { note } : {}),
+            },
         );
     }
 }

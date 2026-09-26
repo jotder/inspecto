@@ -85,7 +85,7 @@ class ReconBreaksTest {
 
     @Test
     void aBreakRecordedWithoutAStampIsStampedByTheNextRun() {
-        ReconBreaks.Break appended = ReconBreaks.Break.identityOnly("value_break", "EU · data", "amount", "resolved", null);
+        ReconBreaks.Break appended = ReconBreaks.Break.identityOnly("AB", "value_break", "EU · data", "amount", "resolved", null);
         List<ReconBreaks.Break> merged = ReconBreaks.merge(List.of(appended), List.of(open("value_break", "EU · data", "amount")), RUN2);
         assertEquals(RUN2, merged.get(0).firstSeenAt());
         assertEquals("resolved", merged.get(0).status());
@@ -99,6 +99,37 @@ class ReconBreaksTest {
         assertNotEquals(ReconBreaks.identity("value_break", "EU|voice", "amount"),
                 ReconBreaks.identity("value_break", "EU", "voice|amount"));
         assertEquals("missing_left|k|", ReconBreaks.identity("missing_left", "k", null));
+    }
+
+    @Test
+    void theLifecycleIdentityPutsThePairInFront() {
+        assertEquals("AC|value_break|EU\\|voice|amount", ReconBreaks.lifecycleId("AC", "value_break", "EU|voice", "amount"));
+        assertNotEquals(ReconBreaks.lifecycleId("AB", "missing_right", "k", null),
+                ReconBreaks.lifecycleId("AC", "missing_right", "k", null));
+    }
+
+    /** 🔴 The point of the pair: an A↔B and an A↔C Break on one key and column have two lifecycles. */
+    @Test
+    void anAbAndAnAcBreakOnTheSameKeyMergeIndependently() {
+        ReconBreaks.Break ab = open("value_break", "EU · data", "amount");
+        ReconBreaks.Break ac = ab.withPair("AC");
+        ReconBreaks.Break resolvedAc = ac.withStatus("resolved", "C lags").withFirstSeenAt(RUN1);
+        List<ReconBreaks.Break> merged = ReconBreaks.merge(List.of(resolvedAc), List.of(ab, ac), RUN2);
+        assertEquals(2, merged.size());
+        assertEquals("AB", merged.get(0).pair());
+        assertEquals("open", merged.get(0).status(), "resolving the A↔C Break did not resolve the A↔B one");
+        assertEquals(RUN2, merged.get(0).firstSeenAt(), "the A↔B Break is new on this run");
+        assertEquals("resolved", merged.get(1).status());
+        assertEquals(RUN1, merged.get(1).firstSeenAt());
+    }
+
+    @Test
+    void aPairLessRecordedBreakReadsAsAbAndAnUnknownPairIsRefused() {
+        Map<String, Object> legacy = new LinkedHashMap<>(Map.of("key", "k", "type", "missing_left", "status", "open"));
+        assertEquals("AB", ReconBreaks.Break.fromMap(legacy).pair());
+        assertEquals("AB", ReconBreaks.Break.fromMap(legacy).toMap().get("pair"), "and is written back with it");
+        legacy.put("pair", "BC");
+        assertThrows(IllegalArgumentException.class, () -> ReconBreaks.Break.fromMap(legacy));
     }
 
     // ── key text: byte-identical to the browser's String() of the JSON ──────────────
@@ -167,6 +198,30 @@ class ReconBreaksTest {
         List<ReconBreaks.Break> all = ReconBreaks.compute(spec, ReconStateStore.MAX_BREAKS);
         assertEquals(249, all.size(), "ids 1..249 are only in A");
         assertTrue(all.stream().anyMatch(b -> b.key().equals("240")));
+    }
+
+    @Test
+    void computeOnAThreeWaySpecTagsEveryBreakWithItsPair() throws Exception {
+        ReconService.Spec spec = ReconService.Spec.of(
+                List.of(new ReconService.Side("a", "SELECT range AS id, 1.0 AS amount FROM range(3)", null, null),
+                        new ReconService.Side("b", "SELECT 0 AS id, 1.0 AS amount", null, null),
+                        new ReconService.Side("c", "SELECT * FROM (VALUES (0, 2.0), (1, 1.0), (2, 1.0)) t(id, amount)", null, null)),
+                List.of("id"), List.of(new ReconService.Measure("amount", "sum", "exact", 0)), false);
+        List<ReconBreaks.Break> all = ReconBreaks.compute(spec, ReconStateStore.MAX_BREAKS);
+        assertEquals(List.of("AB|missing_right|1|", "AB|missing_right|2|", "AC|value_break|0|amount"),
+                all.stream().map(ReconBreaks.Break::id).sorted().toList());
+    }
+
+    /** Each pair under the cap, both together over it: still refused, never recorded short. */
+    @Test
+    void computeRefusesBothPairsTogetherOverTheCap() {
+        ReconService.Spec spec = ReconService.Spec.of(
+                List.of(new ReconService.Side("a", "SELECT range AS id, 1.0 AS amount FROM range(8)", null, null),
+                        new ReconService.Side("b", "SELECT 0 AS id, 1.0 AS amount", null, null),
+                        new ReconService.Side("c", "SELECT 0 AS id, 1.0 AS amount", null, null)),
+                List.of("id"), List.of(new ReconService.Measure("amount", "sum", "exact", 0)), true);
+        IllegalArgumentException refused = assertThrows(IllegalArgumentException.class, () -> ReconBreaks.compute(spec, 10));
+        assertTrue(refused.getMessage().contains("14 Breaks"), refused.getMessage());
     }
 
     @Test

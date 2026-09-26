@@ -35,22 +35,23 @@ describe('ReconApiService — recorded state (R2-03)', () => {
         req.flush({});
     });
 
-    it('sends a status change by identity, dropping an absent column and note', () => {
+    it('sends a status change by identity — pair included, AB when absent — dropping an absent column and note', () => {
         svc.setBreakStatus('orders_recon', { type: 'missing_left', key: 'APAC · sms' }, 'resolved').subscribe();
         const req = httpMock.expectOne(
             (r) => r.method === 'POST' && r.url === `${base}/recon/orders_recon/breaks/status`,
         );
-        expect(req.request.body).toEqual({ type: 'missing_left', key: 'APAC · sms', status: 'resolved' });
+        expect(req.request.body).toEqual({ pair: 'AB', type: 'missing_left', key: 'APAC · sms', status: 'resolved' });
         req.flush({});
 
         svc.setBreakStatus(
             'orders_recon',
-            { type: 'value_break', key: 'EU', column: 'amount' },
+            { pair: 'AC', type: 'value_break', key: 'EU', column: 'amount' },
             'open',
             'back',
         ).subscribe();
         const reopen = httpMock.expectOne((r) => r.url === `${base}/recon/orders_recon/breaks/status`);
         expect(reopen.request.body).toEqual({
+            pair: 'AC',
             type: 'value_break',
             key: 'EU',
             column: 'amount',

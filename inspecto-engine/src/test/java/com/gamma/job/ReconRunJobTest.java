@@ -142,6 +142,31 @@ class ReconRunJobTest {
                 .allMatch(b -> s1.lastRunAt().equals(b.firstSeenAt())), "carried Breaks keep their first sighting");
     }
 
+    /** A scheduled run of a 3-way Reconciliation records its A↔C Breaks too — through the same compute. */
+    @Test
+    void aScheduledThreeWayRunRecordsBothPairs(@TempDir Path dir) throws Exception {
+        Path writeRoot = dir.resolve("cfg");
+        Path dataDir = dir.resolve("data");
+        seedStore(dataDir, "orders_a", "VALUES ('EU','voice',100.0),('MEA','voice',10.0)");
+        seedStore(dataDir, "orders_b", "VALUES ('EU','voice',100.0)");
+        seedStore(dataDir, "orders_c", "VALUES ('EU','voice',100.0)");
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        for (String s : List.of("a", "b", "c")) store.write("dataset", s + "_ds", Map.of("physicalRef", "orders_" + s));
+        store.write("reconciliation", "three_recon", Map.of(
+                "datasets", List.of("a_ds", "b_ds", "c_ds"),
+                "keyColumns", List.of("region", "product"),
+                "compareColumns", List.of(Map.of("column", "amount"))));
+        System.setProperty("assist.write.root", writeRoot.toString());
+        JobConfig cfg = new JobConfig("nightly_recon", "recon.run", null, null, true, false,
+                Map.of("reconciliation", "three_recon"), null, null);
+        JobResult r = new ReconRunJob(cfg, dataDir.toString(), () -> null)
+                .run(new CapturingContext(Map.of("reconciliation", "three_recon")));
+        assertFalse(r.message().contains("not recorded"), r.message());
+        com.gamma.query.ReconStateStore.State s = new com.gamma.query.ReconStateStore(writeRoot).read("three_recon");
+        assertEquals(List.of("AB", "AC"), s.breaks().stream().map(com.gamma.query.ReconBreaks.Break::pair).toList(),
+                "MEA · voice is missing from B AND from C — one Break per pair");
+    }
+
     private static int incidentCount(com.gamma.objects.FakeObjectAccess objects) {
         return (int) objects.opened.stream()
                 .filter(o -> o.kind() == com.gamma.objects.ObjectType.INCIDENT).count();

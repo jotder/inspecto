@@ -429,12 +429,14 @@ final class ReconRoutes implements RouteModule {
 
     /**
      * {@code POST /recon/{id}/record} (gated {@code canOperateRuns}) — record a run of the SAVED
-     * Reconciliation: compute ALL its A↔B Breaks server-side ({@link ReconBreaks#compute}, no page limit),
-     * merge them into the recorded state and stamp {@code lastRunAt}. Returns the new state.
+     * Reconciliation: compute ALL its Breaks server-side ({@link ReconBreaks#compute}, no page limit) — A↔B,
+     * and A↔C on a 3-way Reconciliation, each carrying its {@code pair} — merge them into the recorded state
+     * and stamp {@code lastRunAt}. Returns the new state.
      *
      * <p>🔴 <b>Unpaged on purpose.</b> The Board used to merge the first {@code /recon/breaks} page (200 per
      * set) and so auto-closed every recorded Break beyond it. A run with more than
-     * {@link ReconStateStore#MAX_BREAKS} in one set is refused (422), never recorded short.
+     * {@link ReconStateStore#MAX_BREAKS} in one set, or over both pairs together, is refused (422), never
+     * recorded short.
      *
      * <p>Gates, in order: 503 no write root · 422 unsafe id · 404 unknown reconciliation / dataset · 422
      * unusable config · 403 jail · 422 too many Breaks / failing comparison · 503 sandbox or state unreadable.
@@ -465,17 +467,23 @@ final class ReconRoutes implements RouteModule {
     }
 
     /**
-     * {@code POST /recon/{id}/breaks/status {type, key, column?, status: resolved|open, note?}} (gated
-     * {@code canOperateRuns}) — resolve or re-open one Break by identity, replacing its note (blank clears
-     * it). A Break no run has recorded yet is appended identity-only. Returns {@code {reconciliation, break}}.
+     * {@code POST /recon/{id}/breaks/status {pair?, type, key, column?, status: resolved|open, note?}} (gated
+     * {@code canOperateRuns}) — resolve or re-open one Break by identity {@code (pair, type, key, column)},
+     * replacing its note (blank clears it). {@code pair} is {@code AB} (the default, as a pair-less recorded
+     * Break reads) or {@code AC}, which only a 3-way Reconciliation has. A Break no run has recorded yet is
+     * appended identity-only. Returns {@code {reconciliation, break}}.
      *
-     * <p>Gates, in order: 503 no write root · 422 unsafe id / bad type / non-string key / bad status / note
-     * too long · 404 unknown reconciliation · 403 jail · 422 state full · 503 state unreadable.
+     * <p>Gates, in order: 503 no write root · 422 unsafe id / bad pair / bad type / non-string key / bad
+     * status / note too long · 404 unknown reconciliation · 422 AC on a 2-way Reconciliation · 403 jail ·
+     * 422 state full · 503 state unreadable.
      */
     private static Object breakStatus(ApiContext api, String rawId, Map<String, Object> body) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
         String id = WriteGates.safeName(rawId, "reconciliation id");
         Map<String, Object> b = body == null ? Map.of() : body;
+        String pair = orDefault(ApiContext.str(b, "pair"), ReconBreaks.PAIR_AB);
+        if (!ReconBreaks.PAIRS.contains(pair))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pair must be one of " + ReconBreaks.PAIRS + ", got '" + pair + "'");
         String type = ApiContext.str(b, "type");
         if (type == null || !ReconBreaks.TYPES.contains(type))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "type must be one of " + ReconBreaks.TYPES + ", got '" + type + "'");
@@ -490,11 +498,14 @@ final class ReconRoutes implements RouteModule {
         note = note == null ? null : note.trim();
         if (note != null && note.length() > MAX_NOTE)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "note is longer than " + MAX_NOTE + " characters");
-        if (component(new ComponentStore(writeRoot.resolve("registry")), "reconciliation", id).isEmpty())
-            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + id + "'");
+        Map<String, Object> config = component(new ComponentStore(writeRoot.resolve("registry")), "reconciliation", id)
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + id + "'"));
+        if (ReconBreaks.PAIR_AC.equals(pair) && strings(config.get("datasets")).size() < 3)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation '" + id
+                    + "' compares two Datasets — it has no A vs C Breaks");
         ReconBreaks.Break updated;
         try {
-            updated = new ReconStateStore(writeRoot).setStatus(id, type, key, column, status, note);
+            updated = new ReconStateStore(writeRoot).setStatus(id, pair, type, key, column, status, note);
         } catch (IllegalArgumentException full) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, full.getMessage());
         } catch (SecurityException jail) {

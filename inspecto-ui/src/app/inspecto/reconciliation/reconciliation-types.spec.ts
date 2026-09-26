@@ -4,6 +4,7 @@ import {
     CompareColumn,
     ageBucketOf,
     breakId,
+    lifecycleId,
     breakAgeDays,
     datasetLabels,
     matchedKeyCount,
@@ -192,6 +193,26 @@ describe('breakId — the server-shared Break identity', () => {
         expect(breakId(b('value_break', 'k', 'c'))).not.toBe(breakId(b('missing_left', 'k', 'c')));
         expect(breakId(b('value_break', 'k', 'c'))).not.toBe(breakId(b('value_break', 'k2', 'c')));
         expect(breakId(b('value_break', 'k', 'c'))).not.toBe(breakId(b('value_break', 'k', 'c2')));
+    });
+});
+
+describe('lifecycleId — the recorded identity, pair included', () => {
+    const b = (pair: ReconBreak['pair'], key: string, column?: string): ReconBreak =>
+        ({ pair, type: 'value_break', key, column, status: 'open' }) as ReconBreak;
+
+    /** ⛔ The same literal `ReconBreaksTest.theLifecycleIdentityPutsThePairInFront` pins on the server. */
+    it('puts the pair in front of breakId, in the spelling the backend pins', () => {
+        expect(lifecycleId(b('AC', 'EU|voice', 'amount'))).toBe('AC|value_break|EU\\|voice|amount');
+    });
+
+    it('keeps an A-vs-B and an A-vs-C Break on one key and column apart', () => {
+        expect(lifecycleId(b('AB', 'm2', 'active_flag'))).not.toBe(lifecycleId(b('AC', 'm2', 'active_flag')));
+        // …while their Incident dedupe grain stays one (breakId carries no pair)
+        expect(breakId(b('AB', 'm2', 'active_flag'))).toBe(breakId(b('AC', 'm2', 'active_flag')));
+    });
+
+    it('reads a Break with no pair as AB — how a state recorded before pairs existed overlays', () => {
+        expect(lifecycleId(b(undefined, 'k'))).toBe(lifecycleId(b('AB', 'k')));
     });
 });
 

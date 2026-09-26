@@ -58,7 +58,11 @@ class ControlApiReconStateTest {
     /**
      * One Space with the design doc's example (EU/voice matched, EU/data 118 vs 114 outside 0.5%, MEA/voice only
      * in A, APAC/sms only in B, US/voice matched) as {@code orders_recon}, plus {@code wide_recon}: 250 ids on A
-     * against id 0 alone on B — 249 missing-right Breaks, more than one {@code /recon/breaks} page.
+     * against id 0 alone on B — 249 missing-right Breaks, more than one {@code /recon/breaks} page. And two
+     * 3-way ones: {@code sim_recon}, the RA-C01 shape (HLR vs CRM vs CBS on msisdn, {@code active_flag} exact,
+     * {@code one_to_one}) where m2 breaks on {@code active_flag} against BOTH C and B, and m3 is missing from
+     * CRM only; and {@code wide3_recon}, 30,000 ids only in A against each of B and C — under the cap per pair,
+     * over it together.
      */
     private Ctx open(Path root) throws Exception {
         Path base = root.resolve("s1");
@@ -75,12 +79,29 @@ class ControlApiReconStateTest {
                 + "('US','voice',50.0),('APAC','sms',7.0)) t(region, product, amount)");
         seed(dataDir, "wide_a", "SELECT range AS id, 1.0 AS amount FROM range(250)");
         seed(dataDir, "wide_b", "SELECT 0 AS id, 1.0 AS amount");
+        seed(dataDir, "hlr", "SELECT * FROM (VALUES ('m1',1),('m2',1),('m3',1)) t(msisdn, active_flag)");
+        seed(dataDir, "crm", "SELECT * FROM (VALUES ('m1',1),('m2',0)) t(msisdn, active_flag)");
+        seed(dataDir, "cbs", "SELECT * FROM (VALUES ('m1',1),('m2',0),('m3',1)) t(msisdn, active_flag)");
+        seed(dataDir, "wide3_a", "SELECT range AS id, 1.0 AS amount FROM range(30001)");
 
         ComponentStore store = new ComponentStore(config.resolve("registry"));
         store.write("dataset", "a_ds", Map.of("physicalRef", "orders_a"));
         store.write("dataset", "b_ds", Map.of("physicalRef", "orders_b"));
         store.write("dataset", "wa_ds", Map.of("physicalRef", "wide_a"));
         store.write("dataset", "wb_ds", Map.of("physicalRef", "wide_b"));
+        store.write("dataset", "hlr_ds", Map.of("physicalRef", "hlr"));
+        store.write("dataset", "crm_ds", Map.of("physicalRef", "crm"));
+        store.write("dataset", "cbs_ds", Map.of("physicalRef", "cbs"));
+        store.write("dataset", "w3_ds", Map.of("physicalRef", "wide3_a"));
+        store.write("reconciliation", "sim_recon", Map.of(
+                "datasets", List.of("hlr_ds", "crm_ds", "cbs_ds"),
+                "keyColumns", List.of("msisdn"),
+                "cardinality", "one_to_one",
+                "compareColumns", List.of(Map.of("column", "active_flag", "toleranceType", "exact"))));
+        store.write("reconciliation", "wide3_recon", Map.of(
+                "datasets", List.of("w3_ds", "wb_ds", "wb_ds"),
+                "keyColumns", List.of("id"),
+                "compareColumns", List.of(Map.of("column", "amount"))));
         store.write("reconciliation", "orders_recon", Map.of(
                 "datasets", List.of("a_ds", "b_ds"),
                 "keyColumns", List.of("region", "product"),
@@ -126,7 +147,7 @@ class ControlApiReconStateTest {
             JsonNode read = V1Body.of(send(c, "GET", "/spaces/s1/recon/orders_recon/state", null).body());
             assertEquals(s, read);
             JsonNode list = V1Body.of(send(c, "GET", "/spaces/s1/recon/state", null).body());
-            assertEquals(3, list.get("total").asInt());
+            assertEquals(5, list.get("total").asInt());
             assertFalse(list.get("truncated").asBoolean());
             Map<String, String> last = new LinkedHashMap<>();
             for (JsonNode row : list.get("states")) last.put(row.get("reconciliation").asText(), row.get("lastRunAt").asText());
@@ -229,6 +250,81 @@ class ControlApiReconStateTest {
                     "{\"type\":\"missing_left\",\"key\":\"k\",\"status\":\"open\"}").statusCode());
             // ⚠ a single NULL key column's key IS "" — it must not read as a missing key
             assertEquals(200, send(c, "POST", url, "{\"type\":\"missing_left\",\"key\":\"\",\"status\":\"resolved\"}").statusCode());
+        }
+    }
+
+    // ── a 3-way Reconciliation records its A↔C Breaks too ─────────────────────────────
+
+    @Test
+    void aThreeWayRecordStoresBothPairs(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            HttpResponse<String> r = send(c, "POST", "/spaces/s1/recon/sim_recon/record", null);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode s = V1Body.of(r.body());
+            Map<String, String> ids = new LinkedHashMap<>();
+            for (JsonNode b : s.get("breaks"))
+                ids.put(b.get("pair").asText() + " " + b.get("type").asText() + " " + b.get("key").asText(), b.get("status").asText());
+            assertEquals(Map.of("AB missing_right m3", "open", "AB value_break m2", "open", "AC value_break m2", "open"), ids);
+            assertEquals(s.get("lastRunAt").asText(), find(s, "AC", "m2").get("firstSeenAt").asText(),
+                    "an A↔C Break is stamped by the run like an A↔B one");
+            assertEquals(0.0, find(s, "AC", "m2").get("rightValue").asDouble(), "the compared side is C");
+        }
+    }
+
+    /** 🔴 The pair is in the identity: resolving the A↔C Break on m2 must not touch the A↔B Break on m2. */
+    @Test
+    void resolvingAnAcBreakLeavesTheSameKeyAbBreakOpen(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c, "POST", "/spaces/s1/recon/sim_recon/record", null).statusCode());
+            HttpResponse<String> r = send(c, "POST", "/spaces/s1/recon/sim_recon/breaks/status",
+                    "{\"pair\":\"AC\",\"type\":\"value_break\",\"key\":\"m2\",\"column\":\"active_flag\",\"status\":\"resolved\",\"note\":\"CBS lags\"}");
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals("AC", V1Body.of(r.body()).get("break").get("pair").asText());
+
+            JsonNode state = V1Body.of(send(c, "GET", "/spaces/s1/recon/sim_recon/state", null).body());
+            assertEquals("resolved", find(state, "AC", "m2").get("status").asText());
+            assertEquals("open", find(state, "AB", "m2").get("status").asText(), "the A↔B Break is untouched");
+            assertEquals(3, state.get("breaks").size(), "matched an existing Break — nothing appended");
+
+            JsonNode afterRun = V1Body.of(send(c, "POST", "/spaces/s1/recon/sim_recon/record", null).body());
+            assertEquals("resolved", find(afterRun, "AC", "m2").get("status").asText(), "survives the next run");
+            assertEquals("CBS lags", find(afterRun, "AC", "m2").get("note").asText());
+            assertEquals("open", find(afterRun, "AB", "m2").get("status").asText());
+
+            String url = "/spaces/s1/recon/orders_recon/breaks/status";
+            assertEquals(422, send(c, "POST", url, "{\"pair\":\"AC\",\"type\":\"missing_left\",\"key\":\"k\",\"status\":\"open\"}").statusCode(),
+                    "a 2-way Reconciliation has no A vs C Breaks");
+            assertEquals(422, send(c, "POST", url, "{\"pair\":\"BC\",\"type\":\"missing_left\",\"key\":\"k\",\"status\":\"open\"}").statusCode());
+        }
+    }
+
+    /** Migration rule: a state file R2-03 wrote (no {@code pair}) loads, and its Breaks are A↔B. */
+    @Test
+    void aLegacyPairLessStateLoadsAsAb(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            writeState(c, "sim_recon", 2, List.of(rec("value_break", "m2", "active_flag", "resolved", "fixed in CRM")));
+            HttpResponse<String> read = send(c, "GET", "/spaces/s1/recon/sim_recon/state", null);
+            assertEquals(200, read.statusCode(), read.body());
+            assertEquals("AB", V1Body.of(read.body()).get("breaks").get(0).get("pair").asText());
+
+            JsonNode s = V1Body.of(send(c, "POST", "/spaces/s1/recon/sim_recon/record", null).body());
+            assertEquals("resolved", find(s, "AB", "m2").get("status").asText(), "the legacy resolution is the A↔B one");
+            assertEquals(OLD, find(s, "AB", "m2").get("firstSeenAt").asText());
+            assertEquals("open", find(s, "AC", "m2").get("status").asText(), "the A↔C Break does not inherit it");
+            assertEquals(s.get("lastRunAt").asText(), find(s, "AC", "m2").get("firstSeenAt").asText());
+        }
+    }
+
+    /** 30,000 A↔B + 30,000 A↔C: each pair is under the 50,000 cap, both together are refused — never recorded short. */
+    @Test
+    void moreThanTheCapOverBothPairsIsRefusedAndNothingIsRecorded(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            HttpResponse<String> r = send(c, "POST", "/spaces/s1/recon/wide3_recon/record", null);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("60000 Breaks"), r.body());
+            JsonNode s = V1Body.of(send(c, "GET", "/spaces/s1/recon/wide3_recon/state", null).body());
+            assertEquals(0, s.get("runs").asInt());
+            assertEquals(0, s.get("breaks").size());
         }
     }
 
@@ -411,6 +507,12 @@ class ControlApiReconStateTest {
 
     private static JsonNode find(JsonNode state, String key) {
         for (JsonNode b : state.get("breaks")) if (key.equals(b.get("key").asText())) return b;
+        return null;
+    }
+
+    private static JsonNode find(JsonNode state, String pair, String key) {
+        for (JsonNode b : state.get("breaks"))
+            if (key.equals(b.get("key").asText()) && pair.equals(b.get("pair").asText())) return b;
         return null;
     }
 

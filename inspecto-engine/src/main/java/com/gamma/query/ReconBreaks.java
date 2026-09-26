@@ -47,45 +47,60 @@ public final class ReconBreaks {
     /** The four Break types, in the order {@link #fromSets} emits them. */
     public static final List<String> TYPES = List.of("missing_right", "missing_left", "cardinality_break", "value_break");
 
+    /** The A↔B pair — side 1 against the anchor; what a Break recorded before pairs existed belongs to. */
+    public static final String PAIR_AB = "AB";
+    /** The A↔C pair — side 2 against the anchor, only on a 3-way Reconciliation. */
+    public static final String PAIR_AC = "AC";
+    /** The anchor-relative pairs, indexed by compared side − 1 ({@code ReconService.breaks}' {@code other}). */
+    public static final List<String> PAIRS = List.of(PAIR_AB, PAIR_AC);
+
     /** Separator {@code breakKeyOf} joins the key columns' values with — part of the displayed key. */
     private static final String KEY_SEP = " · ";
 
     /**
-     * One recorded Break — the shape of the SPA's {@code ReconBreak}. {@code keyValues}, {@code column},
+     * One recorded Break — the shape of the SPA's {@code ReconBreak}. {@code pair} is the anchor-relative pair
+     * it was found on ({@link #PAIR_AB} / {@link #PAIR_AC}) and is part of its {@link #id() identity}, so an
+     * A↔B and an A↔C Break on the same key and column are two Breaks with two lifecycles. {@code keyValues}, {@code column},
      * {@code leftValue}, {@code rightValue}, {@code diff}, {@code note} and {@code firstSeenAt} are optional
      * ({@code null} = absent, and omitted from {@link #toMap}).
      */
-    public record Break(String key, Map<String, Object> keyValues, String type, String column,
+    public record Break(String pair, String key, Map<String, Object> keyValues, String type, String column,
                         Object leftValue, Object rightValue, Double diff, String status, String note,
                         String firstSeenAt) {
 
         /** A fresh, {@code open} Break carrying no note and no stamp. */
         static Break fresh(String key, Map<String, Object> keyValues, String type, String column,
                            Object leftValue, Object rightValue, Double diff) {
-            return new Break(key, keyValues, type, column, leftValue, rightValue, diff, OPEN, null, null);
+            return new Break(PAIR_AB, key, keyValues, type, column, leftValue, rightValue, diff, OPEN, null, null);
         }
 
         /** An identity-only Break — what a status change on a Break no run has recorded yet appends. */
-        public static Break identityOnly(String type, String key, String column, String status, String note) {
-            return new Break(key, null, type, column, null, null, null, status, note, null);
+        public static Break identityOnly(String pair, String type, String key, String column, String status, String note) {
+            return new Break(pair, key, null, type, column, null, null, null, status, note, null);
         }
 
-        /** {@link ReconBreaks#identity} of this Break. */
+        /** {@link ReconBreaks#lifecycleId} of this Break — pair included. */
         public String id() {
-            return identity(type, key, column);
+            return lifecycleId(pair, type, key, column);
+        }
+
+        /** This Break on {@code newPair}. */
+        public Break withPair(String newPair) {
+            return new Break(newPair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, firstSeenAt);
         }
 
         public Break withStatus(String newStatus, String newNote) {
-            return new Break(key, keyValues, type, column, leftValue, rightValue, diff, newStatus, newNote, firstSeenAt);
+            return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, newStatus, newNote, firstSeenAt);
         }
 
         Break withFirstSeenAt(String stamp) {
-            return new Break(key, keyValues, type, column, leftValue, rightValue, diff, status, note, stamp);
+            return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, stamp);
         }
 
         /** The wire/persisted shape, absent fields omitted (the SPA reads a missing field as undefined). */
         public Map<String, Object> toMap() {
             Map<String, Object> m = new LinkedHashMap<>();
+            m.put("pair", pair);
             m.put("key", key);
             if (keyValues != null) m.put("keyValues", keyValues);
             m.put("type", type);
@@ -99,7 +114,11 @@ public final class ReconBreaks {
             return m;
         }
 
-        /** Read a persisted Break back; throws {@link IllegalArgumentException} on a shape it cannot trust. */
+        /**
+         * Read a persisted Break back; throws {@link IllegalArgumentException} on a shape it cannot trust.
+         * ⚠ A Break with no {@code pair} was recorded before pairs existed (R2-03 recorded A↔B only), so it
+         * reads as {@link #PAIR_AB} — the migration rule; an unknown pair is untrusted.
+         */
         @SuppressWarnings("unchecked")
         public static Break fromMap(Map<String, Object> m) {
             String key = str(m.get("key"));
@@ -107,9 +126,12 @@ public final class ReconBreaks {
             String status = str(m.get("status"));
             if (key == null || type == null || status == null)
                 throw new IllegalArgumentException("a recorded Break needs key, type and status: " + m);
+            String pair = m.get("pair") == null ? PAIR_AB : str(m.get("pair"));
+            if (!PAIRS.contains(pair))
+                throw new IllegalArgumentException("a recorded Break's pair must be one of " + PAIRS + ": " + m);
             Object kv = m.get("keyValues");
             Object diff = m.get("diff");
-            return new Break(key, kv instanceof Map<?, ?> km ? new LinkedHashMap<>((Map<String, Object>) km) : null,
+            return new Break(pair, key, kv instanceof Map<?, ?> km ? new LinkedHashMap<>((Map<String, Object>) km) : null,
                     type, str(m.get("column")), m.get("leftValue"), m.get("rightValue"),
                     diff instanceof Number n ? n.doubleValue() : null, status, str(m.get("note")),
                     str(m.get("firstSeenAt")));
@@ -136,6 +158,16 @@ public final class ReconBreaks {
         return esc(type) + '|' + esc(key) + '|' + esc(column == null ? "" : column);
     }
 
+    /**
+     * A recorded Break's <b>lifecycle</b> identity — {@code (pair, type, key, column)}: the key {@link #merge}
+     * and the status route match on. It is {@link #identity} with the pair in front, so an A↔B and an A↔C
+     * Break on one key and column resolve, age and auto-close independently. The SPA's {@code lifecycleId()}
+     * renders the byte-identical value. ⚠ The promote dedupe grain stays {@link #identity} (no pair).
+     */
+    public static String lifecycleId(String pair, String type, String key, String column) {
+        return esc(pair) + '|' + identity(type, key, column);
+    }
+
     private static String esc(String part) {
         return (part == null ? "" : part).replace("\\", "\\\\").replace("|", "\\|");
     }
@@ -143,23 +175,26 @@ public final class ReconBreaks {
     // ── computing a run's Breaks ─────────────────────────────────────────────────────
 
     /**
-     * Every A↔B Break of {@code spec}, unpaged — the set a recorded run merges. Bounded by {@code cap}: a set
-     * at the cap is refused ({@link IllegalArgumentException}, the route's 422) rather than recorded short.
+     * Every Break of {@code spec} on every anchor-relative pair — A↔B, and A↔C on a 3-way Reconciliation —
+     * unpaged, each tagged with its {@link Break#pair}: the set a recorded run merges. Bounded by {@code cap}:
+     * a set at the cap, or more than {@code cap} Breaks over all pairs, is refused
+     * ({@link IllegalArgumentException}, the route's 422) rather than recorded short.
      *
      * <p>🔴 Why refuse instead of truncating: {@link #merge} auto-closes every recorded Break absent from the
      * fresh set, so a truncated set would auto-close every real Break beyond the cut — exactly the defect this
      * replaces, where the Board merged a 200-row page and closed everything outside it.
-     *
-     * <p>⚠ A↔B only, as the Board always recorded: on a 3-way Reconciliation the A↔C Breaks are live on the
-     * Breaks page but never enter the lifecycle (their identity carries no side, so they would collide).
      */
     public static List<Break> compute(ReconService.Spec spec, int cap) throws SQLException, IOException {
-        Map<String, ReconService.BreakSet> sets = ReconService.breaks(spec, null, null, 1, cap, 0);
-        for (Map.Entry<String, ReconService.BreakSet> e : sets.entrySet())
-            if (e.getValue().truncated())
-                throw new IllegalArgumentException("reconciliation has more than " + cap + " " + e.getKey()
-                        + " Breaks — too many to record; narrow it (filters, tolerances) before recording a run");
-        List<Break> out = fromSets(spec, sets);
+        List<Break> out = new ArrayList<>();
+        for (int other = 1; other < spec.sides().size(); other++) {
+            String pair = PAIRS.get(other - 1);
+            Map<String, ReconService.BreakSet> sets = ReconService.breaks(spec, null, null, other, cap, 0);
+            for (Map.Entry<String, ReconService.BreakSet> e : sets.entrySet())
+                if (e.getValue().truncated())
+                    throw new IllegalArgumentException("reconciliation has more than " + cap + " " + pair + " "
+                            + e.getKey() + " Breaks — too many to record; narrow it (filters, tolerances) before recording a run");
+            for (Break b : fromSets(spec, sets)) out.add(b.withPair(pair));
+        }
         if (out.size() > cap)
             throw new IllegalArgumentException("reconciliation has " + out.size() + " Breaks, more than the "
                     + cap + " a run may record; narrow it (filters, tolerances) before recording a run");

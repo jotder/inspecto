@@ -51,7 +51,7 @@ run**: nothing was recorded, the list read *"Last run: never"* and the Breaks pa
 resolving a Break was a config write that 403'd too. As built:
 * **Store** — `ReconStateStore` (`inspecto-engine`, `com.gamma.query`): one JSON document per Reconciliation at
   `<write-root>/recon-state/<id>.json` = `{reconciliation, lastRunAt, runs, breaks[]}` (a Break is the SPA's
-  `ReconBreak` shape). Atomic write (`AtomicFiles`), one lock for read-merge-write, **fail closed** (a corrupt
+  `ReconBreak` shape, carrying its `pair` — below). Atomic write (`AtomicFiles`), one lock for read-merge-write, **fail closed** (a corrupt
   file is 503, never "never run"), the id a bare name and the file jailed with `PathJail.contains` against the
   **write root** — not `recon-state/`, so a `recon-state` directory that is itself a link out is caught (403).
   Deleting the `reconciliation` component deletes its state (a re-created id starts fresh). The mirror of
@@ -59,10 +59,11 @@ resolving a Break was a config write that 403'd too. As built:
 * **Routes** (`ReconRoutes`): `GET /recon/{id}/state` and `GET /recon/state` (every saved Reconciliation's
   `{reconciliation, lastRunAt, runs}`, capped 1000 with the true `total`) are ungated reads (no write-root
   503; an unset root is 404/empty, like `/recon/promoted`). **`POST /recon/{id}/record`** and
-  **`POST /recon/{id}/breaks/status {type, key, column?, status: resolved|open, note?}`** are gated
+  **`POST /recon/{id}/breaks/status {pair?, type, key, column?, status: resolved|open, note?}`** are gated
   **`canOperateRuns`** (`CapabilityManifest` group `// ReconRoutes`), like an Expectation's evaluation. Record
-  loads the SAVED Reconciliation and computes every A↔B Break itself (`ReconBreaks.compute`); status resolves /
-  re-opens by identity (a blank note clears it; an unrecorded live Break is appended identity-only; notes
+  loads the SAVED Reconciliation and computes every Break of every pair itself (`ReconBreaks.compute`); status
+  resolves / re-opens by identity (`pair` defaults to `AB`, `AC` on a 2-way Reconciliation is 422; a blank note
+  clears it; an unrecorded live Break is appended identity-only; notes
   ≤ 2000 chars; `auto_closed` is never a caller's to set). The authoring PUT stays `canAuthorWorkbench` and
   knows nothing about state.
 * **Merge** — `ReconBreaks.merge`, a faithful port of the retired TS `mergeBreaks` (+ `breaksFromSets`/
@@ -75,7 +76,23 @@ resolving a Break was a config write that 403'd too. As built:
 * 🔴 **The 200-row fix.** The Board merged ONE `/recon/breaks` page (200 per set, `DEFAULT_BREAKS_LIMIT`), so
   `mergeBreaks` auto-closed every recorded Break beyond it. Record is unpaged; a set larger than
   `ReconStateStore.MAX_BREAKS` (50 000) is **refused (422), never recorded short** — truncating would
-  re-create exactly that defect. Pinned by `ControlApiReconStateTest.moreThanAPageOfBreaksIsRecorded…`.
+  re-create exactly that defect. Pinned by `ControlApiReconStateTest.moreThanAPageOfBreaksIsRecorded…`. On a
+  3-way the cap applies per set AND to both pairs together (`…moreThanTheCapOverBothPairsIsRefused…`).
+* **3-way: both pairs are recorded** (2026-09-26). `ReconBreaks.compute` runs the Break sets once per
+  anchor-relative pair — A↔B (`other = 1`) and, with a third Dataset, A↔C (`other = 2`) — and tags every Break
+  with `pair: "AB" | "AC"`. The pair is in the **lifecycle identity** `ReconBreaks.lifecycleId(pair, type, key,
+  column)` = `pair|` + `identity(type, key, column)` (SPA: `lifecycleId()`, the byte-identical string), which
+  `merge` and the status route match on — so an A↔B and an A↔C Break on one key and column age, resolve and
+  auto-close independently (RA-C01: an MSISDN whose `active_flag` differs in CRM *and* CBS is two Breaks).
+  Mutation-checked: dropping the pair from `lifecycleId` turns `ReconBreaksTest` and
+  `ControlApiReconStateTest.resolvingAnAcBreakLeavesTheSameKeyAbBreakOpen` red. 🔴 **Migration rule:** a
+  recorded Break with no `pair` (every state file R2-03 wrote) **reads as `AB`** — it was an A↔B Break —
+  and is written back with `pair: "AB"` on the next write; an unknown pair is an unreadable state (503). The
+  scheduled `recon.run` Job records both pairs through the same `compute`. The Breaks page tags its live
+  Breaks with the pair of the open tab and overlays by `lifecycleId`, so the *A vs C* tab shows first-seen /
+  status / resolve like *A vs B*; the Board's aging strip counts the open Breaks of both pairs (it reads the
+  whole recorded state). ⚠ The **Incident dedupe grain is unchanged** — `breakId` / `ReconRoutes.breakIdentity`
+  `(type, key, column)`, no pair — so promoting the same key/type/column from both tabs yields ONE Incident.
 * **Scheduled runs record too** — `ReconRunJob` calls the same store after its Signal/Incident, best-effort:
   a refusal is logged and named in the Job result (`— run not recorded: …`), never fails the run.
 * **SPA** — the Board runs the display comparison, then `ReconApiService.record(id)` (a failure toasts
@@ -187,10 +204,6 @@ TOTAL strip humanise too. The builder's view — side letter, Dataset id, raw co
 `headerTooltip` and in a `title` on the Breaks page's record-set headings. `boardColumns` without `sides` falls
 back to the letters (the dashboard widget tile). ⚠ The Studio `Dataset` model reads `description` but
 `toContent` still does not write it back, so a Studio save of a Dataset likely drops it (pre-existing; not verified end-to-end).
-
-* ⚠ Not changed: a recorded run still records the A↔B pair only (`ReconBreaks.compute`, as the Board always
-  did), so C-side Breaks are live on the Breaks page but never enter the recorded lifecycle (true of every Break
-  type on a 3-way) — their identity carries no side, so recording them would collide with the A↔B ones.
 
 As-built design (archived):
 [`reconciliation-board-design.md`](../../../archived-documents/plans-archive/reconciliation-board-design.md) ·
