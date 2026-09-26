@@ -44,7 +44,7 @@ The bid plan's "today" column dates from 2026-09-24. Re-checked by grepping symb
 | WS-10 | Financial-impact ledger + Disposition | PARTIAL | `ObjectService.analytics()` sums one flat `impactAmount`; the Findings framework exists. Left: the typed impact block (suspected / confirmed / recovered / prevented, currency), Disposition required on Incident resolve, the ledger Dataset, the route. |
 | WS-18 | Per-entity Alerts | NOT STARTED | `AlertRule.java` has no key columns; `AlertService` keeps one Incident per Alert Rule + Pipeline. |
 | WS-13 | Maker-checker for human changes | NOT STARTED | `SaveGate.java` validates content, it does not hold changes for approval. `PipelineSettingsRoutes.java` and `PipelineRenameRoutes.java` still write outside `SaveGate`. |
-| WS-12 | Control Lists | NOT STARTED | no `control-list` kind in `ComponentStore.WRITABLE_TYPES`. |
+| WS-12 | Entity Lists | NOT STARTED | no `control-list` kind in `ComponentStore.WRITABLE_TYPES`. |
 | WS-24 | Action Requests | NOT STARTED | `DecisionRoutes.java`: `invoke-api` still records a stub Signal. |
 | WS-20 | KPI definitions | PARTIAL | UIE-1…4 (`f0217d21b`) gave the tile format, target and compare (`kpi.component.ts`). Left: a server-side KPI definition (Measure + target + bands + period + comparison period). |
 | WS-22 | Explainable risk score | NOT STARTED | no scoring component or Job. |
@@ -79,7 +79,7 @@ Turns findings into controlled action. Order is forced: lists need approval, dis
 | # | Item | Eng-wk | Notes |
 |---|---|---|---|
 | 2.1 | **WS-13 Maker-checker** — step 0: route the four Pipeline writes (`/label`, `/settings`, `/save-as-template`, `/rename`) through `SaveGate` or record why not, plus a guard test enumerating every mutating route; then per-kind approval policy, Pending Change, approve / decline / expire, approver ≠ author (403), stale base (409), shared diff view | 4–6 | copy the Link Analysis four-eyes pattern, not its names |
-| 2.2 | **WS-12 Control Lists** — allow / block / watch; key types msisdn, imsi, imei, iccid, prefix / range, country, operator, dealer, device, instrument token, BIN, IP, CIDR; reason, added-by, expires-at; Parquet sidecar for 10⁵ entries; **range and CIDR matching** (equal-key join cannot do it) | 4–6 | needs D-P5 and 🔴 D-P10 (the same concept is being designed in Link Analysis) |
+| 2.2 | **WS-12 Entity Lists** — allow / block / watch; key types msisdn, imsi, imei, iccid, prefix / range, country, operator, dealer, device, instrument token, BIN, IP, CIDR; reason, added-by, expires-at; Parquet sidecar for 10⁵ entries; **range and CIDR matching** (equal-key join cannot do it) | 4–6 | needs D-P5; one kind with Link Analysis `LA-17` (D-P10) |
 | 2.3 | **WS-24 Action Requests** — `ActionDispatcher`: target Connection, payload template, `draft → pending → approved → dispatched → succeeded / failed`, idempotent retries, linked Incident, audit; replaces the `invoke-api` stub | 3–5 | accepted against a stub HTTP endpoint — no real target system needed |
 
 ### Wave 3 — measurement and scoring · ≈ 11–17 eng-wk
@@ -87,7 +87,7 @@ Turns findings into controlled action. Order is forced: lists need approval, dis
 | # | Item | Eng-wk | Notes |
 |---|---|---|---|
 | 3.1 | **WS-20 KPI definitions** — a server-side KPI (Measure + target + bands + period + comparison period); the tile reads it instead of hand-set inputs; a delivered `kpi` Requirement can create one | 4–6 | the widget half shipped (UIE-1…4) |
-| 3.2 | **WS-22 Explainable Risk Score** — weighted-factor component per entity type; `score = Σ weight × indicator`, 0–100, with `factors[]`; feeds Incident priority and, above a threshold, a watch Control List through 2.1 | 4–6 | **Job form**, not a Step (Step Processor hold) |
+| 3.2 | **WS-22 Explainable Risk Score** — weighted-factor component per entity type; `score = Σ weight × indicator`, 0–100, with `factors[]`; feeds Incident priority and, above a threshold, a watch Entity List through 2.1 | 4–6 | **Job form**, not a Step (Step Processor hold) |
 | 3.3 | **WS-25 Tamper-evident audit** — `prevHash` / `hash` chained per Space with a daily anchor; `GET /audit/verify` names the first bad record | 3–5 | masking stays out (D-P8) |
 
 ### Wave 4 — integration and operability · ≈ 18–30 eng-wk
@@ -155,13 +155,13 @@ Arabic / RTL (roadmap).
 Each has a recommendation, so a wave can proceed on it if the operator is away.
 
 ✅ **All ten answered 2026-09-26 (operator: "go with recommendations").** Each row's *Recommendation*
-column is now the decision. D-P10 is decided as **one component kind** serving both assurance and Link
-Analysis; its **name stays open** and must be settled before 2.2 or `LA-17` builds the kind. Waves 1–2
+column is now the decision. D-P10 is decided as **one component kind, named Entity List**, serving both assurance and Link
+Analysis. Waves 1–2
 are on `BACKLOG.md` (D-P9).
 
 | # | Decision | Blocks | Recommendation |
 |---|---|---|---|
-| D-P1 | Canonical names: **Control List**, **Pending Change**, **Action Request**, **Risk Score**, **Risk Tier**, **Escalation Rule** (bid plan D-06) | 2.1–2.3, 3.2, 4.4 | adopt; GLOSSARY entries land with each item |
+| D-P1 | Canonical names: **Entity List**, **Pending Change**, **Action Request**, **Risk Score**, **Risk Tier**, **Escalation Rule** (bid plan D-06) | 2.1–2.3, 3.2, 4.4 | adopt; GLOSSARY entries land with each item |
 | D-P2 | Which edition bundles the intelligence module | 4.6 | Enterprise first |
 | D-P3 | Offline vulnerability scanner and how its database reaches CI | 4.5 | a mirrored database snapshot refreshed on a connected host |
 | D-P4 | Reverse the 2026-09-14 deletion of queues / escalation / watchers | 4.4 | escalation only (reassign, notify, raise priority); keep queues deleted |
@@ -169,7 +169,7 @@ are on `BACKLOG.md` (D-P9).
 | D-P6 | Reverse `BI-4` (paths, not attachments) and choose the xlsx writer | 4.3 | yes, with a size cap; the writer is the already-staged DuckDB `excel` extension (no new dependency) |
 | D-P7 | Name a near-real-time latency target | 4.1 | p95 ≤ 30 s event-to-Incident, measured |
 | D-P8 | Classification-driven masking in audit hardening | 3.3 | defer; hash chain only |
-| **D-P10** | 🔴 **One concept, two names.** A Link Analysis design drafted the same day (`LA-17`, `link-analysis-entity-model-design.md`, uncommitted at the time of writing) proposes an **Entity List**: a Space-scoped set of typed Entity keys with a purpose (watchlist, exclusion, allowlist). That is 2.2's Control List. Pick one name and one component kind before either is built | 2.2, `LA-17` | one kind serving both — Link Analysis consumes it through `excludeBy` / `seedBy`; the name is the operator's call |
+| **D-P10** | One concept, two names: the assurance allow / block / watch list (bid plan: *Control List*) and the Link Analysis `LA-17` **Entity List** (a Space-scoped set of typed Entity keys with a purpose). | 2.2, `LA-17` | ✅ **DECIDED 2026-09-26 (operator): one kind, named Entity List** — the GLOSSARY name, so nothing is renamed. Purposes widen to allow · block · watch · exclusion; entries may be single keys or key ranges (number prefix, CIDR); Link Analysis consumes it through `excludeBy` / `seedBy`. *Control List* is not used. |
 | D-P9 | Board rows: put each wave's items on `BACKLOG.md` now, or keep this plan off the board like the bid plan | scheduling | put waves 1–2 on the board now |
 
 ## 6. How each item is done
