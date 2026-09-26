@@ -68,7 +68,7 @@ The two gaps every detector and every Incident hits. Nothing in waves 2–5 is c
 
 | # | Item | Eng-wk | Why first | Acceptance |
 |---|---|---|---|---|
-| 1.1 | **WS-18 Per-entity Alerts** — optional `by` key columns on a Dataset-measure Alert Rule; one Alert and one Incident per breached key; dedupe per (Alert Rule, key); auto-resolve when the key heals; storm cap; save-time Schema check | 2–4 | Without it a detector says "breached", never *who*. Blocks every content pack and the risk score. | 40 planted offenders → 40 Incidents; re-fire → 0; healed key resolves; a Case Rule groups them into one Case |
+| 1.1 | ✅ **SHIPPED 2026-09-26** — **WS-18 Per-entity Alerts** — optional `by` key columns on a Dataset-measure Alert Rule; one Alert and one Incident per breached key; dedupe per (Alert Rule, key); auto-resolve when the key heals; storm cap; save-time Schema check | 2–4 | Without it a detector says "breached", never *who*. Blocks every content pack and the risk score. | 40 planted offenders → 40 Incidents; re-fire → 0; healed key resolves; a Case Rule groups them into one Case |
 | 1.2 | ✅ **SHIPPED 2026-09-26** — **WS-11 finish** — `assigned` state, `lastSeenAt`, `occurrences`, ageing and recurrence computed server-side | 0.5–1 | Small; closes a shipped feature properly | a recurring Break counts up across runs; ageing shows on the Recon Board |
 | 1.3 | **WS-10 Impact ledger + Disposition** — typed impact on Incident and Case (`outstanding` derived, never stored); Disposition required on resolve, extending the GLOSSARY §9 ladder; an impact ledger Dataset any Measure can read; audited, server-validated | 4–6 | Every RA / FM / BA KPI is "money found / recovered / prevented" | loss KPIs compute from resolved Incidents on synthetic data |
 

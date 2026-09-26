@@ -13,8 +13,9 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **42<!--count:backlog-rows--> rows: 2<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 17<!--count:backlog-p3--> × P3** —
+> **42<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 23<!--count:backlog-p2--> × P2 · 18<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ↔ **42 on 2026-09-26**: P1 `ASSURE-PER-ENTITY-ALERTS-1` closed (wave 1.1 shipped); its residuals re-filed as P3 `ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1`.
 > ↔ **42 on 2026-09-26**: P1 `ASSURE-BREAK-LIFECYCLE-1` closed (wave 1.2 shipped); its recurrence-reach residual re-filed as P3 `ASSURE-BREAK-RECURRENCE-REACH-1`.
 > ⬆ **36 → 42 on 2026-09-26**: filed waves 1–2 of `superpower/assurance-capability-plan.md` (operator: build the customer-independent
 > assurance capabilities before any project starts) — P1 `ASSURE-PER-ENTITY-ALERTS-1`, `ASSURE-BREAK-LIFECYCLE-1`, `ASSURE-IMPACT-LEDGER-1`;
@@ -33,8 +34,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 2<!--count:backlog-p1--> P1 + 23<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 17<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 1<!--count:backlog-p1--> P1 + 23<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 18<!--count:backlog-p3--> P3 rows are mostly a list of things
 > deliberately NOT being built, and reading all 42<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
@@ -63,7 +64,7 @@ changes**; a row that cannot is a decision (§1) or a design (P2). **P2** = buil
 or decision lands. **P3** = demand-gated; build only when someone asks by name. Every §3–§5 row carries its
 rank.
 
-**P1 = assurance wave 1** (`superpower/assurance-capability-plan.md` §3): `ASSURE-PER-ENTITY-ALERTS-1` (§3.5) · `ASSURE-IMPACT-LEDGER-1` (§3.9) — `ASSURE-BREAK-LIFECYCLE-1` ✅ shipped 2026-09-26. The P2 rows split three ways — pick from the first group:
+**P1 = assurance wave 1** (`superpower/assurance-capability-plan.md` §3): `ASSURE-IMPACT-LEDGER-1` (§3.9) — `ASSURE-PER-ENTITY-ALERTS-1` and `ASSURE-BREAK-LIFECYCLE-1` ✅ shipped 2026-09-26. The P2 rows split three ways — pick from the first group:
 
 | State | P2 rows |
 |---|---|
@@ -208,7 +209,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 - **P2** · `DUCKLE-C1-DATASET-FRESHNESS-1` — **Dataset freshness: core shipped 2026-09-16; badge, auto-armed sweep, retention floor and shape-aware spec 2026-09-24 — one residual.** Freshness is an Alert Rule shape (`dataset:` + `maximumAge:`) evaluated against the last `dataset.write` Signal; as-built (the `system.freshness-sweep` system job, the `dataset-publications.tsv` floor, the per-shape `ConfigSpecs.alert()` rules) in `docs/okf/capabilities/studio/studio.md` §3.4. Open: **(2)** owner-routed alerting — the design is decided (owner = the authenticated `Subject`, `"appUser"` where none), but the substrate is absent: `AlertRule` has no owner, `NotificationRule` hardcodes the recipient, `ChannelConfig` routes by a flat `target`, and config-authored rules are evaluated with no request `Subject` to capture — a multi-seam design pass.
 - **P2** · **Completeness KPI (when the hold lifts)** — K1 (`DbConsignmentOutputStore.dailyVolume()`) and K2 (`FileSequenceGaps`; `SeqScope` already ships) are unwired — `VolumeBaseline`/`FileSequenceGaps` have no production caller; **K4**, a `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, a Signal plus a deduped Incident on breach, refusing loudly when `-Dconsignment.outputs.backend=none`), is designed but unbuilt (`superpower/completeness-kpi-k4-design.md`); K3, the baseline-window default as a job parameter. K5 shipped. Open inside the design: `kpi.completeness.*` is a **Signal** type and there is no `SignalType` home (the dotted literals are scattered) — whether to create one; `KPI-UNKNOWN-1` — a null-`bounds` sink's daily count is **unknown, not zero**, end to end; and where the sequence template comes from (the Collector's, a job parameter, or the Collector's with an override). Held by the §2 *Completeness KPI hold*. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
-- **P1** · `ASSURE-PER-ENTITY-ALERTS-1` — **an Alert names the offender, not just the breach (WS-18, wave 1.1 of [`superpower/assurance-capability-plan.md`](superpower/assurance-capability-plan.md)).** Today a Dataset-measure Alert Rule evaluates ONE aggregate and `AlertService.promoteToIncident` keeps one active Incident per Alert Rule + Pipeline, so a detector that catches 40 offenders opens one Incident that says only "breached". Build: an optional `by` (key columns) on a Dataset-measure Alert Rule in `inspecto-engine/src/main/java/com/gamma/alert/AlertRule.java`; per-key evaluation, Alert and Incident in `AlertService.java`, deduped per (Alert Rule, key) while open, resolved when the key heals; a storm cap that falls back to one aggregate Alert; a save-time check that every `by` column is in the Dataset's Schema. Acceptance: 40 planted keys → 40 Incidents; a re-fire → 0; a healed key resolves.
+- **P3** · `ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1` — **residuals of per-entity Alerts** (✅ `ASSURE-PER-ENTITY-ALERTS-1` shipped 2026-09-26: optional `by` + `stormCap` on a Dataset-measure Alert Rule, one Alert and Incident per breached key, injective key ids, heal, relapse, storm Alert, retire-on-rule-change, a fail-closed save-time Schema check; as-built in `okf/capabilities/incidents/incidents.md` §3.2). Open: **(1)** the SPA Alert Rule editor cannot author Measure rules at all, so `by` is shown read-only; **(2)** Measure rules without `by` still never heal; **(3)** `/components/alert-rule` runs no `AlertRule` validation beyond the `by` check (predates this row). Build on demand.
 
 #### Signals, decisions & notifications
 
