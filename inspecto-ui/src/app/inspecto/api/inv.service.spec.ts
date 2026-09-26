@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { provideHttpClient, withXhr } from '@angular/common/http';
+import { HttpErrorResponse, provideHttpClient, withXhr } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { InvService, MultiProjectionResult, RecursivePathsResult } from './inv.service';
+import { Observable } from 'rxjs';
+import { apiErrorMessage } from './api-base';
+import { EntityListIndex, InvService, MultiProjectionResult, RecursivePathsResult } from './inv.service';
 import { environment } from '../../../environments/environment';
 
 const base = environment.apiBaseUrl + '/v1';
@@ -226,5 +228,95 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
         expect(bind.request.method).toBe('POST');
         expect(bind.request.body).toEqual(rule);
         bind.flush({});
+    });
+
+    // ── LA-17 — pinned to the Entity List wire contract (entity-model design §4.3.1) ──
+
+    it('lists Entity Lists with a bare GET and returns the index verbatim', () => {
+        let got: EntityListIndex | undefined;
+        svc.listEntityLists().subscribe((r) => (got = r));
+        const req = httpMock.expectOne(`${base}/inv/entity-lists`);
+        expect(req.request.method).toBe('GET');
+        expect(req.request.params.keys()).toEqual([]);
+        const res: EntityListIndex = { lists: [], headSeq: 0, headHash: null };
+        req.flush(res);
+        expect(got).toEqual(res);
+    });
+
+    it('reads one list with `at` as a query param only when given; the id is path-encoded', () => {
+        svc.getEntityList('wl/1', 7).subscribe();
+        const pinned = httpMock.expectOne((r) => r.url === `${base}/inv/entity-lists/wl%2F1`);
+        expect(pinned.request.method).toBe('GET');
+        expect(pinned.request.params.get('at')).toBe('7');
+        pinned.flush({});
+
+        svc.getEntityList('wl-1', 0).subscribe(); // seq 0 is a position, not "absent"
+        const zero = httpMock.expectOne((r) => r.url === `${base}/inv/entity-lists/wl-1`);
+        expect(zero.request.params.get('at')).toBe('0');
+        zero.flush({});
+
+        svc.getEntityList('wl-1').subscribe();
+        const head = httpMock.expectOne((r) => r.url === `${base}/inv/entity-lists/wl-1`);
+        expect(head.request.params.keys()).toEqual([]);
+        head.flush({});
+    });
+
+    it('creates a list with the body verbatim (reason included)', () => {
+        const body = {
+            title: 'Burners',
+            purpose: 'watch' as const,
+            entityType: 'msisdn',
+            reason: 'warrant 7',
+        };
+        svc.createEntityList(body).subscribe();
+        const req = httpMock.expectOne(`${base}/inv/entity-lists`);
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body).toEqual(body);
+        req.flush({ id: 'burners' }, { status: 201, statusText: 'Created' });
+    });
+
+    it('changes members at /{id}/members and hands back `changed`; retires with {reason} only', () => {
+        let changed: number | undefined;
+        svc.changeEntityListMembers('wl/1', { add: ['+44 7700 900123'], reason: 'seen at scene' }).subscribe(
+            (r) => (changed = r.changed),
+        );
+        const members = httpMock.expectOne(`${base}/inv/entity-lists/wl%2F1/members`);
+        expect(members.request.method).toBe('POST');
+        expect(members.request.body).toEqual({ add: ['+44 7700 900123'], reason: 'seen at scene' });
+        members.flush({ id: 'wl/1', changed: 0 });
+        expect(changed).toBe(0);
+
+        svc.retireEntityList('wl/1', 'case closed').subscribe();
+        const retire = httpMock.expectOne(`${base}/inv/entity-lists/wl%2F1/retire`);
+        expect(retire.request.method).toBe('POST');
+        expect(retire.request.body).toEqual({ reason: 'case closed' });
+        retire.flush({});
+    });
+
+    it('passes 409 / 422 / 503 through untouched, so apiErrorMessage shows the server message', () => {
+        const cases: [number, string, () => Observable<unknown>, string][] = [
+            [409, 'Conflict', () => svc.retireEntityList('wl-1', 'again'), `${base}/inv/entity-lists/wl-1/retire`],
+            [
+                422,
+                'Unprocessable Entity',
+                () => svc.changeEntityListMembers('wl-1', { add: ['a'], remove: ['a'], reason: 'x' }),
+                `${base}/inv/entity-lists/wl-1/members`,
+            ],
+            [
+                503,
+                'Service Unavailable',
+                () => svc.createEntityList({ title: 't', purpose: 'allow', entityType: 'imsi', reason: 'r' }),
+                `${base}/inv/entity-lists`,
+            ],
+        ];
+        for (const [status, statusText, call, url] of cases) {
+            let err: HttpErrorResponse | undefined;
+            call().subscribe({ error: (e: HttpErrorResponse) => (err = e) });
+            const message = `refused with ${status}`;
+            httpMock.expectOne(url).flush({ error: { code: 'X', message } }, { status, statusText });
+            expect(err).toBeInstanceOf(HttpErrorResponse);
+            expect(err?.status).toBe(status);
+            expect(apiErrorMessage(err, 'fallback')).toBe(message);
+        }
     });
 });

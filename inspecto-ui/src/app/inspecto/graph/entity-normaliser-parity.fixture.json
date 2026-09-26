@@ -1,0 +1,125 @@
+{
+  "about": "LA-17 step 2 - the Entity Type normalisers. The SAME file feeds entity-key.spec.ts (browser) and EntityTypesTest (Java); a case that passes on one side only is a split identity. Normalisers are a CLOSED set: default, digits, e164, upper-trim. Lowercasing folds final sigma to sigma on both sides: Java and JS disagree on Final_Sigma context (e.g. before a modifier letter), so the fold is what makes them agree.",
+  "cases": [
+    {
+      "normaliser": "default",
+      "input": " Acme  Ltd.",
+      "expected": "acme ltd"
+    },
+    {
+      "normaliser": "default",
+      "input": "Cinder Wireless;:",
+      "expected": "cinder wireless"
+    },
+    {
+      "normaliser": "default",
+      "input": "\u00c9COLE Nord",
+      "expected": "\u00e9cole nord"
+    },
+    {
+      "normaliser": "default",
+      "input": "Acme\u00a0Ltd",
+      "expected": "acme ltd"
+    },
+    {
+      "normaliser": "default",
+      "input": "a\tb\nc",
+      "expected": "a b c"
+    },
+    {
+      "normaliser": "default",
+      "input": "...",
+      "expected": ""
+    },
+    {
+      "normaliser": "digits",
+      "input": "+44 7700-900 123",
+      "expected": "447700900123"
+    },
+    {
+      "normaliser": "digits",
+      "input": "001010123456789",
+      "expected": "001010123456789"
+    },
+    {
+      "normaliser": "digits",
+      "input": "35-209900-176148-1",
+      "expected": "352099001761481"
+    },
+    {
+      "normaliser": "digits",
+      "input": "no digits",
+      "expected": ""
+    },
+    {
+      "normaliser": "e164",
+      "input": "+44 7700 900123",
+      "expected": "+447700900123"
+    },
+    {
+      "normaliser": "e164",
+      "input": " 0044 7700-900123",
+      "expected": "+447700900123"
+    },
+    {
+      "normaliser": "e164",
+      "input": "07700 900123",
+      "expected": "07700900123"
+    },
+    {
+      "normaliser": "e164",
+      "input": "(+1) 555 0100",
+      "expected": "15550100"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "  gb29 nwbk  6016 ",
+      "expected": "GB29 NWBK 6016"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "till-07",
+      "expected": "TILL-07"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "stra\u00dfe",
+      "expected": "STRASSE"
+    },
+    {
+      "normaliser": "default",
+      "input": "\u039f\u0394\u039f\u03a3",
+      "expected": "\u03bf\u03b4\u03bf\u03c3"
+    },
+    {
+      "normaliser": "default",
+      "input": "\u0391\u03a3\u00aa",
+      "expected": "\u03b1\u03c3\u00aa"
+    },
+    {
+      "normaliser": "default",
+      "input": "\u0391\u03a3\u02b0",
+      "expected": "\u03b1\u03c3\u02b0"
+    },
+    {
+      "normaliser": "default",
+      "input": " a  b\ufeff",
+      "expected": "a b"
+    },
+    {
+      "normaliser": "default",
+      "input": "abc.\u0085",
+      "expected": "abc.\u0085"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "\u3000a b ",
+      "expected": "A B"
+    },
+    {
+      "normaliser": "e164",
+      "input": " \u00a0+44 12",
+      "expected": "+4412"
+    }
+  ]
+}

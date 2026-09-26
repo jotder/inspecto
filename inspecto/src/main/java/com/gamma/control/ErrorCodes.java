@@ -31,6 +31,9 @@ public final class ErrorCodes {
     public static final String NOT_SUPPORTED            = "NOT_SUPPORTED";
     /** 413 — a request body over a route's hard cap (the public delivery-status callback, SEC review F1). */
     public static final String PAYLOAD_TOO_LARGE        = "PAYLOAD_TOO_LARGE";
+    /** 500 — stored evidence disagrees with its own recorded hashes (e.g. a broken identity fact chain, LA-17);
+     *  the store is refused rather than silently read. */
+    public static final String INTEGRITY_VIOLATION      = "INTEGRITY_VIOLATION";
 
     /** The contract's default code for a status ({@code errorCode} is never absent on a v1 error). */
     static String defaultFor(int status) {

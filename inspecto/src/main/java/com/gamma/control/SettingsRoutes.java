@@ -3,6 +3,7 @@ package com.gamma.control;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -118,7 +119,7 @@ final class SettingsRoutes implements RouteModule {
         Path root = WriteGates.requireWriteRoot(api, "link-analysis settings write");
         LinkAnalysisSettings s = new LinkAnalysisSettings(nodeCap(body, "projectionNodeCap"),
                 nodeCap(body, "analysisNodeCap"), nodeCap(body, "suspicionNodeCap"), maskingMode(body),
-                nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"));
+                nodeCap(body, "fourEyesBudgetAbove"), nodeCap(body, "fourEyesFanOutAbove"), entityTypes(body));
         s.write(root.resolve(LinkAnalysisSettings.FILE));
         return linkAnalysisShape(s);
     }
@@ -132,6 +133,8 @@ final class SettingsRoutes implements RouteModule {
         m.put("maskingMode", s.maskingMode());
         m.put("fourEyesBudgetAbove", s.fourEyesBudgetAbove());
         m.put("fourEyesFanOutAbove", s.fourEyesFanOutAbove());
+        m.put("entityTypes", s.entityTypes() == null ? null : EntityTypes.shape(s.entityTypes()));
+        m.put("entityTypesInForce", EntityTypes.shape(s.effectiveEntityTypes()));
         return m;
     }
 
@@ -145,6 +148,18 @@ final class SettingsRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "maskingMode must be one of "
                     + com.gamma.config.spec.ConfigSpecs.LINK_ANALYSIS_MASKING_MODES + ", got '" + raw + "'");
         return v;
+    }
+
+    /** Stated Entity Types (LA-17): {@code null}/absent = inherit {@link EntityTypes#DEFAULTS}; otherwise a list
+     *  that passes {@link EntityTypes#parse} or the write is refused (422) — never trimmed to fit. */
+    private static List<EntityTypes.EntityType> entityTypes(Map<String, Object> body) {
+        Object raw = body.get("entityTypes");
+        if (raw == null) return null;
+        try {
+            return EntityTypes.parse(raw);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+        }
     }
 
     /** A stated node cap: {@code null}/absent = inherit the shipped default; otherwise an int in

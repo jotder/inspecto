@@ -6,6 +6,7 @@ import { SpacesService } from './spaces.service';
 import {
     ANALYSIS_NODE_CAP_DEFAULT,
     SUSPICION_NODE_CAP_DEFAULT,
+    type EntityNormaliser,
     analysisNodeCapValue,
     configureGraphLimits,
     resetGraphLimits,
@@ -33,9 +34,28 @@ export interface LinkAnalysisLimits {
      * cap — one slow algorithm should not set the limit for the 25 that finish in under 60 ms (D-S3).
      */
     suspicionNodeCap: number | null;
+    /** LA-17: the Space's stated Entity Types; `null` = inherit the seeded defaults. A stated list REPLACES them. */
+    entityTypes: EntityTypeConfig[] | null;
+    /** LA-17: the Entity Types actually in force (stated, else the defaults) — server-computed, read-only. */
+    entityTypesInForce: EntityTypeConfig[];
 }
 
-const UNSET: LinkAnalysisLimits = { projectionNodeCap: null, analysisNodeCap: null, suspicionNodeCap: null };
+/** LA-17: one Entity Type (entity-model design §4.1) — `classifications` are the Dataset column classifications it claims. */
+export interface EntityTypeConfig {
+    id: string;
+    label: string;
+    normaliser: EntityNormaliser;
+    masked: boolean;
+    classifications: string[];
+}
+
+const UNSET: LinkAnalysisLimits = {
+    projectionNodeCap: null,
+    analysisNodeCap: null,
+    suspicionNodeCap: null,
+    entityTypes: null,
+    entityTypesInForce: [],
+};
 
 /**
  * Holds the active space's graph limits and applies them to the two pure graph modules.

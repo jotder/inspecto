@@ -181,23 +181,29 @@ final class EntityMasking {
         return out;
     }
 
-    /** The per-Investigation HMAC key, created (CREATE_NEW) on first use. Never served. */
-    private static byte[] key(Path dir) throws IOException {
+    /** The per-Investigation HMAC key, created on first use. Never served. {@link EntityListRoutes} keys
+     *  Entity List members the same way, with one key per Space fact log. ⚠ The key is written to a sibling temp
+     *  file and only then published by {@link EntityFactLog#publishNew} (a hard link, never a replace), so a
+     *  concurrent first reader never sees a partly written {@code mask.key}; the loser of a race reads the winner's. */
+    static byte[] key(Path dir) throws IOException {
         Path f = dir.resolve(KEY_FILE);
         if (!Files.isRegularFile(f)) {
             byte[] k = new byte[32];
             new SecureRandom().nextBytes(k);
+            Path tmp = Files.createTempFile(dir, ".mask-", ".tmp");
             try {
-                Files.writeString(f, HexFormat.of().formatHex(k), StandardCharsets.UTF_8,
-                        StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE);
+                Files.writeString(tmp, HexFormat.of().formatHex(k), StandardCharsets.UTF_8);
+                EntityFactLog.publishNew(tmp, f);
             } catch (FileAlreadyExistsException raced) {
                 // another request created it first — read theirs below
+            } finally {
+                Files.deleteIfExists(tmp);
             }
         }
         return HexFormat.of().parseHex(Files.readString(f, StandardCharsets.UTF_8).trim());
     }
 
-    private static String token(byte[] key, String id) {
+    static String token(byte[] key, String id) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
             mac.init(new SecretKeySpec(key, "HmacSHA256"));

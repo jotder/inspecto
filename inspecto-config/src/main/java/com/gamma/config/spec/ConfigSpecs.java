@@ -1186,7 +1186,10 @@ public final class ConfigSpecs {
                                 + "absent = no budget threshold."),
                 FieldSpec.of("four_eyes_fan_out_above", "Four-eyes fan-out threshold", FieldType.INT,
                         "An expand whose maxFanOut exceeds this, or is unbounded, waits for a second person's "
-                                + "approval (D-U7); absent = no fan-out threshold.")
+                                + "approval (D-U7); absent = no fan-out threshold."),
+                FieldSpec.of("entity_types", "Entity types", FieldType.LIST,
+                        "The space's Entity Types {id, label, normaliser, masked, classifications} (LA-17); "
+                                + "a stated list replaces the seeded defaults; absent = the defaults.")
         );
         return new ConfigSpec("link-analysis-settings", fields, List.of());
     }

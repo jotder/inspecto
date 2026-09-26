@@ -129,7 +129,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/components/transform/describe` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:94` |
 | POST | `/components/transform/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:87` |
 | DELETE | `/config/([^/]+)/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigReadRoutes.java:36` |
-| PUT | `/config/icon-map` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:61` |
+| PUT | `/config/icon-map` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:62` |
 | POST | `/config/patch` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:44` |
 | POST | `/config/preview/parsing` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:43` |
 | POST | `/config/preview/schema` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:46` |
@@ -170,6 +170,9 @@ system: the evidence cannot say something the code does not.
 | POST | `/geo/routes` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/GeoRoutes.java:69` |
 | POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:65` |
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:66` |
+| POST | `/inv/entity-lists` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:69` |
+| POST | `/inv/entity-lists/([^/]+)/members` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:71` |
+| POST | `/inv/entity-lists/([^/]+)/retire` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:73` |
 | POST | `/inv/investigation-templates/([^/]+)/instantiate` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationTemplateRoutes.java:86` |
 | POST | `/inv/investigations` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:125` |
 | POST | `/inv/investigations/([^/]+)/alert-rules` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:58` |
@@ -268,10 +271,10 @@ system: the evidence cannot say something the code does not.
 | POST | `/runs/([^/]+)/retries/cancel` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:114` |
 | POST | `/runs/([^/]+)/retries/retry-now` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:112` |
 | POST | `/runs/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:50` |
-| PUT | `/settings/branding` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:49` |
-| PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:52` |
-| PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:55` |
-| PUT | `/settings/pipeline-history` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:58` |
+| PUT | `/settings/branding` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:50` |
+| PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:53` |
+| PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:56` |
+| PUT | `/settings/pipeline-history` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:59` |
 | PUT | `/settings/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:77` |
 | POST | `/space-comparisons` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceComparisonRoutes.java:42` |
 | POST | `/spaces` | exempt | recovery-route | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:72` |

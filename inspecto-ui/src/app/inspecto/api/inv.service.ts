@@ -616,6 +616,63 @@ export interface InvestigationAlertRuleResult {
     disclosure: string;
 }
 
+// ── LA-17: Entity Lists (`EntityListRoutes`, wire contract: entity-model design §4.3.1) ─────────────────
+
+export type EntityListPurpose = 'allow' | 'block' | 'watch' | 'exclusion';
+
+/** One list as `GET /inv/entity-lists` lists it. A Space object — reads need only Space access. */
+export interface EntityListSummary {
+    id: string;
+    title: string;
+    purpose: EntityListPurpose;
+    /** An Entity Type id from `entityTypesInForce` (the Link Analysis settings). */
+    entityType: string;
+    size: number;
+    /** Retired lists are still listed, flagged. */
+    retired: boolean;
+    createdAt: string;
+    createdBy: string | null;
+    /** The fact-log sequence of this list's latest change. */
+    lastSeq: number;
+}
+
+export interface EntityListIndex {
+    lists: EntityListSummary[];
+    headSeq: number;
+    headHash: string | null;
+}
+
+/** `GET /inv/entity-lists/{id}` — the list as of `atSeq`. `members` are normalised keys, sorted, and MASKED per the
+ *  Space's `maskingMode` (reveal is not in this slice) — never treat them as raw values to send back. */
+export interface EntityListDetail extends EntityListSummary {
+    members: string[];
+    atSeq: number;
+    headHash: string | null;
+}
+
+/** `POST /inv/entity-lists` → 201. `id` is minted when absent, else `^[a-z0-9][a-z0-9_-]{0,63}$`; an id ever used
+ *  (retired too) is a 409. `reason` must be non-blank. */
+export interface EntityListCreateRequest {
+    id?: string;
+    title: string;
+    purpose: EntityListPurpose;
+    entityType: string;
+    reason: string;
+}
+
+/** `POST /inv/entity-lists/{id}/members` — RAW values (the server normalises with the list's Entity Type);
+ *  ≤ 5 000 per call; a value in both `add` and `remove` is a 422. */
+export interface EntityListMembersRequest {
+    add?: string[];
+    remove?: string[];
+    reason: string;
+}
+
+/** The list after a members call. `changed: 0` = nothing was effective and no fact was written. */
+export interface EntityListMembersResult extends EntityListDetail {
+    changed: number;
+}
+
 /**
  * Investigation-studio backend (INV-1): the real DuckDB-side Entity Projection over a Dataset —
  * the server half of the Link Analysis studio's `entity-projection` GraphSource. Offline/mock mode
@@ -740,6 +797,35 @@ export class InvService {
     ): Observable<InvestigationAlertRuleResult> {
         return this.http.post<InvestigationAlertRuleResult>(invPath(id, 'alert-rules'), req);
     }
+
+    // ── LA-17 Entity Lists. Writes need `canManageIncidents`; no write root → 503; unknown list → 404. ──
+
+    listEntityLists(): Observable<EntityListIndex> {
+        return this.http.get<EntityListIndex>(apiUrl('/inv/entity-lists'));
+    }
+
+    /** `at` pins the read to a fact-log position: beyond the head → 422; the list did not exist yet → 404. */
+    getEntityList(id: string, at?: number): Observable<EntityListDetail> {
+        return this.http.get<EntityListDetail>(entityListPath(id, ''), { params: toParams({ at }) });
+    }
+
+    createEntityList(req: EntityListCreateRequest): Observable<EntityListDetail> {
+        return this.http.post<EntityListDetail>(apiUrl('/inv/entity-lists'), req);
+    }
+
+    /** A retired list → 409. */
+    changeEntityListMembers(id: string, req: EntityListMembersRequest): Observable<EntityListMembersResult> {
+        return this.http.post<EntityListMembersResult>(entityListPath(id, '/members'), req);
+    }
+
+    /** Already retired → 409. */
+    retireEntityList(id: string, reason: string): Observable<EntityListDetail> {
+        return this.http.post<EntityListDetail>(entityListPath(id, '/retire'), { reason });
+    }
+}
+
+function entityListPath(id: string, suffix: string): string {
+    return apiUrl(`/inv/entity-lists/${encodeURIComponent(id)}${suffix}`);
 }
 
 function dossierParams(q: DossierQuery, format: string) {

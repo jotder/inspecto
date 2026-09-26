@@ -16,6 +16,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -278,6 +279,65 @@ class ControlApiSettingsTest {
                     "{\"fourEyesBudgetAbove\":0}").statusCode());
             assertEquals("all", json(send(c.port, "GET", "/spaces/acme/settings/link-analysis", null))
                     .get("maskingMode").asText(), "a refused write left the last good values standing");
+        }
+    }
+
+    /** LA-17 step 2: per-Space Entity Types — inherit the seeded nine, a stated list replaces them, 422 on bad. */
+    @Test
+    void linkAnalysisEntityTypesRoundTripAndRefuseBadLists(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String path = "/spaces/acme/settings/link-analysis";
+            JsonNode def = json(send(c.port, "GET", path, null));
+            assertTrue(def.get("entityTypes").isNull(), "absent ⇒ inherit: " + def);
+            assertEquals(9, def.get("entityTypesInForce").size());
+            JsonNode agent = def.get("entityTypesInForce").get(6);
+            assertEquals("agent", agent.get("id").asText());
+            assertEquals("Agent / till", agent.get("label").asText());
+            assertEquals("upper-trim", agent.get("normaliser").asText());
+            assertFalse(agent.get("masked").asBoolean());
+            assertEquals("[\"AGENT\",\"TILL\"]", agent.get("classifications").toString());
+
+            String list = "[{\"id\":\"msisdn\",\"label\":\"MSISDN\",\"normaliser\":\"e164\",\"masked\":true,"
+                    + "\"classifications\":[\"MSISDN\"]},{\"id\":\"till\",\"label\":\"Till\",\"normaliser\":"
+                    + "\"upper-trim\",\"masked\":false,\"classifications\":[\"TILL\",\"AGENT\"]}]";
+            HttpResponse<String> put = send(c.port, "PUT", path, "{\"maskingMode\":\"all\",\"entityTypes\":" + list + "}");
+            assertEquals(200, put.statusCode(), put.body());
+            assertEquals(JSON.readTree(list), json(put).get("entityTypes"));
+            assertEquals(JSON.readTree(list), json(put).get("entityTypesInForce"), "a stated list replaces the defaults");
+            assertTrue(Files.readString(root.resolve("acme").resolve("config").resolve("link-analysis.toon"))
+                    .contains("entity_types"));
+            assertEquals(JSON.readTree(list), json(send(c.port, "GET", path, null)).get("entityTypes"),
+                    "survives the round trip through link-analysis.toon");
+
+            String one = "{\"id\":\"%s\",\"label\":\"%s\",\"normaliser\":\"%s\",\"masked\":%s,\"classifications\":%s}";
+            Map<String, String> bad = new java.util.LinkedHashMap<>();
+            bad.put("[]", "may not be empty");
+            bad.put("[" + one.formatted("Bad-Id", "X", "default", "true", "[]") + "]", "must match");
+            bad.put("[" + one.formatted("a", "X", "default", "true", "[]") + "," + one.formatted("a", "Y", "digits", "false", "[]")
+                    + "]", "duplicate entity type id");
+            bad.put("[" + one.formatted("a", " ", "default", "true", "[]") + "]", "label is blank");
+            bad.put("[" + one.formatted("a", "X", "lower", "true", "[]") + "]", "normaliser must be one of");
+            bad.put("[" + one.formatted("a", "X", "default", "true", "[\"\"]") + "]", "classification is blank");
+            bad.put("[" + one.formatted("a", "X", "default", "true", "[\"IMSI\"]") + ","
+                    + one.formatted("b", "Y", "digits", "false", "[\" imsi \"]") + "]", "claimed by both");
+            bad.put("[" + one.formatted("a", "X", "default", "\"yes\"", "[]") + "]", "masked must be true or false");
+            StringBuilder many = new StringBuilder("[");
+            for (int i = 0; i < 65; i++) many.append(i == 0 ? "" : ",").append(one.formatted("t" + i, "T", "default", "false", "[]"));
+            bad.put(many.append("]").toString(), "at most 64");
+            for (Map.Entry<String, String> b : bad.entrySet()) {
+                HttpResponse<String> r = send(c.port, "PUT", path, "{\"entityTypes\":" + b.getKey() + "}");
+                assertEquals(422, r.statusCode(), b.getValue() + " → " + r.body());
+                assertTrue(r.body().contains(b.getValue()), "the 422 names the problem: " + r.body());
+            }
+            assertEquals(JSON.readTree(list), json(send(c.port, "GET", path, null)).get("entityTypes"),
+                    "a refused write left the last good list standing");
+
+            HttpResponse<String> reset = send(c.port, "PUT", path, "{\"maskingMode\":\"all\"}");
+            assertEquals(200, reset.statusCode(), reset.body());
+            JsonNode got = json(send(c.port, "GET", path, null));
+            assertTrue(got.get("entityTypes").isNull(), "a PUT without entityTypes resets to inherit: " + got);
+            assertEquals(9, got.get("entityTypesInForce").size());
         }
     }
 

@@ -861,6 +861,29 @@ pick a **GraphSource** + query, render via the shared G6 host, analyze (paths, n
 communities). A saved investigation is a **Link-Analysis View** (Component kind `link-analysis-view`); when
 its source is `entity-projection` it is a **Widget** (a Graph Visualization Type bound to a Dataset).
 
+**Entity Type** *(Type — added 2026-09-26, `LA-17`; ✅ built 2026-09-26: `EntityTypes`, `GET|PUT /settings/link-analysis` `entityTypes`)* — A named kind of business identifier (`subscriber`,
+`imsi`, `imei`, `msisdn`, `wallet`, `account`, `agent`, `handset`, `cell`), configured **per Space** in
+`link-analysis.toon`. It carries a normaliser (one of a closed set shared by Java and the SPA) and a `masked` flag, and names the Dataset column
+`classification` values that map to it. Its Instance is a typed **Entity**, keyed `<type>:<normalised value>`; an
+untyped Entity keeps `entity:<value>`. ⛔ Never call it a *classification* — a classification is a column's free-text
+label (`columns[].classification`); the Entity Type is what that label maps to. Design:
+[`superpower/link-analysis-entity-model-design.md`](superpower/link-analysis-entity-model-design.md).
+
+**Entity List** *(added 2026-09-26, `LA-17`; ✅ backend + SPA client built 2026-09-26: `/inv/entity-lists*`, `EntityListRoutes`; `excludeBy`/`seedBy` and the panel not yet)* — A named, persisted, Space-scoped set of typed Entity keys
+with a stated purpose (`allow` · `block` · `watch` · `exclusion`), held as a fold over the Space's **Identity Fact** log,
+so it can be read as of any log position. Consumed by the Investigation ops `excludeBy` / `seedBy`, and it travels
+with an **Investigation Template** (D-E8). ⛔ Never *Reference List* — **Reference** is the Catalog's dimension data
+origin (§3). ⛔ Never *Control List* (the assurance bid plan's name — one concept, `D-P10`): the same Entity List
+serves assurance allow / block / watch and Link Analysis `excludeBy` / `seedBy`. ⛔ Not *watchlist* as the noun: *watch* is
+one purpose of an Entity List.
+
+**Identity Fact** *(added 2026-09-26, `LA-17`; ✅ list kinds built 2026-09-26: `EntityFactLog`)* — One immutable record in a Space's
+append-only identity log (`audit/entity-facts/<seq>.json`), SHA-256-chained to its predecessor, always carrying an actor and
+a reason; the chain is re-verified on every read. Built kinds: `list.created` · `list.member.added` ·
+`list.member.removed` · `list.retired`. Planned (slice 2): **asserted** identity facts (by a person, or by a named
+mapping Dataset) and **resolved** ones derived deterministically from them — never by similarity (`D-M1`) — each
+withdrawn by a later `retract` fact, never edited.
+
 ### Geo (Geo Map Analysis) *(added 2026-07-05; as built: [`okf/frontend/features/geo-map.md`](okf/frontend/features/geo-map.md))*
 
 **Geo Map Analysis Studio** — The Builder-lens Studio pane (`/studio/geo-map`, Phase 1) for geographic
@@ -900,6 +923,9 @@ non-map stacking concepts.
   an **Entry** is a file inside an *Archive*, and it only becomes a Member once Unpack materializes it. One
   word for both would make the container↔content boundary unsayable — which is exactly the boundary the
   `archive!entry` address and the Run-level Archive verdict exist to express.
+- **"Reference list" → Entity List** *(2026-09-26, `LA-17`)*. The backlog's working name for a persisted set of Entity
+  keys would have made **Reference** (a Catalog dimension origin) mean two things. The Link Analysis object is an
+  **Entity List**; a Reference stays a data origin.
 
 ---
 
