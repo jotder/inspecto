@@ -81,6 +81,8 @@ class BackupTaskTest {
     void aBackupNeverCarriesAPendingChangeKey(@TempDir Path source, @TempDir Path backupDir) throws Exception {
         JobConfig cfg = backupCfg(source, backupDir);
         Files.writeString(Files.createDirectories(source.resolve("config.secrets")).resolve(".pending-changes.key"), "k");
+        // ASSURE-RISK-SCORE-1: the Risk Score mask key shares the directory, so it shares the exclusion.
+        Files.writeString(source.resolve("config.secrets").resolve(".risk-score-mask.key"), "k");
         Files.writeString(Files.createDirectories(source.resolve("config").resolve("pending-changes"))
                 .resolve(".pending-changes.key"), "stray");
         new MaintenanceJob(cfg).run();
@@ -88,7 +90,7 @@ class BackupTaskTest {
         try (var zin = new java.util.zip.ZipInputStream(Files.newInputStream(onlyZip(backupDir)))) {
             for (var e = zin.getNextEntry(); e != null; e = zin.getNextEntry()) names.add(e.getName());
         }
-        assertFalse(names.stream().anyMatch(n -> n.contains(".pending-changes.key") || n.contains(".secrets")),
+        assertFalse(names.stream().anyMatch(n -> n.contains(".pending-changes.key") || n.contains(".risk-score-mask.key") || n.contains(".secrets")),
                 "no key in the archive: " + names);
         assertTrue(names.stream().anyMatch(n -> n.endsWith("a.toon")), "the rest is archived: " + names);
     }

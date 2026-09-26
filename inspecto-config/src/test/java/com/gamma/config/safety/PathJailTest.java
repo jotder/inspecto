@@ -34,7 +34,7 @@ class PathJailTest {
     void aJobPathIntoASecretsDirectoryIsRefused(@TempDir Path root) throws Exception {
         Path secrets = Files.createDirectories(root.resolve("config.secrets"));
         java.util.List<Path> roots = java.util.List.of(root);
-        for (String v : new String[]{secrets.toString(), secrets.resolve(".pending-changes.key").toString(),
+        for (String v : new String[]{secrets.toString(), secrets.resolve(".pending-changes.key").toString(), secrets.resolve(".risk-score-mask.key").toString(),
                 root.resolve("CONFIG.SECRETS").resolve("x").toString(), root + "/config.secrets./x", "config.secrets/x",
                 root.resolve("data").resolve("..").resolve("config.secrets").toString()}) {
             PathJail.Escape ex = assertThrows(PathJail.Escape.class,

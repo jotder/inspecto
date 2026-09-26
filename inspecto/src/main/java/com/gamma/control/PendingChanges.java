@@ -400,14 +400,11 @@ public final class PendingChanges {
      * key file by name; {@code .gitignore} ignores it under {@code spaces/}.
      */
     static Path keyFile(Path root) {
-        Path config = root.toAbsolutePath().normalize();
-        if (config.getParent() == null || config.getFileName() == null)
-            throw new IllegalStateException("the config root " + config + " has no parent to hold its secrets");
-        return config.resolveSibling(config.getFileName() + SECRETS_SUFFIX).resolve(KEY_FILE);
+        return com.gamma.util.SpaceSecretKeys.keyFile(root, KEY_FILE);
     }
 
     /** The suffix of the per-config-root secrets directory — {@code BackupTask} skips any directory ending in it. */
-    public static final String SECRETS_SUFFIX = ".secrets";
+    public static final String SECRETS_SUFFIX = com.gamma.util.SpaceSecretKeys.SECRETS_SUFFIX;
 
     /**
      * The Space's Pending Change key: 32 random bytes, created on first use ({@link #keyFile}). Created with
@@ -420,54 +417,8 @@ public final class PendingChanges {
      * against a local administrator, who can read both.
      */
     static byte[] key(Path root) throws IOException {
-        Path f = keyFile(root);
-        Files.createDirectories(f.getParent());
-        // No exists() pre-check: EVERY first use attempts CREATE_NEW, and the filesystem decides the one winner —
-        // a check-then-create would leave a window in which two creators both believe they are first.
-        {
-            byte[] k = new byte[32];
-            new java.security.SecureRandom().nextBytes(k);
-            byte[] hex = java.util.HexFormat.of().formatHex(k).getBytes(StandardCharsets.US_ASCII);
-            boolean posix = f.getFileSystem().supportedFileAttributeViews().contains("posix");
-            java.nio.file.attribute.FileAttribute<?>[] attrs = posix
-                    ? new java.nio.file.attribute.FileAttribute<?>[] {java.nio.file.attribute.PosixFilePermissions
-                            .asFileAttribute(java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"))}
-                    : new java.nio.file.attribute.FileAttribute<?>[0];
-            try (var ch = Files.newByteChannel(f, java.util.EnumSet.of(java.nio.file.StandardOpenOption.CREATE_NEW,
-                    java.nio.file.StandardOpenOption.WRITE), attrs)) {
-                if (!posix) ownerOnlyAcl(f);
-                ch.write(java.nio.ByteBuffer.wrap(hex));
-            } catch (java.nio.file.FileAlreadyExistsException raced) {
-                // another writer created it first — theirs is the key; read it below
-            }
-        }
-        for (int attempt = 0; ; attempt++) {
-            String text = Files.readString(f, StandardCharsets.US_ASCII).trim();
-            if (text.length() == 64) return java.util.HexFormat.of().parseHex(text);
-            if (attempt >= 200) throw new IOException("the Pending Change key " + f + " is not a whole key");
-            try {
-                Thread.sleep(5);   // the first writer is between CREATE_NEW and its write
-            } catch (InterruptedException stop) {
-                Thread.currentThread().interrupt();
-                throw new IOException("interrupted reading the Pending Change key", stop);
-            }
-        }
-    }
-
-    /** Windows: an ACL with one entry — the file's owner, full control — replacing whatever it inherited. */
-    private static void ownerOnlyAcl(Path f) {
-        var view = Files.getFileAttributeView(f, java.nio.file.attribute.AclFileAttributeView.class);
-        if (view == null) return;   // neither POSIX nor ACL: nothing narrower to set
-        try {
-            var owner = view.getOwner();
-            var entry = java.nio.file.attribute.AclEntry.newBuilder()
-                    .setType(java.nio.file.attribute.AclEntryType.ALLOW).setPrincipal(owner)
-                    .setPermissions(java.util.EnumSet.allOf(java.nio.file.attribute.AclEntryPermission.class)).build();
-            view.setAcl(List.of(entry));
-        } catch (IOException | RuntimeException bestEffort) {
-            // a filesystem that refuses an ACL change keeps its default permissions; the key is still outside
-            // every exported, imported and backed-up tree
-        }
+        // The creation rule (CREATE_NEW first-writer-wins, owner-only, read-retry) is shared: SpaceSecretKeys.
+        return com.gamma.util.SpaceSecretKeys.readOrCreate(keyFile(root), "Pending Change key");
     }
 
     /**
