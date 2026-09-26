@@ -227,9 +227,24 @@ timestamp: 2026-07-16T00:00:00Z
     `POST /audit/anchors/rebaseline {"reason": "…"}` (`canAdminister`, audited, once a minute). It refuses (409)
     when nothing fails, repairs nothing, moves the old anchor file aside as `audit-anchors.<ms>.replaced.jsonl`,
     and starts a new anchor file with a signed `break` anchor holding the reason, the problem verify found, the
-    last good anchor and the new start seq (the head + 1). (4) From then on `/audit/verify` checks the new epoch
-    by default, and any range reaching back before the break fails as `acknowledged-break` naming the reason —
-    never `ok` over the gap. (5) Export the anchors off the box again.
+    last good anchor and the new start seq (the head + 1). (4) From then on the DEFAULT `/audit/verify` is never
+    `ok`: it answers `ok: false` with `acknowledged: true`, `breaks: [{at, reason, problem, lastGoodSeq, by, …}]`
+    (every epoch, back through each replaced anchor file) and `epochStart`. `/audit/verify?epoch=current` may say
+    `ok` for the current epoch alone, and still lists the breaks. The replaced file is KEPT and pinned by digest
+    in the break; it missing or edited is `prior-epoch-missing` / `prior-epoch-altered`. The rebaseline is also
+    its own chained audit event, `audit.rebaseline`, carrying the reason, the problem, `lastGoodSeq` and the
+    actor. (5) Export the anchors off the box again.
+  - 🔴 **Round 4:** truncation is judged by what a prune ACTUALLY removed. `event_prune` now writes a chained
+    `events.pruned` AUDIT row (`prune_before`, `partitions_removed`, `retention_days`, the job as actor) through
+    the Space's EventLog; anchored rows gone from the front are retention only for days before the cutoff of a
+    VERIFIED prune record. A configured `retention_days` job that never ran accounts for nothing; the configured
+    window is only reported (`retention.configuredSource`), beside `retention.source: prune-record | none`.
+  - ⚠ **Two known windows, stated so they are not overclaimed.** (1) *Lock race:* a writer that already linked
+    rows it had not yet flushed when its lock file was deleted can collide with a second writer that recovered an
+    older head from disk — the fork is not prevented, it is DETECTED afterwards as a `duplicate`. (2) *One-anchor
+    crash window:* an anchor line is appended before the anchoring record's `latestMac` is updated; a crash
+    between the two leaves the record naming the previous anchor, so removing that newest line in that window is
+    not seen.
   - **Residuals (not built):** a scheduled off-box anchor export target; the multi-pod `DbEventStore` has no
     chain-writer lock (two pods linking one table fork the chain — filed on the board row); a `DbEventStore` shared by several pods gets one chain per process interleaved in
     one table (verifies as duplicates) and serves the chain reads through the `EventStore` keyset-walk defaults
