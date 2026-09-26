@@ -108,8 +108,18 @@ describe('ImpactPanelComponent (WS-10)', () => {
         expect(el.querySelector('inspecto-alert')).not.toBeNull();
     });
 
-    it('offers no edit on a terminal object — its impact is closed server-side', () => {
-        const { el } = create({ ...CASE, status: 'CLOSED' });
+    it('on a CLOSED Case offers only the late-recovery fields', () => {
+        const { c } = create({ ...CASE, status: 'CLOSED' });
+        expect(c.canEdit()).toBe(true);
+        c.startEdit();
+        expect(c.form.controls.recovered.enabled).toBe(true);
+        expect(c.form.controls.prevented.enabled).toBe(true);
+        expect(c.form.controls.confirmed.disabled).toBe(true);
+        expect(c.form.controls.currency.disabled).toBe(true);
+    });
+
+    it('offers no edit on an ARCHIVED Incident — its impact is closed server-side', () => {
+        const { el } = create({ ...CASE, objectType: 'INCIDENT', status: 'ARCHIVED' });
         expect(
             Array.from(el.querySelectorAll('button')).some((b) => /Edit|Record impact/.test(b.textContent ?? '')),
         ).toBe(false);

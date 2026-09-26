@@ -176,6 +176,10 @@ class ControlApiIncidentFinishGateTest {
                         "{\"action\":\"resolve\",\"disposition\":\"FALSE_POSITIVE\"}", "operations");
                 assertEquals(200, resolve.statusCode(), resolve.body());
                 assertEquals("FALSE_POSITIVE", V1Body.of(resolve.body()).get("attributes").get("disposition").asText());
+                // the Disposition is part of the audit record of the resolve that decided it
+                Event resolved = seen.stream().filter(e -> EventType.OBJECT_ACTIVITY.equals(e.type()))
+                        .filter(e -> "RESOLVED".equals(e.attributes().get("to"))).findFirst().orElseThrow();
+                assertEquals("FALSE_POSITIVE", resolved.attributes().get("disposition"), resolved.attributes().toString());
             } finally {
                 c.svc.eventLog().removeSubscriber(sub);
             }

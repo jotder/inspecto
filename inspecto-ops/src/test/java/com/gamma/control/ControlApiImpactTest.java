@@ -101,6 +101,7 @@ class ControlApiImpactTest {
                     "{\"impact\":{\"confirmed\":\"100\",\"currency\":\"EUR\",\"outstanding\":\"100\"}}", // derived
                     "{\"impact\":{\"amount\":\"100\",\"currency\":\"EUR\"}}",            // unknown field
                     "{\"impact\":{\"basis\":{\"nested\":true}}}",                        // non-string text
+                    "{\"impact\":{\"confirmed\":\"" + "0".repeat(40) + "1\",\"currency\":\"EUR\"}}",     // = 1, but > 40 chars
                     "{\"impact\":{\"confirmed\":\"1\",\"currency\":\"EUR\"},\"priority\":\"LOW\"}")) { // other key
                 HttpResponse<String> r = send(c.port, "/objects/" + id + "/impact", bad, "operations");
                 assertEquals(422, r.statusCode(), bad + " -> " + r.body());
@@ -134,6 +135,65 @@ class ControlApiImpactTest {
                     "reopened, its impact is writable again");
 
             assertEquals(404, send(c.port, "/objects/nope/impact", IMPACT, "operations").statusCode());
+        }
+    }
+
+    /** The PATCH's free attribute merge must not become a way round the impact route or the Disposition gate. */
+    @Test
+    void thePatchRefusesTheImpactAndTheDisposition(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String id = open(c, ObjectType.INCIDENT);
+            for (String key : List.of("impact", "disposition")) {
+                HttpResponse<String> r = send(c.port, "PATCH", "/objects/" + id,
+                        "{\"attributes\":{\"" + key + "\":\"CONFIRMED\"}}", "admin");
+                assertEquals(422, r.statusCode(), key + " -> " + r.body());
+                assertTrue(r.body().contains(key), r.body());
+            }
+            var after = TestOpsEngine.of(c.svc).get(id).orElseThrow();
+            assertNull(after.attributes().get("impact"));
+            assertNull(after.attributes().get("disposition"));
+            assertEquals(200, send(c.port, "PATCH", "/objects/" + id, "{\"attributes\":{\"tags\":\"x\"}}", "admin").statusCode(),
+                    "other attributes still ride the PATCH");
+        }
+    }
+
+    /**
+     * Late recoveries (operator 2026-09-26): on a RESOLVED Incident or a CLOSED Case only `recovered` and
+     * `prevented` may still change; any other field is 409, and an ARCHIVED Incident refuses everything.
+     */
+    @Test
+    void lateRecoveriesAreRecordedOnAClosedCaseAndAResolvedIncidentButNothingElseChanges(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            var engine = TestOpsEngine.of(c.svc);
+            String cs = open(c, ObjectType.CASE);
+            String base = "{\"impact\":{\"confirmed\":\"100\",\"recovered\":\"10\",\"currency\":\"EUR\"}}";
+            assertEquals(200, send(c.port, "/objects/" + cs + "/impact", base, "operations").statusCode());
+            engine.transition(cs, "investigate", "t");
+            engine.transition(cs, "resolve", "t");
+            engine.transition(cs, "close", "t");
+            HttpResponse<String> late = send(c.port, "/objects/" + cs + "/impact",
+                    "{\"impact\":{\"confirmed\":\"100\",\"recovered\":\"60\",\"prevented\":\"5\",\"currency\":\"EUR\"}}", "operations");
+            assertEquals(200, late.statusCode(), late.body());
+            assertEquals(new BigDecimal("40"), V1Body.of(late.body()).get("impact").get("outstanding").decimalValue());
+            HttpResponse<String> rewrite = send(c.port, "/objects/" + cs + "/impact",
+                    "{\"impact\":{\"confirmed\":\"200\",\"recovered\":\"60\",\"prevented\":\"5\",\"currency\":\"EUR\"}}", "operations");
+            assertEquals(409, rewrite.statusCode(), rewrite.body());
+            assertTrue(rewrite.body().contains("confirmed"), rewrite.body());
+
+            String inc = TestOpsEngine.of(c.svc).open(ObjectType.INCIDENT, "leak", "d", "MAJOR", null, Map.of(
+                    "dueAt", Long.toString(System.currentTimeMillis() + 86_400_000L),
+                    "postmortem", "{\"timeline\":[{\"time\":\"9\",\"text\":\"x\"}],\"causeAnalysis\":[\"y\"],\"actions\":[{\"text\":\"z\"}]}")).id();
+            assertEquals(200, send(c.port, "/objects/" + inc + "/impact", base, "operations").statusCode());
+            engine.transition(inc, "resolve", "t", "CONFIRMED");
+            assertEquals(200, send(c.port, "/objects/" + inc + "/impact",
+                    "{\"impact\":{\"confirmed\":\"100\",\"recovered\":\"100\",\"currency\":\"EUR\"}}", "operations").statusCode(),
+                    "a recovery after the Incident is resolved");
+            assertEquals(409, send(c.port, "/objects/" + inc + "/impact",
+                    "{\"impact\":{\"confirmed\":\"100\",\"recovered\":\"100\",\"currency\":\"USD\"}}", "operations").statusCode(),
+                    "the currency is not a late recovery");
+            engine.transition(inc, "archive", "t");
+            assertEquals(409, send(c.port, "/objects/" + inc + "/impact", base, "operations").statusCode(),
+                    "ARCHIVED refuses even a recovery");
         }
     }
 
@@ -208,9 +268,13 @@ class ControlApiImpactTest {
     }
 
     private HttpResponse<String> send(int port, String path, String body, String bearer) throws Exception {
+        return send(port, "PUT", path, body, bearer);
+    }
+
+    private HttpResponse<String> send(int port, String method, String path, String body, String bearer) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path));
         if (bearer != null) b.header("Authorization", "Bearer " + bearer);
-        b.header("Content-Type", "application/json").method("PUT", BodyPublishers.ofString(body));
+        b.header("Content-Type", "application/json").method(method, BodyPublishers.ofString(body));
         return client.send(b.build(), BodyHandlers.ofString());
     }
 }

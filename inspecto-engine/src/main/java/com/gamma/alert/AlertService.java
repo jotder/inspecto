@@ -679,8 +679,8 @@ public final class AlertService {
                     rule.severity(), rule.dataset(), new LinkedHashMap<>(attrs), ALERT_KEY);
             if (incidentId.isEmpty()) {
                 // Suppressed: the key breaches AGAIN while its earlier Incident is still active. If that Incident is
-                // RESOLVED (by the heal below or an operator — not terminal until archived) it is re-opened; if it
-                // never left IDENTIFIED/DIAGNOSING (the postmortem gate refused the heal's resolve) `reopen` is
+                // RESOLVED (by an operator — a heal never resolves one; not terminal until archived) it is re-opened;
+                // if it never left IDENTIFIED/DIAGNOSING `reopen` is
                 // illegal and answers false. Either way the new Alert is linked to it, so the relapse is visible
                 // on the Incident being worked.
                 String existing = index.incidents().get(alertKey);
@@ -697,13 +697,13 @@ public final class AlertService {
 
     /**
      * One key stopped breaching (or the storm ended): the all-clear Event + Signal, and — unlike the
-     * freshness all-clear ({@link #clear}) — its ALERT and INCIDENT are resolved through
-     * {@link ObjectAccess#transition}, since a per-key Incident is precisely the thing triage is working.
+     * freshness all-clear ({@link #clear}) — its ALERT is resolved through {@link ObjectAccess#transition}.
      *
-     * <p>⚠ The ALERT always resolves; the INCIDENT only when its workflow allows it. The shipped Incident
-     * workflow refuses {@code resolve} until the postmortem is complete (I1), and a machine heal deliberately
-     * does not bypass that — such an Incident stays open for its operator, the heal visible on its resolved
-     * Alert and the all-clear. {@code transition} answers {@code false} there, which is ignored.
+     * <p>⛔ <b>A machine heal NEVER resolves the INCIDENT</b> (operator standing rule, 2026-09-26, WS-10): the
+     * Incident's outcome is a human decision — a Disposition from the GLOSSARY §9 ladder, which a heal cannot
+     * know — so it stays open for its operator, the heal visible on its resolved Alert and the all-clear. The
+     * heal does not even attempt it: a {@code resolve} the Disposition gate refuses would be a silent
+     * {@code false}.
      */
     private void healKey(AlertRule rule, String key, long nowMs, ObjectIndex index) {
         String scope = rule.dataset();
@@ -741,8 +741,7 @@ public final class AlertService {
             String alertKey = rule.name() + "|" + key;
             String alertId = index.alerts().get(alertKey);
             if (alertId != null) objects.transition(alertId, "resolve", actor(rule));
-            String incidentId = index.incidents().get(alertKey);
-            if (incidentId != null) objects.transition(incidentId, "resolve", actor(rule));
+            // the Incident is left to the human who records its Disposition — see the javadoc
         } catch (RuntimeException e) {
             log.warn("could not resolve the objects of rule {} key {}: {}", rule.name(), key, e.getMessage());
         }

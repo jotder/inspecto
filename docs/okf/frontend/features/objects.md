@@ -85,7 +85,8 @@ the real ControlApi.
   object's top-level `impact` block; the form's own "outstanding" is a live preview only). With
   `LensService.canWorkIncidents()` it edits through `ObjectsService.saveImpact` → `PUT /objects/{id}/impact`,
   sending amounts as exact decimal strings and never `outstanding`; a 422 / 409 renders as an inline
-  `<inspecto-alert>`, and no edit is offered on an `ARCHIVED` / `CLOSED` object (the server's closed-books 409).
+  `<inspecto-alert>`, no edit is offered on an `ARCHIVED` Incident, and on a RESOLVED Incident / CLOSED Case
+  (`lateOnly`) only Recovered and Prevented stay enabled — the server's late-recovery rule.
   Mounted in the mail detail panel (`postmortem-panel`, above the Findings / postmortem) and on the detail
   page's Overview (`[headingLevel]="2"` there — axe `heading-order`). ⚠ The currency-required rule is a
   GROUP validator, which never puts the field into an error state, so its message is an explicit

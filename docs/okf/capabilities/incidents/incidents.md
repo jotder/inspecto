@@ -183,11 +183,13 @@ neither key, and the rule takes the scalar path below. How it runs:
   `key.<column>` per key column, and the Measure `value`; the title is `<description> — <Dataset> for
   msisdn=m7, region=EU` (or the generated title with the same suffix). Scope stays the Dataset id.
 - **Heal** — a key no longer breaching emits `ALERT_CLEARED` + an `alert-rule.cleared` Signal (correlation
-  `alert:<rule>|<dataset>|<key>`) and resolves its ALERT and INCIDENT through the new
-  `ObjectAccess.transition(id, action, actor)` (answers `false`, never throws). 🔴 The shipped Incident workflow
-  **refuses `resolve` until the postmortem is complete** (I1) and a machine heal does not bypass it — so an
-  Incident whose postmortem is unwritten STAYS OPEN; only its ALERT resolves. A key that relapses while its
-  Incident is RESOLVED (non-terminal until archived) **re-opens** that Incident instead of being suppressed;
+  `alert:<rule>|<dataset>|<key>`) and resolves its **ALERT** through the new
+  `ObjectAccess.transition(id, action, actor)` (answers `false`, never throws). ⛔ **A machine heal NEVER
+  resolves the INCIDENT** (operator standing rule, 2026-09-26, with WS-10): an Incident resolves only with a
+  Disposition, which is a human decision a heal cannot know — so the heal does not even attempt it, and the
+  Incident stays open for its operator however complete its postmortem is (`PerEntityAlertObjectsTest`). A key
+  that relapses while its Incident is RESOLVED (by an operator; non-terminal until archived) **re-opens** that
+  Incident instead of being suppressed;
   one whose Incident never left IDENTIFIED/DIAGNOSING is not re-opened, but either way the relapse ALERT is
   linked `ESCALATED_FROM` to that still-active Incident.
 - **Rule edits** — re-saving a `by` rule over different keys (another Dataset, Measure or `by`) or removing it
@@ -342,8 +344,10 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
   action**, `dueAt` is set, **and `attributes.disposition` holds a ladder value** (WS-10, 2026-09-26)
   (`incidentResolutionGaps`). The Disposition rides the resolve itself — `POST /objects/{id}/resolve` or
   `/transition` body `disposition` (case-insensitive, stored in the ladder's spelling); an off-ladder value,
-  or a `disposition` on any move but an Incident's resolve (a Case's lives in its Findings) → 422. A reopened
-  Incident keeps its Disposition, so re-resolving needs none. The UI's `postmortemGaps` soft-warn
+  or a `disposition` on any move but an Incident's resolve (a Case's lives in its Findings) → 422. The resolve's
+  `OBJECT_ACTIVITY` event carries the `disposition`. **A reopen clears it** (blanked — the bag merge cannot
+  delete a key), so a re-resolve needs a fresh decision, never a stale one. ⛔ A machine actor never resolves
+  an Incident (the per-entity Alert heal, §3.2). The UI's `postmortemGaps` soft-warn
   is a *mirror* of the same four checks, not the gate. ⚠ `objects.md` and the archived design still call
   the backend gate "a follow-up"; it shipped.
 - **SLA and escalation.** `dueAt` / `dueInMinutes` at creation; the sweep (`sweepIncidentSla`,
@@ -397,10 +401,13 @@ stored**: `OperationalObject.toMap()` adds a top-level `impact` block with it on
 sends `outstanding` is refused. Written only by `PUT /objects/{id}/impact {impact:{…}}` on `canWorkIncidents`
 (the `postmortem`/`category` narrow-route precedent — recording what an Incident cost is part of finishing it,
 and the `canAdminister` PATCH must not become the analyst's catch-all): `{}` clears it; 400 no/non-object
-`impact`; 422 an invalid value, any other body key, or an Alert/Task; **409 when the object is in its terminal
-state** (Incident `ARCHIVED`, Case `CLOSED` — its books are closed, reopen to change them); 404 unknown or
-out-of-scope. Audited as `OBJECT_ACTIVITY` `action: impact` with the stored value **`before` and `after`**
-and the request's actor. **On a Case this IS the Findings impact** — the built-in Findings spec dropped its
+`impact`; 422 an invalid value (an amount's text is bounded to 40 characters before it is parsed), any other
+body key, or an Alert/Task; **409 on an `ARCHIVED` Incident**, and — **late recoveries** (operator, 2026-09-26) —
+on a `RESOLVED` Incident or a `CLOSED` Case only `recovered` and `prevented` may still change, any other field
+→ 409 (reopen to change the rest); 404 unknown or out-of-scope. Audited as `OBJECT_ACTIVITY` `action: impact`
+with the stored value **`before` and `after`** and the request's actor. ⛔ **`PATCH /objects/{id}` refuses
+`attributes.impact` and `attributes.disposition` (422 naming the key)** — its free merge would bypass the
+validation, the closed-books rule and the audit. **On a Case this IS the Findings impact** — the built-in Findings spec dropped its
 `impactAmount` section and the route its flat `impactAmount` copy (only `recordsAffected` remains), so there
 is one home for the money, not two. ⚠ A deployment-authored `findings-spec` may still declare an `impactAmount`
 key; it is then an ordinary scalar in the blob that nothing sums. `analytics()` sums the typed impact **per
@@ -560,7 +567,7 @@ earlier one, both appear.
 | 2026-09-26 (operator) | **Working an Incident or Case is its own capability, `canWorkIncidents`**: `ack` / `resolve` / `transition` / `assign` moved from `canAdminister` (2026-09-15, `ROUTE-UNGATED-DEFAULT-1` step 2b) to it, seeded to `operations`, `support`, `power` and `admin` (`super` holds everything). Merge / split / `PATCH /objects/{id}` / Case-Rule evaluate **stay `canAdminister`**. Those four routes record the authenticated Subject as the actor; a body `actor` counts only without one (Personal). The SPA shows the lifecycle verbs only with `LensService.canWorkIncidents()` (action node `incidents.work`), and Accept self-assigns through `/assign`, not the PATCH | Only Admin/Super held `canAdminister`, so a fraud analyst on `operations` could not close their own Case and `power` could not work an Incident at all. Moving an object's state is the analyst's daily work; reshaping which Incidents a Case holds, or editing its fields wholesale, is not. Pinned by `ControlApiTriageGateTest` (seeded-role Subjects: 401 / 403 `business` / 200 `operations`, and a Case OPEN → investigate → resolve with Disposition CONFIRMED audited under the Subject) |
 | 2026-09-26 (operator) | **Narrow postmortem + category routes on `canWorkIncidents`** (`INCIDENT-FINISH-GATE-1`, "narrow route"): `PUT /objects/{id}/postmortem` (body `{postmortem:{…}}` → `attributes.postmortem`, the JSON blob the I1 resolution gate reads) and `PUT /objects/{id}/category` (body `{category:"…"}` → `attributes.category`). Each writes ONLY its one key, refuses any other with 422 (400 for a missing/malformed value), runs behind the scope guard, and is audited as an `OBJECT_ACTIVITY` event (`action` = the key) under `ApiContext.actor`. The postmortem panel and Accept's categorise step call them; priority / severity / assignee / tags / escalate / team / target date stay on the `canAdminister` PATCH | Resolving needs the postmortem and Accept needs a category, so without these an analyst could move an Incident but not finish it. Following the `PUT /objects/{id}/findings` precedent keeps the PATCH from becoming the analyst's catch-all. Pinned by `ControlApiIncidentFinishGateTest` (401 / 403 `business` / 200 `operations`, a foreign key → 422, and IDENTIFIED → DIAGNOSING → RESOLVED with a postmortem by an `operations` Subject) |
 | 2026-09-26 | **The SPA shows each disposition control only with the capability its route takes** (`CASE-UI-GATE-LEFTOVERS-1`): Priority, an Incident's Escalate flag, Merge, Split and the Case team / target-date fields render only with `LensService.canAdminister()`. **A comment's `author` is the signed-in Subject** on `POST /objects/{id}/comments` and `POST /notes/{kind}/{id}/comments`; the body's `author` counts only with no Subject (Personal) | A control the server refuses is a dead button; a body field must not re-attribute a Subject's words, as it may not re-attribute a lifecycle move. ⚠ Tagging still rides the PATCH and still shows to everyone — not in this call |
-| 2026-09-26 | **Typed impact on Incident and Case, one home** (WS-10, `ASSURE-IMPACT-LEDGER-1`): `attributes.impact` via `PUT /objects/{id}/impact` on `canWorkIncidents`; `outstanding` derived on read; the Findings `impactAmount` section and flat copy retired; a terminal object's impact is closed (409) | A narrow PUT follows the postmortem / category / findings precedent, where extending the PATCH would hand the analyst `canAdminister`'s fields. A stored `outstanding` drifts the first time `recovered` changes without it. Two homes for a Case's money (Findings `impactAmount` + the typed block) would disagree the day one is edited. Freezing a terminal object keeps a closed ledger closed; recoveries on an Incident are recorded after `reopen` |
+| 2026-09-26 | **Typed impact on Incident and Case, one home** (WS-10, `ASSURE-IMPACT-LEDGER-1`): `attributes.impact` via `PUT /objects/{id}/impact` on `canWorkIncidents`; `outstanding` derived on read; the Findings `impactAmount` section and flat copy retired; a terminal object's impact is closed (409) | A narrow PUT follows the postmortem / category / findings precedent, where extending the PATCH would hand the analyst `canAdminister`'s fields. A stored `outstanding` drifts the first time `recovered` changes without it. Two homes for a Case's money (Findings `impactAmount` + the typed block) would disagree the day one is edited. Freezing a terminal object keeps a closed ledger closed — **amended the same day**: late recoveries (`recovered` / `prevented` only) stay writable on a RESOLVED Incident and a CLOSED Case, because money comes back after the outcome is decided; an ARCHIVED Incident stays fully closed. The PATCH refuses `impact` and `disposition`, and a reopen clears the Disposition |
 | 2026-09-26 | **An Incident resolves only with a Disposition** (WS-10): the ladder gains `DUPLICATE` and `ACCEPTED_RISK` (one list, `FindingsSpec.DISPOSITIONS`, shared by Cases' Findings); the value rides the resolve body and is gated in `ObjectService.commit` beside I1 | Resolved-with-no-outcome Incidents make every found / recovered / prevented KPI unreadable. Gated in `commit` so no route or caller can bypass it, as I1 is. Case stays soft (§6.2) — not in scope of the call |
 
 ### Editions
@@ -757,8 +764,8 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 |---|---|---|
 | `AlertRuleTest` | `inspecto-engine` | both record shapes parse; `when` scoping |
 | `ControlApiAlertRuleWriteTest` | `inspecto` | the write routes' gate order, in-process arming, `canAuthorAlertRules`; a `by` column outside the Dataset's Schema refused at both save doors |
-| `PerEntityAlertTest` | `inspecto-engine` | `by` rules over real DuckDB: 40 keys → 40 Incidents, re-fire → 0, restart seeding, a healed key resolves only its own objects, storm cap → one Alert, unknown never heals, no-`by` unchanged |
-| `PerEntityAlertObjectsTest` | `inspecto-ops` | the real workflow: the postmortem gate keeps a healed Incident open, a relapse after resolve re-opens it, an existing Case Rule groups 40 per-key Incidents into one Case |
+| `PerEntityAlertTest` | `inspecto-engine` | `by` rules over real DuckDB: 40 keys → 40 Incidents, re-fire → 0, restart seeding, a healed key resolves only its own Alert and never its Incident, storm cap → one Alert, unknown never heals, no-`by` unchanged |
+| `PerEntityAlertObjectsTest` | `inspecto-ops` | the real workflow: a heal never resolves the Incident, even with a complete postmortem; a relapse after an operator's resolve re-opens it, an existing Case Rule groups 40 per-key Incidents into one Case |
 | `NotificationServiceTest` | `inspecto-engine` | subscriber hand-off, rate limiter, preferences gating |
 | `ControlApiNotificationsTest` · `ControlApiNotificationChannelsTest` · `ControlApiNotificationRulesTest` · `ControlApiNotificationStreamTest` | `inspecto` | feed routes, channel CRUD (`422` on a bad EMAIL target), rules, the SSE stream |
 | `ControlApiCollectorNotifyTest` | `inspecto` | the ACQ push-notify seam that feeds the ledger |

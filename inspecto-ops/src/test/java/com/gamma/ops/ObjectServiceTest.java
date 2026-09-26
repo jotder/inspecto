@@ -130,9 +130,13 @@ class ObjectServiceTest {
         assertEquals("RESOLVED", resolved.status());
         assertEquals("ACCEPTED_RISK", resolved.attributes().get(ObjectService.ATTR_DISPOSITION), "normalised to the ladder's spelling");
 
-        // reopened and resolved again, the recorded Disposition still satisfies the gate
-        svc.transition(o.id(), "reopen", "alice");
-        assertEquals("RESOLVED", svc.transitionTo(o.id(), "RESOLVED", "alice").status());
+        // reopening un-decides the outcome: the stale Disposition is cleared, so a re-resolve needs a fresh one
+        OperationalObject reopened = svc.transition(o.id(), "reopen", "alice");
+        assertEquals("", reopened.attributes().get(ObjectService.ATTR_DISPOSITION));
+        IllegalStateException stale = assertThrows(IllegalStateException.class,
+                () -> svc.transitionTo(o.id(), "RESOLVED", "alice"));
+        assertTrue(stale.getMessage().contains("disposition"), stale.getMessage());
+        assertEquals("RESOLVED", svc.transitionTo(o.id(), "RESOLVED", "alice", "RECOVERED").status());
     }
 
     /** A Disposition rides only an Incident's resolve: a Case keeps its Disposition in its Findings. */
@@ -416,7 +420,7 @@ class ObjectServiceTest {
                 .attributes().get(ObjectService.ATTR_RESOLVED_AT));
         svc.transition(inc.id(), "reopen", "alice");          // RESOLVED -> DIAGNOSING
         Thread.sleep(2);                                      // so the second stamp is distinguishable
-        long second = Long.parseLong(svc.transitionTo(inc.id(), "RESOLVED", "alice")
+        long second = Long.parseLong(svc.transitionTo(inc.id(), "RESOLVED", "alice", "CONFIRMED") // reopen cleared it
                 .attributes().get(ObjectService.ATTR_RESOLVED_AT));
 
         assertTrue(second > first,

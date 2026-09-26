@@ -75,7 +75,7 @@ class PerEntityAlertObjectsTest {
     }
 
     @Test
-    void aHealedKeyResolvesItsRealIncidentAndARelapseReopensIt() {
+    void aHealNeverResolvesTheRealIncidentAndARelapseReopensOneAHumanResolved() {
         ObjectService objects = new ObjectService(new InMemoryObjectStore());
         AtomicReference<DatasetMeasureProbe.Breaches> now = new AtomicReference<>(offenders(1, 40));
         AlertService svc = new AlertService(List.of(RULE), noPipelines(), emptyStore(), objects.access());
@@ -87,8 +87,7 @@ class PerEntityAlertObjectsTest {
         now.set(offenders(2, 40));                                   // m1 heals
         assertEquals(0, svc.evaluateRules().size());
         assertEquals(39, openAlerts(objects), "the healed key's Alert resolved; the other 39 stay open");
-        // ⚠ The real Incident workflow refuses `resolve` until the postmortem is complete (I1) — a machine heal
-        // does not bypass that, so the healed key's Incident stays open for its operator.
+        // ⛔ A machine heal never resolves an Incident (operator standing rule, WS-10): it stays open for its operator.
         assertEquals("IDENTIFIED", incidentFor(objects, "m1").status());
 
         now.set(offenders(1, 40));                                   // m1 relapses while its Incident is open
@@ -103,13 +102,18 @@ class PerEntityAlertObjectsTest {
                 "the relapse Alert is linked to the Incident still being worked");
         assertEquals("IDENTIFIED", stillOpen.status(), "an Incident never resolved is not 'reopened'");
 
-        // Once the operator has written the postmortem, the next heal resolves the Incident too …
+        // Even with a complete postmortem (and an SLA), the next heal leaves the Incident open — it has no
+        // decided outcome, and only a human records one.
         objects.saveAttributes(incidentFor(objects, "m1").id(), Map.of("postmortem", COMPLETE_POSTMORTEM,
                 ObjectService.ATTR_DUE_AT, Long.toString(System.currentTimeMillis() + 3_600_000)), "dana", "postmortem");
         now.set(offenders(2, 40));
         svc.evaluateRules();
-        assertEquals("RESOLVED", incidentFor(objects, "m1").status());
+        assertEquals("IDENTIFIED", incidentFor(objects, "m1").status(), "a heal never resolves an Incident");
         assertEquals("IDENTIFIED", incidentFor(objects, "m2").status(), "no other key's Incident moved");
+
+        // The operator resolves it with a Disposition …
+        objects.transition(incidentFor(objects, "m1").id(), "resolve", "dana", "CONFIRMED");
+        assertEquals("RESOLVED", incidentFor(objects, "m1").status());
 
         // … and a relapse after that REOPENS it rather than hiding behind the resolved one.
         now.set(offenders(1, 40));

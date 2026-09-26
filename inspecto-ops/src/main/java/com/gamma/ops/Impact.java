@@ -45,6 +45,26 @@ public record Impact(BigDecimal suspected, BigDecimal confirmed, BigDecimal reco
     /** Bounds on an amount: below 10^15 with at most 6 decimal places — a ledger, not a float. */
     private static final BigDecimal MAX_AMOUNT = new BigDecimal("1000000000000000");
     private static final int MAX_SCALE = 6;
+    /** An amount's text is bounded BEFORE it is parsed — {@code new BigDecimal} on a huge string is costly. */
+    static final int MAX_AMOUNT_TEXT = 40;
+
+    /** What may still change on a RESOLVED Incident or a CLOSED Case — late recoveries (operator, 2026-09-26). */
+    public static final List<String> LATE_FIELDS = List.of("recovered", "prevented");
+
+    /** The fields of {@code next} that differ from this stored impact, ignoring {@code allowed}. */
+    public List<String> changedFieldsOtherThan(Impact next, List<String> allowed) {
+        List<String> out = new java.util.ArrayList<>();
+        for (String a : AMOUNTS)
+            if (!allowed.contains(a) && !sameAmount(amount(a), next.amount(a))) out.add(a);
+        if (!allowed.contains("currency") && !java.util.Objects.equals(currency, next.currency())) out.add("currency");
+        if (!allowed.contains("period") && !java.util.Objects.equals(period, next.period())) out.add("period");
+        if (!allowed.contains("basis") && !java.util.Objects.equals(basis, next.basis())) out.add("basis");
+        return out;
+    }
+
+    private static boolean sameAmount(BigDecimal a, BigDecimal b) {
+        return a == null ? b == null : b != null && a.compareTo(b) == 0;
+    }
 
     /** An impact with nothing set — what an absent or cleared {@code attributes.impact} reads as. */
     public boolean isEmpty() {
@@ -154,9 +174,12 @@ public record Impact(BigDecimal suspected, BigDecimal confirmed, BigDecimal reco
         if (v == null || (v instanceof String s && s.isBlank())) return null;
         if (!(v instanceof Number) && !(v instanceof String))
             throw new IllegalArgumentException("impact '" + key + "' must be a decimal number");
+        String text = v.toString().trim();
+        if (text.length() > MAX_AMOUNT_TEXT)
+            throw new IllegalArgumentException("impact '" + key + "' is longer than " + MAX_AMOUNT_TEXT + " characters");
         BigDecimal d;
         try {
-            d = new BigDecimal(v.toString().trim());
+            d = new BigDecimal(text);
         } catch (NumberFormatException bad) {
             throw new IllegalArgumentException("impact '" + key + "' must be a decimal number, not '" + v + "'");
         }

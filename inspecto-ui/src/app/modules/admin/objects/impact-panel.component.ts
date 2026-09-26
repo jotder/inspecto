@@ -106,6 +106,12 @@ const amount: ValidatorFn = (c) => (!c.value || DECIMAL.test(String(c.value).tri
                     @if (form.hasError('currencyRequired') && form.controls.currency.touched) {
                         <p class="text-warn m-0 text-xs" role="alert">A currency is required once an amount is set.</p>
                     }
+                    @if (lateOnly()) {
+                        <p class="text-secondary m-0 text-xs">
+                            This {{ object().objectType === 'CASE' ? 'Case is closed' : 'Incident is resolved' }} — only
+                            late recoveries (Recovered, Prevented) can still be recorded.
+                        </p>
+                    }
                     <p class="text-secondary m-0 text-sm">
                         Outstanding (confirmed − recovered):
                         <span class="font-medium tabular-nums">{{ previewOutstanding() }}</span>
@@ -148,9 +154,15 @@ export class ImpactPanelComponent {
     readonly serverError = signal('');
 
     readonly impact = computed<ObjectImpact | null>(() => this.object().impact ?? null);
-    /** A terminal object's impact is closed server-side (409) — offer no edit there. */
-    readonly canEdit = computed(
-        () => this.canWork() && !['ARCHIVED', 'CLOSED'].includes((this.object().status ?? '').toUpperCase()),
+    private readonly status = computed(() => (this.object().status ?? '').toUpperCase());
+    /** An ARCHIVED Incident's impact is closed server-side (409) — offer no edit there. */
+    readonly canEdit = computed(() => this.canWork() && this.status() !== 'ARCHIVED');
+    /**
+     * Late recoveries (operator 2026-09-26): on a RESOLVED Incident or a CLOSED Case only `recovered` and
+     * `prevented` may still change — the server 409s anything else, so the other controls are disabled.
+     */
+    readonly lateOnly = computed(() =>
+        this.object().objectType === 'INCIDENT' ? this.status() === 'RESOLVED' : this.status() === 'CLOSED',
     );
 
     readonly form = this.fb.group(
@@ -214,6 +226,10 @@ export class ImpactPanelComponent {
             period: i?.period ?? '',
             basis: i?.basis ?? '',
         });
+        for (const k of ['suspected', 'confirmed', 'currency', 'period', 'basis'] as const) {
+            if (this.lateOnly()) this.form.controls[k].disable();
+            else this.form.controls[k].enable();
+        }
         this.formValue.set(this.form.getRawValue() as Record<string, string>);
         this.serverError.set('');
         this.editing.set(true);

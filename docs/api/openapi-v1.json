@@ -8603,7 +8603,7 @@
         "tags" : [ "objects" ],
         "summary" : "Replace an Incident's or Case's typed financial impact (WS-10)",
         "operationId" : "putObjectsByObjectIdImpact",
-        "description" : "Gated on canWorkIncidents. Body {impact:{...}} and nothing else; {} clears the impact. Amounts are non-negative decimals (number or string, at most 6 decimal places); currency is an ISO 4217 code, required when any amount is set. outstanding = confirmed - recovered is derived on read (the object's top-level impact block) and refused here. 400 missing/non-object impact; 422 invalid impact, another key, or an Alert/Task; 409 the object is in its terminal state (ARCHIVED / CLOSED); 404 unknown or out-of-scope id. Audited as an OBJECT_ACTIVITY impact event with the stored value before and after.",
+        "description" : "Gated on canWorkIncidents. Body {impact:{...}} and nothing else; {} clears the impact. Amounts are non-negative decimals (number or string, at most 6 decimal places); currency is an ISO 4217 code, required when any amount is set. outstanding = confirmed - recovered is derived on read (the object's top-level impact block) and refused here. 400 missing/non-object impact; 422 invalid impact (an amount over 40 characters included), another key, or an Alert/Task; 409 an ARCHIVED Incident, or on a RESOLVED Incident / CLOSED Case any change but recovered / prevented (late recoveries); 404 unknown or out-of-scope id. Audited as an OBJECT_ACTIVITY impact event with the stored value before and after.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",

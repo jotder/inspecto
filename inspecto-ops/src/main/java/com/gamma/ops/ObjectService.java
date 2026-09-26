@@ -379,9 +379,22 @@ public final class ObjectService {
         OperationalObject obj = require(id);
         if (!Impact.TYPES.contains(obj.objectType()))
             throw new IllegalArgumentException("impact is recorded on an Incident or a Case, not a " + obj.objectType());
-        if (workflow(obj.objectType()).isTerminal(obj.status()))
-            throw new IllegalStateException(obj.objectType() + " " + id + " is " + obj.status()
-                    + " — its impact is closed; reopen it to change the impact");
+        boolean incident = obj.objectType() == ObjectType.INCIDENT;
+        if (incident && "ARCHIVED".equalsIgnoreCase(obj.status()))
+            throw new IllegalStateException(obj.objectType() + " " + id + " is ARCHIVED — its impact is closed; "
+                    + "reopen it to change the impact");
+        // Late recoveries (operator, 2026-09-26): money recovered or prevented after the outcome is decided is
+        // still recorded on a RESOLVED Incident or a CLOSED (terminal) Case — but nothing else on it changes.
+        boolean booksClosed = incident ? "RESOLVED".equalsIgnoreCase(obj.status())
+                : workflow(obj.objectType()).isTerminal(obj.status());
+        if (booksClosed) {
+            List<String> changed = Impact.fromAttribute(obj.attributes().get(Impact.ATTR)).changedFieldsOtherThan(
+                    impact, Impact.LATE_FIELDS);
+            if (!changed.isEmpty())
+                throw new IllegalStateException(obj.objectType() + " " + id + " is " + obj.status()
+                        + " — only " + Impact.LATE_FIELDS + " may still change (late recoveries), not " + changed
+                        + "; reopen it to change the rest");
+        }
         String before = obj.attributes().getOrDefault(Impact.ATTR, "");
         String after = impact.toJson();
         OperationalObject updated = store.update(
@@ -1523,12 +1536,19 @@ public final class ObjectService {
         }
         long now = System.currentTimeMillis();
         OperationalObject next = obj.withStatus(target, now, wf.isTerminal(target));
+        // WS-10: leaving RESOLVED/ARCHIVED for a working state (reopen) un-decides the outcome — a stale
+        // Disposition must not satisfy the next resolve. Blank, not removed: the bag merge cannot delete a key.
+        boolean reopeningIncident = obj.objectType() == ObjectType.INCIDENT
+                && ("RESOLVED".equalsIgnoreCase(obj.status()) || "ARCHIVED".equalsIgnoreCase(obj.status()))
+                && !"RESOLVED".equalsIgnoreCase(target) && !"ARCHIVED".equalsIgnoreCase(target);
+        if (reopeningIncident && obj.attributes().get(ATTR_DISPOSITION) != null)
+            next = next.withAttributes(Map.of(ATTR_DISPOSITION, ""), now);
         // INCIDENT-KPI-MTTR-1: commit() is the single place every status change lands, so stamping here
         // cannot be bypassed by transition / transitionTo / resolve. Overwrites on a re-resolve on
         // purpose — see ATTR_RESOLVED_AT.
         if ("RESOLVED".equalsIgnoreCase(target)) next = next.withAttributes(Map.of(ATTR_RESOLVED_AT, Long.toString(now)), now);
         OperationalObject updated = store.update(next);
-        EventLog.current().emit(Event.builder(EventType.OBJECT_ACTIVITY)
+        var event = Event.builder(EventType.OBJECT_ACTIVITY)
                 .level(EventLevel.INFO)
                 .source(SOURCE)
                 .correlationId(obj.correlationId())
@@ -1539,7 +1559,10 @@ public final class ObjectService {
                 .attr("from", obj.status())
                 .attr("to", target)
                 .attr("action", action)
-                .attr("actor", actor));
+                .attr("actor", actor);
+        // WS-10: the outcome is part of the record of the resolve that decided it
+        if (resolvingIncident) event.attr("disposition", obj.attributes().get(ATTR_DISPOSITION));
+        EventLog.current().emit(event);
         return updated;
     }
 

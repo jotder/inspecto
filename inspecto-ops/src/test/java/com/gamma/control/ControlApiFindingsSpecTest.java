@@ -157,8 +157,10 @@ class ControlApiFindingsSpecTest {
             assertEquals(200, send(c.port, "PATCH", path, findings(Map.of("disposition", "CONFIRMED"))).statusCode());
             assertEquals(200, send(c.port, "PATCH", path, attrs(Map.of("tags", "urgent"))).statusCode(),
                     "an undeclared key is a non-Findings attribute, never a rejection");
-            assertEquals(200, send(c.port, "PATCH", path, attrs(Map.of("disposition", "MAYBE"))).statusCode(),
+            assertEquals(200, send(c.port, "PATCH", path, attrs(Map.of("summary", "MAYBE"))).statusCode(),
                     "a TOP-LEVEL key is not where Findings live (D3): it is an ordinary attribute");
+            // ... except the two with their own validated writes (WS-10): a top-level `disposition` is refused
+            assertEquals(422, send(c.port, "PATCH", path, attrs(Map.of("disposition", "MAYBE"))).statusCode());
         }
     }
 

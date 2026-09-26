@@ -767,7 +767,16 @@ public final class ObjectRoutes implements RouteModule {
         String assignee = ApiContext.str(body, "assignee");
         if (priority == null && severity == null && assignee == null && attrs == null)
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include at least one of 'priority', 'severity', 'assignee', 'attributes'");
-        if (attrs != null) validateFindings(api, id, attrs);
+        if (attrs != null) {
+            // WS-10: the impact and the Disposition have their own validated, audited writes — the PATCH's
+            // free attribute merge would bypass validation, the closed-books rule and the before/after audit.
+            for (String owned : PATCH_REFUSED_ATTRS)
+                if (attrs.containsKey(owned))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "attribute '" + owned
+                            + "' cannot be set here — " + ("impact".equals(owned)
+                            ? "use PUT /objects/{id}/impact" : "it is recorded with the Incident's resolve"));
+            validateFindings(api, id, attrs);
+        }
         try {
             return OpsEngine.of(api).patch(id, priority, severity, assignee, attrs).toMap();
         } catch (java.util.NoSuchElementException notFound) {
@@ -847,8 +856,9 @@ public final class ObjectRoutes implements RouteModule {
      * {@code PUT /objects/{id}/impact} — replace an Incident's or Case's typed financial impact (WS-10); body
      * {@code {impact:{suspected?, confirmed?, recovered?, prevented?, currency?, period?, basis?}}} and NOTHING
      * else. {@code outstanding} is derived on read and refused here. Validated by {@link Impact#fromBody} → 422
-     * (so is any other key, and an Alert or Task); a missing/non-object {@code impact} → 400; an object in its
-     * terminal state → 409; unknown or out-of-scope id → 404. Audited with {@link ApiContext#actor}, the stored
+     * (so is any other key, and an Alert or Task); a missing/non-object {@code impact} → 400; an ARCHIVED
+     * Incident → 409, and on a RESOLVED Incident or CLOSED Case any change but {@code recovered}/{@code prevented}
+     * (late recoveries) → 409; unknown or out-of-scope id → 404. Audited with {@link ApiContext#actor}, the stored
      * value before and after.
      */
     private Object saveImpact(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
@@ -871,6 +881,9 @@ public final class ObjectRoutes implements RouteModule {
             throw new ApiException(409, ErrorCodes.CONFLICT, closed.getMessage());
         }
     }
+
+    /** Attributes the PATCH refuses because a dedicated route owns them (WS-10). */
+    private static final List<String> PATCH_REFUSED_ATTRS = List.of(Impact.ATTR, ObjectService.ATTR_DISPOSITION);
 
     private static final String POSTMORTEM_ATTR = "postmortem";
     private static final String CATEGORY_ATTR = "category";

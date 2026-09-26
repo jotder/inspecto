@@ -136,7 +136,7 @@ class PerEntityAlertTest {
     }
 
     @Test
-    void aHealedKeyResolvesItsOwnAlertAndIncidentAndNoOther(@TempDir Path root) throws Exception {
+    void aHealedKeyResolvesItsOwnAlertAndNoOtherAndNeverItsIncident(@TempDir Path root) throws Exception {
         plantUsage(root, OFFENDERS, Set.of());
         FakeObjectAccess objects = new FakeObjectAccess();
         AlertService svc = service(root, byRule(100), objects);
@@ -148,16 +148,20 @@ class PerEntityAlertTest {
         String healedKey = "high-spend|msisdn=m7,region=EU";
         List<String> resolved = objects.transitioned.stream()
                 .filter(t -> "resolve".equals(t.action())).map(FakeObjectAccess.Transitioned::objectId).toList();
-        assertEquals(2, resolved.size(), "exactly the healed key's Alert and Incident resolve");
-        for (ObjectType kind : List.of(ObjectType.ALERT, ObjectType.INCIDENT)) {
-            String id = opened(objects, kind).stream()
-                    .filter(o -> healedKey.equals(o.attributes().get(AlertService.ALERT_KEY)))
-                    .findFirst().orElseThrow().id();
-            assertTrue(resolved.contains(id), kind + " of the healed key resolved");
-        }
+        assertEquals(1, resolved.size(), "exactly the healed key's Alert resolves");
+        String alertId = opened(objects, ObjectType.ALERT).stream()
+                .filter(o -> healedKey.equals(o.attributes().get(AlertService.ALERT_KEY)))
+                .findFirst().orElseThrow().id();
+        assertTrue(resolved.contains(alertId), "the healed key's Alert resolved");
+        // ⛔ a machine heal never resolves an Incident — its Disposition is a human decision (WS-10)
+        String incidentId = opened(objects, ObjectType.INCIDENT).stream()
+                .filter(o -> healedKey.equals(o.attributes().get(AlertService.ALERT_KEY)))
+                .findFirst().orElseThrow().id();
+        assertFalse(objects.transitioned.stream().anyMatch(t -> incidentId.equals(t.objectId())),
+                "the heal does not even attempt the Incident");
         assertTrue(objects.transitioned.stream().allMatch(t -> "alert-rule:high-spend".equals(t.actor())));
-        assertEquals(OFFENDERS - 1, objects.activeAttributeIndex(ObjectType.INCIDENT, "usage",
-                AlertService.ALERT_KEY).size(), "the other 39 Incidents stay open");
+        assertEquals(OFFENDERS, objects.activeAttributeIndex(ObjectType.INCIDENT, "usage",
+                AlertService.ALERT_KEY).size(), "all 40 Incidents stay open, the healed one included");
     }
 
     @Test
@@ -181,8 +185,8 @@ class PerEntityAlertTest {
         // Back under the cap: the storm heals and the (now few) offenders are raised one by one.
         plantUsage(root, 3, Set.of());
         assertEquals(3, svc.evaluateRules().size());
-        assertEquals(2, objects.transitioned.stream().filter(t -> "resolve".equals(t.action())).count(),
-                "the storm's Alert and Incident resolve");
+        assertEquals(1, objects.transitioned.stream().filter(t -> "resolve".equals(t.action())).count(),
+                "the storm's Alert resolves; its Incident stays for a human (WS-10)");
     }
 
     @Test
