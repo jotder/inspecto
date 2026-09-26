@@ -76,30 +76,39 @@ public final class DuckDbExtension {
 
     private static void load(Connection conn, String name) throws SQLException {
         String dir = System.getProperty(DIR_PROPERTY);
-        try (Statement st = conn.createStatement()) {
-            if (dir != null && !dir.isBlank()) {
-                Path file = Path.of(dir, name + ".duckdb_extension").toAbsolutePath();
-                if (!Files.isRegularFile(file))
-                    throw new SQLException("-D" + DIR_PROPERTY + "=" + dir + " is set, so extensions load ONLY "
-                            + "from there, and " + file + " does not exist. Stage this platform's " + name
-                            + ".duckdb_extension into it (package.ps1 -RequireExtensions), or unset -D"
-                            + DIR_PROPERTY + " on a networked host to allow an INSTALL.");
-                st.execute("LOAD '" + file.toString().replace('\\', '/').replace("'", "''") + "'");
-                log.debug("DuckDB {} extension loaded from staged file {}", name, file);
-                return;
-            }
+        if (dir != null && !dir.isBlank()) {
+            Path file = Path.of(dir, name + ".duckdb_extension").toAbsolutePath();
+            if (!Files.isRegularFile(file))
+                throw new SQLException("-D" + DIR_PROPERTY + "=" + dir + " is set, so extensions load ONLY "
+                        + "from there, and " + file + " does not exist. Stage this platform's " + name
+                        + ".duckdb_extension into it (package.ps1 -RequireExtensions), or unset -D"
+                        + DIR_PROPERTY + " on a networked host to allow an INSTALL.");
+            execute(conn, "LOAD '" + file.toString().replace('\\', '/').replace("'", "''") + "'");
+            log.debug("DuckDB {} extension loaded from staged file {}", name, file);
+            return;
+        }
+        try {
+            execute(conn, "LOAD " + name);
+        } catch (SQLException notCached) {
             try {
-                st.execute("LOAD " + name);
-            } catch (SQLException notCached) {
-                try {
-                    st.execute("INSTALL " + name);
-                    st.execute("LOAD " + name);
-                } catch (SQLException noNetwork) {
-                    throw new SQLException(noNetwork.getMessage() + " — remedies: run once with network access "
-                            + "(INSTALL caches it under ~/.duckdb), or ship this platform's " + name
-                            + ".duckdb_extension and point -D" + DIR_PROPERTY + " at its directory.", noNetwork);
-                }
+                execute(conn, "INSTALL " + name);
+                execute(conn, "LOAD " + name);
+            } catch (SQLException noNetwork) {
+                throw new SQLException(noNetwork.getMessage() + " — remedies: run once with network access "
+                        + "(INSTALL caches it under ~/.duckdb), or ship this platform's " + name
+                        + ".duckdb_extension and point -D" + DIR_PROPERTY + " at its directory.", noNetwork);
             }
+        }
+    }
+
+    /**
+     * One {@link Statement} per SQL: duckdb_jdbc 1.5.2.1 CLOSES a Statement whose execute failed, so reusing
+     * it after the cache-miss {@code LOAD} made the INSTALL fail with "Statement was closed" — the fallback
+     * never ran and an uncached xlsx ingest quarantined its file as unreadable ({@code EXT-LOAD-STMT-CLOSED-1}).
+     */
+    private static void execute(Connection conn, String sql) throws SQLException {
+        try (Statement st = conn.createStatement()) {
+            st.execute(sql);
         }
     }
 }

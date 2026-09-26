@@ -284,6 +284,10 @@ class DemoCorpusIngestTest {
      */
     @Test
     void excelExamplePartitionsByCategoryNotUnderTheHiveDefault(@TempDir Path dir) throws Exception {
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:")) {   // else the sample is quarantined, nothing written
+            org.junit.jupiter.api.Assumptions.assumeTrue(com.gamma.etl.ExcelExtension.tryLoad(c),
+                    "DuckDB 'excel' extension unavailable on this box — set -D" + com.gamma.etl.ExcelExtension.DIR_PROPERTY);
+        }
         PipelineConfig cfg = stage(dir, "default", "config/excel_example/excel_example_pipeline.toon");
         seed(cfg, "default", "excel_example/INVENTORY_20260820.xlsx");
 

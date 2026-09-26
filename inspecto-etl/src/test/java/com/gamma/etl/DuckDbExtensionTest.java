@@ -12,7 +12,10 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -35,10 +38,15 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class DuckDbExtensionTest {
 
-    /** Records every statement executed, and fails the ones the scenario says are unavailable. */
+    /**
+     * Records every statement executed, and fails the ones the scenario says are unavailable. Like
+     * duckdb_jdbc 1.5.2.1 (measured 2026-09-26), a Statement whose execute failed is closed from then on —
+     * reusing it answers "Statement was closed" ({@code EXT-LOAD-STMT-CLOSED-1}).
+     */
     private static final class Recorder implements InvocationHandler {
         final List<String> executed = new ArrayList<>();
         private final Predicate<String> unavailable;
+        private final Set<Object> closed = Collections.newSetFromMap(new IdentityHashMap<>());
 
         Recorder(Predicate<String> unavailable) {
             this.unavailable = unavailable;
@@ -52,9 +60,13 @@ class DuckDbExtensionTest {
                             new Class<?>[]{Statement.class}, this);
                 }
                 case "execute" -> {
+                    if (closed.contains(proxy)) throw new SQLException("Statement was closed");
                     String sql = (String) args[0];
                     executed.add(sql);
-                    if (unavailable.test(sql)) throw new SQLException("not available here: " + sql);
+                    if (unavailable.test(sql)) {
+                        closed.add(proxy);
+                        throw new SQLException("not available here: " + sql);
+                    }
                     return Boolean.FALSE;
                 }
                 case "close" -> {
