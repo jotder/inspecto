@@ -48,7 +48,7 @@ final class PendingChangeRoutes implements RouteModule {
         // canAdminister, not canAuthorWorkbench: turning maker-checker off is the one change an author must
         // not be able to make — and it is not itself governable, or the policy could never be lifted.
         api.put("/settings/approval", ApiContext.withCapability("canAdminister",
-                (e, m) -> writePolicy(api, api.body(e))));
+                (e, m) -> writePolicy(api, e, api.body(e))));
         api.get("/pending-changes", (e, m) -> list(api, e));
         api.get("/pending-changes/([^/]+)/diff", (e, m) -> diff(api, e, ApiContext.name(m)));
         api.get("/pending-changes/([^/]+)", (e, m) -> one(api, e, ApiContext.name(m)));
@@ -69,8 +69,9 @@ final class PendingChangeRoutes implements RouteModule {
         return out;
     }
 
-    private Object writePolicy(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object writePolicy(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "approval policy write");
+        ApprovalPolicy before = ApprovalPolicy.forRoot(root);
         Map<String, Object> doc = new LinkedHashMap<>(body);
         ApprovalPolicy p;
         try {
@@ -79,6 +80,21 @@ final class PendingChangeRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refused.getMessage());
         }
         p.write(root.resolve(ApprovalPolicy.FILE));
+        // Verification finding 5: turning maker-checker on, off or wider is itself an act an auditor asks
+        // about — one dedicated row with who, and the policy before and after.
+        Map<String, Object> was = before.toMap();
+        was.put("failedClosed", before.failedClosed());
+        Map<String, Object> now = p.toMap();
+        try {
+            com.gamma.event.EventLog.current().emit(com.gamma.event.Event.builder(com.gamma.event.EventType.AUDIT)
+                    .source("audit").message(ApiContext.actor(ex) + " changed the approval policy")
+                    .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                    .action("approval-policy.changed").actionCategory("configuration")
+                    .attr("before", ApiContext.JSON.writeValueAsString(was))    // JSON, not Map.toString
+                    .attr("after", ApiContext.JSON.writeValueAsString(now)));
+        } catch (RuntimeException | com.fasterxml.jackson.core.JsonProcessingException ignored) {
+            // best effort, like every audit emit on a request path
+        }
         return readPolicy(api);
     }
 

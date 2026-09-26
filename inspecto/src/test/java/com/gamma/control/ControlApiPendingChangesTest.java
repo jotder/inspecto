@@ -396,4 +396,26 @@ class ControlApiPendingChangesTest {
                     "refused, not held: the rename never became a Pending Change");
         }
     }
+
+    /** Verification finding 5: changing the policy is audited as its own row — who, and before / after. */
+    @Test
+    void changingThePolicyIsAuditedWithBeforeAndAfter(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            policy(c, "{\"approval\":{}}");   // and lifted again
+            HttpResponse<String> audit = send(c, "GET", "/audit/search?type=AUDIT&limit=500", null, ADMIN);
+            assertEquals(200, audit.statusCode(), audit.body());
+            JsonNode rows = JSON.readTree(audit.body()).get("data");
+            JsonNode lifted = null;
+            for (JsonNode r : rows) {
+                JsonNode a = r.get("attributes");
+                if (a != null && "approval-policy.changed".equals(a.path("action").asText())
+                        && JSON.readTree(a.path("after").asText()).path("approval").isEmpty()) lifted = a;
+            }
+            assertTrue(lifted != null, "an approval-policy.changed row for the lift: " + audit.body());
+            assertEquals("admin-1", lifted.path("actor").asText(), "carries the actor: " + lifted);
+            assertTrue(JSON.readTree(lifted.path("before").asText()).path("approval").has("pattern-pack"),
+                    "carries the policy it replaced: " + lifted);
+        }
+    }
 }
