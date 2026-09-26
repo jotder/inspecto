@@ -1,4 +1,5 @@
 import { DecimalPipe } from '@angular/common';
+import { RiskScorePanelComponent } from 'app/inspecto/components/risk-score-panel.component';
 import { ChangeDetectionStrategy, Component, computed, DestroyRef, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
@@ -125,6 +126,7 @@ type CentralityMetric =
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
         FormsModule,
+        RiskScorePanelComponent,
     ],
     templateUrl: './link-analysis-toolbox.component.html',
 })
@@ -302,6 +304,10 @@ export class LinkAnalysisToolboxComponent {
     readonly flowResult = signal<{ value: number; minCut: GraphSelection } | null>(null);
     readonly spanningForest = signal<GraphSelection | null>(null);
     readonly suspicion = signal<SuspicionScore[]>([]);
+    /** ASSURE-RISK-SCORE-1: a saved risk-score model to read an entity's server-side Risk Score from. */
+    readonly riskModel = signal('');
+    /** The node whose Risk Score factor breakdown is shown (its id is the entity key). */
+    readonly riskEntity = signal<string | null>(null);
 
     /** Node label via the host-supplied lookup. */
     label(id: string): string {

@@ -565,6 +565,21 @@
                                     >Composite risk from degree, betweenness, PageRank, k-core, triangles.</span
                                 >
                             </div>
+                            <mat-form-field class="w-64" subscriptSizing="dynamic">
+                                <mat-label>Risk Score model</mat-label>
+                                <input
+                                    matInput
+                                    [value]="riskModel()"
+                                    (change)="riskModel.set($any($event.target).value.trim()); riskEntity.set(null)"
+                                />
+                            </mat-form-field>
+                            @if (riskModel() && riskEntity()) {
+                                <inspecto-risk-score-panel
+                                    class="mt-2 block max-w-md"
+                                    [model]="riskModel()"
+                                    [entityKey]="riskEntity()!"
+                                />
+                            }
                             @if (suspicion().length) {
                                 <table class="mt-1 w-full max-w-md text-sm">
                                     <caption class="sr-only">
@@ -574,6 +589,9 @@
                                         <tr class="text-left">
                                             <th scope="col" class="py-1">Node</th>
                                             <th scope="col" class="py-1 text-right">Score</th>
+                                            @if (riskModel()) {
+                                                <th scope="col" class="py-1 text-right">Risk Score</th>
+                                            }
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -590,6 +608,17 @@
                                                 <td class="py-0.5 text-right tabular-nums">
                                                     {{ r.score | number: '1.0-0' }}
                                                 </td>
+                                                @if (riskModel()) {
+                                                    <td class="py-0.5 text-right">
+                                                        <button
+                                                            mat-button
+                                                            [attr.aria-label]="'Show the Risk Score of ' + r.label"
+                                                            (click)="riskEntity.set(r.id)"
+                                                        >
+                                                            Factors
+                                                        </button>
+                                                    </td>
+                                                }
                                             </tr>
                                         }
                                     </tbody>

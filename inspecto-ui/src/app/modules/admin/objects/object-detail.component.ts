@@ -45,6 +45,7 @@ import { GraphViewComponent } from 'app/modules/admin/catalog/graph-view.compone
 import { ObjectLinkDialog } from './object-link.dialog';
 import { ActionRequestsPanelComponent } from './action-requests-panel.component';
 import { ImpactPanelComponent } from './impact-panel.component';
+import { RiskScorePanelComponent } from 'app/inspecto/components/risk-score-panel.component';
 import { ResolveDialog, ResolveDialogData, ResolveResult } from './resolve.dialog';
 
 type TabKey = 'overview' | 'graph' | 'timeline' | 'events' | 'comments' | 'attachments';
@@ -86,6 +87,7 @@ interface MemberTimelineEntry {
         StatusBadgeComponent,
         ImpactPanelComponent,
         ActionRequestsPanelComponent,
+        RiskScorePanelComponent,
     ],
     templateUrl: './object-detail.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,

@@ -132,6 +132,14 @@
                                 [objectType]="obj().objectType"
                             />
                         }
+                        <!-- ASSURE-RISK-SCORE-1: an Incident raised by a Risk Score Alert Rule (by: [model, entity_key]) -->
+                        @if (obj().attributes?.['key.model'] && obj().attributes?.['key.entity_key']) {
+                            <inspecto-risk-score-panel
+                                class="mt-6 block"
+                                [model]="obj().attributes!['key.model']"
+                                [entityKey]="obj().attributes!['key.entity_key']"
+                            />
+                        }
                         @if (attributeRows.length) {
                             <div class="mt-6">
                                 <div class="text-secondary mb-1">Attributes</div>
