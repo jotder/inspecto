@@ -9056,6 +9056,32 @@
         },
         "x-generated" : true
       }
+    },
+    "/risk-scores/{model}/{entityKey}" : {
+      "get" : {
+        "tags" : [ "risk-scores" ],
+        "summary" : "The latest Risk Score of one entity under a saved risk-score model, with its factors",
+        "operationId" : "getRiskScore",
+        "description" : "ASSURE-RISK-SCORE-1. Gated on canWorkIncidents. An unknown model, a model outside the caller's data scopes, a row the policy engine denies, or no score for the entity are all 404 (existence-hiding). score = sum of factor contributions (weight x indicator, held to cap), clamped 0-100; every score is recomputable from its factors.",
+        "parameters" : [ {
+          "name" : "model",
+          "in" : "path",
+          "required" : true,
+          "schema" : { "type" : "string", "pattern" : "^[A-Za-z0-9][A-Za-z0-9_]*$" }
+        }, {
+          "name" : "entityKey",
+          "in" : "path",
+          "required" : true,
+          "schema" : { "type" : "string", "maxLength" : 256 }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {model, entityType, entityKey, score, high, highThreshold, modelVersion, runId, scoredAt, factors[{indicator, label, value, missing, weight, cap, capped, contribution, evidence[]}]}"
+          },
+          "403" : { "description" : "The caller lacks canWorkIncidents." },
+          "404" : { "description" : "No visible score for that model and entity." }
+        }
+      }
     }
   },
   "components" : {

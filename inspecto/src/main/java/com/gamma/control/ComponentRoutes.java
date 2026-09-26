@@ -638,6 +638,9 @@ final class ComponentRoutes implements RouteModule {
                 stamped.put("name", id);
                 AlertRoutes.requireGroupingColumns(api, com.gamma.alert.AlertRule.fromMap(stamped));
             }
+            // ASSURE-RISK-SCORE-1: every column a factor names must exist in its Dataset's Schema (fail closed).
+            if (RiskScoreRoutes.TYPE.equals(type))
+                RiskScoreRoutes.requireColumns(api, com.gamma.risk.RiskScoreModel.fromMap(id, content));
             // Maker-checker (ASSURE-MAKER-CHECKER-1): after validation, before the tag projection's side effects.
             Map<String, Object> stamped = new LinkedHashMap<>(content);
             stamped.put("name", id);   // what the store persists
@@ -669,6 +672,8 @@ final class ComponentRoutes implements RouteModule {
     // rather than growing a second accepted-set - two copies of an accepted-set is exactly how the
     // widget/dashboard census came to be needed in the first place.
     static void validateKind(String type, String id, Map<String, Object> content) {
+        // ASSURE-RISK-SCORE-1: structure, numeric weights, and every indicator compiled by MeasureCompiler.
+        if (RiskScoreRoutes.TYPE.equals(type)) com.gamma.risk.RiskScoreModel.fromMap(id, content);
         if ("findings-spec".equals(type)) {
             // The store stamps name=id, and GET /findings/{type} resolves by that id, so validate the
             // content as it will be persisted and refuse a spec whose objectType disagrees with its id.

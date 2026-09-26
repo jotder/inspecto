@@ -123,6 +123,9 @@ final class CapabilityManifest {
             // `simulate`'s gate rather than `apply`'s. There is no `apply` sibling: running a rule
             // template IS the whole operation, it has no consequences to enact.
             new Entry("POST", "/rule-templates/([^/]+)/simulate", Roles.CAN_AUTHOR_WORKBENCH),
+            // RiskScoreRoutes (ASSURE-RISK-SCORE-1) — an entity's Risk Score and its factors are read while
+            // working the Incident it raised; data scopes and the row PDP apply beneath the gate.
+            new Entry("GET", "/risk-scores/([^/]+)/([^/]+)", Roles.CAN_WORK_INCIDENTS),
             // EnrichmentRoutes
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
             // EventRoutes (inspecto-events) — gated 2026-09-15 (`ROUTE-UNGATED-DEFAULT-1`, grounded). A saved
