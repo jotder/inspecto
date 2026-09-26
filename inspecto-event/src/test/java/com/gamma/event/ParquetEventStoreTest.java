@@ -117,4 +117,41 @@ class ParquetEventStoreTest {
             }
         }
     }
+
+    /**
+     * A hard kill (no close(), no shutdown hook) must not lose buffered events — AUDIT rows above all. Found
+     * 2026-09-26: a demo build stopped by kill came back with none of its audit trail. The write-ahead journal
+     * (operator, 2026-09-26) holds every buffered event until its flush lands; a reopened store replays it.
+     */
+    @Test
+    void bufferedEventsSurviveAHardKillThroughTheJournal(@TempDir Path dir) {
+        // Never flushes on its own (threshold 1000, no time roll), and is ABANDONED, never closed: a crash.
+        ParquetEventStore crashed = new ParquetEventStore(dir, 1000, 0, 100);
+        crashed.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "admin object.updated INC-1"));
+        crashed.append(ev(2_000L, EventLevel.WARN, EventType.ACCESS_DENIED, null, "analyst refused"));
+        crashed.append(ev(3_000L, EventLevel.INFO, "JOB_STARTED", "pipea", "job"));
+
+        try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
+            List<Event> back = reopened.query(EventQuery.recent(100));
+            assertEquals(List.of("job", "analyst refused", "admin object.updated INC-1"),
+                    back.stream().map(Event::message).toList(), "all three buffered events replayed, newest first");
+            assertEquals("1", back.get(2).attributes().get("k"), "attributes survive the journal");
+        }
+        // replayed into Parquet and the journal cleared: a third open does not duplicate them
+        try (ParquetEventStore again = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(3, again.query(EventQuery.recent(100)).size(), "replayed exactly once");
+        }
+    }
+
+    /** A kill in the middle of a journal write leaves a torn last line; it is skipped, the rest replays. */
+    @Test
+    void aTornLastJournalLineIsSkipped(@TempDir Path dir) throws Exception {
+        ParquetEventStore crashed = new ParquetEventStore(dir, 1000, 0, 100);
+        crashed.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "kept"));
+        java.nio.file.Files.writeString(dir.resolve(ParquetEventStore.JOURNAL), "{\"eventId\":\"torn",
+                java.nio.file.StandardOpenOption.APPEND);
+        try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(List.of("kept"), reopened.query(EventQuery.recent(100)).stream().map(Event::message).toList());
+        }
+    }
 }

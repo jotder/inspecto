@@ -9,8 +9,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
@@ -47,6 +51,14 @@ import java.util.stream.Stream;
  * ring, and {@link #query(EventQuery)} merges the unflushed buffer with the on-disk Parquet so a search
  * never misses the most recent facts.
  *
+ * <h3>Crash durability — the write-ahead journal (operator, 2026-09-26)</h3>
+ * Every buffered event is ALSO appended as one JSON line to {@value #JOURNAL} in the store's root, and forced
+ * to disk for {@link EventType#AUDIT} / {@link EventType#ACCESS_DENIED}. A successful flush truncates the
+ * journal; opening a store replays a leftover journal into Parquet first. So a hard kill (no {@link #close()},
+ * no shutdown hook) loses no buffered event — before this, up to 10 s or 1 000 events, audit rows included,
+ * vanished (found 2026-09-26: a demo build stopped by kill came back with none of its audit trail). It adds no
+ * Parquet files. A torn last line (a kill mid-write) is skipped. The journal is not a {@code .parquet} file, so
+ * the {@code read_parquet} glob never sees it.
  * <h3>Threading</h3>
  * A single DuckDB {@link Connection} (not thread-safe) is shared for both the flush {@code COPY} and
  * the {@code read_parquet} queries, so every public method is {@code synchronized}. Event volume is
@@ -62,6 +74,9 @@ public final class ParquetEventStore implements EventStore {
 
     /** Scratch table the buffer is staged into before each partitioned {@code COPY}. */
     private static final String BUF_TABLE = "evt_buf";
+
+    /** The write-ahead journal's file name, in the store root (see class doc). */
+    public static final String JOURNAL = "pending.jsonl";
 
     /** Flush when this many events are buffered. */
     public static final int DEFAULT_FLUSH_THRESHOLD = 1000;
@@ -92,6 +107,8 @@ public final class ParquetEventStore implements EventStore {
      */
     private static final int MAX_RETAINED = 50_000;
     private boolean closed;
+    /** The open journal (append); null when it could not be opened — the store then degrades to buffer-only. */
+    private FileChannel journal;
 
     /** Open a store under {@code dir} with default flush/roll/tail settings. */
     public static ParquetEventStore open(Path dir) {
@@ -118,6 +135,83 @@ public final class ParquetEventStore implements EventStore {
         } catch (Exception e) {
             throw new IllegalStateException("Could not initialise Parquet event store at " + root, e);
         }
+        replayJournal();
+        try {
+            journal = FileChannel.open(root.resolve(JOURNAL), StandardOpenOption.CREATE, StandardOpenOption.WRITE,
+                    StandardOpenOption.APPEND);
+        } catch (IOException e) {
+            log.warn("Event journal {} could not be opened; buffered events will not survive a crash: {}",
+                    root.resolve(JOURNAL), e.getMessage());
+        }
+    }
+
+    /** Replay a journal a crashed predecessor left behind: its events go to Parquet now, then it is removed. */
+    private void replayJournal() {
+        Path file = root.resolve(JOURNAL);
+        if (!Files.exists(file)) return;
+        try {
+            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
+            int torn = 0;
+            for (String line : lines) {
+                if (line.isBlank()) continue;
+                try {
+                    Map<?, ?> m = JSON.readValue(line, Map.class);
+                    Event e = new Event(str(m.get("eventId")), ((Number) m.get("ts")).longValue(),
+                            EventLevel.parse(str(m.get("level"))), str(m.get("type")), str(m.get("source")),
+                            str(m.get("pipeline")), str(m.get("correlationId")), str(m.get("message")),
+                            JsonAttributes.fromJson(str(m.get("attributes"))),
+                            JsonAttributes.fromPayloadJson(str(m.get("payload"))));
+                    tail.append(e);
+                    buffer.addLast(e);
+                } catch (Exception bad) {
+                    torn++;   // a kill mid-write tears the last line; everything before it is whole
+                }
+            }
+            if (torn > 0) log.warn("Event journal {}: skipped {} unreadable line(s)", file, torn);
+            if (!buffer.isEmpty()) {
+                log.info("Event journal {}: replaying {} event(s) a previous run did not flush", file, buffer.size());
+                flushLocked();
+            }
+            if (buffer.isEmpty()) Files.deleteIfExists(file);   // kept if the replay flush failed: retried next open
+        } catch (IOException e) {
+            log.warn("Event journal {} could not be replayed: {}", file, e.getMessage());
+        }
+    }
+
+    private static String str(Object o) {
+        return o == null ? null : o.toString();
+    }
+
+    /** One JSON line per event; forced to disk for the audit trail's own types. Never throws to the caller. */
+    private void journalLocked(Event e) {
+        if (journal == null) return;
+        try {
+            Map<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("eventId", e.eventId());
+            m.put("ts", e.ts());
+            m.put("level", e.level().name());
+            m.put("type", e.type());
+            m.put("source", e.source());
+            m.put("pipeline", e.pipeline());
+            m.put("correlationId", e.correlationId());
+            m.put("message", e.message());
+            m.put("attributes", JSON.writeValueAsString(e.attributes()));
+            m.put("payload", JSON.writeValueAsString(e.payload()));
+            journal.write(ByteBuffer.wrap((JSON.writeValueAsString(m) + '\n').getBytes(StandardCharsets.UTF_8)));
+            if (EventType.AUDIT.equals(e.type()) || EventType.ACCESS_DENIED.equals(e.type())) journal.force(false);
+        } catch (IOException ex) {
+            log.warn("Event journal write failed; this event survives only a clean shutdown: {}", ex.getMessage());
+        }
+    }
+
+    /** The buffer is empty again (flushed or dropped): nothing is pending, so the journal is emptied. */
+    private void truncateJournal() {
+        if (journal == null) return;
+        try {
+            journal.truncate(0);
+        } catch (IOException e) {
+            log.warn("Event journal could not be truncated; a restart may replay flushed events: {}", e.getMessage());
+        }
     }
 
     // ── append + flush ──────────────────────────────────────────────────────────
@@ -128,6 +222,7 @@ public final class ParquetEventStore implements EventStore {
         tail.append(event);
         if (buffer.isEmpty()) bufferOpenedAt = System.currentTimeMillis();
         buffer.addLast(event);
+        journalLocked(event);
         boolean full = buffer.size() >= flushThreshold;
         boolean stale = rollMillis > 0 && System.currentTimeMillis() - bufferOpenedAt >= rollMillis;
         if (full || stale) flushLocked();
@@ -183,11 +278,13 @@ public final class ParquetEventStore implements EventStore {
             log.error("Event buffer reached {} undrained events; dropping them to bound memory."
                     + " Durable event/audit history for this window is lost.", buffer.size());
             buffer.clear();
+            truncateJournal();
             flushFailures = 0;
             return;
         }
         buffer.clear();
         clearBufferTable();
+        truncateJournal();
     }
 
     /**
@@ -405,6 +502,9 @@ public final class ParquetEventStore implements EventStore {
         if (closed) return;
         flushLocked();
         closed = true;
+        if (journal != null) {
+            try { journal.close(); } catch (IOException e) { log.warn("Error closing event journal: {}", e.getMessage()); }
+        }
         try { conn.close(); } catch (SQLException e) { log.warn("Error closing event store: {}", e.getMessage()); }
     }
 }

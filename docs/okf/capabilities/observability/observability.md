@@ -302,6 +302,18 @@ hash chain, no signature), not permission-hardened (no `PosixFilePermission` cal
 the in-memory backend **drops** on restart; the Parquet backend's buffer drops after 50k events on sustained
 flush failure (`controls-matrix.md` AU-9). Anyone who needs evidential integrity must add it; see §5.
 
+**Crash durability (operator, 2026-09-26).** On the Parquet backend **an audit row is on disk once its request
+is answered**: every buffered event is also written to a write-ahead journal (`<eventsDir>/pending.jsonl`, one
+JSON line each, forced to disk for `AUDIT` and `ACCESS_DENIED`), a successful flush truncates it, and opening the
+store replays a leftover journal into Parquet. Before this, a hard kill (no clean close) silently lost the whole
+unflushed buffer — up to 10 s or 1 000 events, audit rows included: a demo build stopped by kill came back with
+none of its audit trail. The rule was chosen over a synchronous flush per audit event (one Parquet file per
+request, with no compaction) and a timer flush (still loses a window). ⚠ Scope, exactly: a *process* kill loses
+nothing; after an OS crash or power loss the non-audit lines may be lost (only audit lines are forced), and a
+kill mid-write tears at most the last line, which replay skips. Pinned by
+`ParquetEventStoreTest.bufferedEventsSurviveAHardKillThroughTheJournal` and `…aTornLastJournalLineIsSkipped`,
+both red with the journal write removed.
+
 **Reading and exporting.** Core `GET /audit/search` (offset-paged, `type=AUDIT|ACCESS_DENIED`) and
 `GET /audit/export?format=csv` in every edition; the SPA's Audit log pane (`audit-logs.component.ts`)
 reads them through `AuditService` and **does not** gate on `features.events` — by design (cell 6).
