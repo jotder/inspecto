@@ -61,6 +61,7 @@ class ControlApiActionRequestsTest {
     private volatile int failFirst;
     private Executor priorExecutor;
     private Supplier<WebhookSinkTransport> priorTransport;
+    private com.gamma.pipeline.exec.EgressPolicy.Resolver priorResolver;
 
     private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {
         public void close() {
@@ -104,10 +105,12 @@ class ControlApiActionRequestsTest {
             ex.close();
         });
         target.start();
-        ConnectionRegistry.register(new ConnectionProfile("hook", "https", "127.0.0.1", target.getAddress().getPort(),
+        ConnectionRegistry.register(new ConnectionProfile("hook", "https", "tickets.test", target.getAddress().getPort(),
                 null, "api", null, null, Map.of(), null, null));
         priorExecutor = ActionDispatcher.executor;
         priorTransport = ActionDispatcher.transport;
+        priorResolver = ActionDispatcher.resolver;
+        ActionDispatcher.resolver = ActionDispatcherTest.NET;   // tickets.test → a private address
         ActionDispatcher.executor = Runnable::run;
         ActionDispatcher.transport = () -> new ActionDispatcherTest.LoopbackWire() {
             @Override public Response exchange(String method, URI url, java.net.InetAddress to, String token,
@@ -124,6 +127,7 @@ class ControlApiActionRequestsTest {
         Authenticators.forTest(null);
         ActionDispatcher.executor = priorExecutor;
         ActionDispatcher.transport = priorTransport;
+        ActionDispatcher.resolver = priorResolver;
         ConnectionRegistry.clear();
         System.clearProperty(ActionDispatcher.PROP_BACKOFF_MS);
         target.stop(0);
@@ -149,9 +153,9 @@ class ControlApiActionRequestsTest {
         return open(cfg, writable ? Files.createDirectories(tmp.resolve("config")) : null);
     }
 
-    /** The stub target is on loopback, which the egress policy denies unless the Space allowlists its range. */
+    /** The target (tickets.test → a private address) is denied by default; the Space allowlists the name. */
     private void allowLoopback(Ctx c) throws Exception {
-        data(send(c, "PUT", "/settings/egress", "{\"allow\":[\"127.0.0.1/32\"]}", CHECKER), 200);
+        data(send(c, "PUT", "/settings/egress", "{\"allow\":[\"tickets.test\"]}", CHECKER), 200);
     }
 
     private static String incident(Ctx c) {
@@ -455,7 +459,7 @@ class ControlApiActionRequestsTest {
             data(send(c, "PUT", "/settings/egress", "{\"allow\":[]}", CHECKER), 200);
             JsonNode done = data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200);
             assertEquals("failed", done.get("status").asText());
-            assertTrue(done.at("/lastResponse/error").asText().contains("loopback"), done.toString());
+            assertTrue(done.at("/lastResponse/error").asText().contains("private"), done.toString());
             assertTrue(keys.isEmpty(), "deny by default: nothing sent");
         }
     }
@@ -465,12 +469,12 @@ class ControlApiActionRequestsTest {
         try (Ctx c = open(cfg, tmp, true)) {
             String id = propose(c, incident(c));
             JsonNode e = data(send(c, "GET", "/action-requests/" + id, null, CHECKER), 200).get("egress");
-            assertEquals("127.0.0.1", e.get("host").asText());
+            assertEquals("tickets.test", e.get("host").asText());
             assertEquals(target.getAddress().getPort(), e.get("port").asInt());
             assertEquals("/api", e.get("path").asText());
             assertTrue(e.get("allowlisted").asBoolean());
             JsonNode done = data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200);
-            assertEquals("127.0.0.1", done.at("/attemptLog/0/address").asText(), "the checked address is recorded");
+            assertEquals("10.9.0.5", done.at("/attemptLog/0/address").asText(), "the checked address is recorded");
         }
     }
 
@@ -486,9 +490,9 @@ class ControlApiActionRequestsTest {
             assertEquals("failed", data(send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200)
                     .get("status").asText());
             int sent = keys.size();
-            ConnectionRegistry.register(new ConnectionProfile("hook", "https", "localhost", target.getAddress().getPort(),
+            ConnectionRegistry.register(new ConnectionProfile("hook", "https", "moved.test", target.getAddress().getPort(),
                     null, "api", null, null, Map.of(), null, null));
-            data(send(c, "PUT", "/settings/egress", "{\"allow\":[\"127.0.0.1/32\",\"::1/128\"]}", CHECKER), 200);
+            data(send(c, "PUT", "/settings/egress", "{\"allow\":[\"tickets.test\",\"moved.test\"]}", CHECKER), 200);
             JsonNode retried = data(send(c, "POST", "/action-requests/" + id + "/retry", "{}", CHECKER), 200);
             assertEquals("failed", retried.get("status").asText(), retried.toString());
             assertTrue(retried.at("/lastResponse/error").asText().contains("now resolves to"), retried.toString());
@@ -500,7 +504,8 @@ class ControlApiActionRequestsTest {
     void theEgressAllowlistIsAdministratorOnlyAndValidatedFailClosed(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         try (Ctx c = open(cfg, tmp, true)) {
             assertEquals(403, send(c, "PUT", "/settings/egress", "{\"allow\":[\"10.0.0.0/8\"]}", ANALYST2).statusCode());
-            for (String bad : List.of("0x0a000000/8", "2130706433", "a@b.example", "10.0.0.0/99"))
+            for (String bad : List.of("0x0a000000/8", "2130706433", "a@b.example", "10.0.0.0/99",
+                    "127.0.0.1/32", "169.254.169.254", "0.0.0.0/1", "128.0.0.0/1", "::1", "fe80::/10"))
                 assertEquals(422, send(c, "PUT", "/settings/egress", "{\"allow\":[\"" + bad + "\"]}", CHECKER)
                         .statusCode(), bad);
             assertEquals(422, send(c, "PUT", "/settings/egress", "{\"deny\":[]}", CHECKER).statusCode());

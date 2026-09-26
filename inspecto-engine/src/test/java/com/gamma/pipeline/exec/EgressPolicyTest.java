@@ -71,15 +71,15 @@ class EgressPolicyTest {
 
     @Test
     void aHostEntryLiftsOnlyThePrivateClassesAndACidrLiftsItsRange() {
-        EgressPolicy.Allowlist allow = EgressPolicy.Allowlist.of(List.of("pcrf.internal", "127.0.0.1/32", "10.9.0.0/16"));
+        EgressPolicy.Allowlist allow = EgressPolicy.Allowlist.of(List.of("pcrf.internal", "10.9.0.0/16", "100.64.0.0/10"));
         InetAddress private10 = InetAddress.ofLiteral("10.1.2.3");
         assertTrue(allow.permits("pcrf.internal", private10, "private"));
         assertFalse(allow.permits("other.internal", private10, "private"));
         assertFalse(allow.permits("pcrf.internal", InetAddress.ofLiteral("169.254.169.254"), "link-local"),
                 "a re-pointed allowlisted NAME still cannot reach the metadata service");
-        assertTrue(allow.permits("x", InetAddress.ofLiteral("127.0.0.1"), "loopback"));
-        assertFalse(allow.permits("x", InetAddress.ofLiteral("127.0.0.2"), "loopback"));
         assertTrue(allow.permits("x", InetAddress.ofLiteral("10.9.200.1"), "private"));
+        assertTrue(allow.permits("x", InetAddress.ofLiteral("100.64.1.1"), "cgnat"));
+        assertFalse(allow.permits("x", InetAddress.ofLiteral("10.8.0.1"), "private"), "outside the range");
         assertThrows(IllegalArgumentException.class, () -> EgressPolicy.Allowlist.of(List.of("0x0a000000/8")));
     }
 
@@ -97,12 +97,19 @@ class EgressPolicyTest {
                 EgressPolicy.Allowlist.EMPTY, h -> new InetAddress[0]), "no answer is a refusal");
     }
 
+    /** Round-2 finding 4: no entry, host or CIDR, ever lifts loopback, link-local, unspecified, multicast or this host. */
     @Test
-    void resolveRefusesALoopbackLiteralUnlessItsRangeIsListed() throws Exception {
-        assertThrows(EgressPolicy.Refused.class, () -> EgressPolicy.resolve("127.0.0.1", EgressPolicy.Allowlist.EMPTY));
+    void neverLiftableClassesStayDeniedAndTheirRangesCannotBeListed() throws Exception {
+        for (String bad : List.of("127.0.0.1", "127.0.0.0/8", "169.254.169.254", "169.254.0.0/16", "0.0.0.0/1",
+                "128.0.0.0/1", "0.0.0.0/8", "224.0.0.0/4", "::1", "::/1", "8000::/1", "fe80::/10", "ff02::1"))
+            assertThrows(IllegalArgumentException.class, () -> EgressPolicy.Allowlist.of(List.of(bad)), bad);
         assertThrows(EgressPolicy.Refused.class, () -> EgressPolicy.resolve("localhost",
                 EgressPolicy.Allowlist.of(List.of("localhost"))), "a host entry never lifts loopback");
-        assertEquals("127.0.0.1", EgressPolicy.resolve("127.0.0.1",
-                EgressPolicy.Allowlist.of(List.of("127.0.0.1"))).getHostAddress());
+        EgressPolicy.Allowlist named = EgressPolicy.Allowlist.of(List.of("pcrf.internal"));
+        for (String internal : List.of("127.0.0.1", "169.254.169.254", "0.0.0.0", "224.0.0.1", "::1", "fe80::1"))
+            assertThrows(EgressPolicy.Refused.class, () -> EgressPolicy.resolve("pcrf.internal", named,
+                    h -> new InetAddress[] {InetAddress.ofLiteral(internal)}), "a rebound name → " + internal);
+        assertEquals("10.1.2.3", EgressPolicy.resolve("pcrf.internal", named,
+                h -> new InetAddress[] {InetAddress.ofLiteral("10.1.2.3")}).getHostAddress());
     }
 }

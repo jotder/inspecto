@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.pipeline.exec.EgressPolicy;
 import com.gamma.pipeline.exec.WebhookSink;
 import com.gamma.pipeline.exec.WebhookSinkTransport;
 import com.sun.net.httpserver.HttpServer;
@@ -44,12 +45,16 @@ class ActionDispatcherTest {
             throw new UnsupportedOperationException();
         }
 
-        /** Connects to the PINNED address, as the real wire does — the URL's host is never resolved here. */
+        /**
+         * The test NETWORK: every checked address is routed to the loopback stub on the URL's port — loopback itself
+         * is never allowlistable, so the target is given a private address by {@link #NET} and this wire records the
+         * address it was handed (the real wire's pinning is pinned in inspecto-notify-channels).
+         */
         @Override public Response exchange(String method, URI url, java.net.InetAddress to, String token,
                                            Duration timeout, String json, Map<String, String> headers, int cap)
                 throws Exception {
             addresses.add(to.getHostAddress());
-            URI pinned = new URI(url.getScheme(), null, to.getHostAddress(), url.getPort(), url.getPath(), null, null);
+            URI pinned = new URI(url.getScheme(), null, "127.0.0.1", url.getPort(), url.getPath(), null, null);
             HttpRequest.Builder b = HttpRequest.newBuilder(pinned).timeout(timeout)
                     .header("Content-Type", "application/json").method(method, HttpRequest.BodyPublishers.ofString(json));
             headers.forEach(b::header);
@@ -93,21 +98,37 @@ class ActionDispatcherTest {
         server.start();
     }
 
+    /** The simulated DNS: the target's name answers a private address; anything else resolves for real. */
+    static final EgressPolicy.Resolver NET = h -> switch (h) {
+        case "tickets.test" -> new java.net.InetAddress[] {java.net.InetAddress.ofLiteral("10.9.0.5")};
+        case "moved.test" -> new java.net.InetAddress[] {java.net.InetAddress.ofLiteral("10.9.0.6")};
+        case "rebound.test" -> new java.net.InetAddress[] {java.net.InetAddress.ofLiteral("127.0.0.1")};
+        default -> EgressPolicy.SYSTEM.resolve(h);
+    };
+    private EgressPolicy.Resolver priorResolver;
+
+    @BeforeEach
+    void network() {
+        priorResolver = ActionDispatcher.resolver;
+        ActionDispatcher.resolver = NET;
+    }
+
     @AfterEach
     void stop() {
+        ActionDispatcher.resolver = priorResolver;
         System.clearProperty(ActionDispatcher.PROP_BACKOFF_MS);
         server.stop(0);
         other.stop(0);
     }
 
     private WebhookSink.Endpoint endpoint() {
-        return new WebhookSink.Endpoint(URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/api"),
+        return new WebhookSink.Endpoint(URI.create("http://tickets.test:" + server.getAddress().getPort() + "/api"),
                 null, Duration.ofSeconds(5));
     }
 
-    /** The stub target is on loopback, which the egress policy denies unless its range is allowlisted. */
+    /** The target's private address is denied by default; the Space allowlists the name. */
     private static void allowLoopback(Path root) throws Exception {
-        Files.writeString(root.resolve(EgressRoutes.FILE), dev.toonformat.jtoon.JToon.encode(Map.of("allow", List.of("127.0.0.1/32"))));
+        Files.writeString(root.resolve(EgressRoutes.FILE), dev.toonformat.jtoon.JToon.encode(Map.of("allow", List.of("tickets.test"))));
     }
 
     private static String approved(Path root) throws Exception {
@@ -184,16 +205,28 @@ class ActionDispatcherTest {
         assertTrue(String.valueOf(((Map<?, ?>) rec.get("lastResponse")).get("error")).contains("redirect"));
     }
 
-    /** Deny by default: a loopback target with no allowlist entry is never dialled, and fails without a retry. */
+    /** An allowlisted NAME that re-resolves to loopback (DNS rebinding) is still refused. */
     @Test
-    void aLoopbackTargetIsRefusedByTheEgressPolicyUnlessAllowlisted(@TempDir Path tmp) throws Exception {
+    void anAllowlistedNameReboundToLoopbackIsRefused(@TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        Files.writeString(root.resolve(EgressRoutes.FILE), dev.toonformat.jtoon.JToon.encode(Map.of("allow", List.of("rebound.test"))));
+        String id = approvedWithoutAllowlist(root);
+        ActionDispatcher.run(root, id, new WebhookSink.Endpoint(URI.create("http://rebound.test:"
+                + server.getAddress().getPort() + "/api"), null, Duration.ofSeconds(5)), new LoopbackWire());
+        assertTrue(keys.isEmpty(), "nothing sent");
+        assertTrue(String.valueOf(((Map<?, ?>) read(root, id).get("lastResponse")).get("error")).contains("loopback"));
+    }
+
+    /** Deny by default: a private target with no allowlist entry is never dialled, and fails without a retry. */
+    @Test
+    void aPrivateTargetIsRefusedByTheEgressPolicyUnlessAllowlisted(@TempDir Path tmp) throws Exception {
         Path root = Files.createDirectories(tmp.resolve("config"));
         String id = approvedWithoutAllowlist(root);
         ActionDispatcher.run(root, id, endpoint(), new LoopbackWire());
         Map<String, Object> rec = read(root, id);
         assertEquals("failed", rec.get("status"));
         assertTrue(keys.isEmpty(), "nothing sent");
-        assertTrue(String.valueOf(((Map<?, ?>) rec.get("lastResponse")).get("error")).contains("loopback"));
+        assertTrue(String.valueOf(((Map<?, ?>) rec.get("lastResponse")).get("error")).contains("private"));
         assertEquals(1, rec.get("attempts"), "an egress refusal is not retried");
     }
 
@@ -205,10 +238,10 @@ class ActionDispatcherTest {
         LoopbackWire wire = new LoopbackWire();
         ActionDispatcher.run(root, id, endpoint(), wire);
         Map<String, Object> rec = read(root, id);
-        assertEquals(List.of("127.0.0.1", "127.0.0.1"), wire.addresses);
+        assertEquals(List.of("10.9.0.5", "10.9.0.5"), wire.addresses);
         List<?> log = (List<?>) rec.get("attemptLog");
         assertEquals(2, log.size());
-        assertEquals("127.0.0.1", ((Map<?, ?>) log.get(1)).get("address"));
+        assertEquals("10.9.0.5", ((Map<?, ?>) log.get(1)).get("address"));
         assertEquals(500, ((Map<?, ?>) log.get(0)).get("status"));
     }
 

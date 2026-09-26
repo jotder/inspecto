@@ -30,10 +30,11 @@ import java.util.regex.Pattern;
  *       CGNAT {@code 100.64/10}, {@code 0/8}, broadcast, multicast, unspecified, and any address of THIS host (which
  *       covers every address the control plane can bind). A public address passes.</li>
  *   <li><b>A per-Space allowlist</b> ({@link Allowlist}) lifts the default for named targets, because real
- *       targets (a CBS, a PCRF) often live on private networks: a <b>host</b> entry lets that exact name reach the
- *       PRIVATE classes only (RFC 1918, {@code fc00::/7}, CGNAT) — never loopback, link-local or this host, so a
- *       name that is re-pointed (DNS rebinding) still cannot reach the metadata service; a <b>CIDR</b> entry lets
- *       anything inside that range through, except multicast and unspecified.</li>
+ *       targets (a CBS, a PCRF) often live on private networks — but ONLY the {@link #LIFTABLE} classes (private,
+ *       CGNAT): a <b>host</b> entry lets that exact name reach them, a <b>CIDR</b> entry lets its range reach them.
+ *       Loopback, link-local (the metadata service), unspecified, multicast, broadcast and this host are never
+ *       liftable, and a CIDR overlapping one of their ranges is refused outright ({@link #NEVER_LIFTABLE}) — so
+ *       {@code 128.0.0.0/1} cannot reopen {@code 169.254.169.254}, and a re-pointed name cannot reach it either.</li>
  * </ol>
  * The caller then CONNECTS TO THE CHECKED ADDRESS ({@link #resolve} returns it), so a second resolution cannot
  * swap it — the transport keeps the original name for the Host header, SNI and certificate verification.
@@ -171,7 +172,17 @@ public final class EgressPolicy {
         }
     }
 
-    private static final Set<String> PRIVATE_CLASSES = Set.of("private", "cgnat");
+    /**
+     * The only classes an allowlist entry may lift (round-2 finding 4): private (RFC 1918, ULA, site-local) and CGNAT.
+     * Loopback, link-local (the metadata service), unspecified, multicast, broadcast and this host are NEVER liftable,
+     * by a host entry or a CIDR.
+     */
+    static final Set<String> LIFTABLE = Set.of("private", "cgnat");
+
+    /** Ranges no allowlist CIDR may overlap — refused at parse, so an entry can never even name them. */
+    static final List<Cidr> NEVER_LIFTABLE = List.of(Cidr.raw("0.0.0.0/8"), Cidr.raw("127.0.0.0/8"),
+            Cidr.raw("169.254.0.0/16"), Cidr.raw("224.0.0.0/4"), Cidr.raw("255.255.255.255/32"),
+            Cidr.raw("::/127"), Cidr.raw("fe80::/10"), Cidr.raw("ff00::/8"));
 
     /** A CIDR range, parsed from a canonical {@code address/bits}. */
     public record Cidr(byte[] network, int bits, String text) {
@@ -191,6 +202,24 @@ public final class EgressPolicy {
             }
             if (bits < 1 || bits > max) throw new IllegalArgumentException("'" + s + "': the prefix length must be 1.." + max);
             return new Cidr(a.getAddress(), bits, s);
+        }
+
+        /** Parse without the host-syntax check — the built-in {@link #NEVER_LIFTABLE} table only. */
+        static Cidr raw(String s) {
+            int slash = s.indexOf('/');
+            InetAddress a = InetAddress.ofLiteral(s.substring(0, slash));
+            return new Cidr(a.getAddress(), Integer.parseInt(s.substring(slash + 1)), s);
+        }
+
+        /** Whether this range and {@code o} share any address (same family, prefixes agree on the shorter length). */
+        public boolean overlaps(Cidr o) {
+            if (o.network.length != network.length) return false;
+            int n = Math.min(bits, o.bits);
+            for (int i = 0; i < n; i++) {
+                int mask = 0x80 >> (i % 8);
+                if ((o.network[i / 8] & mask) != (network[i / 8] & mask)) return false;
+            }
+            return true;
         }
 
         public boolean contains(InetAddress a) {
@@ -214,12 +243,21 @@ public final class EgressPolicy {
             List<Cidr> cidrs = new ArrayList<>();
             for (String raw : entries) {
                 String e = raw == null ? "" : raw.trim().toLowerCase(Locale.ROOT);
+                Cidr c = null;
                 if (e.indexOf('/') >= 0) {
-                    cidrs.add(Cidr.parse(e));
+                    c = Cidr.parse(e);
                 } else {
                     checkHost(e);
-                    if (isIpLiteral(e)) cidrs.add(Cidr.parse(e + (e.indexOf(':') >= 0 ? "/128" : "/32")));
+                    if (isIpLiteral(e)) c = Cidr.parse(e + (e.indexOf(':') >= 0 ? "/128" : "/32"));
                     else hosts.add(e);
+                }
+                if (c != null) {
+                    for (Cidr never : NEVER_LIFTABLE)
+                        if (c.overlaps(never))
+                            throw new IllegalArgumentException("'" + e + "' overlaps " + never.text() + " — loopback, "
+                                    + "link-local (the metadata service), unspecified, multicast and broadcast ranges can "
+                                    + "never be allowlisted; name only the private range the target lives in");
+                    cidrs.add(c);
                 }
             }
             return new Allowlist(Set.copyOf(hosts), List.copyOf(cidrs));
@@ -232,9 +270,9 @@ public final class EgressPolicy {
 
         /** Whether this list lets {@code host} reach {@code a}, which is of denied class {@code cls}. */
         public boolean permits(String host, InetAddress a, String cls) {
-            if ("multicast".equals(cls) || "unspecified".equals(cls) || "broadcast".equals(cls)) return false;
+            if (!LIFTABLE.contains(cls)) return false;   // never loopback, link-local, this host, …
             for (Cidr c : cidrs) if (c.contains(a)) return true;
-            return PRIVATE_CLASSES.contains(cls) && namesHost(host);
+            return namesHost(host);
         }
     }
 
