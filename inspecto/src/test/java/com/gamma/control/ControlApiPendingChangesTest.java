@@ -247,6 +247,42 @@ class ControlApiPendingChangesTest {
         }
     }
 
+    /** A DELETE is held like any write, end to end: held and kept, four-eyes, applied once, stale when edited. */
+    @Test
+    void aHeldDeleteIsAppliedOnlyByAnotherPersonAndNeverOverAnEditedTarget(@TempDir Path cfg, @TempDir Path tmp)
+            throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            store(c).write("pattern-pack", "d1", Map.of("title", "v1", "owner", "author-1"));
+            store(c).write("pattern-pack", "d2", Map.of("title", "v1", "owner", "author-1"));
+            policy(c, PACK_POLICY);
+
+            JsonNode held = data(send(c, "DELETE", "/components/pattern-pack/d1", null, AUTHOR), 202);
+            String id = held.at("/pendingChange/id").asText();
+            assertEquals("delete", data(send(c, "GET", "/pending-changes/" + id, null, CHECKER), 200)
+                    .get("operation").asText());
+            assertTrue(store(c).exists("pattern-pack", "d1"), "a held delete deletes nothing");
+            assertEquals(403, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", SELF).statusCode(),
+                    "four-eyes");
+            assertTrue(store(c).exists("pattern-pack", "d1"));
+            assertTrue(data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER), 200)
+                    .get("applied").asBoolean());
+            assertFalse(store(c).exists("pattern-pack", "d1"), "approved: deleted");
+            assertEquals(409, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER).statusCode(),
+                    "already decided");
+
+            String stale = data(send(c, "DELETE", "/components/pattern-pack/d2", null, AUTHOR), 202)
+                    .at("/pendingChange/id").asText();
+            store(c).write("pattern-pack", "d2", Map.of("title", "edited since", "owner", "author-1"));
+            HttpResponse<String> r = send(c, "POST", "/pending-changes/" + stale + "/approve", "{}", CHECKER);
+            assertEquals(409, r.statusCode(), r.body());
+            assertEquals("edited since", store(c).get("pattern-pack", "d2").orElseThrow().content().get("title"),
+                    "a stale delete never deletes the edited target");
+            assertEquals("stale", data(send(c, "GET", "/pending-changes/" + stale, null, CHECKER), 200)
+                    .get("status").asText());
+        }
+    }
+
     @Test
     void declineClosesTheChangeUnappliedAndTheAuthorCannotDeclineTheirOwn(@TempDir Path cfg, @TempDir Path tmp)
             throws Exception {
