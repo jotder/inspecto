@@ -470,6 +470,7 @@ public final class ObjectRoutes implements RouteModule {
         Map<String, String> attrs = new LinkedHashMap<>();
         if (body.get("attributes") instanceof Map<?, ?> bag)
             bag.forEach((k, v) -> { if (k != null && v != null) attrs.put(k.toString(), v.toString()); });
+        refuseOwnedAttributes(attrs);   // WS-10: not on create either — else resolve passes with no decided outcome
         Long dueAt = parseDueAt(body);
         if (dueAt != null) attrs.put(ObjectService.ATTR_DUE_AT, Long.toString(dueAt));
 
@@ -770,11 +771,7 @@ public final class ObjectRoutes implements RouteModule {
         if (attrs != null) {
             // WS-10: the impact and the Disposition have their own validated, audited writes — the PATCH's
             // free attribute merge would bypass validation, the closed-books rule and the before/after audit.
-            for (String owned : PATCH_REFUSED_ATTRS)
-                if (attrs.containsKey(owned))
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "attribute '" + owned
-                            + "' cannot be set here — " + ("impact".equals(owned)
-                            ? "use PUT /objects/{id}/impact" : "it is recorded with the Incident's resolve"));
+            refuseOwnedAttributes(attrs);
             validateFindings(api, id, attrs);
         }
         try {
@@ -882,8 +879,18 @@ public final class ObjectRoutes implements RouteModule {
         }
     }
 
-    /** Attributes the PATCH refuses because a dedicated route owns them (WS-10). */
+    /** Attributes neither the PATCH nor POST /objects accepts, because a dedicated validated, audited write owns
+     *  them (WS-10): the impact route and the Incident's resolve. */
     private static final List<String> PATCH_REFUSED_ATTRS = List.of(Impact.ATTR, ObjectService.ATTR_DISPOSITION);
+
+    /** 422 naming the key when a free attribute bag carries one of {@link #PATCH_REFUSED_ATTRS}. */
+    private static void refuseOwnedAttributes(Map<String, String> attrs) {
+        for (String owned : PATCH_REFUSED_ATTRS)
+            if (attrs.containsKey(owned))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "attribute '" + owned
+                        + "' cannot be set here — " + ("impact".equals(owned)
+                        ? "use PUT /objects/{id}/impact" : "it is recorded with the Incident's resolve"));
+    }
 
     private static final String POSTMORTEM_ATTR = "postmortem";
     private static final String CATEGORY_ATTR = "category";

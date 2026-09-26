@@ -194,6 +194,20 @@ class ControlApiImpactTest {
             engine.transition(inc, "archive", "t");
             assertEquals(409, send(c.port, "/objects/" + inc + "/impact", base, "operations").statusCode(),
                     "ARCHIVED refuses even a recovery");
+
+            // ARCHIVED -> DIAGNOSING (reopen) is the one way back: the Incident is open again, so every field is
+            // editable; resolved again (with a fresh Disposition — the reopen cleared the old one), the
+            // late-recovery rule holds once more
+            engine.transition(inc, "reopen", "t");
+            assertEquals(200, send(c.port, "/objects/" + inc + "/impact",
+                    "{\"impact\":{\"confirmed\":\"150\",\"recovered\":\"100\",\"currency\":\"EUR\"}}", "operations").statusCode(),
+                    "reopened, the whole impact is editable");
+            engine.transition(inc, "resolve", "t", "RECOVERED");
+            assertEquals(200, send(c.port, "/objects/" + inc + "/impact",
+                    "{\"impact\":{\"confirmed\":\"150\",\"recovered\":\"150\",\"currency\":\"EUR\"}}", "operations").statusCode());
+            assertEquals(409, send(c.port, "/objects/" + inc + "/impact",
+                    "{\"impact\":{\"confirmed\":\"999\",\"recovered\":\"150\",\"currency\":\"EUR\"}}", "operations").statusCode(),
+                    "re-resolved, only late recoveries again");
         }
     }
 

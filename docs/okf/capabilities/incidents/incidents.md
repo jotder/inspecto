@@ -405,8 +405,8 @@ and the `canAdminister` PATCH must not become the analyst's catch-all): `{}` cle
 body key, or an Alert/Task; **409 on an `ARCHIVED` Incident**, and — **late recoveries** (operator, 2026-09-26) —
 on a `RESOLVED` Incident or a `CLOSED` Case only `recovered` and `prevented` may still change, any other field
 → 409 (reopen to change the rest); 404 unknown or out-of-scope. Audited as `OBJECT_ACTIVITY` `action: impact`
-with the stored value **`before` and `after`** and the request's actor. ⛔ **`PATCH /objects/{id}` refuses
-`attributes.impact` and `attributes.disposition` (422 naming the key)** — its free merge would bypass the
+with the stored value **`before` and `after`** and the request's actor. ⛔ **`PATCH /objects/{id}` and `POST /objects` refuse
+`attributes.impact` and `attributes.disposition` (422 naming the key)** — their free attribute bags would bypass the
 validation, the closed-books rule and the audit. **On a Case this IS the Findings impact** — the built-in Findings spec dropped its
 `impactAmount` section and the route its flat `impactAmount` copy (only `recordsAffected` remains), so there
 is one home for the money, not two. ⚠ A deployment-authored `findings-spec` may still declare an `impactAmount`

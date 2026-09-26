@@ -147,6 +147,16 @@ class ControlApiObjectsTest {
             assertEquals(400, send(c.port, "POST", "/objects", "{\"title\":\"linkless\",\"links\":[]}").statusCode());
             assertEquals(404, send(c.port, "POST", "/objects",
                     "{\"title\":\"dangling\",\"links\":[{\"to\":\"ghost\"}]}").statusCode());
+
+            // WS-10: create cannot seed a Disposition (a later resolve would pass with no decided outcome) nor an
+            // unvalidated, unaudited impact — each has its own write
+            for (String owned : List.of("disposition", "impact")) {
+                HttpResponse<String> seeded = send(c.port, "POST", "/objects", "{\"title\":\"seeded\",\"attributes\":{\""
+                        + owned + "\":\"FALSE_POSITIVE\"},\"links\":[{\"to\":\"" + src.id() + "\"}]}");
+                assertEquals(422, seeded.statusCode(), owned + " -> " + seeded.body());
+                assertTrue(seeded.body().contains(owned), seeded.body());
+            }
+            assertEquals(1, json(send(c.port, "GET", "/objects?type=INCIDENT", null)).size(), "nothing was created");
         }
     }
 
