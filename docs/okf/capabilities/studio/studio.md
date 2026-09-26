@@ -362,16 +362,23 @@ renders against that agreed bar.
 component — a Measure (`dataset` + `measure` shorthand + the `timeField` a period is cut on), `target`, good
 `direction` (`up` / `down` / `band`), RAG `bands`, period `grain` (`day`…`year` — wider than
 `MeasureCompiler.GRAINS`, which are grouping grains), `comparison` (`previous` / `last-year` / `none`),
-`unit` / `format`, and the R3 `owner`. Authored through `/components/kpi`, so it gets history and restore and
+`unit` / `format`, an optional IANA `timezone`, and the R3 `owner`. Authored through `/components/kpi`, so it gets history and restore and
 reaches the maker-checker hold; validated fail closed by `KpiDefinition.fromMap`
 (`inspecto-engine/src/main/java/com/gamma/query/KpiDefinition.java`) on every door, and at the authoring doors
-the Dataset must exist AND be readable by the author, with the measure field and `timeField` in its Schema
-(`KpiRoutes.requireMeasure`). `GET /kpis/{id}/value?asOf=` (`KpiEvaluator`) evaluates the period **to date**
+the Dataset must exist AND be readable by the author, with the measure field and `timeField` in its Schema, and the `timeField` a `DATE`, `TIMESTAMP` or
+`TIMESTAMPTZ` column (`KpiRoutes.requireMeasure`). `GET /kpis/{id}/value?asOf=` (`KpiEvaluator`) evaluates the period **to date**
 against the SAME elapsed length of the comparison period (a month read on the 13th compares 13 days with 13
-days), through `MeasureCompiler` + `SqlGuard`, and answers value, comparison, delta, Δ%, `band`
-(`GREEN`/`AMBER`/`RED`, the `statusTone` words) and `tone`. ⚠ A Dataset the caller cannot read answers **404
+days), through `MeasureCompiler` + `SqlGuard`, and answers value, comparison, delta, Δ%, the `timezone`, `band`
+(`GREEN`/`AMBER`/`RED`, the `statusTone` words) and `tone`. 🔴 **A KPI evaluates in ONE explicit zone** — its
+`timezone`, else a Space setting if one existed (none does today), else **UTC**: the window is local midnight in
+that zone, written as typed `TIMESTAMPTZ` literals, and the DuckDB session `TimeZone` is SET to the same zone for
+the query (`QueryExecutor.run(req, policy, zone)`), because DuckDB otherwise follows the HOST. The default `asOf` is
+today in that zone; a future `asOf`, one before year 1, or an Instant the calendar cannot place is a 400. Offset
+forms (`+05:30`) are refused — `ZoneOffset.UTC`'s id `Z` is unknown to DuckDB, so UTC is the region id `UTC`. ⚠ A Dataset the caller cannot read answers **404
 exactly as an absent one** — a KPI is never a way round Dataset sharing. The KPI tile binds with
-`options.kpi.kpiId`; the hand-set Widget inputs stay the fallback. A delivered `kpi` Requirement creates one
+`options.kpi.kpiId` and then shows ONLY the server's numbers — "No data" for a null value, "KPI unavailable" on a
+read error; the hand-set Widget inputs apply only with no `kpiId`. A `band` KPI's delta and target lines drop the
+up/down wording and take their tone from the server's band. A delivered `kpi` Requirement creates one
 only by the explicit `POST /requirements/{id}/kpi` (`canAuthorWorkbench`), which takes its
 `target`/`unit`/`title` and reads the direction off its `comparator`. ⚠ Distinct from the semantic model's
 descriptive **KPI catalog** (`kpis:` / `GET /catalog/kpis`), which is text for the assistant and runs nothing.

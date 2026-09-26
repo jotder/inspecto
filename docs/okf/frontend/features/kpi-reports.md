@@ -25,7 +25,8 @@ distinct from the analytical **Dashboards** authored in the [Studio](studio.md);
   *New KPI definition* action (`canAuthorWorkbench`) opens `kpi-definition.dialog.ts`, a schema-form editor that
   saves through `/components/kpi` and shows the server's fail-closed refusal in place. A KPI tile binds to one
   with `options.kpi.kpiId` and then reads its numbers, target, direction, format and RAG band from
-  `GET /kpis/{id}/value`; the hand-set inputs are the fallback. Contract: [Studio](../../capabilities/studio/studio.md) §3.6.
+  `GET /kpis/{id}/value` — never the hand-set inputs, which apply only with no `kpiId` (a null value reads
+  "No data", a failed read "KPI unavailable"). Contract: [Studio](../../capabilities/studio/studio.md) §3.6.
 * **Scheduled exports** (C6, 2026-07-04): a schedule IS a [Job](jobs.md) — `type: 'report'` with
   `params: {reportKind, dashboardId, format, recipients}`; no separate entity. Dispatch keys on
   `params.dashboardId` presence, *not* on `type === 'report'` (that type predates C6 and covers other
