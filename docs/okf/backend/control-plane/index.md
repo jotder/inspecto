@@ -13,6 +13,9 @@ v1 contract, queries, observability, the job scheduler, and multi-space hosting.
   `POST /queries/{id}/run` on DuckDB.
 * [Decision rules](decision-rules.md) - `/decision-rules` CRUD + sample-driven `simulate` over the
   `query-types` condition tree, evaluated by the shared `ConditionTree` engine (query-eval.ts parity).
+* [Action Requests](action-requests.md) - an outbound API call raised from an Incident / Case (or a Decision
+  Rule's `invoke-api`), four-eyes approved, signed with the Pending Change key, sent once to an https Connection
+  with bounded retries under one idempotency key; redirects never followed.
 * [Tags](tags.md) - the cross-entity label graph (D7): Tag vs Tag Assignment, the central
   `(tag, targetKind, targetId)` store, rename propagation, and the per-target gate that keeps a tag from
   ever becoming an access grant.

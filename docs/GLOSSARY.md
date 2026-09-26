@@ -826,6 +826,15 @@ built: [`okf/backend/config/config-safety.md`](okf/backend/config/config-safety.
 Request" — that word means a commercial CR. ⛔ Not an agent approval: the `/agent/approvals` inbox governs
 what the assistant may do, not whether a human's config change lands.
 
+**Action Request** — An outbound API call raised from an **Incident** or **Case** (by a person, or by a Decision
+Rule's `invoke-api` consequence) and held for a second person's approval before it is sent: the target
+**Connection**, the method, the payload rendered at creation, an idempotency key, and its delivery — attempts and
+the last response. Approved / declined four-eyes (`canApproveChanges`), then sent with bounded retries; a failed
+one can be retried under the same key. *(Added 2026-09-27, operator decision D-P1, `ASSURE-ACTION-REQUESTS-1`; as
+built: [`okf/backend/control-plane/action-requests.md`](okf/backend/control-plane/action-requests.md).)* ⛔ never
+"webhook call" or "outbound action" for this — a **webhook** is the `sink.webhook` Step or a notification
+channel, neither of which is approved. ⛔ Not a **Pending Change**: that holds a config change; this holds a call.
+
 **Approval Policy** — The per-Space, per-kind setting (`approval.toon`, `GET|PUT /settings/approval`) that
 says which config kinds need a Pending Change, which capability may approve one, and whether four-eyes
 applies. Default off.

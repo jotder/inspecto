@@ -53,7 +53,8 @@ identically to what the UI authors and `ConditionTree` evaluates.
 ## Record-routing consequences run during live pipeline execution
 
 `apply` executes real platform consequences on demand (`emit-signal`, `start-job`,
-`trigger-pipeline`; stub signals for `render-widget`/`generate-report`/`invoke-api`). `start-job` on a
+`trigger-pipeline`; stub signals for `render-widget`/`generate-report`; `invoke-api` proposes a pending
+[Action Request](action-requests.md) on the rule's Incident — never a direct call). `start-job` on a
 **disabled** job depends on **how the rule was applied** (operator, 2026-09-25; disabled means "not scheduled",
 [jobs](jobs.md)): a **person's** `POST /decision-rules/{name}/apply` (the SPA's *Apply*) runs it like *Run now*
 (`executed`, the entry carries its `runId`, the run's trigger is `manual:<actor>` from `ApiContext.actor`); an
