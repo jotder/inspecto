@@ -71,6 +71,12 @@ final class AuditTrail {
                     .attr(AuditAttrs.HTTP_PATH, path)
                     .attr(AuditAttrs.HTTP_STATUS, status);
             if (capability != null) event.attr(AuditAttrs.CAPABILITY, capability);
+            // ASSURE-MAKER-CHECKER-1 (D-P13): an approved Pending Change's write is the author's (the actor
+            // above); the approver who let it through rides on the same row.
+            if (ApiContext.attr(ex, ApiContext.ATTR_APPROVED_CHANGE) instanceof java.util.Map<?, ?> pc) {
+                event.attr("approvedBy", pc.get("approvedBy"));
+                event.attr("pendingChange", pc.get("id"));
+            }
             EventLog.current().emit(event);
         } catch (RuntimeException ignore) {
             // best effort — the audit trail must never break the request

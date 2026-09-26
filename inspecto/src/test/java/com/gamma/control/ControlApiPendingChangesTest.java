@@ -260,13 +260,56 @@ class ControlApiPendingChangesTest {
                     .statusCode());
             assertEquals(403, send(c, "POST", "/pending-changes/pc-20260101000000-abcdef/decline", "{}", AUTHOR)
                     .statusCode(), "the route gate: no canApproveChanges");
-            // PLAIN holds canApproveChanges but not the route's own canAuthorWorkbench: the replay refuses it,
-            // and the change stays pending for someone who may apply it.
-            HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", PLAIN);
-            assertEquals(403, r.statusCode(), r.body());
-            assertEquals("pending", data(send(c, "GET", "/pending-changes/" + id, null, CHECKER), 200)
+            // D-P13: PLAIN holds canApproveChanges and NOT the route's canAuthorWorkbench — a checker need not be
+            // a builder. The write is the AUTHOR's, so it applies.
+            JsonNode ok = data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", PLAIN), 200);
+            assertTrue(ok.get("applied").asBoolean(), ok.toString());
+            assertTrue(store(c).exists("pattern-pack", "p1"));
+        }
+    }
+
+    // ── D-P13 with the SEEDED role table: an admin (canApproveChanges, no canAuthorWorkbench) approves a builder ──
+
+    /** An Authenticator shaped like the OIDC one: `Bearer <user>:<role>` → the role's grants in THIS Space's table. */
+    private static void armWithSeededRoles() {
+        Authenticators.forTest(ex -> {
+            String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
+            if (!h.startsWith("Bearer ") || !h.contains(":")) return Optional.empty();
+            String user = h.substring(7, h.indexOf(':')), role = h.substring(h.indexOf(':') + 1);
+            Roles.Def def = Roles.effective(ex).get(role);
+            if (def == null) return Optional.empty();
+            ComponentAccess.heldRoles(ex, Set.of(role));
+            return Optional.of(new Subject(user, def.capabilities(), def.dataScopes()));
+        });
+    }
+
+    @Test
+    void aSeededAdminApprovesABuildersChangeAndTheAuthorIsRecheckedAtApplyTime(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        armWithSeededRoles();
+        String builder = "Bearer dana:pipeline-developer", admin = "Bearer ada:admin";
+        try (Ctx c = open(cfg, root)) {
+            assertFalse(Roles.SEED.get("admin").capabilities().contains("canAuthorWorkbench"), "premise: admin is no builder");
+            assertTrue(Roles.SEED.get("admin").capabilities().contains("canApproveChanges"));
+            data(send(c, "PUT", "/settings/approval", PACK_POLICY, admin.replace("ada", "ops-admin")), 200);
+
+            String first = data(send(c, "POST", "/components/pattern-pack", "{\"id\":\"p1\",\"title\":\"A\"}", builder),
+                    202).at("/pendingChange/id").asText();
+            JsonNode ok = data(send(c, "POST", "/pending-changes/" + first + "/approve", "{}", admin), 200);
+            assertTrue(ok.get("applied").asBoolean(), ok.toString());
+            assertEquals("dana", store(c).get("pattern-pack", "p1").orElseThrow().content().get("owner"),
+                    "applied as its author");
+
+            // The author loses the grant in THIS Space's role table while a second change waits: re-checked now.
+            String second = data(send(c, "POST", "/components/pattern-pack", "{\"id\":\"p2\",\"title\":\"B\"}", builder),
+                    202).at("/pendingChange/id").asText();
+            Roles.write(root, Map.of("pipeline-developer", new Roles.Def(Set.of("canRequestShares"), null)), List.of());
+            HttpResponse<String> refused = send(c, "POST", "/pending-changes/" + second + "/approve", "{}", admin);
+            assertEquals(403, refused.statusCode(), refused.body());
+            assertTrue(refused.body().contains("no longer holds"), refused.body());
+            assertFalse(store(c).exists("pattern-pack", "p2"));
+            assertEquals("pending", data(send(c, "GET", "/pending-changes/" + second, null, admin), 200)
                     .get("status").asText());
-            assertFalse(store(c).exists("pattern-pack", "p1"));
         }
     }
 

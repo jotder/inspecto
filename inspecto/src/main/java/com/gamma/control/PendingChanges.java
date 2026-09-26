@@ -117,6 +117,15 @@ public final class PendingChanges {
         rec.put("status", "pending");
         rec.put("author", ApiContext.actor(ex));
         rec.put("authorType", ApiContext.actorType(ex));
+        // D-P13: the AUTHOR applies an approved change, re-checked at apply time — so record who they are in
+        // this Space's role table: their recognised roles (re-resolved against the table as it is THEN), and
+        // their capabilities + data scopes now (used only when the Authenticator stamps no roles).
+        Subject author = ApiContext.subject(ex).orElse(null);
+        rec.put("authorRoles", ApiContext.attr(ex, ComponentAccess.ATTR_HELD_ROLES) instanceof Set<?> held
+                ? held.stream().map(String::valueOf).sorted().toList() : List.of());
+        rec.put("authorCapabilities", author == null ? List.of() : author.capabilities().stream().sorted().toList());
+        rec.put("authorDataScopes", author == null || author.dataScopes() == null ? null
+                : author.dataScopes().stream().sorted().toList());
         rec.put("reason", reason == null || reason.isBlank() ? null : reason.trim());
         rec.put("createdAt", now.toString());
         rec.put("expiresAt", now.plus(policy.expiresAfterHours(), ChronoUnit.HOURS).toString());
@@ -191,13 +200,28 @@ public final class PendingChanges {
     }
 
     /**
-     * The author a replayed write acts on behalf of, or {@code null} outside a replay — so provenance a route
-     * stamps from the caller (a component's {@code owner}) names the person who PROPOSED the change, and the
-     * approved write is byte-for-byte the proposed one.
+     * The AUTHOR of {@code rec} as a Subject whose capabilities are as they are NOW (D-P13, verification
+     * finding 3): the approved write is the author's act, so the route re-checks the AUTHOR's authority at
+     * apply time, and a checker need not be a builder. With recorded roles (an Authenticator that stamps them —
+     * the OIDC one does) the capabilities are re-resolved against {@code configRoot}'s role table and Access
+     * Profiles as they stand now, exactly as {@code OidcAuthenticator} resolves them; without, the snapshot
+     * taken at propose time is all there is. ⚠ Role MEMBERSHIP is the IdP's and is as of the proposal — a
+     * server cannot re-ask the IdP for a user who is not in the request.
      */
-    static String onBehalfOf(HttpExchange ex) {
-        return ApiContext.attr(ex, ApiContext.ATTR_APPROVED_CHANGE) instanceof Map<?, ?> pc && pc.get("author") != null
-                ? String.valueOf(pc.get("author")) : null;
+    @SuppressWarnings("unchecked")
+    static Subject authorNow(Map<String, Object> rec, Path configRoot) {
+        List<String> roles = rec.get("authorRoles") instanceof List<?> l ? (List<String>) l : List.of();
+        java.util.Set<String> caps = new java.util.TreeSet<>();
+        if (!roles.isEmpty()) {
+            Map<String, Roles.Def> defs = Roles.effective(configRoot);
+            for (String r : roles) if (defs.get(r) != null) caps.addAll(defs.get(r).capabilities());
+            caps.removeAll(AccessGrants.deniedCapabilities(configRoot, roles));
+        } else if (rec.get("authorCapabilities") instanceof List<?> snap) {
+            for (Object c : snap) caps.add(String.valueOf(c));
+        }
+        java.util.Set<String> scopes = rec.get("authorDataScopes") instanceof List<?> ds
+                ? new java.util.TreeSet<>(ds.stream().map(String::valueOf).toList()) : null;
+        return new Subject(String.valueOf(rec.get("author")), caps, scopes);
     }
 
     /**

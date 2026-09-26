@@ -188,11 +188,20 @@ final class PendingChangeRoutes implements RouteModule {
 
             Map<String, Object> request = (Map<String, Object>) rec.get("request");
             Map<String, Object> marker = new LinkedHashMap<>(rec);
+            marker.put("approvedBy", by);   // AuditTrail stamps it on the replayed write beside the author (actor)
             Map<String, String> headers = new LinkedHashMap<>();
             if (request.get("headers") instanceof Map<?, ?> h) h.forEach((k, v) -> headers.put(String.valueOf(k), String.valueOf(v)));
+            // D-P13: the write is the AUTHOR's, re-checked as they stand now — the approver needed only the
+            // approver capability above. The replay runs as the author; their recorded roles ride with them.
+            Path rolesRoot = Roles.configRoot(ex) != null ? Roles.configRoot(ex) : root;
+            Subject author = PendingChanges.authorNow(rec, rolesRoot);
+            Map<String, Object> replayAttrs = new LinkedHashMap<>();
+            replayAttrs.put(ApiContext.ATTR_APPROVED_CHANGE, marker);
+            replayAttrs.put(ApiContext.ATTR_SUBJECT, author);
+            replayAttrs.put(ComponentAccess.ATTR_HELD_ROLES, java.util.Set.copyOf(
+                    rec.get("authorRoles") instanceof List<?> l ? l.stream().map(String::valueOf).toList() : List.<String>of()));
             ApiContext.Replayed r = api.replay(ex, String.valueOf(request.get("method")), String.valueOf(request.get("path")),
-                    String.valueOf(request.get("body")).getBytes(StandardCharsets.UTF_8), headers,
-                    Map.of(ApiContext.ATTR_APPROVED_CHANGE, marker));
+                    String.valueOf(request.get("body")).getBytes(StandardCharsets.UTF_8), headers, replayAttrs);
             boolean applied = r.status() >= 200 && r.status() < 300 && "verified".equals(marker.get("outcome"));
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("status", r.status());
@@ -225,6 +234,9 @@ final class PendingChangeRoutes implements RouteModule {
             }
             int status = r.status() >= 200 && r.status() < 300 ? 409 : r.status();
             String message = errorField(r.body(), "message");
+            if (r.status() == 403 && message != null)
+                message = "the author '" + rec.get("author") + "' no longer holds what this change needs (" + message
+                        + ") — the change is applied as its author, re-checked now";
             throw new ApiException(status, status == 409 ? ErrorCodes.CONFLICT : errorField(r.body(), "errorCode"),
                     "pending change '" + id + "' was not applied: " + (message == null
                             ? "its route answered " + r.status() + " without reaching the approved write" : message));
