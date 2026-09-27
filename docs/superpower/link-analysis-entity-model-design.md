@@ -333,5 +333,18 @@ append time and replay never re-reads the list:
 - ⚠ Gotcha: `ApiContext.query` decodes the JDK's already-decoded `getQuery()`, so `%2B` becomes a space; the group
   lookup reads `getRawQuery()` instead (`EntityIdentityRoutes.rawQuery`). Any other route taking a `+` in a query
   parameter has the same defect — not fixed here.
+- ⚠ Known limit (D-M9): a list created before D-M9 has no `normaliser` on its `list.created` fact and folds to
+  `default`, whatever its Entity Type's rule. Dev data only; there is deliberately no compat path (breaking changes
+  are free).
+- **Review fixes (2026-09-27)**: (1) an empty typed key (`N/A` under `digits`/`e164`) mints no node and no edge in the
+  SPA (`typedOrEntityId` returns `null`, every mint site skips it like a blank value) — the server already refuses
+  empty keys, and its projection routes only ship `columnTypes` (they mint no ids), while the evaluator/masking only
+  test normalised ids against member sets that never hold `""`. (2) Entity Type id `entity` is reserved (422 on
+  settings save — it would collide with untyped `entity:<value>`). (3) **Membership oracle, confirmed by probe**: under
+  masking a Space-only caller sent a guessed raw key to the group read and got a 2-member group (plus the key's token)
+  for a grouped key vs 1 member otherwise. Both identity reads now require `canManageIncidents`, always
+  (`ControlApiEntityIdentityTest.identityReadsNeedCanManageIncidentsSoARawKeyCannotBeProbed`). **Entity List reads
+  stay Space-open**: they take no key input, and masked members are keyed-HMAC tokens a caller cannot compute, so with
+  the group read gated there is no guess-and-check path.
 - **Owed**: applying resolution in Investigations (pinned `atSeq`, merged nodes showing members + joining assertions,
   §8.1 last bullet) waits on the parallel SPA lane; D-M11's `typedEntityKey` projection step; SPA client methods.
