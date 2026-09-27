@@ -83,6 +83,13 @@ public final class AlertService {
      * restart neither re-raises every open key nor forgets to heal one.
      */
     private final Map<String, java.util.Set<String>> openKeys = new ConcurrentHashMap<>();
+    /**
+     * ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1 (2): {@code <rule>|<dataset>} of a scalar (no-{@code by}) Measure rule
+     * → whether it was breached at the last sweep that could read it — that rule's breach / heal EDGE detector,
+     * the one-key counterpart of {@link #openKeys}. Seeded on the rule's first sweep from its still-active ALERT
+     * object ({@link #measureOpen}), so a restart does not forget to heal it.
+     */
+    private final Map<String, Boolean> openMeasures = new ConcurrentHashMap<>();
     /** The object attribute that dedupes a per-key Alert / Incident: {@code <rule>|<key>}. */
     static final String ALERT_KEY = "alertKey";
     /** The pseudo-key of a {@code by} rule's storm Alert. A real key always reads {@code col=value}, so never this. */
@@ -235,6 +242,19 @@ public final class AlertService {
      */
     private void retireKeys(AlertRule old) {
         openKeys.remove(old.name());
+        if (old.isMeasureRule() && !old.isGrouped()) {
+            // The scalar Measure rule's one "key": its edge state goes and its still-active ALERT resolves, as a
+            // `by` rule's per-key ALERTs do below. Its Incident, likewise, stays with triage.
+            openMeasures.remove(old.name() + "|" + old.dataset());
+            if (objects == null) return;
+            try {
+                String alertId = objects.activeAttributeIndex(ObjectType.ALERT, old.dataset(), "rule").get(old.name());
+                if (alertId != null) objects.transition(alertId, "resolve", actor(old) + ":rule-changed");
+            } catch (RuntimeException e) {
+                log.warn("could not retire the open Alert of alert rule {}: {}", old.name(), e.getMessage());
+            }
+            return;
+        }
         if (!old.isGrouped() || objects == null) return;
         String prefix = old.name() + "|";
         String actor = actor(old) + ":rule-changed";
@@ -374,8 +394,15 @@ public final class AlertService {
             var probe = measureProbe;
             if (probe == null) continue;
             java.util.OptionalDouble value = probe.apply(rule.dataset(), rule.measure());
-            if (value.isEmpty() || !rule.breached(value.getAsDouble())) continue;
-            fire(rule, rule.dataset(), rule.dataset(), value.getAsDouble(), nowMs, out);
+            if (value.isEmpty()) continue;                // unknown: neither fires nor heals
+            String measureKey = rule.name() + "|" + rule.dataset();
+            if (rule.breached(value.getAsDouble())) {
+                openMeasures.put(measureKey, Boolean.TRUE);
+                fire(rule, rule.dataset(), rule.dataset(), value.getAsDouble(), nowMs, out);
+            } else if (measureOpen(rule, measureKey)) {
+                openMeasures.put(measureKey, Boolean.FALSE);
+                healMeasure(rule, measureKey, value.getAsDouble(), nowMs);
+            }
         }
 
         // Investigation rules (LA-23) are scoped to their Investigation: the scope — and so the cooldown key, the
@@ -519,6 +546,72 @@ public final class AlertService {
             EventLog.current().emit(s.toEvent());
         } catch (RuntimeException e) {
             log.warn("could not emit alert-rule.cleared signal for {}: {}", rule.name(), e.getMessage());
+        }
+    }
+
+    // ── scalar Measure rule heal — ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1 (2) ──────────────
+
+    /** Whether the scalar Measure rule was breached at its last readable sweep; on its first sweep in this
+     *  instance, whether it left an ALERT open (the restart case — see {@link #openMeasures}). */
+    private boolean measureOpen(AlertRule rule, String measureKey) {
+        return openMeasures.computeIfAbsent(measureKey, k -> {
+            if (objects == null) return Boolean.FALSE;
+            try {
+                return objects.hasActiveMatching(ObjectType.ALERT, rule.dataset(), Map.of("rule", rule.name()));
+            } catch (RuntimeException e) {
+                log.warn("could not read the open Alert of alert rule {}: {}", rule.name(), e.getMessage());
+                return Boolean.FALSE;
+            }
+        });
+    }
+
+    /**
+     * A scalar Measure rule stopped breaching: the same heal as one key of a {@code by} rule ({@link #healKey}) —
+     * the all-clear Event + {@code alert-rule.cleared} Signal (correlated with the fired Signal), the cooldown
+     * cleared so a relapse fires at once, and its ALERT resolved. ⛔ Its INCIDENT is never resolved by this
+     * heal — only a human records a Disposition (see {@link #healKey}); a relapse re-opens it if an operator
+     * resolved it ({@link #promoteToIncident}).
+     */
+    private void healMeasure(AlertRule rule, String measureKey, double value, long nowMs) {
+        lastFired.remove(measureKey);   // the fire() cooldown key — the next breach must fire at once
+        String scope = rule.dataset();
+        String message = String.format(Locale.ROOT, "CLEARED: %s on %s no longer breaches alert rule %s (now %s)",
+                rule.measure(), textScope(rule, scope), rule.name(), value);
+        log.info("[ALERT-CLEARED] {}", message);
+        EventLog.current().emit(Event.builder(EventType.ALERT_CLEARED)
+                .level(EventLevel.INFO)
+                .source(AlertService.class.getName())
+                .pipeline(scope)
+                .message(message)
+                .attr("rule", rule.name())
+                .attr("dataset", scope)
+                .attr("measure", rule.measure())
+                .attr("value", value)
+                .attr("severity", rule.severity())
+                .attr(com.gamma.notify.Notification.RECIPIENT_ATTR, recipient(rule))
+                .build());
+        try {
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("rule", rule.name());
+            payload.put("dataset", scope);
+            payload.put("measure", rule.measure());
+            payload.put("value", value);
+            payload.put("owner", rule.owner());
+            Signal s = new Signal(null, "alert-rule.cleared", Instant.ofEpochMilli(nowMs),
+                    Severity.INFO, Ref.of("alert-rule", rule.name()), Ref.of("dataset", scope),
+                    "alert:" + measureKey,   // the fired Signal's correlation key
+                    null, null, null, message, payload, 1);
+            EventLog.current().emit(s.toEvent());
+        } catch (RuntimeException e) {
+            log.warn("could not emit alert-rule.cleared signal for {}: {}", rule.name(), e.getMessage());
+        }
+        if (objects == null) return;
+        try {
+            String alertId = objects.activeAttributeIndex(ObjectType.ALERT, scope, "rule").get(rule.name());
+            if (alertId != null) objects.transition(alertId, "resolve", actor(rule));
+            // the Incident is left to the human who records its Disposition
+        } catch (RuntimeException e) {
+            log.warn("could not resolve the Alert of rule {}: {}", rule.name(), e.getMessage());
         }
     }
 
@@ -875,7 +968,9 @@ public final class AlertService {
      * is added when the promotion is <em>suppressed</em> as a duplicate: a re-fire whose earlier ALERT was
      * resolved but whose INCIDENT is still being handled opens a fresh ALERT that stays unlinked. Wiring
      * that case needs "link to the active Incident instead", which the {@code IncidentAccess} contract
-     * cannot express today (it reports suppressed and dry-run alike as an empty result).
+     * cannot express today (it reports suppressed and dry-run alike as an empty result). A scalar Measure
+     * rule — which heals, so its relapse is routine — does exactly that by looking the active Incident up
+     * on the {@code rule} attribute, as a {@code by} key does on {@link #ALERT_KEY}.
      */
     private void promoteToIncident(AlertRule rule, Alert alert, String title, String pipeline,
                                    Map<String, String> attrs, String alertObjectId) {
@@ -883,14 +978,25 @@ public final class AlertService {
         // S1-4: promote through the incidents Platform Service — the same interface a granted Run
         // uses. The service enforces the active-object convention (one active INCIDENT per
         // rule+pipeline) via the "rule" dedupe attribute already present in attrs.
-        incidents.openIncident(title, alert.message(),
-                        rule.severity(), pipeline, new LinkedHashMap<>(attrs), "rule")
+        java.util.Optional<String> incidentId = incidents.openIncident(title, alert.message(),
+                rule.severity(), pipeline, new LinkedHashMap<>(attrs), "rule");
+        if (incidentId.isEmpty() && rule.isMeasureRule()) {
+            // A scalar Measure rule heals (healMeasure), so a relapse meets its still-active Incident exactly as a
+            // `by` key does (persistKeyObjects): re-open it if an operator RESOLVED it (`reopen` answers false from
+            // IDENTIFIED/DIAGNOSING), and link the relapse Alert to it either way.
+            String existing = objects.activeAttributeIndex(ObjectType.INCIDENT, pipeline, "rule").get(rule.name());
+            if (existing != null) {
+                objects.transition(existing, "reopen", actor(rule));
+                incidentId = java.util.Optional.of(existing);
+            }
+        }
+        incidentId
                 // Machine actor, mirroring the Case Rules auto-linker's `case-rule:<name>` convention.
                 // ⚠ `incidentId` is the id itself since EDG-01 cell 7 — this was the only reader of the
                 // opened object, and it only ever wanted .id().
                 // ⚠ "ESCALATED_FROM" as a String: LinkRelationship is domain vocabulary and stays in the
                 // optional module, so the seam names the relationship rather than importing the enum.
-                .ifPresent(incidentId -> objects.link(incidentId, alertObjectId,
+                .ifPresent(id -> objects.link(id, alertObjectId,
                         ESCALATED_FROM, "alert-rule:" + rule.name()));
     }
 

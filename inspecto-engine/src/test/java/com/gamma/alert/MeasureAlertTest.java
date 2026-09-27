@@ -6,6 +6,10 @@ import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.StatusStore;
+import com.gamma.event.Event;
+import com.gamma.event.EventLevel;
+import com.gamma.event.EventLog;
+import com.gamma.event.EventType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,7 +18,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
 import java.util.Set;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -87,6 +93,65 @@ class MeasureAlertTest {
 
     private static AlertRule measureRule2(String dataset) {
         return new AlertRule("few-orders", null, "lt", 1000, null, "WARNING", null, dataset, "count");
+    }
+
+    // ── heal — ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1 (2) ───────────────────────────────
+
+    private static List<Event> cleared(List<Event> seen, String dataset) {
+        return seen.stream().filter(e -> EventType.ALERT_CLEARED.equals(e.type())
+                && dataset.equals(e.attributes().get("dataset"))).toList();
+    }
+
+    @Test
+    void aScalarMeasureRuleHealsOnTheEdgeAndARelapseFiresAtOnce(@TempDir Path dir) throws Exception {
+        List<Event> seen = new CopyOnWriteArrayList<>();
+        EventLog.current().addSubscriber(seen::add);
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        AlertService svc = new AlertService(
+                List.of(measureRule("heal_ds", "sum(amount)", "lt", 1000)), configs(cfg), emptyStore());
+        AtomicReference<OptionalDouble> value = new AtomicReference<>(OptionalDouble.of(750.0));
+        svc.measureProbe((d, m) -> value.get());
+
+        assertEquals(1, svc.evaluate(null, 0).size(), "breach");
+        value.set(OptionalDouble.of(1500.0));                           // recovers, inside the cooldown
+        assertTrue(svc.evaluate(null, 1000).isEmpty(), "an all-clear is not a fired Alert");
+        List<Event> clears = cleared(seen, "heal_ds");
+        assertEquals(1, clears.size(), "the recovery is announced even while the breach's cooldown runs");
+        assertEquals(EventLevel.INFO, clears.get(0).level());
+        assertEquals("low-revenue", clears.get(0).attributes().get("rule"));
+        assertTrue(seen.stream().anyMatch(e -> EventType.SIGNAL.equals(e.type())
+                && "alert-rule.cleared".equals(e.attributes().get(com.gamma.signal.Signal.ATTR_TYPE))
+                && "alert:low-revenue|heal_ds".equals(e.correlationId())), "the correlated all-clear Signal");
+
+        assertTrue(svc.evaluate(null, 2000).isEmpty());
+        assertEquals(1, cleared(seen, "heal_ds").size(), "healthy again: no second all-clear (edge only)");
+
+        value.set(OptionalDouble.of(10.0));                             // relapse 3s after the first fire
+        assertEquals(1, svc.evaluate(null, 3000).size(),
+                "the heal reset the cooldown — the relapse is not swallowed by a breach that is over");
+    }
+
+    @Test
+    void anUnknownValueNeitherFiresNorHealsAndANeverBreachedRuleIsNeverCleared(@TempDir Path dir) throws Exception {
+        List<Event> seen = new CopyOnWriteArrayList<>();
+        EventLog.current().addSubscriber(seen::add);
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        AlertService svc = new AlertService(
+                List.of(measureRule("unknown_ds", "sum(amount)", "lt", 1000)), configs(cfg), emptyStore());
+        AtomicReference<OptionalDouble> value = new AtomicReference<>(OptionalDouble.of(5000.0));
+        svc.measureProbe((d, m) -> value.get());
+
+        svc.evaluate(null, 0);
+        assertTrue(cleared(seen, "unknown_ds").isEmpty(), "never breached ⇒ nothing to clear");
+
+        value.set(OptionalDouble.of(1.0));
+        assertEquals(1, svc.evaluate(null, 1000).size());
+        value.set(OptionalDouble.empty());                              // the Dataset cannot be read
+        svc.evaluate(null, 2000);
+        assertTrue(cleared(seen, "unknown_ds").isEmpty(), "unknown is not healed");
+        value.set(OptionalDouble.of(5000.0));
+        svc.evaluate(null, 3000);
+        assertEquals(1, cleared(seen, "unknown_ds").size(), "readable and healthy ⇒ healed");
     }
 
     @Test
