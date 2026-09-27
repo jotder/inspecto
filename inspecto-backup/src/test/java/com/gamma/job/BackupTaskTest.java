@@ -133,6 +133,17 @@ class BackupTaskTest {
     }
 
     @Test
+    void backupNeverArchivesDuckDbSpill(@TempDir Path source, @TempDir Path backupDir) throws Exception {
+        JobConfig cfg = backupCfg(source, backupDir);
+        Files.writeString(Files.createDirectories(source.resolve(".duckdb_tmp")).resolve("x.tmp"), "spill");
+        JobResult r = new MaintenanceJob(cfg).run();
+        assertTrue(r.message().contains("archived 2 file(s), 9 byte(s)"), r.message());
+        try (var zf = new java.util.zip.ZipFile(onlyZip(backupDir).toFile())) {
+            assertTrue(zf.stream().noneMatch(e -> e.getName().contains(".duckdb_tmp")), "spill not archived");
+        }
+    }
+
+    @Test
     void backupVerifyPassesThenDetectsCorruption(@TempDir Path source, @TempDir Path backupDir) throws Exception {
         new MaintenanceJob(backupCfg(source, backupDir)).run();
         JobConfig verify = job(Map.of("task", "backup_verify", "backup_dir", backupDir.toString()));

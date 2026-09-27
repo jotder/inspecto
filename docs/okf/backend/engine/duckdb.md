@@ -45,7 +45,10 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   `StorageSeries`, `ObjectsAnalyticsJob` via `SpaceConfigRoot.currentDataRoot()` (the compactors deliberately
   NOT under the store dir they walk). No Space context ⇒ `spillDir = null` ⇒ `java.io.tmpdir`:
   `ParquetEventStore`, `ExchangeSnapshotWriter`, `PipelineDocumentXlsx`, `TypeFlow`, `SchemaExtractor`,
-  `SqlGuard`. Test: `DuckDbSettingsTest.openInMemory*`. `SqlSandbox` keeps its own 1GB cap.
+  `SqlGuard`. ⚠ Data-root walks must skip the spill dir: `BackupTask` and `StorageReportTask` use
+  `DuckDbUtil.regularFilesSkippingSpill` (no descent into `.duckdb_tmp`, vanished entries tolerated) so
+  concurrent spill is never archived/counted and cannot fail the walk. Test: `DuckDbSettingsTest.openInMemory*`,
+  `BackupTaskTest.backupNeverArchivesDuckDbSpill`, `MaintenanceLibraryTest.storageReportIgnoresDuckDbSpill`. `SqlSandbox` keeps its own 1GB cap.
 * **Memory / spill caps (opt-in; one knob for every scratch connection).** `DuckDbUtil.applyDuckDbSettings`
   sets `memory_limit` / `temp_directory` (spill) / `max_temp_directory_size` when a value is configured;
   unset ⇒ DuckDB's own default (≈ 80% RAM **per instance** — the aggregate-overcommit hazard under

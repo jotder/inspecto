@@ -100,13 +100,12 @@ final class BackupTask {
             return JobResult.ok("backup: source directory not present, nothing to do (" + dir + ")", 0L);
         }
         List<Path> files;
-        try (Stream<Path> walk = Files.walk(dir)) {
-            files = new ArrayList<>(walk.filter(Files::isRegularFile)
-                    .filter(p -> !p.toAbsolutePath().normalize()
-                            .startsWith(backupDir.toAbsolutePath()))   // never archive the archive dir
-                    .filter(p -> !secret(dir, p))                       // never archive a secret
-                    .toList());
-        }
+        // Skips <data root>/.duckdb_tmp: concurrent jobs' transient DuckDB spill is never archived.
+        files = new ArrayList<>(com.gamma.util.DuckDbUtil.regularFilesSkippingSpill(dir).stream()
+                .filter(p -> !p.toAbsolutePath().normalize()
+                        .startsWith(backupDir.toAbsolutePath()))   // never archive the archive dir
+                .filter(p -> !secret(dir, p))                       // never archive a secret
+                .toList());
         files.sort(Comparator.comparing(Path::toString));   // deterministic archive order
         long totalBytes = 0;
         for (Path p : files) totalBytes += Files.size(p);

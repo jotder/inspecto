@@ -660,6 +660,14 @@ class MaintenanceLibraryTest {
     }
 
     @Test
+    void storageReportIgnoresDuckDbSpill(@TempDir Path space) throws Exception {
+        Files.writeString(Files.createDirectories(space.resolve("data")).resolve("small.csv"), "12");
+        Files.writeString(Files.createDirectories(space.resolve(".duckdb_tmp")).resolve("x.tmp"), "spillspill");
+        JobResult r = new MaintenanceJob(job(Map.of("task", "storage_report", "dir", space.toString()))).run();
+        assertTrue(r.message().contains("1 file(s), 2 byte(s)"), r.message());
+    }
+
+    @Test
     void storageReportStaysQuietUnderTheThreshold(@TempDir Path space) throws Exception {
         Files.writeString(Files.createDirectories(space.resolve("data")).resolve("small.csv"), "12");
         JobResult r = new MaintenanceJob(job(Map.of("task", "storage_report",

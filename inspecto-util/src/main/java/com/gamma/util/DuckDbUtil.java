@@ -147,6 +147,33 @@ public final class DuckDbUtil {
     }
 
     /**
+     * Every regular file under {@code root}, never descending into a {@link #SPILL_DIR_NAME} directory —
+     * concurrent jobs' DuckDB spill is transient, so a data-root walk (backup, storage report) must neither
+     * archive/count it nor fail when a spill file vanishes mid-walk. Other vanished entries are skipped too.
+     */
+    public static java.util.List<Path> regularFilesSkippingSpill(Path root) throws IOException {
+        java.util.List<Path> out = new java.util.ArrayList<>();
+        Files.walkFileTree(root, new java.nio.file.SimpleFileVisitor<>() {
+            @Override
+            public java.nio.file.FileVisitResult preVisitDirectory(Path dir, java.nio.file.attribute.BasicFileAttributes a) {
+                return dir.getFileName() != null && SPILL_DIR_NAME.equals(dir.getFileName().toString())
+                        ? java.nio.file.FileVisitResult.SKIP_SUBTREE : java.nio.file.FileVisitResult.CONTINUE;
+            }
+            @Override
+            public java.nio.file.FileVisitResult visitFile(Path f, java.nio.file.attribute.BasicFileAttributes a) {
+                if (a.isRegularFile()) out.add(f);
+                return java.nio.file.FileVisitResult.CONTINUE;
+            }
+            @Override
+            public java.nio.file.FileVisitResult visitFileFailed(Path f, IOException e) throws IOException {
+                if (e instanceof java.nio.file.NoSuchFileException) return java.nio.file.FileVisitResult.CONTINUE;
+                throw e;
+            }
+        });
+        return out;
+    }
+
+    /**
      * Open an in-memory {@code jdbc:duckdb:} scratch connection with {@code memory_limit} resolved through
      * {@link #memoryLimit} and {@code temp_directory} set to {@code spillDir}
      * (DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1). ⚠ An in-memory database otherwise spills to {@code .tmp}

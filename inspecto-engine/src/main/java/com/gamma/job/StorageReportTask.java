@@ -19,7 +19,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.stream.Stream;
 
 /**
  * The {@code storage_report} maintenance task (MNT-3): read-only storage observation over {@code dir}
@@ -55,8 +54,9 @@ final class StorageReportTask {
         Map<String, long[]> axes = new TreeMap<>();          // axis -> {files, bytes}
         List<Map.Entry<Path, Long>> files = new ArrayList<>();
         long totalBytes = 0;
-        try (Stream<Path> walk = Files.walk(dir)) {
-            for (Path p : walk.filter(Files::isRegularFile).toList()) {
+        try {
+            // Skips <data root>/.duckdb_tmp: transient DuckDB spill is not stored data.
+            for (Path p : com.gamma.util.DuckDbUtil.regularFilesSkippingSpill(dir)) {
                 long size;
                 try {
                     size = Files.size(p);
