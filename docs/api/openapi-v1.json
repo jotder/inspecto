@@ -8879,103 +8879,452 @@
     "/pending-changes" : {
       "get" : {
         "tags" : [ "pending-changes" ],
-        "summary" : "GET /pending-changes (generated skeleton)",
+        "summary" : "List the Space's Pending Changes",
         "operationId" : "getPendingChanges",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+        "description" : "Every Pending Change of the Space, newest first, without content (`current` / `proposed` / `request` are omitted — GET /pending-changes/{id} reads them). Open to any caller (reads are not capability-gated). A still-pending change past its `expiresAt` is recorded `expired` as it is read. At most 500 items are returned; `total` is the true count after filtering and `truncated` says whether items were cut. With no write root the list is empty.",
+        "parameters" : [ {
+          "name" : "status",
+          "in" : "query",
+          "required" : false,
+          "description" : "Only changes in this status.",
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "pending", "approved", "declined", "withdrawn", "expired", "stale", "invalid" ]
           }
-        },
-        "x-generated" : true
+        }, {
+          "name" : "kind",
+          "in" : "query",
+          "required" : false,
+          "description" : "Only changes to this policy kind (e.g. `pipeline`, `pattern-pack`).",
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "The matching Pending Changes.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/PendingChangeList"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "The Pending Change store is locked by another request or Pod beyond the wait bound (STORE_BUSY) — retry.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/pending-changes/{pendingchangeId}/diff" : {
       "get" : {
         "tags" : [ "pending-changes" ],
-        "summary" : "GET /pending-changes/{pendingchangeId}/diff (generated skeleton)",
+        "summary" : "Line diff of a Pending Change",
         "operationId" : "getPendingChangesByPendingchangeIdDiff",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "The TOON of `current` against the TOON of `proposed`, line by line — the Pipeline history diff.",
         "parameters" : [ {
           "name" : "pendingchangeId",
           "in" : "path",
           "required" : true,
+          "description" : "The Pending Change id, `pc-<yyyyMMddHHmmss>-<6 hex>`; any other shape is 422.",
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "pattern" : "^pc-\\d{14}-[0-9a-f]{6}$"
           }
         } ],
         "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          "200" : {
+            "description" : "The diff.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/PendingChangeDiff"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "422" : {
+            "description" : "The id is not a Pending Change id (CONFIG_VALIDATION_FAILED).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "The store is locked beyond the wait bound (STORE_BUSY) — retry.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
-        },
-        "x-generated" : true
+        }
       }
     },
     "/pending-changes/{pendingchangeId}" : {
       "get" : {
         "tags" : [ "pending-changes" ],
-        "summary" : "GET /pending-changes/{pendingchangeId} (generated skeleton)",
+        "summary" : "Read one Pending Change with its content",
         "operationId" : "getPendingChangesByPendingchangeId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "The full record: the summary fields plus `current` (what the change replaces, null for a create) and `proposed` (what it writes, null for a delete), and the method + path it was proposed through (the raw request body is never served). A record whose MAC does not verify is shown with `status: invalid` and `integrity: invalid`. Expired on read like the list.",
         "parameters" : [ {
           "name" : "pendingchangeId",
           "in" : "path",
           "required" : true,
+          "description" : "The Pending Change id, `pc-<yyyyMMddHHmmss>-<6 hex>`; any other shape is 422.",
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "pattern" : "^pc-\\d{14}-[0-9a-f]{6}$"
           }
         } ],
         "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          "200" : {
+            "description" : "The Pending Change.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/PendingChangeDetail"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "422" : {
+            "description" : "The id is not a Pending Change id (CONFIG_VALIDATION_FAILED).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "The store is locked beyond the wait bound (STORE_BUSY) — retry.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           }
-        },
-        "x-generated" : true
+        }
       }
     },
     "/pending-changes/{pendingchangeId}/approve" : {
       "post" : {
         "tags" : [ "pending-changes" ],
-        "summary" : "POST /pending-changes/{pendingchangeId}/approve (generated skeleton)",
+        "summary" : "Approve a Pending Change and apply it",
         "operationId" : "postPendingChangesByPendingchangeIdApprove",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Requires canApproveChanges (the route) and then the kind's `approverCapability` (in the handler). Gates in order: canApproveChanges 403 → no authenticated Subject 403 → write root 503 → `reason` over 500 chars 422 → unsafe id 422 → unknown 404 → MAC does not verify 409 → not pending (decided, withdrawn or expired) 409 → the kind's approverCapability 403 → with `fourEyes`, the author approving their own change 403. The original request is then replayed through the route it was proposed through, AS ITS AUTHOR with their authority re-checked now; only a replay that writes exactly the approved content applies. Decided under a cross-process compare-and-set: of two concurrent decisions one wins, the other is 409.",
         "parameters" : [ {
           "name" : "pendingchangeId",
           "in" : "path",
           "required" : true,
+          "description" : "The Pending Change id, `pc-<yyyyMMddHHmmss>-<6 hex>`; any other shape is 422.",
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "pattern" : "^pc-\\d{14}-[0-9a-f]{6}$"
           }
         } ],
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PendingChangeDecisionRequest"
+              }
+            }
           }
         },
-        "x-generated" : true
+        "responses" : {
+          "200" : {
+            "description" : "Applied: `applied: true`, the change `approved`, and `result` carrying the replayed route's own status and body.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/PendingChangeDecision"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "canApproveChanges or the kind's approverCapability missing; no authenticated Subject (an author and a decider cannot be told apart — Personal, which has no Authenticator, is always refused here); the author deciding their own four-eyes change; or the author no longer holds what the change needs (PERMISSION_DENIED).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "409" : {
+            "description" : "Already decided, withdrawn or expired; integrity check failed; the recorded request is not a maker-checker route; or the target changed since the change was proposed — the change is then closed `stale` (CONFLICT).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unsafe id or `reason` over 500 chars (CONFIG_VALIDATION_FAILED); a replay refused by its route with 422 comes back as that 422 and leaves the change pending.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Write root unset (CONTROL_PLANE_READ_ONLY), or the store locked beyond the wait bound (STORE_BUSY).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/pending-changes/{pendingchangeId}/decline" : {
       "post" : {
         "tags" : [ "pending-changes" ],
-        "summary" : "POST /pending-changes/{pendingchangeId}/decline (generated skeleton)",
+        "summary" : "Decline a Pending Change",
         "operationId" : "postPendingChangesByPendingchangeIdDecline",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Closes the change `declined`, unapplied; the target is free for a new proposal. Gates as approve up to and including four-eyes (an author may not decline their own four-eyes change — they withdraw it). Audited as `pending-change.declined`.",
         "parameters" : [ {
           "name" : "pendingchangeId",
           "in" : "path",
           "required" : true,
+          "description" : "The Pending Change id, `pc-<yyyyMMddHHmmss>-<6 hex>`; any other shape is 422.",
           "schema" : {
-            "type" : "string"
+            "type" : "string",
+            "pattern" : "^pc-\\d{14}-[0-9a-f]{6}$"
           }
         } ],
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PendingChangeDecisionRequest"
+              }
+            }
           }
         },
-        "x-generated" : true
+        "responses" : {
+          "200" : {
+            "description" : "Declined: `applied: false`, the change `declined` with `decidedBy`, `decidedAt` and `decisionReason`.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/PendingChangeDecision"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "canApproveChanges or the kind's approverCapability missing; no authenticated Subject (an author and a decider cannot be told apart — Personal, which has no Authenticator, is always refused here); or the author deciding their own four-eyes change (PERMISSION_DENIED).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "409" : {
+            "description" : "Already decided, withdrawn or expired, or the integrity check failed (CONFLICT).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unsafe id or `reason` over 500 chars (CONFIG_VALIDATION_FAILED).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Write root unset (CONTROL_PLANE_READ_ONLY), or the store locked beyond the wait bound (STORE_BUSY).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pending-changes/{pendingchangeId}/withdraw" : {
+      "post" : {
+        "tags" : [ "pending-changes" ],
+        "summary" : "Withdraw your own Pending Change",
+        "operationId" : "postPendingChangesByPendingchangeIdWithdraw",
+        "description" : "The AUTHOR takes back a change they proposed: it closes `withdrawn`, unapplied, signed and audited (`pending-change.withdrawn`) as a decline is. No capability is needed — only the Subject who proposed it may withdraw it. Gates in order: no authenticated Subject (an author and a decider cannot be told apart — Personal, which has no Authenticator, is always refused here) 403 → write root 503 → `reason` over 500 chars 422 → unsafe id 422 → unknown 404 → integrity 409 → not pending (decided, withdrawn or expired) 409 → the caller is not the author 403. Same cross-process compare-and-set as approve: a withdraw racing an approve leaves exactly one outcome.",
+        "parameters" : [ {
+          "name" : "pendingchangeId",
+          "in" : "path",
+          "required" : true,
+          "description" : "The Pending Change id, `pc-<yyyyMMddHHmmss>-<6 hex>`; any other shape is 422.",
+          "schema" : {
+            "type" : "string",
+            "pattern" : "^pc-\\d{14}-[0-9a-f]{6}$"
+          }
+        } ],
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/PendingChangeDecisionRequest"
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Withdrawn: `applied: false`, the change `withdrawn` with `decidedBy` = the author.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/PendingChangeDecision"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "No authenticated Subject (an author and a decider cannot be told apart — Personal, which has no Authenticator, is always refused here), or the caller is not the change's author (PERMISSION_DENIED).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "409" : {
+            "description" : "Already decided, withdrawn or expired, or the integrity check failed (CONFLICT).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "Unsafe id or `reason` over 500 chars (CONFIG_VALIDATION_FAILED).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Write root unset (CONTROL_PLANE_READ_ONLY), or the store locked beyond the wait bound (STORE_BUSY).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/action-requests" : {
@@ -10705,6 +11054,232 @@
               "b" : {
                 "type" : [ "number", "null" ]
               }
+            }
+          }
+        }
+      },
+      "PendingChange" : {
+        "type" : "object",
+        "description" : "A Pending Change without its content — what the list, and every decision, returns.",
+        "required" : [ "id", "kind", "name", "operation", "status", "author", "createdAt", "expiresAt", "approverCapability", "fourEyes", "baseVersion", "proposedVersion" ],
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "pattern" : "^pc-\\d{14}-[0-9a-f]{6}$"
+          },
+          "kind" : {
+            "type" : "string",
+            "description" : "The Approval Policy kind (config type or component kind)."
+          },
+          "name" : {
+            "type" : "string",
+            "description" : "The target's name within its kind."
+          },
+          "operation" : {
+            "type" : "string",
+            "enum" : [ "create", "update", "delete" ]
+          },
+          "status" : {
+            "type" : "string",
+            "enum" : [ "pending", "approved", "declined", "withdrawn", "expired", "stale", "invalid" ],
+            "description" : "`pending` until decided; `approved` (applied), `declined`, `withdrawn` (by its author), `expired`, `stale` (its base moved) are terminal; `invalid` = the record's MAC does not verify."
+          },
+          "author" : {
+            "type" : "string",
+            "description" : "The Subject id that proposed it."
+          },
+          "authorType" : {
+            "type" : "string",
+            "enum" : [ "user", "agent" ]
+          },
+          "authorRoles" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "authorCapabilities" : {
+            "type" : "array",
+            "items" : {
+              "type" : "string"
+            },
+            "description" : "For the reviewer only — apply re-resolves the author's roles as they are then."
+          },
+          "reason" : {
+            "type" : [ "string", "null" ],
+            "description" : "The author's X-Change-Reason."
+          },
+          "createdAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "expiresAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "approverCapability" : {
+            "type" : "string"
+          },
+          "fourEyes" : {
+            "type" : "boolean"
+          },
+          "baseVersion" : {
+            "type" : "string",
+            "description" : "Content hash of what it replaces; `absent` for a create."
+          },
+          "proposedVersion" : {
+            "type" : "string",
+            "description" : "Content hash of what it writes; `absent` for a delete."
+          },
+          "decidedBy" : {
+            "type" : "string",
+            "description" : "Who closed it — the approver, decliner, the author on a withdraw, `system` on expiry."
+          },
+          "decidedAt" : {
+            "type" : "string",
+            "format" : "date-time"
+          },
+          "decisionReason" : {
+            "type" : [ "string", "null" ]
+          },
+          "appliedStatus" : {
+            "type" : "integer",
+            "description" : "The replayed route's status, on `approved`."
+          },
+          "mac" : {
+            "type" : "string",
+            "description" : "HMAC-SHA256 over the record, keyed outside the config tree."
+          },
+          "integrity" : {
+            "type" : "string",
+            "enum" : [ "invalid" ],
+            "description" : "Present only when the MAC does not verify."
+          }
+        }
+      },
+      "PendingChangeDetail" : {
+        "allOf" : [ {
+          "$ref" : "#/components/schemas/PendingChange"
+        }, {
+          "type" : "object",
+          "properties" : {
+            "current" : {
+              "type" : [ "object", "null" ],
+              "description" : "The content it replaces; null for a create."
+            },
+            "proposed" : {
+              "type" : [ "object", "null" ],
+              "description" : "The content it writes; null for a delete."
+            },
+            "request" : {
+              "type" : "object",
+              "required" : [ "method", "path" ],
+              "properties" : {
+                "method" : {
+                  "type" : "string"
+                },
+                "path" : {
+                  "type" : "string"
+                }
+              }
+            }
+          }
+        } ]
+      },
+      "PendingChangeList" : {
+        "type" : "object",
+        "required" : [ "items", "total", "truncated" ],
+        "properties" : {
+          "items" : {
+            "type" : "array",
+            "maxItems" : 500,
+            "items" : {
+              "$ref" : "#/components/schemas/PendingChange"
+            }
+          },
+          "total" : {
+            "type" : "integer",
+            "description" : "Every matching change, however many were returned."
+          },
+          "truncated" : {
+            "type" : "boolean"
+          }
+        }
+      },
+      "PendingChangeDiff" : {
+        "type" : "object",
+        "required" : [ "id", "kind", "name", "operation", "added", "removed", "coarse", "lines" ],
+        "properties" : {
+          "id" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "name" : {
+            "type" : "string"
+          },
+          "operation" : {
+            "type" : "string",
+            "enum" : [ "create", "update", "delete" ]
+          },
+          "added" : {
+            "type" : "integer"
+          },
+          "removed" : {
+            "type" : "integer"
+          },
+          "coarse" : {
+            "type" : "boolean",
+            "description" : "True when the middle was too large to tabulate and is shown as a whole replacement."
+          },
+          "lines" : {
+            "type" : "array",
+            "items" : {
+              "type" : "object",
+              "required" : [ "op", "text" ],
+              "properties" : {
+                "op" : {
+                  "type" : "string",
+                  "enum" : [ "context", "remove", "add" ]
+                },
+                "text" : {
+                  "type" : "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "PendingChangeDecisionRequest" : {
+        "type" : "object",
+        "properties" : {
+          "reason" : {
+            "type" : "string",
+            "maxLength" : 500,
+            "description" : "Recorded as `decisionReason` and on the audit row."
+          }
+        }
+      },
+      "PendingChangeDecision" : {
+        "type" : "object",
+        "required" : [ "pendingChange", "applied" ],
+        "properties" : {
+          "pendingChange" : {
+            "$ref" : "#/components/schemas/PendingChange"
+          },
+          "applied" : {
+            "type" : "boolean",
+            "description" : "True only for an approval that wrote."
+          },
+          "result" : {
+            "type" : "object",
+            "description" : "Approve only: the replayed route's own answer.",
+            "properties" : {
+              "status" : {
+                "type" : "integer"
+              },
+              "body" : { }
             }
           }
         }
