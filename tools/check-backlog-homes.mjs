@@ -209,7 +209,9 @@ for (const row of rows) {
 // unchanged.
 // 2026-09-27: 38 → 37. QUERY-BOUND-WIDGET-1 shipped and took its pointer (→ studio.md) with it;
 // WEBHOOK-EGRESS-POLICY-1 and D-8 closed the same day with inline links, not `→` pointers. The grammar is unchanged.
-const MIN_DOC_POINTERS = 37;
+// 2026-09-27: 37 → 36. The policy-authoring UX row closed on its browser pass and took its pointer
+// (→ auth-security.md) with it; the grammar is unchanged.
+const MIN_DOC_POINTERS = 36;
 
 const scope =
     `scope: ${rows.length} board row(s), ${identified} with an identifier and ` +
