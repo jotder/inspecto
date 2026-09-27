@@ -154,4 +154,41 @@ class ParquetEventStoreTest {
             assertEquals(List.of("kept"), reopened.query(EventQuery.recent(100)).stream().map(Event::message).toList());
         }
     }
+    /** ASSURE-AUDIT-CHAIN-RESIDUALS-1 (4): one corrupt file in the middle of the store is skipped and REPORTED —
+     *  search, keyset page and count still answer from every other file, never an empty "complete" result. */
+    @Test
+    void aCorruptFileInTheMiddleIsSkippedAndReportedByEveryOrdinaryRead(@TempDir Path dir) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            for (int i = 0; i < 5; i++) {
+                store.append(ev(1_000L + i, EventLevel.INFO, EventType.LOG, "P", "row" + i));
+                store.flush();                                          // one Parquet file per row
+            }
+        }
+        Path day = dir.resolve("level=INFO/year=1970/month=01/day=01");
+        List<Path> files;
+        try (var s = java.nio.file.Files.list(day)) {
+            files = s.filter(p -> p.toString().endsWith(".parquet")).sorted().toList();
+        }
+        assertEquals(5, files.size());
+        java.nio.file.Files.writeString(files.get(2), "not a parquet file");   // corrupt the middle one in place
+        String bad = "level=INFO/year=1970/month=01/day=01/" + files.get(2).getFileName();
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            List<Event> rows = store.query(EventQuery.builder().type(EventType.LOG).limit(100).build());
+            assertEquals(4, rows.size(), "the four readable files still answer");
+            assertEquals(List.of(bad), store.unreadableUnits(), "the skipped file is named, not dropped silently");
+            List<Event> signals = store.query(EventQuery.builder().type(EventType.SIGNAL).limit(100).build());
+            assertEquals(1, signals.size(), "one warning Signal per newly unreadable file, not one per read");
+            assertEquals(ParquetEventStore.UNREADABLE_SIGNAL, signals.get(0).attributes().get("signalType"));
+            assertEquals(EventLevel.WARN, signals.get(0).level());
+            assertEquals(bad, signals.get(0).attributes().get("file"));
+
+            assertEquals(4, store.page(100, null, null).stream().filter(e -> EventType.LOG.equals(e.type())).count(),
+                    "the keyset page skips the same file");
+            assertEquals(5, store.count(), "four rows on disk + the buffered Signal");
+
+            java.nio.file.Files.delete(files.get(2));
+            store.query(EventQuery.recent(10));
+            assertEquals(List.of(), store.unreadableUnits(), "a removed file is no longer reported");
+        }
+    }
 }

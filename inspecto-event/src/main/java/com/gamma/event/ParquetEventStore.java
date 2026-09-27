@@ -341,11 +341,12 @@ public final class ParquetEventStore implements EventStore {
         List<Event> merged = new ArrayList<>();
         // 1) unflushed buffer (newest facts) — filter in memory
         for (Event e : buffer) if (q.matches(e)) merged.add(e);
-        // 2) on-disk Parquet — filter + page in SQL (skip when nothing has been flushed yet)
-        if (hasParquet()) merged.addAll(queryParquet(q));
+        // 2) on-disk Parquet — filter + page in SQL
+        merged.addAll(queryParquet(q));
         merged.sort(Comparator.comparingLong(Event::ts).reversed());
         int from = Math.min(q.offset(), merged.size());
         int to = Math.min(from + q.limit(), merged.size());
+        signalUnreadable();
         return new ArrayList<>(merged.subList(from, to));
     }
 
@@ -363,32 +364,9 @@ public final class ParquetEventStore implements EventStore {
             String like = "%" + q.textContains().toLowerCase(java.util.Locale.ROOT) + "%";
             params.add(like); params.add(like);
         }
-        String reader = SqlViews.reader("PARQUET", root + "/**/*.parquet", true);
         String where = conds.isEmpty() ? "" : " WHERE " + String.join(" AND ", conds);
-        String sql = "SELECT event_id, ts_ms, level, type, source, pipeline, correlation_id, message, attributes, payload"
-                + " FROM " + reader + where + " ORDER BY ts_ms DESC LIMIT ?";
-        List<Event> out = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            int i = 1;
-            for (Object p : params) {
-                if (p instanceof Long l) ps.setLong(i++, l);
-                else ps.setString(i++, String.valueOf(p));
-            }
-            ps.setInt(i, q.offset() + q.limit());      // fetch enough to page after merge with buffer
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    out.add(new Event(rs.getString("event_id"), rs.getLong("ts_ms"),
-                            EventLevel.parse(rs.getString("level")), rs.getString("type"),
-                            rs.getString("source"), rs.getString("pipeline"),
-                            rs.getString("correlation_id"), rs.getString("message"),
-                            JsonAttributes.fromJson(rs.getString("attributes")),
-                            JsonAttributes.fromPayloadJson(rs.getString("payload"))));
-                }
-            }
-        } catch (SQLException e) {
-            log.warn("Event Parquet query failed: {}", e.getMessage());
-        }
-        return out;
+        params.add(q.offset() + q.limit());      // fetch enough to page after merge with buffer (per file, when split)
+        return readEvents(parquetFiles(), where + " ORDER BY ts_ms DESC LIMIT ?", params);
     }
 
     @Override
@@ -397,55 +375,32 @@ public final class ParquetEventStore implements EventStore {
         List<Event> merged = new ArrayList<>();
         // 1) unflushed buffer (newest facts) — keyset-filter in memory
         for (Event e : buffer) if (EventStore.afterKey(e, afterTs, afterId)) merged.add(e);
-        // 2) on-disk Parquet — keyset predicate + order in SQL (skip when nothing has been flushed yet)
-        if (hasParquet()) merged.addAll(pageParquet(n, afterTs, afterId));
+        // 2) on-disk Parquet — keyset predicate + order in SQL
+        merged.addAll(pageParquet(n, afterTs, afterId));
         merged.sort(KEYSET_ORDER);
+        signalUnreadable();
         return new ArrayList<>(merged.subList(0, Math.min(n, merged.size())));
     }
 
     /** One SQL keyset page over the Parquet files: strictly older than {@code (afterTs, afterId)}, newest-first. */
     private List<Event> pageParquet(int limit, Long afterTs, String afterId) {
-        String reader = SqlViews.reader("PARQUET", root + "/**/*.parquet", true);
         String where = afterTs == null ? ""
                 : " WHERE (ts_ms < ? OR (ts_ms = ? AND event_id < ?))";
-        String sql = "SELECT event_id, ts_ms, level, type, source, pipeline, correlation_id, message, attributes, payload"
-                + " FROM " + reader + where + " ORDER BY ts_ms DESC, event_id DESC LIMIT ?";
-        List<Event> out = new ArrayList<>();
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            int i = 1;
-            if (afterTs != null) {
-                ps.setLong(i++, afterTs);
-                ps.setLong(i++, afterTs);
-                ps.setString(i++, afterId == null ? "" : afterId);
-            }
-            ps.setInt(i, limit);
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    out.add(new Event(rs.getString("event_id"), rs.getLong("ts_ms"),
-                            EventLevel.parse(rs.getString("level")), rs.getString("type"),
-                            rs.getString("source"), rs.getString("pipeline"),
-                            rs.getString("correlation_id"), rs.getString("message"),
-                            JsonAttributes.fromJson(rs.getString("attributes")),
-                            JsonAttributes.fromPayloadJson(rs.getString("payload"))));
-                }
-            }
-        } catch (SQLException e) {
-            log.warn("Event Parquet page failed: {}", e.getMessage());
+        List<Object> params = new ArrayList<>();
+        if (afterTs != null) {
+            params.add(afterTs);
+            params.add(afterTs);
+            params.add(afterId == null ? "" : afterId);
         }
-        return out;
+        params.add(limit);
+        return readEvents(parquetFiles(), where + " ORDER BY ts_ms DESC, event_id DESC LIMIT ?", params);
     }
 
     @Override
     public synchronized long count() {
         long total = buffer.size();
-        if (!hasParquet()) return total;
-        String reader = SqlViews.reader("PARQUET", root + "/**/*.parquet", true);
-        try (PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM " + reader);
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) total += rs.getLong(1);
-        } catch (SQLException e) {
-            log.warn("Event Parquet count failed: {}", e.getMessage());
-        }
+        for (Long n : readFiles(parquetFiles(), "SELECT COUNT(*)", "", List.of(), rs -> rs.getLong(1))) total += n;
+        signalUnreadable();
         return total;
     }
 
@@ -463,9 +418,9 @@ public final class ParquetEventStore implements EventStore {
         for (Event e : buffer)
             if (AuditChain.chained(e) && AuditChain.seq(e) > 0
                     && (best == null || AuditChain.seq(e) > AuditChain.seq(best))) best = e;
-        if (!hasParquet()) return best;
         for (Event d : chainQuery("WHERE " + CHAINED_SQL + " ORDER BY " + SEQ_SQL + " DESC LIMIT 1", List.of()))
             if (best == null || AuditChain.seq(d) > AuditChain.seq(best)) best = d;
+        signalUnreadable();
         return best;
     }
 
@@ -474,10 +429,10 @@ public final class ParquetEventStore implements EventStore {
         int n = Math.max(0, limit);
         List<Event> merged = new ArrayList<>();
         for (Event e : buffer) if (AuditChain.chained(e) && AuditChain.seq(e) >= fromSeq) merged.add(e);
-        if (hasParquet())
-            merged.addAll(chainQuery("WHERE " + CHAINED_SQL + " AND " + SEQ_SQL + " >= ? ORDER BY " + SEQ_SQL
-                    + ", event_id LIMIT ?", List.of(fromSeq, (long) n)));
+        merged.addAll(chainQuery("WHERE " + CHAINED_SQL + " AND " + SEQ_SQL + " >= ? ORDER BY " + SEQ_SQL
+                + ", event_id LIMIT ?", List.of(fromSeq, (long) n)));
         merged.sort(CHAIN_ORDER);
+        signalUnreadable();
         return new ArrayList<>(merged.subList(0, Math.min(n, merged.size())));
     }
 
@@ -486,10 +441,11 @@ public final class ParquetEventStore implements EventStore {
         long n = 0;
         for (Event e : buffer)
             if (AuditChain.TYPES.contains(e.type()) && e.ts() >= fromTs && AuditChain.unlinked(e)) n++;
-        if (!hasParquet()) return n;
         String where = "WHERE type IN ('" + EventType.AUDIT + "', '" + EventType.ACCESS_DENIED + "') AND ts_ms >= ? AND ("
                 + SEQ_SQL + " IS NULL OR json_extract_string(attributes, '$." + AuditAttrs.AUDIT_UNLINKED + "') = 'true')";
-        return n + chainQuery(where, List.of(fromTs)).size();
+        n += chainQuery(where, List.of(fromTs)).size();
+        signalUnreadable();
+        return n;
     }
 
     @Override
@@ -506,66 +462,147 @@ public final class ParquetEventStore implements EventStore {
         return found;
     }
 
+    /** The Parquet files this store can currently not read, relative to its root — every read (search, page,
+     *  count, chain) keeps it current: a file joins when a read of it fails and leaves when one succeeds or it
+     *  is gone. A verify must not pass over them silently. */
     @Override
     public synchronized List<String> unreadableUnits() {
-        return unreadable;
-    }
-
-    /** Files the last chain read could not open (see {@link #chainQuery}). */
-    private List<String> unreadable = List.of();
-
-    /**
-     * A chain read over the Parquet files. One glob query when every file reads; when the glob fails, every file is
-     * read ON ITS OWN, the unreadable ones are recorded ({@link #unreadableUnits}) and the rest still answer — so
-     * one corrupt file planted in the directory cannot blind the whole chain (and, through an unreadable head,
-     * unlink every later audit row). The per-file rows are the UNION of each file's answer to {@code tail}: callers
-     * re-sort and re-limit. Throws only when no file at all could be read, never answering "empty" for "unreadable".
-     */
-    private List<Event> chainQuery(String tail, List<Long> params) {
-        List<Event> out = new ArrayList<>();
-        try {
-            readInto(out, SqlViews.reader("PARQUET", root + "/**/*.parquet", true), tail, params);
-            unreadable = List.of();
-            return out;
-        } catch (SQLException globFailed) {
-            out.clear();
-        }
-        List<String> bad = new ArrayList<>();
-        int good = 0;
-        try (Stream<Path> w = Files.walk(root)) {
-            for (Path f : w.filter(x -> x.getFileName().toString().endsWith(".parquet")).sorted().toList()) {
-                try {
-                    readInto(out, SqlViews.reader("PARQUET", f.toString(), true), tail, params);
-                    good++;
-                } catch (SQLException oneFile) {
-                    bad.add(root.relativize(f).toString().replace('\\', '/'));
-                }
-            }
-        } catch (IOException e) {
-            throw new IllegalStateException("audit chain read failed under " + root + ": " + e.getMessage(), e);
-        }
-        unreadable = List.copyOf(bad);
-        if (!bad.isEmpty()) log.error("Audit chain read: {} unreadable Parquet file(s) under {}: {}", bad.size(), root, bad);
-        if (good == 0) throw new IllegalStateException("audit chain read failed under " + root + ": no file readable");
+        List<String> out = new ArrayList<>();
+        for (Path f : unreadable) out.add(rel(f));
         return out;
     }
 
-    private void readInto(List<Event> out, String reader, String tail, List<Long> params) throws SQLException {
-        String sql = "SELECT event_id, ts_ms, level, type, source, pipeline, correlation_id, message, attributes, payload"
-                + " FROM " + reader + " " + tail;
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            for (int i = 0; i < params.size(); i++) ps.setLong(i + 1, params.get(i));
-            try (ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    out.add(new Event(rs.getString("event_id"), rs.getLong("ts_ms"),
-                            EventLevel.parse(rs.getString("level")), rs.getString("type"),
-                            rs.getString("source"), rs.getString("pipeline"),
-                            rs.getString("correlation_id"), rs.getString("message"),
-                            JsonAttributes.fromJson(rs.getString("attributes")),
-                            JsonAttributes.fromPayloadJson(rs.getString("payload"))));
+    /**
+     * A chain read over the Parquet files ({@link #readEvents}), which reads the unreadable files' neighbours
+     * anyway — so one corrupt file planted in the directory cannot blind the whole chain (and, through an
+     * unreadable head, unlink every later audit row). The per-file rows are the UNION of each file's answer to
+     * {@code tail}: callers re-sort and re-limit. Throws only when no file at all could be read, never answering
+     * "empty" for "unreadable".
+     */
+    private List<Event> chainQuery(String tail, List<Object> params) {
+        List<Path> files = parquetFiles();
+        List<Event> out = readEvents(files, tail, params);
+        if (!files.isEmpty() && unreadable.containsAll(files))
+            throw new IllegalStateException("audit chain read failed under " + root + ": no file readable");
+        return out;
+    }
+
+    // -- reads that survive one unreadable file (ASSURE-AUDIT-CHAIN-RESIDUALS-1 (4)) --
+
+    /** The signal type of the warning a newly unreadable Parquet file raises. */
+    public static final String UNREADABLE_SIGNAL = "events.file_unreadable";
+
+    /** Files a read failed on, in path order; see {@link #unreadableUnits}. */
+    private final java.util.TreeSet<Path> unreadable = new java.util.TreeSet<>();
+    /** Files that joined {@link #unreadable} during the current read — each raises one warning Signal. */
+    private final List<Path> newlyUnreadable = new ArrayList<>();
+
+    /** One mapped result row. */
+    @FunctionalInterface
+    private interface Row<T> {
+        T map(ResultSet rs) throws SQLException;
+    }
+
+    private static final String EVENT_COLUMNS =
+            "SELECT event_id, ts_ms, level, type, source, pipeline, correlation_id, message, attributes, payload";
+
+    private List<Event> readEvents(List<Path> files, String tail, List<Object> params) {
+        return readFiles(files, EVENT_COLUMNS, tail, params, rs -> new Event(rs.getString("event_id"),
+                rs.getLong("ts_ms"), EventLevel.parse(rs.getString("level")), rs.getString("type"),
+                rs.getString("source"), rs.getString("pipeline"), rs.getString("correlation_id"),
+                rs.getString("message"), JsonAttributes.fromJson(rs.getString("attributes")),
+                JsonAttributes.fromPayloadJson(rs.getString("payload"))));
+    }
+
+    /**
+     * {@code select FROM <files> tail} over the given files. The files not known to be unreadable go in ONE query;
+     * when that fails, each is read on its own. A known-unreadable file is retried on its own every time (it may
+     * have been repaired). A file that fails is recorded ({@link #unreadableUnits}, an ERROR log, one warning
+     * Signal) and SKIPPED — the rest still answer, where one corrupt file used to fail the whole search into an
+     * empty result that looked complete. With a per-file split, the rows are the UNION of each file's answer:
+     * callers re-sort and re-limit (every caller does).
+     */
+    private <T> List<T> readFiles(List<Path> files, String select, String tail, List<Object> params, Row<T> row) {
+        List<T> out = new ArrayList<>();
+        List<Path> good = new ArrayList<>();
+        List<Path> retry = new ArrayList<>();
+        for (Path f : files) (unreadable.contains(f) ? retry : good).add(f);
+        if (!good.isEmpty()) {
+            try {
+                readInto(out, reader(good), select, tail, params, row);
+            } catch (SQLException together) {
+                out.clear();
+                retry.addAll(0, good);
+            }
+        }
+        for (Path f : retry) {
+            List<T> one = new ArrayList<>();
+            try {
+                readInto(one, reader(List.of(f)), select, tail, params, row);
+                unreadable.remove(f);
+                out.addAll(one);
+            } catch (SQLException bad) {
+                if (unreadable.add(f)) {
+                    newlyUnreadable.add(f);
+                    log.error("Event store file {} could not be read; reads skip it until it is readable again: {}",
+                            f, bad.getMessage());
                 }
             }
         }
+        return out;
+    }
+
+    private static String reader(List<Path> files) {
+        List<String> names = new ArrayList<>();
+        for (Path f : files) names.add(f.toString());
+        return SqlViews.reader("PARQUET", names, true);
+    }
+
+    private <T> void readInto(List<T> out, String reader, String select, String tail, List<Object> params, Row<T> row)
+            throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(select + " FROM " + reader + " " + tail)) {
+            int i = 1;
+            for (Object p : params) {
+                if (p instanceof Long l) ps.setLong(i++, l);
+                else if (p instanceof Integer n) ps.setInt(i++, n);
+                else ps.setString(i++, String.valueOf(p));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) out.add(row.map(rs));
+            }
+        }
+    }
+
+    /** Every Parquet file under the root, in path order; forgets the unreadable ones that are gone. */
+    private List<Path> parquetFiles() {
+        if (!Files.isDirectory(root)) return List.of();
+        try (Stream<Path> w = Files.walk(root)) {
+            List<Path> files = w.filter(p -> p.getFileName().toString().endsWith(".parquet")).sorted().toList();
+            unreadable.retainAll(new java.util.HashSet<>(files));
+            return files;
+        } catch (IOException e) {
+            throw new IllegalStateException("event store listing failed under " + root + ": " + e.getMessage(), e);
+        }
+    }
+
+    private String rel(Path f) {
+        return root.relativize(f).toString().replace('\\', '/');
+    }
+
+    /**
+     * One WARN {@link EventType#SIGNAL} per file that became unreadable during this read — so a search that
+     * answered without it does not pass for a complete one on any surface that watches Signals. Appended after
+     * the read has merged its rows, so it never shows up in the answer it describes.
+     */
+    private void signalUnreadable() {
+        if (newlyUnreadable.isEmpty()) return;
+        List<Path> now = List.copyOf(newlyUnreadable);
+        newlyUnreadable.clear();
+        for (Path f : now)
+            append(Event.builder(EventType.SIGNAL).level(EventLevel.WARN).source("event-store")
+                    .message("Event store file " + rel(f) + " could not be read; every read skips it until it is"
+                            + " readable again, so results exclude its rows")
+                    .attr("signalType", UNREADABLE_SIGNAL).attr("severity", "WARN").attr("file", rel(f)).build());
     }
 
     // -- the single chain writer per directory --
