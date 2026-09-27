@@ -514,9 +514,9 @@ class ControlApiActionRequestsTest {
         }
     }
 
-    /** WEBHOOK-EGRESS-POLICY-1: the first read seeds from the Space's webhook Step targets; a PUT that empties it sticks. */
+    /** WEBHOOK-EGRESS-POLICY-1: BOOT seeds a pre-existing Space from its webhook Step targets; a removal sticks. */
     @Test
-    void theFirstReadSeedsTheAllowlistFromWebhookTargetsAndARemovalIsNeverReSeeded(@TempDir Path cfg, @TempDir Path tmp)
+    void bootSeedsTheAllowlistFromWebhookTargetsAndARemovalIsNeverReSeeded(@TempDir Path cfg, @TempDir Path tmp)
             throws Exception {
         Path root = Files.createDirectories(tmp.resolve("config"));
         Files.writeString(root.resolve("cbs_connection.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("connection",
@@ -524,12 +524,28 @@ class ControlApiActionRequestsTest {
         Files.writeString(root.resolve("orders_hook.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("webhook",
                 Map.of("connection", "cbs"))));
         try (Ctx c = open(cfg, tmp, true)) {
-            Files.deleteIfExists(root.resolve(EgressRoutes.FILE));   // no allowlist recorded yet
             assertEquals("[\"cbs.internal\"]",
                     data(send(c, "GET", "/settings/egress", null, AUTHOR), 200).get("allow").toString());
             data(send(c, "PUT", "/settings/egress", "{\"allow\":[]}", CHECKER), 200);
+        }
+        try (Ctx c = open(cfg, tmp, true)) {   // the next boot
             assertEquals(0, data(send(c, "GET", "/settings/egress", null, AUTHOR), 200).get("allow").size(),
                     "a removed seed entry is not re-seeded");
+        }
+    }
+
+    /** A Space whose allowlist file is missing after boot is never seeded by a read. */
+    @Test
+    void aReadNeverSeedsTheAllowlist(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            Path root = c.root();
+            Files.deleteIfExists(root.resolve(EgressRoutes.FILE));
+            Files.writeString(root.resolve("cbs_connection.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("connection",
+                    Map.of("id", "cbs", "connector", "https", "host", "10.0.0.5"))));
+            Files.writeString(root.resolve("orders_hook.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("webhook",
+                    Map.of("connection", "cbs"))));
+            assertEquals(0, data(send(c, "GET", "/settings/egress", null, AUTHOR), 200).get("allow").size());
+            assertFalse(Files.exists(root.resolve(EgressRoutes.FILE)));
         }
     }
 

@@ -15,7 +15,7 @@ number** — rows moved between sections in this consolidation, and older docs c
 
 > **43<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 17<!--count:backlog-p2--> × P2 · 26<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
-> ⬇ **44 → 43 on 2026-09-27**: closed P2 `WEBHOOK-EGRESS-POLICY-1` — the `sink.webhook` Step and the webhook channel go through the egress policy + pinned connect; each Space's allowlist is seeded once from its current webhook targets (as-built `okf/backend/control-plane/action-requests.md` § *The egress policy*).
+> ⬇ **44 → 43 on 2026-09-27**: closed P2 `WEBHOOK-EGRESS-POLICY-1` — the `sink.webhook` Step and the webhook channel go through the egress policy + pinned connect; each Space existing at upgrade has its allowlist seeded once at boot from its current webhook targets (a Space created through the product starts empty) (as-built `okf/backend/control-plane/action-requests.md` § *The egress policy*).
 > ⬇ **45 → 44 on 2026-09-27**: closed P2 `QUERY-BOUND-WIDGET-1` — the Widget Builder binds a saved Query and `/bi/query` `query` aggregates over its rendered-at-read result (as-built `okf/frontend/features/studio.md`).
 > ⬇ **46 → 45 on 2026-09-27**: closed P2 **D-8 XLSX export** — `PipelineDocumentXlsxTest` ran 5/5 on Linux CI (run `36299231097`) and `package.ps1 -Edition Professional` ran green (as-built `okf/capabilities/pipeline-authoring/pipeline-authoring.md`).
 > ⬇ **47 → 46 on 2026-09-27**: closed P3 `VIRTUAL-DATASET-SQL-RENAME-1` — a store rename rewrites a virtual Dataset's SQL relation via the parse tree (`SqlGuard.renameBaseTable`; as-built `okf/frontend/features/studio.md`).

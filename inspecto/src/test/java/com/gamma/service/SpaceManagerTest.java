@@ -138,6 +138,38 @@ class SpaceManagerTest {
         }
     }
 
+    private static void webhookTarget(Path config, String host) throws Exception {
+        Files.writeString(config.resolve("cbs_connection.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("connection",
+                Map.of("id", "cbs", "connector", "https", "host", host))));
+        Files.writeString(config.resolve("orders_hook.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("webhook",
+                Map.of("connection", "cbs"))));
+    }
+
+    /** WEBHOOK-EGRESS-POLICY-1: a Space already on disk at boot is seeded ONCE from its webhook targets. */
+    @Test
+    void bootSeedsAPreExistingSpacesEgressAllowlist(@TempDir Path root) throws Exception {
+        Path config = Files.createDirectories(root.resolve("old").resolve("config"));
+        webhookTarget(config, "db.corp.internal");
+        try (SpaceManager mgr = SpaceManager.discover(root)) {
+            assertEquals(List.of("db.corp.internal"), com.gamma.pipeline.exec.EgressAllowlist.entries(config));
+        }
+    }
+
+    /** A Space CREATED through the product is recorded empty, so neither a read nor a later boot seeds it. */
+    @Test
+    void aSpaceCreatedAfterBootIsNeverSeeded(@TempDir Path root) throws Exception {
+        Path config = root.resolve("acme").resolve("config");
+        try (SpaceManager mgr = SpaceManager.discover(root)) {
+            mgr.create(SpaceId.of("acme"), null, null);
+            webhookTarget(config, "10.0.0.5");
+            assertEquals(List.of(), com.gamma.pipeline.exec.EgressAllowlist.entries(config));
+        }
+        try (SpaceManager mgr = SpaceManager.discover(root)) {   // the next boot
+            assertEquals(List.of(), com.gamma.pipeline.exec.EgressAllowlist.entries(config),
+                    "a private host its author added is not allowlisted without canAdminister");
+        }
+    }
+
     @Test
     void discoverOnAMissingRootYieldsNoSpaces(@TempDir Path root) throws Exception {
         try (SpaceManager mgr = SpaceManager.discover(root.resolve("does-not-exist"))) {

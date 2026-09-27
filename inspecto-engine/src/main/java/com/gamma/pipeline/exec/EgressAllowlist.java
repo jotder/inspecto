@@ -33,12 +33,12 @@ import java.util.stream.Stream;
  * {@code egress.toon} in the Space's config root ({@code allow: [tickets.internal, 10.20.0.0/16]}) and written by
  * {@code PUT /settings/egress}. A file that is present but unreadable reads as EMPTY — fail closed.
  *
- * <h3>One-time seeding (operator decision 2026-09-27)</h3>
+ * <h3>One-time seeding at upgrade (operator decision 2026-09-27)</h3>
  * Before this, the two webhooks dialled any address, so a Space may already send to private hosts with no entry.
- * The FIRST read of a Space that has no {@code egress.toon} seeds it from the hosts that Space already targets —
+ * At service start ({@link #migrate}) a Space that has no {@code egress.toon} is seeded from the hosts it already targets —
  * every {@code sink.webhook} Step's Connection host, every {@code WEBHOOK} channel's URL host, and the host of
  * {@code -Dnotify.webhook.url} (the URL the webhook channel actually posts to) — persists it with a
- * {@code seededAt} stamp, logs it and emits an {@code egress-allowlist.seeded} audit event. Once the file exists it
+ * {@code seededAt} stamp, logs it and emits an {@code egress-allowlist.seeded} audit event. A Space created through the product gets an EMPTY file ({@link #recordEmpty}) and the read path never seeds. Once the file exists it
  * is never seeded again, so a later PUT that removes a seeded entry sticks. A seeded host that can never be
  * allowlisted (a loopback or link-local literal) is skipped and logged. Hosts only: a host entry lifts only the
  * private and CGNAT classes ({@link EgressPolicy}), so seeding a public host changes nothing.
@@ -68,14 +68,18 @@ public final class EgressAllowlist {
         return EgressPolicy.Allowlist.of(entries(root));
     }
 
-    /** The Space's allowlist entries — seeded once if none were ever recorded; empty when none (or unreadable). */
+    /**
+     * The Space's allowlist entries; empty when none (or unreadable). ⛔ NEVER seeds: a Space with no
+     * {@code egress.toon} reads as EMPTY (deny) — seeding here would let whoever creates a Space, a Connection and a
+     * webhook Step before the first send allowlist a private host without {@code canAdminister}.
+     */
     public static List<String> entries(Path root) {
         if (root == null) return List.of();
         Path f = root.resolve(FILE);
         if (!Files.exists(f)) {
-            synchronized (LOCK) {
-                if (!Files.exists(f)) return seed(root, f);
-            }
+            if (WARNED.add(root.toAbsolutePath().normalize().toString()))
+                log.warn("[EGRESS] {} has no {} — the egress allowlist is EMPTY (deny by default)", root, FILE);
+            return List.of();
         }
         try {
             Object allow = ToonHelper.load(f.toString()).get("allow");
@@ -89,39 +93,65 @@ public final class EgressAllowlist {
         }
     }
 
-    /** Write the seed (possibly empty — the file's existence is the "recorded" marker) and return it. */
-    private static List<String> seed(Path root, Path f) {
-        List<String> hosts = new ArrayList<>();
-        for (String h : currentTargetHosts(root)) {
+    private static final Set<String> WARNED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
+    /**
+     * The ONE-TIME upgrade migration, run at service start for each Space config root ({@code SpaceManager}): a Space
+     * with no {@code egress.toon} is seeded from the hosts it targets today and the file written. A Space that already
+     * has the file — including one created through the product, which {@link #recordEmpty} marks — is untouched. A
+     * Space folder an operator drops onto disk is seeded at the next boot (an operator action, trusted). If the file
+     * cannot be written nothing is allowed: the error is logged and the list stays EMPTY (fail closed).
+     */
+    public static void migrate(Path root) {
+        if (root == null) return;
+        Path f = root.resolve(FILE);
+        synchronized (LOCK) {
+            if (Files.exists(f)) return;
+            List<String> hosts = new ArrayList<>();
+            for (String h : currentTargetHosts(root)) {
+                try {
+                    EgressPolicy.Allowlist.of(List.of(h));
+                    hosts.add(h);
+                } catch (IllegalArgumentException never) {
+                    log.warn("[EGRESS] not seeding '{}' into the egress allowlist: {}", h, never.getMessage());
+                }
+            }
+            Map<String, Object> doc = new LinkedHashMap<>();
+            doc.put("allow", hosts);
+            doc.put("seededAt", Instant.now().toString());
             try {
-                EgressPolicy.Allowlist.of(List.of(h));
-                hosts.add(h);
-            } catch (IllegalArgumentException never) {
-                log.warn("[EGRESS] not seeding '{}' into the egress allowlist: {}", h, never.getMessage());
+                write(root, doc);
+            } catch (IOException e) {
+                log.error("[EGRESS] could not persist the seeded egress allowlist {} ({}) — the allowlist stays EMPTY "
+                        + "(deny) until an administrator writes it with PUT /settings/egress", f, e.getMessage());
+                return;
+            }
+            log.info("[EGRESS] seeded the egress allowlist {} from this Space's current webhook targets: {}", f, hosts);
+            try {
+                EventLog.current().emit(Event.builder(EventType.AUDIT).source("audit")
+                        .message("the egress allowlist was seeded from the Space's webhook targets: " + hosts)
+                        .actor("system").actorType("system")
+                        .action("egress-allowlist.seeded").actionCategory("configuration")
+                        .attr("after", String.join(",", hosts)));
+            } catch (RuntimeException ignored) {
+                // best effort, like every audit emit
             }
         }
+    }
+
+    /** Record an EMPTY allowlist for a Space created through the product, so {@link #migrate} never seeds it. */
+    public static void recordEmpty(Path root) throws IOException {
         Map<String, Object> doc = new LinkedHashMap<>();
-        doc.put("allow", hosts);
-        doc.put("seededAt", Instant.now().toString());
-        try {
-            Files.createDirectories(root);
-            AtomicFiles.write(f, JToon.encode(doc).getBytes(StandardCharsets.UTF_8), ".egress-");
-        } catch (IOException e) {
-            log.warn("[EGRESS] could not persist the seeded egress allowlist {} ({}) — using it for now, will "
-                    + "seed again on the next read", f, e.getMessage());
-            return hosts;
+        doc.put("allow", List.of());
+        doc.put("createdAt", Instant.now().toString());
+        synchronized (LOCK) {
+            write(root, doc);
         }
-        log.info("[EGRESS] seeded the egress allowlist {} from this Space's current webhook targets: {}", f, hosts);
-        try {
-            EventLog.current().emit(Event.builder(EventType.AUDIT).source("audit")
-                    .message("the egress allowlist was seeded from the Space's webhook targets: " + hosts)
-                    .actor("system").actorType("system")
-                    .action("egress-allowlist.seeded").actionCategory("configuration")
-                    .attr("after", String.join(",", hosts)));
-        } catch (RuntimeException ignored) {
-            // best effort, like every audit emit
-        }
-        return hosts;
+    }
+
+    private static void write(Path root, Map<String, Object> doc) throws IOException {
+        Files.createDirectories(root);
+        AtomicFiles.write(root.resolve(FILE), JToon.encode(doc).getBytes(StandardCharsets.UTF_8), ".egress-");
     }
 
     /**

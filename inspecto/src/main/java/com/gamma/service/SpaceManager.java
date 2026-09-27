@@ -114,6 +114,8 @@ public final class SpaceManager implements AutoCloseable {
         // launch dir in this layout, NOT -Dassist.write.root — publish that explicitly so the engine holds no
         // cwd assumption of its own (SpaceBootstrap.load's per-space register() covers the multi-space case).
         com.gamma.pipeline.SpaceConfigRoot.registerConfigReadRoot(DEFAULT.value(), legacy.base());
+        // WEBHOOK-EGRESS-POLICY-1: the one-time upgrade seed of the egress allowlist, at boot only.
+        com.gamma.pipeline.exec.EgressAllowlist.migrate(com.gamma.pipeline.SpaceConfigRoot.forSpace(DEFAULT.value()));
         return m;
     }
 
@@ -137,6 +139,7 @@ public final class SpaceManager implements AutoCloseable {
                 .filter(d -> Files.isDirectory(d.resolve("config")))
                 .sorted()
                 .filter(d -> m.ownedByThisPod(partition, d))
+                .peek(d -> com.gamma.pipeline.exec.EgressAllowlist.migrate(d.resolve("config")))   // WEBHOOK-EGRESS-POLICY-1
                 .forEach(m::bootQuietly);
         }
         log.info("SpaceManager: {} space(s) booted from {}", m.spaces.size(), spacesRoot.toAbsolutePath());
@@ -319,6 +322,7 @@ public final class SpaceManager implements AutoCloseable {
             new SpaceContext.SpaceManifest(name, description == null ? "" : description.trim(), Instant.now().toString())
                     .write(base.resolve("space.toon"));
 
+            com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
             SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
             wire(ctx);
@@ -362,6 +366,7 @@ public final class SpaceManager implements AutoCloseable {
             if (bundle.spaceToon() != null) Files.write(manifest, bundle.spaceToon());
             else new SpaceContext.SpaceManifest(id.value(), "", Instant.now().toString()).write(manifest);
 
+            com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
             SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
             wire(ctx);
@@ -444,6 +449,7 @@ public final class SpaceManager implements AutoCloseable {
                     ? com.gamma.util.ToonHelper.opt(tplMeta, "tagline", "") : description.trim();
             new SpaceContext.SpaceManifest(name, desc, Instant.now().toString()).write(base.resolve("space.toon"));
 
+            com.gamma.pipeline.exec.EgressAllowlist.recordEmpty(base.resolve("config"));   // a NEW Space is never seeded
             SpaceContext ctx = bootStarted(base);
             spaces.put(id, ctx);
             wire(ctx);

@@ -47,8 +47,9 @@ class EgressAllowlistTest {
     }
 
     @Test
-    void theFirstReadSeedsFromTheSpacesCurrentWebhookTargetsAndPersistsIt() throws Exception {
+    void theBootMigrationSeedsFromTheSpacesCurrentWebhookTargetsAndPersistsIt() throws Exception {
         space();
+        EgressAllowlist.migrate(root);
         List<String> seeded = EgressAllowlist.entries(root);
         assertEquals(java.util.Set.of("cbs.internal", "10.20.0.5", "alerts.internal", "notify.internal"),
                 java.util.Set.copyOf(seeded));
@@ -68,18 +69,22 @@ class EgressAllowlistTest {
     @Test
     void aLaterPutThatRemovesEntriesIsNeverReSeeded() throws Exception {
         space();
+        EgressAllowlist.migrate(root);
         assertFalse(EgressAllowlist.entries(root).isEmpty());
         Files.writeString(root.resolve(EgressAllowlist.FILE), JToon.encode(Map.of("allow", List.of("cbs.internal"))));
         assertEquals(List.of("cbs.internal"), EgressAllowlist.entries(root));
-        assertEquals(List.of("cbs.internal"), EgressAllowlist.entries(root), "stable on every later read");
+        EgressAllowlist.migrate(root);   // the next boot
+        assertEquals(List.of("cbs.internal"), EgressAllowlist.entries(root), "stable across later boots");
     }
 
     @Test
     void aSpaceWithNoWebhookTargetsIsSeededEmptyAndThenStaysRecorded() throws Exception {
+        EgressAllowlist.migrate(root);
         assertEquals(List.of(), EgressAllowlist.entries(root));
         assertTrue(Files.exists(root.resolve(EgressAllowlist.FILE)), "an empty seed is still recorded");
         write("late.toon", Map.of("webhook", Map.of("connection", "cbs")));
         write("cbs_connection.toon", Map.of("connection", Map.of("id", "cbs", "connector", "https", "host", "cbs.internal")));
+        EgressAllowlist.migrate(root);
         assertEquals(List.of(), EgressAllowlist.entries(root), "a target added after the seed needs an explicit entry");
     }
 
@@ -87,7 +92,34 @@ class EgressAllowlistTest {
     void aTargetThatCanNeverBeAllowlistedIsSkipped() throws Exception {
         write("lo_connection.toon", Map.of("connection", Map.of("id", "lo", "connector", "https", "host", "127.0.0.1")));
         write("p.toon", Map.of("webhook", Map.of("connection", "lo")));
+        EgressAllowlist.migrate(root);
         assertEquals(List.of(), EgressAllowlist.entries(root));
+    }
+
+    /** The lazy read path NEVER seeds: no file means EMPTY, and no file is written. */
+    @Test
+    void theReadPathNeverSeeds() throws Exception {
+        space();
+        assertEquals(List.of(), EgressAllowlist.entries(root));
+        assertFalse(Files.exists(root.resolve(EgressAllowlist.FILE)));
+    }
+
+    /** A Space created through the product is recorded EMPTY, so a later boot never seeds it. */
+    @Test
+    void aSpaceRecordedEmptyAtCreateIsNeverSeeded() throws Exception {
+        EgressAllowlist.recordEmpty(root);
+        space();   // its author adds a private Connection + webhook Step before any boot
+        EgressAllowlist.migrate(root);
+        assertEquals(List.of(), EgressAllowlist.entries(root));
+    }
+
+    /** If the seed cannot be written nothing is allowed (fail closed). */
+    @Test
+    void aSeedThatCannotBePersistedAllowsNothing() throws Exception {
+        System.setProperty("notify.webhook.url", "http://notify.internal/in");
+        Path notADir = Files.writeString(root.resolve("blocker"), "x").resolve("config");
+        EgressAllowlist.migrate(notADir);
+        assertEquals(List.of(), EgressAllowlist.entries(notADir));
     }
 
     @Test

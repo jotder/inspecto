@@ -123,17 +123,25 @@ now refused — by design.
 
 **The allowlist reader** is `EgressAllowlist` (`inspecto-engine`, `com.gamma.pipeline.exec`): `of(root)` for a
 caller holding the config root (the Action Request routes and dispatcher, via `EgressRoutes`), `forCurrentSpace()`
-(`SpaceConfigRoot.current()`, the Space MDC) for the two webhooks; no root ⇒ EMPTY. **One-time seeding**
-(operator decision 2026-09-27, "seed the allowlist"): the first read of a Space with no `egress.toon` seeds it
-from the hosts it targets today — each `sink.webhook` Step's Connection host (a flat `webhook: {connection}` block
+(`SpaceConfigRoot.current()`, the Space MDC) for the two webhooks. ⛔ **The read path never seeds**: no root or no
+`egress.toon` ⇒ EMPTY (deny), with one `[EGRESS] … has no egress.toon` warning per root.
+
+**One-time upgrade seeding** (operator decision 2026-09-27, "seed the allowlist"; tightened after adversarial
+review the same day): `EgressAllowlist.migrate(root)` runs **at service start only** — `SpaceManager.discover` for
+each Space it boots, `SpaceManager.single` for the default root. A Space with no `egress.toon` is seeded from the
+hosts it targets at that moment — each `sink.webhook` Step's Connection host (a flat `webhook: {connection}` block
 or a graph `sink.webhook` node, scanned from the config root's `*.toon`, depth 4, `.history` skipped; the host from
 `<id>_connection.toon`, else `ConnectionRegistry`), each `WEBHOOK` channel's URL host (`registry/channels/`), and
 the host of `-Dnotify.webhook.url` (what the channel actually posts to) — writes `{allow, seededAt}`, logs
-`[EGRESS] seeded …` and emits the audit `egress-allowlist.seeded`. The FILE'S EXISTENCE is the "recorded" marker,
-so an empty seed is still recorded and a later `PUT` that removes entries is never re-seeded; a target added after
-the seed needs an explicit entry. A seed host that can never be allowlisted (a loopback literal) is skipped and
-logged. If the seed cannot be persisted it is used for that read and retried on the next. ⚠ Seeding is shared: a
-seeded host also lifts Action Requests to that host (the allowlist is one per Space).
+`[EGRESS] seeded …` and emits the audit `egress-allowlist.seeded`. A seed host that can never be allowlisted (a
+loopback literal) is skipped and logged. 🔴 **A Space created through the product** (`SpaceManager.create`,
+`createFromBundle`, `createFromTemplate`) gets an EMPTY `egress.toon` (`{allow: [], createdAt}`) written before it
+boots (`EgressAllowlist.recordEmpty`), so it is never seeded — otherwise anyone who can create a Space, a Connection
+and a webhook Step could allowlist a private host without `canAdminister`. ⚠ A Space folder an operator drops
+onto disk before a boot IS seeded at that boot: an operator action, trusted. The file's existence is the
+"recorded" marker, so a later `PUT` that removes entries is never re-seeded. If the seed cannot be written the
+error is logged and the list stays EMPTY — fail closed. ⚠ Seeding is shared: a seeded host also lifts Action
+Requests to that host (the allowlist is one per Space).
 ⚠ Embedded-IPv4 IPv6 forms other than IPv4-mapped (6to4, NAT64 `64:ff9b::/96`) are classified as public.
 
 ## Dispatch
