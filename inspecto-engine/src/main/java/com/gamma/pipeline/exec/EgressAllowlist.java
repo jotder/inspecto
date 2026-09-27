@@ -106,12 +106,22 @@ public final class EgressAllowlist {
      * cannot be written nothing is allowed: the error is logged and the list stays EMPTY (fail closed).
      */
     public static void migrate(Path root) {
+        migrate(root, List.of());
+    }
+
+    /**
+     * {@link #migrate(Path)} that also seeds {@code extraHosts} — the hosts of Connections the Space loaded from
+     * OUTSIDE {@code root} (a single-tenant server's launch config, which is not under {@code -Dassist.write.root}).
+     */
+    public static void migrate(Path root, java.util.Collection<String> extraHosts) {
         if (root == null) return;
         Path f = root.resolve(FILE);
         synchronized (LOCK) {
             if (Files.exists(f)) return;
+            Set<String> targets = new LinkedHashSet<>(currentTargetHosts(root));
+            for (String h : extraHosts) if (h != null && !h.isBlank()) targets.add(h.trim().toLowerCase(Locale.ROOT));
             List<String> hosts = new ArrayList<>();
-            for (String h : currentTargetHosts(root)) {
+            for (String h : targets) {
                 try {
                     EgressPolicy.Allowlist.of(List.of(h));
                     hosts.add(h);
@@ -212,13 +222,18 @@ public final class EgressAllowlist {
 
     private static void objectStoreHost(Path connectionFile, Set<String> out) {
         try {
-            ConnectionProfile p = ConnectionProfile.load(connectionFile);
-            if (p.connector() != null && OBJECT_STORE_CONNECTORS.contains(p.connector().trim().toLowerCase(Locale.ROOT))
-                    && p.host() != null && !p.host().isBlank())
-                out.add(p.host().trim().toLowerCase(Locale.ROOT));
+            String h = objectStoreHost(ConnectionProfile.load(connectionFile));
+            if (h != null) out.add(h);
         } catch (Exception unreadable) {
             // not a loadable Connection — nothing to seed
         }
+    }
+
+    /** The host an object-store Connection dials, lower-cased; {@code null} for any other connector or no host. */
+    public static String objectStoreHost(ConnectionProfile p) {
+        if (p == null || p.connector() == null || p.host() == null || p.host().isBlank()) return null;
+        return OBJECT_STORE_CONNECTORS.contains(p.connector().trim().toLowerCase(Locale.ROOT))
+                ? p.host().trim().toLowerCase(Locale.ROOT) : null;
     }
 
     private static void channelHost(Map<String, Object> doc, Set<String> out) {

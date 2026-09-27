@@ -42,6 +42,8 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ObjectStoreEgressTest {
 
+    private static final String EXPECTED = "ID,AMT" + (char) 10 + "r1,10" + (char) 10;
+
     private static final InetAddress LOOPBACK = InetAddress.ofLiteral("127.0.0.1");
     private static final InetAddress PRIVATE = InetAddress.ofLiteral("10.1.2.3");
     private static final InetAddress METADATA = InetAddress.ofLiteral("169.254.169.254");
@@ -235,6 +237,57 @@ class ObjectStoreEgressTest {
             assertInstanceOf(javax.net.ssl.SSLHandshakeException.class, e.getCause(), String.valueOf(e.getCause()));
         } finally {
             https.stop(0);
+        }
+    }
+
+    /**
+     * The production allowlist supplier ({@code EgressAllowlist.forCurrentSpace}), not a stub: a single-tenant
+     * server's launch-config S3 Connection on a LAN is seeded by the boot migration into the write root, and a
+     * Collector-style download on the default Space (no MDC) — and on a pool thread of a NAMED Space whose MDC is
+     * propagated the way CollectorProcessor does — both reach the store.
+     */
+    @Test
+    void theRealPerSpaceAllowlistLetsASeededLanStoreThroughOnEveryCollectorThread() throws Exception {
+        resolveTo(PRIVATE);
+        Path writeRoot = tmp.resolve("write");
+        String prior = System.getProperty("assist.write.root");
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            com.gamma.pipeline.exec.EgressAllowlist.migrate(writeRoot, List.of("store.lan"));
+            assertEquals(EXPECTED, read(connector("store.lan").open(file("a.csv"))));
+
+            Path spaceRoot = tmp.resolve("spaceA/config");
+            com.gamma.pipeline.exec.EgressAllowlist.migrate(spaceRoot, List.of("store.lan"));
+            com.gamma.pipeline.SpaceConfigRoot.register("spaceA", spaceRoot);
+            org.slf4j.MDC.put(com.gamma.event.EventLog.SPACE_MDC_KEY, "spaceA");
+            Map<String, String> mdc = org.slf4j.MDC.getCopyOfContextMap();
+            org.slf4j.MDC.clear();
+            try (var pool = java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+                String got = pool.submit(() -> {
+                    org.slf4j.MDC.setContextMap(mdc);
+                    try {
+                        return read(connector("store.lan").open(file("a.csv")));
+                    } finally {
+                        org.slf4j.MDC.clear();
+                    }
+                }).get();
+                assertEquals(EXPECTED, got);
+                // negative: a named Space that never allowlisted it is refused on the same thread shape
+                Map<String, String> other = Map.of(com.gamma.event.EventLog.SPACE_MDC_KEY, "spaceB");
+                var ex = assertThrows(java.util.concurrent.ExecutionException.class, () -> pool.submit(() -> {
+                    org.slf4j.MDC.setContextMap(other);
+                    try {
+                        return read(connector("store.lan").open(file("a.csv")));
+                    } finally {
+                        org.slf4j.MDC.clear();
+                    }
+                }).get());
+                assertInstanceOf(AcquisitionException.class, ex.getCause());
+            }
+        } finally {
+            com.gamma.pipeline.SpaceConfigRoot.forget("spaceA");
+            if (prior == null) System.clearProperty("assist.write.root");
+            else System.setProperty("assist.write.root", prior);
         }
     }
 }

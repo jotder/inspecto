@@ -145,4 +145,15 @@ class EgressAllowlistTest {
     void noRootMeansEmpty() {
         assertEquals(List.of(), EgressAllowlist.entries(null));
     }
+
+    /** A single-tenant server's launch-config Connections live outside the write root; their hosts are passed in. */
+    @Test
+    void theBootMigrationSeedsObjectStoreHostsLoadedFromOutsideTheRoot() {
+        EgressAllowlist.migrate(root, List.of("MinIO.LAN", " ", "10.9.9.9"));
+        assertEquals(List.of("minio.lan", "10.9.9.9"), EgressAllowlist.entries(root));
+        assertEquals("minio.lan", EgressAllowlist.objectStoreHost(new com.gamma.acquire.ConnectionProfile(
+                "m", "s3", "MinIO.lan", 9000, null, null, null, null, Map.of(), null)));
+        assertNull(EgressAllowlist.objectStoreHost(new com.gamma.acquire.ConnectionProfile(
+                "h", "https", "cbs.lan", 443, null, null, null, null, Map.of(), null)));
+    }
 }
