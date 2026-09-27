@@ -28,6 +28,10 @@ describe('embedQueryBody', () => {
         expect(body.limit).toBeGreaterThan(0);
     });
 
+    it('declares a query-bound widget not embeddable (a public embed would drop the query filter)', () => {
+        expect(embedQueryBody({ ...BAR_WIDGET, queryId: 'long_calls' })).toBeNull();
+    });
+
     it('declares view-bound and expression-measure widgets not embeddable', () => {
         expect(embedQueryBody({ ...BAR_WIDGET, viewId: 'geo-1' })).toBeNull();
         expect(

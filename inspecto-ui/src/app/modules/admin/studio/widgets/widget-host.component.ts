@@ -13,6 +13,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { isSharedRef } from 'app/inspecto/api';
+import { apiErrorMessage } from 'app/inspecto/api/api-base';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -139,13 +140,15 @@ export interface DrillEvent extends DrillPair {
                                     Too many queries in a short time — the server is throttling this widget.
                                     <button mat-button type="button" (click)="retry()">Retry</button>
                                 </inspecto-alert>
-                            } @else if (queryError(); as err) {
-                                <!-- QUERY-BOUND-WIDGET-1: the bound saved Query could not run (deleted, not
+                            } @else if (runError(); as err) {
+                                <!-- The data run failed (QUERY-BOUND-WIDGET-1 for a bound saved Query: deleted, not
                                      visible to this user, or refused). A blank chart would read as "no data". -->
                                 <inspecto-alert
                                     variant="error"
-                                    title="Bound query unavailable"
-                                    data-testid="tile-query-error"
+                                    [title]="resolvedWidget()?.queryId ? 'Bound query unavailable' : 'Data unavailable'"
+                                    [attr.data-testid]="
+                                        resolvedWidget()?.queryId ? 'tile-query-error' : 'tile-run-error'
+                                    "
                                 >
                                     {{ err }}
                                 </inspecto-alert>
@@ -235,8 +238,9 @@ export class WidgetHostComponent {
     readonly canExport = computed(() => this.plugin()?.render.kind === 'chartjs');
     /** False once a data run fails — a shared-bound dataset that no longer resolves (revoked/expired grant). */
     private readonly runOk = signal(true);
-    /** A query-bound widget's failed run (deleted/hidden query, refused SQL) — shown, never an empty chart. */
-    readonly queryError = signal<string | null>(null);
+    /** A failed data run's server message (deleted/hidden query, refused SQL, backend error) — shown as an
+     *  error alert, never an empty chart. A revoked shared grant has its own state and leaves this null. */
+    readonly runError = signal<string | null>(null);
     /** The last run was refused `429` even after {@link DatasetResultService}'s retries. */
     readonly throttled = signal(false);
     /** Bumped by {@link retry} so the query effect re-runs. */
@@ -275,7 +279,7 @@ export class WidgetHostComponent {
         if (!this.resolvedWidget()) return this.loadFailed() ? 'ready' : 'loading';
         if (!this.plugin() || this.viewBound()) return 'ready';
         if (!this.resolvedDataset()) return this.datasetFailed() ? 'ready' : 'loading';
-        if (this.throttled() || this.showRevoked() || this.queryError()) return 'ready';
+        if (this.throttled() || this.showRevoked() || this.runError()) return 'ready';
         if (!this.resultArrived()) return 'loading';
         return this.runOk() && this.rowCount() === 0 ? 'empty' : 'ready';
     });
@@ -321,15 +325,21 @@ export class WidgetHostComponent {
                 .run(spec, this.colMetas())
                 .then((res) => {
                     this.runOk.set(res.ok);
-                    this.queryError.set(!res.ok && !res.throttled && widget.queryId ? (res.error ?? 'failed') : null);
+                    this.runError.set(
+                        !res.ok && !res.throttled && !isSharedRef(dataset.physicalRef)
+                            ? (res.error ?? 'The data query failed.')
+                            : null,
+                    );
                     this.throttled.set(!!res.throttled);
                     this.rowCount.set(res.ok ? res.rows.length : 0);
                     this.truncated.set(res.ok && !!res.truncated);
                     this.props.set(plugin.transformProps(res.ok ? res.rows : [], widget.controls));
                     this.resultArrived.set(true);
                 })
-                .catch(() => {
+                .catch((e: unknown) => {
                     this.runOk.set(false);
+                    if (!isSharedRef(dataset.physicalRef))
+                        this.runError.set(apiErrorMessage(e, 'The data query failed.'));
                     this.truncated.set(false);
                     this.props.set({ labels: [], series: [] });
                     this.resultArrived.set(true);

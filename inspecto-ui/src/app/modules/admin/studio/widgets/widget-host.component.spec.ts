@@ -456,4 +456,50 @@ describe('WidgetHostComponent', () => {
         expect(fixture.nativeElement.querySelector('inspecto-viz-render')).toBeNull();
         await expectNoA11yViolations(fixture.nativeElement);
     });
+
+    function withRun(result: unknown) {
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            { provide: DatasetResultService, useValue: { run: () => Promise.resolve(result) } },
+        ]);
+        fixture.componentRef.setInput('widget', { ...WIDGET, vizType: 'bar' });
+        fixture.componentRef.setInput('dataset', DS);
+        return fixture;
+    }
+
+    it('any failed data run shows an error alert with the server message, not an empty chart', async () => {
+        const fixture = withRun({ ok: false, rows: [], error: 'Binder Error: column amount not found' });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const alert = fixture.nativeElement.querySelector('[data-testid="tile-run-error"]');
+        expect(alert?.textContent).toContain('Data unavailable');
+        expect(alert?.textContent).toContain('Binder Error: column amount not found');
+        expect(fixture.nativeElement.querySelector('[data-testid="tile-query-error"]')).toBeNull();
+        expect(fixture.nativeElement.querySelector('inspecto-viz-render')).toBeNull();
+        expect(fixture.nativeElement.querySelector('[role="alert"]')).toBeTruthy();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('a genuinely empty result is the no-data state, not an error', async () => {
+        const fixture = withRun({ ok: true, rows: [] });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.runError()).toBeNull();
+        expect(fixture.componentInstance.tileState()).toBe('empty');
+        expect(fixture.nativeElement.querySelector('inspecto-alert')).toBeNull();
+    });
+
+    it('a query-bound failed run keeps the "Bound query unavailable" wording', async () => {
+        const fixture = withRun({ ok: false, rows: [], error: 'refused' });
+        fixture.componentRef.setInput('widget', { ...WIDGET, vizType: 'bar', queryId: 'q1' });
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const alert = fixture.nativeElement.querySelector('[data-testid="tile-query-error"]');
+        expect(alert?.textContent).toContain('Bound query unavailable');
+        expect(fixture.nativeElement.querySelector('[data-testid="tile-run-error"]')).toBeNull();
+    });
 });

@@ -48,7 +48,10 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   `WHERE` reaches the Widget. Refusals: a missing or not-visible (`ComponentAccess.canView`) query → 404
   *"no query 'x'"*; a non-`sql` query, no text, a query over a different Dataset, or an unsafe text → 422.
   A query-bound tile that fails shows a *Bound query unavailable* alert (`tile-query-error`), not a blank
-  chart. ⚠ A query-bound Widget is **not embeddable** (`embedQueryBody` returns null — the public query
+  chart; since 2026-09-27 **every** failed tile run does the same (`widget-host`'s `runError`, a *Data
+  unavailable* alert `tile-run-error` carrying the server message) — dashboard tiles and the Menu viewer
+  inherit it; an `ok` run with zero rows stays the `empty` no-data state, a revoked shared grant keeps
+  *Access revoked*. ⚠ A query-bound Widget is **not embeddable** (`embedQueryBody` returns null — the public query
   surface cannot run a saved query). ⚠ No caller-supplied parameter values cross yet: only the query's
   declared defaults + session context apply.
 * **The rows seam — `DatasetRowsService` (2026-08-14, split S2 slice B).** What a Dataset's `sourceName`
