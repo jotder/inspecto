@@ -109,10 +109,7 @@ export function describePredicate(g: ConditionGroup | null | undefined): string 
                     <dt class="text-secondary">Layout</dt>
                     <dd class="m-0">{{ data.layout }}</dd>
                     <dt class="text-secondary">Fingerprint</dt>
-                    <dd class="m-0 text-xs">
-                        computed on save (FNV-1a 64 — a stable fingerprint; the SHA-256 chain of custody arrives with
-                        the backend snapshot store)
-                    </dd>
+                    <dd class="m-0 text-xs">computed on save (SHA-256 over the frozen content)</dd>
                 </dl>
                 <div class="rounded-lg border p-3">
                     <div class="text-secondary mb-2 text-xs font-semibold uppercase tracking-wide">
@@ -303,8 +300,11 @@ export class LinkAnalysisSnapshotDialog {
      * ⚠ Attachment is a SECOND, optional step on the same action, and it is deliberately not allowed to
      * fail the save: the snapshot is already sealed by then, and reporting "not saved" because a Case link
      * failed would be a lie. A failed attach says so, and the seal stands.
+     *
+     * Hashing (SHA-256, Web Crypto) is async, so `saving` is raised BEFORE it: a second submit while the
+     * digest runs is refused rather than sealing twice. A hash failure (no secure context) seals nothing.
      */
-    save(): void {
+    async save(): Promise<void> {
         this.form.markAllAsTouched();
         this.caseForm.markAllAsTouched();
         this.submitted.set(true);
@@ -312,19 +312,26 @@ export class LinkAnalysisSnapshotDialog {
         if (this.creatingCase() && (this.caseForm.invalid || this.memberError())) return;
         const { title, description, caseId } = this.form.getRawValue();
         const already = this.sealed();
-        const snap =
-            already ??
-            snapshotGraph({
-                title: title.trim(),
-                description: description.trim() || undefined,
-                graph: this.data.graph,
-                predicate: this.data.predicate,
-                origin: this.data.origin,
-                viewport: { layout: this.data.layout },
-            });
         this.saveError.set('');
         this.caseError.set('');
         this.saving.set(true);
+        let snap: GraphSnapshot;
+        try {
+            snap =
+                already ??
+                (await snapshotGraph({
+                    title: title.trim(),
+                    description: description.trim() || undefined,
+                    graph: this.data.graph,
+                    predicate: this.data.predicate,
+                    origin: this.data.origin,
+                    viewport: { layout: this.data.layout },
+                }));
+        } catch (e: unknown) {
+            this.saving.set(false);
+            this.saveError.set(e instanceof Error ? e.message : 'The analysis could not be saved.');
+            return;
+        }
         (already ? of(already) : this.store.save(snap)).subscribe({
             next: () => {
                 this.markSealed(snap);

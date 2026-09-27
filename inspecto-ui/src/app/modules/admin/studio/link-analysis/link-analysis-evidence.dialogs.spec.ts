@@ -113,16 +113,16 @@ describe('LinkAnalysisSnapshotDialog', () => {
         expect(el.textContent).toContain('2 nodes · 1 links');
         expect(el.textContent).toContain('1 stranded nodes excluded');
 
-        fixture.componentInstance.save(); // empty title — refused, error rendered
+        await fixture.componentInstance.save(); // empty title — refused, error rendered
         fixture.detectChanges();
         expect(close).not.toHaveBeenCalled();
         expect(el.querySelector('mat-error')?.textContent).toContain('title');
 
         fixture.componentInstance.form.setValue({ title: 'Chain', description: '', caseId: '' });
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         const snap = close.mock.calls[0][0] as GraphSnapshot;
         expect(snap.nodes.map((n) => n.id)).toEqual(['a', 'b']);
-        expect(verifySnapshot(snap)).toBe(true);
+        expect(await verifySnapshot(snap)).toBe(true);
         expect(TestBed.inject(LinkAnalysisSnapshotsService).snapshots()).toEqual([snap]);
         await expectNoA11yViolations(el);
     });
@@ -158,19 +158,19 @@ describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
         return { fixture, close, store };
     }
 
-    it('saves the analysis with no Case at all', () => {
+    it('saves the analysis with no Case at all', async () => {
         const { fixture, close, store } = create(() => of([{ id: 'CASE-9', title: 'Real case' }]));
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         const snap = close.mock.calls[0][0] as GraphSnapshot;
-        expect(verifySnapshot(snap)).toBe(true);
+        expect(await verifySnapshot(snap)).toBe(true);
         expect(snap.attachedTo).toEqual([]); // saved, unattached — a legitimate outcome
         expect(store.snapshots()).toHaveLength(1);
     });
 
-    it('attaches in the same action when a Case IS chosen', () => {
+    it('attaches in the same action when a Case IS chosen', async () => {
         const { fixture, close, store } = create(() => of([{ id: 'CASE-9', title: 'Real case' }]));
         fixture.componentInstance.form.patchValue({ caseId: 'CASE-9' });
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         const snap = close.mock.calls[0][0] as GraphSnapshot;
         expect(snap.attachedTo).toEqual(['CASE-9']);
         expect(store.snapshots()[0].attachedTo).toEqual(['CASE-9']);
@@ -191,9 +191,9 @@ describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
         // ...but Save is NOT disabled, and the analysis is kept. This is the 2026-09-22 decision: the
         // analysis stands on its own, so a failed Case lookup must never be a dead end.
         expect(el.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         const snap = close.mock.calls[0][0] as GraphSnapshot;
-        expect(verifySnapshot(snap)).toBe(true);
+        expect(await verifySnapshot(snap)).toBe(true);
         expect(snap.attachedTo).toEqual([]);
         expect(store.snapshots()).toHaveLength(1);
         await expectNoA11yViolations(el);
@@ -288,25 +288,25 @@ describe('LinkAnalysisSnapshotDialog — create a Case in place (LA-CASE-CREATE-
         expect(el.textContent).toContain('1 of 2 picked');
         await expectNoA11yViolations(el);
 
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         expect(calls).toEqual(['seal', 'case:Ring:1', 'attach:CASE-NEW']);
         expect(openCaseFromEntities.mock.calls[0][2]).toEqual([{ id: 'entity:bob', dataset: 'tx', label: 'Bob' }]);
         const snap = close.mock.calls[0][0] as GraphSnapshot;
         expect(snap.attachedTo).toEqual(['CASE-NEW']);
-        expect(verifySnapshot(snap)).toBe(true);
+        expect(await verifySnapshot(snap)).toBe(true);
     });
 
-    it('refuses to create an empty Case — nothing is sealed or created without a picked node', () => {
+    it('refuses to create an empty Case — nothing is sealed or created without a picked node', async () => {
         const { fixture, close, calls, el } = create({ selected: [] });
         chooseNewCase(fixture);
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         fixture.detectChanges();
         expect(el.querySelector('p[role="alert"]')?.textContent).toContain('Pick at least one node');
         expect(calls).toEqual([]);
         expect(close).not.toHaveBeenCalled();
     });
 
-    it('a refused Case keeps the dialog open with the seal remembered — a retry never seals twice', () => {
+    it('a refused Case keeps the dialog open with the seal remembered — a retry never seals twice', async () => {
         let fail = true;
         const { fixture, close, calls, el } = create({
             openCase: () =>
@@ -321,7 +321,7 @@ describe('LinkAnalysisSnapshotDialog — create a Case in place (LA-CASE-CREATE-
                     : of(MADE),
         });
         chooseNewCase(fixture);
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         fixture.detectChanges();
         expect(close).not.toHaveBeenCalled();
         expect(el.textContent).toContain('The Case was not created');
@@ -329,18 +329,18 @@ describe('LinkAnalysisSnapshotDialog — create a Case in place (LA-CASE-CREATE-
         expect(el.querySelector<HTMLInputElement>('input[formcontrolname="title"]')?.disabled).toBe(true);
 
         fail = false;
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         expect(calls).toEqual(['seal', 'case:Ring:1', 'case:Ring:1', 'attach:CASE-NEW']);
         expect((close.mock.calls[0][0] as GraphSnapshot).attachedTo).toEqual(['CASE-NEW']);
     });
 
-    it('a failed attach after the Case exists retries ONLY the attach — the Case is never opened twice', () => {
+    it('a failed attach after the Case exists retries ONLY the attach — the Case is never opened twice', async () => {
         let fail = true;
         const { fixture, close, calls, el } = create({
             attachTo: () => (fail ? throwError(() => new Error('down')) : of(['CASE-NEW'])),
         });
         chooseNewCase(fixture);
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         fixture.detectChanges();
         expect(close).not.toHaveBeenCalled();
         expect(el.textContent).toContain('Case CASE-NEW was created');
@@ -348,7 +348,7 @@ describe('LinkAnalysisSnapshotDialog — create a Case in place (LA-CASE-CREATE-
         expect(fixture.componentInstance.form.getRawValue().caseId).toBe('CASE-NEW');
 
         fail = false;
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         expect(calls).toEqual(['seal', 'case:Ring:1', 'attach:CASE-NEW', 'attach:CASE-NEW']);
         expect((close.mock.calls[0][0] as GraphSnapshot).attachedTo).toEqual(['CASE-NEW']);
     });
@@ -478,11 +478,11 @@ describe('LinkAnalysisSnapshotDialog — a failed seal keeps the work on screen'
         return { fixture, close };
     }
 
-    it('does not close, and says why, when the seal is refused', () => {
+    it('does not close, and says why, when the seal is refused', async () => {
         const { fixture, close } = create(() => throwError(() => new Error('snapshot already exists')));
         fixture.componentInstance.form.setValue({ title: 'Chain', description: '', caseId: '' });
 
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         fixture.detectChanges();
 
         expect(close).not.toHaveBeenCalled();
@@ -492,11 +492,11 @@ describe('LinkAnalysisSnapshotDialog — a failed seal keeps the work on screen'
         expect(alerts.some((a) => a.textContent?.includes('already exists'))).toBe(true);
     });
 
-    it('keeps the analyst’s typed work when the seal is refused', () => {
+    it('keeps the analyst’s typed work when the seal is refused', async () => {
         const { fixture } = create(() => throwError(() => new Error('write root unavailable')));
         fixture.componentInstance.form.setValue({ title: 'Layering chain', description: 'notes', caseId: '' });
 
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
         fixture.detectChanges();
 
         expect(fixture.componentInstance.form.getRawValue().title).toBe('Layering chain');
@@ -506,7 +506,7 @@ describe('LinkAnalysisSnapshotDialog — a failed seal keeps the work on screen'
 
     // The seal succeeded; only the Case link failed. Reporting "not saved" would be a lie about evidence
     // that demonstrably exists on disk.
-    it('closes when the snapshot sealed but the attachment failed', () => {
+    it('closes when the snapshot sealed but the attachment failed', async () => {
         const close = vi.fn();
         const store = fakeSnapshots({ attachTo: () => throwError(() => new Error('ops unavailable')) });
         TestBed.configureTestingModule({
@@ -533,7 +533,7 @@ describe('LinkAnalysisSnapshotDialog — a failed seal keeps the work on screen'
         fixture.detectChanges();
         fixture.componentInstance.form.setValue({ title: 'Chain', description: '', caseId: 'CASE-9' });
 
-        fixture.componentInstance.save();
+        await fixture.componentInstance.save();
 
         expect(close).toHaveBeenCalledTimes(1);
         const closed = close.mock.calls[0][0] as GraphSnapshot;

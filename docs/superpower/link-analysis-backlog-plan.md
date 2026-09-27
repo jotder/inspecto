@@ -100,7 +100,7 @@ return.
 | Overlays | Legend and Working set (`workingSetStats`) minimise to pills; state persisted with the view | — |
 | Two-stage filter loop | `inspecto/graph/graph-filter.ts` + `<inspecto-link-analysis-filter>`; **Apply locally** · **Push to server** (tree sent as `query.filter`, merged with `markStranded`) | **LA-01** — the body ignores `filter`; a push returns the unfiltered projection |
 | Advanced search | Dialog over the data-table Pro tier; *Run on server* via `POST /db/query`; **Project result as graph** folds RESULT rows client-side, SQL text never reaches `/inv/projection` | — |
-| Evidence | `inspecto/graph/graph-snapshot.ts` (canonical JSON + FNV-1a fingerprint), Snapshot dialog, Attach to Case dialog; `LinkAnalysisSnapshotsService` is a **session-scoped mock store** | **LA-03** snapshots route · **LA-12** SHA-256 |
+| Evidence | `inspecto/graph/graph-snapshot.ts` (canonical JSON + SHA-256 `manifestHash`, FNV-1a until 2026-09-28), Snapshot dialog, Attach to Case dialog; `LinkAnalysisSnapshotsService` is a **session-scoped mock store** | **LA-03** snapshots route · **LA-12** SHA-256 |
 | View toolbox | `graph-view` `[plugins]`: minimap · grid · Louvain hulls · bundling · fisheye · link-filter lens · hover / brush / lasso; layout gallery; label toggles | — |
 | Rendering | Level of detail = label suppression above `LOD_LABEL_CAP = 300`; render footer prints the caps | **LA-06** |
 
@@ -711,7 +711,7 @@ Plus, once LA-10 exists: `enquiryId`, `opSeq`, `datasetVersion`.
 
 ✅ **And the gap is smaller than “M” implies.** Measured 2026-09-22 against the shipped type: subgraph, scores (as `metrics`), predicate, annotations and origin are **already captured**; only **node positions**, a **true `{zoom, pan}` viewport** (today only `{layout}`) and the **Dataset version** are missing. The snapshot BUILDER is already a pure, framework-free, spec-covered module (`snapshotGraph`, `verifySnapshot`). ⇒ **LA-03 is mostly a persistence swap**, not a modelling exercise. ⚠ A snapshot at the 500-node cap serialises to roughly **250–300 KB** — a document, not a blob, but larger than anything `ComponentStore` holds today.
 
-⚠ **Do not conflate with LA-12.** `manifestHash` is **FNV-1a 64 and explicitly not cryptographic**; the SHA-256 chain of custody is LA-12's separate swap.
+⚠ **Do not conflate with LA-12.** ~~`manifestHash` is **FNV-1a 64 and explicitly not cryptographic**~~ — since 2026-09-28 `manifestHash` is SHA-256 (`sha256:<hex>`, the server's format); the chain of custody is still LA-12's Dossier manifest, since the server stores `manifestHash` without recomputing it.
 
 ✅ **AS BUILT 2026-09-22 (backend half).** Three routes on `InvRoutes`:
 `POST /inv/snapshots` seals one, `GET /inv/snapshots?limit=n` lists ids newest-first with the TRUE total and a
@@ -866,11 +866,13 @@ guards is currently uncaught.
   would become the first route that returns snapshot CONTENT, open to anyone who owns any Investigation.
 * **Audit.** `LINK_DOSSIER_BUILT` (at, format, root, intact) and `LINK_DOSSIER_VERIFIED` (verified, both roots,
   changed count). Both are best-effort, per LA-04.
-* 🔴 **Plan vs code.** (1) *"Replaces the FNV-1a fingerprint"* holds on the SERVER only. The SPA's
-  `graph-snapshot.ts` still uses FNV-1a: moving it to Web Crypto SHA-256 makes `snapshotGraph` and
-  `verifySnapshot` async, which reaches `link-analysis-evidence.dialogs.ts`, its spec and the on-screen copy.
-  That is more than a two-file change, so it was **deferred**. The dossier's manifest, not the SPA's
-  `manifestHash`, is the custody root. (2) *Centrality tables* are carried, not computed, as above. (3) The
+* 🔴 **Plan vs code.** (1) ✅ **SPA SHA-256 swap SHIPPED 2026-09-28.** `graph-snapshot.ts` `manifestHash` is
+  now Web Crypto SHA-256 over the UTF-8 bytes of the canonical JSON, written `sha256:<hex>` — the server's own
+  format and canonicalisation (`InvestigationEvaluator.sha256(canonical(…))`), pinned by a known vector computed
+  with the server's Jackson recipe (non-ASCII label, unsorted keys). `snapshotGraph`/`verifySnapshot` are async;
+  the Snapshot dialog's `save()` awaits the hash with `saving` raised first, and refuses (seals nothing) outside
+  a secure context. The server still stores `manifestHash` verbatim and never recomputes it, so the dossier's
+  manifest, not the SPA's `manifestHash`, is the custody root. (2) *Centrality tables* are carried, not computed, as above. (3) The
   dossier is **not persisted** as an Artifact: it is regenerated deterministically, and custody is proved by
   the reader's held manifest. A stored, `opSeq`-anchored dossier Artifact is deferred. (4) `render()` and
   `open()` are copied from `InvestigationRoutes`, to be folded together once LA-20 lands. The dossier's
@@ -883,7 +885,7 @@ guards is currently uncaught.
   check avoids this by evaluating prefixes. The fix is for `replay` to do the same.
 * ⏳ **Deferred:** ~~SPA wiring (no Dossier UI yet)~~ — ✅ SPA wired 2026-09-23 (`link-analysis-dossier.component`:
   json summary, steps/method downloads, verify) + `at`/`snapshots` pickers 2026-09-27 (⚠ SPA-sealed snapshots
-  carry no `investigationId`, so the picker's choices are refused 422 until sealing anchors them) · the SPA SHA-256 swap · PDF/HTML renderings · a persisted
+  carry no `investigationId`, so the picker's choices are refused 422 until sealing anchors them) · ~~the SPA SHA-256 swap~~ (shipped 2026-09-28) · PDF/HTML renderings · a persisted
   Dossier Artifact · coverage (LA-19) · server-side centrality · snapshot dossiers without an Investigation.
 
 ### 5.7 The Working Set as a derived relation — LA-20

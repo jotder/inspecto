@@ -665,9 +665,13 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   node count. A snapshot must be **anchored**, meaning its body's `investigationId` names this Investigation,
   or it is refused (422), so a dossier cannot be used to read another analyst's snapshot. Access matches the
   Investigation: owner-only, plus the R3 Dataset check. Neither route persists anything; both are audited
-  (`LINK_DOSSIER_BUILT` / `LINK_DOSSIER_VERIFIED`). ⚠ The SPA still fingerprints snapshots with FNV-1a:
-  swapping it to Web Crypto SHA-256 makes `snapshotGraph`/`verifySnapshot` async, which reaches the evidence
-  dialog and its spec, so it was deferred.
+  (`LINK_DOSSIER_BUILT` / `LINK_DOSSIER_VERIFIED`). The SPA's snapshot `manifestHash` is SHA-256 too
+  (2026-09-28): Web Crypto over the UTF-8 bytes of the canonical JSON, written `sha256:<hex>` — the server's
+  format and canonicalisation (`InvestigationEvaluator.sha256(canonical(…))`), pinned in `graph-snapshot.spec.ts`
+  by a vector computed with the server's Jackson recipe. ⚠ `snapshotGraph`/`verifySnapshot` are **async**, and
+  `crypto.subtle` exists only in a secure context (https or localhost): elsewhere the Snapshot dialog refuses
+  to seal and says why, never falling back to a weaker digest. The server stores `manifestHash` verbatim and
+  never recomputes it — the Dossier manifest remains the custody root.
   **SPA half (2026-09-23):** the Investigation panel's *Dossier* section (`link-analysis-dossier.component`)
   renders the json dossier, downloads `steps`/`method` as Blobs through HttpClient at the dossier's own `at`
   (never a bare href — it would skip the bearer), and verifies either the manifest just issued or an uploaded

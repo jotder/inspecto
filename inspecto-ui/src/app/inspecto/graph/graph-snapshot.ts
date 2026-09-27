@@ -7,9 +7,12 @@ import { G6GraphData } from './graph-types';
  * folded counts, the metrics the analyst computed, the predicate that produced it and the viewport — with a
  * manifest hash over the frozen content so a later reader can tell whether it is the same evidence.
  *
- * Framework-free. ⚠ The hash is FNV-1a 64 over a canonical JSON form: a stable *fingerprint* for the UI-first
- * cut, **not** a cryptographic digest — the plan's chain-of-custody gate (S3.2, SHA-256) replaces it when the
- * backend `POST /inv/snapshots` lands. Say so in the UI; never present it as SHA-256.
+ * Framework-free. The hash is SHA-256 (Web Crypto) over the UTF-8 bytes of a canonical JSON form, written as
+ * `sha256:<64 lowercase hex>` — the same format and canonicalisation as the server's
+ * `InvestigationEvaluator.sha256(canonical(…))`, so custody is SHA-256 end to end (LA-12). The server stores
+ * `manifestHash` verbatim and never recomputes it; the Dossier's manifest hashes the stored bytes.
+ * ⚠ Async, and `crypto.subtle` exists only in a secure context (https or localhost): hashing refuses there
+ * rather than falling back to a weaker digest.
  */
 export interface GraphSnapshot {
     id: string;
@@ -26,7 +29,7 @@ export interface GraphSnapshot {
     origin: { sourceId: string; dataset?: string; query: unknown };
     viewport?: { layout: string };
     annotations: { targetId: string; text: string }[];
-    /** Fingerprint of {nodes, edges, metrics, predicate, origin} in canonical form. */
+    /** `sha256:<hex>` of {nodes, edges, metrics, predicate, origin} in canonical form. */
     manifestHash: string;
     /** Which Case ids this snapshot is attached to (UI-first: kept in the browser session). */
     attachedTo: string[];
@@ -49,16 +52,17 @@ function sortKeys(v: unknown): unknown {
     return v;
 }
 
-/** FNV-1a, 64-bit, as 16 hex characters. A fingerprint, not a cryptographic digest. */
-export function fnv1a64(text: string): string {
-    let h = 0xcbf29ce484222325n;
-    const prime = 0x100000001b3n;
-    const mask = 0xffffffffffffffffn;
-    for (let i = 0; i < text.length; i++) {
-        h ^= BigInt(text.charCodeAt(i));
-        h = (h * prime) & mask;
-    }
-    return h.toString(16).padStart(16, '0');
+const SHA256_PREFIX = 'sha256:';
+
+/**
+ * SHA-256 of the UTF-8 bytes of `text`, as `sha256:<64 lowercase hex>` — the server's format
+ * (`InvestigationEvaluator.sha256`). Rejects outside a secure context, where `crypto.subtle` is absent.
+ */
+export async function sha256(text: string): Promise<string> {
+    const subtle = globalThis.crypto?.subtle;
+    if (!subtle) throw new Error('SHA-256 needs a secure context (https or localhost) — nothing was sealed.');
+    const digest = await subtle.digest('SHA-256', new TextEncoder().encode(text));
+    return SHA256_PREFIX + Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 export interface SnapshotInput {
@@ -75,16 +79,16 @@ export interface SnapshotInput {
 }
 
 /** Freeze a graph as evidence. Stranded (`missing`) nodes are excluded — they are not part of the answer. */
-export function snapshotGraph(input: SnapshotInput): GraphSnapshot {
+export async function snapshotGraph(input: SnapshotInput): Promise<GraphSnapshot> {
     const nodes = input.graph.nodes.filter((n) => !n.data.missing);
     const keep = new Set(nodes.map((n) => n.id));
     const edges = input.graph.edges.filter((e) => keep.has(e.source) && keep.has(e.target));
     const metrics = input.metrics ?? {};
     const predicate = input.predicate ?? null;
-    const manifestHash = fnv1a64(canonicalJson({ nodes, edges, metrics, predicate, origin: input.origin }));
+    const manifestHash = await sha256(canonicalJson({ nodes, edges, metrics, predicate, origin: input.origin }));
     const now = input.now ?? new Date();
     return {
-        id: `snp-${now.getTime().toString(36)}-${manifestHash.slice(0, 6)}`,
+        id: `snp-${now.getTime().toString(36)}-${manifestHash.slice(SHA256_PREFIX.length, SHA256_PREFIX.length + 6)}`,
         title: input.title,
         description: input.description,
         createdAt: now.toISOString(),
@@ -100,8 +104,8 @@ export function snapshotGraph(input: SnapshotInput): GraphSnapshot {
     };
 }
 
-/** Re-derive the fingerprint from a snapshot's frozen content; `true` when it still matches its manifest. */
-export function verifySnapshot(s: GraphSnapshot): boolean {
+/** Re-derive the hash from a snapshot's frozen content; `true` when it still matches its manifest. */
+export async function verifySnapshot(s: GraphSnapshot): Promise<boolean> {
     const { nodes, edges, metrics, predicate, origin } = s;
-    return fnv1a64(canonicalJson({ nodes, edges, metrics, predicate, origin })) === s.manifestHash;
+    return (await sha256(canonicalJson({ nodes, edges, metrics, predicate, origin }))) === s.manifestHash;
 }
