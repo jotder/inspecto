@@ -6646,9 +6646,9 @@
     "/objects/{objectId}/resolve" : {
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects/{objectId}/resolve (generated skeleton)",
+        "summary" : "Resolve an Incident, Alert or Case",
         "operationId" : "postObjectsByObjectIdResolve",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "The fixed `resolve` action (WS-10). An Incident resolves only with a `disposition` from the Disposition ladder — absent or unknown is 422, as is any other gap of the resolution gate (timeline, cause analysis, corrective actions, SLA). A `disposition` on a non-Incident is 422: a Case records its Disposition in its Findings. Reopening an Incident clears the recorded disposition, so the next resolve must decide again.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -6657,21 +6657,55 @@
             "type" : "string"
           }
         } ],
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "actor" : {
+                    "type" : "string",
+                    "description" : "Who made the move; defaults to the signed-in principal."
+                  },
+                  "disposition" : {
+                    "$ref" : "#/components/schemas/Disposition"
+                  }
+                }
+              }
+            }
           }
         },
-        "x-generated" : true,
+        "responses" : {
+          "200" : {
+            "description" : "The object after the move (its attribute bag carries the recorded disposition).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "400" : {
+            "$ref" : "#/components/responses/BadRequest"
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "422" : {
+            "$ref" : "#/components/responses/ValidationFailed"
+          }
+        },
         "x-optional-module" : true
       }
     },
     "/objects/{objectId}/transition" : {
       "post" : {
         "tags" : [ "objects" ],
-        "summary" : "POST /objects/{objectId}/transition (generated skeleton)",
+        "summary" : "Move an object through its Workflow",
         "operationId" : "postObjectsByObjectIdTransition",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Body `{action}` (a Workflow action, e.g. `accept`, `resolve`, `archive`, `reopen`) or `{status}` / `{to}` (a target state); one of them is required (else 400). `disposition` rides only a move that DECIDES an Incident — `RESOLVED`, or any terminal state of its Workflow except `ARCHIVED` — where it is REQUIRED (a value of the Disposition ladder, else 422); on any other move it is 422. Moving an Incident out of RESOLVED/ARCHIVED back to a working state (reopen) clears the recorded disposition.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -6680,12 +6714,58 @@
             "type" : "string"
           }
         } ],
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "action" : {
+                    "type" : "string",
+                    "description" : "A Workflow action of the object's type."
+                  },
+                  "status" : {
+                    "type" : "string",
+                    "description" : "A target state, instead of an action."
+                  },
+                  "to" : {
+                    "type" : "string",
+                    "description" : "Alias of status."
+                  },
+                  "actor" : {
+                    "type" : "string",
+                    "description" : "Who made the move; defaults to the signed-in principal."
+                  },
+                  "disposition" : {
+                    "$ref" : "#/components/schemas/Disposition"
+                  }
+                }
+              }
+            }
           }
         },
-        "x-generated" : true,
+        "responses" : {
+          "200" : {
+            "description" : "The object after the move (its attribute bag carries the recorded disposition).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Envelope"
+                }
+              }
+            }
+          },
+          "400" : {
+            "$ref" : "#/components/responses/BadRequest"
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "422" : {
+            "$ref" : "#/components/responses/ValidationFailed"
+          }
+        },
         "x-optional-module" : true
       }
     },
@@ -9973,7 +10053,12 @@
           }
         }
       },
-      "ErrorResponse" : {
+      "Disposition" : {
+      "type" : "string",
+      "description" : "The Disposition ladder (GLOSSARY §9; FindingsSpec.DISPOSITIONS): the outcome an Incident is resolved with, and the default choices of a Case's Findings. Case-insensitive on input, stored upper-case.",
+      "enum" : [ "CONFIRMED", "FALSE_POSITIVE", "RECOVERED", "WRITTEN_OFF", "INCONCLUSIVE", "DUPLICATE", "ACCEPTED_RISK" ]
+    },
+    "ErrorResponse" : {
         "type" : "object",
         "required" : [ "error" ],
         "properties" : {
