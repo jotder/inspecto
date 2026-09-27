@@ -6,6 +6,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.MeasureCompiler;
+import com.gamma.query.Parameters;
 import com.gamma.query.QueryExecutor;
 import com.gamma.query.ResultSetDescriptor;
 import com.gamma.sql.SqlGuard;
@@ -84,6 +85,18 @@ final class BiRoutes implements RouteModule {
             throw new ApiException(422, bad.getMessage());
         }
 
+        // 4. QUERY-BOUND-WIDGET-1: a Widget bound to a saved Query aggregates over THAT query's result, so the
+        //    query's own filtering reaches the Widget. Its text is read and rendered NOW (parameter defaults
+        //    + session context), never baked at save time, and the whole statement is re-guarded.
+        String queryId = ApiContext.str(body, "query");
+        if (queryId != null) {
+            sql = boundQuerySql(ex, store, queryId, spec);
+            List<Finding> boundFindings = SqlGuard.check(sql);
+            if (!boundFindings.isEmpty())
+                return ApiContext.respondJson(ex, 422, Map.of(
+                        "error", "bound query '" + queryId + "' failed the SQL safety check", "findings", boundFindings));
+        }
+
         QueryExecutor.Request req = new QueryExecutor.Request(spec.dataset(), relationSql, sql,
                 spec.limit(), 0, List.of(), List.of());
         try {
@@ -91,6 +104,46 @@ final class BiRoutes implements RouteModule {
         } catch (SQLException e) {
             throw new ApiException(422, "BI query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
+    }
+
+    /** The reserved CTE name a bound query's result is aggregated from. */
+    private static final String BOUND = "__bound_query";
+
+    /**
+     * Compile {@code spec} over the saved query {@code queryId}'s result:
+     * {@code WITH "__bound_query" AS (<rendered query text>) SELECT … FROM "__bound_query"}. The query must
+     * exist and be visible (else 404, like a dataset), be {@code type:sql} with text, and read the SAME
+     * dataset the spec names (the dataset view it references is the one registered for the run).
+     */
+    private static String boundQuerySql(HttpExchange ex, ComponentStore store, String queryId, MeasureCompiler.Spec spec) {
+        Map<String, Object> query;
+        try {
+            query = store.get("query", queryId).map(ComponentRegistry.Component::content).orElse(null);
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(400, bad.getMessage());
+        }
+        if (query == null || !ComponentAccess.canView(ex, query))
+            throw new ApiException(404, "no query '" + queryId + "' — the Widget's bound query was deleted or is not visible to you");
+        String type = ApiContext.str(query, "type");
+        if (type != null && !"sql".equalsIgnoreCase(type))
+            throw new ApiException(422, "bound query '" + queryId + "' is type '" + type + "'; only type:sql queries run server-side");
+        String text = ApiContext.str(query, "text");
+        if (text == null) throw new ApiException(422, "bound query '" + queryId + "' has no 'text'");
+        String queryDataset = ApiContext.str(query, "datasetId");
+        if (!spec.dataset().equals(queryDataset))
+            throw new ApiException(422, "bound query '" + queryId + "' reads dataset '" + queryDataset
+                    + "', not the Widget's dataset '" + spec.dataset() + "'");
+        String resolved;
+        try {
+            resolved = Parameters.resolve(text, QueryRoutes.declaredParams(query), Map.of(),
+                    Parameters.Context.of(ApiContext.actor(ex), null));
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, bad.getMessage());
+        }
+        resolved = resolved.strip().replaceAll(";+$", "").strip();
+        MeasureCompiler.Spec overQuery = new MeasureCompiler.Spec(BOUND, spec.measures(), spec.groupBy(),
+                spec.grains(), spec.filters(), spec.orderBy(), spec.limit());
+        return "WITH \"" + BOUND + "\" AS (" + resolved + ") " + MeasureCompiler.compile(overQuery);
     }
 
     /** The Result Set contract (same shape as {@code /queries/{id}/run}) + the compiled SQL for transparency. */

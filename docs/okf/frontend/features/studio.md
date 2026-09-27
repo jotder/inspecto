@@ -37,6 +37,20 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   `POST /bi/query` (DuckDB) and unmappable specs (named-Measure SQL, OR filters) fail honestly.
   ⚠ *(Until 2026-09-08 this said "offline the same specs run byte-identically on AlaSQL" — that arm went
   with the mock backend; AlaSQL survives only as the data-table Pro editor's own client-side SQL.)* Sharing/RBAC stays gated on the security module.
+* **A Widget can read a saved Query (QUERY-BOUND-WIDGET-1, 2026-09-27).** The Widget Builder's *Saved query*
+  picker (shown once a Dataset is picked) offers the Query Library's `type:sql` queries over **that** Dataset,
+  plus *None* to unbind; picking another Dataset unbinds. The binding persists as the Widget's `queryId`, and
+  `WidgetHost` + the builder preview put it on the `QuerySpec` → `biQueryBody` sends it as the `/bi/query`
+  body's `query`. `BiRoutes` then loads the query **at run time** (never baked at save), resolves its
+  `$`-parameter defaults exactly like `/queries/{id}/run` (`QueryRoutes.declaredParams`), and compiles
+  `WITH "__bound_query" AS (<query text>) SELECT … FROM "__bound_query"` — the whole statement re-passes
+  `SqlGuard`, in the same `QueryExecutor` sandbox with the Dataset view registered, so the query's own
+  `WHERE` reaches the Widget. Refusals: a missing or not-visible (`ComponentAccess.canView`) query → 404
+  *"no query 'x'"*; a non-`sql` query, no text, a query over a different Dataset, or an unsafe text → 422.
+  A query-bound tile that fails shows a *Bound query unavailable* alert (`tile-query-error`), not a blank
+  chart. ⚠ A query-bound Widget is **not embeddable** (`embedQueryBody` returns null — the public query
+  surface cannot run a saved query). ⚠ No caller-supplied parameter values cross yet: only the query's
+  declared defaults + session context apply.
 * **The rows seam — `DatasetRowsService` (2026-08-14, split S2 slice B).** What a Dataset's `sourceName`
   resolves to is asked in ONE place (`src/app/inspecto/viz/dataset-rows.service.ts`): it reads the
   real store over `GET /db/table`, or `POST /db/query` with the dataset's Query Core model compiled by

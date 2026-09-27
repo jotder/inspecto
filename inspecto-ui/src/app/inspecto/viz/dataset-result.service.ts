@@ -117,6 +117,7 @@ export function biQueryBody(spec: QuerySpec, cols: ColumnMeta[] = []): BiQueryBo
     if (filters.length) body.filters = filters;
     if (spec.orderBy?.length) body.orderBy = spec.orderBy;
     if (spec.limit != null) body.limit = spec.limit;
+    if (spec.queryId) body.query = spec.queryId;
     return body;
 }
 

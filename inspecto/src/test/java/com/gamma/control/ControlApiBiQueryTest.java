@@ -172,4 +172,62 @@ class ControlApiBiQueryTest {
                     "unsafe identifier");
         }
     }
+
+    // ── QUERY-BOUND-WIDGET-1: a Widget bound to a saved Query aggregates over that query's result ──
+
+    private void seedEuQuery(Ctx c, String text) throws Exception {
+        new ComponentStore(c.root.resolve("registry")).write("query", "eu_only",
+                Map.of("type", "sql", "datasetId", "sales_ds", "text", text));
+    }
+
+    @Test
+    void aBoundQueryFiltersTheAggregationAndIsReadAtRunTime(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedSales(c);
+            seedEuQuery(c, "SELECT * FROM sales_ds WHERE region = 'EU';");
+            String body = """
+                    {"dataset":"sales_ds","query":"eu_only",
+                     "measures":[{"agg":"sum","field":"amount"}],"groupBy":["region"]}""";
+            HttpResponse<String> r = biQuery(c.port, body);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode rows = V1Body.of(r.body()).get("rows");
+            assertEquals(1, rows.size(), "the query's own WHERE removed US");
+            assertEquals("EU", rows.get(0).get("region").asText());
+            assertEquals(40.0, rows.get(0).get("sum_amount").asDouble(), 1e-9);
+
+            // Edit the saved query: the next render reads the NEW text (rendered at read, not baked).
+            seedEuQuery(c, "SELECT * FROM sales_ds WHERE region = 'US'");
+            JsonNode after = V1Body.of(biQuery(c.port, body).body()).get("rows");
+            assertEquals("US", after.get(0).get("region").asText());
+        }
+    }
+
+    @Test
+    void aMissingBoundQueryIsA404NotAnEmptyResult(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedSales(c);
+            HttpResponse<String> r = biQuery(c.port, """
+                    {"dataset":"sales_ds","query":"gone","measures":[{"agg":"count"}]}""");
+            assertEquals(404, r.statusCode(), r.body());
+            assertTrue(r.body().contains("no query 'gone'"), r.body());
+        }
+    }
+
+    @Test
+    void aBoundQueryOverAnotherDatasetOrUnsafeSqlIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedSales(c);
+            new ComponentStore(c.root.resolve("registry")).write("query", "other",
+                    Map.of("type", "sql", "datasetId", "not_sales", "text", "SELECT 1"));
+            HttpResponse<String> mismatch = biQuery(c.port, """
+                    {"dataset":"sales_ds","query":"other","measures":[{"agg":"count"}]}""");
+            assertEquals(422, mismatch.statusCode(), mismatch.body());
+
+            seedEuQuery(c, "SELECT * FROM read_csv('/etc/passwd')");
+            HttpResponse<String> unsafe = biQuery(c.port, """
+                    {"dataset":"sales_ds","query":"eu_only","measures":[{"agg":"count"}]}""");
+            assertEquals(422, unsafe.statusCode(), unsafe.body());
+            assertTrue(unsafe.body().contains("findings"), unsafe.body());
+        }
+    }
 }

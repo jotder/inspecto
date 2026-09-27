@@ -161,6 +161,11 @@ describe('DatasetResultService — 429 rate limiting', () => {
 });
 
 describe('biQueryBody', () => {
+    it('a query-bound spec sends the saved Query id as `query` (QUERY-BOUND-WIDGET-1)', () => {
+        expect(biQueryBody(spec({ queryId: 'long_calls' }), COLS)?.query).toBe('long_calls');
+        expect(biQueryBody(spec({}), COLS)).not.toHaveProperty('query');
+    });
+
     it('maps measures/groupBy/orderBy/limit and types filter values by column', () => {
         const body = biQueryBody(
             spec({

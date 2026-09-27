@@ -36,6 +36,8 @@ import {
 } from 'app/inspecto/transfer';
 import { Dataset, DatasetColumn, inferRoles } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
+import { Query } from '../queries/query-types';
+import { QueriesService } from '../queries/queries.service';
 import { Widget, WidgetOptions, WorkingSetBinding, buildWidget } from './widget-types';
 import { WidgetSaveDialog, WidgetSaveResult } from './widget-save.dialog';
 import { WidgetOptionsData, WidgetOptionsDialog } from './widget-options.dialog';
@@ -72,6 +74,7 @@ import './widget.kind'; // ensure the widget kind + viz plugins are registered
 })
 export class ExploreComponent implements OnInit {
     private datasetsApi = inject(DatasetsService);
+    private queriesApi = inject(QueriesService);
     private widgetsApi = inject(WidgetsService);
     private componentsApi = inject(ComponentsService);
     private datasetResult = inject(DatasetResultService);
@@ -97,9 +100,18 @@ export class ExploreComponent implements OnInit {
     readonly existingWidgetIds = signal<string[]>([]);
     readonly selectedId = signal<string>('');
     readonly dataset = signal<Dataset | null>(null);
-    /** A saved query this widget is bound to (R3 lineage; preserved across an edit round-trip). Rendering
-     *  still runs the dataset+controls path — query-driven rendering is a follow-on. */
+    /** A saved query this widget is bound to (R3). The widget aggregates over that query's result
+     *  (`/bi/query` `query`), so the query's own filtering reaches it; unset = the whole Dataset. */
     readonly boundQueryId = signal<string | undefined>(undefined);
+    /** The Query Library, for the binding picker. */
+    readonly queries = signal<Query[]>([]);
+    /** Bindable queries: server-runnable (`sql`) ones over the picked Dataset, plus "none" to unbind. */
+    readonly queryOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'None — the whole Dataset' },
+        ...this.queries()
+            .filter((q) => q.type === 'sql' && q.datasetId === this.selectedId())
+            .map((q) => ({ value: q.id, label: q.name })),
+    ]);
     readonly vizType = signal<string>('');
     readonly controls = signal<ControlValues>({});
     readonly options = signal<WidgetOptions>({});
@@ -193,6 +205,10 @@ export class ExploreComponent implements OnInit {
             next: (d) => this.datasets.set(d),
             error: () => this.toastr.warning('Could not load datasets.'),
         });
+        this.queriesApi.list().subscribe({
+            next: (q) => this.queries.set(q),
+            error: () => this.toastr.warning('Could not load the Query Library.'),
+        });
         this.widgetsApi.list().subscribe({
             next: (w) => this.existingWidgetIds.set(w.map((x) => x.id)),
             error: () => undefined,
@@ -269,6 +285,7 @@ export class ExploreComponent implements OnInit {
 
     onSelectDataset(id: string): void {
         this.selectedId.set(id);
+        this.boundQueryId.set(undefined); // a bound query reads one Dataset — a new Dataset unbinds it
         this.datasetsApi.get(id).subscribe({
             next: async (d) => {
                 this.dataset.set(d);
@@ -279,6 +296,12 @@ export class ExploreComponent implements OnInit {
             },
             error: (e) => this.toastr.error(apiErrorMessage(e, `Could not load dataset "${id}"`)),
         });
+    }
+
+    /** Bind a saved Query (or `''` to unbind) and re-render over it. */
+    onBindQuery(id: string): void {
+        this.boundQueryId.set(id || undefined);
+        this.run();
     }
 
     /** Switch the visualization — re-auto-assign channels for the new plugin's controls, then render.
@@ -380,12 +403,15 @@ export class ExploreComponent implements OnInit {
             filters: null,
             options: this.options(),
         });
+        const queryId = this.boundQueryId();
+        if (queryId) spec.queryId = queryId;
         this.running.set(true);
         // Through DatasetResultService: POST /bi/query — the builder previews against the same data
         // path the saved widget will render with.
         this.datasetResult
             .run(spec, this.colMetas())
             .then((res) => {
+                if (!res.ok && queryId) this.toastr.error(res.error ?? 'The bound query could not run.');
                 this.props.set(plugin.transformProps(res.ok ? res.rows : [], this.controls()));
             })
             .catch(() => this.props.set({ labels: [], series: [] }))

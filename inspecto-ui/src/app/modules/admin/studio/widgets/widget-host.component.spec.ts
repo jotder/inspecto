@@ -413,4 +413,47 @@ describe('WidgetHostComponent', () => {
         expect(fixture.nativeElement.querySelector('inspecto-alert')).toBeNull();
         expect(fixture.nativeElement.querySelector('inspecto-viz-render')).toBeTruthy();
     });
+
+    // QUERY-BOUND-WIDGET-1
+    it('a query-bound widget runs its spec over the saved Query (queryId reaches DatasetResultService)', async () => {
+        const specs: { queryId?: string }[] = [];
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: {
+                    run: (spec: { queryId?: string }) => {
+                        specs.push(spec);
+                        return Promise.resolve({ ok: true, rows: [{ sum_duration_s: 5 }] });
+                    },
+                },
+            },
+        ]);
+        fixture.componentRef.setInput('widget', { ...WIDGET, queryId: 'long_calls' });
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(specs[0].queryId).toBe('long_calls');
+    });
+
+    it('a query-bound widget whose query is gone shows the refusal, not an empty chart', async () => {
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: { run: () => Promise.resolve({ ok: false, rows: [], error: "no query 'long_calls'" }) },
+            },
+        ]);
+        fixture.componentRef.setInput('widget', { ...WIDGET, vizType: 'bar', queryId: 'long_calls' });
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const alert = fixture.nativeElement.querySelector('[data-testid="tile-query-error"]');
+        expect(alert?.textContent).toContain("no query 'long_calls'");
+        expect(fixture.nativeElement.querySelector('inspecto-viz-render')).toBeNull();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
 });

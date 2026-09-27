@@ -15,6 +15,7 @@ import { runSpec } from 'app/inspecto/viz/query-spec';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { WidgetsService } from './widgets.service';
+import { QueriesService } from '../queries/queries.service';
 import { ExploreComponent } from './explore.component';
 
 const DS: Dataset = {
@@ -39,7 +40,16 @@ const CDR_PAGE: DatasetRows = {
     truncated: false,
 };
 
+/** Every spec the builder previewed, in order. */
+const runs: { queryId?: string }[] = [];
+const QUERIES = [
+    { id: 'long_calls', name: 'Long calls', type: 'sql', datasetId: 'cdr_sample', parameters: [] },
+    { id: 'other_ds', name: 'Other', type: 'sql', datasetId: 'elsewhere', parameters: [] },
+    { id: 'structured', name: 'Structured', type: 'structured', datasetId: 'cdr_sample', parameters: [] },
+];
+
 function create(ds: Dataset = DS, page: DatasetRows = CDR_PAGE) {
+    runs.length = 0;
     TestBed.configureTestingModule({
         imports: [ExploreComponent],
         providers: [
@@ -62,7 +72,17 @@ function create(ds: Dataset = DS, page: DatasetRows = CDR_PAGE) {
                 },
             },
             // Pass-through to the offline runSpec (no cache, no HttpClient) — byte-identical M1 behaviour.
-            { provide: DatasetResultService, useValue: { run: runSpec, clear: () => undefined } },
+            {
+                provide: DatasetResultService,
+                useValue: {
+                    run: (...a: Parameters<typeof runSpec>) => {
+                        runs.push(a[0]);
+                        return runSpec(...a);
+                    },
+                    clear: () => undefined,
+                },
+            },
+            { provide: QueriesService, useValue: { list: () => of(QUERIES) } },
             // The rows seam, stubbed at its offline answer: the store's sample page, and the server-derived
             // cardinality it would carry live for a dimension column.
             {
@@ -177,5 +197,34 @@ describe('ExploreComponent', () => {
         const fixture = create();
         fixture.detectChanges();
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    // QUERY-BOUND-WIDGET-1
+    it('binds a saved Query over the picked Dataset, previews over it, and unbinds', async () => {
+        const fixture = create();
+        const c = fixture.componentInstance;
+        fixture.detectChanges();
+        c.onSelectDataset('cdr_sample');
+        await fixture.whenStable();
+        // Only server-runnable (sql) queries over THIS Dataset are offered, plus "none".
+        expect(c.queryOptions().map((o) => o.value)).toEqual(['', 'long_calls']);
+
+        c.onBindQuery('long_calls');
+        expect(c.boundQueryId()).toBe('long_calls');
+        expect(runs.at(-1)?.queryId).toBe('long_calls');
+
+        c.onBindQuery('');
+        expect(c.boundQueryId()).toBeUndefined();
+        expect(runs.at(-1)?.queryId).toBeUndefined();
+    });
+
+    it('picking a Dataset clears a binding made over the previous one', async () => {
+        const fixture = create();
+        const c = fixture.componentInstance;
+        c.onSelectDataset('cdr_sample');
+        await fixture.whenStable();
+        c.onBindQuery('long_calls');
+        c.onSelectDataset('cdr_sample');
+        expect(c.boundQueryId()).toBeUndefined();
     });
 });

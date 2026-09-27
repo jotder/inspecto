@@ -22,6 +22,8 @@ interface EmbedWidget {
     vizType: string;
     controls: ControlValues;
     viewId?: string;
+    /** A bound saved Query — the public query surface cannot run one, so such a widget is not embeddable. */
+    queryId?: string;
     /** The widget's options. Only the query-shaping `tableSort` is read (it becomes the public query's `orderBy`),
      *  so a shared table opens in the same row order, and keeps the same top rows, as in the app. */
     options?: Pick<VizRenderOptions, 'tableSort'>;
@@ -47,7 +49,7 @@ interface TileVm {
  * and a named-measure `expression` cannot cross the wire.
  */
 export function embedQueryBody(widget: EmbedWidget): PublicQueryBody | null {
-    if (widget.viewId) return null;
+    if (widget.viewId || widget.queryId) return null;
     const plugin = getViz(widget.vizType);
     if (!plugin) return null;
     const spec = plugin.buildQuery(widget.controls ?? {}, {

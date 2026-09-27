@@ -139,6 +139,16 @@ export interface DrillEvent extends DrillPair {
                                     Too many queries in a short time — the server is throttling this widget.
                                     <button mat-button type="button" (click)="retry()">Retry</button>
                                 </inspecto-alert>
+                            } @else if (queryError(); as err) {
+                                <!-- QUERY-BOUND-WIDGET-1: the bound saved Query could not run (deleted, not
+                                     visible to this user, or refused). A blank chart would read as "no data". -->
+                                <inspecto-alert
+                                    variant="error"
+                                    title="Bound query unavailable"
+                                    data-testid="tile-query-error"
+                                >
+                                    {{ err }}
+                                </inspecto-alert>
                             } @else {
                                 <inspecto-viz-render
                                     [plugin]="p"
@@ -225,6 +235,8 @@ export class WidgetHostComponent {
     readonly canExport = computed(() => this.plugin()?.render.kind === 'chartjs');
     /** False once a data run fails — a shared-bound dataset that no longer resolves (revoked/expired grant). */
     private readonly runOk = signal(true);
+    /** A query-bound widget's failed run (deleted/hidden query, refused SQL) — shown, never an empty chart. */
+    readonly queryError = signal<string | null>(null);
     /** The last run was refused `429` even after {@link DatasetResultService}'s retries. */
     readonly throttled = signal(false);
     /** Bumped by {@link retry} so the query effect re-runs. */
@@ -263,7 +275,7 @@ export class WidgetHostComponent {
         if (!this.resolvedWidget()) return this.loadFailed() ? 'ready' : 'loading';
         if (!this.plugin() || this.viewBound()) return 'ready';
         if (!this.resolvedDataset()) return this.datasetFailed() ? 'ready' : 'loading';
-        if (this.throttled() || this.showRevoked()) return 'ready';
+        if (this.throttled() || this.showRevoked() || this.queryError()) return 'ready';
         if (!this.resultArrived()) return 'loading';
         return this.runOk() && this.rowCount() === 0 ? 'empty' : 'ready';
     });
@@ -304,10 +316,12 @@ export class WidgetHostComponent {
                 filters: this.filter(),
                 options: widget.options,
             });
+            if (widget.queryId) spec.queryId = widget.queryId;
             this.datasetResult
                 .run(spec, this.colMetas())
                 .then((res) => {
                     this.runOk.set(res.ok);
+                    this.queryError.set(!res.ok && !res.throttled && widget.queryId ? (res.error ?? 'failed') : null);
                     this.throttled.set(!!res.throttled);
                     this.rowCount.set(res.ok ? res.rows.length : 0);
                     this.truncated.set(res.ok && !!res.truncated);

@@ -27,6 +27,9 @@ export interface BiQueryBody {
     filters?: BiFilter[];
     orderBy?: { field: string; dir: 'asc' | 'desc' }[];
     limit?: number;
+    /** A saved Query id: aggregate over its result instead of the whole Dataset. The query must read `dataset`;
+     *  a missing or hidden one is a 404, never an empty result. */
+    query?: string;
 }
 
 /** The Result Set contract `/bi/query` shares with `/queries/{id}/run`. */

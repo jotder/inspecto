@@ -143,7 +143,7 @@ final class QueryRoutes implements RouteModule {
         }
     }
 
-    private static List<Parameters.Def> declaredParams(Map<String, Object> query) {
+    static List<Parameters.Def> declaredParams(Map<String, Object> query) {
         List<Parameters.Def> defs = new ArrayList<>();
         if (query.get("parameters") instanceof List<?> ps)
             for (Object o : ps)

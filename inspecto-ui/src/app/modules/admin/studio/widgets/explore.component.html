@@ -66,6 +66,15 @@
                 [ngModel]="selectedId()"
                 (ngModelChange)="onSelectDataset($event)"
             />
+            @if (dataset() && !viewBound()) {
+                <inspecto-option-picker
+                    label="Saved query"
+                    help="Bind a Query Library query — the widget then reads its result, filters included."
+                    [options]="queryOptions()"
+                    [ngModel]="boundQueryId() ?? ''"
+                    (ngModelChange)="onBindQuery($event)"
+                />
+            }
 
             <!-- Investigation views: bind a saved studio view (geo-map / link-analysis) instead of a dataset. -->
             <div>

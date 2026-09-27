@@ -59,6 +59,9 @@ export interface QuerySpec {
     filters?: ConditionGroup | null;
     orderBy?: { field: string; dir: SortDir }[];
     limit?: number | null;
+    /** A saved Query (R3) the Widget is bound to — the server aggregates over that query's result, read and
+     *  rendered at run time, instead of the whole Dataset (QUERY-BOUND-WIDGET-1). Absent = the Dataset. */
+    queryId?: string;
 }
 
 /** The channels a plugin can map fields onto (Tableau-style). `rows` / `columns` are the heatmap's two axes. */
