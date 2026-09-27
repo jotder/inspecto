@@ -301,7 +301,10 @@ console.log(`  ${cdxPath}\n  ${spdxPath}`);
 // 0 unhashed, 4 unlicensed — and all four unlicensed are OUR OWN modules, whose poms declare no licence.
 // So the honest gate is a RULE, not a count: no component may be unhashed, and only first-party components
 // may be unlicensed.
-const unlicensedThirdParty = components.filter((c) => !c.firstParty && c.licenseMissing);
+// Our own code built outside this repo (resolved from ~/.m2 like a dependency, so listed and hashed as one),
+// whose poms declare no licence exactly like our in-repo modules. Exempt from the licence rule only.
+const OWN_OUT_OF_REPO_GROUPS = new Set(['com.eoiagent']);
+const unlicensedThirdParty = components.filter((c) => !c.firstParty && !OWN_OUT_OF_REPO_GROUPS.has(c.group) && c.licenseMissing);
 if (unhashed || unlicensedThirdParty.length) {
     if (unhashed) {
         console.error(`\n✖ SBOM (${edition}): ${unhashed} component(s) have no resolvable artifact in ${M2}, so no hash was recorded.`);
