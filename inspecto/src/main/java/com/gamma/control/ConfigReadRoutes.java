@@ -64,6 +64,7 @@ final class ConfigReadRoutes implements RouteModule {
     private Object deleteConfig(ApiContext api, HttpExchange ex, String type, String name) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "config delete");
         if (ConfigSpecs.forType(type) == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
+        type = type.toLowerCase(java.util.Locale.ROOT);   // as forType judges it — so "Pipeline" meets the active 409 too
         String fileName = WriteGates.safeName(name, "config name");
 
         Path dir = writeRoot;

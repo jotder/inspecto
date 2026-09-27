@@ -51,6 +51,7 @@ final class ConfigWriteRoutes implements RouteModule {
         Object cfgObj = body.get("config");
         if (type == null || !(cfgObj instanceof Map<?, ?>))
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'type' and 'config' (a draft config map)");
+        type = type.toLowerCase(java.util.Locale.ROOT);   // as ConfigSpecs.forType judges it — every type branch below too
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
         Map<String, Object> draft = mapAt(body, "config");
@@ -344,6 +345,7 @@ final class ConfigWriteRoutes implements RouteModule {
         Object patchObj = body.get("patch");
         if (type == null || name == null || name.isBlank() || !(patchObj instanceof Map<?, ?>))
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'type', 'name' and 'patch' (a partial config map)");
+        type = type.toLowerCase(java.util.Locale.ROOT);   // as ConfigSpecs.forType judges it — every type branch below too
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
         Map<String, Object> patch = mapAt(body, "patch");
