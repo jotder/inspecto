@@ -59,6 +59,7 @@ class ControlApiRestoreJobGateTest {
         Authenticators.forTest(null);
         if (priorRoots == null) System.clearProperty("assist.safety.roots");
         else System.setProperty("assist.safety.roots", priorRoots);   // surefire's, which BackupTaskTest relies on
+        System.clearProperty("jobs.audit.dir");
     }
 
     private String priorRoots;
@@ -67,6 +68,8 @@ class ControlApiRestoreJobGateTest {
         priorRoots = System.getProperty("assist.safety.roots");
         System.setProperty("assist.safety.roots", dir.toAbsolutePath().toString());
         System.setProperty("assist.write.root", Files.createDirectories(dir.resolve("wr")).toString());
+        // the flat SpaceRoot's audit dir is CWD-relative "jobs_audit" — keep the restore job's run log in the @TempDir
+        System.setProperty("jobs.audit.dir", dir.resolve("jobs_audit").toString());
         try {
             CollectorService svc = new CollectorService(List.of(), 3600, 1);
             ControlApi api = new ControlApi(svc, 0);
