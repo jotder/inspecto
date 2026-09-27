@@ -65,6 +65,17 @@ public final class SecurityTriggers implements Consumer<Event> {
     private final Rule t1, t2, t3;
     private final Consumer<Event> emit;
     private final LongSupplier clock;
+    /** The event log this evaluator watches, or null (unit tests): at most ONE evaluator is active per log. */
+    private final Object log;
+
+    /**
+     * The evaluator currently evaluating each log. Every CollectorService subscribes one, and the default Space's
+     * services all share {@code EventLog.global()} — two live (or one leaked, never closed) services on that log
+     * would each count the same audit row and fire twice. The first evaluator to see an event on a log owns it
+     * until {@link #detach()}.
+     */
+    private static final Map<Object, SecurityTriggers> ACTIVE =
+            java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
     /** Per (trigger, key): the recent matching timestamps (≤ threshold), and when it last fired. */
     private static final class Window {
@@ -81,13 +92,23 @@ public final class SecurityTriggers implements Consumer<Event> {
 
     /** Production: thresholds from system properties, the wall clock, emitting into {@code emit}. */
     public SecurityTriggers(Consumer<Event> emit) {
-        this(emit, System::currentTimeMillis,
+        this(null, emit);
+    }
+
+    /** Production: as above, active only while no other evaluator owns {@code log}. */
+    public SecurityTriggers(Object log, Consumer<Event> emit) {
+        this(log, emit, System::currentTimeMillis,
                 rule(T1, "Repeated authorization refusals", 20, 10),
                 rule(T2, "Burst of authentication failures", 50, 10),
                 rule(T3, "Rejected delivery-status signatures", 10, 60));
     }
 
     SecurityTriggers(Consumer<Event> emit, LongSupplier clock, Rule t1, Rule t2, Rule t3) {
+        this(null, emit, clock, t1, t2, t3);
+    }
+
+    SecurityTriggers(Object log, Consumer<Event> emit, LongSupplier clock, Rule t1, Rule t2, Rule t3) {
+        this.log = log;
         this.emit = emit;
         this.clock = clock;
         this.t1 = t1;
@@ -112,12 +133,18 @@ public final class SecurityTriggers implements Consumer<Event> {
     @Override
     public void accept(Event e) {
         if (e == null) return;
+        if (log != null && ACTIVE.computeIfAbsent(log, k -> this) != this) return;   // another evaluator owns it
         try {
             if (EventType.ACCESS_DENIED.equals(e.type())) onDenied(e);
             else if (EventType.AUDIT.equals(e.type())) onAudit(e);
         } catch (RuntimeException ignore) {
             // best effort — a trigger must never break the log it observes
         }
+    }
+
+    /** Stop owning the log (service close), so the next evaluator on it takes over. */
+    public void detach() {
+        if (log != null) ACTIVE.remove(log, this);
     }
 
     private void onDenied(Event e) {

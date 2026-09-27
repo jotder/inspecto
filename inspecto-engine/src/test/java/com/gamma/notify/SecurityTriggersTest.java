@@ -140,4 +140,26 @@ class SecurityTriggersTest {
         assertEquals(List.of("root@x.com"), mailedTo, "one digest, to the administrator only");
         svc.close();
     }
+
+    /** Two services on one shared log (the default Space's EventLog.global()) must not both count the same row. */
+    @Test
+    void onlyOneEvaluatorPerLogFiresAndTheNextTakesOverAfterDetach() {
+        Object log = new Object();
+        long tenMin = 600_000L;
+        java.util.function.Supplier<SecurityTriggers> make = () -> new SecurityTriggers(log, fired::add, now::get,
+                new SecurityTriggers.Rule(SecurityTriggers.T1, "t1", 3, tenMin),
+                new SecurityTriggers.Rule(SecurityTriggers.T2, "t2", 3, tenMin),
+                new SecurityTriggers.Rule(SecurityTriggers.T3, "t3", 3, 3_600_000L));
+        SecurityTriggers first = make.get(), second = make.get();
+        for (int i = 0; i < 3; i++) {
+            Event e = denied(403, "mallory", null, "/jobs");
+            first.accept(e);
+            second.accept(e);
+        }
+        assertEquals(1, fired.size(), "one evaluator owns the log");
+        first.detach();
+        for (int i = 0; i < 3; i++) second.accept(denied(403, "eve", null, "/jobs"));
+        assertEquals(2, fired.size(), "after the owner detaches the next evaluator takes over");
+        second.detach();
+    }
 }

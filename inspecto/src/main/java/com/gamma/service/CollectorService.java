@@ -600,7 +600,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // ses-sns §8: the built-in security triggers (T1–T4) read the audit rows of this log and emit
         // SECURITY_TRIGGERED back into it, which the builtin-security-triggered rule turns into a notification.
         final com.gamma.event.EventLog triggerLog = this.eventLog;
-        this.securityTriggers = new com.gamma.notify.SecurityTriggers(triggerLog::emit);
+        this.securityTriggers = new com.gamma.notify.SecurityTriggers(triggerLog, triggerLog::emit);
         this.eventLog.addSubscriber(securityTriggers);
         String viewsFile = System.getProperty("events.views.file");
         this.savedViews = new SavedViewStore(viewsFile == null ? null : Path.of(viewsFile));
@@ -2043,6 +2043,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.removeSubscriber(eventObjectBridge);   // de-register the D2 gap→ALERT bridge
         this.eventLog.removeSubscriber(notificationSubscriber);   // de-register the B2 event→feed engine
         this.eventLog.removeSubscriber(securityTriggers);   // de-register the security trigger evaluator
+        securityTriggers.detach();   // …and release the log, so a later service's evaluator takes over
         try { notificationService.close(); } catch (Exception e) { log.warn("Error closing notification service: {}", e.getMessage()); }
         try { notifications.close(); } catch (Exception e) { log.warn("Error closing notification store: {}", e.getMessage()); }
         EventLog.unregister(spaceId);                  // stop MDC-routing to this space's log

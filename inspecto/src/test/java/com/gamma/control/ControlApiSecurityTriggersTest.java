@@ -112,8 +112,24 @@ class ControlApiSecurityTriggersTest {
                     "{\"roles\":[{\"name\":\"auditor\",\"capabilities\":[\"canOperateRuns\"]}]}", "Bearer admin", null);
             assertEquals(200, put.statusCode(), put.body());
             List<Notification> security = awaitSecurity(c, 1);
-            assertEquals(1, security.size());
+            assertEquals(1, security.size(), () -> "security notifications: "
+                    + security.stream().map(n -> n.title() + " | " + n.body()).toList());
             assertTrue(security.get(0).title().contains("Role"), security.get(0).title());
+        }
+    }
+
+    /** CI (Linux, one fork): an earlier class's default-Space service was still on EventLog.global() and doubled T4. */
+    @Test
+    void aSecondLiveDefaultSpaceServiceDoesNotDoubleARolesWriteTrigger(@TempDir Path dir) throws Exception {
+        Authenticators.forTest(FAKE);
+        try (Ctx other = open(dir.resolve("other")); Ctx c = open(dir.resolve("mine"))) {
+            HttpResponse<String> put = send(c.port, "PUT", "/access/roles",
+                    "{\"roles\":[{\"name\":\"auditor\",\"capabilities\":[\"canOperateRuns\"]}]}", "Bearer admin", null);
+            assertEquals(200, put.statusCode(), put.body());
+            List<Notification> security = awaitSecurity(c, 1);
+            Thread.sleep(300);   // let a duplicate, if any, arrive
+            security = c.svc.notifications().recent(100).stream().filter(n -> "security".equals(n.category())).toList();
+            assertEquals(1, security.size(), "one trigger per roles write, however many services share the log");
         }
     }
 
