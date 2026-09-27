@@ -472,6 +472,7 @@ final class ConfigWriteRoutes implements RouteModule {
         return switch (type) {
             case "job"      -> List.of("job.name");
             case "schema"   -> List.of("raw.name");
+            case "alert"    -> List.of("alert.name");   // the alert spec refuses a top-level name
             case "pipeline" -> List.of("id", "name");
             default         -> List.of("name");   // enrichment, meta
         };

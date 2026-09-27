@@ -90,19 +90,13 @@ class ControlApiConfigWriteKindCapabilityTest {
         }
     }
 
-    /**
-     * The holder passes the gate. ⚠ It then meets a PRE-EXISTING content refusal: {@code identityFields("alert")}
-     * is the top-level {@code name}, while the alert spec keys the rule under {@code alert.name} and refuses a
-     * top-level {@code name} as dead — so no {@code type: alert} draft is writable through this door today. The
-     * test pins "not 403" (the gate), not a write.
-     */
+    /** The holder passes the gate and the draft is written — the alert's identity is {@code alert.name}. */
     @Test
-    void anAlertWithCanAuthorAlertRulesPassesTheGate(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void anAlertWithCanAuthorAlertRulesIsWritten(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
-            assertEquals(200, post(c.port, AUTHOR, "/alerts/rules", ALERT_RULE).statusCode(), "the direct route admits");
             HttpResponse<String> r = post(c.port, AUTHOR, "/config/write", ALERT_WRITE);
-            assertEquals(422, r.statusCode(), r.body());
-            assertTrue(r.body().contains("identity field"), r.body());
+            assertEquals(200, r.statusCode(), r.body());
+            assertTrue(Files.exists(root.resolve("rule-1.toon")), "written under the alert's own name");
         }
     }
 
