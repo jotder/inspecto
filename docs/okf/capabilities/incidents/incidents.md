@@ -381,13 +381,20 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
   that records no outcome, and `RESOLVED → ARCHIVED` already passed the gate. So a custom workflow buys nothing
   the default does not already allow; the Disposition may ride a custom terminal move exactly as it rides a
   resolve, and leaving that state clears it (`ObjectServiceTest.aCustomTerminalStateCannotFinishAnIncidentWithoutTheResolutionGate`).
+  The `disposition` body field (and the `Disposition` ladder enum) is documented on both operations in
+  `docs/api/openapi-v1.json` since 2026-09-28 — they are hand-written, no longer generated skeletons.
   ⛔ A machine actor never resolves
   an Incident (the per-entity Alert heal, §3.2). The UI's `postmortemGaps` soft-warn
   is a *mirror* of the same four checks, not the gate. ⚠ `objects.md` and the archived design still call
   the backend gate "a follow-up"; it shipped.
 - **SLA and escalation.** `dueAt` / `dueInMinutes` at creation; the sweep (`sweepIncidentSla`,
   `ObjectService.java:830-905`, cadence `-Dobjects.sla.sweep.seconds`, default 60, `0` disables) stamps
-  `slaBreachedAt` once and emits `OBJECT_SLA_BREACH`. ⛔ **The `EscalationPolicy` that once ran on breach
+  `slaBreachedAt` once and emits `OBJECT_SLA_BREACH`. **The clock stops at `RESOLVED` and at every terminal
+  state of the Incident's registered workflow** (`IMPORT-RESIDUALS-1` (4), 2026-09-28) — the resolution gate's
+  set (`decidesIncident`) **plus** `ARCHIVED`: the gate exempts `ARCHIVED` because archiving records no outcome,
+  but an archived Incident is no longer worked either. Keyed on the state as well as `closedAt`, because an
+  Incident can sit in a terminal state with no `closedAt` (a workflow file that later made its state terminal,
+  an imported object) (`ObjectServiceTest.slaSweepSkipsEveryWorkflowTerminalStateButStillBreachesOpenOnes`). ⛔ **The `EscalationPolicy` that once ran on breach
   is RETIRED (`RETIRE-HALVES-1`, 2026-09-14)** — a breach now emits its event and nothing else; no severity
   bump, no re-routing, and `OBJECT_ESCALATED` is emitted by nothing (the `@PublicApi` constant stays for
   stored events). The Case `targetDate` is a **loose** SLA — overdue hint only, no sweep.
@@ -399,6 +406,13 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
 - **RCA templates** (`RcaTemplate`, `RcaTemplateRegistry`, `GET /rca/templates`, 1 committed example
   `orders_rca.toon`) seed the postmortem's cause-analysis structure; the **Postmortem** is the Incident's
   resolution artifact, the **Findings** are the Case's (§3.5).
+- **`analytics(type)` reads every object** (`ASSURE-IMPACT-LEDGER-RESIDUALS-1` (1), 2026-09-28). It walks
+  `ObjectService.allMatching(filter)` — a lazy, oldest-first iterator holding one `ObjectQuery.MAX_LIMIT`
+  (10 000) page at a time — where it used to read ONE page and silently stop, so `total`, the breakdowns and
+  the impact sums undercounted past 10 000 objects of a type. `DbObjectStore` orders by `created_at, id` so
+  OFFSET pages neither overlap nor skip on a tie. ⚠ Offset paging, not a snapshot: an object purged mid-walk
+  can shift another across a page boundary. Pinned in both backends by
+  `ObjectServiceTest.analyticsCountsEveryObjectBeyondOneQueryPage*` (10 007 objects sharing one `createdAt`).
 
 ### 3.5 Cases
 

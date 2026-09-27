@@ -215,7 +215,10 @@ Design of record (all phases + resolved decisions + TOON config gallery):
     same Dataset. The Disposition is the Incident's `attributes.disposition`, else the Case's Findings value.
     Same retention (`retention_days`, prefix `impact_`), the `types` filter applies (only INCIDENT / CASE ever
     produce rows), and it works on **either** objects backend because it reads through `ObjectService`, not the
-    table. ⚠ **Freshness = the job's cadence**: a Measure over it lags a live edit until the next run — there is
+    table. It reads **every** impacted object, paged through `ObjectService.allMatching` (it once stopped
+    silently at `ObjectQuery.MAX_LIMIT` = 10 000 per type — `ASSURE-IMPACT-LEDGER-RESIDUALS-1` (1), fixed
+    2026-09-28, `ObjectsAnalyticsJobTest.ledgerReadsEveryImpactedObjectBeyondOneQueryPage`); the rows
+    themselves are still collected in memory before the write. ⚠ **Freshness = the job's cadence**: a Measure over it lags a live edit until the next run — there is
     still no live view of `inspecto_ops_objects` (single-writer DB, the non-goal below). Pinned by
     `ObjectsAnalyticsJobTest.writesTheImpactLedgerAsADatasetAnyMeasureCanRead` (read back through
     `DatasetRelation`, plus a per-currency `sum(outstanding)` over the latest snapshot).

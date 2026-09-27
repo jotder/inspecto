@@ -248,7 +248,7 @@ public final class ObjectsAnalyticsJob implements Job {
         List<LedgerRow> out = new ArrayList<>();
         for (ObjectType type : types) {
             if (!Impact.TYPES.contains(type)) continue;
-            for (OperationalObject o : svc.query(ObjectQuery.builder().objectType(type).limit(ObjectQuery.MAX_LIMIT).build())) {
+            for (OperationalObject o : svc.allMatching(ObjectQuery.builder().objectType(type).build())) {   // every object, paged
                 Impact i = Impact.of(o).orElse(null);
                 if (i == null || i.currency() == null) continue;
                 String disposition = o.attributes().get(ObjectService.ATTR_DISPOSITION);

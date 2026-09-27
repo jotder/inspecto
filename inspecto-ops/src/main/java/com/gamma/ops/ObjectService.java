@@ -432,6 +432,43 @@ public final class ObjectService {
     }
 
     /**
+     * EVERY object matching {@code filter}'s constraints — its {@code limit}/{@code offset}/ordering are
+     * ignored — lazily, oldest-first, holding one {@link ObjectQuery#MAX_LIMIT} page in memory at a time. The read
+     * behind a rollup that must count the whole corpus: a single {@link #query} stops at {@code MAX_LIMIT}
+     * rows, silently (`ASSURE-IMPACT-LEDGER-RESIDUALS-1`).
+     *
+     * <p>⚠ Offset paging, not a snapshot: an object deleted mid-walk (only the MNT-14 retention sweep deletes)
+     * can shift a later one across a page boundary and be missed, and one created mid-walk may or may not be
+     * seen. Fine for a sampled rollup; not a transactional read.
+     */
+    public Iterable<OperationalObject> allMatching(ObjectQuery filter) {
+        return () -> new java.util.Iterator<>() {
+            private List<OperationalObject> page = List.of();
+            private int index = 0;
+            private int offset = 0;
+            private boolean last = false;
+
+            @Override public boolean hasNext() {
+                while (index == page.size()) {
+                    if (last) return false;
+                    page = store.query(new ObjectQuery(filter.objectType(), filter.status(), filter.severity(),
+                            filter.assignee(), filter.owner(), filter.correlationId(), filter.textContains(),
+                            ObjectQuery.MAX_LIMIT, offset, filter.closedBefore(), true));
+                    index = 0;
+                    offset += page.size();
+                    last = page.size() < ObjectQuery.MAX_LIMIT;
+                }
+                return true;
+            }
+
+            @Override public OperationalObject next() {
+                if (!hasNext()) throw new NoSuchElementException();
+                return page.get(index++);
+            }
+        };
+    }
+
+    /**
      * The not-yet-terminal objects of {@code type} for a {@code correlationId} — used to avoid opening a
      * duplicate object while one is still being handled (e.g. an alert that keeps breaching).
      */
@@ -456,8 +493,6 @@ public final class ObjectService {
      */
     public Map<String, Object> analytics(ObjectType type) {
         Workflow wf = workflow(type);
-        List<OperationalObject> all = store.query(ObjectQuery.builder()
-                .objectType(type).limit(ObjectQuery.MAX_LIMIT).build());
         Map<String, Integer> byStatus = new LinkedHashMap<>();
         Map<String, Integer> byCategory = new LinkedHashMap<>();
         Map<String, Integer> byPriority = new LinkedHashMap<>();
@@ -470,7 +505,10 @@ public final class ObjectService {
         int mttdCount = 0;
         Map<String, Map<String, Object>> impactByCurrency = new java.util.TreeMap<>();
         long recordsAffected = 0;
-        for (OperationalObject o : all) {
+        int total = 0;
+        // Every object of the type, a page at a time — never one MAX_LIMIT page (ASSURE-IMPACT-LEDGER-RESIDUALS-1).
+        for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(type).build())) {
+            total++;
             bump(byStatus, o.status() == null ? "UNKNOWN" : o.status().toUpperCase(java.util.Locale.ROOT));
             bump(byCategory, categoryL1(o.attributes().get("category")));
             bump(byPriority, o.priority() == null || o.priority().isBlank() ? "NONE" : o.priority().toUpperCase(java.util.Locale.ROOT));
@@ -520,7 +558,7 @@ public final class ObjectService {
         impact.put("recordsAffected", recordsAffected);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("type", type.name());
-        out.put("total", all.size());
+        out.put("total", total);
         out.put("backlog", backlog);
         out.put("byStatus", byStatus);
         out.put("byCategory", byCategory);
@@ -973,8 +1011,15 @@ public final class ObjectService {
     /**
      * SLA sweep (Phase 3): breach every {@link ObjectType#INCIDENT} that has passed its {@link #ATTR_DUE_AT}
      * deadline while still being worked. An incident qualifies when it carries a {@code dueAt} attribute at
-     * or before {@code now}, is not yet {@code RESOLVED} and not terminal ({@code CLOSED}), and has not
-     * already breached. Each new breach stamps a {@link #ATTR_SLA_BREACHED_AT} marker (so repeated sweeps
+     * or before {@code now}, is not yet {@code RESOLVED}, is in no terminal state of its registered
+     * {@link Workflow} (the default {@code ARCHIVED}, or a {@code *_workflow.toon}'s own, e.g. {@code CLOSED}) and
+     * carries no {@code closedAt}, and has not already breached.
+     *
+     * <p>The stop set is the resolution gate's ({@link #decidesIncident}: {@code RESOLVED} + every custom terminal
+     * state) PLUS {@code ARCHIVED}: the gate exempts {@code ARCHIVED} because archiving records no outcome, but
+     * an archived Incident is equally no longer being worked, so its clock stops too (`IMPORT-RESIDUALS-1`).
+     * The state check matters beyond {@code closedAt}: an object can sit in a terminal state with no
+     * {@code closedAt} — a workflow file that later made its state terminal, or an imported object. Each new breach stamps a {@link #ATTR_SLA_BREACHED_AT} marker (so repeated sweeps
      * never re-fire) and emits an {@link EventType#OBJECT_SLA_BREACH} event onto {@link EventLog#global()},
      * so the breach surfaces in the Event Viewer next to the incident's {@code OBJECT_ACTIVITY} history.
      *
@@ -987,9 +1032,11 @@ public final class ObjectService {
     public int sweepIncidentSla(long now) {
         List<OperationalObject> incidents = store.query(ObjectQuery.builder()
                 .objectType(ObjectType.INCIDENT).limit(ObjectQuery.MAX_LIMIT).build());
+        Workflow wf = workflow(ObjectType.INCIDENT);
         int breached = 0;
         for (OperationalObject o : incidents) {
-            if (o.isClosed()) continue;                                      // terminal (CLOSED) — settled
+            if (o.isClosed()) continue;                                      // closedAt stamped — settled
+            if (wf.isTerminal(o.status())) continue;                         // any workflow terminal state
             if ("RESOLVED".equalsIgnoreCase(o.status())) continue;           // fixed — SLA clock stopped
             if (o.attributes().containsKey(ATTR_SLA_BREACHED_AT)) continue;  // already breached — idempotent
             long dueAt = parseEpoch(o.attributes().get(ATTR_DUE_AT));

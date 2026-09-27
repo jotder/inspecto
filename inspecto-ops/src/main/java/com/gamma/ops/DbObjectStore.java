@@ -175,7 +175,8 @@ public final class DbObjectStore extends AbstractJdbcStore implements ObjectStor
         }
         String sql = "SELECT " + COLS + " FROM " + TABLE
                 + (where.isEmpty() ? "" : " WHERE " + String.join(" AND ", where))
-                + " ORDER BY created_at " + (q.oldestFirst() ? "ASC" : "DESC") + " LIMIT ? OFFSET ?";
+                // id breaks created_at ties so consecutive OFFSET pages never overlap or skip (ObjectService#allMatching)
+                + " ORDER BY created_at " + (q.oldestFirst() ? "ASC, id ASC" : "DESC, id DESC") + " LIMIT ? OFFSET ?";
         List<OperationalObject> out = new ArrayList<>();
         try {
             runConn(conn -> {

@@ -309,6 +309,81 @@ class ObjectServiceTest {
         assertEquals(0, svc.sweepIncidentSla(now));
     }
 
+    /** An Incident written straight to the store — the fast seeding path, and the only way to hold a state
+     *  with no {@code closedAt} (what a later workflow file or an import leaves behind). */
+    private static OperationalObject stored(String id, String status, long createdAt, Map<String, String> attrs) {
+        return new OperationalObject(id, ObjectType.INCIDENT, id, "d", status, "HIGH", "LOW", null, null, "corr",
+                attrs, createdAt, createdAt, 0L);
+    }
+
+    /** IMPORT-RESIDUALS-1 (4): every terminal state of the Incident's registered Workflow stops the SLA clock. */
+    @Test
+    void slaSweepSkipsEveryWorkflowTerminalStateButStillBreachesOpenOnes() {
+        com.gamma.ops.workflow.Workflow custom = new com.gamma.ops.workflow.Workflow(ObjectType.INCIDENT, "IDENTIFIED",
+                java.util.Set.of(new com.gamma.ops.workflow.Workflow.Transition("IDENTIFIED", "DIAGNOSING", "accept"),
+                        new com.gamma.ops.workflow.Workflow.Transition("DIAGNOSING", "WONTFIX", "dismiss"),
+                        new com.gamma.ops.workflow.Workflow.Transition("DIAGNOSING", "ARCHIVED", "archive")),
+                java.util.Set.of("WONTFIX", "ARCHIVED"));
+        InMemoryObjectStore store = new InMemoryObjectStore();
+        ObjectService svc = new ObjectService(store, Map.of(ObjectType.INCIDENT, custom));
+        long now = System.currentTimeMillis();
+        Map<String, String> overdue = Map.of(ObjectService.ATTR_DUE_AT, Long.toString(now - 60_000));
+        store.create(stored("custom-terminal", "WONTFIX", now - 120_000, overdue));   // closedAt 0 — the gap
+        store.create(stored("archived", "ARCHIVED", now - 120_000, overdue));
+        store.create(stored("resolved", "RESOLVED", now - 120_000, overdue));
+        store.create(stored("open", "DIAGNOSING", now - 120_000, overdue));
+
+        assertEquals(1, svc.sweepIncidentSla(now), "only the Incident still being worked breaches");
+        assertTrue(svc.get("open").orElseThrow().attributes().containsKey(ObjectService.ATTR_SLA_BREACHED_AT));
+        for (String id : List.of("custom-terminal", "archived", "resolved"))
+            assertFalse(svc.get(id).orElseThrow().attributes().containsKey(ObjectService.ATTR_SLA_BREACHED_AT), id);
+    }
+
+    // ── ASSURE-IMPACT-LEDGER-RESIDUALS-1 (1): rollups read every object, not one MAX_LIMIT page ──────────
+
+    private static final int BEYOND_ONE_PAGE = ObjectQuery.MAX_LIMIT + 7;
+
+    /** Seed {@link #BEYOND_ONE_PAGE} Incidents sharing ONE createdAt (the worst case for offset paging), each
+     *  with a EUR impact of 1, the last one resolved. */
+    private static void seedBeyondOnePage(ObjectStore store, long createdAt) {
+        Map<String, String> eur = Map.of("impact", "{\"confirmed\":\"1\",\"currency\":\"EUR\"}");
+        for (int i = 0; i < BEYOND_ONE_PAGE; i++)
+            store.create(stored(String.format("inc-%05d", i), i == BEYOND_ONE_PAGE - 1 ? "RESOLVED" : "IDENTIFIED",
+                    createdAt, eur));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void assertCountsEveryObject(ObjectService svc) {
+        Map<String, Object> a = svc.analytics(ObjectType.INCIDENT);
+        assertEquals(BEYOND_ONE_PAGE, a.get("total"), "every object, not the first MAX_LIMIT");
+        assertEquals(BEYOND_ONE_PAGE, a.get("backlog"));
+        assertEquals(Map.of("IDENTIFIED", BEYOND_ONE_PAGE - 1, "RESOLVED", 1), a.get("byStatus"));
+        Map<String, Object> eur = (Map<String, Object>) ((Map<String, Object>)
+                ((Map<String, Object>) a.get("impact")).get("byCurrency")).get("EUR");
+        assertEquals(BEYOND_ONE_PAGE, eur.get("count"));
+        assertEquals(0, new java.math.BigDecimal(BEYOND_ONE_PAGE).compareTo((java.math.BigDecimal) eur.get("confirmed")));
+        java.util.Set<String> ids = new java.util.HashSet<>();
+        for (OperationalObject o : svc.allMatching(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()))
+            assertTrue(ids.add(o.id()), "no object visited twice across pages: " + o.id());
+        assertEquals(BEYOND_ONE_PAGE, ids.size());
+    }
+
+    @Test
+    void analyticsCountsEveryObjectBeyondOneQueryPageInMemory() {
+        InMemoryObjectStore store = new InMemoryObjectStore();
+        seedBeyondOnePage(store, 1_000L);
+        assertCountsEveryObject(new ObjectService(store));
+    }
+
+    /** The durable store pages by SQL OFFSET; identical createdAt makes the id tiebreak load-bearing. */
+    @Test
+    void analyticsCountsEveryObjectBeyondOneQueryPageInTheDbStore() throws Exception {
+        try (DbObjectStore store = DbObjectStore.open("jdbc:duckdb:", null, null)) {
+            seedBeyondOnePage(store, 1_000L);
+            assertCountsEveryObject(new ObjectService(store));
+        }
+    }
+
     // ── Phase 4: correlation links + graph ──────────────────────────────────────────
 
     @Test
