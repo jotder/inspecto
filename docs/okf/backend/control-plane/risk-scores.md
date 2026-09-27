@@ -197,6 +197,12 @@ two places:
 
 A 404 renders nothing.
 
+**Authoring the Job.** `risk.score` is in the Jobs palette (`job-attributes.ts`, the declared fallback when
+`GET /jobs/types` is unavailable). Its one parameter, `model`, is declared `STRING` (there is no component-ref
+`ParamType`), so `JOB_PARAM_COMPONENT_REFS` marks it as a reference to the `risk-score` kind: `JobFormDialog`
+renders it as a required autocomplete over the saved models (`riskScoreModelOptionLoader`,
+`GET /components/risk-score`). Suggestions assist; the Job still refuses an unknown model when it fires.
+
 ## Residuals
 
 - **The watch Entity List is not fed.** "Above a threshold → watch Entity List" waits on
@@ -206,5 +212,4 @@ A 404 renders nothing.
 - An indicator is a Measure. There is no free-form arithmetic expression, and no reference to a saved
   Measure component, because none exists.
 - The history Dataset grows by one file per run. No retention is applied yet.
-- There is no `risk.score` entry in the UI job palette (`job-attributes.ts`).
 - Tracked as P3 `ASSURE-RISK-SCORE-RESIDUALS-1`.

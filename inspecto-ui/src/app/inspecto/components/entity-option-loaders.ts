@@ -42,6 +42,12 @@ export function datasetOptionLoader(): AttributeOptionLoader {
     return async () => toOptions((await firstValueFrom(components.list('dataset'))).map((d) => d.name));
 }
 
+/** Saved Risk Score models (`/components/risk-score`) — the `risk.score` Job's `model` parameter. */
+export function riskScoreModelOptionLoader(): AttributeOptionLoader {
+    const components = inject(ComponentsService);
+    return async () => toOptions((await firstValueFrom(components.list('risk-score'))).map((d) => d.name));
+}
+
 /** Datasets in the plural `datasets/<id>` ref form the `on: dataset` trigger's `from:` speaks. */
 export function datasetRefOptionLoader(): AttributeOptionLoader {
     const components = inject(ComponentsService);

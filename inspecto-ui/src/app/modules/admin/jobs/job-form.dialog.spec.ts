@@ -4,7 +4,13 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Observable, of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { JobExpressionDecl, JobProcessorCatalog, JobsService, JobTypeDescriptor } from 'app/inspecto/api';
+import {
+    ComponentsService,
+    JobExpressionDecl,
+    JobProcessorCatalog,
+    JobsService,
+    JobTypeDescriptor,
+} from 'app/inspecto/api';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { JobFormData, JobFormDialog } from './job-form.dialog';
@@ -728,5 +734,88 @@ describe('JobFormDialog — the post-sync chain editor', () => {
         expect(save).not.toHaveBeenCalled();
         // …and it is visible: the blank-id row's error is on screen, not just in the form state.
         expect(fixture.nativeElement.textContent).toContain('had no matching processor');
+    });
+});
+
+/** `risk.score` (ASSURE-RISK-SCORE-RESIDUALS-1 (6)): its one parameter, `model`, names a saved risk-score model. */
+describe('JobFormDialog — risk.score', () => {
+    // RiskScoreJobType.DESCRIPTOR, as GET /jobs/types/risk.score serves it.
+    const RISK_SCORE: JobTypeDescriptor = {
+        id: 'risk.score',
+        title: 'Risk Score',
+        description: 'Scores every entity a saved Risk Score model names.',
+        parameters: [
+            {
+                name: 'model',
+                type: 'STRING',
+                required: true,
+                deduce: '',
+                default: '',
+                description: 'Saved risk-score component id',
+            },
+        ],
+        emits: ['risk.score.produced'],
+        artifacts: [{ name: 'scores', kind: 'dataset' }],
+        requires: [],
+    };
+
+    const setup = async () => {
+        const list = vi.fn(() => of([{ name: 'subs' }, { name: 'dealers' }]));
+        TestBed.overrideProvider(ComponentsService, { useValue: { list } });
+        const r = create(
+            {},
+            undefined,
+            vi.fn(() => of(RISK_SCORE)),
+        );
+        r.c.schemaForm.form.patchValue({ type: 'risk.score', scheduleMode: 'manual' });
+        await Promise.resolve(); // flush the queued loadParams microtask
+        r.fixture.detectChanges();
+        return { ...r, list };
+    };
+    /** The param form's `Model` field — `[formControlName]` is a binding there, so there is no attribute to select. */
+    const modelField = (el: HTMLElement): HTMLElement | undefined =>
+        Array.from(el.querySelectorAll<HTMLElement>('inspecto-schema-form mat-form-field')).find(
+            (f) => f.querySelector('mat-label')?.textContent?.trim() === 'Model',
+        );
+
+    it('is in the declared type palette, so it is pickable when the catalog is unavailable', () => {
+        const { c } = create({});
+        const options = (c.attributes().find((s) => s.key === 'type')?.options ?? []).map((o) => o.value);
+        expect(options).toContain('risk.score');
+    });
+
+    it('renders `model` as a required autocomplete over the saved risk-score models', async () => {
+        const { c, fixture, list } = await setup();
+        const model = c.paramSpecs().find((s) => s.key === 'model');
+        expect(model).toMatchObject({ type: 'autocomplete', required: true, tier: 'required' });
+        expect(modelField(fixture.nativeElement)?.querySelector('input[aria-autocomplete]')).toBeTruthy();
+
+        const options = await c.paramOptionLoaders()['model']({});
+        expect(list).toHaveBeenCalledWith('risk-score');
+        expect(options.map((o) => o.value)).toEqual(['dealers', 'subs']);
+    });
+
+    it('refuses to save without a model, on screen, then sends the picked model', async () => {
+        const { c, fixture, save } = await setup();
+        c.save();
+        fixture.detectChanges();
+        expect(save).not.toHaveBeenCalled();
+        expect(
+            modelField(fixture.nativeElement)?.querySelector('.mat-mdc-form-field-subscript-wrapper mat-error')
+                ?.textContent,
+        ).toContain('is required');
+
+        c.paramForm!.form.patchValue({ model: 'subs' });
+        c.save(); // → save step
+        c.saveForm.patchValue({ name: 'score_subs' });
+        c.save();
+        expect(save).toHaveBeenCalledWith(
+            expect.objectContaining({ type: 'risk.score', params: expect.objectContaining({ model: 'subs' }) }),
+        );
+    });
+
+    it('renders the risk.score parameters with no a11y violations', async () => {
+        const { fixture } = await setup();
+        await expectNoA11yViolations(fixture.nativeElement);
     });
 });

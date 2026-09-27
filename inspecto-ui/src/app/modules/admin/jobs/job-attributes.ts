@@ -25,6 +25,7 @@ export const JOB_ATTRIBUTES: AttributeSpec[] = [
             { value: 'maintenance', label: 'maintenance' },
             { value: 'pipeline', label: 'pipeline' },
             { value: 'sql.template', label: 'sql.template' },
+            { value: 'risk.score', label: 'risk.score' },
         ],
     },
     {
@@ -106,3 +107,14 @@ export const JOB_ATTRIBUTES: AttributeSpec[] = [
         help: 'Run once at startup when a scheduled fire was missed while the server was down.',
     },
 ];
+
+/**
+ * Declared Job parameters that name a saved registry component although the server declares them
+ * `STRING` (there is no component-ref `ParamType`): Job Type id → parameter name → component kind.
+ * `JobFormDialog` renders each as an autocomplete over that kind's saved components — suggestions assist,
+ * the server stays the gate (`risk.score` 400s on an unknown model at fire time).
+ */
+export const JOB_PARAM_COMPONENT_REFS: Record<string, Record<string, 'risk-score'>> = {
+    // RiskScoreJobType: one required parameter, `model` — the saved risk-score component id.
+    'risk.score': { model: 'risk-score' },
+};

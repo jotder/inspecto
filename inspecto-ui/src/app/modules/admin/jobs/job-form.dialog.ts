@@ -39,10 +39,14 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { AttributeOptionLoader, InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import { datasetOptionLoader, pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import {
+    datasetOptionLoader,
+    pipelineOptionLoader,
+    riskScoreModelOptionLoader,
+} from 'app/inspecto/components/entity-option-loaders';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { AttributeSpec } from 'app/inspecto/component-model';
-import { JOB_ATTRIBUTES } from './job-attributes';
+import { JOB_ATTRIBUTES, JOB_PARAM_COMPONENT_REFS } from './job-attributes';
 import { JobChainEditorComponent } from './job-chain-editor.component';
 import { parseChain } from './job-chain';
 import {
@@ -291,6 +295,12 @@ export class JobFormDialog implements AfterViewInit {
     /** Suggestion sources for the DECLARED parameters — built per descriptor, because the keys are the
      *  Job Type's own (a `DATASET_REF` renders as an autocomplete and would otherwise offer nothing). */
     readonly paramOptionLoaders = signal<Record<string, AttributeOptionLoader>>({});
+    /** Built here, in the injection context — the loaders `inject()` their service, so constructing one
+     *  inside {@link applyDescriptor} (a subscribe callback) would throw NG0203. */
+    private readonly datasetLoader = datasetOptionLoader();
+    private readonly componentLoaders: Record<'risk-score', AttributeOptionLoader> = {
+        'risk-score': riskScoreModelOptionLoader(),
+    };
 
     /** The runtime Expression vocabulary (`GET /jobs/expressions`, §4.3) — the token picker's source. */
     readonly expressions = signal<JobExpressionDecl[]>([]);
@@ -433,7 +443,12 @@ export class JobFormDialog implements AfterViewInit {
 
     /** Everything a descriptor drives: typed params, declared grants, suggestions, the "what this does" panel. */
     private applyDescriptor(d: JobTypeDescriptor): void {
-        let specs = paramDeclsToSpecs(d.parameters);
+        // A STRING parameter that names a saved component (JOB_PARAM_COMPONENT_REFS) is an entity reference:
+        // an autocomplete over that kind, never a bare text box (R2).
+        const refs = JOB_PARAM_COMPONENT_REFS[d.id] ?? {};
+        let specs = paramDeclsToSpecs(d.parameters).map((sp) =>
+            refs[sp.key] ? { ...sp, type: 'autocomplete' as const } : sp,
+        );
         // A post-sync chain: hand both params to the structural editor and drop them from the generated
         // form. Fails open — see CHAIN_PARAMS.
         const declaredKeys = new Set(specs.map((sp) => sp.key));
@@ -453,10 +468,12 @@ export class JobFormDialog implements AfterViewInit {
         this.paramSpecs.set(specs);
         this.selectedType.set(d);
         this.typeRequires.set(d.requires ?? []);
-        // A declared DATASET_REF maps to an autocomplete; give each one the dataset suggestions.
+        // A declared DATASET_REF maps to an autocomplete; give each one the dataset suggestions, and each
+        // component reference its kind's saved components.
         const loaders: Record<string, AttributeOptionLoader> = {};
         for (const decl of d.parameters ?? []) {
-            if (decl.type === 'DATASET_REF') loaders[decl.name] = datasetOptionLoader();
+            if (decl.type === 'DATASET_REF') loaders[decl.name] = this.datasetLoader;
+            else if (refs[decl.name]) loaders[decl.name] = this.componentLoaders[refs[decl.name]];
         }
         this.paramOptionLoaders.set(loaders);
         const init: Record<string, unknown> = {};
