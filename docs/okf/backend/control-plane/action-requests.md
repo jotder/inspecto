@@ -128,6 +128,18 @@ JSON `PinnedHttp` cannot carry an object). `Host` = the SigV4-signed value; SNI/
 never followed; a refusal is an `AcquisitionException` naming `egress refused: …` and dials nothing. Details in
 [connectors](../acquisition/connectors.md).
 
+**No writable config root ⇒ the launch config is trusted, in memory** (session decision 2026-09-27). A single-tenant
+server or engine CLI with no `-Dassist.write.root` offers no way to change config through the product, so
+`EgressAllowlist.bootDefaultSpace(launchRoot, loadedObjectStoreHosts)` builds an IN-MEMORY allowlist at boot from
+the launch config's targets — object-store Connection hosts, `sink.webhook` Step Connection hosts, `WEBHOOK`
+channel hosts (the same scan as the migration, over the launch dir) and `-Dnotify.webhook.url` — never persisted,
+rebuilt each boot, and served by `forCurrentSpace()` only for the default Space when it has no root. With a
+writable root the persisted one-time migration below applies unchanged (and the in-memory list is dropped). Wired
+in `SpaceManager.single` (launch dir = `SpaceRoot.legacy().base()`, plus the service's loaded object-store
+Connections), `CollectorService.main` (the launch dir) and `CollectorProcessor.main` (the pipeline file's
+directory). ⚠ Other engine entry points (`MultiCollectorProcessor`, `MainApp`) are not wired: with no root they
+stay deny-by-default.
+
 **The allowlist reader** is `EgressAllowlist` (`inspecto-engine`, `com.gamma.pipeline.exec`): `of(root)` for a
 caller holding the config root (the Action Request routes and dispatcher, via `EgressRoutes`), `forCurrentSpace()`
 (`SpaceConfigRoot.current()`, the Space MDC) for the two webhooks. ⛔ **The read path never seeds**: no root or no
@@ -140,7 +152,9 @@ hosts it targets at that moment — each `sink.webhook` Step's Connection host (
 or a graph `sink.webhook` node, scanned from the config root's `*.toon`, depth 4, `.history` skipped; the host from
 `<id>_connection.toon`, else `ConnectionRegistry`), each `WEBHOOK` channel's URL host (`registry/channels/`), and
 the host of `-Dnotify.webhook.url` (what the channel actually posts to), and every object-store Connection's host
-(any `*_connection.toon` under the root with `connector: s3 | gcs | azure` — a MinIO on a LAN keeps working) — writes `{allow, seededAt}`, logs
+(any `*_connection.toon` under the root with `connector: s3 | gcs | azure` — a MinIO on a LAN keeps working; for
+`SpaceManager.single` also the object-store hosts of the Connections loaded from the launch config, outside the
+write root) — writes `{allow, seededAt}`, logs
 `[EGRESS] seeded …` and emits the audit `egress-allowlist.seeded`. A seed host that can never be allowlisted (a
 loopback literal) is skipped and logged. 🔴 **A Space created through the product** (`SpaceManager.create`,
 `createFromBundle`, `createFromTemplate`) gets an EMPTY `egress.toon` (`{allow: [], createdAt}`) written before it

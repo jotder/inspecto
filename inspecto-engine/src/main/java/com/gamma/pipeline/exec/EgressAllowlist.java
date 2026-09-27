@@ -63,7 +63,53 @@ public final class EgressAllowlist {
 
     /** The current Space's parsed allowlist ({@link SpaceConfigRoot#current()}); EMPTY when it has no root. */
     public static EgressPolicy.Allowlist forCurrentSpace() {
-        return of(SpaceConfigRoot.current());
+        Path root = SpaceConfigRoot.current();
+        EgressPolicy.Allowlist trusted = launchConfig;
+        if (root == null && trusted != null && EventLog.DEFAULT_SPACE_ID.equals(EventLog.currentSpaceId())) return trusted;
+        return of(root);
+    }
+
+    /**
+     * The IN-MEMORY allowlist of a default Space with NO writable config root (session decision 2026-09-27), or
+     * {@code null}. With no write root nobody can change config through the product, so the operator-authored launch
+     * config is trusted: its targets are allowed, computed at boot, never persisted, recomputed each boot.
+     */
+    private static volatile EgressPolicy.Allowlist launchConfig;
+
+    /**
+     * Boot the DEFAULT Space's egress allowlist: with a writable config root ({@link SpaceConfigRoot#forSpace}) the
+     * persisted one-time {@link #migrate(Path, java.util.Collection)} applies unchanged; with none, the launch
+     * config's targets — {@code launchRoot}'s webhook Step / channel / object-store Connection hosts,
+     * {@code -Dnotify.webhook.url}, plus {@code extraHosts} (the loaded Connections' object-store hosts) — become an
+     * in-memory allowlist ({@link #forCurrentSpace}). Boot only; the read path never builds it.
+     */
+    public static void bootDefaultSpace(Path launchRoot, java.util.Collection<String> extraHosts) {
+        Path root = SpaceConfigRoot.forSpace(EventLog.DEFAULT_SPACE_ID);
+        if (root != null) {
+            launchConfig = null;
+            migrate(root, extraHosts);
+            return;
+        }
+        Set<String> targets = new LinkedHashSet<>(launchRoot == null ? Set.of() : currentTargetHosts(launchRoot));
+        if (launchRoot == null) addUrlHost(System.getProperty("notify.webhook.url"), targets);
+        for (String h : extraHosts) if (h != null && !h.isBlank()) targets.add(h.trim().toLowerCase(Locale.ROOT));
+        List<String> hosts = new ArrayList<>();
+        for (String h : targets) {
+            try {
+                EgressPolicy.Allowlist.of(List.of(h));
+                hosts.add(h);
+            } catch (IllegalArgumentException never) {
+                log.warn("[EGRESS] not trusting '{}' from the launch config: {}", h, never.getMessage());
+            }
+        }
+        launchConfig = EgressPolicy.Allowlist.of(hosts);
+        log.info("[EGRESS] no writable config root — the launch config is trusted; in-memory egress allowlist "
+                + "(not persisted, rebuilt each boot): {}", hosts);
+    }
+
+    /** Test seam: drop the in-memory launch-config allowlist. */
+    static void clearLaunchConfig() {
+        launchConfig = null;
     }
 
     /** The parsed allowlist of the Space whose config root is {@code root}. */

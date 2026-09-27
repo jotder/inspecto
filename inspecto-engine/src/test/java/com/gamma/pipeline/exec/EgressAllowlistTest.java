@@ -26,6 +26,7 @@ class EgressAllowlistTest {
     @AfterEach
     void clearProperty() {
         System.clearProperty("notify.webhook.url");
+        EgressAllowlist.clearLaunchConfig();
     }
 
     private void write(String rel, Map<String, Object> doc) throws Exception {
@@ -144,6 +145,52 @@ class EgressAllowlistTest {
     @Test
     void noRootMeansEmpty() {
         assertEquals(List.of(), EgressAllowlist.entries(null));
+    }
+
+    /**
+     * Session decision 2026-09-27: with NO writable config root the launch config is trusted as an IN-MEMORY
+     * allowlist — its LAN store is allowed, a host it does not name is not, and nothing is written.
+     */
+    @Test
+    void withNoWriteRootTheLaunchConfigIsTrustedInMemoryOnly() throws Exception {
+        String prior = System.getProperty("assist.write.root");
+        System.clearProperty("assist.write.root");
+        try {
+            write("minio_connection.toon", Map.of("connection", Map.of("id", "minio", "connector", "s3", "host", "minio.lan")));
+            write("orders.toon", Map.of("pipeline", "orders", "webhook", Map.of("connection", "cbs")));
+            write("cbs_connection.toon", Map.of("connection", Map.of("id", "cbs", "connector", "https", "host", "cbs.lan")));
+            EgressAllowlist.bootDefaultSpace(root, List.of("blob.lan"));
+            InetAddress lan = InetAddress.ofLiteral("10.1.2.3");
+            EgressPolicy.Resolver toLan = h -> new InetAddress[] {lan};
+            EgressPolicy.Allowlist in = EgressAllowlist.forCurrentSpace();
+            for (String ok : List.of("minio.lan", "cbs.lan", "blob.lan"))
+                assertEquals(lan, EgressPolicy.resolve(ok, in, toLan), ok);
+            assertThrows(EgressPolicy.Refused.class, () -> EgressPolicy.resolve("elsewhere.lan", in, toLan),
+                    "a host the launch config does not name stays denied");
+            assertFalse(Files.exists(root.resolve(EgressAllowlist.FILE)), "never persisted");
+        } finally {
+            if (prior != null) System.setProperty("assist.write.root", prior);
+        }
+    }
+
+    /** With a writable root the persisted one-time migration applies unchanged — no in-memory trust. */
+    @Test
+    void withAWriteRootTheBootIsThePersistedMigration() throws Exception {
+        String prior = System.getProperty("assist.write.root");
+        Path writeRoot = root.resolve("write");
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            Path launch = Files.createDirectories(root.resolve("launch"));
+            Files.writeString(launch.resolve("minio_connection.toon"),
+                    JToon.encode(Map.of("connection", Map.of("id", "minio", "connector", "s3", "host", "launch-only.lan"))));
+            EgressAllowlist.bootDefaultSpace(launch, List.of("minio.lan"));
+            assertEquals(List.of("minio.lan"), EgressAllowlist.entries(writeRoot),
+                    "the write root is seeded from its own targets plus the loaded Connections, not the launch dir scan");
+            assertFalse(EgressAllowlist.forCurrentSpace().namesHost("launch-only.lan"));
+        } finally {
+            if (prior == null) System.clearProperty("assist.write.root");
+            else System.setProperty("assist.write.root", prior);
+        }
     }
 
     /** A single-tenant server's launch-config Connections live outside the write root; their hosts are passed in. */

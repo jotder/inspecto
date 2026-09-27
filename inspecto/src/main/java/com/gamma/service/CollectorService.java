@@ -2054,6 +2054,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             System.exit(1);
             return;
         }
+        // Egress allowlist at boot (the ControlApi path does this in SpaceManager.single): persisted migration with
+        // a writable root, else the launch config trusted in memory (session decision 2026-09-27).
+        com.gamma.pipeline.exec.EgressAllowlist.bootDefaultSpace(java.nio.file.Path.of("").toAbsolutePath(),
+                svc.connections().values().stream().map(com.gamma.pipeline.exec.EgressAllowlist::objectStoreHost)
+                        .filter(java.util.Objects::nonNull).toList());
         CountDownLatch latch = new CountDownLatch(1);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             svc.close();

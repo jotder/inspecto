@@ -117,7 +117,9 @@ public final class SpaceManager implements AutoCloseable {
         // WEBHOOK-EGRESS-POLICY-1: the one-time upgrade seed of the egress allowlist, at boot only.
         // The launch config's Connections are NOT under the write root the migration scans, so their object-store
         // hosts are passed in — without it a LAN MinIO a single-tenant server already used is denied after upgrade.
-        com.gamma.pipeline.exec.EgressAllowlist.migrate(com.gamma.pipeline.SpaceConfigRoot.forSpace(DEFAULT.value()),
+        // With NO writable root the launch config is trusted as an in-memory allowlist instead (session decision
+        // 2026-09-27) — EgressAllowlist.bootDefaultSpace picks the branch.
+        com.gamma.pipeline.exec.EgressAllowlist.bootDefaultSpace(legacy.base(),
                 service.connections().values().stream()
                         .map(com.gamma.pipeline.exec.EgressAllowlist::objectStoreHost)
                         .filter(java.util.Objects::nonNull).toList());

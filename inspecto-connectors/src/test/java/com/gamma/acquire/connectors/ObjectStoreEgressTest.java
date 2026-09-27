@@ -290,4 +290,28 @@ class ObjectStoreEgressTest {
             else System.setProperty("assist.write.root", prior);
         }
     }
+    /**
+     * Session decision 2026-09-27, end to end on the real supplier: with NO writable config root the launch config's
+     * LAN store is trusted in memory and reached; a store the launch config does not name is refused.
+     */
+    @Test
+    void withNoWriteRootTheLaunchConfigsLanStoreIsReachedAndAnotherIsNot() throws Exception {
+        resolveTo(PRIVATE);
+        String prior = System.getProperty("assist.write.root");
+        System.clearProperty("assist.write.root");
+        org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
+        Path launch = Files.createDirectories(tmp.resolve("launch"));
+        try {
+            Files.writeString(launch.resolve("minio_connection.toon"),
+                    String.join(String.valueOf((char) 10), "connection:", "  id: minio", "  connector: s3", "  host: store.lan", ""));
+            com.gamma.pipeline.exec.EgressAllowlist.bootDefaultSpace(launch, List.of());
+            assertEquals(EXPECTED, read(connector("store.lan").open(file("a.csv"))));
+            AcquisitionException e = assertThrows(AcquisitionException.class,
+                    () -> connector("other.lan").open(file("a.csv")));
+            assertTrue(e.getMessage().contains("egress refused"), e.getMessage());
+        } finally {
+            com.gamma.pipeline.exec.EgressAllowlist.bootDefaultSpace(Files.createDirectories(tmp.resolve("empty")), List.of());
+            if (prior != null) System.setProperty("assist.write.root", prior);
+        }
+    }
 }

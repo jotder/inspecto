@@ -54,6 +54,10 @@ public class CollectorProcessor {
             System.exit(1);
         }
         PipelineConfig cfg = PipelineConfig.load(args[0]);
+        // Egress allowlist at boot: the persisted migration with a writable root, else the launch config (the
+        // pipeline file's directory) trusted in memory (session decision 2026-09-27).
+        java.nio.file.Path launchDir = java.nio.file.Path.of(args[0]).toAbsolutePath().getParent();
+        com.gamma.pipeline.exec.EgressAllowlist.bootDefaultSpace(launchDir, java.util.List.of());
         LogSetup.configure(cfg.dirs().logDir(), cfg.identity().pipelineName(), cfg.identity().runTimestamp());
         try {
             run(cfg);

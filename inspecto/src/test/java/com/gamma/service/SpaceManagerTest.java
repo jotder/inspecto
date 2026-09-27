@@ -155,6 +155,41 @@ class SpaceManagerTest {
         }
     }
 
+    /**
+     * {@code SpaceManager.single}'s egress wiring: with a writable root, a loaded object-store Connection's host is
+     * seeded into the persisted allowlist; with none, it is trusted in memory and nothing is written.
+     */
+    @Test
+    void singleSeedsTheLoadedObjectStoreConnectionHosts(@TempDir Path root) throws Exception {
+        String prior = System.getProperty("assist.write.root");
+        Path writeRoot = root.resolve("write");
+        try {
+            System.setProperty("assist.write.root", writeRoot.toString());
+            CollectorService svc = new CollectorService(List.of(), 60, 1);
+            svc.registerConnection(new ConnectionProfile("minio", "s3", "MinIO.lan", 9000, null, "bucket", "k", "s",
+                    Map.of(), null));
+            svc.registerConnection(new ConnectionProfile("db", "postgres", "db.lan", 5432, null, null, "k", "s",
+                    Map.of(), null));
+            try (SpaceManager mgr = SpaceManager.single(svc)) {
+                assertEquals(List.of("minio.lan"), com.gamma.pipeline.exec.EgressAllowlist.entries(writeRoot));
+            }
+
+            System.clearProperty("assist.write.root");
+            CollectorService noRoot = new CollectorService(List.of(), 60, 1);
+            noRoot.registerConnection(new ConnectionProfile("minio2", "s3", "store2.lan", 9000, null, "bucket", "k", "s",
+                    Map.of(), null));
+            try (SpaceManager mgr = SpaceManager.single(noRoot)) {
+                MDC.remove(EventLog.SPACE_MDC_KEY);
+                var allow = com.gamma.pipeline.exec.EgressAllowlist.forCurrentSpace();
+                assertTrue(allow.namesHost("store2.lan"), "trusted in memory with no write root");
+                assertFalse(allow.namesHost("db.lan"));
+            }
+        } finally {
+            if (prior == null) System.clearProperty("assist.write.root");
+            else System.setProperty("assist.write.root", prior);
+        }
+    }
+
     /** A Space CREATED through the product is recorded empty, so neither a read nor a later boot seeds it. */
     @Test
     void aSpaceCreatedAfterBootIsNeverSeeded(@TempDir Path root) throws Exception {
