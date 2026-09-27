@@ -228,6 +228,10 @@ public final class EventType {
      *  event per identity fact written. {@code listId}, {@code kind} (the fact kind), {@code added}, {@code removed}
      *  (counts — never the keys, as {@link #LINK_ENTITY_REVEALED}) and {@code seq} (the fact's log position). */
     public static final String ENTITY_LIST_CHANGED = "ENTITY_LIST_CHANGED";
+    /** An analyst asserted or retracted an identity ({@code POST /inv/entity-identities}, {@code .../retract}, LA-17
+     *  slice 2) — one event per identity fact. {@code kind}, {@code seq}, {@code assertionSeq} (the assertion the fact
+     *  made or retracted) and {@code groupSize} — never the keys. */
+    public static final String ENTITY_IDENTITY_CHANGED = "ENTITY_IDENTITY_CHANGED";
     /** A sensitive expand was held for four-eyes approval instead of running (LA-19 / D-U7). {@code investigationId},
      *  {@code requestId}, {@code budget}, {@code maxFanOut} and the thresholds it exceeded. Nothing was read. */
     public static final String LINK_EXPANSION_REQUESTED = "LINK_EXPANSION_REQUESTED";

@@ -217,7 +217,7 @@ public final class EntityListRoutes implements RouteModule {
         }
     }
 
-    private static EntityFactLog.Log append(EntityFactLog log, EntityFactLog.Log head, HttpExchange ex, String reason,
+    static EntityFactLog.Log append(EntityFactLog log, EntityFactLog.Log head, HttpExchange ex, String reason,
                                             String kind, String id, Map<String, Object> payload) throws IOException {
         try {
             return log.append(head, ApiContext.actor(ex), reason, kind, id, payload);
@@ -235,7 +235,7 @@ public final class EntityListRoutes implements RouteModule {
         return new ApiException(404, ErrorCodes.NOT_FOUND, "entity list '" + id + "' not found" + at);
     }
 
-    private static String reason(Map<String, Object> body) {
+    static String reason(Map<String, Object> body) {
         String r = ApiContext.str(body, "reason");
         if (r == null || r.length() > MAX_REASON)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'reason', 1.." + MAX_REASON

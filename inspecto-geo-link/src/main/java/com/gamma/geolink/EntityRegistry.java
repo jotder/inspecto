@@ -65,6 +65,74 @@ final class EntityRegistry {
         return out;
     }
 
+    // ── identity resolution (slice 2, design §8.1) ─────────────────────────────────────────────────────
+
+    /** One {@code identity.asserted} fact: typed keys {@code a}, {@code b} (normalised, sealed), and whether it is retracted. */
+    record Assertion(long seq, String a, String b, String via, String actor, String at, String reason,
+                     long retractedBy) {
+        boolean live() { return retractedBy == 0; }
+    }
+
+    /**
+     * One resolved group: its id (the lexicographically smallest member key), every member key (sorted) and the
+     * seqs of the live assertions that join it (sorted) — a merge never hides which assertion matched.
+     */
+    record Group(String id, SortedSet<String> members, SortedSet<Long> assertions) {}
+
+    /** Every {@code identity.asserted} fact as of {@code atSeq}, by seq, with the retraction (if any) as of {@code atSeq}. */
+    static Map<Long, Assertion> assertions(List<EntityFactLog.Fact> facts, long atSeq) {
+        Map<Long, Assertion> out = new LinkedHashMap<>();
+        for (EntityFactLog.Fact f : facts) {
+            if (f.seq() > atSeq) break;
+            Map<String, Object> b = f.body();
+            switch (f.kind()) {
+                case "identity.asserted" -> out.put(f.seq(), new Assertion(f.seq(), str(b, "a"), str(b, "b"),
+                        str(b, "via"), str(b, "actor"), str(b, "at"), str(b, "reason"), 0));
+                case "identity.retracted" -> {
+                    if (b.get("assertionSeq") instanceof Number n && out.get(n.longValue()) instanceof Assertion x
+                            && x.live())
+                        out.put(x.seq(), new Assertion(x.seq(), x.a(), x.b(), x.via(), x.actor(), x.at(), x.reason(),
+                                f.seq()));
+                }
+                default -> { }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * The resolved groups as of {@code atSeq}: a union-find over the LIVE assertions, applied in seq order. The
+     * result depends only on the set of live edges, never on the order they were applied, so it is deterministic:
+     * groups keyed and sorted by their smallest member key. A key in no live assertion is in no group.
+     */
+    static Map<String, Group> resolve(List<EntityFactLog.Fact> facts, long atSeq) {
+        Map<String, String> parent = new java.util.HashMap<>();
+        List<Assertion> live = assertions(facts, atSeq).values().stream().filter(Assertion::live).toList();
+        for (Assertion x : live) {
+            String ra = find(parent, x.a()), rb = find(parent, x.b());
+            if (ra.equals(rb)) continue;
+            if (ra.compareTo(rb) < 0) parent.put(rb, ra); else parent.put(ra, rb);   // root = smallest key
+        }
+        Map<String, Group> groups = new java.util.TreeMap<>();
+        for (Assertion x : live) {
+            String root = find(parent, x.a());
+            Group g = groups.computeIfAbsent(root, r -> new Group(r, new TreeSet<>(), new TreeSet<>()));
+            g.members().add(x.a());
+            g.members().add(x.b());
+            g.assertions().add(x.seq());
+        }
+        Map<String, Group> out = new LinkedHashMap<>();
+        groups.forEach((id, g) -> out.put(id, new Group(id, Collections.unmodifiableSortedSet(g.members()),
+                Collections.unmodifiableSortedSet(g.assertions()))));
+        return out;
+    }
+
+    private static String find(Map<String, String> parent, String k) {
+        String r = k;
+        while (parent.containsKey(r)) r = parent.get(r);
+        return r;
+    }
+
     private static String str(Map<String, Object> b, String key) {
         Object v = b.get(key);
         return v == null ? null : String.valueOf(v);

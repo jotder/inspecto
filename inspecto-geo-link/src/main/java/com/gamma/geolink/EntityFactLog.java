@@ -120,7 +120,8 @@ final class EntityFactLog {
 
     /**
      * Append one fact after {@code head} (which the caller read under {@link #lock()}) and answer the new log.
-     * {@code payload} goes between {@code listId} and {@code prevHash}.
+     * {@code payload} goes between {@code listId} and {@code prevHash}. A {@code null} {@code listId} (the
+     * {@code identity.*} kinds, design §8.1) omits the field.
      */
     Log append(Log head, String actor, String reason, String kind, String listId, Map<String, Object> payload)
             throws IOException {
@@ -131,7 +132,7 @@ final class EntityFactLog {
         body.put("actor", actor);
         body.put("reason", reason);
         body.put("kind", kind);
-        body.put("listId", listId);
+        if (listId != null) body.put("listId", listId);   // identity.* facts name no list
         body.putAll(payload);
         body.put("prevHash", head.headHash());
         byte[] bytes = ApiContext.JSON.writeValueAsBytes(body);

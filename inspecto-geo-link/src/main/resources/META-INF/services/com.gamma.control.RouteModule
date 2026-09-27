@@ -8,3 +8,4 @@ com.gamma.geolink.InvestigationTemplateRoutes
 com.gamma.geolink.InvestigationMeasureRoutes
 com.gamma.geolink.InvestigationCoverageRoutes
 com.gamma.geolink.EntityListRoutes
+com.gamma.geolink.EntityIdentityRoutes

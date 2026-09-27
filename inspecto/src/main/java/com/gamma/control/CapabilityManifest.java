@@ -48,6 +48,9 @@ final class CapabilityManifest {
             new Entry("POST", "/inv/entity-lists", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/entity-lists/([^/]+)/members", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/entity-lists/([^/]+)/retire", Roles.CAN_MANAGE_INCIDENTS),
+            // EntityIdentityRoutes (LA-17 slice 2) — identity assertions share the same fact log, same capability.
+            new Entry("POST", "/inv/entity-identities", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("POST", "/inv/entity-identities/([^/]+)/retract", Roles.CAN_MANAGE_INCIDENTS),
             // InvestigationRoutes, LA-19 controls (operator 2026-09-24) — revealing a masked entity (D-U6) and
             // deciding a pending sensitive expand (D-U7, four-eyes) are oversight acts with their own capabilities.
             new Entry("POST", "/inv/investigations/([^/]+)/reveal", Roles.CAN_REVEAL_LINK_ENTITIES),

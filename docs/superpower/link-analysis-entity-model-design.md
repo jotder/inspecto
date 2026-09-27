@@ -259,3 +259,62 @@ append time and replay never re-reads the list:
    row reads *Watch · MSISDN · 0 members*, *Add selection* stays disabled until an Investigation is open.
    Still owed: projection ids through `typedEntityKey` (`<type>:<key>`, D-M6), member browsing, the `at` read.
 7. `verification` subagent PASS; distill into OKF, move plan to archive when shipped.
+
+## 8. Slice 2 — resolution (operator decisions 2026-09-27)
+
+| Id | Question | Answer |
+|---|---|---|
+| **D-M9** | Fix for `LA17-NORMALISER-CHANGE-1`? | **Record the normaliser per list.** `list.created` seals `normaliser`; every later member write on that list normalises with the sealed rule, whatever the Entity Type says today. A `list.created` fact without the field reads as `default`. A settings change never strands members. |
+| **D-M10** | Scope of the first slice-2 cut? | **Analyst assertions + fold.** Mapping-Dataset import is a later cut. |
+| **D-M11** | Order? | **Projection ids through `typedEntityKey` first** (the owed slice-1 step 6 item), then resolution over typed keys. |
+
+### 8.1 Design (to be confirmed against code by the build; deviations recorded in §8.2)
+- **Facts** (same log, same chain, same lock as §4.2): `identity.asserted {a, b, via, reason}` — `a`, `b` are typed
+  keys `<type>:<normalised value>` (normalised with the type's rule at assert time, sealed in the fact); `via` is
+  `analyst` in this cut (`dataset:<id>@<fingerprint>` reserved for the import cut). `identity.retracted {assertionSeq,
+  reason}` retracts one assertion; never edits it. `reason` required.
+- **Fold**: `EntityRegistry` gains a deterministic union-find over live (unretracted) assertions as of `atSeq` →
+  `resolved` groups. A group's id is its lexicographically smallest member key (stable, explainable). Every group
+  carries its members AND the assertion seqs that join it (a merge never hides which identifier matched — the gate).
+- **Routes** (`inspecto-geo-link`, `EntityListRoutes` family): assert, retract, read groups (`?at=`), read one key's
+  group. Capability as list writes. 422 on a self-assertion, an untyped key, or a type not in force; 409 on retracting an
+  already-retracted or unknown assertion.
+- **Investigation**: the resolution is applied at a pinned `atSeq` (sealed like a list op), so replay is deterministic.
+  A merged node shows every member identifier and the joining assertions. Masking applies per member key.
+
+### 8.2 As built (2026-09-27)
+- **D-M9 shipped.** `list.created` carries `normaliser` (the Entity Type's rule at creation); `EntityRegistry` reads a
+  fact without it as `default`; member add/remove normalise with it, and so does `excludeBy`/`seedBy` sealing
+  (`InvestigationRoutes.sealList` — the members were stored under that rule, so matching must use it too). The list
+  summary gained `normaliser`. Member writes on a list whose type is no longer **in force** still 409 (unchanged).
+  `LA17-NORMALISER-CHANGE-1` closed; pinned by `ControlApiEntityListTest` (mutation-checked: reverting to the type's
+  current rule turns both new tests red on the expected values).
+- **Resolution routes** — new `EntityIdentityRoutes` (ServiceLoader `RouteModule`, not grown into `EntityListRoutes`):
+  - `GET /inv/entity-identities?at=` → `{groups, atSeq, headSeq, headHash}`;
+  - `GET /inv/entity-identities/group?key=<typed key>&at=` → `{group, atSeq, headHash}` — a key in no live assertion
+    resolves to itself (one member, no assertions). The lookup is **exact** (no normalising); `key` is a query
+    parameter because a typed key may hold `/`.
+  - `POST /inv/entity-identities` `{a, b, reason}` → **201** `{assertion, group, atSeq, headHash}`;
+  - `POST /inv/entity-identities/{seq}/retract` `{reason}` → 200 `{retracted, groups, atSeq, headHash}` (the groups of
+    the assertion's two keys afterwards — two when it split).
+  - A group: `{id, members[], assertions[{seq, a, b, via, actor, at, reason}]}`.
+- **Gates**: `canManageIncidents` → no write root 503 (reads too) → 422 (reason; non-string / untyped / empty-type key;
+  type not in force; value empty after the normaliser; `a == b` after normalising; retract seq not an integer) →
+  409 (retract: no `identity.asserted` at that seq — a list fact's seq included — or already retracted) → append under
+  the log lock. `CapabilityManifest`, `AbsentGeoLinkRoutes.SURFACE` (Personal 503), `openapi-v1.json` (3 path
+  skeletons, spliced in so the file's unrelated inline formatting is untouched) and `route-gating.md` updated.
+- **Facts**: `identity.asserted {a, b, via:"analyst"}` / `identity.retracted {assertionSeq}` with the usual
+  `seq, at, actor, reason, kind, …, prevHash`; they carry **no `listId`** (`EntityFactLog.append` omits a null one).
+- **Fold**: `EntityRegistry.assertions(facts, atSeq)` + `resolve(facts, atSeq)` — union-find over live assertions,
+  root = smallest key, groups sorted by id; order-independent (pinned by `EntityResolutionFoldTest`). Not cached,
+  as the list fold.
+- **Event** `ENTITY_IDENTITY_CHANGED` `{kind, seq, assertionSeq, groupSize}` — one per fact, never keys.
+- **Masking** per member key by its own Entity Type under `typed` (a type not in force masks, fail closed); the group
+  id and the assertion's `a`/`b` are rendered the same way. Same token/key as list members.
+- ⚠ Deviations / readings: a redundant assertion (two keys already in one group) is **accepted** and listed as another
+  joining seq — it is extra evidence, not an error. Cross-type assertions (`msisdn:` ↔ `imsi:`) are the point and allowed.
+- ⚠ Gotcha: `ApiContext.query` decodes the JDK's already-decoded `getQuery()`, so `%2B` becomes a space; the group
+  lookup reads `getRawQuery()` instead (`EntityIdentityRoutes.rawQuery`). Any other route taking a `+` in a query
+  parameter has the same defect — not fixed here.
+- **Owed**: applying resolution in Investigations (pinned `atSeq`, merged nodes showing members + joining assertions,
+  §8.1 last bullet) waits on the parallel SPA lane; D-M11's `typedEntityKey` projection step; SPA client methods.

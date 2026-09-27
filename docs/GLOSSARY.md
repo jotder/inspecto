@@ -928,8 +928,8 @@ one purpose of an Entity List.
 **Identity Fact** *(added 2026-09-26, `LA-17`; ✅ list kinds built 2026-09-26: `EntityFactLog`)* — One immutable record in a Space's
 append-only identity log (`audit/entity-facts/<seq>.json`), SHA-256-chained to its predecessor, always carrying an actor and
 a reason; the chain is re-verified on every read. Built kinds: `list.created` · `list.member.added` ·
-`list.member.removed` · `list.retired`. Planned (slice 2): **asserted** identity facts (by a person, or by a named
-mapping Dataset) and **resolved** ones derived deterministically from them — never by similarity (`D-M1`) — each
+`list.member.removed` · `list.retired` · `identity.asserted` · `identity.retracted` (analyst assertions, built
+2026-09-27: `/inv/entity-identities*`). Planned: **asserted** identity facts by a named mapping Dataset and **resolved** ones derived deterministically from them — never by similarity (`D-M1`) — each
 withdrawn by a later `retract` fact, never edited.
 
 ### Geo (Geo Map Analysis) *(added 2026-07-05; as built: [`okf/frontend/features/geo-map.md`](okf/frontend/features/geo-map.md))*

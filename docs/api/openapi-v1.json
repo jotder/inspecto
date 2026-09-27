@@ -8767,6 +8767,72 @@
         "x-optional-module" : true
       }
     },
+    "/inv/entity-identities" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "GET /inv/entity-identities (generated skeleton)",
+        "operationId" : "getInvEntityIdentities",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      },
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/entity-identities (generated skeleton)",
+        "operationId" : "postInvEntityIdentities",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/inv/entity-identities/group" : {
+      "get" : {
+        "tags" : [ "inv" ],
+        "summary" : "GET /inv/entity-identities/group (generated skeleton)",
+        "operationId" : "getInvEntityIdentitiesGroup",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
+    "/inv/entity-identities/{entityidentityId}/retract" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/entity-identities/{entityidentityId}/retract (generated skeleton)",
+        "operationId" : "postInvEntityIdentitiesByEntityidentityIdRetract",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "entityidentityId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
     "/settings/approval" : {
       "get" : {
         "tags" : [ "settings" ],
