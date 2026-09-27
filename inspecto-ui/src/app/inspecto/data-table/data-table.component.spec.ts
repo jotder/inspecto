@@ -6,7 +6,7 @@ import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { describe, expect, it, vi } from 'vitest';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { DataTableComponent, DataTableTier } from './data-table.component';
+import { DataTableComponent, DataTableTier, headerWordFloor } from './data-table.component';
 
 async function create(tier: DataTableTier = 'standard') {
     TestBed.configureTestingModule({
@@ -650,5 +650,25 @@ describe('DataTableComponent', () => {
             const f = await create('mini');
             await expectNoA11yViolations(f.nativeElement);
         });
+    });
+});
+
+describe('headerWordFloor (a header word is never split)', () => {
+    // jsdom has no canvas, so the per-character estimate (7.5px) applies: 80 + 9 × 7.5 = 147.5 → 148.
+    it('floors a column at its longest header word plus the header chrome', () => {
+        expect(headerWordFloor({ headerName: 'Committed batches' }).minWidth).toBe(148);
+    });
+
+    it('leaves a short header on the default floor', () => {
+        expect(headerWordFloor({ headerName: 'Id' }).minWidth).toBeUndefined();
+    });
+
+    it('keeps a host floor that is already wider', () => {
+        expect(headerWordFloor({ headerName: 'Time', minWidth: 180 }).minWidth).toBe(180);
+    });
+
+    it('respects a column the host pinned narrower on purpose', () => {
+        expect(headerWordFloor({ headerName: 'Escalated', maxWidth: 60, minWidth: 60 }).minWidth).toBe(60);
+        expect(headerWordFloor({ headerName: 'Escalated', wrapHeaderText: false }).minWidth).toBeUndefined();
     });
 });

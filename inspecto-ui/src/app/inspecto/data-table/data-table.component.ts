@@ -414,7 +414,8 @@ export class DataTableComponent {
             const sel = this.chosen();
             base = sel ? all.filter((c) => sel.includes(String(c.field))) : all;
         }
-        return acts.length ? [...base, actionsColumn(acts, 160, this.pinActions() ? 'right' : undefined)] : base;
+        const cols = base.map(headerWordFloor);
+        return acts.length ? [...cols, actionsColumn(acts, 160, this.pinActions() ? 'right' : undefined)] : cols;
     });
 
     /**
@@ -636,4 +637,35 @@ export class DataTableComponent {
         const cell = api?.getFocusedCell();
         return cell ? (api!.getDisplayedRowAtIndex(cell.rowIndex) ?? null) : null;
     }
+}
+
+/** Header padding + the always-on sort glyph + the filter button: ~73px measured 2026-09-27, plus margin. */
+const HEADER_CHROME_PX = 80;
+let headerCtx: CanvasRenderingContext2D | null | undefined;
+
+function headerWordPx(word: string): number {
+    if (headerCtx === undefined) {
+        try {
+            headerCtx = document.createElement('canvas').getContext('2d');
+            if (headerCtx) headerCtx.font = '600 12px "Inter var", ui-sans-serif, system-ui, sans-serif';
+        } catch {
+            headerCtx = null;
+        }
+    }
+    return headerCtx ? headerCtx.measureText(word).width : word.length * 7.5;
+}
+
+/**
+ * A header wraps (`wrapHeaderText`), but ag-Grid's `overflow-wrap: break-word` splits a word that does not fit its
+ * line — the default `flex: 1` squeezed columns until "Committed" read "Committ/ed" and "Watermark" "Waterm/ark"
+ * (Collectors, Processing Status, Signal Ledger at 1440px). Floor each column at its header's longest word plus
+ * the header chrome. A host that pinned a column narrower (`maxWidth`, or `wrapHeaderText: false` for a header
+ * truncated on purpose) keeps its choice.
+ */
+export function headerWordFloor(c: ColDef): ColDef {
+    const header = c.headerName?.trim();
+    if (!header || c.wrapHeaderText === false) return c;
+    const floor = Math.ceil(HEADER_CHROME_PX + Math.max(...header.split(/\s+/).map(headerWordPx)));
+    if (floor <= (c.minWidth ?? 110) || (c.maxWidth != null && c.maxWidth < floor)) return c;
+    return { ...c, minWidth: floor };
 }

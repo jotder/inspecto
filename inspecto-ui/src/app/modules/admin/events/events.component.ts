@@ -171,32 +171,34 @@ export class EventsComponent implements OnInit, OnDestroy {
     readonly selectedView = signal('');
     saveName = '';
 
+    // minWidth, not width: the DataTable's default `flex: 1` overrides a bare `width`, which squeezed Time to
+    // "27 Sep 20…" and broke Severity/Pipeline/Correlation mid-word at 1440px. The grid scrolls (Actions pinned).
     readonly columnDefs: ColDef<EventRow>[] = [
         {
             headerName: 'Time',
-            width: 180,
+            minWidth: 180,
             valueGetter: (p) => p.data?.ts,
             valueFormatter: (p) => fmtDateTime(p.value),
         },
         {
             field: 'severity',
             headerName: 'Severity',
-            width: 110,
+            minWidth: 120,
             // The signal's severity (`critical` surfaces distinctly); falls back to the legacy level. A
             // valueFormatter (not a badge cellRenderer) — the pro-tier grid renders formatters reliably.
             valueFormatter: (p) => String(p.value ?? p.data?.level ?? '').toUpperCase(),
         },
-        { field: 'type', headerName: 'Type', width: 180 },
+        { field: 'type', headerName: 'Type', minWidth: 180 },
         {
             field: 'pipeline',
             headerName: 'Pipeline',
-            width: 140,
+            minWidth: 140,
             valueFormatter: (p) => p.value ?? '—',
         },
         {
             field: 'correlationId',
             headerName: 'Correlation',
-            width: 150,
+            minWidth: 150,
             valueFormatter: (p) => p.value ?? '—',
         },
         // Since R4 this is the signal's emitting producer (`<kind>/<id>`), e.g. pipeline/cdr_ingest, alert-rule/high_error_rate.

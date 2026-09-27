@@ -372,7 +372,7 @@ export class ObjectMailComponent implements OnInit {
     // ── grid ──────────────────────────────────────────────────────────────────────
     // Untyped ColDef[]: escalated/category/tags are derived (attribute-bag) columns, not model fields.
     // Sized by min/max + flex weights (the DataTable's default `flex: 1` overrides a bare `width`). The minimums
-    // sum to ~850px, so the list fits beside the folders at 1440px with no horizontal scroll; 110px is the floor
+    // sum to ~860px, so the list fits beside the folders at 1440px with no horizontal scroll; 110px is the floor
     // for a header with sort + filter icons (narrower, the word breaks mid-letter).
     readonly columnDefs: ColDef[] = [
         {
@@ -408,6 +408,9 @@ export class ObjectMailComponent implements OnInit {
         {
             field: 'tags',
             headerName: 'Tags',
+            // Under the 110px default: "Tags" is short, and the DataTable's header-word floor lifts Description
+            // to 148px, so this keeps the list's floors inside its 864px pane at 1440px.
+            minWidth: 100,
             valueGetter: (p: ValueGetterParams<OperationalObject>) => (p.data ? objectTags(p.data).join(', ') : ''),
             cellRenderer: (p: ICellRendererParams<OperationalObject>) =>
                 p.data

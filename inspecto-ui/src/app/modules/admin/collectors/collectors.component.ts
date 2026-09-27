@@ -74,29 +74,34 @@ export class CollectorsComponent implements OnInit {
      */
     readonly anyAcquisition = signal(false);
 
+    // Floors, not bare widths: the DataTable's default `flex: 1` overrides a bare `width`, so these nine columns
+    // shared the pane equally and clipped the ids. The DataTable floors each header's longest word itself; the grid
+    // scrolls past the floors, with Actions pinned.
     readonly columnDefs: ColDef<CollectorView>[] = [
-        { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
-        { field: 'id', headerName: 'Collector', flex: 1 },
-        { field: 'connector', headerName: 'Connector', width: 120 },
+        { field: 'pipeline', headerName: 'Pipeline', flex: 2, minWidth: 120 },
+        { field: 'id', headerName: 'Collector', flex: 2, minWidth: 125 },
+        { field: 'connector', headerName: 'Connector' },
         {
             field: 'connection',
             headerName: 'Connection',
             flex: 1,
+            minWidth: 130,
             valueFormatter: (p) => p.value ?? '—',
         },
-        { field: 'duplicateMode', headerName: 'Dedup', width: 120 },
+        { field: 'duplicateMode', headerName: 'Dedup' },
         {
             colId: 'watermark',
             headerName: 'Watermark',
             flex: 1,
+            minWidth: 130,
             valueGetter: (p) => {
                 const wm = p.data?.incrementalWatermark ?? '—';
                 const db = p.data?.dbWatermarkCurrent;
                 return db ? `${wm} (@ ${db})` : wm;
             },
         },
-        { field: 'fetchParallel', headerName: 'Parallel', width: 110 },
-        { field: 'guarantee', headerName: 'Guarantee', width: 140 },
+        { field: 'fetchParallel', headerName: 'Parallel' },
+        { field: 'guarantee', headerName: 'Guarantee', minWidth: 140, maxWidth: 140 },
     ];
 
     readonly rowActions: InspectoRowAction<CollectorView>[] = [

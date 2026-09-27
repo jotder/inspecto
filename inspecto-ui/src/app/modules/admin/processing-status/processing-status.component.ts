@@ -70,32 +70,35 @@ export class ProcessingStatusComponent implements OnInit {
     readonly problemCards = signal<MetricCard[]>([]);
     readonly cards = signal<MetricCard[]>([]);
 
+    // Floors, not bare widths: the DataTable's default `flex: 1` overrides a bare `width`, which clipped every
+    // batch id and time at 1440px. The grid scrolls past the floors, with Actions pinned.
     readonly columnDefs: ColDef<RunStatus>[] = [
-        { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
+        { field: 'pipeline', headerName: 'Pipeline', flex: 1, minWidth: 130 },
         {
             field: 'paused',
             headerName: 'State',
-            width: 110,
+            minWidth: 110,
             cellRenderer: (p: ICellRendererParams<RunStatus>) => statusBadgeHtml(p.value ? 'PAUSED' : 'RUNNING'),
         },
-        { field: 'committedBatches', headerName: 'Committed batches', width: 170 },
-        { field: 'quarantineFiles', headerName: 'Quarantine files', width: 160 },
+        { field: 'committedBatches', headerName: 'Committed batches', minWidth: 125 },
+        { field: 'quarantineFiles', headerName: 'Quarantine files', minWidth: 125 },
         {
             field: 'lastBatchStatus',
             headerName: 'Last batch',
-            width: 130,
+            minWidth: 130,
             cellRenderer: (p: ICellRendererParams<RunStatus>) => (p.value ? statusBadgeHtml(p.value) : '—'),
         },
         {
             field: 'lastBatchId',
             headerName: 'Last batch id',
             flex: 1,
+            minWidth: 150,
             valueFormatter: (p) => p.value ?? '—',
         },
         {
             field: 'lastBatchTime',
             headerName: 'Last batch time',
-            width: 180,
+            minWidth: 180,
             valueFormatter: (p) => fmtDateTime(p.value),
         },
     ];
