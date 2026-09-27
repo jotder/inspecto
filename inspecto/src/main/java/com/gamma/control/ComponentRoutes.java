@@ -47,11 +47,14 @@ final class ComponentRoutes implements RouteModule {
      * The decoded kind of a GENERIC write route. That segment is URL-decoded a second time
      * ({@link ApiContext#name}), so {@code findings%252Dspec} misses the literal findings-spec routes and
      * lands here as {@code findings-spec}; demand that kind's own capability too, so an encoding cannot
-     * swap it for canAuthorWorkbench (fail-closed: such a caller needs both).
+     * swap it for canAuthorWorkbench (fail-closed: such a caller needs both). Every kind is judged by
+     * {@link ImportCapabilityGuard#requireKind} — the import doors' own table — so a dedicated-only kind
+     * (access-profile, access-catalog, requirement) is refused here for any caller, and a stricter kind
+     * (alert-rule, findings-spec) needs its own route's capability.
      */
     private static String genericKind(com.sun.net.httpserver.HttpExchange ex, java.util.regex.Matcher m) {
         String kind = ApiContext.name(m);
-        if (FINDINGS_SPEC.equals(kind)) ApiContext.requireCapability(ex, Roles.CAN_MANAGE_INCIDENTS);
+        ImportCapabilityGuard.requireKind(ex, kind);
         return kind;
     }
 

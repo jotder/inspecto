@@ -80,7 +80,9 @@ registered before the generic ones in `ComponentRoutes` — so the manifest, the
 `compliance/evidence/route-gating.md` each see one capability per route. ⚠ The generic routes URL-decode the
 kind segment a second time, so `findings%252Dspec` misses the literal routes; the generic handlers therefore
 also demand `canManageIncidents` for that kind (fail-closed: such a caller needs both). Pinned by
-`ControlApiFindingsSpecGateTest` with a real Subject.
+`ControlApiFindingsSpecGateTest` with a real Subject. Since 2026-09-27 the generic handlers read the SAME table
+the import doors do (`ImportCapabilityGuard.requireKind`), so `/components/alert-rule` needs
+`canAuthorAlertRules` too, and the dedicated-only kinds are refused there (below).
 **Saving Findings VALUES on a Case is collaboration, not administration (operator 2026-09-25, IMPLEMENTED).**
 Writing the *spec* needs `canManageIncidents`; filling it in on a Case needs only that the caller **can see
 the Case** — the same posture as comments and attachments. It has its own route, `PUT /objects/{id}/findings`,
@@ -683,6 +685,25 @@ role table and settings documents are not on the table because no import writes 
 `ASSURE-AUDIT-CHAIN-1`); the guard only makes the non-administrator case atomic. Tests:
 `ControlApiImportCapabilityGateTest` (real HTTP, armed Subject; mutating the check to a no-op turns all 7 red,
 403 → 200).
+
+**Dedicated-only kinds** (`IMPORT-DEDICATED-ONLY-KINDS-1`, operator decision 2026-09-27). `access-profile`,
+`access-catalog` and `requirement` are written through their dedicated routes ONLY (`/access/*`, which validates
+under `canConfigureAccess`; `/requirements`, whose triage lifecycle only `canTriageRequirements` advances).
+`ImportCapabilityGuard.DEDICATED_ONLY` refuses them, 403 for ANY caller, on the generic
+`/components/{kind}` POST/PUT/DELETE/version-restore (before: a `canAuthorWorkbench` builder could DELETE an
+Access Profile — which WIDENS that subject's access — or save a Requirement with `status: delivered`) and on
+every import door except Space creation (`/spaces/import`, which may seed them). ⚠ **Breaking change:** a
+`/bundle/import` or `/import` bundle carrying a `requirement` (item or `registry/requirements/` file) is
+refused WHOLE — nothing is written; move Requirements with `POST /requirements` instead.
+**Classification is spelling-proof:** each raw entry is classified after `ImportCapabilityGuard.normalizedPath`
+(case, `.`/empty segments, the trailing dots and spaces Windows drops), and a file under `registry/` whose kind
+cannot be told is refused (defence in depth behind `ImportPaths`' shape rule); `DecisionRuleGuard.guardImport`
+uses the same normalisation. **Completeness is derived:** `ImportCapabilityGuardTest` walks
+`CapabilityManifest` for every `ComponentStore.WRITABLE_TYPES` kind (plus `connection`) and fails when a kind's own
+write route is stricter than `canAuthorWorkbench` and neither `KIND_CAPABILITY` nor `DEDICATED_ONLY` covers it
+(mutation-checked: changing the alert-rule entry turns two cases red). Real-HTTP tests:
+`ControlApiDedicatedOnlyKindsTest`. A `/bundle/import` `kpi` item also meets the `/components/kpi` save gate
+(`KpiRoutes.requireMeasure`: Dataset exists and is readable, fields in its Schema, `timeField` a DATE/TIMESTAMP).
 `SpaceManager.createFromBundle` (a new Space, `canAdminister`) keeps only the segment rules.
 
 Tests: `ControlApiImportReservedPathsTest` (real HTTP, armed Subject; every alias at all three doors on a

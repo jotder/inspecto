@@ -383,6 +383,12 @@ final class BundleRoutes implements RouteModule {
                         skipped++;
                     } else {
                         Map<String, Object> content = cast(item.get("content"));
+                        // ASSURE-KPI-DEFINITIONS-RESIDUALS-1 (2): the /components/kpi save gate, not only the structural
+                        // half — its Dataset exists and is readable by THIS caller, its measure field and timeField are
+                        // Schema columns, the timeField a DATE/TIMESTAMP. `kpi` sorts after `dataset` (unlisted in
+                        // APPLY_ORDER), so a Dataset travelling in the same bundle is already written. A refusal fails
+                        // this item (IllegalArgumentException, below).
+                        if (KpiRoutes.TYPE.equals(kind)) KpiRoutes.requireMeasure(api, exchange, id, content);
                         src.write(id, content);
                         // D7 (c): a widget's tags travel INSIDE its config, but assignment edges are
                         // per-Space and do not cross a bundle. Without adopting the incoming array here,

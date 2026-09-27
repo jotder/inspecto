@@ -12,7 +12,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -99,8 +98,9 @@ public final class DecisionRuleGuard {
         boolean changed = false;
         ComponentStore store = config == null ? null : new ComponentStore(config.resolve("registry"));
         for (Map.Entry<String, byte[]> e : bundle.configEntries().entrySet()) {
-            String rel = e.getKey().replace('\\', '/').toLowerCase(Locale.ROOT);
-            while (rel.startsWith("./")) rel = rel.substring(2);
+            // the SAME normalisation the import's kind gate classifies by (case, "."/empty segments, trailing
+            // dots/spaces), so no spelling reaches registry/decision-rules/ past this guard
+            String rel = ImportCapabilityGuard.normalizedPath(e.getKey());
             if (!rel.startsWith(DIR_PREFIX)) continue;
             Map<String, Object> content;
             try {

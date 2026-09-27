@@ -90,7 +90,7 @@ final class SpaceRoutes implements RouteModule {
         try {
             return manifest(api.spaces().createFromBundle(SpaceId.of(id), e.getRequestBody().readAllBytes(),
                     b -> {   // IMPORT-CONNECTION-JOB-GATE-1: each carried kind needs its own route's gate
-                        ImportCapabilityGuard.checkFiles(e, b.configEntries());
+                        ImportCapabilityGuard.checkFiles(e, b.configEntries(), true);   // a NEW Space may seed dedicated-only kinds
                         return DecisionRuleGuard.guardImport(e, null, b);   // a NEW Space: no stored rule, no live registry
                     }));
         } catch (IllegalArgumentException badBundle) {   // not a bundle / invalid manifest / zip-slip
