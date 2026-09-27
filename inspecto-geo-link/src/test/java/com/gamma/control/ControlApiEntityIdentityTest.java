@@ -140,7 +140,8 @@ class ControlApiEntityIdentityTest {
         try (Ctx c = open(cfg, root)) {
             status(401, send(c, "POST", IDS, assertion("imsi:1", "msisdn:+441"), null), "no credential");
             status(403, send(c, "POST", IDS, assertion("imsi:1", "msisdn:+441"), VIEWER), "assert needs the capability");
-            status(403, send(c, "POST", IDS + "/1/retract", "{\"reason\":\"r\"}", VIEWER), "retract needs the capability");
+            status(403, send(c, "POST", "/inv/entity-identities/1/retract", "{\"reason\":\"r\"}", VIEWER),
+                    "retract needs the capability");   // literal path: check-authgate-coverage reads literals only
             assertEquals(0, facts(c), "no refused caller wrote a fact");
             JsonNode made = data(post(c, IDS, assertion("imsi:1", "msisdn:+441")), 201);
             assertEquals("analyst-1", made.at("/assertion/actor").asText(), "the actor is the Subject");
@@ -163,6 +164,7 @@ class ControlApiEntityIdentityTest {
             status(403, hit, "a guessed key that IS grouped");
             status(403, miss, "a guessed key that is not");
             status(403, send(c, "GET", IDS, null, VIEWER), "the list-groups read");
+            status(403, send(c, "GET", "/inv/entity-identities/group", null, VIEWER), "the group read, before any key check");
             status(401, send(c, "GET", IDS + "/group?key=msisdn:%2B447700900123", null, null), "no credential");
             assertEquals(2, data(get(c, IDS + "/group?key=msisdn:%2B447700900123"), 200).at("/group/members").size());
         }
