@@ -3,8 +3,10 @@ import { KpiDefinition } from 'app/inspecto/api';
 
 /**
  * The KPI definition editor's attributes (ASSURE-KPI-DEFINITIONS-1) — drives `<inspecto-schema-form>` in
- * {@link KpiDefinitionDialog}. The server validates the same content fail closed at save (the Measure must exist,
- * the bands must be ordered, the grain must be known); this form only asks.
+ * the KPI editor (`kpi-reports/kpi-definition.dialog`) and, filtered, the create-KPI action on a Requirement
+ * (`requirements/requirement-kpi.dialog`) — shared here so neither feature imports the other. The server
+ * validates the same content fail closed at save (the Measure must exist, the bands must be ordered, the grain
+ * must be known); this form only asks.
  */
 export const KPI_DEFINITION_ATTRIBUTES: AttributeSpec[] = [
     { key: 'title', label: 'Title', type: 'string', tier: 'required', placeholder: 'e.g. Refund exposure' },

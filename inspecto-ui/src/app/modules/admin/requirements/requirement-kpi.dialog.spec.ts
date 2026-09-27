@@ -9,7 +9,7 @@ import { ComponentsService, DbBrowserService } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { buildRequirement, RequirementsService } from 'app/inspecto/requirement';
-import { KPI_DEFINITION_ATTRIBUTES } from '../kpi-reports/kpi-definition-attributes';
+import { KPI_DEFINITION_ATTRIBUTES } from 'app/inspecto/kpi/kpi-definition-attributes';
 import { RequirementKpiDialog } from './requirement-kpi.dialog';
 
 const REQ = buildRequirement('Refund exposure', 'kpi', 'y');

@@ -8,7 +8,12 @@ import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form
 import { columnOptionLoader, datasetOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
-import { fromKpiContent, KPI_DEFINITION_ATTRIBUTES, kpiIdFor, toKpiContent } from './kpi-definition-attributes';
+import {
+    fromKpiContent,
+    KPI_DEFINITION_ATTRIBUTES,
+    kpiIdFor,
+    toKpiContent,
+} from 'app/inspecto/kpi/kpi-definition-attributes';
 
 /** Dialog input: an existing KPI definition to edit; absent ⇒ create. */
 export interface KpiDefinitionData {

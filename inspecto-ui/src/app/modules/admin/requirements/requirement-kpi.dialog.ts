@@ -10,7 +10,7 @@ import { columnOptionLoader, datasetOptionLoader } from 'app/inspecto/components
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { Requirement, RequirementKpiBody, RequirementKpiResult, RequirementsService } from 'app/inspecto/requirement';
-import { KPI_DEFINITION_ATTRIBUTES } from '../kpi-reports/kpi-definition-attributes';
+import { KPI_DEFINITION_ATTRIBUTES } from 'app/inspecto/kpi/kpi-definition-attributes';
 
 /** The keys `POST /requirements/{id}/kpi` needs from a Builder — the KPI editor's own specs for them. */
 const ASKED = ['dataset', 'measure', 'timeField', 'grain'];
