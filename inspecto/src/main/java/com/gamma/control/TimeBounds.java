@@ -38,7 +38,7 @@ public final class TimeBounds {
                             java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"))
                     .atZone(zone).toInstant().toEpochMilli();
         } catch (RuntimeException e) {
-            throw new ApiException(400, "invalid time '" + s + "' (use epoch millis or yyyy-MM-dd[ HH:mm:ss])");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid time '" + s + "' (use epoch millis or yyyy-MM-dd[ HH:mm:ss])");
         }
     }
 }

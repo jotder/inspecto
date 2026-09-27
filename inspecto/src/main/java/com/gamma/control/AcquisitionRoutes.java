@@ -42,16 +42,16 @@ final class AcquisitionRoutes implements RouteModule {
     private Object notifySource(ApiContext api, com.sun.net.httpserver.HttpExchange e, String sourceId)
             throws java.io.IOException {
         String pipeline = api.service().pipelineForSourceId(sourceId)
-                .orElseThrow(() -> new ApiException(404, "no source '" + sourceId + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no source '" + sourceId + "'"));
         if (ApiContext.v1(e)) {
             String runId = api.service().triggerRunAsync(pipeline, "notify")
-                    .orElseThrow(() -> new ApiException(404, "no source '" + sourceId + "'"));
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no source '" + sourceId + "'"));
             e.getResponseHeaders().set("Location", "/api/v1/runs/runs/" + runId);
             return ApiContext.respondJson(e, 202, java.util.Map.of(
                     "runId", runId, "source", sourceId, "pipeline", pipeline, "status", "running"));
         }
         return api.service().runPipelineOffThread(pipeline)
-                .orElseThrow(() -> new ApiException(404, "no source '" + sourceId + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no source '" + sourceId + "'"));
     }
 
     /** {@code GET /metrics/acquisition} — the acquisition counters/gauges/histogram as JSON (UI dashboard). */

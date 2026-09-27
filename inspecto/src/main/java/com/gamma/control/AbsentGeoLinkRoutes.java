@@ -84,7 +84,7 @@ final class AbsentGeoLinkRoutes implements RouteModule {
             // api.stub, not api.post/get: a stub must occupy the route table (so the path 503s instead of
             // 404ing) WITHOUT making hasRoute() true — otherwise /bootstrap's derived feature flag would
             // report the module present because its own stand-in had claimed the pattern.
-            api.stub(r[0], r[1], (e, m) -> { throw new ApiException(503, MESSAGE); });
+            api.stub(r[0], r[1], (e, m) -> { throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, MESSAGE); });
         }
     }
 }

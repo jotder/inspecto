@@ -47,7 +47,7 @@ final class AuthRoutes implements RouteModule {
         String verifier = ApiContext.str(body, "codeVerifier");
         String redirectUri = ApiContext.str(body, "redirectUri");
         if (code == null || verifier == null || redirectUri == null)
-            throw new ApiException(400, "body must include 'code', 'codeVerifier' and 'redirectUri'");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'code', 'codeVerifier' and 'redirectUri'");
         TokenRelay.Tokens t = relay.exchangeCode(code, verifier, redirectUri).orElseThrow(() -> {
             AuditTrail.authentication(ex, "auth.exchange", false, 401);
             return new ApiException(401, ErrorCodes.UNAUTHENTICATED, "code exchange failed");

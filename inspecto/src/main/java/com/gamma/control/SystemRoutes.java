@@ -44,16 +44,16 @@ final class SystemRoutes implements RouteModule {
     private Object testConnection(Map<String, Object> body) {
         String url = Values.trimOrEmpty(body == null ? null : body.get("url"));
         if (url.isBlank())
-            throw new ApiException(422, "url is required — the JDBC URL to test, e.g. "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "url is required — the JDBC URL to test, e.g. "
                     + "jdbc:postgresql://host:5432/inspecto");
         if (!OperationalDbReport.allowedScheme(url))
-            throw new ApiException(422, "url must start with one of "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "url must start with one of "
                     + String.join(" or ", OperationalDbReport.allowedSchemes())
                     + " — this endpoint opens the connection for real, so it dials nothing else");
 
         String password = Values.trimOrEmpty(body == null ? null : body.get("password"));
         if (!password.isBlank() && !password.startsWith("${"))
-            throw new ApiException(422, "password must be a secret reference (${ENV:…}, ${KEYSTORE:…} "
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "password must be a secret reference (${ENV:…}, ${KEYSTORE:…} "
                     + "or ${FILE:…}), never a literal — provision the secret, then test it");
 
         // Resolved here and held only for the length of the call; the outcome never echoes it.

@@ -1277,7 +1277,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         try {
             return json.readValue(raw, new TypeReference<Map<String, Object>>() {});
         } catch (com.fasterxml.jackson.core.JsonProcessingException bad) {
-            throw new ApiException(400, "request body must be a JSON object (a '{\"key\": \u2026}' map); "
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "request body must be a JSON object (a '{\"key\": \u2026}' map); "
                     + "a bare array, string or number is not a request body");
         }
     }

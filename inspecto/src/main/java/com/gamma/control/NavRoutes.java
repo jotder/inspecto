@@ -44,12 +44,12 @@ final class NavRoutes implements RouteModule {
     private Object writeMenus(ApiContext api, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "menu write");
         if (!(body.get("version") instanceof Number v) || v.intValue() != NavMenus.VERSION)
-            throw new ApiException(422, "version must be " + NavMenus.VERSION);
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "version must be " + NavMenus.VERSION);
         NavMenus menus;
         try {
             menus = NavMenus.of(body.get("nodes"), body.get("landing"));
         } catch (IllegalArgumentException ex) {
-            throw new ApiException(422, ex.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, ex.getMessage());
         }
         menus.write(root.resolve(MENUS_FILE));
         return shape(menus);

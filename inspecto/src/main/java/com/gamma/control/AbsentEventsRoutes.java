@@ -51,7 +51,7 @@ final class AbsentEventsRoutes implements RouteModule {
     public void register(ApiContext api) {
         for (String[] r : SURFACE) {
             if (api.hasRoute(r[0], r[1])) continue;   // the real module is here — nothing to stub
-            api.stub(r[0], r[1], (e, m) -> { throw new ApiException(503, MESSAGE); });
+            api.stub(r[0], r[1], (e, m) -> { throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, MESSAGE); });
         }
     }
 }

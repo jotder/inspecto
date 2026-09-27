@@ -22,6 +22,6 @@ final class AbsentMetricsRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         if (api.hasRoute("GET", "/metrics")) return;   // the real module is here — nothing to stub
-        api.stub("GET", "/metrics", (e, m) -> { throw new ApiException(503, MESSAGE); });
+        api.stub("GET", "/metrics", (e, m) -> { throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, MESSAGE); });
     }
 }

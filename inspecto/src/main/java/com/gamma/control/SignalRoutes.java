@@ -57,7 +57,7 @@ final class SignalRoutes implements RouteModule {
      */
     private Object count(ApiContext api, HttpExchange e) {
         String type = ApiContext.query(e, "type");
-        if (type == null || type.isBlank()) throw new ApiException(422, "type is required");
+        if (type == null || type.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "type is required");
         Long since = parseEpochMs(ApiContext.query(e, "since"), "since");
         Long until = parseEpochMs(ApiContext.query(e, "until"), "until");
         int page = com.gamma.event.EventQuery.MAX_LIMIT;
@@ -103,7 +103,7 @@ final class SignalRoutes implements RouteModule {
     private Object signalTree(ApiContext api, HttpExchange e) {
         String correlationId = ApiContext.query(e, "correlationId");
         if (correlationId == null || correlationId.isBlank())
-            throw new ApiException(400, "'correlationId' is required for /signals/tree (a tree is scoped to one correlation chain)");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'correlationId' is required for /signals/tree (a tree is scoped to one correlation chain)");
         int limit = clampLimit(ApiContext.query(e, "limit"));
         List<Signal> found = Signals.query(api.service().events(),
                 null, null, null, null, correlationId, limit);
@@ -123,7 +123,7 @@ final class SignalRoutes implements RouteModule {
         try {
             return Long.parseLong(s.trim());
         } catch (NumberFormatException ex) {
-            throw new ApiException(400, "invalid '" + field + "' (expected epoch millis): " + s);
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid '" + field + "' (expected epoch millis): " + s);
         }
     }
 
@@ -133,7 +133,7 @@ final class SignalRoutes implements RouteModule {
         try {
             return Severity.valueOf(s.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException ex) {
-            throw new ApiException(400, "invalid 'severity' (expected TRACE|DEBUG|INFO|WARN|ERROR|CRITICAL): " + s);
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid 'severity' (expected TRACE|DEBUG|INFO|WARN|ERROR|CRITICAL): " + s);
         }
     }
 

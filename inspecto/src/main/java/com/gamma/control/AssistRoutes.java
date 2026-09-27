@@ -54,7 +54,7 @@ final class AssistRoutes implements RouteModule {
             try {
                 return assistAgentOr503(api).updateSettings(api.body(e));
             } catch (IllegalArgumentException ex) {
-                throw new ApiException(400, ex.getMessage());
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, ex.getMessage());
             }
         }));
         api.post("/assist/(.+)", (e, m) -> assist(api, ApiContext.name(m), api.body(e)));
@@ -62,7 +62,7 @@ final class AssistRoutes implements RouteModule {
 
     /** The in-process assist agent, or 503 when the optional module is absent (v4.1 settings routes). */
     private AssistAgent assistAgentOr503(ApiContext api) {
-        return api.service().assistAgent().orElseThrow(() -> new ApiException(503,
+        return api.service().assistAgent().orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                 "assist agent not available (inspecto-agent not on classpath)"));
     }
 
@@ -80,13 +80,13 @@ final class AssistRoutes implements RouteModule {
     private Object assist(ApiContext api, String intent, Map<String, Object> body) {
         Optional<AssistAgent> agent = api.service().assistAgent();
         if (agent.isEmpty())
-            throw new ApiException(503, "assist agent not available (inspecto-agent not on classpath)");
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "assist agent not available (inspecto-agent not on classpath)");
         AssistRequest req = new AssistRequest(
                 intent, mapField(body, "screenContext"), mapField(body, "partialInput"), ApiContext.str(body, "userText"));
         AssistResult result = agent.get().assist(req);
         return switch (result.status()) {
-            case UNSUPPORTED -> throw new ApiException(404, "unknown assist intent: " + intent);
-            case UNAVAILABLE -> throw new ApiException(503,
+            case UNSUPPORTED -> throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown assist intent: " + intent);
+            case UNAVAILABLE -> throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                     result.message() == null ? "assist model unavailable" : result.message());
             case OK -> result;
         };

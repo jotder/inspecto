@@ -46,7 +46,7 @@ final class LineageRoutes implements RouteModule {
     /** {@code GET /lineage?store=} — the file→store (ingest) and store→pipeline (authored) lineage around one store. */
     private Object storeLineage(ApiContext api, String store) {
         if (store == null || store.isBlank())
-            throw new ApiException(400, "the 'store' query param is required");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "the 'store' query param is required");
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("store", store);
         out.put("upstream", upstream(api, store));

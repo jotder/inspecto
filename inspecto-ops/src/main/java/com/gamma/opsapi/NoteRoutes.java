@@ -5,6 +5,7 @@ import com.gamma.control.RouteErrors;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.RouteModule;
 import com.gamma.control.Subject;
 
@@ -72,7 +73,7 @@ public final class NoteRoutes implements RouteModule {
     private Object addComment(ApiContext api, HttpExchange ex, String targetKind, String targetId,
                               Map<String, Object> body) {
         String text = ApiContext.str(body, "body");
-        if (text == null) throw new ApiException(400, "body must include 'body'");
+        if (text == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'body'");
         return RouteErrors.mapErrors(() -> notes(api, ex)
                 .comment(targetKind, targetId,
                         ApiContext.subject(ex).map(Subject::id).orElseGet(() -> ApiContext.str(body, "author")), text)
@@ -87,7 +88,7 @@ public final class NoteRoutes implements RouteModule {
                                  Map<String, Object> body) {
         String name = ApiContext.str(body, "name");
         String uri = ApiContext.str(body, "uri");
-        if (name == null || uri == null) throw new ApiException(400, "body must include 'name' and 'uri'");
+        if (name == null || uri == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'name' and 'uri'");
         return RouteErrors.mapErrors(() -> notes(api, ex).attach(targetKind, targetId, ApiContext.str(body, "author"),
                 name, ApiContext.str(body, "contentType"), uri, ApiContext.str(body, "caption")).toMap());
     }

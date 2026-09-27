@@ -56,7 +56,7 @@ public final class AnnotationTargets {
         try {
             c = root == null ? null : new ComponentStore(root).get(targetKind, targetId).orElse(null);
         } catch (IllegalArgumentException bad) {           // not a writable component type
-            throw new ApiException(400, bad.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
         }
         if (c == null) return null;
         ComponentAccess.requireView(ex, targetKind, targetId, c.content());
@@ -89,11 +89,11 @@ public final class AnnotationTargets {
     private static String visibleObjectCorrelationId(ApiContext api, HttpExchange ex, String id) {
         com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
         if (objects == null)
-            throw new ApiException(503, "Operational objects are not installed in this bundle - they are "
+            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "Operational objects are not installed in this bundle - they are "
                     + "provided by the optional inspecto-ops module (Professional edition and above).");
         Map<String, Object> o = objects.summary(id).orElse(null);
         if (o == null) return null;
-        if (!objectVisibleTo(ex, o)) throw new ApiException(404, "no object with id '" + id + "'");
+        if (!objectVisibleTo(ex, o)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no object with id '" + id + "'");
         Object corr = o.get("correlationId");
         return corr == null ? "" : String.valueOf(corr);
     }

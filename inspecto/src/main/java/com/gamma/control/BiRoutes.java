@@ -63,7 +63,7 @@ final class BiRoutes implements RouteModule {
             spec = MeasureCompiler.parse(body, DEFAULT_LIMIT, MAX_LIMIT);
             sql = MeasureCompiler.compile(spec);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
 
         // 2. Defence in depth: the compiled text still passes the same guard as caller-authored SQL.
@@ -75,14 +75,14 @@ final class BiRoutes implements RouteModule {
         // 3. Resolve the dataset to its trusted relation and execute in the sandbox.
         Map<String, Object> dataset = store.get("dataset", spec.dataset())
                 .map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, "no dataset '" + spec.dataset() + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + spec.dataset() + "'"));
         if (!ComponentAccess.canView(ex, dataset))   // R3: shared-away ⇒ indistinguishable from absence
-            throw new ApiException(404, "no dataset '" + spec.dataset() + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + spec.dataset() + "'");
         String relationSql;
         try {
             relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
 
         // 4. QUERY-BOUND-WIDGET-1: a Widget bound to a saved Query aggregates over THAT query's result, so the
@@ -102,7 +102,7 @@ final class BiRoutes implements RouteModule {
         try {
             return response(QueryExecutor.run(req), sql);
         } catch (SQLException e) {
-            throw new ApiException(422, "BI query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "BI query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
@@ -120,25 +120,25 @@ final class BiRoutes implements RouteModule {
         try {
             query = store.get("query", queryId).map(ComponentRegistry.Component::content).orElse(null);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(400, bad.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
         }
         if (query == null || !ComponentAccess.canView(ex, query))
-            throw new ApiException(404, "no query '" + queryId + "' — the Widget's bound query was deleted or is not visible to you");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no query '" + queryId + "' — the Widget's bound query was deleted or is not visible to you");
         String type = ApiContext.str(query, "type");
         if (type != null && !"sql".equalsIgnoreCase(type))
-            throw new ApiException(422, "bound query '" + queryId + "' is type '" + type + "'; only type:sql queries run server-side");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bound query '" + queryId + "' is type '" + type + "'; only type:sql queries run server-side");
         String text = ApiContext.str(query, "text");
-        if (text == null) throw new ApiException(422, "bound query '" + queryId + "' has no 'text'");
+        if (text == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bound query '" + queryId + "' has no 'text'");
         String queryDataset = ApiContext.str(query, "datasetId");
         if (!spec.dataset().equals(queryDataset))
-            throw new ApiException(422, "bound query '" + queryId + "' reads dataset '" + queryDataset
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "bound query '" + queryId + "' reads dataset '" + queryDataset
                     + "', not the Widget's dataset '" + spec.dataset() + "'");
         String resolved;
         try {
             resolved = Parameters.resolve(text, QueryRoutes.declaredParams(query), Map.of(),
                     Parameters.Context.of(ApiContext.actor(ex), null));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         resolved = resolved.strip().replaceAll(";+$", "").strip();
         MeasureCompiler.Spec overQuery = new MeasureCompiler.Spec(BOUND, spec.measures(), spec.groupBy(),

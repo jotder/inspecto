@@ -81,17 +81,17 @@ final class DatasetRoutes implements RouteModule {
         Map<String, Object> dataset;
         try {
             dataset = store.get("dataset", id).map(ComponentRegistry.Component::content)
-                    .orElseThrow(() -> new ApiException(404, "no dataset '" + id + "'"));
+                    .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + id + "'"));
         } catch (IllegalArgumentException bad) {             // an id the store refuses to resolve
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, bad.getMessage());
         }
         if (!ComponentAccess.canView(ex, dataset))             // R3: shared-away ⇒ indistinguishable from absence
-            throw new ApiException(404, "no dataset '" + id + "'");
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + id + "'");
         String relationSql;
         try {
             relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, bad.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         int limit = Math.max(1, Math.min(MAX_ROW_LIMIT,
                 ApiContext.parseIntOr(ApiContext.query(ex, "limit"), DEFAULT_ROW_LIMIT)));
@@ -101,7 +101,7 @@ final class DatasetRoutes implements RouteModule {
         try {
             r = QueryExecutor.run(new QueryExecutor.Request(id, relationSql, sql, limit, 0, List.of(), List.of()));
         } catch (SQLException e) {
-            throw new ApiException(422, "dataset read failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dataset read failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         } catch (IOException e) {
             throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + e.getMessage());
         }
@@ -135,16 +135,16 @@ final class DatasetRoutes implements RouteModule {
         // time; checking here turns that into an answer the caller can act on.
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         store.get("dataset", id).map(ComponentRegistry.Component::content)
-                .orElseThrow(() -> new ApiException(404, "no dataset '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + id + "'"));
 
         Map<String, Object> body = api.body(ex);
         String target = ApiContext.str(body, "target");
         if (target == null)
-            throw new ApiException(422, "materialize needs a 'target' dataset id to write to");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "materialize needs a 'target' dataset id to write to");
         // Gate 2 — the target becomes a directory name under the data root.
         target = WriteGates.safeName(target, "materialize target");
         if (target.equals(id))
-            throw new ApiException(422, "materialize target must differ from the source dataset '" + id + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "materialize target must differ from the source dataset '" + id + "'");
 
         // Gate 3 — jail the resolved output directory. safeName already refuses separators and '..', so
         // this cannot currently fire; it is kept because the containment rule must live at the edge too,

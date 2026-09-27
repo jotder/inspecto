@@ -2,6 +2,7 @@ package com.gamma.eventsapi;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.control.Cursor;
 import com.gamma.control.RouteModule;
 import com.gamma.control.TimeBounds;
@@ -60,7 +61,7 @@ public final class EventRoutes implements RouteModule {
                 (e, m) -> saveView(api, api.body(e))));
         api.post("/events/views/([^/]+)/delete", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> {
             if (!api.service().savedViews().delete(ApiContext.name(m)))
-                throw new ApiException(404, "no saved view named '" + ApiContext.name(m) + "'");
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "no saved view named '" + ApiContext.name(m) + "'");
             return Map.of("name", ApiContext.name(m), "deleted", true);
         }));
         api.get("/events/([^/]+)", (e, m) -> eventById(api, ApiContext.name(m)));
@@ -129,7 +130,7 @@ public final class EventRoutes implements RouteModule {
         return api.service().events().query(EventQuery.recent(EventQuery.MAX_LIMIT)).stream()
                 .filter(ev -> id.equals(ev.eventId())).findFirst()
                 .map(Event::toMap)
-                .orElseThrow(() -> new ApiException(404, "no event with id '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no event with id '" + id + "'"));
     }
 
     /**
@@ -178,7 +179,7 @@ public final class EventRoutes implements RouteModule {
     /** {@code POST /events/views} — upsert a saved view from {@code {name, level?, type?, pipeline?, correlationId?, q?, from?, to?}}. */
     private Object saveView(ApiContext api, Map<String, Object> reqBody) {
         String viewName = ApiContext.str(reqBody, "name");
-        if (viewName == null) throw new ApiException(400, "body must include 'name'");
+        if (viewName == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'name'");
         Map<String, String> filters = new LinkedHashMap<>();
         for (String k : List.of("level", "type", "pipeline", "correlationId", "q", "from", "to")) {
             String v = ApiContext.str(reqBody, k);

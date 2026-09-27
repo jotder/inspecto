@@ -464,7 +464,7 @@ public final class ExchangeRoutes implements RouteModule {
     /** The grant a grant-scoped route acts on — 404 when absent (it has no owner to authorize against). */
     private static ShareGrant grantOf(ApiContext api, String id) {
         return requireExchange(api).grant(id)
-                .orElseThrow(() -> new ApiException(404, "no such grant '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such grant '" + id + "'"));
     }
 
     /** The validated, hosted Space a body field names (the handler's own 400/404, raised before the gate). */
@@ -476,9 +476,9 @@ public final class ExchangeRoutes implements RouteModule {
     /** The config root holding {@code space}'s role table — what its capability gate is decided by. */
     private static java.nio.file.Path spaceRoles(ApiContext api, String space) {
         SpaceContext ctx = api.spaces().space(SpaceId.of(space))
-                .orElseThrow(() -> new ApiException(404, "no such space '" + space + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + space + "'"));
         java.nio.file.Path config = ctx.root().config();
-        if (config == null) throw new ApiException(409, "space '" + space + "' has no config root");
+        if (config == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + space + "' has no config root");
         return config;
     }
 

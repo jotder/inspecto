@@ -76,7 +76,7 @@ final class AuditLogRoutes implements RouteModule {
         Long from = seqParam(ex, "from");
         Long to = seqParam(ex, "to");
         if (from != null && to != null && from > to)
-            throw new ApiException(400, "from (" + from + ") is after to (" + to + ")");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "from (" + from + ") is after to (" + to + ")");
         Path root = api.writeRoot();
         AuditAnchors.AnchorFile anchors = root == null ? AuditAnchors.AnchorFile.NONE : AuditAnchors.readFile(root);
         java.util.Map<String, Object> out = new java.util.LinkedHashMap<>(AuditVerifier.verify(
@@ -164,7 +164,7 @@ final class AuditLogRoutes implements RouteModule {
         } catch (NumberFormatException ignore) {
             // fall through
         }
-        throw new ApiException(400, name + " must be a chain seq (an integer from 1), got '" + v + "'");
+        throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, name + " must be a chain seq (an integer from 1), got '" + v + "'");
     }
 
     /** {@code GET /audit/search?type=AUDIT|ACCESS_DENIED&limit=&offset=&pipeline=&correlationId=&q=&from=&to=} */
@@ -178,7 +178,7 @@ final class AuditLogRoutes implements RouteModule {
      */
     private static Object routeInventory(ApiContext api) {
         if (!(api instanceof ControlApi control))
-            throw new ApiException(501, "route inventory is not available on this host");
+            throw new ApiException(501, ErrorCodes.NOT_SUPPORTED, "route inventory is not available on this host");
         List<java.util.Map<String, Object>> rows = new java.util.ArrayList<>();
         for (ControlApi.RouteRow r : control.routeInventory()) {
             java.util.Map<String, Object> row = new java.util.LinkedHashMap<>();
@@ -243,11 +243,11 @@ final class AuditLogRoutes implements RouteModule {
     private static EventQuery auditQuery(HttpExchange ex, int defaultLimit) {
         String type = ApiContext.query(ex, "type");
         if (type == null || type.isBlank())
-            throw new ApiException(400, "type is required and must be one of " + sorted()
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "type is required and must be one of " + sorted()
                     + " - this route serves only the audit projection (the full events feed is the "
                     + "optional inspecto-events module)");
         String canonical = AUDITABLE.stream().filter(t -> t.equalsIgnoreCase(type)).findFirst()
-                .orElseThrow(() -> new ApiException(400, "type '" + type + "' is not auditable - must be one of "
+                .orElseThrow(() -> new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "type '" + type + "' is not auditable - must be one of "
                         + sorted() + " (the full events feed is the optional inspecto-events module)"));
         return EventQuery.builder()
                 .type(canonical)

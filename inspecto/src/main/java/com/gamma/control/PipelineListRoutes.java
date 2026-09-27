@@ -98,7 +98,7 @@ final class PipelineListRoutes implements RouteModule {
     private Object authoredPipeline(ApiContext api, String id) {
         Path root = PipelineSupport.pipelinesRootOrNull(api);
         PipelineGraph g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
-        if (g == null) throw new ApiException(404, "no authored pipeline '" + id + "'");
+        if (g == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'");
         return PipelineProjection.graph(g);
     }
 
@@ -110,19 +110,19 @@ final class PipelineListRoutes implements RouteModule {
     private Object authoredPipelineRaw(ApiContext api, String id) {
         Path root = PipelineSupport.pipelinesRootOrNull(api);
         PipelineGraph g = root == null ? null : new PipelineStore(root).get(id).orElse(null);
-        if (g == null) throw new ApiException(404, "no authored pipeline '" + id + "'");
+        if (g == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'");
         return PipelineCodec.toMap(g);
     }
 
     /** {@code DELETE /pipelines/authored/{id}} — remove an authored pipeline; 404 if absent. */
     private Object deletePipeline(ApiContext api, String id) throws IOException {
         PipelineStore store = pipelineStore(api);
-        if (!pipelineExists(store, id)) throw new ApiException(404, "no authored pipeline '" + id + "'");
+        if (!pipelineExists(store, id)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no authored pipeline '" + id + "'");
         boolean removed;
         try {
             removed = store.delete(id);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
         return Map.of("id", id, "deleted", true, "fileRemoved", removed);
     }
@@ -131,7 +131,7 @@ final class PipelineListRoutes implements RouteModule {
         try {
             return store.exists(id);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
     }
 }

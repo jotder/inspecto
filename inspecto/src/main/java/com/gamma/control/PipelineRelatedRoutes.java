@@ -38,7 +38,7 @@ final class PipelineRelatedRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "pipeline related");
         String id = WriteGates.safeName(name, "pipeline name");
         PipelineConfig cfg = api.service().configFor(id)
-                .orElseThrow(() -> new ApiException(404, "no pipeline named '" + id + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + id + "'"));
         return PipelineRelated.toJson(PipelineRelated.of(writeRoot, cfg, limit(ex)));
     }
 
@@ -50,9 +50,9 @@ final class PipelineRelatedRoutes implements RouteModule {
         try {
             limit = Integer.parseInt(raw.trim());
         } catch (NumberFormatException nfe) {
-            throw new ApiException(400, "limit must be an integer");
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "limit must be an integer");
         }
-        if (limit < 1) throw new ApiException(400, "limit must be positive");
+        if (limit < 1) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "limit must be positive");
         return limit;
     }
 }

@@ -66,9 +66,9 @@ final class ViewRoutes implements RouteModule {
             out.put("rows", r.rows());
             return out;
         } catch (IllegalStateException e) {
-            throw new ApiException(409, e.getMessage());
+            throw new ApiException(409, ErrorCodes.CONFLICT, e.getMessage());
         } catch (java.sql.SQLException | IOException e) {
-            throw new ApiException(422, "view query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "view query failed: " + DuckDbUtil.withoutPendingQueryPreamble(e.getMessage()));
         }
     }
 
@@ -79,9 +79,9 @@ final class ViewRoutes implements RouteModule {
         try {
             def = root == null ? null : new ViewStore(root).get(name).orElse(null);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(400, e.getMessage());
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
-        if (def == null) throw new ApiException(404, "no view '" + name + "'");
+        if (def == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no view '" + name + "'");
         return def;
     }
 

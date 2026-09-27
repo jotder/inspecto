@@ -100,15 +100,15 @@ final class BiTemplates {
     /** {@code POST /bi/templates/{id}/apply} — body {@code {dataset, prefix?}}; writes the components. */
     static Object apply(ApiContext api, String templateId, Map<String, Object> body) throws IOException {
         Template t = TEMPLATES.stream().filter(x -> x.id().equals(templateId)).findFirst()
-                .orElseThrow(() -> new ApiException(404, "no template '" + templateId + "'"));
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no template '" + templateId + "'"));
         String dataset = ApiContext.str(body, "dataset");
-        if (dataset == null) throw new ApiException(422, "apply body must include 'dataset'");
+        if (dataset == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "apply body must include 'dataset'");
         String rawPrefix = ApiContext.str(body, "prefix");
         String prefix = rawPrefix == null ? "" : rawPrefix.trim() + "_";
 
         Path writeRoot = WriteGates.requireWriteRoot(api, "template apply");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        store.get("dataset", dataset).orElseThrow(() -> new ApiException(404, "no dataset '" + dataset + "'"));
+        store.get("dataset", dataset).orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + dataset + "'"));
         // Maker-checker (ASSURE-MAKER-CHECKER-1): an all-or-nothing board is not ONE Pending Change.
         PendingChanges.holdRefusing(api, java.util.List.of("dataset", "widget", "dashboard"),
                 "applying a BI template writes a whole board in one act");
@@ -140,7 +140,7 @@ final class BiTemplates {
             try {
                 ComponentRoutes.validateKind(api, kind, id, content);
             } catch (IllegalArgumentException e) {
-                throw new ApiException(422, "template '" + templateId + "' would write an invalid "
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template '" + templateId + "' would write an invalid "
                         + kind + " '" + id + "': " + e.getMessage());
             }
             resolved.add(Map.of("kind", kind, "id", id, "content", content));
@@ -150,7 +150,7 @@ final class BiTemplates {
             String kind = (String) c.get("kind");
             String id = (String) c.get("id");
             if (store.get(kind, id).isPresent())
-                throw new ApiException(409, kind + " '" + id + "' already exists — re-apply with a 'prefix'");
+                throw new ApiException(409, ErrorCodes.CONFLICT, kind + " '" + id + "' already exists — re-apply with a 'prefix'");
         }
         List<Map<String, Object>> written = new ArrayList<>();
         for (Map<String, Object> c : resolved) {

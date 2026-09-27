@@ -115,12 +115,12 @@ final class DeliveryStatusRoutes implements RouteModule {
     private Object unsuppress(ApiContext api, HttpExchange e) {
         String target = ApiContext.query(e, "target");
         if (target == null || target.isBlank()) {
-            throw new ApiException(422, "target is required: DELETE /notifications/suppressions?target=<address>");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "target is required: DELETE /notifications/suppressions?target=<address>");
         }
         DeliveryReceiptStore receipts = api.service().deliveryReceipts();
         long now = System.currentTimeMillis();
         if (receipts == null || !receipts.unsuppress(target.trim(), now, ApiContext.actor(e))) {
-            throw new ApiException(409, "this deployment cannot record a suppression override — "
+            throw new ApiException(409, ErrorCodes.CONFLICT, "this deployment cannot record a suppression override — "
                     + "delivery receipts are not stored durably (-Ddelivery.receipts.backend)");
         }
         return Map.of("target", target.trim(), "unsuppressedAt", now,
@@ -130,7 +130,7 @@ final class DeliveryStatusRoutes implements RouteModule {
 
     private Object callback(ApiContext api, HttpExchange e, String adapterId) throws Exception {
         DeliveryStatusAdapter adapter = adapterById(adapterId);
-        if (adapter == null) throw new ApiException(404, "no delivery-status adapter '" + adapterId + "'");
+        if (adapter == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no delivery-status adapter '" + adapterId + "'");
 
         // rawBody, never body(): the provider signed these exact bytes, and a re-serialised map would not
         // reproduce their key order or whitespace. Parsing happens inside the adapter, after verification.
@@ -143,7 +143,7 @@ final class DeliveryStatusRoutes implements RouteModule {
         }
 
         List<DeliveryEvent> events = adapter.parse(raw);
-        if (events.isEmpty()) throw new ApiException(422, "no delivery-status events in payload");
+        if (events.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "no delivery-status events in payload");
 
         DeliveryReceiptStore receipts = api.service().deliveryReceipts();
         List<Map<String, Object>> stamped = new ArrayList<>();

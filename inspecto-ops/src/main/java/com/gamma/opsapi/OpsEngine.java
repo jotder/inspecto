@@ -2,6 +2,7 @@ package com.gamma.opsapi;
 
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
+import com.gamma.control.ErrorCodes;
 import com.gamma.ops.ObjectService;
 import com.gamma.ops.ObjectServiceAccess;
 
@@ -33,7 +34,7 @@ final class OpsEngine {
         return api.service().objects()
                 .filter(ObjectServiceAccess.class::isInstance)
                 .map(access -> ((ObjectServiceAccess) access).service())
-                .orElseThrow(() -> new ApiException(503,
+                .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE,
                         "Operational objects are not available in this bundle - the inspecto-ops module is "
                                 + "installed but registered no ObjectEngineProvider."));
     }
