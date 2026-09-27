@@ -438,9 +438,13 @@ public interface ApiContext {
         return ex.getRequestHeaders().getFirst("User-Agent");
     }
 
-    /** Decode the {@code key} query-string parameter, or {@code null} if absent. */
+    /**
+     * Decode the {@code key} query-string parameter, or {@code null} if absent. Parses the RAW query and decodes once:
+     * {@code getQuery()} is already percent-decoded, so decoding it again turned {@code %2B} into a space and split a
+     * value on an encoded {@code %26}.
+     */
     static String query(HttpExchange ex, String key) {
-        String q = ex.getRequestURI().getQuery();
+        String q = ex.getRequestURI().getRawQuery();
         if (q == null) return null;
         for (String kv : q.split("&")) {
             int eq = kv.indexOf('=');

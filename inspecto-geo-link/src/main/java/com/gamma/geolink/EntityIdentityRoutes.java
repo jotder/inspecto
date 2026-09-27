@@ -89,7 +89,7 @@ public final class EntityIdentityRoutes implements RouteModule {
 
     private Object group(ApiContext api, HttpExchange ex) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "entity identities");
-        String key = rawQuery(ex, "key");
+        String key = ApiContext.query(ex, "key");
         if (key == null || key.isBlank() || key.indexOf(':') <= 0)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'key' must be a typed Entity key <type>:<value>");
         EntityFactLog log = new EntityFactLog(root);
@@ -201,22 +201,6 @@ public final class EntityIdentityRoutes implements RouteModule {
         for (EntityRegistry.Group g : EntityRegistry.resolve(facts.facts(), atSeq).values())
             if (g.members().contains(key)) return g;
         return new EntityRegistry.Group(key, new TreeSet<>(List.of(key)), new TreeSet<>());
-    }
-
-    /**
-     * A query parameter decoded ONCE from the RAW query. ⚠ Not {@code ApiContext.query}: it decodes
-     * {@code getQuery()}, which the JDK has already percent-decoded, so a {@code %2B} arrives as {@code +} and is then
-     * decoded again to a space — a typed MSISDN key could never be looked up.
-     */
-    private static String rawQuery(HttpExchange ex, String name) {
-        String q = ex.getRequestURI().getRawQuery();
-        if (q == null) return null;
-        for (String kv : q.split("&")) {
-            int eq = kv.indexOf('=');
-            if (eq > 0 && kv.substring(0, eq).equals(name))
-                return java.net.URLDecoder.decode(kv.substring(eq + 1), java.nio.charset.StandardCharsets.UTF_8);
-        }
-        return null;
     }
 
     private static long at(HttpExchange ex, EntityFactLog.Log facts) {
