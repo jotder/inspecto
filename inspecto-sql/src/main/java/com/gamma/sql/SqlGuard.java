@@ -347,6 +347,74 @@ public final class SqlGuard {
         for (var c : n) walk(c, trustedRelation, out);
     }
 
+    /**
+     * {@code VIRTUAL-DATASET-SQL-RENAME-1}: {@code sql} with every unqualified {@code BASE_TABLE} reference to
+     * {@code oldName} (case-insensitive, as DuckDB binds) replaced by {@code newName} — located by the
+     * parser's own {@code query_location}, never by regex, so a column, alias or string literal spelled
+     * {@code oldName} is untouched and the author's text (comments, spacing) survives. Returns {@code sql}
+     * UNCHANGED when it does not parse as one statement, when a CTE shadows {@code oldName}, or when any
+     * reference's text at its location is not the bare/double-quoted name (fail closed).
+     */
+    public static String renameBaseTable(String sql, String oldName, String newName) {
+        if (sql == null || oldName == null || newName == null || oldName.isEmpty()) return sql;
+        try {
+            String json;
+            synchronized (PARSER_LOCK) {
+                if (parser == null) parser = openParser();
+                try (var ps = parser.prepareStatement("SELECT json_serialize_sql(?::VARCHAR)")) {
+                    ps.setString(1, sql);
+                    try (var rs = ps.executeQuery()) {
+                        rs.next();
+                        json = rs.getString(1);
+                    }
+                }
+            }
+            var root = JSON.readTree(json);
+            if (root.path("error").asBoolean(true) || root.path("statements").size() != 1) return sql;
+            java.util.TreeSet<Integer> locations = new java.util.TreeSet<>();
+            if (!collectRefs(root.path("statements"), oldName, locations)) return sql;
+            String quotedOld = "\"" + oldName.replace("\"", "\"\"") + "\"";
+            String replacement = newName.matches("[A-Za-z_][A-Za-z0-9_]*") ? newName
+                    : "\"" + newName.replace("\"", "\"\"") + "\"";
+            StringBuilder out = new StringBuilder(sql);
+            for (int loc : locations.descendingSet()) {
+                int len;
+                if (sql.regionMatches(true, loc, quotedOld, 0, quotedOld.length())) {
+                    len = quotedOld.length();
+                } else if (sql.regionMatches(true, loc, oldName, 0, oldName.length())
+                        && (loc + oldName.length() == sql.length()
+                            || !Character.isJavaIdentifierPart(sql.charAt(loc + oldName.length())))) {
+                    len = oldName.length();
+                } else {
+                    return sql;
+                }
+                out.replace(loc, loc + len, replacement);
+            }
+            return out.toString();
+        } catch (Exception | LinkageError e) {
+            synchronized (PARSER_LOCK) { closeParser(); }
+            return sql;
+        }
+    }
+
+    /** False when a CTE named {@code oldName} shadows the store or a matching ref carries no location. */
+    private static boolean collectRefs(com.fasterxml.jackson.databind.JsonNode n, String oldName,
+                                       java.util.Set<Integer> out) {
+        if (n.isObject()) {
+            for (var e : n.path("cte_map").path("map"))
+                if (oldName.equalsIgnoreCase(e.path("key").asText(""))) return false;
+            if (n.has("alias") && n.has("sample") && "BASE_TABLE".equals(n.path("type").asText(""))
+                    && n.path("catalog_name").asText("").isEmpty() && n.path("schema_name").asText("").isEmpty()
+                    && oldName.equalsIgnoreCase(n.path("table_name").asText(""))) {
+                if (!n.path("query_location").canConvertToInt()) return false;
+                out.add(n.path("query_location").asInt());
+            }
+        }
+        if (n.isContainerNode())
+            for (var c : n) if (!collectRefs(c, oldName, out)) return false;
+        return true;
+    }
+
     private static java.sql.Connection openParser() throws Exception {
         com.gamma.util.DuckDbUtil.loadDriver();
         // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).

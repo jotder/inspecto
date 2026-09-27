@@ -13,8 +13,9 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **47<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
+> **46<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 26<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ⬇ **47 → 46 on 2026-09-27**: closed P3 `VIRTUAL-DATASET-SQL-RENAME-1` — a store rename rewrites a virtual Dataset's SQL relation via the parse tree (`SqlGuard.renameBaseTable`; as-built `okf/frontend/features/studio.md`).
 > ⬇ **48 → 47 on 2026-09-27**: closed P2 `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` — every in-memory DuckDB open goes through `DuckDbUtil.openInMemory(spillDir)` (capped `memory_limit`, Space-data-root or `java.io.tmpdir` spill; as-built `okf/backend/engine/duckdb.md`).
 > ↔ **48 on 2026-09-27**: P2 `ASSURE-AUDIT-CHAIN-1` closed (wave 3.3 shipped); residuals re-filed as P3 `ASSURE-AUDIT-CHAIN-RESIDUALS-1`.
 > ↔ **48 on 2026-09-27**: P2 `ASSURE-KPI-DEFINITIONS-1` closed (wave 3.1 shipped); residuals re-filed as P3 `ASSURE-KPI-DEFINITIONS-RESIDUALS-1`.
@@ -53,8 +54,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 47<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 26<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 46<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -218,7 +219,6 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Datasets & lineage
 
-- **P3** · **VIRTUAL-DATASET-SQL-RENAME-1 — a store rename leaves a virtual Dataset's SQL naming the old store** (filed 2026-09-26 closing `VIRTUAL-DATASET-SQL-1`) — `PipelineRenameRoutes.rewriteDatasetRefs` rewrites `sourceName` but not the `sql` text, whose `FROM` still names the old store; `DatasetRelation` binds only the NEW name, so every read of that Dataset 422s ("table … does not exist") until the SQL is re-saved. Fails closed, never silently wrong. Fix when a rename is exercised on a SQL-authored Dataset: rewrite the relation reference via the DuckDB parse tree (`SqlGuard`'s `json_serialize_sql` walk), never by regex. → `okf/frontend/features/studio.md`
 - **P3** · **D-11 hand-authored `relations` component** — deferred until a business relation exists that no Pipeline exercises; ⬜ re-confirmed not fired 2026-09-15. → `archived-documents/plans-archive/elt-final-amendment-plan.md` §3.4
 
 ### 3.5 Data quality, Observability, Signals & Alerting

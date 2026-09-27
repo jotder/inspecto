@@ -285,6 +285,54 @@ class ControlApiPipelineRenameTest {
         }
     }
 
+    /**
+     * VIRTUAL-DATASET-SQL-RENAME-1: a SQL-authored (virtual) Dataset's {@code sql} names the store in its
+     * FROM; the rename rewrites that relation reference (via the DuckDB parse tree) beside
+     * {@code sourceName}, so the Dataset still reads — while a column and a string literal spelled like the
+     * old store are left alone.
+     */
+    @Test
+    void renameRewritesAVirtualDatasetsSqlRelationOnly() throws Exception {
+        Path root = Files.createTempDirectory("rename-virtual-sql");
+        try (Ctx c = open(root, false)) {
+            ComponentStore store = new ComponentStore(root.resolve("registry"));
+            String sql = "SELECT id, mini_etl, 'mini_etl' AS tag -- reads mini_etl\nFROM mini_etl WHERE id > 1";
+            Map<String, Object> ds = new LinkedHashMap<>();
+            ds.put("kind", "virtual");
+            ds.put("sourceName", "mini_etl");
+            ds.put("sql", sql);
+            store.write("dataset", "mini_vds", ds);
+
+            HttpResponse<String> r = post(c.port, "/pipelines/mini_etl/rename", "{\"newId\":\"mini_v2\"}");
+            assertEquals(200, r.statusCode(), r.body());
+
+            Map<String, Object> after = store.get("dataset", "mini_vds").orElseThrow().content();
+            assertEquals("mini_v2", String.valueOf(after.get("sourceName")));
+            assertEquals("SELECT id, mini_etl, 'mini_etl' AS tag -- reads mini_etl\nFROM mini_v2 WHERE id > 1",
+                    String.valueOf(after.get("sql")),
+                    "only the FROM relation is renamed; the column, literal and comment are untouched");
+
+            // The rewritten Dataset reads: its relation binds the new store name over a store at that name.
+            Path dataRoot = root.resolve("data");
+            Files.createDirectories(dataRoot.resolve("mini_v2"));
+            String parquet = dataRoot.resolve("mini_v2").resolve("part.parquet").toString().replace('\\', '/');
+            com.gamma.util.DuckDbUtil.loadDriver();
+            try (var conn = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+                 var st = conn.createStatement()) {
+                st.execute("COPY (SELECT * FROM (VALUES (1, 'a'), (2, 'b'), (3, 'c')) t(id, mini_etl)) TO '"
+                        + parquet + "' (FORMAT PARQUET)");
+                String rel = com.gamma.query.DatasetRelation.relationSql(after, dataRoot, null);
+                try (var rs = st.executeQuery("SELECT count(*), min(tag) FROM (" + rel + ")")) {
+                    assertTrue(rs.next());
+                    assertEquals(2, rs.getInt(1));
+                    assertEquals("mini_etl", rs.getString(2));
+                }
+            }
+        } finally {
+            deleteRecursive(root);
+        }
+    }
+
     @Test
     void rewriteDependentsFalseLeavesThemPointingAtTheOldId() throws Exception {
         Path root = Files.createTempDirectory("rename-no-dependents");

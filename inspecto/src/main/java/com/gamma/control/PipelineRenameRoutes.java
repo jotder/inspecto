@@ -654,6 +654,12 @@ final class PipelineRenameRoutes implements RouteModule {
             if (sn != null && oldId.equalsIgnoreCase(String.valueOf(sn).trim())) {
                 updated.put("sourceName", newId);
                 changed = true;
+                // VIRTUAL-DATASET-SQL-RENAME-1: the SQL's FROM names the store too; rewrite it via the
+                // DuckDB parse tree (unparseable SQL is left as is and keeps failing closed at read).
+                Object sql = content.get("sql");
+                if (sql != null)
+                    updated.put("sql", com.gamma.sql.SqlGuard.renameBaseTable(
+                            String.valueOf(sql), String.valueOf(sn).trim(), newId));
             }
 
             Object ref = content.get("physicalRef");

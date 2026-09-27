@@ -65,7 +65,13 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   model would be a hand-kept mirror. ⚠ A virtual Dataset saved before this has no `sql` and still 422s on
   the server (no compat shim): open it and Save. ⛔ `sql` beside a `view` or `physicalRef` is refused as
   ambiguous. ⚠ The SQL can read only its own `sourceName` — any other relation is not in scope and 422s.
-  ⚠ A store rename rewrites `sourceName` but not the SQL text (`VIRTUAL-DATASET-SQL-RENAME-1`).
+  A store rename (`POST /pipelines/{id}/rename`) rewrites `sourceName` AND the SQL's relation references
+  (2026-09-27, `VIRTUAL-DATASET-SQL-RENAME-1`): `SqlGuard.renameBaseTable` locates each unqualified
+  `BASE_TABLE` named the old store in DuckDB's `json_serialize_sql` tree and splices the new name in at its
+  `query_location` — the author's text (comments, spacing) survives; columns, aliases and literals spelled
+  like the store are untouched. ⛔ Never regex, never `json_deserialize_sql` (it re-spells the statement).
+  ⚠ Left unchanged (and so still 422 at read, fail closed): SQL that does not parse, a CTE shadowing the
+  store name, a schema-qualified ref (`main.old`), or text at a location that is not the bare/quoted name.
   ⚠ The editor preview reads the store the `/db/query` way (CSV too); the saved relation reads it the
   `physicalRef` way (Parquet under `storeReadRoot`) — the same for every pipeline-shaped store.
 * ⛔ **The sample-row folds must stay — but not for the reason this bullet used to give.** Since the mock

@@ -124,4 +124,18 @@ class SqlGuardParseTreeTest {
         System.out.printf("SqlGuard parse-tree layer: %.3f ms/call over %d calls%n", avgMs, n);
         assertTrue(avgMs < 20, "the parse-tree layer must not reopen a connection per call: " + avgMs + " ms");
     }
+
+    /** VIRTUAL-DATASET-SQL-RENAME-1: exact relation refs only, located by the parse tree; fail closed. */
+    @Test
+    void renameBaseTableRewritesOnlyRelationReferences() {
+        assertEquals("SELECT o.x FROM new_s o JOIN new_s ON 1 WHERE y = 'old_s'",
+                SqlGuard.renameBaseTable("SELECT o.x FROM \"old_s\" o JOIN OLD_S ON 1 WHERE y = 'old_s'", "old_s", "new_s"));
+        assertEquals("SELECT * FROM (SELECT old_s FROM new_s) t",
+                SqlGuard.renameBaseTable("SELECT * FROM (SELECT old_s FROM old_s) t", "old_s", "new_s"));
+        // a CTE shadowing the name, a qualified ref, and unparseable SQL are all left exactly as written
+        String cte = "WITH old_s AS (SELECT 1) SELECT * FROM old_s";
+        assertEquals(cte, SqlGuard.renameBaseTable(cte, "old_s", "new_s"));
+        assertEquals("SELECT * FROM main.old_s", SqlGuard.renameBaseTable("SELECT * FROM main.old_s", "old_s", "new_s"));
+        assertEquals("SELEC * FROM old_s", SqlGuard.renameBaseTable("SELEC * FROM old_s", "old_s", "new_s"));
+    }
 }
