@@ -401,7 +401,7 @@ export class ObjectMailComponent implements OnInit {
             field: 'category',
             headerName: 'Category',
             flex: 2,
-            minWidth: 140,
+            minWidth: 136,
             valueGetter: (p: ValueGetterParams<OperationalObject>) => (p.data ? objectCategory(p.data) : ''),
             tooltipValueGetter: (p) => (p.data ? objectCategory(p.data) : ''),
         },
@@ -420,7 +420,7 @@ export class ObjectMailComponent implements OnInit {
             field: 'title',
             headerName: 'Description',
             flex: 3,
-            minWidth: 150,
+            minWidth: 134,
             cellRenderer: (p: ICellRendererParams<OperationalObject>) => {
                 const o = p.data;
                 if (!o) return '';
@@ -431,8 +431,9 @@ export class ObjectMailComponent implements OnInit {
         {
             field: 'status',
             headerName: 'Status',
-            minWidth: 120,
-            maxWidth: 120,
+            // Fits the longest status badge, INVESTIGATING (138px).
+            minWidth: 140,
+            maxWidth: 140,
             valueGetter: (p: ValueGetterParams<OperationalObject>) => (p.data ? displayStatus(p.data) : ''),
             cellRenderer: (p: ICellRendererParams<OperationalObject>) => statusBadgeHtml(p.value as string),
         },

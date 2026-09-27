@@ -126,7 +126,9 @@
         ></div>
 
         <!-- Center: toolbar + list -->
-        <section class="flex h-full min-h-0 min-w-0 flex-auto flex-col">
+        <!-- overflow-hidden: with a wide detail panel the list narrows below its header's actions, which otherwise
+             paint over the detail panel's title. -->
+        <section class="flex h-full min-h-0 min-w-0 flex-auto flex-col overflow-hidden">
             <div class="flex flex-col gap-3 px-4 sm:px-6">
                 <inspecto-page-header
                     [title]="title"

@@ -83,8 +83,10 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
                 [class.pb-4]="!hasTabs"
                 [class.pb-0]="hasTabs"
             >
-                <div class="flex min-w-0 items-start gap-4">
-                    <div class="min-w-0 flex-auto">
+                <!-- flex-wrap + a 12rem title floor: in a narrow pane (a list beside a wide detail panel) the actions
+                     drop below the title instead of squeezing it to one letter ("M…" for Case Manager). -->
+                <div class="flex min-w-0 flex-wrap items-start gap-4">
+                    <div class="min-w-[12rem] flex-auto">
                         @if (backLink) {
                             <a
                                 [routerLink]="backLink"
