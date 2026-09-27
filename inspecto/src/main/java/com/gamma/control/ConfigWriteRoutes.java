@@ -54,14 +54,7 @@ final class ConfigWriteRoutes implements RouteModule {
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
         Map<String, Object> draft = mapAt(body, "config");
-        if ("job".equals(type)) {   // ASSURE-AUDIT-CHAIN-1: the event_prune gate, on this producer of jobs too
-            try {
-                JobRoutes.requireAdministerForEventPrune(ex, com.gamma.job.JobConfig.fromMap(
-                        draft.containsKey("job") ? draft : Map.of("job", draft)));
-            } catch (IllegalArgumentException | IllegalStateException unparseable) {
-                // the spec gate below refuses a malformed job; nothing to judge here
-            }
-        }
+        requireKindCapability(ex, type, draft);
         // SCHEMA-FILE-NAME-1: a SCHEMA's file may be named apart from its content. A schema self-names via
         // `raw.name`, but `raw.name` is the raw/source identity (`ORDERS`, `CALL`) and a Pipeline references
         // its schema as `<pipeline>_schema.toon` — two names that differ in every committed schema. Deriving
@@ -325,6 +318,24 @@ final class ConfigWriteRoutes implements RouteModule {
      * {@code /config/write}) → identity change 409 → merged-draft ERROR findings 422
      * ({@code written:false}) → atomic write.
      */
+    /**
+     * These doors are never a way around a kind's own route gate (as {@link ImportCapabilityGuard} for imports):
+     * an {@code alert} needs {@code canAuthorAlertRules}, as {@code /alerts/rules}; an administer-only
+     * maintenance Job ({@code event_prune}, {@code restore}) needs {@code canAdminister}, as {@code /jobs}
+     * (ASSURE-AUDIT-CHAIN-1).
+     */
+    private static void requireKindCapability(HttpExchange ex, String type, Map<String, Object> draft) {
+        if ("alert".equals(type)) ApiContext.requireCapability(ex, Roles.CAN_AUTHOR_ALERT_RULES);
+        if ("job".equals(type)) {
+            try {
+                JobRoutes.requireAdministerForEventPrune(ex, com.gamma.job.JobConfig.fromMap(
+                        draft.containsKey("job") ? draft : Map.of("job", draft)));
+            } catch (IllegalArgumentException | IllegalStateException unparseable) {
+                // the spec gate refuses a malformed job; nothing to judge here
+            }
+        }
+    }
+
     private Object patchConfig(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "config patch");
 
@@ -358,6 +369,8 @@ final class ConfigWriteRoutes implements RouteModule {
         // mapping.rules whether they live inline or in the sibling CSV.
         if ("schema".equals(type)) ConfigFileSupport.mergeSiblings(target, existing);
         Map<String, Object> merged = deepMerge(existing, patch);
+        requireKindCapability(ex, type, existing);   // turning an administer-only Job INTO something else, too
+        requireKindCapability(ex, type, merged);
 
         // The filename derives from the identity field, so a patch may not move it — a renamed
         // identity under the old filename would silently split the config from its index entry.
