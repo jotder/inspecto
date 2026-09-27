@@ -1,6 +1,8 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.ConsignmentEvent;
+import com.gamma.etl.ConsignmentManifest;
+import com.gamma.etl.MemberStatus;
 import com.gamma.etl.CsvIngester;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.SchemaSelector;
@@ -65,9 +67,9 @@ public final class RecordReplay {
 
     /**
      * An EMPTY claim (never completed into a record) older than this is treated as abandoned by a crash and may be
-     * reclaimed. A completed record is never stale. ⚠ A crash in the narrow window AFTER the replay Consignment
-     * committed but BEFORE its record was written also leaves an empty claim — reclaiming that one would land
-     * the records twice; the window is the few statements between the commit and the record move.
+     * reclaimed. A completed record is never stale. A crash AFTER the replay Consignment committed but BEFORE its
+     * record was written also leaves an empty claim; the reclaim finds that Consignment's manifest (it names the
+     * hash-derived replay input) and completes the record instead of replaying.
      */
     static final Duration ABANDONED_CLAIM_AFTER = Duration.ofMinutes(30);
 
@@ -123,6 +125,27 @@ public final class RecordReplay {
             if (claimedAt.isAfter(Instant.now().minus(ABANDONED_CLAIM_AFTER)))
                 throw new IllegalStateException("a replay of '" + file + "' from this sidecar is in progress (claimed "
                         + claimedAt + "; treated as abandoned after " + ABANDONED_CLAIM_AFTER.toMinutes() + " min)");
+            // The crash may have come AFTER the replay Consignment committed but BEFORE its record was written.
+            // The replay's identity is fixed before the commit (its input name is derived from the sidecar hash),
+            // so a manifest naming that input is the proof it landed: complete the record, do not replay.
+            ConsignmentManifest committed = committedManifest(manifests, replayName);
+            if (committed != null) {
+                Files.deleteIfExists(input);
+                Files.deleteIfExists(poll.resolve(replayName + ".writing"));
+                String status = committed.members.stream()
+                        .filter(m -> replayName.equals(m.filename()))
+                        .anyMatch(m -> MemberStatus.SUCCESS.name().equals(m.status())) ? "SUCCESS" : "QUARANTINED";
+                Map<String, Object> rec = baseRecord(file, sidecar, hash, replayName, lineNumbers);
+                rec.put("batchId", committed.batchId);
+                rec.put("status", status);
+                rec.put("completedFromManifest", true);   // row counts are not in the manifest
+                writeRecord(claim, rec);
+                log.warn("[REPLAY] {} — abandoned claim's replay had already committed as {}; record completed, "
+                        + "nothing replayed", file, committed.batchId);
+                return new Result(file, replayName, committed.batchId, status, lines.size(), 0, 0,
+                        "completed from the committed Consignment's manifest after a crash; row counts unknown",
+                        claim.toString());
+            }
             log.warn("[REPLAY] {} — reclaiming an abandoned replay claim from {} ({})", file, claimedAt, claim);
             Files.deleteIfExists(input);                          // the crashed replay's leftover input, if any
             Files.deleteIfExists(poll.resolve(replayName + ".writing"));
@@ -134,13 +157,7 @@ public final class RecordReplay {
             }
         }
 
-        Map<String, Object> record = new LinkedHashMap<>();
-        record.put("originalFile", file);
-        record.put("sidecar", sidecar.toString());
-        record.put("sidecarSha256", hash);
-        record.put("replayFile", replayName);
-        record.put("replayedAt", Instant.now().toString());
-        record.put("lines", lineNumbers);
+        Map<String, Object> record = baseRecord(file, sidecar, hash, replayName, lineNumbers);
 
         ConsignmentEvent[] seen = new ConsignmentEvent[1];
         Throwable thrown = null;
@@ -177,14 +194,55 @@ public final class RecordReplay {
         record.put("status", ev.status());
         record.put("outputRows", ev.outputRows());
         record.put("errorRows", ev.errorRows());
-        Path tmp = claim.resolveSibling(claim.getFileName() + ".tmp");
-        Files.writeString(tmp, new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(record),
-                StandardCharsets.UTF_8);
-        Files.move(tmp, claim, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        writeRecord(claim, record);
         log.info("[REPLAY] {} — {} record(s) replayed as {} ({}): {} landed, {} still rejected",
                 file, lines.size(), ev.batchId(), ev.status(), ev.outputRows(), ev.errorRows());
         return new Result(file, replayName, ev.batchId(), ev.status(), lines.size(), ev.outputRows(),
                 ev.errorRows(), ev.error(), claim.toString());
+    }
+
+    private static Map<String, Object> baseRecord(String file, Path sidecar, String hash, String replayName,
+                                                  List<Long> lineNumbers) {
+        Map<String, Object> record = new LinkedHashMap<>();
+        record.put("originalFile", file);
+        record.put("sidecar", sidecar.toString());
+        record.put("sidecarSha256", hash);
+        record.put("replayFile", replayName);
+        record.put("replayedAt", Instant.now().toString());
+        record.put("lines", lineNumbers);
+        return record;
+    }
+
+    private static void writeRecord(Path claim, Map<String, Object> record) throws IOException {
+        Path tmp = claim.resolveSibling(claim.getFileName() + ".tmp");
+        Files.writeString(tmp, new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create().toJson(record),
+                StandardCharsets.UTF_8);
+        Files.move(tmp, claim, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+    }
+
+    /**
+     * The live (not superseded) manifest of a Consignment that committed {@code replayName}, or null. Parked
+     * members are not a commit. Scanned only on the rare reclaim of an abandoned claim.
+     */
+    static ConsignmentManifest committedManifest(String manifestsDir, String replayName) throws IOException {
+        Path dir = Paths.get(manifestsDir);
+        if (!Files.isDirectory(dir)) return null;
+        try (Stream<Path> files = Files.list(dir)) {
+            for (Path p : files.filter(f -> f.getFileName().toString().endsWith(".json")).toList()) {
+                ConsignmentManifest m;
+                try {
+                    m = new com.google.gson.Gson().fromJson(Files.readString(p, StandardCharsets.UTF_8),
+                            ConsignmentManifest.class);
+                } catch (RuntimeException | IOException unreadable) {
+                    continue;
+                }
+                if (m == null || m.members == null) continue;
+                boolean hit = m.members.stream().anyMatch(e -> replayName.equals(e.filename())
+                        && !MemberStatus.PARKED.name().equals(e.status()));
+                if (hit) return m;
+            }
+        }
+        return null;
     }
 
     /** {@code feed.csv.gz} → {@code feed__replay_<sha8>.csv}: a plain file (the sidecar holds decoded text). */

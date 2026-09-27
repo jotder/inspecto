@@ -166,9 +166,18 @@ sidecar row). What was missing was only the replay, now `POST /runs/{name}/repla
   never stale, but an **empty** claim (a replay that never wrote its record) is refused as *in progress* while
   younger than `RecordReplay.ABANDONED_CLAIM_AFTER` (30 min) and, once older, treated as a crash's leftover —
   its leftover input (and `.writing` temp) is deleted from the poll root and the claim re-taken atomically
-  (pinned by three `RecordReplayTest` cases). ⚠ Residual: a crash in the few statements AFTER the replay
-  Consignment committed but BEFORE its record was moved into place also leaves an empty claim, and
-  reclaiming that one would land the records twice. ⚠ A whole-Consignment `reprocess` of the original rewrites the
+  (pinned by three `RecordReplayTest` cases). **The post-commit crash window (closed 2026-09-27):** a
+  crash AFTER the replay Consignment committed but BEFORE its record was moved into place also leaves an
+  empty claim. The replay's identity is fixed before the commit — its input name `<stem>__replay_<sha8>`
+  is derived from the sidecar hash — so the reclaim first scans `dirs.status_dir`'s manifests
+  (`RecordReplay.committedManifest`) for a live, non-`PARKED` member of that name; found ⇒ it deletes any
+  leftover input, **completes the record** from that manifest (`batchId`, `status`,
+  `completedFromManifest: true` — row counts are not in a manifest, so they read 0) and replays nothing.
+  Pinned by `aCrashAfterTheCommitButBeforeTheRecordIsCompletedNotReplayed`. ⚠ Mutating the check away
+  turns it red as `FAILED`, not as a double landing: under `duplicate_check` the second ingest of the
+  same replay name is refused by its marker — so without the check the claim was never completable, and
+  without `duplicate_check` it would have landed twice. A crash BEFORE the manifest write (inside the
+  commit tail itself) is not covered here. ⚠ A whole-Consignment `reprocess` of the original rewrites the
   same sidecar with the same content, so its replay stays refused — correctly, since the earlier replay's
   rows were not superseded.
 - **Refused (422):** a non-delimited frontend or plugin decoder, a sidecar row with no `raw_line`, and a
@@ -184,8 +193,16 @@ single `AuditTrail` seam every mutating route goes through (actor, capability `c
 its own action `pipeline.rejects_replayed` since 2026-09-25 — before that it fell to the POST default and
 read as `pipeline.created`; `reprocess` was already `pipeline.reprocessed` the same way. **SPA:** the
 rejected-rows dialog on Run Detail carries the action since 2026-09-25 — see
-[run-detail](../../frontend/features/run-detail.md). Still open: the dry run's per-record rejects on the HTTP
-trigger response.
+[run-detail](../../frontend/features/run-detail.md). **Dry-run rejects on HTTP (2026-09-27):** the dry branch
+of `ConsignmentIngestor.process` also files each member with `rejectTotal > 0` into `DryRunRejects`
+(keyed by pipeline name, like `IngestProgress`; the run claim means one run per slot), and
+`CollectorService.runPipeline` takes the slot while it still holds the claim. The v1 async poll
+`GET /runs/runs/{runId}` then carries `rejects: [{consignment, file, rejectTotal, rejects: [{line, reason}]}]`
+on a finished dry run — `[]` when nothing was rejected, absent on a real or failed run. Schema:
+`PipelineRun` / `DryRunMemberRejects` in `openapi-v1.json`; pinned by
+`ControlApiAsyncV1Test.pipelineDryRunPollCarriesTheRejectedRecords`. The legacy synchronous `RunResult`
+body does not carry them, and the SPA has no pipeline-trigger dry-run panel to show them in (its dry-run
+panel is the authored-pipeline `…/dry-run`, a different route) — so no UI change.
 
 ## Identity and status, per lane
 

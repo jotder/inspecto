@@ -214,6 +214,7 @@ final class RunRoutes implements RouteModule {
         m.put("total", r.total());
         m.put("failed", r.failed());
         m.put("message", r.message());
+        if (r.rejects() != null) m.put("rejects", r.rejects());   // a finished dry run only (X4)
         return m;
     }
 

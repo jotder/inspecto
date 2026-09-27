@@ -1543,9 +1543,9 @@
     "/runs/runs/{runId}" : {
       "get" : {
         "tags" : [ "runs" ],
-        "summary" : "GET /runs/runs/{runId} (generated skeleton)",
+        "summary" : "Poll one manual pipeline run",
         "operationId" : "getRunsRunsByRunId",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "The status of one run fired by POST /runs/{name}/trigger (its Location). A finished dry run (?dryRun=true) also carries its per-record rejects (EXECUTION-RESIDUALS X4). 404 once evicted or unknown.",
         "parameters" : [ {
           "name" : "runId",
           "in" : "path",
@@ -1555,11 +1555,28 @@
           }
         } ],
         "responses" : {
+          "200" : {
+            "description" : "The run, live (RUNNING) or terminal.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/PipelineRun"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
           "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+            "description" : "Envelope-wrapped error (see #/components/schemas/Envelope)."
           }
-        },
-        "x-generated" : true
+        }
       }
     },
     "/runs/{runId}/pause" : {
@@ -10310,6 +10327,84 @@
           },
           "message" : {
             "type" : [ "string", "null" ]
+          }
+        }
+      },
+      "PipelineRun" : {
+        "type" : "object",
+        "description" : "One manual pipeline run (W5b): live (RUNNING) or terminal.",
+        "required" : [ "runId", "pipeline", "status" ],
+        "properties" : {
+          "runId" : {
+            "type" : "string"
+          },
+          "pipeline" : {
+            "type" : "string"
+          },
+          "trigger" : {
+            "type" : "string"
+          },
+          "startedAt" : {
+            "type" : [ "string", "null" ]
+          },
+          "finishedAt" : {
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "type" : "string",
+            "description" : "RUNNING, then terminal SUCCESS / FAILED."
+          },
+          "total" : {
+            "type" : "integer",
+            "description" : "Files processed; -1 while RUNNING."
+          },
+          "failed" : {
+            "type" : "integer",
+            "description" : "Files that failed; -1 while RUNNING."
+          },
+          "message" : {
+            "type" : [ "string", "null" ]
+          },
+          "rejects" : {
+            "type" : [ "array", "null" ],
+            "description" : "Set only on a finished DRY run (EXECUTION-RESIDUALS X4): one entry per member that rejected records; empty when none did; null for a real or failed run.",
+            "items" : {
+              "$ref" : "#/components/schemas/DryRunMemberRejects"
+            }
+          }
+        }
+      },
+      "DryRunMemberRejects" : {
+        "type" : "object",
+        "description" : "One dry-run member's rejected records, read from its reject sidecar before the scratch root was deleted. The raw line is deliberately not carried.",
+        "required" : [ "file", "rejectTotal", "rejects" ],
+        "properties" : {
+          "consignment" : {
+            "type" : "string"
+          },
+          "file" : {
+            "type" : "string"
+          },
+          "rejectTotal" : {
+            "type" : "integer",
+            "description" : "Every record the sidecar holds (uncapped)."
+          },
+          "rejects" : {
+            "type" : "array",
+            "description" : "The first 100 records, in file order.",
+            "maxItems" : 100,
+            "items" : {
+              "type" : "object",
+              "required" : [ "line", "reason" ],
+              "properties" : {
+                "line" : {
+                  "type" : "integer"
+                },
+                "reason" : {
+                  "type" : "string"
+                }
+              }
+            }
           }
         }
       },

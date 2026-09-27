@@ -206,6 +206,33 @@ class RecordReplayTest {
         assertTrue(Files.readString(claim).contains("\"batchId\""), "the reclaimed record is completed");
     }
 
+    /**
+     * The crash window: the replay Consignment COMMITTED, then the process died before its record was written, so
+     * the claim is still empty. Reclaiming it must find that commit and complete the record — not land twice.
+     */
+    @Test
+    void aCrashAfterTheCommitButBeforeTheRecordIsCompletedNotReplayed(@TempDir Path dir) throws Exception {
+        ingestOnce(dir, "java");
+        Files.writeString(dir.resolve("mini_schema.toon"), SCHEMA_V2);
+        PipelineConfig cfg = PipelineConfig.load(dir.resolve("mini_pipeline.toon").toString());
+        RecordReplay.Result first = RecordReplay.replay(cfg, "feed.csv", null);
+        assertEquals("SUCCESS", first.status(), first.toString());
+        assertEquals(4, landedRows(cfg).size());
+        Path claim = claimFor(cfg);
+        Files.writeString(claim, "");                                          // the record write never happened
+        Files.setLastModifiedTime(claim, java.nio.file.attribute.FileTime.from(
+                java.time.Instant.now().minus(RecordReplay.ABANDONED_CLAIM_AFTER).minusSeconds(60)));
+
+        RecordReplay.Result again = RecordReplay.replay(cfg, "feed.csv", null);
+
+        assertEquals(first.batchId(), again.batchId(), again.toString());
+        assertEquals("SUCCESS", again.status());
+        assertEquals(4, landedRows(cfg).size(), "no double landing: " + landedRows(cfg));
+        assertTrue(Files.readString(claim).contains(first.batchId()), "the record is completed");
+        assertThrows(IllegalStateException.class, () -> RecordReplay.replay(cfg, "feed.csv", null),
+                "a completed record refuses any further replay");
+    }
+
     /** A FRESH empty claim may be a replay still in flight (another node, a slow run) — it stays refused. */
     @Test
     void aFreshEmptyClaimIsStillRefused(@TempDir Path dir) throws Exception {

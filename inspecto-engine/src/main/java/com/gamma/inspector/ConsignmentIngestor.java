@@ -105,11 +105,14 @@ public final class ConsignmentIngestor {
                         m.parsedRows(), m.errorRows(),
                         m.reason() == null || m.reason().isBlank() ? "" : " — " + m.reason());
                 // X4: per-RECORD offsets + reasons, read from the reject sidecar before the scratch went.
-                if (m.rejectTotal() > 0)
+                if (m.rejectTotal() > 0) {
+                    DryRunRejects.add(cfg.identity().pipelineName(), new DryRunRejects.MemberRejects(
+                            batch.batchId(), m.filename(), m.rejectTotal(), m.rejects()));
                     log.info("dry run: consignment {} member {} rejected record(s), first {} of {}: {}",
                             batch.batchId(), m.filename(), m.rejects().size(), m.rejectTotal(),
                             m.rejects().stream().map(r -> "line " + r.line() + " (" + r.reason() + ")")
                                     .collect(java.util.stream.Collectors.joining("; ")));
+                }
             }
         } else {
             try {

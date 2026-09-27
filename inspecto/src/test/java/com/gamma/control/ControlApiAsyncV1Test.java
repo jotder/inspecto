@@ -416,6 +416,52 @@ class ControlApiAsyncV1Test {
 
 
     /**
+     * EXECUTION-RESIDUALS X4 — a pipeline dry run's per-record rejects (line + reason, first 100 + total) are on
+     * its poll response; a real run carries none ({@code rejects} is null), and the dry run landed nothing.
+     */
+    @Test
+    void pipelineDryRunPollCarriesTheRejectedRecords(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, List.of())) {
+            String pipe = c.svc.pipelines().get(0).name();
+            Path inbox = Files.createDirectories(cfg.resolve("inbox"));
+            Path feed = Files.writeString(inbox.resolve("feed.csv"),
+                    "a1,1.0,2020-04-03\nshort-one\na2,2.0,2020-04-03\nshort-two\n");
+
+            JsonNode dry = pollPipelineRun(c, V1Body.of(
+                    post(c.port, "/runs/" + pipe + "/trigger?dryRun=true", null).body()).get("runId").asText());
+            assertEquals("SUCCESS", dry.get("status").asText(), dry.toString());
+            JsonNode rejects = dry.get("rejects");
+            assertEquals(1, rejects.size(), dry.toString());
+            JsonNode m = rejects.get(0);
+            assertEquals("feed.csv", m.get("file").asText(), m.toString());
+            assertEquals(2, m.get("rejectTotal").asLong(), m.toString());
+            assertEquals(2, m.get("rejects").size(), m.toString());
+            assertTrue(m.get("rejects").get(0).get("line").asLong() > 0, m.toString());
+            assertFalse(m.get("rejects").get(0).get("reason").asText().isBlank(), m.toString());
+            assertTrue(Files.exists(feed), "a dry run moves nothing");
+
+            JsonNode real = pollPipelineRun(c, V1Body.of(
+                    post(c.port, "/runs/" + pipe + "/trigger", null).body()).get("runId").asText());
+            assertEquals("SUCCESS", real.get("status").asText(), real.toString());
+            assertTrue(real.path("rejects").isNull() || real.path("rejects").isMissingNode(), real.toString());
+        }
+    }
+
+    private JsonNode pollPipelineRun(Ctx c, String runId) throws Exception {
+        long deadline = System.nanoTime() + 20_000_000_000L;
+        JsonNode run = null;
+        while (System.nanoTime() < deadline) {
+            HttpResponse<String> polled = get(c.port, "/runs/runs/" + runId);
+            assertEquals(200, polled.statusCode(), polled.body());
+            run = V1Body.of(polled.body());
+            if (!"RUNNING".equals(run.get("status").asText())) return run;
+            Thread.sleep(50);
+        }
+        fail("run " + runId + " never finished: " + run);
+        return run;
+    }
+
+    /**
      * PIPELINE-DRYRUN-1 — the trigger's opt-out is spelled {@code ?skipPostAction=true} (renamed from
      * {@code ?dryRun=true} on 2026-09-20, because it does NOT suppress the ingest write), and the v1 body
      * echoes the flag under that same name.

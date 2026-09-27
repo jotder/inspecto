@@ -1768,6 +1768,16 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      */
     public Optional<MultiCollectorProcessor.RunResult> runPipeline(String pipelineName, boolean skipPostAction,
                                                                    boolean dryRun) {
+        return runPipeline(pipelineName, skipPostAction, dryRun, null);
+    }
+
+    /**
+     * {@link #runPipeline(String, boolean, boolean)}, handing a dry run's per-record rejects
+     * ({@link com.gamma.inspector.DryRunRejects}) to {@code dryRunRejects} while the run claim is still held.
+     */
+    private Optional<MultiCollectorProcessor.RunResult> runPipeline(
+            String pipelineName, boolean skipPostAction, boolean dryRun,
+            java.util.function.Consumer<List<com.gamma.inspector.DryRunRejects.MemberRejects>> dryRunRejects) {
         refuseIfTemplate(pipelineName);
         return underSpace(() -> {
             Optional<MultiCollectorProcessor.RunResult> result = pathFor(pipelineName).map(p -> {
@@ -1780,7 +1790,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                         // would silently delay the next real scheduled run.
                         if (!dryRun)
                             pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());
-                        return MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), skipPostAction, dryRun);
+                        if (dryRun) com.gamma.inspector.DryRunRejects.take(pipelineName);   // no stale slot
+                        MultiCollectorProcessor.RunResult r =
+                                MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), skipPostAction, dryRun);
+                        if (dryRun) {
+                            List<com.gamma.inspector.DryRunRejects.MemberRejects> rejects =
+                                    com.gamma.inspector.DryRunRejects.take(pipelineName);
+                            if (dryRunRejects != null) dryRunRejects.accept(rejects);
+                        }
+                        return r;
                     } finally {
                         running.remove(pipelineName);
                     }
@@ -1936,19 +1954,23 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         refuseIfTemplate(pipelineName);   // refuse on the request thread, not as an async run failure
         String runId = newPipelineRunId(pipelineName);
         String start = LocalDateTime.now().format(RUN_AT_TS);
-        liveRuns.put(runId, new PipelineRun(runId, pipelineName, trigger, start, null, "RUNNING", -1, -1, null));
+        liveRuns.put(runId, new PipelineRun(runId, pipelineName, trigger, start, null, "RUNNING", -1, -1, null,
+                null));
         triggerWorkers.submit(() -> {
             try {
+                List<List<com.gamma.inspector.DryRunRejects.MemberRejects>> rejects = new ArrayList<>(1);
                 MultiCollectorProcessor.RunResult res =
-                        runPipeline(pipelineName, skipPostAction, dryRun)
+                        runPipeline(pipelineName, skipPostAction, dryRun, rejects::add)
                                 .orElse(new MultiCollectorProcessor.RunResult(0, 0));
                 liveRuns.put(runId, new PipelineRun(runId, pipelineName, trigger, start,
                         LocalDateTime.now().format(RUN_AT_TS), "SUCCESS", res.total(), res.failed(),
-                        res.failed() + " of " + res.total() + " file(s) failed"));
+                        res.failed() + " of " + res.total() + " file(s) failed",
+                        dryRun ? (rejects.isEmpty() ? List.of() : rejects.get(0)) : null));
             } catch (RuntimeException e) {
                 log.error("{} pipeline run '{}' ({}) failed", trigger, pipelineName, runId, e);
                 liveRuns.put(runId, new PipelineRun(runId, pipelineName, trigger, start,
-                        LocalDateTime.now().format(RUN_AT_TS), "FAILED", 0, 0, String.valueOf(e.getMessage())));
+                        LocalDateTime.now().format(RUN_AT_TS), "FAILED", 0, 0, String.valueOf(e.getMessage()),
+                        null));
             }
         });
         return Optional.of(runId);
