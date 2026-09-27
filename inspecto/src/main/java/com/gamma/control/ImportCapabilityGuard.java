@@ -21,8 +21,8 @@ import java.util.Map;
  *   <li>{@code alert-rule} ({@code registry/alert-rules/}) — {@code canAuthorAlertRules}, as {@code /alerts/rules};</li>
  *   <li>{@code findings-spec} ({@code registry/findings-specs/}) — {@code canManageIncidents}, as
  *       {@code /components/findings-spec};</li>
- *   <li>an {@code event_prune} Job ({@code *_job.toon}) — {@code canAdminister}, as {@code /jobs}
- *       ({@link JobRoutes#requireAdministerForEventPrune}).</li>
+ *   <li>an {@code event_prune} or {@code restore} Job ({@code *_job.toon}) — {@code canAdminister}, as {@code /jobs}
+ *       ({@link JobRoutes#isAdministerOnlyMaintenance}).</li>
  * </ul>
  * Every door calls {@link #checkItems} or {@link #checkFiles} BEFORE its first write: the first missing capability
  * refuses the whole import (403, naming the kind and the capability). A no-op without a Subject (Personal), like
@@ -39,16 +39,13 @@ final class ImportCapabilityGuard {
             "alert-rule", Roles.CAN_AUTHOR_ALERT_RULES,
             "findings-spec", Roles.CAN_MANAGE_INCIDENTS);
 
-    static final String EVENT_PRUNE_JOB = "job (event_prune)";
-
     /** A {@code /bundle/import} envelope's items ({@code {kind, id, content}}), plus each pipeline item's closure files. */
     static void checkItems(HttpExchange ex, List<Map<String, Object>> items) {
         for (Map<String, Object> item : items) {
             String kind = ApiContext.str(item, "kind");
             if (kind == null) continue;
             if (KIND_CAPABILITY.containsKey(kind)) require(ex, kind, KIND_CAPABILITY.get(kind));
-            if ("job".equals(kind) && item.get("content") instanceof Map<?, ?> c && isEventPrune(c))
-                require(ex, EVENT_PRUNE_JOB, Roles.CAN_ADMINISTER);
+            if ("job".equals(kind) && item.get("content") instanceof Map<?, ?> c) requireIfAdministerOnly(ex, c);
         }
     }
 
@@ -58,8 +55,7 @@ final class ImportCapabilityGuard {
             String rel = e.getKey().replace('\\', '/').toLowerCase(Locale.ROOT);
             String file = rel.substring(rel.lastIndexOf('/') + 1);
             if (file.endsWith("_connection.toon")) require(ex, "connection", Roles.CAN_ONBOARD_CONNECTIONS);
-            else if (file.endsWith("_job.toon") && isEventPrune(jobSection(e.getValue())))
-                require(ex, EVENT_PRUNE_JOB, Roles.CAN_ADMINISTER);
+            else if (file.endsWith("_job.toon")) requireIfAdministerOnly(ex, jobSection(e.getValue()));
             else if (rel.contains("registry/")) {
                 String[] parts = rel.substring(rel.indexOf("registry/") + "registry/".length()).split("/");
                 if (parts.length < 2) continue;
@@ -79,16 +75,20 @@ final class ImportCapabilityGuard {
         }
     }
 
-    /** Parsed exactly as the Job loader parses it, so the verdict is {@link JobRoutes#requireAdministerForEventPrune}'s. */
+    /** Parsed exactly as the Job loader parses it, so the verdict is {@link JobRoutes#isAdministerOnlyMaintenance}'s;
+     *  refused as {@code job (<task>)}, the task lower-cased as {@code MaintenanceJob} dispatches it. */
     @SuppressWarnings("unchecked")
-    private static boolean isEventPrune(Map<?, ?> job) {
+    private static void requireIfAdministerOnly(HttpExchange ex, Map<?, ?> job) {
         Map<String, Object> j = new LinkedHashMap<>((Map<String, Object>) job);
         j.putIfAbsent("name", "import");
         try {
             JobConfig c = JobConfig.fromMap(Map.of("job", j));
-            return JobRoutes.isEventPrune(c);
+            if (!JobRoutes.isAdministerOnlyMaintenance(c)) return;
+            require(ex, "job (" + c.opt("task", "").toLowerCase(Locale.ROOT) + ")", Roles.CAN_ADMINISTER);
+        } catch (ApiException denied) {
+            throw denied;
         } catch (RuntimeException unparseable) {
-            return false;   // the spec gate refuses a malformed job
+            // the spec gate refuses a malformed job
         }
     }
 

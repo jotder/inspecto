@@ -265,6 +265,21 @@ class ControlApiImportCapabilityGateTest {
     }
 
     @Test
+    void aRawImportRestoreJobInAnyCasingNeedsCanAdminister(@TempDir Path root) throws Exception {
+        // MAINT-RESTORE-ESCALATION-1: the import guard asks JobRoutes.isAdministerOnlyMaintenance, which judges the
+        // JobConfig task string — inspecto-backup (where the restore task lives) is not on this module's classpath
+        try (Ctx c = open(root)) {
+            for (String task : List.of("restore", "RESTORE", "Restore")) {
+                byte[] restore = dataSourceZip("jobs/back_job.toon", "job:\n  name: back\n  type: maintenance\n"
+                        + "  task: " + task + "\n  archive: x.zip\n  target: config\n  overwrite: true\n");
+                Map<String, String> before = tree(c.config);
+                refused(send(c, "POST", "/import", restore, BUILDER), "job (restore)", "canAdminister");
+                assertEquals(before, tree(c.config), "nothing written for task " + task);
+            }
+        }
+    }
+
+    @Test
     void aMixedRawImportWhoseForbiddenEntryComesLastWritesNothing(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             Map<String, byte[]> all = new LinkedHashMap<>();
