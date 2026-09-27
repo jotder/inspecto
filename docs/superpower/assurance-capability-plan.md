@@ -8,7 +8,7 @@ timestamp: 2026-09-26T00:00:00Z
 
 # Assurance capability plan — build the product before the project
 
-> **Status: ACTIVE 2026-09-26 — decisions answered (§5), waves 1–2 on the board, wave 1 in flight.**
+> **Status: ACTIVE — waves 1–3 SHIPPED 2026-09-27 (`origin/master` `d5bf89ad1`) except 2.2 ⏸ (Link Analysis leads the Entity List); waves 4–5 not started. Decisions D-P1 … D-P14 answered (§5).**
 > **Why this exists.** An assurance bid was planned workstream by workstream (`WS-01 … WS-46`) in a
 > local, git-excluded working set (`superpower/rfp-mvno-assurance/build-plan.md`, listed in
 > [`../INDEX.md`](../INDEX.md)). That project is **not confirmed**. The operator's call (2026-09-26):
@@ -70,7 +70,7 @@ The two gaps every detector and every Incident hits. Nothing in waves 2–5 is c
 |---|---|---|---|---|
 | 1.1 | ✅ **SHIPPED 2026-09-26** — **WS-18 Per-entity Alerts** — optional `by` key columns on a Dataset-measure Alert Rule; one Alert and one Incident per breached key; dedupe per (Alert Rule, key); auto-resolve when the key heals; storm cap; save-time Schema check | 2–4 | Without it a detector says "breached", never *who*. Blocks every content pack and the risk score. | 40 planted offenders → 40 Incidents; re-fire → 0; healed key resolves; a Case Rule groups them into one Case |
 | 1.2 | ✅ **SHIPPED 2026-09-26** — **WS-11 finish** — `assigned` state, `lastSeenAt`, `occurrences`, ageing and recurrence computed server-side | 0.5–1 | Small; closes a shipped feature properly | a recurring Break counts up across runs; ageing shows on the Recon Board |
-| 1.3 | **WS-10 Impact ledger + Disposition** — typed impact on Incident and Case (`outstanding` derived, never stored); Disposition required on resolve, extending the GLOSSARY §9 ladder; an impact ledger Dataset any Measure can read; audited, server-validated | 4–6 | Every RA / FM / BA KPI is "money found / recovered / prevented" | loss KPIs compute from resolved Incidents on synthetic data |
+| 1.3 | ✅ **SHIPPED 2026-09-26** — **WS-10 Impact ledger + Disposition** — typed impact on Incident and Case (`outstanding` derived, never stored); Disposition required on resolve, extending the GLOSSARY §9 ladder; an impact ledger Dataset any Measure can read; audited, server-validated | 4–6 | Every RA / FM / BA KPI is "money found / recovered / prevented" | loss KPIs compute from resolved Incidents on synthetic data |
 
 ### Wave 2 — governance and action · ≈ 11–17 eng-wk
 
