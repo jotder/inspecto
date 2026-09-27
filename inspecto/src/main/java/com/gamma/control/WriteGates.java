@@ -119,6 +119,13 @@ public final class WriteGates {
         // `registry\kpis` is ONE segment to Path — yet it is normalised into `registry/kpis` further on.
         String[] parts = java.util.Arrays.stream(rel.toString().split("[/\\\\]+"))
                 .filter(s -> !s.isEmpty()).toArray(String[]::new);
+        // A query parameter is decoded exactly once, so `registry%252Fkpis` arrives as the literal name
+        // `registry%2Fkpis`. No config path names a `%`: refuse every such segment rather than judge what
+        // a later decode might make of it (fail closed; no existence oracle).
+        for (String part : parts)
+            if (part.indexOf('%') >= 0)
+                throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION,
+                        "a config path may not contain '%' (a percent-encoded spelling): " + rel);
         if (parts.length == 0 || !"registry".equalsIgnoreCase(windowsName(parts[0]))) return;
         String dir = parts.length > 2 ? windowsName(parts[1]) : null;
         String kind = null;
