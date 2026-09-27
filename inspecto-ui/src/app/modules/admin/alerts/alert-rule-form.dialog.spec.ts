@@ -101,7 +101,7 @@ describe('AlertRuleFormDialog', () => {
 
     it('blocks save on a duplicate id (case-insensitive) at the save step, then creates once unique', () => {
         const { c, save } = create({ existingNames: ['high_error_rate'] });
-        c.schemaForm.form.patchValue({ metric: 'error_rate' });
+        c.schemaForm.form.patchValue({ metric: 'error_rate', threshold: 0.05 });
         c.save();
         expect(c.step()).toBe('save');
 
@@ -117,7 +117,7 @@ describe('AlertRuleFormDialog', () => {
 
     it('omits an empty pipeline scope and keeps a set one', () => {
         const { c, save } = create({});
-        c.schemaForm.form.patchValue({ metric: 'error_rate', onPipeline: '' });
+        c.schemaForm.form.patchValue({ metric: 'error_rate', threshold: 0.05, onPipeline: '' });
         c.save();
         c.saveForm.patchValue({ name: 'r1' });
         c.save();
@@ -135,7 +135,7 @@ describe('AlertRuleFormDialog', () => {
             {},
             vi.fn(() => throwError(() => ({ status: 503 }))),
         );
-        c.schemaForm.form.patchValue({ metric: 'error_rate' });
+        c.schemaForm.form.patchValue({ metric: 'error_rate', threshold: 0.05 });
         c.save();
         c.saveForm.patchValue({ name: 'r1' });
         c.save();
@@ -396,5 +396,97 @@ describe('AlertRuleFormDialog', () => {
         const err = field.querySelector('mat-error');
         expect(err?.textContent).toContain('A rule id is required.');
         expect(err?.closest('.mat-mdc-form-field-subscript-wrapper')).not.toBeNull();
+    });
+    /** The "One Alert per" draft input (the schema-form list field labelled so). */
+    function byInput(el: HTMLElement): HTMLInputElement {
+        return fieldByLabel(el, 'One Alert per')!.querySelector('input') as HTMLInputElement;
+    }
+
+    it('Save changes with the by suggestion panel still open keeps the typed entry (edit)', async () => {
+        const { c, save, fixture } = create({ rule: { ...MEASURE_RULE, by: ['region'], stormCap: 50 } as AlertRule });
+        c.schemaForm.optionLoaders = {
+            ...c.optionLoaders,
+            by: async () => [{ value: 'msisdn', label: 'msisdn (varchar)' }],
+        };
+        c.schemaForm.showOptional.set(true);
+        fixture.detectChanges();
+        const input = byInput(fixture.nativeElement);
+        input.focus(); // loads the suggestions
+        await fixture.whenStable();
+        fixture.detectChanges();
+        input.value = 'msisdn';
+        input.dispatchEvent(new Event('input')); // typing opens the panel
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(document.querySelector('mat-option')?.textContent).toContain('msisdn'); // the panel IS open
+        // The Save mousedown blurs the draft while the panel is open (blur-commit deferred to `closed`) …
+        input.dispatchEvent(new Event('blur'));
+        expect(c.schemaForm.listValue('by')).toEqual(['region']); // blur-commit really was deferred
+        // … and the click runs save() before any outside-click closes the panel.
+        c.save();
+        const [, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
+        expect(body['by']).toEqual(['region', 'msisdn']);
+    });
+
+    it('create: a typed but uncommitted by entry is saved', () => {
+        const { c, save } = create({});
+        c.schemaForm.form.get('kind')!.setValue('measure');
+        c.schemaForm.form.patchValue({ dataset: 'usage_ds', measure: 'count', threshold: 1 });
+        c.schemaForm.setListDraft('by', 'msisdn');
+        c.save();
+        c.save();
+        const [body] = save.mock.lastCall as unknown as [Record<string, unknown>];
+        expect(body['by']).toEqual(['msisdn']);
+    });
+
+    it('a picked by suggestion commits exactly once, even when the panel then closes and Save runs', () => {
+        const { c, save, fixture } = create({ rule: MEASURE_RULE });
+        c.schemaForm.showOptional.set(true);
+        fixture.detectChanges();
+        const input = byInput(fixture.nativeElement);
+        const spec = c.attributes.find((s) => s.key === 'by')!;
+        c.schemaForm.setListDraft('by', 'ms');
+        c.schemaForm.addListOption(spec, 'msisdn', input);
+        c.schemaForm.commitListDraftIfLeft(spec, input);
+        c.save();
+        const [, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
+        expect(body['by']).toEqual(['msisdn']);
+    });
+
+    it('threshold has no default and must be greater than 0 (the engine refuses 0)', () => {
+        const { c, save, fixture } = create({});
+        expect(c.schemaForm.form.get('threshold')?.value ?? null).toBeNull();
+        c.schemaForm.form.patchValue({ metric: 'error_rate', threshold: 0 });
+        c.save();
+        fixture.detectChanges();
+        expect(c.step()).toBe('config');
+        expect(save).not.toHaveBeenCalled();
+        expect(fieldByLabel(fixture.nativeElement, 'Threshold')!.querySelector('mat-error')?.textContent).toContain(
+            'Threshold must be greater than 0',
+        );
+    });
+
+    it('offers only the comparators the engine accepts (no eq)', () => {
+        const { c } = create({});
+        const comparator = c.attributes.find((s) => s.key === 'comparator')!;
+        expect(comparator.options!.map((o) => o.value)).toEqual(['gt', 'gte', 'lt', 'lte']);
+    });
+
+    it('a freshness rule hides comparator/threshold and re-saves them as stored', () => {
+        const fresh = {
+            name: 'sales_fresh',
+            dataset: 'sales_ds',
+            maximumAge: '6h',
+            comparator: 'gt',
+            threshold: 0,
+            severity: 'WARNING',
+        } as AlertRule;
+        const { c, save } = create({ rule: fresh });
+        expect(c.schemaForm.form.get('threshold')).toBeNull();
+        c.schemaForm.form.patchValue({ severity: 'CRITICAL' });
+        c.save();
+        const [, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
+        expect(body).toEqual({ ...fresh, severity: 'CRITICAL' });
     });
 });

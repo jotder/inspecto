@@ -1024,6 +1024,24 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
         if (input.ownerDocument.activeElement !== input) this.addListItem(spec);
     }
 
+    /**
+     * Commit every visible `list` field's typed-but-uncommitted draft. {@link validate} runs this first, so a
+     * host that validates before it saves cannot lose an entry the author typed: the blur-commit is skipped
+     * while a suggestion panel is open, and a Save click runs BEFORE Material's outside-click closes that
+     * panel (whose `closed` would have committed it) — so the draft was still only a draft at save time.
+     *
+     * <p>⚠ Deliberately NOT run by {@link value}: hosts read `value()` from template bindings on every change
+     * detection (e.g. `expectation-form.dialog`'s `[current]="aiCurrent()"`), so committing there would turn
+     * each keystroke of a draft into its own chip. A host that saves WITHOUT `validate()` calls this itself.
+     */
+    commitListDrafts(): void {
+        for (const s of this.allSpecs) {
+            if (s.type === 'list' && this.form.get(s.key)?.enabled && this.listDraft(s.key).trim()) {
+                this.addListItem(s);
+            }
+        }
+    }
+
     removeListItem(spec: AttributeSpec, index: number): void {
         const next = this.listValue(spec.key).filter((_, i) => i !== index);
         this.writeList(spec.key, next);
@@ -1135,6 +1153,7 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
      * own "disabled = not part of validity" semantics rather than fighting it.
      */
     validate(): boolean {
+        this.commitListDrafts();
         if (this.form.invalid) {
             this.form.markAllAsTouched();
             if (this.hasInvalidIn('optional')) this.showOptional.set(true);

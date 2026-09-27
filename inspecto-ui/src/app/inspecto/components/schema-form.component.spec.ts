@@ -253,6 +253,17 @@ describe('InspectoSchemaFormComponent', () => {
      * entries commit as chips, committed ones drop out of the list, and the draft filters it. Without a
      * loader the draft input carries no combobox role — the plain list is unchanged.
      */
+    it('validate() commits a typed-but-uncommitted list draft; value() alone never does', () => {
+        const fixture = create(LIST_SPECS);
+        const c = fixture.componentInstance;
+        c.setListDraft('patterns', '^CALL');
+        expect(c.value()['patterns'] ?? null).toBeNull(); // value() is read from templates: must stay pure
+        expect(c.listDraft('patterns')).toBe('^CALL');
+        expect(c.validate()).toBe(true);
+        expect(c.value()['patterns']).toEqual(['^CALL']);
+        expect(c.listDraft('patterns')).toBe('');
+    });
+
     it('a list field without an optionLoader has no suggestion combobox', () => {
         const fixture = create(LIST_SPECS);
         const input = fixture.nativeElement.querySelector('input[placeholder="^CALL"]') as HTMLInputElement;

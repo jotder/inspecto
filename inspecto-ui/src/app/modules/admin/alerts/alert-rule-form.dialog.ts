@@ -82,6 +82,13 @@ const wholeNumberValidator: ValidatorFn = (c: AbstractControl) =>
         ? null
         : { message: 'Storm cap must be a whole number' };
 
+/** `threshold` must be > 0 (`AlertRule`: "alert.threshold must be a positive number") — `min` would allow 0. */
+const positiveValidator: ValidatorFn = (c: AbstractControl) =>
+    c.value === null || c.value === '' || Number(c.value) > 0 ? null : { message: 'Threshold must be greater than 0' };
+
+/** A freshness rule's breach is "age exceeded": the engine fixes comparator/threshold, so the form hides both. */
+const FRESHNESS_FIXED = ['comparator', 'threshold'];
+
 /** Dialog input: an existing rule ⇒ edit; absent ⇒ create. */
 export interface AlertRuleFormData {
     rule?: AlertRule;
@@ -267,6 +274,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
         measure: [measureValidator],
         by: [groupByValidator()],
         stormCap: [wholeNumberValidator],
+        threshold: [positiveValidator],
     };
 
     readonly isEdit = !!this.data.rule;
@@ -281,7 +289,12 @@ export class AlertRuleFormDialog implements AfterViewInit {
     /** A freshness / Investigation rule gets neither kind's fields (the engine refuses them on it). */
     readonly attributes = this.authored
         ? ALERT_RULE_ATTRIBUTES
-        : ALERT_RULE_ATTRIBUTES.filter((s) => s.key !== 'kind' && !KIND_KEYS.includes(s.key));
+        : ALERT_RULE_ATTRIBUTES.filter(
+              (s) =>
+                  s.key !== 'kind' &&
+                  !KIND_KEYS.includes(s.key) &&
+                  !(this.data.rule?.maximumAge && FRESHNESS_FIXED.includes(s.key)),
+          );
 
     /** Create flow: `config` (the rule) → `save` (rule id, asked last). Edit stays on `config`. */
     readonly step = signal<'config' | 'save'>('config');
@@ -384,8 +397,9 @@ export class AlertRuleFormDialog implements AfterViewInit {
                       ...(by.length ? { by, ...(stormCap !== null ? { stormCap } : {}) } : {}),
                   }
                 : {}),
-            comparator: String(v.comparator ?? 'gt'),
-            threshold: Number(v.threshold ?? 0),
+            // A freshness rule's comparator/threshold are not form fields (hidden ⇒ absent from `v`): stored values.
+            comparator: String(v.comparator ?? this.data.rule?.comparator ?? 'gt'),
+            threshold: Number(v.threshold ?? this.data.rule?.threshold),
             severity: String(v.severity ?? 'WARNING'),
             ...(onPipeline ? { onPipeline } : {}),
             ...(description ? { description } : {}),

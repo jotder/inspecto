@@ -60,10 +60,16 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
             { value: 'gte', label: '≥ at least' },
             { value: 'lt', label: '< less than' },
             { value: 'lte', label: '≤ at most' },
-            { value: 'eq', label: '= equals' },
         ],
     },
-    { key: 'threshold', label: 'Threshold', type: 'number', tier: 'required', default: 0 },
+    // No default: the engine refuses a threshold that is not > 0 (`AlertRule`), and a pre-filled 0 is exactly that.
+    {
+        key: 'threshold',
+        label: 'Threshold',
+        type: 'number',
+        tier: 'required',
+        help: 'A positive number (an error_rate is a fraction, e.g. 0.05).',
+    },
     {
         key: 'window',
         label: 'Window',

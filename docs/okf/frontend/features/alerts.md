@@ -43,3 +43,9 @@ the control's `valueChanges`. Rules of the save:
 panel defers the list's blur-commit to the panel's `closed` event, because clicking an option blurs the
 draft first and would otherwise commit the half-typed text as a second entry. Without a loader the draft
 input has no combobox role and behaves as before.
+🔴 That deferral once LOST an entry: with the panel open, a Save click runs before Material's outside-click
+closes it, so the draft was never committed. `validate()` now runs `commitListDrafts()` first; `value()`
+deliberately does not (hosts read it from template bindings every change detection, which would chip each
+keystroke) — a host that saves without `validate()` must call `commitListDrafts()` itself.
+**Threshold** has no default and must be > 0 (the engine's rule for every kind but freshness, whose
+comparator/threshold are fixed and hidden); the comparator offers only `gt | gte | lt | lte`.
