@@ -247,7 +247,7 @@ public record AlertRule(String name, String metric, String comparator, double th
                     "alert.measure must be count or agg(field) with agg ∈ count/countDistinct/sum/avg/min/max");
         } else {
             require(measure == null, "alert.measure requires alert.dataset");
-            require(METRICS.contains(metric), "alert.metric must be one of " + METRICS);
+            require(metric != null && METRICS.contains(metric), "alert.metric must be one of " + METRICS);   // Set.of(..).contains(null) throws
             require(window != null && window.matches("\\d+[smhdb]"), "alert.window must be Ns/Nm/Nh/Nd or Nb");
         }
         require(COMPARATORS.contains(comparator), "alert.comparator must be one of " + COMPARATORS);

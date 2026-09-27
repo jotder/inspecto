@@ -196,7 +196,8 @@ neither key, and the rule takes the scalar path below. How it runs:
   **retires** its open keys (`AlertService.retireKeys`): the edge state is dropped and each still-active per-key
   ALERT of the old rule resolves as actor `alert-rule:<name>:rule-changed`; no all-clear is emitted (nothing
   recovered) and the Incidents stay with triage. A threshold/severity edit keeps the open keys.
-  ⚠ The scalar (no-`by`) Measure rule still has no heal — unchanged on purpose.
+  A **scalar (no-`by`) Measure rule heals the same way** (`ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1`, 2026-09-28) —
+  see *Scalar Measure heal* below.
 - **Storm** — more than `stormCap` breaching keys → ONE storm Alert/Incident (pseudo-key `*`, attributes
   `breachedKeys`, `stormCap`; title `Storm: 40 keys breach — …`). While it rages no key fires or heals (a capped
   read cannot see which keys healed); back under the cap it heals and the keys are raised one by one.
@@ -205,12 +206,31 @@ neither key, and the rule takes the scalar path below. How it runs:
   Decision Rule's `create-alert`, and `/components/alert-rule` for a body carrying `by`) reads the Dataset's
   Schema via `DatasetMeasureProbe.columns` — its relation's columns, as `GET /datasets/{id}/rows` serves them —
   and 422s a missing column, or a Schema that cannot be read (unknown Dataset, no data yet). Names match exactly.
-  ⚠ Outside `by`, `/components/alert-rule` still does not run `AlertRule` validation at all — a pre-existing gap.
+  Since 2026-09-28 `/components/alert-rule` (create, update and version restore) runs the whole of
+  `AlertRoutes.parse` — `AlertRule.fromMap`, the Investigation-rule refusal and this check — over the content as
+  stored (`name` = id), so it refuses exactly what `POST /alerts/rules` refuses; the Personal-edition refusal
+  (`AlertRoutes.editionRefused`) still answers first. ⚠ A body with neither `metric` nor `dataset` used to be an
+  HTTP **500** on both doors (`Set.of(..).contains(null)`, as with comparator/severity before 2026-09-24); it is
+  a 422 (`ControlApiAlertRuleWriteTest`).
 - **Case grouping** — no Case Rule change is needed: an existing Case Rule whose `q` matches the rule's title
   (e.g. its `description`) groups the per-key Incidents into one Case.
 - **UI** — the Alert Rule dialog authors Measure rules too (2026-09-27): a *Watch* kind choice, Dataset, Measure,
   **One Alert per** (`by`, column suggestions from the Dataset) and **Storm cap**; the save-time 422 renders in
   the dialog ([alerts feature](../../frontend/features/alerts.md)).
+
+**Scalar Measure heal** (`ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1` (2), 2026-09-28). A Dataset Measure rule without
+`by` keeps its cooldown-throttled firing, and gains the heal of one `by` key: `AlertService.openMeasures`
+(`<rule>|<dataset>` → breached at the last readable sweep; seeded on the rule's first sweep from a still-active
+ALERT, so a restart still heals) is the edge detector. On the breached → healthy edge `healMeasure` emits
+`ALERT_CLEARED` + an INFO `alert-rule.cleared` Signal (correlation `alert:<rule>|<dataset>`, the fired Signal's),
+clears the cooldown so a relapse fires at once, and resolves the rule's ALERT (looked up on the `rule` attribute).
+⛔ **The Incident is never resolved by the heal** — the same Disposition rule as the `by` path. A relapse whose
+Incident is still active (the dedupe on `rule` suppresses a second one) re-opens it if an operator RESOLVED it and
+links the new ALERT `ESCALATED_FROM` it either way (`promoteToIncident`, measure rules only). An empty probe answer
+neither fires nor heals; a never-breached rule is never "cleared". A re-save over another Dataset or Measure retires
+the old ALERT (actor `alert-rule:<name>:rule-changed`), the Incident stays with triage. Ledger-metric and
+Investigation rules still have no heal. Tests: `MeasureAlertTest` (engine), `ScalarMeasureAlertObjectsTest`
+(`inspecto-ops`, the real workflow).
 
 **Evaluation.** `AlertService` polls on a window-derived floor of 1 min, default 10 min
 (`AlertService.java:411-413`); a breach emits `EventType.ALERT_FIRED` (`:227`) and the canonical
@@ -774,8 +794,10 @@ about the rows below; Standard is 31 modules / 4106 tests, Enterprise 32 / 4126 
 | Class | Module | Proves |
 |---|---|---|
 | `AlertRuleTest` | `inspecto-engine` | both record shapes parse; `when` scoping |
-| `ControlApiAlertRuleWriteTest` | `inspecto` | the write routes' gate order, in-process arming, `canAuthorAlertRules`; a `by` column outside the Dataset's Schema refused at both save doors |
+| `ControlApiAlertRuleWriteTest` | `inspecto` | the write routes' gate order, in-process arming, `canAuthorAlertRules`; a `by` column outside the Dataset's Schema refused at both save doors; `/components/alert-rule` refuses every shape `/alerts/rules` refuses |
 | `PerEntityAlertTest` | `inspecto-engine` | `by` rules over real DuckDB: 40 keys → 40 Incidents, re-fire → 0, restart seeding, a healed key resolves only its own Alert and never its Incident, storm cap → one Alert, unknown never heals, no-`by` unchanged |
+| `MeasureAlertTest` | `inspecto-engine` | scalar Measure rules: fire, cooldown, the heal edge (all-clear once, cooldown reset so a relapse fires at once), unknown never heals |
+| `ScalarMeasureAlertObjectsTest` | `inspecto-ops` | the real workflow for a no-`by` Measure rule: heal resolves the Alert never the Incident, relapse links / re-opens, restart seeding, retire on a Dataset change |
 | `PerEntityAlertObjectsTest` | `inspecto-ops` | the real workflow: a heal never resolves the Incident, even with a complete postmortem; a relapse after an operator's resolve re-opens it, an existing Case Rule groups 40 per-key Incidents into one Case |
 | `NotificationServiceTest` | `inspecto-engine` | subscriber hand-off, rate limiter, preferences gating |
 | `ControlApiNotificationsTest` · `ControlApiNotificationChannelsTest` · `ControlApiNotificationRulesTest` · `ControlApiNotificationStreamTest` | `inspecto` | feed routes, channel CRUD (`422` on a bad EMAIL target), rules, the SSE stream |

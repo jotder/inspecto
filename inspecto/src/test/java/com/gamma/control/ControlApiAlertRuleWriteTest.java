@@ -300,4 +300,45 @@ class ControlApiAlertRuleWriteTest {
             assertEquals(AlertRule.DEFAULT_STORM_CAP, onDisk.stormCap());
         }
     }
+
+    /**
+     * ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1 (3): the generic {@code /components/alert-rule} door refuses every shape
+     * {@code POST /alerts/rules} refuses — create, update and version restore alike — and writes nothing; a valid
+     * rule still saves through it.
+     */
+    @Test
+    void theGenericComponentDoorRefusesEveryShapeTheAlertRulesDoorRefuses(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        java.util.Map<String, String> invalid = new java.util.LinkedHashMap<>();
+        invalid.put("unknown comparator", rule("bad", "between", 0.05));
+        invalid.put("unknown severity", "{\"name\":\"bad\",\"metric\":\"error_rate\",\"threshold\":1,\"window\":\"1h\",\"severity\":\"PANIC\"}");
+        invalid.put("unknown metric", "{\"name\":\"bad\",\"metric\":\"cpu\",\"threshold\":1,\"window\":\"1h\"}");
+        invalid.put("no metric, no dataset", "{\"name\":\"bad\",\"threshold\":1,\"window\":\"1h\"}");
+        invalid.put("bad window", "{\"name\":\"bad\",\"metric\":\"error_rate\",\"threshold\":1,\"window\":\"soon\"}");
+        invalid.put("non-numeric threshold", "{\"name\":\"bad\",\"metric\":\"error_rate\",\"threshold\":\"lots\",\"window\":\"1h\"}");
+        invalid.put("measure rule with a window", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"window\":\"1h\"}");
+        invalid.put("unknown aggregation", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"median(amount)\",\"threshold\":1}");
+        invalid.put("stormCap without by", "{\"name\":\"bad\",\"dataset\":\"usage\",\"measure\":\"count\",\"threshold\":1,\"stormCap\":5}");
+        invalid.put("by on a ledger rule", "{\"name\":\"bad\",\"metric\":\"error_rate\",\"threshold\":1,\"window\":\"1h\",\"by\":[\"msisdn\"]}");
+        invalid.put("by column not in the Schema", byRule("bad", "usage", "[\"imsi\"]"));
+        invalid.put("Investigation rule", "{\"name\":\"bad\",\"investigation\":\"inv-42\",\"measure\":\"count\",\"threshold\":3}");
+        try (Ctx c = open(cfg, root)) {
+            seedUsage(root);
+            for (var e : invalid.entrySet()) {
+                HttpResponse<String> dedicated = send(c.port, "POST", "/alerts/rules", e.getValue());
+                assertEquals(422, dedicated.statusCode(), e.getKey() + " (dedicated door): " + dedicated.body());
+                HttpResponse<String> generic = send(c.port, "POST", "/components/alert-rule", e.getValue());
+                assertEquals(422, generic.statusCode(), e.getKey() + " (generic door): " + generic.body());
+                assertTrue(store(root).get("alert-rule", "bad").isEmpty(), e.getKey() + ": nothing written");
+            }
+
+            HttpResponse<String> ok = send(c.port, "POST", "/components/alert-rule", rule("good", "gt", 0.05));
+            assertEquals(200, ok.statusCode(), "a valid rule still saves through the generic door: " + ok.body());
+            HttpResponse<String> badPut = send(c.port, "PUT", "/components/alert-rule/good", rule("good", "between", 0.05));
+            assertEquals(422, badPut.statusCode(), "an update is checked too: " + badPut.body());
+            assertEquals("gt", store(root).get("alert-rule", "good").orElseThrow().content().get("comparator"));
+            HttpResponse<String> okPut = send(c.port, "PUT", "/components/alert-rule/good", rule("good", "lt", 0.2));
+            assertEquals(200, okPut.statusCode(), okPut.body());
+        }
+    }
 }

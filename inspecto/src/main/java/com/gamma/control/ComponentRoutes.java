@@ -634,12 +634,13 @@ final class ComponentRoutes implements RouteModule {
                 ComponentRegistry.Component prior = existing(store, type, id);
                 content = DecisionRuleGuard.prepare(ex, content, prior == null ? null : prior.content());
             }
-            // ASSURE-PER-ENTITY-ALERTS-1: this door must not arm a `by` rule the /alerts/rules door refuses.
-            // ⚠ Only a rule carrying `by` is parsed here; the door's wider lack of Alert Rule validation predates it.
-            if ("alert-rule".equals(type) && content.get("by") != null) {
+            // ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1 (3): this door refuses exactly what POST /alerts/rules refuses —
+            // the same AlertRoutes.parse (AlertRule.fromMap, the Investigation-rule refusal, the `by` Schema check),
+            // over the content as the store will persist it (name = id).
+            if ("alert-rule".equals(type)) {
                 Map<String, Object> stamped = new LinkedHashMap<>(content);
                 stamped.put("name", id);
-                AlertRoutes.requireGroupingColumns(api, com.gamma.alert.AlertRule.fromMap(stamped));
+                AlertRoutes.parse(api, stamped);
             }
             // ASSURE-KPI-DEFINITIONS-1: a KPI's Measure must exist, and be readable by its author, at save.
             if (KpiRoutes.TYPE.equals(type)) KpiRoutes.requireMeasure(api, ex, id, content);

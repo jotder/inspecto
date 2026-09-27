@@ -188,7 +188,9 @@ final class AlertRoutes implements RouteModule {
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
     }
 
-    private static AlertRule parse(ApiContext api, Map<String, Object> body) {
+    /** Parse + validate an Alert Rule body — 422 on anything the rule refuses. Every save door runs it: create,
+     *  update, a Decision Rule's {@code create-alert}, and {@code /components/alert-rule} ({@code ComponentRoutes}). */
+    static AlertRule parse(ApiContext api, Map<String, Object> body) {
         if (!EditionFeatures.present(EditionFeatures.ALERT_DISPATCH))   // the consequence's door (G9)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH));
         AlertRule rule;
@@ -212,7 +214,7 @@ final class AlertRoutes implements RouteModule {
      * Schema — the relation's columns, as {@code GET /datasets/{id}/rows} reports them. <b>Fail closed</b>: a
      * Schema that cannot be read (unknown Dataset, a relation DuckDB cannot open, no data yet) refuses the save
      * rather than arming a rule whose every sweep would silently compute nothing. A rule with no {@code by} is
-     * not looked at. Also run by {@code /components/alert-rule} ({@code ComponentRoutes}).
+     * not looked at. Runs inside {@link #parse}.
      */
     static void requireGroupingColumns(ApiContext api, AlertRule rule) {
         if (!rule.isGrouped()) return;
