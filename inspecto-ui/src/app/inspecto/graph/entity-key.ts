@@ -32,9 +32,9 @@ export function normalizeTypedKey(value: string, normaliser: EntityNormaliser): 
         case 'e164': {
             const t = value.trim();
             const d = t.replace(/[^0-9]/g, '');
-            if (t.startsWith('+')) return '+' + d;
-            if (d.startsWith('00')) return '+' + d.slice(2);
-            return d;
+            // A bare '+' (from '+N/A', '00', …) carries no number: empty, so it mints no junk hub.
+            const r = t.startsWith('+') ? '+' + d : d.startsWith('00') ? '+' + d.slice(2) : d;
+            return r === '+' ? '' : r;
         }
         case 'upper-trim':
             return value.replace(/\s+/g, ' ').trim().toUpperCase();

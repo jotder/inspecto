@@ -73,8 +73,9 @@ public final class EntityTypes {
             case "e164" -> {
                 String t = trimWs(value);
                 String d = NON_DIGIT.matcher(t).replaceAll("");
-                if (t.startsWith("+")) yield "+" + d;
-                yield d.startsWith("00") ? "+" + d.substring(2) : d;
+                // A bare "+" (from "+N/A", "00", …) carries no number: empty, so it mints no junk hub.
+                String r = t.startsWith("+") ? "+" + d : d.startsWith("00") ? "+" + d.substring(2) : d;
+                yield r.equals("+") ? "" : r;
             }
             case "upper-trim" -> trimWs(WS_RUN.matcher(value).replaceAll(" ")).toUpperCase(Locale.ROOT);
             default -> throw new IllegalArgumentException("normaliser must be one of " + NORMALISERS

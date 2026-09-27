@@ -2,6 +2,31 @@
   "about": "LA-17 step 2 - the Entity Type normalisers. The SAME file feeds entity-key.spec.ts (browser) and EntityTypesTest (Java); a case that passes on one side only is a split identity. Normalisers are a CLOSED set: default, digits, e164, upper-trim. Lowercasing folds final sigma to sigma on both sides: Java and JS disagree on Final_Sigma context (e.g. before a modifier letter), so the fold is what makes them agree.",
   "cases": [
     {
+      "normaliser": "e164",
+      "input": "+",
+      "expected": ""
+    },
+    {
+      "normaliser": "e164",
+      "input": "+N/A",
+      "expected": ""
+    },
+    {
+      "normaliser": "e164",
+      "input": "+ unknown",
+      "expected": ""
+    },
+    {
+      "normaliser": "e164",
+      "input": "00",
+      "expected": ""
+    },
+    {
+      "normaliser": "e164",
+      "input": "00-",
+      "expected": ""
+    },
+    {
       "normaliser": "default",
       "input": " Acme  Ltd.",
       "expected": "acme ltd"
