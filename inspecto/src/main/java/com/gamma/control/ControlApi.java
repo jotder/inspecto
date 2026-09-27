@@ -399,7 +399,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         anchorRoll.scheduleWithFixedDelay(this::rollAuditAnchors, 1, 10, java.util.concurrent.TimeUnit.MINUTES);
         System.setProperty(LOCAL_BASE_URL_PROP, "http://127.0.0.1:" + port());
         if (Authenticators.active().isPresent())
-            log.info("ControlApi started on port {} (Professional edition — authentication enforced via {})",
+            log.info("ControlApi started on port {} (authentication enforced via {})",
                     port(), Authenticators.active().get().getClass().getName());
         else
             log.info("ControlApi started on port {} (no authentication — Personal/core edition). "
