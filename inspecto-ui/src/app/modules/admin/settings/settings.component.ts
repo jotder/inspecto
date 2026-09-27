@@ -1,10 +1,20 @@
 import { NgComponentOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, inject, signal, Type, ViewEncapsulation } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    inject,
+    signal,
+    Type,
+    ViewChild,
+    ViewEncapsulation,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, Router } from '@angular/router';
 
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 
 import { AccessComponent } from 'app/modules/admin/access/access.component';
 import { ConfigComponent } from 'app/modules/admin/config/config.component';
@@ -14,6 +24,7 @@ import { IconSettingsComponent } from 'app/modules/admin/icon-settings/icon-sett
 import { MapSettingsComponent } from 'app/modules/admin/map-settings/map-settings.component';
 import { ModelSettingsComponent } from 'app/modules/admin/model-settings/model-settings.component';
 import { NotificationCenterComponent } from 'app/modules/admin/notification-center/notification-center.component';
+import { EgressSettingsComponent } from './egress.component';
 import { OperationalDbComponent } from './operational-db.component';
 import { SchedulerSettingsComponent } from './scheduler.component';
 import { SpacesComponent } from 'app/modules/admin/spaces/spaces.component';
@@ -26,6 +37,11 @@ interface SettingsDrawer {
     readonly description: string;
     readonly icon: string;
     readonly component: Type<unknown>;
+}
+
+/** A section holding an unsaved draft implements this; the route's leave guard asks before discarding it. */
+interface UnsavedChangesAware {
+    hasUnsavedChanges(): boolean;
 }
 
 /**
@@ -81,6 +97,13 @@ export class SettingsComponent {
             component: SchedulerSettingsComponent,
         },
         {
+            id: 'egress',
+            title: 'Egress Allowlist',
+            icon: 'heroicons_outline:globe-alt',
+            description: 'Private hosts and ranges that outbound calls may reach.',
+            component: EgressSettingsComponent,
+        },
+        {
             id: 'spaces',
             title: 'Spaces',
             icon: 'heroicons_outline:square-3-stack-3d',
@@ -134,6 +157,9 @@ export class SettingsComponent {
     private route = inject(ActivatedRoute);
     private router = inject(Router);
     private destroyRef = inject(DestroyRef);
+    private confirm = inject(InspectoConfirmService);
+
+    @ViewChild(NgComponentOutlet) private outlet?: NgComponentOutlet;
 
     /** The option whose content is shown in the common panel; `null` until one is picked.
      *  Driven by the `:section` route param (R5) — deep-linkable, Back works, refresh keeps it. */
@@ -143,6 +169,20 @@ export class SettingsComponent {
         this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((p) => {
             const id = p.get('section');
             this.selected.set(this.drawers.find((d) => d.id === id) ?? null);
+        });
+    }
+
+    /**
+     * The route's `canDeactivate` — also run on a section switch, since the `:section` param changes. A section
+     * reporting an unsaved draft is only left after the operator confirms the discard.
+     */
+    async canLeave(): Promise<boolean> {
+        const section = this.outlet?.componentInstance as Partial<UnsavedChangesAware> | null | undefined;
+        if (!section?.hasUnsavedChanges?.()) return true;
+        return this.confirm.confirmDestructive('Your unsaved changes will be lost.', {
+            title: 'Discard changes?',
+            confirmText: 'Discard',
+            cancelText: 'Keep editing',
         });
     }
 

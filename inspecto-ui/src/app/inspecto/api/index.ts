@@ -56,6 +56,7 @@ export * from './geo-settings.service';
 export * from './geo.service';
 export * from './branding.service';
 export * from './scheduler-settings.service';
+export * from './egress-settings.service';
 export * from './inv.service';
 export * from './share.service';
 export * from './exchange.service';

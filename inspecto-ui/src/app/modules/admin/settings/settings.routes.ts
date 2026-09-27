@@ -13,5 +13,7 @@ export default [
                   ? { consumed: segments, posParams: { section: segments[0] } }
                   : null,
         component: SettingsComponent,
+        // Runs on a section switch too (the `:section` param changes): a section's unsaved draft is confirmed first.
+        canDeactivate: [(c: SettingsComponent) => c.canLeave()],
     },
 ] as Routes;

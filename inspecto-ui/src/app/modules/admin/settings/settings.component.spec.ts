@@ -1,11 +1,15 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap, provideRouter, Router } from '@angular/router';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, of } from 'rxjs';
+import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { defaultNavigation } from 'app/core/navigation/navigation-data';
 import { GammaNavigationItem } from '@gamma/components/navigation';
+import { EgressSettingsService, LensService } from 'app/inspecto/api';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { EgressSettingsComponent } from './egress.component';
 import { SettingsComponent } from './settings.component';
 
 /** Every `link` in the nav tree, at any depth. */
@@ -76,6 +80,37 @@ describe('SettingsComponent', () => {
 
         params.next(convertToParamMap({}));
         expect(c.selected()).toBeNull();
+        fixture.destroy();
+    });
+
+    it('asks before leaving a section holding an unsaved draft (the route leave guard)', async () => {
+        const confirm = { confirmDestructive: vi.fn(async () => false) };
+        TestBed.configureTestingModule({
+            imports: [SettingsComponent],
+            providers: [
+                provideNoopAnimations(),
+                provideRouter([]),
+                {
+                    provide: ActivatedRoute,
+                    useValue: { paramMap: new BehaviorSubject(convertToParamMap({ section: 'egress' })) },
+                },
+                { provide: EgressSettingsService, useValue: { get: () => of({ allow: [] }), save: vi.fn() } },
+                { provide: LensService, useValue: { canAdminister: () => true } },
+                { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn() } },
+                { provide: InspectoConfirmService, useValue: confirm },
+            ],
+        });
+        const fixture = TestBed.createComponent(SettingsComponent);
+        fixture.detectChanges();
+        const c = fixture.componentInstance;
+        expect(await c.canLeave()).toBe(true); // pristine: no question asked
+        expect(confirm.confirmDestructive).not.toHaveBeenCalled();
+
+        const section = fixture.debugElement.query((d) => d.componentInstance instanceof EgressSettingsComponent)
+            .componentInstance as EgressSettingsComponent;
+        section.entries.set(['tickets.internal']);
+        expect(await c.canLeave()).toBe(false); // the operator chose "Keep editing"
+        expect(confirm.confirmDestructive).toHaveBeenCalledOnce();
         fixture.destroy();
     });
 });

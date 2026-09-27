@@ -229,10 +229,20 @@ port, path and an allowlist badge — then key, attempts (with each attempt's ad
 Approve / Decline (pending), Retry (failed) or Mark as failed (dispatched) for a `canApproveChanges` holder. The
 Incident / Case detail page carries an **Action Requests** panel: status badge, attempts, last response and Retry.
 
+**Settings ▸ Egress Allowlist** (`modules/admin/settings/egress.component.ts`, `EgressSettingsService`) lists the
+Space's entries for every caller (the GET is ungated) and edits them only under `canAdminister` — the capability
+the PUT checks; without it every add / remove / save control is hidden. Entries are edited as a draft (trimmed and
+lowercased, as the server stores them; shape checks only: no spaces, no duplicate, at most 200) and replaced in one
+PUT. An info notice states what can never be allowlisted; the server stays the only judge, and its 422 refusal
+(e.g. a range overlapping `169.254.0.0/16`) is shown inline, verbatim, with the draft kept. A 503 (no writable
+config root) is an in-place warning; anything else toasts via `apiErrorMessage`. The dirty draft is guarded by the
+Settings route's `canDeactivate` (`SettingsComponent.canLeave`, which also runs on a section switch and asks any
+section exposing `hasUnsavedChanges()`) and by `beforeunload`. ⚠ A host name such as `localhost` passes the PUT (it
+is a valid DNS name) but still never lifts loopback at connect time — the notice says so.
+
 ## Deferred / known gaps
 
 - No per-request `path` below the Connection's base path: one Connection per endpoint.
-- No UI for the Egress Allowlist yet — `PUT /settings/egress` only.
 - `inspecto`-module tests drive the dispatcher over a loopback **test** wire (it connects to the pinned address like
   the real one); the real wire's pinning, SNI / certificate verification and redirect refusal are pinned in
   `HttpWebhookSinkTransportTest` and `PinnedHttpTlsTest`.
