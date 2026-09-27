@@ -716,6 +716,13 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             }
             log.error("{} {} failed", ex.getRequestMethod(), path(ex), e);
             respond(ex, 500, Map.of("error", String.valueOf(e.getMessage())));
+        } catch (VirtualMachineError vme) {
+            throw vme;   // OOM / StackOverflow: the JVM is not in a state to answer reliably
+        } catch (Error e) {
+            // A LinkageError (NoClassDefFoundError — e.g. a jdk.* module missing from the jlinked bundle
+            // runtime) used to escape as a silently dropped connection with nothing in the log.
+            log.error("{} {} failed", ex.getRequestMethod(), path(ex), e);
+            respond(ex, 500, Map.of("error", String.valueOf(e)));
         }
     }
 
