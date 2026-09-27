@@ -316,6 +316,7 @@ class ControlApiSettingsTest {
             bad.put("[" + one.formatted("Bad-Id", "X", "default", "true", "[]") + "]", "must match");
             bad.put("[" + one.formatted("a", "X", "default", "true", "[]") + "," + one.formatted("a", "Y", "digits", "false", "[]")
                     + "]", "duplicate entity type id");
+            bad.put("[" + one.formatted("entity", "X", "default", "true", "[]") + "]", "'entity' is reserved");
             bad.put("[" + one.formatted("a", " ", "default", "true", "[]") + "]", "label is blank");
             bad.put("[" + one.formatted("a", "X", "lower", "true", "[]") + "]", "normaliser must be one of");
             bad.put("[" + one.formatted("a", "X", "default", "true", "[\"\"]") + "]", "classification is blank");

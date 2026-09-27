@@ -131,6 +131,8 @@ public final class EntityTypes {
         for (EntityType t : types) {
             if (!ID.matcher(t.id()).matches())
                 throw new IllegalArgumentException("entity type id must match " + ID.pattern() + ", got '" + t.id() + "'");
+            if (t.id().equals("entity")) // untyped projection ids are entity:<value>; a type named entity would collide
+                throw new IllegalArgumentException("entity type id 'entity' is reserved (untyped ids are entity:<value>)");
             if (!ids.add(t.id())) throw new IllegalArgumentException("duplicate entity type id '" + t.id() + "'");
             if (t.label().isBlank()) throw new IllegalArgumentException("entity type '" + t.id() + "': label is blank");
             if (!NORMALISERS.contains(t.normaliser()))
