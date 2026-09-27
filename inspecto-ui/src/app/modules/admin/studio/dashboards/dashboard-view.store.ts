@@ -40,6 +40,13 @@ export class DashboardViewStore {
     readonly range = signal<DateRangeSelection | null>(null);
     /** The day presets count back from: `asOf` when it is a real day, else today. */
     readonly anchor = computed(() => (isIsoDay(this.asOf()) ? this.asOf() : todayIso()));
+    /** The day a KPI-bound tile is evaluated at: `asOf` only when it is a real day not after today, else blank —
+     *  never the browser's today (unlike {@link anchor}), so a blank leaves the day to the server in the KPI's own
+     *  zone. A half-typed or future `asOf` would otherwise 400 every KPI tile into "KPI unavailable". */
+    readonly kpiAsOf = computed(() => {
+        const d = this.asOf();
+        return isIsoDay(d) && d <= todayIso() ? d : '';
+    });
 
     /** Value suggestions per exposed field — the quick-filter pickers' choices, read off one PAGE of each
      *  tiled dataset (so they are offers, not the column's full domain) and capped so a high-cardinality

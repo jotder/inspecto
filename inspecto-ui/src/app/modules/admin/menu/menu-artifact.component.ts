@@ -89,7 +89,7 @@ import 'app/modules/admin/studio/widgets/widget.kind'; // side-effect: register 
                                                 [widget]="widget"
                                                 [dataset]="dataset"
                                                 [filter]="view.filterFor(dataset)"
-                                                [asOf]="view.asOf()"
+                                                [asOf]="view.kpiAsOf()"
                                                 (drill)="view.onDrill($event)"
                                             />
                                         } @else {

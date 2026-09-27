@@ -4,14 +4,14 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, LensService } from 'app/inspecto/api';
+import { apiErrorMessage, LensService, PendingChangesService } from 'app/inspecto/api';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
-import { buildRequirement, Requirement, RequirementKpiBody, RequirementsService } from 'app/inspecto/requirement';
+import { buildRequirement, Requirement, RequirementKpiResult, RequirementsService } from 'app/inspecto/requirement';
 import { RequirementFormDialog, RequirementFormResult } from './requirement-form.dialog';
-import { RequirementDecisionDialog, RequirementDecisionResult } from './requirement-decision.dialog';
+import { RequirementDecisionDialog, RequirementDecisionResult, RequirementDetail } from './requirement-decision.dialog';
 import { RequirementKpiDialog } from './requirement-kpi.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
@@ -38,11 +38,16 @@ export class RequirementsComponent implements OnInit {
     private api = inject(RequirementsService);
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
+    private pendingChanges = inject(PendingChangesService);
     /** Business lens = read-only — hides the decide/deliver actions in the detail dialog. */
     protected lens = inject(LensService);
 
     readonly requirements = signal<Requirement[]>([]);
     readonly loading = signal(false);
+    /** KPI ids with a create held for approval — the Requirement is stamped only once it is approved, so without
+     *  this a held create would offer Create KPI again and 409. Read from `GET /pending-changes` on every load; a
+     *  hold answered here is added at once, and kept if that read fails. The create's KPI id is the Requirement's. */
+    readonly pendingKpis = signal<ReadonlySet<string>>(new Set());
 
     // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columns: ColDef<Requirement>[] = [
@@ -78,6 +83,13 @@ export class RequirementsComponent implements OnInit {
 
     load(): void {
         this.loading.set(true);
+        this.pendingChanges.list('pending').subscribe({
+            next: (res) => {
+                const held = res.items.filter((c) => c.kind === 'kpi' && c.operation === 'create').map((c) => c.name);
+                this.pendingKpis.set(new Set(held)); // the server's list is the truth once it answers
+            },
+            error: () => undefined, // degrade: only this session's holds are known
+        });
         this.api.list().subscribe({
             next: (r) => {
                 this.requirements.set(r);
@@ -112,7 +124,10 @@ export class RequirementsComponent implements OnInit {
 
     openDetail(r: Requirement): void {
         this.dialog
-            .open(RequirementDecisionDialog, { data: r, width: '520px' })
+            .open(RequirementDecisionDialog, {
+                data: { ...r, kpiPending: this.pendingKpis().has(r.id) } satisfies RequirementDetail,
+                width: '520px',
+            })
             .afterClosed()
             .subscribe((result?: RequirementDecisionResult) => {
                 if (result?.action === 'createKpi') {
@@ -134,23 +149,19 @@ export class RequirementsComponent implements OnInit {
             });
     }
 
-    /** Ask the Measure and period, then `POST /requirements/{id}/kpi` — gated on the server's `canAuthorWorkbench`. */
+    /** Ask the Measure and period; the dialog makes the `POST /requirements/{id}/kpi` call (server: `canAuthorWorkbench`). */
     createKpi(r: Requirement): void {
         if (!this.lens.canAuthorWorkbench()) return;
         this.dialog
             .open(RequirementKpiDialog, { data: r, width: '560px' })
             .afterClosed()
-            .subscribe((body?: RequirementKpiBody) => {
-                if (!body) return;
-                this.api.createKpi(r.id, body).subscribe({
-                    next: (res) => {
-                        if ('pendingChange' in res)
-                            this.toastr.info(`The KPI for "${r.title}" is waiting for approval in Pending Changes`);
-                        else this.toastr.success(`KPI "${res.name}" created — find it under KPI & Reports`);
-                        this.load();
-                    },
-                    error: (e) => this.toastr.error(apiErrorMessage(e, `Could not create a KPI from "${r.title}"`)),
-                });
+            .subscribe((res?: RequirementKpiResult) => {
+                if (!res) return;
+                if ('pendingChange' in res) {
+                    this.pendingKpis.update((s) => new Set([...s, r.id]));
+                    this.toastr.info(`The KPI for "${r.title}" is waiting for approval in Pending Changes`);
+                } else this.toastr.success(`KPI "${res.name}" created — find it under KPI & Reports`);
+                this.load();
             });
     }
 }

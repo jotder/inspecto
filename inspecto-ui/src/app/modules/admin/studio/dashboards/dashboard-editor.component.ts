@@ -316,7 +316,7 @@ export class DashboardEditorComponent implements OnInit {
     }
     /** The Dashboard's `asOf` day, which a KPI-bound tile evaluates its definition at (blank ⇒ today). */
     tileAsOf(): string {
-        return this.view.asOf();
+        return this.view.kpiAsOf();
     }
 
     /** The author picked a default range — it is also what the preview shows from now on. */

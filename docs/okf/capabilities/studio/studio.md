@@ -383,9 +383,12 @@ only by the explicit `POST /requirements/{id}/kpi` (`canAuthorWorkbench`), which
 `target`/`unit`/`title` and reads the direction off its `comparator`. In the UI that is the **Create KPI** button
 on the Requirement detail (`requirement-decision.dialog`), shown for a delivered `kpi` Requirement with no `kpi`
 stamp yet and gated on `lens.canAuthorWorkbench()` (the server's capability); it asks ONLY the Dataset, Measure,
-date column and period (`requirement-kpi.dialog`) — the KPI id defaults to the Requirement's — and a 202 hold
-toasts "waiting for approval". A KPI-bound tile evaluates at its Dashboard's `asOf` day
-(`DashboardViewStore.asOf` → tile → widget host → `VizRenderComponent.kpiAsOf` → `KpiComponent.asOf`); a blank
+date column and period (`requirement-kpi.dialog`, which makes the call and stays open on a 422/409 refusal) —
+the KPI id defaults to the Requirement's. ⚠ A 202 hold does NOT stamp the Requirement until approval, so the pane
+reads `GET /pending-changes?status=pending` and shows "waiting for approval" in place of the button for a held
+`kpi` create of that id (else a second click 409s). A KPI-bound tile evaluates at its Dashboard's `asOf` day
+(`DashboardViewStore.kpiAsOf` → tile → widget host → `VizRenderComponent.kpiAsOf` → `KpiComponent.asOf`, one read
+in flight — a newer day cancels the older); only a real day not after today is sent, and a blank or invalid
 `asOf` sends none, so the server's today in the KPI's zone applies — never the browser's today, which a zone ahead
 of the server's could make a "future" 400. ⚠ Distinct from the semantic model's
 descriptive **KPI catalog** (`kpis:` / `GET /catalog/kpis`), which is text for the assistant and runs nothing.

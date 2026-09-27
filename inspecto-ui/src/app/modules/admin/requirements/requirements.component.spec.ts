@@ -1,11 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
-import { HttpErrorResponse } from '@angular/common/http';
 import { of, throwError } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
-import { LensService } from 'app/inspecto/api';
+import { LensService, PendingChange, PendingChangesService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import {
@@ -25,7 +24,7 @@ interface CreateOptions {
     create?: ReturnType<typeof vi.fn>;
     decide?: ReturnType<typeof vi.fn>;
     deliver?: ReturnType<typeof vi.fn>;
-    createKpi?: ReturnType<typeof vi.fn>;
+    pending?: ReturnType<typeof vi.fn>;
     toastr?: { success: ReturnType<typeof vi.fn>; error: ReturnType<typeof vi.fn>; info: ReturnType<typeof vi.fn> };
 }
 
@@ -42,7 +41,6 @@ function create(opts: CreateOptions = {}) {
                     create: opts.create ?? (() => of(REQ)),
                     decide: opts.decide ?? (() => of(REQ)),
                     deliver: opts.deliver ?? (() => of(REQ)),
-                    createKpi: opts.createKpi ?? (() => of({ name: REQ.id })),
                 },
             },
             {
@@ -50,6 +48,10 @@ function create(opts: CreateOptions = {}) {
                 useValue: opts.toastr ?? { success: () => undefined, error: () => undefined, info: () => undefined },
             },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
+            {
+                provide: PendingChangesService,
+                useValue: { list: opts.pending ?? (() => of({ items: [], total: 0, truncated: false })) },
+            },
         ],
     });
     // DataTableComponent (used in the template) also provides/injects MatDialog; a plain providers[]
@@ -93,58 +95,62 @@ describe('RequirementsComponent', () => {
 
     describe('Create KPI from a delivered kpi requirement (ASSURE-KPI-DEFINITIONS-1)', () => {
         const DELIVERED = deliverRequirement(decideRequirement(REQ, true));
-        const BODY = { dataset: 'orders', measure: 'sum(amount)', timeField: 'order_date', grain: 'month' };
-        /** The detail dialog closes with Create KPI, then the KPI dialog with the Builder's answers. */
-        const dialogs = (body: unknown = BODY) =>
+        /** The detail dialog closes with Create KPI, then the KPI dialog with the server's answer. */
+        const dialogs = (answer: unknown) =>
             vi
                 .fn()
                 .mockReturnValueOnce({ afterClosed: () => of({ action: 'createKpi' }) })
-                .mockReturnValueOnce({ afterClosed: () => of(body) });
+                .mockReturnValueOnce({ afterClosed: () => of(answer) })
+                .mockReturnValue({ afterClosed: () => of(undefined) });
         const toasts = () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() });
+        const HELD = { status: 'pending', written: false, pendingChange: { id: 'pc-1' } };
+        const detailData = (open: ReturnType<typeof vi.fn>, call: number) =>
+            (open.mock.calls[call] as unknown as [unknown, { data: { kpiPending?: boolean } }])[1].data;
 
-        it('asks the Measure and period, calls createKpi and names the created KPI', () => {
-            const createKpi = vi.fn(() => of({ name: 'refunds', requirement: DELIVERED.id }));
+        it('opens the KPI dialog from the detail and names the created KPI', () => {
             const toastr = toasts();
-            const dialogOpen = dialogs();
-            const fixture = create({ list: [DELIVERED], createKpi, toastr, dialogOpen });
+            const dialogOpen = dialogs({ name: 'refunds', requirement: DELIVERED.id });
+            const fixture = create({ list: [DELIVERED], toastr, dialogOpen });
             fixture.componentInstance.openDetail(DELIVERED);
             expect(dialogOpen).toHaveBeenCalledTimes(2);
-            expect(createKpi).toHaveBeenCalledWith(DELIVERED.id, BODY);
             expect(toastr.success).toHaveBeenCalledWith(expect.stringContaining('KPI "refunds" created'));
         });
 
-        it('says so when the KPI is held for approval', () => {
-            const createKpi = vi.fn(() => of({ status: 'pending', written: false, pendingChange: { id: 'pc-1' } }));
+        it('after a 202 hold, says so and the detail no longer offers Create KPI (even if the pending read fails)', () => {
             const toastr = toasts();
-            const fixture = create({ list: [DELIVERED], createKpi, toastr, dialogOpen: dialogs() });
+            const dialogOpen = dialogs(HELD);
+            const pending = vi.fn(() => throwError(() => new Error('down')));
+            const fixture = create({ list: [DELIVERED], toastr, dialogOpen, pending });
             fixture.componentInstance.openDetail(DELIVERED);
             expect(toastr.info).toHaveBeenCalledWith(expect.stringContaining('waiting for approval'));
             expect(toastr.success).not.toHaveBeenCalled();
+            fixture.componentInstance.openDetail(DELIVERED);
+            expect(detailData(dialogOpen, 0).kpiPending).toBe(false);
+            expect(detailData(dialogOpen, 2).kpiPending).toBe(true);
         });
 
-        it("toasts the server's refusal", () => {
-            const refusal = new HttpErrorResponse({
-                status: 422,
-                error: { error: { code: 'CONFIG_VALIDATION_FAILED', message: "kpi dataset 'nope' does not exist" } },
-            });
-            const createKpi = vi.fn(() => throwError(() => refusal));
-            const toastr = toasts();
-            const fixture = create({ list: [DELIVERED], createKpi, toastr, dialogOpen: dialogs() });
+        it('on reload, a held kpi create in Pending Changes marks its requirement pending', () => {
+            const held = { kind: 'kpi', name: DELIVERED.id, operation: 'create' } as PendingChange;
+            const other = { kind: 'dataset', name: DELIVERED.id, operation: 'create' } as PendingChange;
+            const pending = vi.fn(() => of({ items: [held, other], total: 2, truncated: false }));
+            const dialogOpen = vi.fn(() => ({ afterClosed: () => of(undefined) }));
+            const fixture = create({ list: [DELIVERED], pending, dialogOpen });
+            expect(pending).toHaveBeenCalledWith('pending');
             fixture.componentInstance.openDetail(DELIVERED);
-            expect(toastr.error).toHaveBeenCalledWith("kpi dataset 'nope' does not exist");
+            expect(detailData(dialogOpen, 0).kpiPending).toBe(true);
         });
 
         it('does nothing when the KPI dialog is cancelled, or without canAuthorWorkbench', () => {
-            const createKpi = vi.fn(() => of({ name: 'refunds' }));
-            const dialogOpen = dialogs(null); // null: undefined would take the default body
-            const fixture = create({ list: [DELIVERED], createKpi, dialogOpen });
+            const toastr = toasts();
+            const dialogOpen = dialogs(undefined);
+            const fixture = create({ list: [DELIVERED], toastr, dialogOpen });
             fixture.componentInstance.openDetail(DELIVERED);
-            expect(createKpi).not.toHaveBeenCalled();
+            expect(toastr.success).not.toHaveBeenCalled();
+            expect(toastr.info).not.toHaveBeenCalled();
 
             TestBed.inject(LensService).selectLens('business');
             fixture.componentInstance.createKpi(DELIVERED);
             expect(dialogOpen).toHaveBeenCalledTimes(2); // the business lens never opens the KPI dialog
-            expect(createKpi).not.toHaveBeenCalled();
         });
     });
 

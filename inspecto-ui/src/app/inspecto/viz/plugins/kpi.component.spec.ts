@@ -180,6 +180,28 @@ describe('KpiComponent (UIE-1)', () => {
             http.verify();
         });
 
+        it('a newer asOf cancels the older read, so a slow stale answer never overwrites the newer value', () => {
+            TestBed.configureTestingModule({
+                imports: [KpiComponent],
+                providers: [provideNoopAnimations(), provideHttpClient(withXhr()), provideHttpClientTesting()],
+            });
+            const fixture = TestBed.createComponent(KpiComponent);
+            const http = TestBed.inject(HttpTestingController);
+            const url = environment.apiBaseUrl + '/v1/kpis/refunds/value';
+            fixture.componentRef.setInput('kpiId', 'refunds');
+            fixture.componentRef.setInput('asOf', '2026-07-31');
+            fixture.detectChanges();
+            const older = http.expectOne((r) => r.url === url);
+            fixture.componentRef.setInput('asOf', '2026-08-13');
+            fixture.detectChanges();
+            const newer = http.expectOne((r) => r.url === url);
+            newer.flush({ ...served, value: 50 });
+            expect(older.cancelled).toBe(true); // its late answer has nowhere to land
+            fixture.detectChanges();
+            expect(fixture.componentInstance.definition()?.value).toBe(50);
+            http.verify();
+        });
+
         it('a band KPI drops the up / down wording and takes its tones from the server band', async () => {
             const { el, text } = bound({ ...served, direction: 'band', value: 50, band: 'AMBER', tone: 'warning' });
             expect(text('kpi-delta')).toBe('Change +SAR 10 (25.0 %) vs prior period');

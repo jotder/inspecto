@@ -1,15 +1,4 @@
-import {
-    ChangeDetectionStrategy,
-    Component,
-    DestroyRef,
-    Injector,
-    computed,
-    effect,
-    inject,
-    input,
-    signal,
-} from '@angular/core';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, Injector, computed, effect, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
@@ -111,7 +100,6 @@ export class KpiComponent {
     readonly definition = signal<KpiValue | null>(null);
     /** Resolved only when a `kpiId` is bound, so an unbound tile needs no HttpClient (every host spec). */
     private readonly injector = inject(Injector);
-    private readonly destroyRef = inject(DestroyRef);
     /** A caption for a host with no title of its own (the assistant's KPI artifact). A dashboard tile omits it —
      *  its card already carries the widget title. */
     readonly label = input<string | undefined>(undefined);
@@ -131,17 +119,19 @@ export class KpiComponent {
     readonly bound = computed(() => !!this.kpiId());
 
     constructor() {
-        effect(() => {
+        // One read in flight: a kpiId/asOf change cancels the previous request (the effect's cleanup), so a slow
+        // stale answer can never overwrite the newer one.
+        effect((onCleanup) => {
             const id = this.kpiId();
             const asOf = this.asOf() || undefined;
             this.definition.set(null);
             this.failed.set(false);
             if (!id) return;
-            this.injector
+            const read = this.injector
                 .get(KpisService)
                 .value(id, asOf)
-                .pipe(takeUntilDestroyed(this.destroyRef))
                 .subscribe({ next: (v) => this.definition.set(v), error: () => this.failed.set(true) });
+            onCleanup(() => read.unsubscribe());
         });
     }
 

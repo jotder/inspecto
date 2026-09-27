@@ -6,6 +6,7 @@ import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { WidgetsService } from '../widgets/widgets.service';
+import { todayIso } from './dashboard-date-range';
 import { DashboardViewStore } from './dashboard-view.store';
 
 function ds(id: string, columns: string[], calculated: string[] = []): Dataset {
@@ -147,5 +148,19 @@ describe('DashboardViewStore — treemap subgroup drill (group AND subgroup)', (
         expect(s.filter().items).toEqual([eq('typology', 'IRSF')]);
         s.onDrill({ field: 'typology', value: 'IRSF' });
         expect(s.filter().items).toEqual([]);
+    });
+});
+
+describe('DashboardViewStore — the day a KPI tile evaluates at (ASSURE-KPI-DEFINITIONS-1)', () => {
+    it('passes a real past day, and blanks a half-typed, impossible or future one instead of the browser today', () => {
+        const s = store();
+        s.asOf.set('2026-08-13');
+        expect(s.kpiAsOf()).toBe('2026-08-13');
+        for (const bad of ['', '2026-08', '2026-02-30', '9999-12-31']) {
+            s.asOf.set(bad);
+            expect(s.kpiAsOf()).toBe('');
+        }
+        s.asOf.set(todayIso());
+        expect(s.kpiAsOf()).toBe(todayIso());
     });
 });

@@ -28,6 +28,7 @@ class StubTileComponent {
     readonly widget = input<Widget>();
     readonly dataset = input<Dataset | undefined>(undefined);
     readonly filter = input<ConditionGroup | null>(null);
+    readonly asOf = input('');
     readonly drill = output<DrillEvent>();
 }
 @Component({
@@ -192,6 +193,18 @@ describe('MenuArtifactComponent', () => {
         // The host (menu item) owns the page's <h1>; the header adds no heading of its own.
         expect(header.querySelector('h1, h2, h3')).toBeNull();
         await expectNoA11yViolations(f.nativeElement);
+    });
+
+    it("gives each tile the Dashboard's asOf for its KPI read — a real past day only, never a future one", async () => {
+        const f = create({ ...dashboard([]), asOf: '2026-09-23' });
+        await settle(f);
+        expect(tile(f).asOf()).toBe('2026-09-23');
+    });
+
+    it('gives the tiles no asOf when the Dashboard states a future day', async () => {
+        const f = create({ ...dashboard([]), asOf: '9999-12-31' });
+        await settle(f);
+        expect(tile(f).asOf()).toBe('');
     });
 
     it('UIE-5: renders no header for a Dashboard that declares none of it', async () => {

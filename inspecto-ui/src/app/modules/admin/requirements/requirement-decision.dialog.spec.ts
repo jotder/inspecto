@@ -109,6 +109,14 @@ describe('RequirementDecisionDialog', () => {
             expect(createKpiButton(fixture.nativeElement)).toBeUndefined();
         });
 
+        it('while a KPI from it is held for approval, explains that instead of offering Create KPI', async () => {
+            const { fixture } = create({ ...delivered(), kpiPending: true } as Requirement);
+            const el = fixture.nativeElement as HTMLElement;
+            expect(createKpiButton(el)).toBeUndefined();
+            expect(el.querySelector('[data-testid="kpi-pending"]')?.textContent).toContain('waiting for approval');
+            await expectNoA11yViolations(el);
+        });
+
         it('shows the created KPI id instead once the requirement has one', () => {
             const { fixture } = create({ ...delivered(), kpi: 'refund_exposure' });
             const el = fixture.nativeElement as HTMLElement;

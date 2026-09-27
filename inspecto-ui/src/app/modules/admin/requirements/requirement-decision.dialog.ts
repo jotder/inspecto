@@ -17,6 +17,9 @@ export type RequirementDecisionResult =
     | { action: 'deliver'; note?: string }
     | { action: 'createKpi' };
 
+/** The detail dialog's input: the Requirement, plus whether a KPI created from it is held for approval. */
+export type RequirementDetail = Requirement & { kpiPending?: boolean };
+
 /**
  * Requirement detail — full description + the Builder-queue triage actions (Wave-3 interview decision,
  * 2026-07-03): Accept/Reject a `submitted` requirement, or Deliver an `accepted` one. Business (and
@@ -94,6 +97,10 @@ export type RequirementDecisionResult =
                 <p class="text-secondary text-sm">
                     <span class="font-medium">KPI:</span> <span class="font-mono">{{ data.kpi }}</span>
                 </p>
+            } @else if (data.kpiPending) {
+                <p class="text-secondary text-sm" data-testid="kpi-pending">
+                    A KPI from this requirement is waiting for approval in Pending Changes.
+                </p>
             } @else if (canCreateKpi()) {
                 <div>
                     <button mat-flat-button color="primary" (click)="createKpi()">Create KPI</button>
@@ -107,7 +114,7 @@ export type RequirementDecisionResult =
 })
 export class RequirementDecisionDialog {
     private ref = inject(MatDialogRef<RequirementDecisionDialog, RequirementDecisionResult>);
-    readonly data = inject<Requirement>(MAT_DIALOG_DATA);
+    readonly data = inject<RequirementDetail>(MAT_DIALOG_DATA);
     readonly lens = inject(LensService);
 
     readonly note = new FormControl('', { nonNullable: true });
