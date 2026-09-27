@@ -4,7 +4,8 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
-import { AlertRule, AlertsService } from 'app/inspecto/api';
+import { AlertRule, AlertsService, ComponentsService } from 'app/inspecto/api';
+import { DbBrowserService } from 'app/inspecto/api/db-browser.service';
 import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { AlertRuleFormData, AlertRuleFormDialog } from './alert-rule-form.dialog';
@@ -424,6 +425,44 @@ describe('AlertRuleFormDialog', () => {
         input.dispatchEvent(new Event('blur'));
         expect(c.schemaForm.listValue('by')).toEqual(['region']); // blur-commit really was deferred
         // … and the click runs save() before any outside-click closes the panel.
+        c.save();
+        const [, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
+        expect(body['by']).toEqual(['region', 'msisdn']);
+    });
+
+    it('the real Dataset-aware loader suggests the columns of the store the Dataset resolves to, and Save keeps a typed entry', async () => {
+        // The Alert Rule `dataset` holds a Dataset ID (`fraud_cases_open`), not a store name — probing
+        // `/db/table?name=fraud_cases_open` 404'd, so no suggestion ever appeared. Resolve it first.
+        const table = vi.fn(() => of({ columns: [{ name: 'msisdn', type: 'VARCHAR' }], rows: [], truncated: false }));
+        TestBed.overrideProvider(ComponentsService, {
+            useValue: {
+                list: () => of([]),
+                get: (_t: string, id: string) =>
+                    of({
+                        type: 'dataset',
+                        name: id,
+                        ref: `dataset/${id}`,
+                        content: { kind: 'physical', physicalRef: 'fraud_cases' },
+                    }),
+            },
+        });
+        TestBed.overrideProvider(DbBrowserService, { useValue: { table } });
+        const { c, save, fixture } = create({ rule: { ...MEASURE_RULE, by: ['region'], stormCap: 50 } as AlertRule });
+        c.schemaForm.showOptional.set(true);
+        fixture.detectChanges();
+        const input = byInput(fixture.nativeElement);
+        input.focus();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        input.value = 'msisdn';
+        input.dispatchEvent(new Event('input'));
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(table).toHaveBeenCalledWith(expect.objectContaining({ name: 'fraud_cases', limit: 1 }));
+        expect(document.querySelector('mat-option')?.textContent).toContain('msisdn (string)');
+        await expectNoA11yViolations(fixture.nativeElement);
+        input.dispatchEvent(new Event('blur'));
         c.save();
         const [, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
         expect(body['by']).toEqual(['region', 'msisdn']);

@@ -33,6 +33,7 @@ import {
     datasetOptionLoader,
     pipelineOrJobOptionLoader,
 } from 'app/inspecto/components/entity-option-loaders';
+import { datasetColumnOptionLoader } from 'app/modules/admin/studio/datasets/dataset-column-option-loader';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition-group.component';
 import { dbColumnType } from 'app/inspecto/query/query-columns';
@@ -209,12 +210,12 @@ export class ExpectationFormDialog implements AfterViewInit {
     );
 
     /** Suggestion sources: `target` follows the Attach-to picker; `refDataset` = dataset components;
-     *  `column`/`refColumn` probe the sibling target's / reference dataset's records (R2 follow-up). */
+     *  `column` probes the sibling target's store; `refColumn` resolves the reference Dataset's columns (R2 follow-up). */
     readonly optionLoaders = {
         target: pipelineOrJobOptionLoader(),
         refDataset: datasetOptionLoader(),
         column: columnOptionLoader('target'),
-        refColumn: columnOptionLoader('refDataset'),
+        refColumn: datasetColumnOptionLoader('refDataset'),
     };
 
     readonly isEdit = !!this.data.expectation;

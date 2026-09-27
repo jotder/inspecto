@@ -6,7 +6,8 @@ import { apiErrorMessage } from 'app/inspecto/api';
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
-import { columnOptionLoader, datasetOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import { datasetOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import { datasetColumnOptionLoader } from 'app/modules/admin/studio/datasets/dataset-column-option-loader';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { Requirement, RequirementKpiBody, RequirementKpiResult, RequirementsService } from 'app/inspecto/requirement';
@@ -68,7 +69,7 @@ export class RequirementKpiDialog {
 
     readonly requestClose = guardDirtyClose(this.ref, () => this.schemaForm?.isDirty() ?? false, this.confirm);
     readonly attributes = REQUIREMENT_KPI_ATTRIBUTES;
-    readonly optionLoaders = { dataset: datasetOptionLoader(), timeField: columnOptionLoader('dataset') };
+    readonly optionLoaders = { dataset: datasetOptionLoader(), timeField: datasetColumnOptionLoader('dataset') };
     readonly saving = signal(false);
     readonly refusal = signal<string | null>(null);
 

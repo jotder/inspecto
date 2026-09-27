@@ -23,7 +23,7 @@ operational column name stays.
 engine's `AlertRule.fromMap` tells the shapes apart by `dataset`) picks a **Pipeline metric** (`metric` +
 `window`, optional `when` over ledger columns) or a **Dataset Measure** (`dataset` via `datasetOptionLoader`,
 `measure` checked by the shared `inspecto/query/measure-grammar.ts`, optional per-entity **One Alert per**
-`by` — a `list` whose entries are suggested by `columnOptionLoader('dataset')` and checked as bare
+`by` — a `list` whose entries are suggested by `datasetColumnOptionLoader('dataset')` (`studio/datasets/dataset-column-option-loader.ts`: resolves the Dataset id, then `DatasetRowsService.columns` — declared columns, else a 1-row probe of its `physicalRef`/view/query; the old `columnOptionLoader` probed the Dataset id as a store name and 404'd, so no suggestion ever appeared — same fix for KPI `timeField` and Expectation `refColumn`) and checked as bare
 identifiers — and **Storm cap** `stormCap`). Each kind's fields hang off `kind` by `dependsOn`, so a hidden
 field is neither validated nor saved; the `when` tree is host-rendered and follows a `kind` signal fed from
 the control's `valueChanges`. Rules of the save:

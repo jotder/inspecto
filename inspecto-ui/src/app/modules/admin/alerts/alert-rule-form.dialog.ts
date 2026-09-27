@@ -18,10 +18,10 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import {
-    columnOptionLoader,
     datasetOptionLoader,
     pipelineOptionLoader,
 } from 'app/inspecto/components/entity-option-loaders';
+import { datasetColumnOptionLoader } from 'app/modules/admin/studio/datasets/dataset-column-option-loader';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { firstValueFrom } from 'rxjs';
 import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition-group.component';
@@ -266,7 +266,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
         },
         onPipeline: pipelineOptionLoader(),
         dataset: datasetOptionLoader(),
-        by: columnOptionLoader('dataset'),
+        by: datasetColumnOptionLoader('dataset'),
     };
 
     /** Domain rules a declarative spec cannot phrase — each renders its own message on screen. */
