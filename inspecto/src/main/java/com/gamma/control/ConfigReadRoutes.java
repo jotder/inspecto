@@ -75,6 +75,7 @@ final class ConfigReadRoutes implements RouteModule {
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
         Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, type, fileName, subdir);
+        WriteGates.refuseReservedConfigTarget(writeRoot, target);   // CONFIG-WRITE-REGISTRY-1, before the 404
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
         if (!Files.isRegularFile(target)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such config: " + rel);
 

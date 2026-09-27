@@ -72,6 +72,70 @@ public final class WriteGates {
         }
     }
 
+    /**
+     * Gate 3b for the {@code /config/*} write routes ({@code CONFIG-WRITE-REGISTRY-1}, 2026-09-27) — a target
+     * that is not a config file those routes own → 403. Two classes of file sit under the same write root:
+     * <ul>
+     *   <li><b>{@code registry/}</b> — every component kind. Its own door ({@code /components/<kind>},
+     *       {@code /access/*}, {@code /alerts/rules}) carries the kind's capability ({@code canManageIncidents},
+     *       {@code canConfigureAccess}, …), its {@code fromMap} validation and its maker-checker key. A caller
+     *       {@code subdir} of {@code registry/<dir>} used to land a {@code meta} file there (or overwrite, patch
+     *       or delete one — deleting {@code registry/access-profiles/role-<r>.toon} WIDENS that role) under
+     *       {@code canAuthorWorkbench} and the {@code meta} approval rule. No shipped caller writes there.</li>
+     *   <li>the reserved Space documents ({@link com.gamma.service.ReservedConfigPaths}: {@code roles.toon},
+     *       {@code approval.toon}, …) — a {@code meta} named {@code roles} WAS {@code roles.toon}.</li>
+     * </ul>
+     * Judged on the normalised path AND its real path, case-insensitively and with the trailing dots/spaces
+     * Windows drops, so {@code Registry/}, {@code registry./}, {@code x/../registry/} and a link to the
+     * registry all count. Call it on the FINAL target, before any existence check (no existence oracle).
+     */
+    static void refuseReservedConfigTarget(Path root, Path target) {
+        Path base = root.toAbsolutePath().normalize();
+        Path abs = target.toAbsolutePath().normalize();
+        refuseRegistry(base.relativize(abs));
+        Path realBase = realOfNearestExisting(base), realAbs = realOfNearestExisting(abs);
+        if (realBase != null && realAbs != null && realAbs.startsWith(realBase))
+            refuseRegistry(realBase.relativize(realAbs));
+        String reserved = com.gamma.service.ImportPaths.reservedRefusal(base,
+                base.relativize(abs).toString().replace('\\', '/'));
+        if (reserved != null)
+            throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION,
+                    "the config routes do not write this file: it is " + reserved + ", owned by its own route");
+    }
+
+    private static void refuseRegistry(Path rel) {
+        if (rel.getNameCount() == 0 || !"registry".equalsIgnoreCase(windowsName(rel.getName(0)))) return;
+        String dir = rel.getNameCount() > 2 ? windowsName(rel.getName(1)) : null;
+        String kind = null;
+        if (dir != null) {
+            java.util.Set<String> kinds = new java.util.TreeSet<>(com.gamma.pipeline.ComponentStore.WRITABLE_TYPES);
+            kinds.add("connection");
+            for (String k : kinds)
+                if (com.gamma.pipeline.ComponentRegistry.dirForType(k).filter(dir::equalsIgnoreCase).isPresent()) kind = k;
+        }
+        throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION,
+                "registry/ is the component registry, not a config directory — write "
+                        + (kind == null ? "a component through /components/<kind>" : "a " + kind + " through /components/" + kind)
+                        + ", which applies its own capability, validation and approval");
+    }
+
+    /** A path segment as Windows resolves it: trailing dots and spaces dropped ({@code "registry. "} IS {@code registry}). */
+    private static String windowsName(Path segment) {
+        return segment.toString().replaceAll("[. ]+$", "");
+    }
+
+    /** The real path of {@code p}'s nearest existing ancestor with the missing tail re-attached, or {@code null}. */
+    private static Path realOfNearestExisting(Path p) {
+        try {
+            Path existing = p;
+            while (existing != null && !java.nio.file.Files.exists(existing)) existing = existing.getParent();
+            if (existing == null) return null;
+            return existing.toRealPath().resolve(existing.relativize(p)).normalize();
+        } catch (java.io.IOException | RuntimeException e) {
+            return null;   // the lexical verdict above and ImportPaths' fail-closed real-path check still stand
+        }
+    }
+
     /** Gate 4 — resource conflict → 409. */
     public static void conflictIf(boolean conflict, String message) {
         if (conflict) throw new ApiException(409, ErrorCodes.CONFLICT, message);

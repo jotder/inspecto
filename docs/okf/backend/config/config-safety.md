@@ -173,6 +173,39 @@ falsified the doc; the constructor now keeps empty empty, `PathJail.requireUnder
 ⚠ Surefire sets the roots to `<repo>;<temp>`, so **nothing under a `@TempDir` escapes by default** — a
 containment test that does not narrow the roots passes vacuously.
 
+## The `/config/*` write routes never reach `registry/` or a reserved file (`CONFIG-WRITE-REGISTRY-1`, 2026-09-27)
+
+Being contained in the write root is not the same as being a file those routes own. `POST /config/write`,
+`POST /config/patch` and `DELETE /config/{type}/{name}` take a caller `subdir`, and until this fix a
+`canAuthorWorkbench` Subject could aim it at `registry/<dir>` and **plant, overwrite, patch or delete any
+component**. Measured on real HTTP for `kpi`, `findings-spec`, `alert-rule` and `access-profile`: every
+operation answered 200, `GET /components/<kind>/<id>` then served the planted file, and no Pending Change
+was held although a policy governed each kind. That bypassed the kind's own capability (`canManageIncidents`,
+`canConfigureAccess`, `canAuthorAlertRules`), its `fromMap` validation (a KPI with no Measure) and its
+maker-checker rule (the write was held — or not — as `meta`). Deleting `registry/access-profiles/role-<r>.toon`
+**widens** that role: a role with no saved profile allows everywhere. Only the `meta` spec's unknown-key ERROR
+stopped a kind-shaped payload, so what landed was `name`-only — a guard by coincidence, not by design. The
+same routes also wrote the reserved Space documents: `meta` named `roles` **was** `roles.toon`.
+
+**The rule** — `WriteGates.refuseReservedConfigTarget`, called on the FINAL target of all three routes, after
+the 422 content gate and before any existence check (so a refusal is not an existence oracle) → **403
+`PATH_JAIL_VIOLATION`**:
+
+- the config-relative path's first segment is `registry` → refused, naming `/components/<kind>` as the door.
+  Judged on the normalised path **and** its real path, case-insensitively and with the trailing dots/spaces
+  Windows drops — `Registry/`, `REGISTRY/KPIS`, `registry./`, `registry\kpis`, `x/../registry/`, a
+  double-encoded `?subdir=registry%252Fkpis` on a DELETE (its query is decoded twice) and a link into the
+  registry all count;
+- the path is a reserved file or directory (`ImportPaths.reservedRefusal`, i.e. `ReservedConfigPaths` plus
+  its real-path check — the same list every import already honours).
+
+⛔ No shipped caller wrote under `registry/` through these routes: the UI's `subdir` is always a Pipeline's own
+config directory, and `schema-editor.dialog.ts` already routes a registry schema through `/components/schema`
+(its comment explains why `subdir: 'registry/schemas'` was wrong anyway — the component read does no
+sibling-CSV merge). ⚠ The `GET /config/{type}/{name}` read is deliberately left alone: it is ungated like every
+read, and `/components/<kind>` already serves the same bytes. Pinned by `ControlApiConfigWriteRegistryJailTest`
+(its symlink case needs link privilege and skips on a stock Windows account).
+
 ## Decision 2026-09-23 — a relative DATA path resolves under the Space directory
 
 **Operator decision (`DATA-DIRS-RESOLVE-AGAINST-CWD-1`):** a config's relative data paths resolve under the

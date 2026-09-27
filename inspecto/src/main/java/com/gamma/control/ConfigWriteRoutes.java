@@ -145,6 +145,7 @@ final class ConfigWriteRoutes implements RouteModule {
                 break;
             }
         }
+        WriteGates.refuseReservedConfigTarget(writeRoot, target);   // CONFIG-WRITE-REGISTRY-1: never registry/ or a reserved file
 
         // ⛔ D3 (a created Pipeline lands in config/<id>/) is SIGNED and still unlanded. Two attempts,
         // each of which taught the next one something:
@@ -362,6 +363,7 @@ final class ConfigWriteRoutes implements RouteModule {
         // the prerequisite for deleting it — resolving only against the write root made that
         // impossible for every pipeline whose file lives in a subdirectory.
         Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, type, fileName, subdir);
+        WriteGates.refuseReservedConfigTarget(writeRoot, target);   // CONFIG-WRITE-REGISTRY-1, before the 404
         String rel = writeRoot.relativize(target).toString().replace('\\', '/');
         if (!Files.isRegularFile(target))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such config: " + rel + " (create it via /config/write first)");
