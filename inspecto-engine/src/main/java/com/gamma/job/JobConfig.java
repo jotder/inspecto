@@ -49,6 +49,18 @@ public record JobConfig(String name, String type, String cron, String onPipeline
                         String onSignal, String when,
                         Map<String, String> args, Map<String, String> bind) {
 
+    /**
+     * The Job's author, SERVER-STAMPED by every control-plane write door ({@code MAINT-TASK-AUTHORITY-1}): the
+     * Subject id that created it, the one that last saved it, and the role names that last editor held then
+     * (comma-separated). Carried in {@link #params()} like any other key; a client-supplied value is always
+     * discarded. The run authority re-resolves {@link #UPDATED_BY_ROLES} against the role table as it is at RUN
+     * time, so an administrator-only task stops running when its last editor loses {@code canAdminister}.
+     */
+    public static final String CREATED_BY = "createdBy";
+    public static final String UPDATED_BY = "updatedBy";
+    public static final String UPDATED_BY_ROLES = "updatedByRoles";
+    public static final java.util.Set<String> AUTHOR_KEYS = java.util.Set.of(CREATED_BY, UPDATED_BY, UPDATED_BY_ROLES);
+
     /** Null-guard the trigger maps so {@link #args()}/{@link #bind()} accessors never return null (P3a-2). */
     public JobConfig {
         args = args == null ? Map.of() : args;

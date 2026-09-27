@@ -48,8 +48,11 @@ class ControlApiRestoreJobGateTest {
     void arm() {
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
             case "Bearer power" -> Optional.of(new Subject("power-1", Set.of("canAuthorWorkbench", "canOperateRuns")));
-            case "Bearer admin" -> Optional.of(new Subject("admin-1",
-                    Set.of("canAuthorWorkbench", "canOperateRuns", "canAdminister")));
+            case "Bearer admin" -> {
+                // MAINT-TASK-AUTHORITY-1: the runner re-resolves the last editor's recorded roles
+                ComponentAccess.heldRoles(ex, Set.of("admin"));
+                yield Optional.of(new Subject("admin-1", Set.of("canAuthorWorkbench", "canOperateRuns", "canAdminister")));
+            }
             default -> Optional.empty();
         });
     }

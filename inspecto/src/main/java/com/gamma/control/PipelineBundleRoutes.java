@@ -230,6 +230,7 @@ final class PipelineBundleRoutes implements RouteModule {
         Map<String, Object> manifest = manifestOf(entries);
         // IMPORT-CONNECTION-JOB-GATE-1: a carried file of a kind whose own route is stricter needs that gate.
         ImportCapabilityGuard.checkFiles(e, entries);
+        entries = new LinkedHashMap<>(JobAuthority.stampFiles(e, entries));   // MAINT-TASK-AUTHORITY-1
         Imported r = importClosure(api, writeRoot, manifest, entries,
                 ApiContext.query(e, "name"), ApiContext.query(e, "conflict"));
         return r.written() ? r.body() : ApiContext.respondJson(e, 422, r.body());

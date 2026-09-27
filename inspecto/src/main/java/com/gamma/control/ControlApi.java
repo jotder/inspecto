@@ -279,7 +279,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         // security module's no-arg constructor rejects) fails to boot instead of silently accepting
         // traffic. A no-op on Personal — the lookup just resolves empty.
         Authenticators.active();
+        // MAINT-TASK-AUTHORITY-1: the runner re-checks an administrator-only Job's last editor against the role
+        // table the request gate resolves (this server's bound Space); inert while no Authenticator is active.
+        com.gamma.job.JobService.installRunAuthority(runAuthority);
     }
+
+    private final com.gamma.job.JobService.RunAuthority runAuthority = JobAuthority.runAuthority(this::writeRoot);
 
     /**
      * The address the control plane listens on: {@code -Dcontrol.bind=<host-or-IP>}, or **every
@@ -416,6 +421,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     public void close() {
         if (anchorRoll != null) anchorRoll.shutdownNow();
         http.stop(SHUTDOWN_DRAIN_SECONDS);
+        if (com.gamma.job.JobService.runAuthority() == runAuthority) com.gamma.job.JobService.installRunAuthority(null);
         // Only clear the loopback URL if it still points at us (a later ControlApi in the same JVM may
         // have re-published its own — don't strip a live one out from under it).
         String mine = "http://127.0.0.1:" + port();

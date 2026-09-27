@@ -347,7 +347,7 @@ final class JobRoutes implements RouteModule {
     /** {@code POST /jobs} — create a new scheduled job (write-root gated); 409 if the name exists. */
     private Object createJob(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
-        JobConfig c = parseJob(body);
+        JobConfig c = JobAuthority.stamp(ex, parseJob(body), null);   // MAINT-TASK-AUTHORITY-1: server-stamped author
         requireAdministerForEventPrune(ex, c);
         WriteGates.conflictIf(api.service().jobServiceOrCreate().jobs().stream()
                         .anyMatch(v -> v.name().equals(c.name())),
@@ -368,7 +368,7 @@ final class JobRoutes implements RouteModule {
         JobConfig existing = svc.jobConfig(name)
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'"));
         ETags.requireMatch(ex, ETags.of(ContentHash.of(existing.toMap())));
-        JobConfig c = parseJob(body);
+        JobConfig c = JobAuthority.stamp(ex, parseJob(body), existing);   // MAINT-TASK-AUTHORITY-1
         requireAdministerForEventPrune(ex, existing);   // turning an event_prune INTO something else, too
         requireAdministerForEventPrune(ex, c);
         if (!name.equals(c.name())) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body 'name' must match the path id");
@@ -398,7 +398,19 @@ final class JobRoutes implements RouteModule {
      * (Personal), like every capability check.
      */
     static void requireAdministerForEventPrune(HttpExchange ex, JobConfig c) {
-        if (isAdministerOnlyMaintenance(c)) ApiContext.requireCapability(ex, "canAdminister");
+        if (requiresAdminister(c, Roles.configRoot(ex))) ApiContext.requireCapability(ex, "canAdminister");
+    }
+
+    /**
+     * Whether authoring — and, at run time, running ({@link JobAuthority}) — {@code c} needs {@code canAdminister}:
+     * a task in {@link #isAdministerOnlyMaintenance}'s set, or a {@code cleanup} whose swept or archive directory
+     * overlaps the Space config root {@code configRoot} ({@link JobAuthority#cleanupTouchesConfigRoot},
+     * MAINT-TASK-AUTHORITY-1: a builder's cleanup could otherwise retire {@code roles.toon}'s neighbours, or archive
+     * files INTO the config tree). Every other cleanup stays {@code canAuthorWorkbench}. ⚠ Every Job-authoring door
+     * asks THIS predicate, with the config root the request gate resolves roles against.
+     */
+    static boolean requiresAdminister(JobConfig c, Path configRoot) {
+        return isAdministerOnlyMaintenance(c) || JobAuthority.cleanupTouchesConfigRoot(c, configRoot);
     }
 
     /**

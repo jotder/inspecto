@@ -152,7 +152,7 @@ final class ImportCapabilityGuard {
         }
     }
 
-    /** Parsed exactly as the Job loader parses it, so the verdict is {@link JobRoutes#isAdministerOnlyMaintenance}'s;
+    /** Parsed exactly as the Job loader parses it, so the verdict is {@link JobRoutes#requiresAdminister}'s;
      *  refused as {@code job (<task>)}, the task lower-cased as {@code MaintenanceJob} dispatches it. */
     @SuppressWarnings("unchecked")
     private static void requireIfAdministerOnly(HttpExchange ex, Map<?, ?> job) {
@@ -160,7 +160,7 @@ final class ImportCapabilityGuard {
         j.putIfAbsent("name", "import");
         try {
             JobConfig c = JobConfig.fromMap(Map.of("job", j));
-            if (!JobRoutes.isAdministerOnlyMaintenance(c)) return;
+            if (!JobRoutes.requiresAdminister(c, Roles.configRoot(ex))) return;
             require(ex, "job (" + c.opt("task", "").toLowerCase(Locale.ROOT) + ")", Roles.CAN_ADMINISTER);
         } catch (ApiException denied) {
             throw denied;

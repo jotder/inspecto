@@ -246,6 +246,7 @@ final class DataSourceRoutes implements RouteModule {
         // ASSURE-ACTION-REQUESTS-1 round-2 finding 1: a registry/decision-rules/ entry passes the ONE rule gate
         // (invoke-api needs canWorkIncidents, params validated, makers server-stamped) before anything is written.
         bundle = DecisionRuleGuard.guardImport(e, config, bundle);
+        bundle = JobAuthority.stampBundle(e, bundle);   // MAINT-TASK-AUTHORITY-1: carried Jobs server-stamped
 
         // Conflict = a bundle pipeline id that already exists in this space's registry.
         Set<String> existing = api.service().pipelines().stream()

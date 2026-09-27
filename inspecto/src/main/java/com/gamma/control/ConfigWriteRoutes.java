@@ -54,8 +54,10 @@ final class ConfigWriteRoutes implements RouteModule {
         type = type.toLowerCase(java.util.Locale.ROOT);   // as ConfigSpecs.forType judges it — every type branch below too
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);
-        Map<String, Object> draft = mapAt(body, "config");
-        requireKindCapability(ex, type, draft);
+        Map<String, Object> authored = mapAt(body, "config");
+        requireKindCapability(ex, type, authored);
+        Map<String, Object> draft = "job".equals(type)   // MAINT-TASK-AUTHORITY-1: a Job's author is server-stamped
+                ? JobAuthority.stampDraft(ex, authored, storedJobCreatedBy(api, authored)) : authored;
         // SCHEMA-FILE-NAME-1: a SCHEMA's file may be named apart from its content. A schema self-names via
         // `raw.name`, but `raw.name` is the raw/source identity (`ORDERS`, `CALL`) and a Pipeline references
         // its schema as `<pipeline>_schema.toon` — two names that differ in every committed schema. Deriving
@@ -338,6 +340,14 @@ final class ConfigWriteRoutes implements RouteModule {
         }
     }
 
+    /** The {@code createdBy} of the live Job this draft names, or null (a create, or no JobService yet). */
+    private static String storedJobCreatedBy(ApiContext api, Map<String, Object> draft) {
+        Object j = draft.get("job") instanceof Map<?, ?> m ? m.get("name") : draft.get("name");
+        if (j == null) return null;
+        return api.service().jobService().flatMap(s -> s.jobConfig(String.valueOf(j)))
+                .map(c -> c.params().get(com.gamma.job.JobConfig.CREATED_BY)).orElse(null);
+    }
+
     private Object patchConfig(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "config patch");
 
@@ -375,6 +385,7 @@ final class ConfigWriteRoutes implements RouteModule {
         Map<String, Object> merged = deepMerge(existing, patch);
         requireKindCapability(ex, type, existing);   // turning an administer-only Job INTO something else, too
         requireKindCapability(ex, type, merged);
+        if ("job".equals(type)) merged = JobAuthority.stampDraft(ex, merged, JobAuthority.createdByOf(existing));   // MAINT-TASK-AUTHORITY-1
 
         // The filename derives from the identity field, so a patch may not move it — a renamed
         // identity under the old filename would silently split the config from its index entry.

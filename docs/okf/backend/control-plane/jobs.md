@@ -508,13 +508,44 @@ user (canAuthorWorkbench + canOperateRuns) granted themselves `canAdminister` �
 editing a Job whose task is in `JobRoutes.isAdministerOnlyMaintenance` (`event_prune`, `restore`) needs
 `canAdminister` at `POST`/`PUT /jobs` and `/config/write` type `job`, judged **lower-cased** as `MaintenanceJob`
 dispatches it (`RESTORE` runs the restore). ⚠ Every Job-authoring door must ask that predicate — the import doors
-included (their guard lands separately). ⚠ Enforcement is at **authoring time only**: a Job records no author, so
-the runner cannot refuse a restore whose author lacked the capability; a restore Job already on disk before the
-gate still runs. Other tasks judged: `backup` / `backup_verify` read and write only archives, the prunes and
-`compact` forget or merge data but write no config — authoring-level; `cleanup` can retire files under any jailed
-dir (config included) — deletion, not escalation, left open in `MAINT-TASK-AUTHORITY-1`. Test:
+included (through `ImportCapabilityGuard`). Other tasks judged: `backup` / `backup_verify` read and write only
+archives, the prunes and `compact` forget or merge data but write no config — authoring-level. Test:
 `inspecto-backup` `ControlApiRestoreJobGateTest` (the only classpath holding `restore`, so the admin probe really
 runs it).
+
+🔴 **Jobs carry a server-stamped author, and the runner re-checks it** (`MAINT-TASK-AUTHORITY-1`, 2026-09-27;
+session decisions, overturnable). Seam: `control/JobAuthority.java` + `JobService.RunAuthority`.
+* **Stamping.** Every Job write door — `POST`/`PUT /jobs`, `/config/write` + `/config/patch` type `job`,
+  `/bundle/import` job items and pipeline-closure files, `/import`, `/pipelines/import`, `/spaces/import` —
+  strips any client-sent `createdBy` / `updatedBy` / `updatedByRoles` (`JobConfig.AUTHOR_KEYS`, carried in the
+  `job:` section like any param) and, when a Subject is attached, stamps `updatedBy` = the Subject id,
+  `updatedByRoles` = its held (table-backed) role names, `createdBy` = the stored Job's (or the writer on a create;
+  a raw-file import always stamps the importer). No Subject (Personal / no Authenticator) ⇒ stripped, not stamped.
+  ⚠ A raw-file import re-encodes each `*_job.toon` (comments are lost), as `DecisionRuleGuard.guardImport` does.
+  The keys are `ParameterResolver.FRAMEWORK_KEYS`, never an "undeclared parameter" warning.
+* **Run-time re-check.** `ControlApi` installs `JobAuthority.runAuthority` into `JobService` (process-wide);
+  `executeRun` consults it for EVERY run path (cron, event, signal, manual, replay, catch-up, dry run) before the
+  parameter ladder. A Job for which `JobRoutes.requiresAdminister` holds runs only if its `updatedByRoles`,
+  re-resolved against the bound Space's role table AS IT IS NOW (seed ∪ `roles.toon`, deny grants removed — the
+  `PendingChanges.authorNow` idiom), still grant `canAdminister`. Otherwise the run is `REJECTED` with the reason,
+  a `job.run.rejected` signal, and an `AUDIT` event `job.run.refused` (actor = the last editor). Inert while no
+  Authenticator is active (behaves as before). ⚠ The re-check sees the ROLE TABLE changing, never an identity
+  provider dropping a user from a group — the server holds no user → role store; the roles recorded at save are
+  what is re-resolved. A Subject whose Authenticator stamps no held roles records none, so its admin-only Jobs are
+  refused (fail closed).
+* 🔴 **Migration: existing `restore` / `event_prune` Jobs (and config-root cleanups) PAUSE on an authenticated
+  server until an administrator re-saves them** — a Job with no recorded author is refused (`records no author`,
+  WARN logged once per Job). Safe by default; a hand-edited file on disk is trusted like any file on disk.
+* **`cleanup` over the config root is administrator-only.** Content-aware, not the whole task:
+  `JobAuthority.cleanupTouchesConfigRoot` resolves `dir` and `archive_dir` (a relative value against EVERY base a
+  runner may use — the config root, `SpaceConfigRoot.current()` as `CleanupTask` does, and the working directory,
+  its legacy fallback), canonicalises both sides (real path of the longest existing prefix, lower-cased on
+  Windows) and flags a path inside the config root — which holds every `ReservedConfigPaths` entry — or an ANCESTOR
+  of it (a sweep that walks down into it). `archive_dir` counts because archiving INTO the config tree plants
+  files there. Such a cleanup needs `canAdminister` at every authoring door (same predicate, config root =
+  `Roles.configRoot(ex)`, the root the gate resolves roles against) and at run time; every other cleanup stays
+  `canAuthorWorkbench`.
+Test: `ControlApiJobAuthorityTest` (stamping at four doors, revocation, legacy refusal, cleanup gate + run-time).
 
 * **Dry run (MNT-1)** — `POST /jobs/{name}/trigger?dryRun=true` (v1 202 body echoes it); `JobContext.dryRun()`;
   tasks with no preview do nothing on a dry run (fail-closed).

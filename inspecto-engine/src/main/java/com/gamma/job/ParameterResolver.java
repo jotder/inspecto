@@ -59,12 +59,15 @@ final class ParameterResolver {
      * <ul>
      *   <li>{@code on_pipeline_gate} — {@code JobService.onCommit}'s {@code any}/{@code all} multi-upstream
      *       semantics, documented on {@link JobConfig} itself and applicable to every type.</li>
+     *   <li>{@link JobConfig#AUTHOR_KEYS} — the server-stamped author of the Job, read by
+     *       {@code JobService}'s run authority ({@code MAINT-TASK-AUTHORITY-1}).</li>
      * </ul>
      * ⚠ {@code flow} is <b>not</b> here: it is the pre-rename alias of the {@code pipeline} parameter and is
      * excused below only when a {@code pipeline} declaration exists — i.e. exactly when the ladder's
      * {@code config:flow} rung actually reads it.
      */
-    private static final java.util.Set<String> FRAMEWORK_KEYS = java.util.Set.of("on_pipeline_gate");
+    private static final java.util.Set<String> FRAMEWORK_KEYS = java.util.Set.of("on_pipeline_gate",
+            JobConfig.CREATED_BY, JobConfig.UPDATED_BY, JobConfig.UPDATED_BY_ROLES);
 
     /**
      * Where a resolved value came from, and what it overrode (`DUCKLE-C4-PARAM-PROVENANCE-1`, 2026-09-15).

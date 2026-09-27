@@ -338,6 +338,12 @@ final class BundleRoutes implements RouteModule {
                 continue;   // the item fails on its own when it is written
             }
             ImportCapabilityGuard.checkFiles(exchange, entries);
+            // MAINT-TASK-AUTHORITY-1: a carried *_job.toon is server-stamped; the closure writes these bytes
+            Map<String, byte[]> stamped = JobAuthority.stampFiles(exchange, entries);
+            if (stamped != entries) {
+                @SuppressWarnings("unchecked") Map<String, Object> fs = (Map<String, Object>) files;
+                stamped.forEach((n, b) -> { if (b != entries.get(n)) fs.put(n, new String(b, StandardCharsets.UTF_8)); });
+            }
             PipelineBundleRoutes.judgeClosure(api, api.writeRoot(), cast(m), entries, ApiContext.str(item, "id"));
         }
         // Maker-checker (ASSURE-MAKER-CHECKER-1): N items cannot be ONE Pending Change — under a policy for any
@@ -350,6 +356,7 @@ final class BundleRoutes implements RouteModule {
         // needs canWorkIncidents, params validated, makers server-stamped) BEFORE the first item is written — one
         // refusal refuses the whole import.
         preparedDecisionRules(api, exchange, ordered);
+        stampedJobs(api, exchange, ordered);   // MAINT-TASK-AUTHORITY-1
 
         List<Map<String, Object>> results = new ArrayList<>();
         int imported = 0, overwritten = 0, skipped = 0, unchanged = 0, failed = 0;
@@ -507,6 +514,18 @@ final class BundleRoutes implements RouteModule {
             case "enrichment" -> new EnrichmentBundleSource(api, root);
             default -> null;
         };
+    }
+
+    /** Server-stamp every {@code job} item's author ({@link JobAuthority#stamp}), keeping the stored Job's {@code createdBy}. */
+    @SuppressWarnings("unchecked")
+    private static void stampedJobs(ApiContext api, com.sun.net.httpserver.HttpExchange ex, List<Map<String, Object>> items) {
+        for (Map<String, Object> item : items) {
+            if (!"job".equals(ApiContext.str(item, "kind")) || !(item.get("content") instanceof Map<?, ?> c)) continue;
+            String id = ApiContext.str(item, "id");
+            String prior = id == null ? null : api.service().jobService().flatMap(s -> s.jobConfig(id))
+                    .map(j -> j.params().get(JobConfig.CREATED_BY)).orElse(null);
+            item.put("content", JobAuthority.stamp(ex, (Map<String, Object>) c, prior));
+        }
     }
 
     /** Run {@link DecisionRuleGuard#prepare} over every decision-rule item, replacing its content with the stamped one. */

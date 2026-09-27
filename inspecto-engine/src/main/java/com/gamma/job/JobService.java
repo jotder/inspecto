@@ -1355,6 +1355,26 @@ public final class JobService implements AutoCloseable {
                     LocalDateTime.now().format(TS), "REJECTED", 0L, reason));
             return;
         }
+        // MAINT-TASK-AUTHORITY-1: an authority the control plane installs may refuse the run (an administrator-only
+        // task whose last editor no longer holds canAdminister). Fail closed: an authority that throws refuses.
+        RunAuthority authority = runAuthority;
+        if (authority != null && cfg != null) {
+            String refused;
+            try {
+                refused = authority.refusal(cfg).orElse(null);
+            } catch (RuntimeException e) {
+                refused = "the run authority could not decide (" + e.getMessage() + ")";
+            }
+            if (refused != null) {
+                ctx.log().error("run refused: " + refused, null);
+                ctx.signals().emit("job.run.rejected", Severity.WARN,
+                        Map.of("job", name, "run", runId, "reason", refused));
+                if (pipelineId != null) runningPipelines.remove(pipelineId);
+                record(new JobRun(runId, name, job.type(), trigger, start,
+                        LocalDateTime.now().format(TS), "REJECTED", 0L, refused));
+                return;
+            }
+        }
         // P3a/P3a-2: resolve the Job Type's declared parameters across the §7.2 ladder — trigger args
         // (this fire's explicit args over any static config args:) → signal bind: → config params: →
         // deduce → default. A missing required parameter fails the Run REJECTED before any user code.
@@ -1462,6 +1482,29 @@ public final class JobService implements AutoCloseable {
                 Map.of("job", name), res.durationMs() / 1000.0);
         log.info("[JOB] {} ({}) {} in {}ms — {}",
                 name, trigger, res.status(), res.durationMs(), res.message());
+    }
+
+    /**
+     * Decides, at RUN time, whether a Job may run on this server ({@code MAINT-TASK-AUTHORITY-1}): a non-empty
+     * answer is the reason the run is refused — recorded {@code REJECTED} with that reason and a
+     * {@code job.run.rejected} signal, the task never started. Every run path (cron, event, signal, manual,
+     * replay, catch-up) passes through it. The engine is identity-agnostic, so the control plane installs it.
+     */
+    @FunctionalInterface
+    public interface RunAuthority {
+        Optional<String> refusal(JobConfig cfg);
+    }
+
+    private static volatile RunAuthority runAuthority;
+
+    /** Install (or, with {@code null}, remove) the process-wide {@link RunAuthority}. */
+    public static void installRunAuthority(RunAuthority authority) {
+        runAuthority = authority;
+    }
+
+    /** The installed {@link RunAuthority}, or {@code null}. */
+    public static RunAuthority runAuthority() {
+        return runAuthority;
     }
 
     /** Record a terminal run to both the durable ledger and the live-run registry (so a poll sees the result). */
