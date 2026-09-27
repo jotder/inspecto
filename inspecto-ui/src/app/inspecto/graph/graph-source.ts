@@ -1,5 +1,6 @@
 import type { GraphDirection, MultiEdgeMapping, MultiNodeMapping } from 'app/inspecto/api';
 import type { G6GraphData } from './graph-types';
+import type { EntityTypeRef } from './entity-key';
 import type { ConditionGroup } from '../query/query-types';
 
 /**
@@ -35,7 +36,16 @@ export interface EntityProjection {
      * stays plain `entity:<value>`, unchanged since 2026-07-08) when only one mapping runs.
      */
     entityType?: string;
+    /**
+     * LA-17 D-M6: the Entity Type of `sourceCol` / `targetCol`, as the server resolved it from the Dataset's
+     * column classifications (never authored). A typed endpoint mints `<type>:<key>` and wins over `entityType`.
+     */
+    sourceType?: EntityTypeRef;
+    targetType?: EntityTypeRef;
 }
+
+/** The part of a mapping that decides entity node ids — what every mint site takes. */
+export type EntityIdMapping = Pick<EntityProjection, 'entityType' | 'sourceType' | 'targetType'>;
 
 /**
  * The unified graph query — the generalization of the lineage plane's `GraphQuery`

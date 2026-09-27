@@ -257,7 +257,24 @@ append time and replay never re-reads the list:
    list · create · add the canvas selection · retire · *Exclude by list* / *Seed by list* on the open Investigation
    (OKF `link-analysis.md`). Preview-driven 2026-09-26 against a rebuilt Enterprise bundle: create → `POST 201`, the
    row reads *Watch · MSISDN · 0 members*, *Add selection* stays disabled until an Investigation is open.
-   Still owed: projection ids through `typedEntityKey` (`<type>:<key>`, D-M6), member browsing, the `at` read.
+   ✅ **Typed projection ids DONE 2026-09-27** (D-M6, D-M11 first half). As built: the server resolves a column's
+   type (`InvRoutes.columnTypes`: Dataset registry `columns[].classification` → the first in-force Entity Type
+   claiming it, trimmed + case-insensitive) and returns `columnTypes {col: {id, normaliser}}` on `/inv/projection` +
+   `…/neighbors`, and `entityType` / `sourceType` / `targetType` on `/inv/projection/multi` rows. The SPA mints
+   through ONE function, `endpointId` (`entity-projection.ts`): typed → `typedEntityKey`, untyped → `entity:<key>`
+   (a column type overrides the free-text `entityType` scope). Mint sites changed: `projectEntities`,
+   `projectTriples`, `projectMultiResult`, `recursivePathsToGraph`, `branchingResultToGraph`, `workingSetToGraph`,
+   `nodeIdsForKeys` (brush), `caseMemberCandidates` (accepts typed ids); the typed mappings ride on the graph
+   (`idMappings`), `lastRun` and `InvestigationRef`. Server/SPA agreement: the evaluator, Working Set and
+   `excludeBy` never compare node ids (raw values / per-normaliser keys), so nothing to align there; the one server
+   node-id reader, `ObjectService.EntityMember`, was widened from `entity:…` to `^[a-z][a-z0-9_]{0,31}:.+`.
+   Gotchas: a value arriving without its column (seed, path hop, pattern match value, Geo key) resolves to the
+   candidate already drawn, else source-for-seeds/start and target-for-later-hops — a column pair typed
+   differently with a colliding raw value could pick the wrong end; the Geo co-location dialog stays untyped; no
+   back-compat for stored `entity:` ids (D-M6). Tests: `ControlApiInvProjectionTest` +1, `MultiProjectionContractTest`
+   +1, `ObjectServiceEntityCaseTest` +1; SPA specs in `entity-projection`, `multi-projection`, `geo-link-brush`,
+   `investigation-state`, `case-members`.
+   Still owed: member browsing, the `at` read.
 7. `verification` subagent PASS; distill into OKF, move plan to archive when shipped.
 
 ## 8. Slice 2 — resolution (operator decisions 2026-09-27)

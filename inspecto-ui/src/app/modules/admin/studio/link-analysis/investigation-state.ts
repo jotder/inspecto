@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { EntityProjection, G6Node } from 'app/inspecto/graph';
+import { EntityProjection, EntityTypeRef, G6Node } from 'app/inspecto/graph';
 import { InvestigationLogEntry, WorkingSet, apiErrorMessage } from 'app/inspecto/api';
-import { ProjectedGraph, entityId, projectTriples } from './entity-projection';
+import { ProjectedGraph, projectTriples, resolveEntityId } from './entity-projection';
 
 /**
  * LA-10 — the pure half of the Investigation panel: how a server Working Set becomes the canvas graph, which
@@ -17,6 +17,9 @@ export interface InvestigationRef {
     id: string;
     title?: string;
     entityType?: string;
+    /** LA-17 D-M6: the projection's server-resolved column types, so Working Set ids are the query graph's. */
+    sourceType?: EntityTypeRef;
+    targetType?: EntityTypeRef;
     /** Set on a fork (D-E4) — the Investigation it was re-ordered from. */
     parentId?: string;
 }
@@ -51,7 +54,8 @@ export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection):
     );
     const byId = new Map(g.nodes.map((n) => [n.id, n]));
     for (const e of ws.entities) {
-        const id = entityId(projection.entityType, e.id);
+        // A Working Set entity records no column (D-M6): take the id a link already drew, else mint it as a source.
+        const id = resolveEntityId([projection], e.id, (x) => byId.has(x));
         const node = byId.get(id);
         if (!node) {
             const added = { id, data: { label: e.id, kind: 'entity', spellings: [e.id] } };

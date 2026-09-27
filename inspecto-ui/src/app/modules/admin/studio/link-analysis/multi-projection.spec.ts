@@ -90,6 +90,30 @@ describe('projectMultiResult (LA-08)', () => {
     });
 });
 
+describe('projectMultiResult typed rows (LA-17 D-M6)', () => {
+    it('mints <type>:<key> from a row type, so a typed id in two Datasets is ONE node; untyped stays entity:', () => {
+        const imei = { id: 'imei', normaliser: 'digits' as const };
+        const g = projectMultiResult({
+            nodes: [{ id: '35-01', label: null, category: null, __provenance_dataset: 'devices', entityType: imei }],
+            edges: [
+                {
+                    source: 'Ann',
+                    target: '3501',
+                    kind: 'uses',
+                    count: 1,
+                    __provenance_dataset: 'calls',
+                    targetType: imei,
+                },
+            ],
+            mappings: [],
+            truncated: false,
+        });
+        expect(g.nodes.map((n) => n.id)).toEqual(['imei:3501', 'entity:ann']);
+        expect(g.nodes[0].data.provenance).toEqual(['devices', 'calls']);
+        expect(g.idMappings).toEqual([{}, { sourceType: imei, targetType: imei }]);
+    });
+});
+
 describe('recursivePathsToGraph (LA-11)', () => {
     const a = entityId(undefined, 'A');
     const b = entityId(undefined, 'B');
@@ -124,8 +148,15 @@ describe('recursivePathsToGraph (LA-11)', () => {
     });
 
     it('scopes ids with the mapping entity type, so they match a type-scoped projection', () => {
-        const { state } = recursivePathsToGraph(res, { nodes: [], edges: [] }, 'person');
+        const { state } = recursivePathsToGraph(res, { nodes: [], edges: [] }, [{ entityType: 'person' }]);
         expect(state.paths[0].nodeIds[0]).toBe(entityId('person', 'A'));
+    });
+
+    it('mints typed hops: the start as a source, later hops as targets, reusing a drawn id (D-M6)', () => {
+        const t = { id: 'cell', normaliser: 'upper-trim' as const };
+        const drawn = { nodes: [{ id: 'cell:B', data: { label: 'b', kind: 'entity' } }], edges: [] };
+        const { state } = recursivePathsToGraph(res, drawn, [{ targetType: t }]);
+        expect(state.paths[0].nodeIds).toEqual(['entity:a', 'cell:B', 'cell:C']);
     });
 });
 

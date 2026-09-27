@@ -43,6 +43,17 @@ export function normalizeTypedKey(value: string, normaliser: EntityNormaliser): 
     }
 }
 
+/**
+ * The Entity Type a projection column is typed by (LA-17 D-M6): its Dataset's `columns[].classification`
+ * claimed by an in-force Entity Type. The SERVER resolves it and sends it with the projection answer
+ * (`columnTypes` on `/inv/projection[/neighbors]`, `entityType`/`sourceType`/`targetType` on `/inv/projection/multi`
+ * rows), so the SPA never guesses which columns are typed.
+ */
+export interface EntityTypeRef {
+    id: string;
+    normaliser: EntityNormaliser;
+}
+
 /** A typed entity id (D-M6): `<type>:<normalised key>`. */
 export function typedEntityKey(type: string, value: string, normaliser: EntityNormaliser): string {
     return `${type}:${normalizeTypedKey(value, normaliser)}`;

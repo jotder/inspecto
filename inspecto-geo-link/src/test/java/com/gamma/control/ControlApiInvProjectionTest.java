@@ -692,6 +692,29 @@ class ControlApiInvProjectionTest {
         }
     }
 
+    /** LA-17 D-M6: a column's registry classification claimed by an in-force Entity Type types it; others stay untyped. */
+    @Test
+    void columnTypesNameTheEntityTypeOfEachClassifiedColumn(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedCalls(c);
+            new ComponentStore(c.root.resolve("registry")).write("dataset", "calls_ds", Map.of("view", "calls_view",
+                    "columns", List.of(Map.of("name", "caller", "classification", " msisdn "),
+                            Map.of("name", "callee", "classification", "NOBODY_CLAIMS"))));
+            String body = "{\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"";
+            for (HttpResponse<String> r : List.of(project(c.port, body + "}"),
+                    neighbors(c.port, body + ",\"value\":\"alice\"}"))) {
+                assertEquals(200, r.statusCode(), r.body());
+                JsonNode types = json(r.body()).get("columnTypes");
+                assertEquals("msisdn", types.at("/caller/id").asText(), r.body());
+                assertEquals("e164", types.at("/caller/normaliser").asText());
+                assertFalse(types.has("callee"), "a classification no type claims stays untyped: " + types);
+            }
+            // No declared columns at all: an empty map, never absent.
+            seedCalls(c);
+            assertEquals(0, json(project(c.port, body + "}").body()).get("columnTypes").size());
+        }
+    }
+
     /** Parse a v1 response and peel the envelope's {@code data} (mirrors the control module's V1Body, which
      *  lives in inspecto's TEST tree and is not visible from another module — the inspecto-policy precedent). */
     private static com.fasterxml.jackson.databind.JsonNode json(String raw) throws Exception {

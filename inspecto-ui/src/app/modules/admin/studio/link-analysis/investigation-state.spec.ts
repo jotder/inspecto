@@ -24,6 +24,19 @@ function entry(step: number, extra: Partial<InvestigationLogEntry> = {}): Invest
 }
 
 describe('LA-10 investigation-state', () => {
+    it('draws typed Working Set ids that agree with the typed query graph (LA-17 D-M6)', () => {
+        const typed: EntityProjection = { ...P, sourceType: { id: 'msisdn', normaliser: 'e164' } };
+        const ws: WorkingSet = {
+            entities: [entity('0044 1'), entity('Bob'), entity('+44 2')],
+            links: [{ source: '0044 1', target: 'Bob', kind: 'call', count: 1, admittedBy: 2 }],
+            excluded: [],
+            hash: 'h',
+        };
+        const g = workingSetToGraph(ws, typed);
+        // Bob is a TARGET (untyped column) — the link drew it, and the seed reuses that id, never re-minting it typed.
+        expect(g.nodes.map((n) => n.id)).toEqual(['msisdn:+441', 'entity:msisdn:bob', 'msisdn:+442']);
+    });
+
     it('draws the Working Set with entityId() ids — the SAME ids the query graph uses (D-S4)', () => {
         const ws: WorkingSet = {
             entities: [entity('Alice '), entity('Bob'), entity('Carol')],

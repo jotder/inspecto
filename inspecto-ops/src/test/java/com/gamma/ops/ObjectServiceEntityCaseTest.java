@@ -38,6 +38,15 @@ class ObjectServiceEntityCaseTest {
     }
 
     @Test
+    void anEntityKeyIsAnUntypedOrATypedNodeId() {
+        // LA-17 D-M6: a typed column mints '<type>:<key>'; untyped keeps 'entity:<key>'.
+        assertEquals("msisdn:+4478", new ObjectService.EntityMember("msisdn:+4478", "calls", null).entityKey());
+        assertEquals("entity:bob", BOB.entityKey());
+        for (String bad : new String[] {"bob", ":bob", "entity:", "MSISDN:+44"})
+            assertThrows(IllegalArgumentException.class, () -> new ObjectService.EntityMember(bad, "calls", null), bad);
+    }
+
+    @Test
     void aFailedWriteRollsBackEveryObjectThisCallCreatedButNeverAReusedOne() {
         CaseRefusingStore store = new CaseRefusingStore();
         ObjectService svc = new ObjectService(store);

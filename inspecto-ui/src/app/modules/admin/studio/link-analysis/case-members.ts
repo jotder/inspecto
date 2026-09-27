@@ -18,7 +18,7 @@ export interface CaseMemberCandidate {
  * 2026-09-23: *mint from the node*). A node qualifies when it is a real projected Entity:
  *  - a node that already references an Incident (`objectRef`, projected from an `incidentId` column) joins as
  *    that Incident — minting a second object for it would duplicate the record it points at;
- *  - any other Entity is minted, keyed by its node id (`entity:[<type>:]<normalised key>`, D-S4) plus the
+ *  - any other Entity is minted, keyed by its node id (`entity:<normalised key>`, or typed `<type>:<key>` — D-S4, D-M6) plus the
  *    Dataset it was projected from — the identity the server reuses on a second mint.
  *
  * ⛔ Excluded, deliberately: stranded nodes (not in the current answer), super-nodes (a stand-in for many
@@ -43,18 +43,21 @@ export function caseMemberCandidates(graph: G6GraphData, originDataset: string |
                 });
             continue;
         }
-        if (!n.id.startsWith('entity:')) continue;
+        if (!ENTITY_NODE_ID.test(n.id)) continue;
         const dataset = datasetOf(n, originDataset);
         if (!dataset) continue;
         out.push({
             nodeId: n.id,
             label: d.label,
-            detail: `${dataset} · ${n.id.slice('entity:'.length)}`,
+            detail: `${dataset} · ${n.id.startsWith('entity:') ? n.id.slice('entity:'.length) : n.id}`,
             member: { id: n.id, dataset, label: d.label },
         });
     }
     return out;
 }
+
+/** An Entity node id: untyped `entity:<key>` or typed `<type>:<key>` (D-M6) — the server's `EntityMember` rule. */
+const ENTITY_NODE_ID = /^[a-z][a-z0-9_]{0,31}:./;
 
 function datasetOf(n: G6Node, originDataset: string | undefined): string | undefined {
     const p = n.data.provenance?.filter((x) => !!x) ?? [];

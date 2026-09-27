@@ -3,6 +3,7 @@ package com.gamma.geolink;
 import com.gamma.control.ApiContext;
 import com.gamma.control.ApiException;
 import com.gamma.control.ComponentAccess;
+import com.gamma.control.EntityTypes;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.LinkAnalysisSettings;
 import com.gamma.control.RouteModule;
@@ -595,7 +596,8 @@ public final class InvRoutes implements RouteModule {
 
     /** One validated LA-08 mapping, resolved and rendered before any query runs. */
     private record Mapping(boolean node, String dataset, String relationSql, String sql, String kind,
-                           String category, List<String> attrs) {}
+                           String category, List<String> attrs, Map<String, Object> idType,
+                           Map<String, Object> sourceType, Map<String, Object> targetType) {}
 
     /**
      * {@code POST /inv/projection/multi} (LA-08, contract §5.2) — node mappings and edge projections over
@@ -637,8 +639,9 @@ public final class InvRoutes implements RouteModule {
             for (int i = 0; i < attrs.size(); i++)
                 sql.append(", CAST(").append(q(attrs.get(i))).append(" AS VARCHAR) AS attr_").append(i);
             sql.append(" FROM ").append(q(ds)).append(" WHERE ").append(q(idCol)).append(" IS NOT NULL ORDER BY 1, 2");
+            Map<String, Map<String, Object>> types = columnTypes(writeRoot, ds, List.of(idCol));
             plan.add(new Mapping(true, ds, relationSql, guarded(sql.toString(), ds), null,
-                    ApiContext.str(m, "category"), attrs));
+                    ApiContext.str(m, "category"), attrs, types.get(idCol), null, null));
         }
         for (Map<String, Object> m : edgeSpecs) {
             String ds = datasetOf(m, "edges");
@@ -648,7 +651,9 @@ public final class InvRoutes implements RouteModule {
             String filterSql = "(" + filterSql(body.get("filter"), ds, relationSql) + ") AND ("
                     + filterSql(m.get("filter"), ds, relationSql) + ")";
             String sql = edgeSql(ds, srcCol, tgtCol, null, attrs, "", filterSql);
-            plan.add(new Mapping(false, ds, relationSql, guarded(sql, ds), ApiContext.str(m, "type"), null, attrs));
+            Map<String, Map<String, Object>> types = columnTypes(writeRoot, ds, List.of(srcCol, tgtCol));
+            plan.add(new Mapping(false, ds, relationSql, guarded(sql, ds), ApiContext.str(m, "type"), null, attrs,
+                    null, types.get(srcCol), types.get(tgtCol)));
         }
         // D-U7, judged on the WHOLE plan before any mapping runs (fail closed, whole call): `limit` applies per
         // mapping, so the call reads up to limit × mappings rows, and one entity can take up to `limit` links from
@@ -678,8 +683,11 @@ public final class InvRoutes implements RouteModule {
                         for (int i = 0; i < mp.attrs().size(); i++) attrs.put(mp.attrs().get(i), row.get("attr_" + i));
                         out.put("attrs", attrs);
                     }
+                    if (mp.idType() != null) out.put("entityType", mp.idType());
                 } else {
                     out = edgeRow(row, mp.kind(), mp.attrs());
+                    if (mp.sourceType() != null) out.put("sourceType", mp.sourceType());
+                    if (mp.targetType() != null) out.put("targetType", mp.targetType());
                 }
                 out.put(PROVENANCE, mp.dataset());
                 (mp.node() ? nodes : edges).add(out);
@@ -729,6 +737,29 @@ public final class InvRoutes implements RouteModule {
         return sql;
     }
 
+    /**
+     * LA-17 D-M6: the Entity Type each named column is typed by -- its Dataset's registry {@code columns[].classification}
+     * claimed (trimmed, case-insensitive) by an in-force Entity Type -- as column -> {@code {id, normaliser}}. A column
+     * with no classification, or one no type claims, is absent (untyped). The SPA mints {@code <type>:<key>} from this,
+     * so every mint site agrees on which columns are typed; {@code EntityMasking} reads the same classification.
+     */
+    static Map<String, Map<String, Object>> columnTypes(Path writeRoot, String datasetId, List<String> columns) {
+        Map<String, Object> ds = new ComponentStore(writeRoot.resolve("registry")).get("dataset", datasetId)
+                .map(ComponentRegistry.Component::content).orElse(Map.of());
+        Map<String, Map<String, Object>> out = new LinkedHashMap<>();
+        if (!(ds.get("columns") instanceof List<?> cols)) return out;
+        List<EntityTypes.EntityType> types = LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes();
+        for (String name : columns)
+            for (Object o : cols)
+                if (o instanceof Map<?, ?> c && name.equalsIgnoreCase(String.valueOf(c.get("name")))
+                        && c.get("classification") != null) {
+                    String cls = String.valueOf(c.get("classification")).trim();
+                    types.stream().filter(t -> t.classifications().stream().anyMatch(x -> x.trim().equalsIgnoreCase(cls)))
+                            .findFirst().ifPresent(t -> out.put(name, Map.of("id", t.id(), "normaliser", t.normaliser())));
+                }
+        return out;
+    }
+
     private Object project(ApiContext api, HttpExchange ex, Map<String, Object> body, String neighborsOf) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity projection");
         String datasetId = ApiContext.str(body, "dataset");
@@ -770,6 +801,7 @@ public final class InvRoutes implements RouteModule {
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("rows", rows);
             out.put("truncated", r.truncated());
+            out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
             audit(ex, datasetId, neighborsOf, rows.size(), r.truncated());
             return out;
         } catch (SQLException e) {

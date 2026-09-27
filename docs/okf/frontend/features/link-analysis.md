@@ -487,7 +487,8 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
     the node's raw spelling and described *Raised from Link Analysis: Entity … in Dataset …*. ⚠ The cost is
     real: these land in the Incidents inbox like any manually raised Incident.
   - **Identity = `entityKey` + `entityDataset`** (attributes on the Incident): the node id
-    (`entity:[<type>:]<D-S4 key>`, so the Entity type and the normalised key are both in it) plus the source
+    (`entity:[<scope>:]<D-S4 key>`, or typed `<type>:<key>` for a classified column — LA-17 D-M6; the server's
+    `EntityMember` accepts `^[a-z][a-z0-9_]{0,31}:.+`) plus the source
     Dataset — the node's own `provenance` when recorded (several merged Datasets joined, sorted), else the
     Dataset the pane projected. Minting the same pair again REUSES the object; a match the caller cannot see
     (data scope) is not reused, so existence-hiding holds. The lookup is `ObjectStore.findByAttributes` —
@@ -756,6 +757,25 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   Writes are gated on `LensService.canManageIncidents()` (the rest of the panel still has no client gate — a 403 is
   surfaced); the section renders nothing when `SessionService.geoLinkEnabled` is off (a deep link reaches the page
   even though the nav hides it). A 503 is an explained info notice.
+* **Typed node ids (LA-17 D-M6, as built 2026-09-27).** A projection column whose Dataset registry
+  `columns[].classification` is claimed (trimmed, case-insensitive) by an in-force Entity Type mints
+  `<type>:<key>` — `typedEntityKey`, the type's normaliser (`msisdn` `0044 78` → `msisdn:+4478`); every other column
+  keeps `entity:<key>` (or the free-text `entity:<scope>:<key>`, which a column type overrides). ⛔ The SPA never
+  guesses which columns are typed: the SERVER resolves it (`InvRoutes.columnTypes`, the same classification lookup
+  `EntityMasking` uses) and sends `columnTypes: {col: {id, normaliser}}` on `/inv/projection` and `…/neighbors`
+  (always present, `{}` when untyped) and `entityType` / `sourceType` / `targetType` on `/inv/projection/multi`
+  rows. The ONE mint is `endpointId(mapping, 'source'|'target', value)` in `entity-projection.ts`; the GraphSources
+  stamp the typed mappings on the graph (`idMappings`) and the component remembers them on `lastRun` (the
+  `entity-projection` query is replaced by its typed mappings via `resolveRunQuery`), so the Investigation binding
+  (`InvestigationRef.sourceType/targetType`, persisted with the saved view), traversal, pattern and brush all mint
+  the same ids. ⚠ A value that arrives WITHOUT its column — a Working Set seed, a path hop, a pattern match value, a
+  Geo key — goes through `resolveEntityId` / `entityIdCandidates`: the candidate already drawn wins, else the start
+  / seed as a source and later hops as targets; the brush tries every candidate. ⚠ Server ids are unaffected: the
+  evaluator, Working Set and `excludeBy` compare RAW values / per-normaliser keys, never node ids — the only
+  server-side node-id reader is the Case-from-Entities `EntityMember` key, widened to accept typed ids. ⚠ No
+  back-compat (D-M6): a saved view, snapshot or Case member holding `entity:<value>` for a now-typed column no longer
+  matches. ⚠ The Geo co-location graph (`coLocationGraph`) stays untyped — it is drawn in its own dialog and never
+  compared with projection ids.
 * ✅ **The feed is INGESTED, not merely authored** (verified end to end 2026-09-23): 1 283/1 283 rows land
   across three Hive partitions, `rejected_files=0`, `rejected_rows=0`, `cast_failures=0`, and every row
   reconciles to the source PSV by `REC_SEQ` with zero value mismatches. `IMEI` keeps its leading zeros as

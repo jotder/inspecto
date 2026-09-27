@@ -98,6 +98,29 @@ class MultiProjectionContractTest {
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
+    /** LA-17 D-M6: a typed column's rows carry its Entity Type; an untyped column's rows carry none. */
+    @Test
+    void typedColumnsStampTheirEntityTypeOnEveryRow(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, false)) {
+            seed(c);
+            dataset(c, "people_ds", "SELECT * FROM (VALUES (1,'Ann','GB')) AS t(pid,name,country)",
+                    Map.of("columns", List.of(Map.of("name", "pid", "classification", "MSISDN"))));
+            dataset(c, "calls_ds", "SELECT * FROM (VALUES ('1','2',5)) AS t(caller,callee,secs)",
+                    Map.of("columns", List.of(Map.of("name", "callee", "classification", "IMEI"))));
+            HttpResponse<String> r = multi(c.port, THREE, null);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode d = json(r.body());
+            assertEquals("msisdn", d.at("/nodes/0/entityType/id").asText(), r.body());
+            assertEquals("e164", d.at("/nodes/0/entityType/normaliser").asText());
+            for (JsonNode e : d.get("edges")) {
+                if (e.get("__provenance_dataset").asText().equals("calls_ds")) {
+                    assertFalse(e.has("sourceType"), "caller is unclassified: " + e);
+                    assertEquals("imei", e.at("/targetType/id").asText());
+                } else assertFalse(e.has("sourceType") || e.has("targetType"), e.toString());
+            }
+        }
+    }
+
     @Test
     void threeDatasetsJoinWithProvenanceAndNoOrphanedEdges(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, false)) {

@@ -1220,8 +1220,9 @@ public final class ObjectService {
     /** One Link Analysis Entity to become a member of a new Case: its node id, source Dataset and label. */
     public record EntityMember(String entityKey, String dataset, String label) {
         public EntityMember {
-            if (entityKey == null || !entityKey.startsWith("entity:") || entityKey.length() <= "entity:".length())
-                throw new IllegalArgumentException("an entity needs its node id ('entity:…'), got '" + entityKey + "'");
+            // LA-17 D-M6: untyped ids are 'entity:<key>', typed ones '<type>:<key>' (an Entity Type id).
+            if (entityKey == null || !entityKey.matches("[a-z][a-z0-9_]{0,31}:.+"))
+                throw new IllegalArgumentException("an entity needs its node id ('entity:…' or '<type>:…'), got '" + entityKey + "'");
             if (dataset == null || dataset.isBlank())
                 throw new IllegalArgumentException("entity '" + entityKey + "' needs the Dataset it was projected from");
             label = label == null || label.isBlank() ? entityKey : label.trim();

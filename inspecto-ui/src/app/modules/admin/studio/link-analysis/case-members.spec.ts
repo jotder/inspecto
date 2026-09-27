@@ -27,6 +27,21 @@ describe('caseMemberCandidates', () => {
         expect(c[2].member).toEqual({ objectId: 'INC-7' });
     });
 
+    it('keys a typed Entity by its typed node id (LA-17 D-M6)', () => {
+        const typed: G6GraphData = {
+            nodes: [{ id: 'msisdn:+4478', data: { label: '0044 78', kind: 'entity' } }],
+            edges: [],
+        };
+        expect(caseMemberCandidates(typed, 'calls')).toEqual([
+            {
+                nodeId: 'msisdn:+4478',
+                label: '0044 78',
+                detail: 'calls · msisdn:+4478',
+                member: { id: 'msisdn:+4478', dataset: 'calls', label: '0044 78' },
+            },
+        ]);
+    });
+
     it('offers no Entity it cannot key — no provenance and no Dataset on the pane', () => {
         expect(caseMemberCandidates(G, undefined).map((x) => x.nodeId)).toEqual(['entity:account:bob', 'entity:inc-7']);
     });

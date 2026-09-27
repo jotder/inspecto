@@ -100,7 +100,7 @@ import {
     SnapshotDialogData,
 } from './link-analysis-evidence.dialogs';
 import { LinkAnalysisSnapshotsService } from './link-analysis-snapshots.service';
-import { GraphSnapshot } from 'app/inspecto/graph';
+import { EntityIdMapping, GraphSnapshot } from 'app/inspecto/graph';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
 import { InspectoSplitDirective } from 'app/inspecto/components/split.directive';
 import {
@@ -138,6 +138,7 @@ import {
     invErrorMessage,
     projectionNodeCapValue,
     recursivePathsToGraph,
+    resolveRunQuery,
     splitIdentityGroups,
 } from './entity-projection';
 import { GeoLinkBrushService, nodeIdsForKeys } from './geo-link-brush';
@@ -392,7 +393,12 @@ export class LinkAnalysisComponent implements OnInit {
     readonly graph = signal<G6GraphData | null>(null);
     readonly truncated = signal(false);
     /** The query behind the rendered graph — what the collapsed form + status bar summarize. */
-    readonly lastRun = signal<{ sourceId: GraphSourceId; query: GraphSourceQuery } | null>(null);
+    /** `idMappings`: what the run minted node ids with (D-M6 column types resolved) — brush + path hops reuse it. */
+    readonly lastRun = signal<{
+        sourceId: GraphSourceId;
+        query: GraphSourceQuery;
+        idMappings?: EntityIdMapping[];
+    } | null>(null);
     /** LA-08: each mapping's row count + own `truncated`, from a multi-Dataset projection (empty otherwise). */
     readonly mappingSummary = signal<MultiProjectionMappingSummary[]>([]);
     /** LA-11: the last server traversal, mapped onto the graph; reset with every fresh graph. */
@@ -419,6 +425,7 @@ export class LinkAnalysisComponent implements OnInit {
                 sourceCol: p.sourceCol,
                 targetCol: p.targetCol,
                 entityType: p.entityType,
+                idMappings: [p] as (EntityIdMapping | undefined)[],
                 linkKindCol: p.linkKindCol || undefined,
                 filter: q.filter,
                 label: `${dsName(p.datasetId)}: ${p.sourceCol} → ${p.targetCol}`,
@@ -430,6 +437,7 @@ export class LinkAnalysisComponent implements OnInit {
                 sourceCol: e.sourceColumn,
                 targetCol: e.targetColumn,
                 entityType: undefined,
+                idMappings: (run.idMappings ?? []) as (EntityIdMapping | undefined)[],
                 linkKindCol: undefined,
                 filter:
                     q.filter && e.filter
@@ -800,11 +808,22 @@ export class LinkAnalysisComponent implements OnInit {
     // ── canvas emphasis (shared: written by search / canvas clicks / the analysis toolbox child) ──
     readonly emphasis = signal<GraphEmphasis | null>(null);
 
-    /** The last run's mapping entity types — what `entityId` scoped the node ids with (`undefined` = unscoped). */
-    private readonly brushEntityTypes = computed<(string | undefined)[]>(() => {
-        const q = this.lastRun()?.query;
-        return q?.projections?.length ? q.projections.map((p) => p.entityType) : [q?.projection?.entityType];
+    /** The last run's id mappings — what the node ids were minted with (`undefined` = unscoped, untyped). */
+    private readonly brushEntityTypes = computed<(EntityIdMapping | undefined)[]>(() => {
+        const run = this.lastRun();
+        if (run?.idMappings?.length) return run.idMappings;
+        const q = run?.query;
+        return q?.projections?.length ? q.projections : [q?.projection];
     });
+
+    /** Remember a run with the typed mappings its answer resolved (LA-17 D-M6). */
+    private runOf(sourceId: GraphSourceId, q: GraphSourceQuery, g: ProjectedGraph) {
+        return {
+            sourceId,
+            query: sourceId === 'entity-projection' ? resolveRunQuery(q, g) : q,
+            idMappings: g.idMappings,
+        };
+    }
 
     /** LA-22: a Geo Map selection highlights the nodes its KEYS project to; an explicit emphasis wins. */
     readonly geoBrushEmphasis = computed<GraphEmphasis | null>(() => {
@@ -905,7 +924,7 @@ export class LinkAnalysisComponent implements OnInit {
             this.truncated.set(!!(g as ProjectedGraph).truncated);
             this.mappingSummary.set((g as MultiProjectedGraph).mappings ?? []);
             this.kindFilter.set([]);
-            this.lastRun.set({ sourceId, query: q });
+            this.lastRun.set(this.runOf(sourceId, q, g as ProjectedGraph));
             this.queryOpen.set(false); // smart form: collapse to the selected-values summary
         } catch (err) {
             this.graph.set(null);
@@ -962,7 +981,7 @@ export class LinkAnalysisComponent implements OnInit {
             const truncated = !!(next as ProjectedGraph).truncated;
             this.graph.set(markStranded(prev, next));
             this.truncated.set(truncated);
-            this.lastRun.set({ sourceId: run.sourceId, query: q });
+            this.lastRun.set(this.runOf(run.sourceId, q, next as ProjectedGraph));
             this.localFilter.set(null); // the server applied it; the local stage starts clean
             const n = next.edges.length.toLocaleString();
             this.pushState.set(truncated ? `${n} links · truncated — refine and push again` : `${n} links · complete`);
@@ -1360,7 +1379,7 @@ export class LinkAnalysisComponent implements OnInit {
                     limit: SERVER_PATH_LIMIT,
                 }),
             );
-            const { graph, state } = recursivePathsToGraph(res, g, target.entityType);
+            const { graph, state } = recursivePathsToGraph(res, g, target.idMappings);
             this.graph.set(graph);
             this.serverPaths.set(state);
             this.emphasis.set(
@@ -1402,7 +1421,7 @@ export class LinkAnalysisComponent implements OnInit {
                     filter: target.filter,
                 }),
             );
-            const { graph, state } = branchingResultToGraph(res, g, target.entityType);
+            const { graph, state } = branchingResultToGraph(res, g, target.idMappings);
             this.graph.set(graph);
             this.serverPattern.set(state);
             this.emphasis.set(

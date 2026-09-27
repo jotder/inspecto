@@ -301,7 +301,7 @@ export class LinkAnalysisInvestigationComponent {
     /** LA-23: open the Investigation a template just created, keeping the open one's entity type for drawing. */
     adoptInstantiated(res: InstantiateTemplateResult): void {
         this.order.set(null);
-        this.store.adopt(res.id, res.header?.title ?? undefined, this.store.activeRef()?.entityType);
+        this.store.adopt(res.id, res.header?.title ?? undefined, this.store.activeRef() ?? undefined);
     }
 
     opLabel(e: InvestigationLogEntry): string {

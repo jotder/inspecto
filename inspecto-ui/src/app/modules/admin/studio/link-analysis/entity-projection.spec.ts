@@ -11,8 +11,11 @@ import {
     projectTriples,
     PROJECTION_NODE_CAP_DEFAULT,
     configureProjectionLimits,
+    endpointId,
     projectionNodeCapValue,
     resetProjectionLimits,
+    resolveRunQuery,
+    withColumnTypes,
 } from './entity-projection';
 
 const rows = [
@@ -248,6 +251,51 @@ describe('EntityProjectionGraphSource.expand (Phase E, incremental expand)', () 
                 projections: [{ datasetId: 'links-ds', sourceCol: 'a', targetCol: 'b' }],
             }),
         ).rejects.toThrow(/single-mapping/);
+    });
+});
+
+describe('typed projection ids (LA-17 D-M6)', () => {
+    const msisdn = { id: 'msisdn', normaliser: 'e164' as const };
+
+    it('mints <type>:<key> with the type normaliser for a typed column, entity:<value> for an untyped one', () => {
+        const p = withColumnTypes({ datasetId: 'calls', sourceCol: 'a', targetCol: 'b' }, { a: msisdn });
+        const g = projectTriples(
+            [
+                { source: '0044 78', target: 'Bob', kind: 'call', count: 1 },
+                { source: '+44 78', target: 'bob', kind: 'call', count: 2 },
+            ],
+            false,
+            p,
+        );
+        expect(g.nodes.map((n) => n.id)).toEqual(['msisdn:+4478', 'entity:bob']);
+        expect(g.nodes[0].data.spellings).toEqual(['0044 78', '+44 78']);
+        expect(g.edges.map((e) => e.id)).toEqual(['msisdn:+4478->entity:bob:call']);
+        expect(endpointId(p, 'source', '0044 78')).toBe('msisdn:+4478');
+        expect(endpointId(p, 'target', 'Bob')).toBe('entity:bob');
+    });
+
+    it('a column type wins over the free-text entityType scope; absent columnTypes leave the mapping untyped', () => {
+        const p = { datasetId: 'd', sourceCol: 'a', targetCol: 'b', entityType: 'person' };
+        expect(endpointId(withColumnTypes(p, { b: msisdn }), 'target', '0044 1')).toBe('msisdn:+441');
+        expect(withColumnTypes({ ...p, sourceType: msisdn }, undefined)).toEqual(p);
+        expect(endpointId(p, 'source', 'Bob')).toBe('entity:person:bob');
+    });
+
+    it('the source resolves the answer columnTypes onto the ids and records them as idMappings', async () => {
+        const inv = {
+            project: () =>
+                of({
+                    rows: [{ source: '0044 78', target: 'x', kind: null, count: 1 }],
+                    truncated: false,
+                    columnTypes: { a: msisdn },
+                }),
+        } as never;
+        const src = new EntityProjectionGraphSource({ get: () => of(null) } as never, inv);
+        const q = { projection: { datasetId: 'calls', sourceCol: 'a', targetCol: 'b' } };
+        const g = await src.query(q);
+        expect(g.nodes.map((n) => n.id)).toEqual(['msisdn:+4478', 'entity:x']);
+        expect(g.idMappings).toEqual([{ ...q.projection, sourceType: msisdn }]);
+        expect(resolveRunQuery(q, g).projection?.sourceType).toEqual(msisdn);
     });
 });
 

@@ -4,12 +4,15 @@ import {
     G6Edge,
     G6GraphData,
     G6Node,
+    EntityIdMapping,
     EntityProjection,
+    EntityTypeRef,
     GraphSelection,
     GraphSource,
     GraphSourceQuery,
     mergeGraphs,
     normalizeEntityKey,
+    typedEntityKey,
 } from 'app/inspecto/graph';
 import {
     InvService,
@@ -76,14 +79,85 @@ export function resetProjectionLimits(): void {
 }
 
 /**
- * The Entity node id for a projected value. Type-scoped (`entity:<entityType>:<key>`) when a
+ * The UNTYPED Entity node id for a projected value. Type-scoped (`entity:<entityType>:<key>`) when a
  * multi-mapping merge supplies an `entityType`, so a `person` "Bob" stays distinct from an `account`
  * "Bob" (Phase C). Unscoped `entity:<key>` otherwise. The key is {@link normalizeEntityKey} of the raw
  * value (D-S4, 2026-09-23), so `ACME Ltd` and ` acme  ltd.` are ONE node; the raw spelling stays the label.
+ * A column typed by an Entity Type mints through {@link endpointId} instead (D-M6).
  */
 export function entityId(entityType: string | undefined, value: string): string {
     const key = normalizeEntityKey(value);
     return entityType ? `entity:${entityType}:${key}` : `entity:${key}`;
+}
+
+/** The node id for a value under an optional column type: typed `<type>:<key>` (D-M6), else {@link entityId}. */
+export function typedOrEntityId(
+    type: EntityTypeRef | undefined,
+    entityType: string | undefined,
+    value: string,
+): string {
+    return type ? typedEntityKey(type.id, value, type.normaliser) : entityId(entityType, value);
+}
+
+/**
+ * THE mint for a value read from one endpoint column of a mapping (LA-17 D-M6): a typed column
+ * (`sourceType` / `targetType`, server-resolved from the Dataset's classification) mints `<type>:<key>`
+ * with that type's normaliser; an untyped column keeps {@link entityId}. Every projection path mints here.
+ */
+export function endpointId(p: EntityIdMapping | undefined, end: 'source' | 'target', value: string): string {
+    return typedOrEntityId(end === 'source' ? p?.sourceType : p?.targetType, p?.entityType, value);
+}
+
+/**
+ * Every id `value` could have under the given mappings, preferred end first. Used where a raw value arrives
+ * WITHOUT its column (a path hop, a Working Set seed, a Geo key): the caller picks the candidate already drawn.
+ */
+export function entityIdCandidates(
+    mappings: readonly (EntityIdMapping | undefined)[],
+    value: string,
+    prefer: 'source' | 'target' = 'source',
+): string[] {
+    const other = prefer === 'source' ? 'target' : 'source';
+    const out = new Set<string>();
+    for (const m of mappings.length ? mappings : [undefined]) {
+        out.add(endpointId(m, prefer, value));
+        out.add(endpointId(m, other, value));
+    }
+    return [...out];
+}
+
+/** The candidate id already in `has`, else the first (preferred) one. */
+export function resolveEntityId(
+    mappings: readonly (EntityIdMapping | undefined)[],
+    value: string,
+    has: (id: string) => boolean,
+    prefer: 'source' | 'target' = 'source',
+): string {
+    const c = entityIdCandidates(mappings, value, prefer);
+    return c.find(has) ?? c[0];
+}
+
+/**
+ * An `entity-projection` query with its mappings replaced by the typed ones the answer resolved (D-M6), so every
+ * later mint off the remembered run (Working Set, traversal, advanced search) agrees with the drawn ids.
+ */
+export function resolveRunQuery(q: GraphSourceQuery, g: ProjectedGraph): GraphSourceQuery {
+    const typed = g.idMappings as EntityProjection[] | undefined;
+    if (!typed?.length) return q;
+    if (q.projections?.length === typed.length) return { ...q, projections: typed };
+    if (q.projection && !q.projections?.length) return { ...q, projection: typed[0] };
+    return q;
+}
+
+/** Apply a projection answer's `columnTypes` to the mapping it answered (absent/empty = untyped). */
+export function withColumnTypes(
+    p: EntityProjection,
+    types: Record<string, EntityTypeRef> | undefined,
+): EntityProjection {
+    const { sourceType: _s, targetType: _t, ...rest } = p;
+    const sourceType = types?.[p.sourceCol];
+    const targetType = types?.[p.targetCol];
+    return { ...rest, ...(sourceType ? { sourceType } : {}), ...(targetType ? { targetType } : {}) };
 }
 
 /** Record a raw spelling on a node that already exists (D-S4) — the split-identity notice reads these. */
@@ -122,6 +196,11 @@ export interface ProjectionError {
 export interface ProjectedGraph extends G6GraphData {
     /** True when the node cap cut the projection short — surfaced as a banner. */
     truncated: boolean;
+    /**
+     * LA-17 D-M6: the mappings the node ids were minted with, column types resolved — what a later mint over the
+     * same graph (brush, path hop) must use. Set by the GraphSources; absent on a pure fold.
+     */
+    idMappings?: EntityIdMapping[];
 }
 
 export function isProjectionError(v: ProjectedGraph | ProjectionError): v is ProjectionError {
@@ -144,8 +223,8 @@ export function projectEntities(
     >();
     let truncated = false;
 
-    const ensure = (value: string, column: string): string | null => {
-        const id = entityId(p.entityType, value);
+    const ensure = (value: string, column: string, end: 'source' | 'target'): string | null => {
+        const id = endpointId(p, end, value);
         if (!nodes.has(id)) {
             if (nodes.size >= projectionNodeCapValue()) {
                 truncated = true;
@@ -168,8 +247,8 @@ export function projectEntities(
         const s = String(row[p.sourceCol] ?? '').trim();
         const t = String(row[p.targetCol] ?? '').trim();
         if (!s || !t) continue;
-        const sid = ensure(s, p.sourceCol);
-        const tid = ensure(t, p.targetCol);
+        const sid = ensure(s, p.sourceCol, 'source');
+        const tid = ensure(t, p.targetCol, 'target');
         if (!sid || !tid) continue;
         const kind = p.linkKindCol ? String(row[p.linkKindCol] ?? 'link') : 'link';
         const attrs = p.attrCols?.length
@@ -191,7 +270,7 @@ export function projectEntities(
 
 /**
  * Fold the backend's aggregated triples (heaviest first) into the same G6 shapes as
- * {@link projectEntities}: `entity:<value>` node ids, `sid->tid:kind` edge ids, `kind · count`
+ * {@link projectEntities}: {@link endpointId} node ids, `sid->tid:kind` edge ids, `kind · count`
  * folded-edge labels, and the {@link projectionNodeCapValue} with a truncation flag.
  */
 export function projectTriples(
@@ -204,8 +283,8 @@ export function projectTriples(
     const edges = new Map<string, G6Edge & { data: { kind: string; count: number } }>();
     let truncated = serverTruncated;
 
-    const ensure = (value: string, column?: string): string | null => {
-        const id = entityId(p?.entityType, value);
+    const ensure = (value: string, column: string | undefined, end: 'source' | 'target'): string | null => {
+        const id = endpointId(p, end, value);
         if (!nodes.has(id)) {
             if (nodes.size >= projectionNodeCapValue()) {
                 truncated = true;
@@ -228,8 +307,8 @@ export function projectTriples(
         const s = String(t.source ?? '').trim();
         const tv = String(t.target ?? '').trim();
         if (!s || !tv) continue;
-        const sid = ensure(s, p?.sourceCol);
-        const tid = ensure(tv, p?.targetCol);
+        const sid = ensure(s, p?.sourceCol, 'source');
+        const tid = ensure(tv, p?.targetCol, 'target');
         if (!sid || !tid) continue;
         const kind = t.kind ?? 'link';
         const id = `${sid}->${tid}:${kind}${t.attrs ? ':' + JSON.stringify(t.attrs) : ''}`;
@@ -261,7 +340,7 @@ export class EntityProjectionGraphSource implements GraphSource {
     async query(q: GraphSourceQuery): Promise<ProjectedGraph> {
         if (q.projections?.length) {
             const graphs = await Promise.all(q.projections.map((p) => this.queryOne(p, q.filter)));
-            return mergeProjectedGraphs(graphs);
+            return { ...mergeProjectedGraphs(graphs), idMappings: graphs.flatMap((g) => g.idMappings ?? []) };
         }
         if (!q.projection) throw new Error('The entity-projection source needs a Dataset mapping.');
         return this.queryOne(q.projection, q.filter);
@@ -281,7 +360,8 @@ export class EntityProjectionGraphSource implements GraphSource {
                 filter,
             }),
         );
-        return projectTriples(res.rows, res.truncated, p);
+        const typed = withColumnTypes(p, res.columnTypes);
+        return { ...projectTriples(res.rows, res.truncated, typed), idMappings: [typed] };
     }
 
     /**
@@ -304,7 +384,8 @@ export class EntityProjectionGraphSource implements GraphSource {
                 value: nodeLabel,
             }),
         );
-        return projectTriples(res.rows, res.truncated, p);
+        const typed = withColumnTypes(p, res.columnTypes);
+        return { ...projectTriples(res.rows, res.truncated, typed), idMappings: [typed] };
     }
 }
 
@@ -338,8 +419,8 @@ export interface MultiProjectedGraph extends ProjectedGraph {
 
 /**
  * Map a `POST /inv/projection/multi` answer (LA-08) into the studio graph. The server returns values RAW, one
- * entry per provenance (D-S4); every node id is minted by {@link entityId} UNSCOPED, so an entity that appears
- * in two Datasets under two spellings is ONE node carrying both Datasets in `data.provenance` and both
+ * entry per provenance (D-S4); a node id is minted UNSCOPED by {@link entityId}, or `<type>:<key>` when the row
+ * says its column is typed (LA-17 D-M6), so an entity that appears in two Datasets under two spellings is ONE node carrying both Datasets in `data.provenance` and both
  * spellings in `data.spellings`. Node mappings are read first, so their label column and category win the
  * display; an edge endpoint no node mapping named still becomes an entity. Edges fold on
  * `sid->tid:kind[:attrs]` exactly as {@link projectTriples} does, summing counts across Datasets.
@@ -358,8 +439,16 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
         return categoryColors.get(c)!;
     };
 
-    const ensure = (value: string, provenance: string, label?: string | null, category?: string | null) => {
-        const id = entityId(undefined, value);
+    const types = new Map<string, EntityTypeRef>();
+    const ensure = (
+        value: string,
+        provenance: string,
+        type: EntityTypeRef | undefined,
+        label?: string | null,
+        category?: string | null,
+    ) => {
+        if (type) types.set(type.id, type);
+        const id = typedOrEntityId(type, undefined, value);
         const node = nodes.get(id);
         if (node) {
             addSpelling(node, value);
@@ -383,14 +472,14 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
 
     for (const n of res.nodes) {
         const v = String(n.id ?? '').trim();
-        if (v) ensure(v, n.__provenance_dataset, n.label, n.category);
+        if (v) ensure(v, n.__provenance_dataset, n.entityType, n.label, n.category);
     }
     for (const t of res.edges) {
         const s = String(t.source ?? '').trim();
         const tv = String(t.target ?? '').trim();
         if (!s || !tv) continue;
-        const sid = ensure(s, t.__provenance_dataset);
-        const tid = ensure(tv, t.__provenance_dataset);
+        const sid = ensure(s, t.__provenance_dataset, t.sourceType);
+        const tid = ensure(tv, t.__provenance_dataset, t.targetType);
         if (!sid || !tid) continue;
         const kind = t.kind ?? 'link';
         const id = `${sid}->${tid}:${kind}${t.attrs ? ':' + JSON.stringify(t.attrs) : ''}`;
@@ -410,7 +499,9 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
             });
         }
     }
-    return { nodes: [...nodes.values()], edges: [...edges.values()], truncated, mappings: res.mappings };
+    // A raw value arriving without its column (a Geo key, a path hop) may be any seen type, or untyped.
+    const idMappings: EntityIdMapping[] = [{}, ...[...types.values()].map((t) => ({ sourceType: t, targetType: t }))];
+    return { nodes: [...nodes.values()], edges: [...edges.values()], truncated, mappings: res.mappings, idMappings };
 }
 
 /** The LA-08 GraphSource: one `POST /inv/projection/multi` call per query. No incremental expand (yet). */
@@ -447,16 +538,16 @@ export interface ServerPathsState {
 }
 
 /**
- * Map a `POST /inv/traversal/recursive-paths` answer (LA-11) onto the working set. Path values are raw; each is
- * minted by {@link entityId} with the mapping's `entityType`, so a hop lands on the node the projection already
- * drew. A step between two nodes the working set already links reuses that link (either direction); a step it
+ * Map a `POST /inv/traversal/recursive-paths` answer (LA-11) onto the working set. Path values are raw and carry
+ * no column, so each is minted by {@link resolveEntityId} over the run's `mappings` — the candidate the projection
+ * already drew, else the start as a source and every later hop as a target (D-M6). A step between two nodes the working set already links reuses that link (either direction); a step it
  * does not have — the walk ran over the whole Dataset, not the loaded slice — is added as a `path` link, and
  * so is any node it reached beyond the working set, so every returned path can be drawn and highlighted.
  */
 export function recursivePathsToGraph(
     res: RecursivePathsResult,
     base: G6GraphData,
-    entityType?: string,
+    mappings: readonly (EntityIdMapping | undefined)[] = [],
 ): { graph: G6GraphData; state: ServerPathsState } {
     const nodes = new Map(base.nodes.map((n) => [n.id, n]));
     const edges = new Map(base.edges.map((e) => [e.id, e]));
@@ -464,9 +555,9 @@ export function recursivePathsToGraph(
         [...edges.values()].find((e) => (e.source === a && e.target === b) || (e.source === b && e.target === a))?.id;
 
     const paths: GraphSelection[] = res.paths.map((p) => {
-        const nodeIds = p.nodes.map((raw) => {
+        const nodeIds = p.nodes.map((raw, i) => {
             const value = String(raw ?? '').trim();
-            const id = entityId(entityType, value);
+            const id = resolveEntityId(mappings, value, (x) => nodes.has(x), i === 0 ? 'source' : 'target');
             if (!nodes.has(id)) nodes.set(id, { id, data: { label: value, kind: 'entity', spellings: [value] } });
             return id;
         });
@@ -506,7 +597,8 @@ export interface ServerPatternState {
 
 /**
  * Map a `POST /inv/pattern/branching` answer (LA-14b) onto the working set, as {@link recursivePathsToGraph} does
- * for LA-11: node values are raw and minted by {@link entityId}; a leg the working set already draws is reused
+ * for LA-11: node values are raw; a leg endpoint mints by {@link resolveEntityId} preferring its own end (D-M6), a match's bare values by the id
+ * their leg minted (else {@link resolveEntityId}); a leg the working set already draws is reused
  * (the same edge id {@link projectTriples} mints — when the projection's `attrCols` are the time column then the
  * threshold columns, the order the server spells `attrs` in), and one it lacks —
  * the search ran over the whole Dataset, typically because the projection cut exactly these legs — is added.
@@ -514,21 +606,25 @@ export interface ServerPatternState {
 export function branchingResultToGraph(
     res: BranchingPatternResult,
     base: G6GraphData,
-    entityType?: string,
+    mappings: readonly (EntityIdMapping | undefined)[] = [],
 ): { graph: G6GraphData; state: ServerPatternState } {
     const nodes = new Map(base.nodes.map((n) => [n.id, n]));
     const edges = new Map(base.edges.map((e) => [e.id, e]));
-    const node = (raw: string): string => {
+    const minted = new Map<string, string>(); // raw value -> the id a leg endpoint minted it as
+    const node = (raw: string, end?: 'source' | 'target'): string => {
         const value = String(raw ?? '').trim();
-        const id = entityId(entityType, value);
+        const id = end
+            ? resolveEntityId(mappings, value, (x) => nodes.has(x), end)
+            : (minted.get(value) ?? resolveEntityId(mappings, value, (x) => nodes.has(x), 'target'));
+        if (end && !minted.has(value)) minted.set(value, id);
         if (!nodes.has(id)) nodes.set(id, { id, data: { label: value, kind: 'entity', spellings: [value] } });
         else addSpelling(nodes.get(id)!, value);
         return id;
     };
     const legId = new Map<string, string>();
     for (const leg of res.edges) {
-        const sid = node(leg.source);
-        const tid = node(leg.target);
+        const sid = node(leg.source, 'source');
+        const tid = node(leg.target, 'target');
         const id = `${sid}->${tid}:${leg.kind}:${JSON.stringify(leg.attrs)}`;
         if (!edges.has(id))
             edges.set(id, {
@@ -540,9 +636,9 @@ export function branchingResultToGraph(
         legId.set(leg.id, id);
     }
     const matches: BranchingMatch[] = res.matches.map((m) => ({
-        nodeIds: m.nodeIds.map(node),
+        nodeIds: m.nodeIds.map((v) => node(v)),
         edgeIds: m.edgeIds.map((id) => legId.get(id) ?? id),
-        layers: m.layers.map((layer) => layer.map(node)),
+        layers: m.layers.map((layer) => layer.map((v) => node(v))),
     }));
     return {
         graph: { nodes: [...nodes.values()], edges: [...edges.values()] },
@@ -579,7 +675,8 @@ export interface SplitIdentityGroup {
  * This function itself never mutates the graph.
  *
  * Type-scoped ids are compared only within their own scope, so `entity:person:bob` and
- * `entity:account:bob` are two entities by construction, not a split identity. Super-node stand-ins
+ * `entity:account:bob` (or typed `msisdn:+44…` vs `imsi:…`, D-M6) are two entities by construction, not a split
+ * identity. Super-node stand-ins
  * are skipped -- their label is a count, not a name.
  */
 export function splitIdentityGroups(graph: G6GraphData | null | undefined): SplitIdentityGroup[] {

@@ -367,7 +367,7 @@ export class GeoMapComponent implements OnInit, OnDestroy {
         const result = this.resultEmphasis();
         if (result) return { pointIds: result };
         const b = this.brush.brush();
-        if (b?.origin === 'link') return { pointIds: pointIdsForNodes(d.points, new Set(b.nodeIds), b.entityTypes) };
+        if (b?.origin === 'link') return { pointIds: pointIdsForNodes(d.points, new Set(b.nodeIds), b.mappings) };
         const sel = this.selectedId();
         return sel ? { pointIds: [sel] } : null;
     });

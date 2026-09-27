@@ -19,7 +19,17 @@ describe('nodeIdsForKeys (Geo → Link)', () => {
 
     it('matches a type-scoped node only through the mapping entity type', () => {
         const nodes = new Set([entityId('person', 'Bob'), entityId('account', 'Bob')]);
-        expect(nodeIdsForKeys(['Bob'], nodes, ['person'])).toEqual([entityId('person', 'Bob')]);
+        expect(nodeIdsForKeys(['Bob'], nodes, [{ entityType: 'person' }])).toEqual([entityId('person', 'Bob')]);
+    });
+
+    it('matches a typed node through its column type and normaliser (LA-17 D-M6)', () => {
+        const msisdn = { id: 'msisdn', normaliser: 'e164' as const };
+        const nodes = new Set(['msisdn:+4478', 'entity:0044 78']);
+        // The Geo key is spelled 0044 78; the e164 normaliser folds it onto the typed node, never the untyped one.
+        expect(nodeIdsForKeys(['0044 78'], nodes, [{ sourceType: msisdn, targetType: msisdn }])).toEqual([
+            'msisdn:+4478',
+        ]);
+        expect(nodeIdsForKeys(['0044 78'], nodes, [undefined])).toEqual(['entity:0044 78']);
     });
 
     it('matches a spelling variant of the key, because ids are normalised (D-S4)', () => {
@@ -41,7 +51,7 @@ describe('GeoLinkBrushService', () => {
         s.fromGeo(['K1', 'K1', '']);
         expect(s.brush()).toEqual({ origin: 'geo', keys: ['K1'] });
         s.fromLink(['entity:K1'], [undefined]);
-        expect(s.brush()).toEqual({ origin: 'link', nodeIds: ['entity:K1'], entityTypes: [undefined] });
+        expect(s.brush()).toEqual({ origin: 'link', nodeIds: ['entity:K1'], mappings: [undefined] });
         s.clear();
         expect(s.brush()).toBeNull();
     });

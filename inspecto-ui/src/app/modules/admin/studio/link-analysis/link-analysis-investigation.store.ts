@@ -64,6 +64,8 @@ export class InvestigationSessionStore {
             targetCol: h.targetCol,
             linkKindCol: h.linkKindCol ?? undefined,
             entityType: this.activeRef()?.entityType,
+            sourceType: this.activeRef()?.sourceType,
+            targetType: this.activeRef()?.targetType,
         };
     });
     readonly workingSetGraph = computed<ProjectedGraph | null>(() => {
@@ -112,7 +114,16 @@ export class InvestigationSessionStore {
                     linkKindCol: p.linkKindCol || undefined,
                 }),
             );
-            this.refs.update((all) => [...all, { id: h.id, title: h.title ?? undefined, entityType: p.entityType }]);
+            this.refs.update((all) => [
+                ...all,
+                {
+                    id: h.id,
+                    title: h.title ?? undefined,
+                    entityType: p.entityType,
+                    sourceType: p.sourceType,
+                    targetType: p.targetType,
+                },
+            ]);
             this.close();
             this.activeId.set(h.id);
             // A fresh Investigation has an empty log and an empty Working Set — no replay needed.
@@ -164,7 +175,14 @@ export class InvestigationSessionStore {
             const res = await firstValueFrom(this.inv.reorderInvestigation(parent.id, { order }));
             this.refs.update((all) => [
                 ...all,
-                { id: res.id, title: parent.title, entityType: parent.entityType, parentId: parent.id },
+                {
+                    id: res.id,
+                    title: parent.title,
+                    entityType: parent.entityType,
+                    sourceType: parent.sourceType,
+                    targetType: parent.targetType,
+                    parentId: parent.id,
+                },
             ]);
             this.close();
             this.activeId.set(res.id);
@@ -173,8 +191,13 @@ export class InvestigationSessionStore {
     }
 
     /** LA-23: a template was instantiated into a NEW Investigation — remember it and open it. */
-    async adopt(id: string, title?: string, entityType?: string): Promise<boolean> {
-        if (!this.refs().some((r) => r.id === id)) this.refs.update((all) => [...all, { id, title, entityType }]);
+    async adopt(
+        id: string,
+        title?: string,
+        like?: Pick<InvestigationRef, 'entityType' | 'sourceType' | 'targetType'>,
+    ): Promise<boolean> {
+        const ids = { entityType: like?.entityType, sourceType: like?.sourceType, targetType: like?.targetType };
+        if (!this.refs().some((r) => r.id === id)) this.refs.update((all) => [...all, { id, title, ...ids }]);
         return this.open(id);
     }
 

@@ -4,6 +4,7 @@ import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import type { ConditionGroup } from '../query/query-types';
 import type { BranchStage } from '../graph/branching-pattern-engine';
+import type { EntityTypeRef } from '../graph/entity-key';
 
 /** One aggregated projection triple: a distinct (source, target[, kind]) pair with its folded row count. */
 export interface ProjectionTriple {
@@ -21,6 +22,8 @@ export interface ProjectionResult {
     rows: ProjectionTriple[];
     /** True when the server row limit cut the projection short. */
     truncated: boolean;
+    /** LA-17 D-M6: column → the Entity Type typing it; an untyped column is absent. */
+    columnTypes?: Record<string, EntityTypeRef>;
 }
 
 /** The wire shape of an entity-projection request (mirrors the studio's `EntityProjection` mapping). */
@@ -80,10 +83,15 @@ export interface MultiProjectionNode {
     category: string | null;
     attrs?: Record<string, string | null>;
     __provenance_dataset: string;
+    /** LA-17 D-M6: the Entity Type of the mapping's `idColumn`, when typed. */
+    entityType?: EntityTypeRef;
 }
 
 export interface MultiProjectionEdge extends ProjectionTriple {
     __provenance_dataset: string;
+    /** LA-17 D-M6: the Entity Types of the mapping's source / target columns, when typed. */
+    sourceType?: EntityTypeRef;
+    targetType?: EntityTypeRef;
 }
 
 /** One mapping's share of the union — how many rows it contributed and whether its own `limit` cut it. */
