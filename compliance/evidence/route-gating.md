@@ -158,8 +158,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/decision-rules/([^/]+)/simulate` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DecisionRoutes.java:62` |
 | POST | `/enrichment` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/EnrichmentRoutes.java:41` |
 | POST | `/enrichment/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/EnrichmentRoutes.java:44` |
-| POST | `/events/views` | gated | `canAuthorWorkbench` | `inspecto-events/src/main/java/com/gamma/eventsapi/EventRoutes.java:59` |
-| POST | `/events/views/([^/]+)/delete` | gated | `canAuthorWorkbench` | `inspecto-events/src/main/java/com/gamma/eventsapi/EventRoutes.java:61` |
+| POST | `/events/views` | gated | `canAuthorWorkbench` | `inspecto-events/src/main/java/com/gamma/eventsapi/EventRoutes.java:60` |
+| POST | `/events/views/([^/]+)/delete` | gated | `canAuthorWorkbench` | `inspecto-events/src/main/java/com/gamma/eventsapi/EventRoutes.java:62` |
 | POST | `/exchange/grants/([^/]+)/(approve|deny|revoke)` | gated | `canApproveShares` | `inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:92` |
 | POST | `/exchange/grants/([^/]+)/expiry` | gated | `canApproveShares` | `inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:98` |
 | POST | `/exchange/grants/([^/]+)/pin` | gated | `canRequestShares` | `inspecto-exchange/src/main/java/com/gamma/exchange/ExchangeRoutes.java:95` |
@@ -212,8 +212,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/jobs/packs/rescan` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:84` |
 | POST | `/jobs/runs/([^/]+)/replay` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:96` |
 | PUT | `/nav/menus` | gated | `canCurateMenus` | `inspecto/src/main/java/com/gamma/control/NavRoutes.java:34` |
-| POST | `/notes/([^/]+)/([^/]+)/attachments` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java:57` |
-| POST | `/notes/([^/]+)/([^/]+)/comments` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java:55` |
+| POST | `/notes/([^/]+)/([^/]+)/attachments` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java:58` |
+| POST | `/notes/([^/]+)/([^/]+)/comments` | exempt | collaboration | `inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java:56` |
 | DELETE | `/notifications/(?!suppressions$)([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/NotificationRoutes.java:87` |
 | POST | `/notifications/([^/]+)/read` | exempt | self-service | `inspecto/src/main/java/com/gamma/control/NotificationRoutes.java:49` |
 | POST | `/notifications/([^/]+)/unread` | exempt | self-service | `inspecto/src/main/java/com/gamma/control/NotificationRoutes.java:50` |
