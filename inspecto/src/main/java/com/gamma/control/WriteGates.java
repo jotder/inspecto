@@ -115,8 +115,12 @@ public final class WriteGates {
     }
 
     private static void refuseRegistry(Path rel) {
-        if (rel.getNameCount() == 0 || !"registry".equalsIgnoreCase(windowsName(rel.getName(0)))) return;
-        String dir = rel.getNameCount() > 2 ? windowsName(rel.getName(1)) : null;
+        // Split on BOTH separators, whatever the OS: on Linux `\` is an ordinary name character, so
+        // `registry\kpis` is ONE segment to Path — yet it is normalised into `registry/kpis` further on.
+        String[] parts = java.util.Arrays.stream(rel.toString().split("[/\\\\]+"))
+                .filter(s -> !s.isEmpty()).toArray(String[]::new);
+        if (parts.length == 0 || !"registry".equalsIgnoreCase(windowsName(parts[0]))) return;
+        String dir = parts.length > 2 ? windowsName(parts[1]) : null;
         String kind = null;
         if (dir != null) {
             java.util.Set<String> kinds = new java.util.TreeSet<>(com.gamma.pipeline.ComponentStore.WRITABLE_TYPES);
@@ -131,8 +135,8 @@ public final class WriteGates {
     }
 
     /** A path segment as Windows resolves it: trailing dots and spaces dropped ({@code "registry. "} IS {@code registry}). */
-    private static String windowsName(Path segment) {
-        return segment.toString().replaceAll("[. ]+$", "");
+    private static String windowsName(String segment) {
+        return segment.replaceAll("[. ]+$", "");
     }
 
     /** The real path of {@code p}'s nearest existing ancestor with the missing tail re-attached, or {@code null}. */
