@@ -43,26 +43,28 @@ export class RequirementsComponent implements OnInit {
     readonly requirements = signal<Requirement[]>([]);
     readonly loading = signal(false);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columns: ColDef<Requirement>[] = [
         { field: 'title', headerName: 'Title', flex: 1 },
-        { field: 'kind', headerName: 'Kind', width: 140 },
+        { field: 'kind', headerName: 'Kind', minWidth: 140 },
         {
             field: 'status',
             headerName: 'Status',
-            width: 130,
+            minWidth: 130,
+            maxWidth: 130,
             cellRenderer: (p: ICellRendererParams<Requirement>) => statusBadgeHtml(p.value as string),
         },
         {
             field: 'deliveredNote',
             headerName: 'Linked Component / Target',
-            width: 220,
+            minWidth: 220,
             cellRenderer: (p: ICellRendererParams<Requirement>) => {
                 const val = p.value as string;
                 if (!val) return '<span class="text-hint text-xs">—</span>';
                 return `<span class="inline-flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">🔗 ${val}</span>`;
             },
         },
-        { field: 'submittedAt', headerName: 'Submitted', width: 170, valueFormatter: (p) => fmtDateTime(p.value) },
+        { field: 'submittedAt', headerName: 'Submitted', minWidth: 170, valueFormatter: (p) => fmtDateTime(p.value) },
     ];
 
     readonly rowActions: InspectoRowAction<Requirement>[] = [

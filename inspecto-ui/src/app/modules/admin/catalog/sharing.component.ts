@@ -99,23 +99,25 @@ export class SharingComponent implements OnInit {
         }));
     });
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly grantColumns: ColDef[] = [
         { field: 'item', headerName: 'Item', flex: 1 },
-        { field: 'kind', headerName: 'Kind', width: 110 },
-        { field: 'owner', headerName: 'Owner', width: 150 },
-        { field: 'consumer', headerName: 'Consumer', width: 150 },
-        { field: 'mode', headerName: 'Mode', width: 110 },
+        { field: 'kind', headerName: 'Kind', minWidth: 110 },
+        { field: 'owner', headerName: 'Owner', minWidth: 150 },
+        { field: 'consumer', headerName: 'Consumer', minWidth: 150 },
+        { field: 'mode', headerName: 'Mode', minWidth: 110 },
         {
             field: 'status',
             headerName: 'Status',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: { value: string }) => statusBadgeHtml(p.value),
         },
         { field: 'purpose', headerName: 'Purpose', flex: 1 },
         {
             field: 'pin',
             headerName: 'Pinned',
-            width: 150,
+            minWidth: 150,
             // A pinned snapshot behind the owner's current publish is flagged "Behind" (S3 drift);
             // the pin row-action re-pins or clears it. `behind` is a `v<n>` string, safe to interpolate.
             cellRenderer: (p: { value: string | null; data: GrantRow }) =>
@@ -128,28 +130,28 @@ export class SharingComponent implements OnInit {
         {
             field: 'expiresAt',
             headerName: 'Expires',
-            width: 170,
+            minWidth: 170,
             valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—'),
         },
-        { field: 'requestedAt', headerName: 'Requested', width: 170, valueFormatter: (p) => fmtDateTime(p.value) },
+        { field: 'requestedAt', headerName: 'Requested', minWidth: 170, valueFormatter: (p) => fmtDateTime(p.value) },
     ];
 
     readonly offerColumns: ColDef[] = [
         { field: 'item', headerName: 'Item', flex: 1 },
-        { field: 'kind', headerName: 'Kind', width: 110 },
-        { field: 'owner', headerName: 'Owner', width: 150 },
+        { field: 'kind', headerName: 'Kind', minWidth: 110 },
+        { field: 'owner', headerName: 'Owner', minWidth: 150 },
         { field: 'description', headerName: 'Description', flex: 2 },
-        { field: 'freshness.version', headerName: 'Snapshot', width: 110, valueFormatter: (p) => p.value ?? '—' },
+        { field: 'freshness.version', headerName: 'Snapshot', minWidth: 110, valueFormatter: (p) => p.value ?? '—' },
         {
             field: 'freshness.rows',
             headerName: 'Rows',
-            width: 100,
+            minWidth: 100,
             valueFormatter: (p) => (p.value == null ? '—' : Number(p.value).toLocaleString()),
         },
         {
             field: 'freshness.refreshedAt',
             headerName: 'Refreshed',
-            width: 170,
+            minWidth: 170,
             valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—'),
         },
     ];

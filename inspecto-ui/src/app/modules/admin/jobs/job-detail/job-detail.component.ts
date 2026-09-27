@@ -103,30 +103,33 @@ export class JobDetailComponent implements OnInit, OnDestroy {
     readonly fmtDateTime = fmtDateTime;
     readonly fmtDuration = fmtDuration;
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly runColumns: ColDef<JobRun>[] = [
-        { field: 'startTime', headerName: 'Started', width: 180, valueFormatter: (p) => fmtDateTime(p.value) },
+        { field: 'startTime', headerName: 'Started', minWidth: 180, valueFormatter: (p) => fmtDateTime(p.value) },
         {
             field: 'status',
             headerName: 'Status',
-            width: 110,
+            minWidth: 110,
+            maxWidth: 110,
             cellRenderer: (p: ICellRendererParams<JobRun>) => statusBadgeHtml(p.value as string),
         },
-        { field: 'triggerType', headerName: 'Trigger', width: 110 },
+        { field: 'triggerType', headerName: 'Trigger', minWidth: 110 },
         {
             field: 'durationMs',
             headerName: 'Duration',
-            width: 110,
+            minWidth: 110,
             valueFormatter: (p) => fmtDuration(p.value as number),
         },
         { field: 'error', headerName: 'Message', flex: 1, minWidth: 240, valueFormatter: (p) => p.value ?? '—' },
     ];
 
     readonly logColumns: ColDef<JobLogLine>[] = [
-        { field: 'ts', headerName: 'Time', width: 180, valueFormatter: (p) => fmtDateTime(p.value) },
+        { field: 'ts', headerName: 'Time', minWidth: 180, valueFormatter: (p) => fmtDateTime(p.value) },
         {
             field: 'level',
             headerName: 'Level',
-            width: 90,
+            minWidth: 90,
+            maxWidth: 90,
             cellRenderer: (p: ICellRendererParams<JobLogLine>) => statusBadgeHtml(p.value as string),
         },
         { field: 'message', headerName: 'Message', flex: 1, minWidth: 280 },

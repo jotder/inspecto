@@ -64,17 +64,19 @@ export class MaintenanceOverviewComponent implements OnInit {
     storageAxes = signal<StorageAxis[]>([]);
     lastBackup = signal<RunArtifactRow | null>(null);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly jobColumns: ColDef<JobView>[] = [
         { field: 'name', headerName: 'Job', flex: 1 },
-        { field: 'cron', headerName: 'Cron', width: 130 },
+        { field: 'cron', headerName: 'Cron', minWidth: 130 },
         {
             field: 'lastStatus',
             headerName: 'Last status',
-            width: 140,
+            minWidth: 140,
+            maxWidth: 140,
             cellRenderer: (p: ICellRendererParams<JobView>) => statusBadgeHtml((p.value as string) || '—'),
         },
-        { field: 'lastRunTime', headerName: 'Last run', width: 170, valueFormatter: fmtDateTime },
-        { field: 'nextFire', headerName: 'Next fire', width: 170, valueFormatter: fmtDateTime },
+        { field: 'lastRunTime', headerName: 'Last run', minWidth: 170, valueFormatter: fmtDateTime },
+        { field: 'nextFire', headerName: 'Next fire', minWidth: 170, valueFormatter: fmtDateTime },
     ];
 
     readonly failedRunColumns: ColDef<JobRunRow>[] = [
@@ -82,10 +84,11 @@ export class MaintenanceOverviewComponent implements OnInit {
         {
             field: 'status',
             headerName: 'Status',
-            width: 130,
+            minWidth: 130,
+            maxWidth: 130,
             cellRenderer: (p: ICellRendererParams<JobRunRow>) => statusBadgeHtml(p.value as string),
         },
-        { field: 'startTime', headerName: 'Started', width: 170, valueFormatter: fmtDateTime },
+        { field: 'startTime', headerName: 'Started', minWidth: 170, valueFormatter: fmtDateTime },
         { field: 'message', headerName: 'Message', flex: 2 },
     ];
 

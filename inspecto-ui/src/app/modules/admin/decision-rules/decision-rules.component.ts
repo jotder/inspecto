@@ -78,12 +78,13 @@ export class DecisionRulesComponent implements OnInit {
     readonly rows = signal<DecisionRule[]>([]);
     readonly loading = signal(false);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<DecisionRule>[] = [
-        { field: 'priority', headerName: 'Prio', width: 90 },
+        { field: 'priority', headerName: 'Prio', minWidth: 90, maxWidth: 90 },
         { field: 'name', headerName: 'Rule', flex: 1, minWidth: 180 },
         {
             headerName: 'Target',
-            width: 180,
+            minWidth: 180,
             valueGetter: (p) => (p.data ? `${p.data.targetType}: ${p.data.target}` : ''),
         },
         {
@@ -101,12 +102,13 @@ export class DecisionRulesComponent implements OnInit {
         {
             field: 'enabled',
             headerName: 'Enabled',
-            width: 110,
+            minWidth: 110,
+            maxWidth: 110,
             cellRenderer: (p: ICellRendererParams<DecisionRule>) => statusBadgeHtml(p.value ? 'enabled' : 'disabled'),
         },
         {
             headerName: 'Last simulation',
-            width: 150,
+            minWidth: 150,
             valueGetter: (p) => p.data?.lastSimulation ?? null,
             cellRenderer: (p: ICellRendererParams<DecisionRule>) =>
                 p.data?.lastSimulation
@@ -115,7 +117,7 @@ export class DecisionRulesComponent implements OnInit {
         },
         {
             headerName: 'Checked',
-            width: 170,
+            minWidth: 170,
             valueGetter: (p) => p.data?.lastSimulation?.checkedAt ?? null,
             valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—'),
         },

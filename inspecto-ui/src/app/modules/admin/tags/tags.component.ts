@@ -94,14 +94,15 @@ export class TagsComponent implements OnInit {
 
     readonly canAuthor = computed(() => this.lens.canAuthorWorkbench());
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<TagAssignment>[] = [
-        { field: 'targetKind', headerName: 'Kind', width: 180 },
+        { field: 'targetKind', headerName: 'Kind', minWidth: 180 },
         { field: 'targetId', headerName: 'Target', flex: 1 },
-        { field: 'actor', headerName: 'Tagged by', width: 160 },
+        { field: 'actor', headerName: 'Tagged by', minWidth: 160 },
         {
             field: 'createdAt',
             headerName: 'Tagged',
-            width: 180,
+            minWidth: 180,
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },

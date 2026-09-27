@@ -159,6 +159,7 @@ export class JobsComponent implements OnInit, OnDestroy {
             });
     }
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<JobView>[] = [
         {
             field: 'name',
@@ -182,25 +183,27 @@ export class JobsComponent implements OnInit, OnDestroy {
         {
             field: 'nextFire',
             headerName: 'Next fire',
-            width: 170,
+            minWidth: 170,
             valueFormatter: (p) => fmtDateTime(p.value),
         },
         {
             field: 'enabled',
             headerName: 'Enabled',
-            width: 110,
+            minWidth: 110,
+            maxWidth: 110,
             cellRenderer: (p: ICellRendererParams<JobView>) => statusBadgeHtml(p.value ? 'enabled' : 'disabled'),
         },
         {
             field: 'lastStatus',
             headerName: 'Last result',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<JobView>) => (p.value ? statusBadgeHtml(p.value as string) : '—'),
         },
         {
             field: 'lastRunTime',
             headerName: 'Last run',
-            width: 170,
+            minWidth: 170,
             valueFormatter: (p) => fmtDateTime(p.value),
         },
     ];
@@ -251,22 +254,23 @@ export class JobsComponent implements OnInit, OnDestroy {
         {
             field: 'startTime',
             headerName: 'Started',
-            width: 180,
+            minWidth: 180,
             valueFormatter: (p) => p.value ?? '—',
         },
-        { field: 'job', headerName: 'Job', width: 160 },
-        { field: 'type', headerName: 'Type', width: 120 },
-        { field: 'trigger', headerName: 'Trigger', width: 130 },
+        { field: 'job', headerName: 'Job', minWidth: 160 },
+        { field: 'type', headerName: 'Type', minWidth: 120 },
+        { field: 'trigger', headerName: 'Trigger', minWidth: 130 },
         {
             field: 'status',
             headerName: 'Status',
-            width: 110,
+            minWidth: 110,
+            maxWidth: 110,
             cellRenderer: (p: ICellRendererParams<JobRunRow>) => statusBadgeHtml(p.value as string),
         },
         {
             field: 'durationMs',
             headerName: 'Duration',
-            width: 110,
+            minWidth: 110,
             valueFormatter: (p) => fmtDuration(p.value as number),
         },
         { field: 'message', headerName: 'Message', flex: 1, minWidth: 220 },

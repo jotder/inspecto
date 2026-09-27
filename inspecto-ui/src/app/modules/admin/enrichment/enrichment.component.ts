@@ -75,23 +75,25 @@ export class EnrichmentComponent implements OnInit {
     to: Date | null = null;
     readonly report = signal<EnrichmentRunReport | null>(null);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly jobColumns: ColDef<EnrichmentJobView>[] = [
         { field: 'name', headerName: 'Job', flex: 1 },
         { field: 'onPipeline', headerName: 'On pipeline', flex: 1 },
-        { field: 'eventTriggered', headerName: 'Event', width: 90 },
-        { field: 'scheduleTriggered', headerName: 'Scheduled', width: 110 },
-        { field: 'runCount', headerName: 'Runs', width: 90 },
+        { field: 'eventTriggered', headerName: 'Event', minWidth: 90, maxWidth: 90 },
+        { field: 'scheduleTriggered', headerName: 'Scheduled', minWidth: 110, maxWidth: 110 },
+        { field: 'runCount', headerName: 'Runs', minWidth: 90, maxWidth: 90 },
         {
             field: 'lastRunStatus',
             headerName: 'Last status',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<EnrichmentJobView>) =>
                 p.value ? statusBadgeHtml(p.value as string) : '—',
         },
         {
             field: 'lastRunTime',
             headerName: 'Last run',
-            width: 170,
+            minWidth: 170,
             valueFormatter: (p) => fmtDateTime(p.value),
         },
     ];

@@ -42,22 +42,23 @@ export class LearningComponent implements OnInit {
     /** The intelligence module is not deployed here — an expected state, explained in place (UI-10). */
     readonly unavailable = signal(false);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<TriageRunFeedback>[] = [
         {
             field: 'at',
             headerName: 'When',
-            width: 180,
+            minWidth: 180,
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },
-        { field: 'triageRunId', headerName: 'Triage Run', width: 200 },
+        { field: 'triageRunId', headerName: 'Triage Run', minWidth: 200 },
         {
             field: 'rating',
             headerName: 'Rating',
-            width: 140,
+            minWidth: 140,
             cellRenderer: (p: ICellRendererParams<TriageRunFeedback>) => statusBadgeHtml(p.value as string),
         },
-        { field: 'submittedBy', headerName: 'By', width: 160 },
+        { field: 'submittedBy', headerName: 'By', minWidth: 160 },
         {
             field: 'note',
             headerName: 'Note',

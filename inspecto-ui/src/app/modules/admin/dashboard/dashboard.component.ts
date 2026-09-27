@@ -95,27 +95,30 @@ export class DashboardComponent implements OnInit {
     /** Newest few events for the activity feed (GET /events/search?limit=8). */
     readonly recentEvents = signal<EventRow[]>([]);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly pipelineColumns: ColDef<RunStatus>[] = [
         { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
         {
             field: 'paused',
             headerName: 'Paused',
-            width: 110,
+            minWidth: 110,
+            maxWidth: 110,
             cellRenderer: (p: ICellRendererParams<RunStatus>) => statusBadgeHtml(p.value ? 'paused' : 'active'),
         },
-        { field: 'committedBatches', headerName: 'Committed', width: 130 },
-        { field: 'quarantineFiles', headerName: 'Quarantine', width: 130 },
+        { field: 'committedBatches', headerName: 'Committed', minWidth: 130, maxWidth: 130 },
+        { field: 'quarantineFiles', headerName: 'Quarantine', minWidth: 130, maxWidth: 130 },
         { field: 'lastBatchId', headerName: 'Last batch', flex: 1 },
         {
             field: 'lastBatchStatus',
             headerName: 'Last status',
-            width: 140,
+            minWidth: 140,
+            maxWidth: 140,
             cellRenderer: (p: ICellRendererParams<RunStatus>) => (p.value ? statusBadgeHtml(p.value) : '—'),
         },
         {
             field: 'lastBatchTime',
             headerName: 'Last time',
-            width: 180,
+            minWidth: 180,
             valueFormatter: (p) => fmtDateTime(p.value),
         },
     ];

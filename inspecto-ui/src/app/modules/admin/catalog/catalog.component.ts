@@ -121,14 +121,15 @@ export class CatalogComponent implements OnInit {
     readonly g6Data = signal<G6GraphData | null>(null);
     legend: { kind: NodeKind; fill: string; label: string }[] = [];
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly nodeColumns: ColDef[] = [
-        { field: 'kind', headerName: 'Kind', width: 110 },
+        { field: 'kind', headerName: 'Kind', minWidth: 110 },
         { field: 'label', headerName: 'Label', flex: 1 },
         { field: 'id', headerName: 'Id', flex: 1 },
         {
             field: 'attrs.format',
             headerName: 'Format',
-            width: 100,
+            minWidth: 100,
             cellRenderer: (p: { value?: string }) =>
                 p.value
                     ? `<span class="px-2 py-0.5 rounded text-xs font-semibold uppercase bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300">${p.value}</span>`
@@ -137,26 +138,26 @@ export class CatalogComponent implements OnInit {
         {
             field: 'overlay.freshness',
             headerName: 'Freshness',
-            width: 130,
+            minWidth: 130,
             cellRenderer: (p: { value?: string }) =>
                 p.value ? statusBadgeHtml(p.value) : '<span class="text-secondary font-mono text-xs">—</span>',
         },
         {
             field: 'overlay.rowCount',
             headerName: 'Rows',
-            width: 110,
+            minWidth: 110,
             valueFormatter: (p) => (p.value != null ? Number(p.value).toLocaleString() : '—'),
         },
         {
             field: 'overlay.completeness',
             headerName: 'Complete',
-            width: 110,
+            minWidth: 110,
             valueFormatter: (p) => (p.value == null ? '—' : Math.round(p.value * 100) + '%'),
         },
         {
             field: 'overlay.lastSeen',
             headerName: 'Last seen',
-            width: 180,
+            minWidth: 180,
             valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—'),
         },
     ];
@@ -165,11 +166,12 @@ export class CatalogComponent implements OnInit {
         { field: 'label', headerName: 'Stream', flex: 1 },
         {
             headerName: 'Lifecycle',
-            width: 110,
+            minWidth: 110,
+            maxWidth: 110,
             valueGetter: (p) => lifecycleOf((p.data as MetadataNode)?.attrs),
             cellRenderer: (p: { value: string }) => (p.value ? statusBadgeHtml(p.value) : '—'),
         },
-        { field: 'attrs.connector', headerName: 'Connector', width: 130 },
+        { field: 'attrs.connector', headerName: 'Connector', minWidth: 130 },
         {
             field: 'attrs.connection',
             headerName: 'Connection',
@@ -186,11 +188,12 @@ export class CatalogComponent implements OnInit {
             // Pipeline-produced references carry the producer's active flag (P3); path/dangling
             // enrichment-scoped rows have no lifecycle and render '—'.
             headerName: 'Lifecycle',
-            width: 110,
+            minWidth: 110,
+            maxWidth: 110,
             valueGetter: (p) => lifecycleOf((p.data as MetadataNode)?.attrs),
             cellRenderer: (p: { value: string }) => (p.value ? statusBadgeHtml(p.value) : '—'),
         },
-        { field: 'attrs.connector', headerName: 'Connector', width: 130 },
+        { field: 'attrs.connector', headerName: 'Connector', minWidth: 130 },
         {
             field: 'attrs.connection',
             headerName: 'Connection',
@@ -222,7 +225,7 @@ export class CatalogComponent implements OnInit {
     ];
 
     readonly kpiColumns: ColDef[] = [
-        { field: 'id', headerName: 'Id', width: 170 },
+        { field: 'id', headerName: 'Id', minWidth: 170 },
         { field: 'name', headerName: 'Name', flex: 1 },
         {
             field: 'definition',
@@ -231,7 +234,7 @@ export class CatalogComponent implements OnInit {
             wrapText: true,
             autoHeight: true,
         },
-        { field: 'grain', headerName: 'Grain', width: 150 },
+        { field: 'grain', headerName: 'Grain', minWidth: 150 },
         { field: 'joinKeys', headerName: 'Join keys', flex: 1 },
         { field: 'inputs', headerName: 'Inputs', flex: 1 },
     ];

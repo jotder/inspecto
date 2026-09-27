@@ -55,20 +55,22 @@ export class ApprovalsComponent implements OnInit {
      *  rendered as an explained panel rather than an error toast. */
     readonly unavailable = signal(false);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<AgentApproval>[] = [
         {
             field: 'requestedAt',
             headerName: 'Requested',
-            width: 180,
+            minWidth: 180,
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },
-        { field: 'tool', headerName: 'Tool', width: 170 },
-        { field: 'agentActor', headerName: 'Actor', width: 160 },
+        { field: 'tool', headerName: 'Tool', minWidth: 170 },
+        { field: 'agentActor', headerName: 'Actor', minWidth: 160 },
         {
             field: 'status',
             headerName: 'Status',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<AgentApproval>) => statusBadgeHtml(p.value as string),
         },
         {

@@ -61,11 +61,12 @@ export class ExpectationsComponent implements OnInit {
     readonly loading = signal(false);
     readonly sweeping = signal(false);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<Expectation>[] = [
         { field: 'name', headerName: 'Expectation', flex: 1, minWidth: 180 },
         {
             headerName: 'Check',
-            width: 120,
+            minWidth: 120,
             valueGetter: (p) => (p.data ? (KIND_LABELS[p.data.kind] ?? p.data.kind) : ''),
         },
         {
@@ -74,22 +75,24 @@ export class ExpectationsComponent implements OnInit {
             minWidth: 160,
             valueGetter: (p) => (p.data ? `${p.data.targetType}: ${p.data.target}` : ''),
         },
-        { field: 'column', headerName: 'Column', width: 130 },
+        { field: 'column', headerName: 'Column', minWidth: 130 },
         {
             field: 'severity',
             headerName: 'Severity',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<Expectation>) => (p.value ? statusBadgeHtml(p.value as string) : '—'),
         },
         {
             field: 'enabled',
             headerName: 'Enabled',
-            width: 110,
+            minWidth: 110,
+            maxWidth: 110,
             cellRenderer: (p: ICellRendererParams<Expectation>) => statusBadgeHtml(p.value ? 'enabled' : 'disabled'),
         },
         {
             headerName: 'Last result',
-            width: 130,
+            minWidth: 130,
             valueGetter: (p) => p.data?.lastResult?.status ?? '',
             cellRenderer: (p: ICellRendererParams<Expectation>) =>
                 p.data?.lastResult
@@ -101,7 +104,7 @@ export class ExpectationsComponent implements OnInit {
         },
         {
             headerName: 'Checked',
-            width: 170,
+            minWidth: 170,
             valueGetter: (p) => p.data?.lastResult?.checkedAt ?? null,
             valueFormatter: (p) => (p.value ? fmtDateTime(p.value) : '—'),
         },

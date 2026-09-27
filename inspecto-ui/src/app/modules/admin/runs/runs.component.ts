@@ -79,11 +79,12 @@ export class RunsComponent implements OnInit {
     /** Run open in the side panel — driven by the `/runs/:name` route param (R5). */
     readonly detailName = signal<string | null>(null);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<RunView>[] = [
         { field: 'name', headerName: 'Run', flex: 1 },
         { field: 'configPath', headerName: 'Config', flex: 2 },
-        { field: 'paused', headerName: 'Paused', width: 100 },
-        { field: 'committedBatches', headerName: 'Committed', width: 120 },
+        { field: 'paused', headerName: 'Paused', minWidth: 100, maxWidth: 100 },
+        { field: 'committedBatches', headerName: 'Committed', minWidth: 120, maxWidth: 120 },
     ];
 
     /** Business lens is read-only observe (plan §1) — only "Open detail" stays; every other action here

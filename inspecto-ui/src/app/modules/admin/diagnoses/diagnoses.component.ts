@@ -45,11 +45,12 @@ export class DiagnosesComponent implements OnInit {
     readonly loading = signal(false);
     limit = 50;
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<Diagnosis>[] = [
         {
             field: 'epochMillis',
             headerName: 'When',
-            width: 180,
+            minWidth: 180,
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },
@@ -58,7 +59,8 @@ export class DiagnosesComponent implements OnInit {
         {
             field: 'severity',
             headerName: 'Severity',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<Diagnosis>) => statusBadgeHtml(p.value as string),
         },
         {
@@ -68,7 +70,7 @@ export class DiagnosesComponent implements OnInit {
             wrapText: true,
             autoHeight: true,
         },
-        { field: 'heuristicOnly', headerName: 'Heuristic', width: 110 },
+        { field: 'heuristicOnly', headerName: 'Heuristic', minWidth: 110, maxWidth: 110 },
     ];
 
     ngOnInit(): void {

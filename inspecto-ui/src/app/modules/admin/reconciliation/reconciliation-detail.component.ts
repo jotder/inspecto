@@ -180,6 +180,7 @@ export class ReconciliationDetailComponent implements OnInit {
         const v = this.impactOf(b);
         return f && v !== undefined ? formatNumber(v, f) : '—';
     };
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     /** Sorted by the NUMBER, rendered through the shared formatter. */
     private readonly impactColumn = computed<ColDef<ReconBreak>[]>(() => {
         const header = this.impactHeader();
@@ -188,7 +189,7 @@ export class ReconciliationDetailComponent implements OnInit {
                   {
                       colId: 'impact',
                       headerName: header,
-                      width: 150,
+                      minWidth: 150,
                       valueGetter: (p) => (p.data ? (this.impactOf(p.data) ?? null) : null),
                       valueFormatter: (p) => (p.data ? this.impactText(p.data) : '—'),
                   },
@@ -305,14 +306,14 @@ export class ReconciliationDetailComponent implements OnInit {
         {
             colId: 'age',
             headerName: 'Age',
-            width: 100,
+            minWidth: 100,
             valueGetter: (p) => (p.data ? breakAgeDays(p.data) : null),
             valueFormatter: (p) => (p.value === null || p.value === undefined ? '—' : `${p.value}d`),
         },
         {
             colId: 'seen',
             headerName: 'Seen',
-            width: 170,
+            minWidth: 170,
             headerTooltip: 'Recorded runs this break was present in; recurred = came back after auto-closing',
             valueGetter: (p) => p.data?.occurrences ?? null,
             valueFormatter: (p) => (p.data ? this.seenText(p.data) : '—'),
@@ -320,7 +321,7 @@ export class ReconciliationDetailComponent implements OnInit {
         {
             field: 'assignee',
             headerName: 'Assignee',
-            width: 140,
+            minWidth: 140,
             valueFormatter: (p) => (p.value ? String(p.value) : '—'),
         },
     ];
@@ -333,7 +334,8 @@ export class ReconciliationDetailComponent implements OnInit {
         {
             field: 'status',
             headerName: 'Status',
-            width: 130,
+            minWidth: 130,
+            maxWidth: 130,
             cellRenderer: (p: ICellRendererParams<ReconBreak>) => statusBadgeHtml(p.value as string),
         },
     ]);
@@ -370,7 +372,7 @@ export class ReconciliationDetailComponent implements OnInit {
         {
             colId: 'records',
             headerName: 'Records',
-            width: 140,
+            minWidth: 140,
             valueGetter: (p) => (p.data ? this.recordsText(p.data) : ''),
         },
         ...this.impactColumn(),
@@ -378,7 +380,8 @@ export class ReconciliationDetailComponent implements OnInit {
         {
             field: 'status',
             headerName: 'Status',
-            width: 130,
+            minWidth: 130,
+            maxWidth: 130,
             cellRenderer: (p: ICellRendererParams<ReconBreak>) => statusBadgeHtml(p.value as string),
         },
     ]);
@@ -398,13 +401,14 @@ export class ReconciliationDetailComponent implements OnInit {
                 // R3-03: the cell reads the humanised field; the stored column name stays one hover away.
                 tooltipValueGetter: (p) => p.data?.column ?? '',
             },
-            { field: 'diff', headerName: 'Δ', width: 120, cellRenderer: varianceCell() },
+            { field: 'diff', headerName: 'Δ', minWidth: 120, cellRenderer: varianceCell() },
             ...this.impactColumn(),
             ...this.lifecycleColumns,
             {
                 field: 'status',
                 headerName: 'Status',
-                width: 130,
+                minWidth: 130,
+                maxWidth: 130,
                 cellRenderer: (p: ICellRendererParams<ReconBreak>) => statusBadgeHtml(p.value as string),
             },
         ];
@@ -497,7 +501,7 @@ export class ReconciliationDetailComponent implements OnInit {
     readonly treeColumns = computed<ColDef[]>(() => {
         const r = this.recon();
         return [
-            { field: 'column', headerName: 'Column', width: 150, valueFormatter: (p) => p.value ?? '—' },
+            { field: 'column', headerName: 'Column', minWidth: 150, valueFormatter: (p) => p.value ?? '—' },
             {
                 field: 'leftValue',
                 headerName: r ? this.leftLabel() : 'Left',
@@ -512,11 +516,12 @@ export class ReconciliationDetailComponent implements OnInit {
                 flex: 1,
                 valueFormatter: (p) => fmtVal(p.value),
             },
-            { field: 'diff', headerName: 'Δ', width: 120, cellRenderer: varianceCell() },
+            { field: 'diff', headerName: 'Δ', minWidth: 120, cellRenderer: varianceCell() },
             {
                 field: 'status',
                 headerName: 'Status',
-                width: 120,
+                minWidth: 120,
+                maxWidth: 120,
                 cellRenderer: (p: ICellRendererParams) => (p.value ? statusBadgeHtml(String(p.value)) : ''),
             },
         ];

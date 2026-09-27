@@ -76,27 +76,29 @@ export class ActionRequestsComponent implements OnInit {
     /** A request left in `dispatched` (the server stopped mid-send) can be marked failed; the server enforces the idle time. */
     readonly canMarkFailed = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'dispatched');
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<ActionRequest>[] = [
         {
             field: 'createdAt',
             headerName: 'Requested',
-            width: 180,
+            minWidth: 180,
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },
-        { field: 'method', headerName: 'Method', width: 100 },
+        { field: 'method', headerName: 'Method', minWidth: 100, maxWidth: 100 },
         { field: 'connection', headerName: 'Connection', flex: 1 },
         {
             headerName: 'From',
-            width: 200,
+            minWidth: 200,
             valueGetter: (p) => p.data?.incidentId ?? p.data?.caseId ?? '',
         },
-        { field: 'author', headerName: 'Author', width: 150 },
-        { field: 'attempts', headerName: 'Attempts', width: 110 },
+        { field: 'author', headerName: 'Author', minWidth: 150 },
+        { field: 'attempts', headerName: 'Attempts', minWidth: 110, maxWidth: 110 },
         {
             field: 'status',
             headerName: 'Status',
-            width: 130,
+            minWidth: 130,
+            maxWidth: 130,
             cellRenderer: (p: ICellRendererParams<ActionRequest>) => statusBadgeHtml(p.value as string),
         },
     ];

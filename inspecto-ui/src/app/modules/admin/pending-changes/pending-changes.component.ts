@@ -87,22 +87,24 @@ export class PendingChangesComponent implements OnInit {
         return `${d.added} line(s) added, ${d.removed} removed.`;
     });
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<PendingChange>[] = [
         {
             field: 'createdAt',
             headerName: 'Proposed',
-            width: 180,
+            minWidth: 180,
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },
-        { field: 'kind', headerName: 'Kind', width: 140 },
+        { field: 'kind', headerName: 'Kind', minWidth: 140 },
         { field: 'name', headerName: 'Name', flex: 1 },
-        { field: 'operation', headerName: 'Change', width: 110 },
-        { field: 'author', headerName: 'Author', width: 150 },
+        { field: 'operation', headerName: 'Change', minWidth: 110 },
+        { field: 'author', headerName: 'Author', minWidth: 150 },
         {
             field: 'status',
             headerName: 'Status',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<PendingChange>) => statusBadgeHtml(p.value as string),
         },
     ];

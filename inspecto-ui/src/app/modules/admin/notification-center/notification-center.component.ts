@@ -61,14 +61,16 @@ export class NotificationCenterComponent implements OnInit {
     readonly loadingDeliveries = signal(false);
     readonly loadingRules = signal(false);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly channelCols: ColDef<NotificationChannel>[] = [
         { field: 'id', headerName: 'Channel', flex: 1 },
-        { field: 'kind', headerName: 'Kind', width: 120 },
+        { field: 'kind', headerName: 'Kind', minWidth: 120 },
         { field: 'target', headerName: 'Target', flex: 2, minWidth: 200 },
         {
             field: 'enabled',
             headerName: 'State',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<NotificationChannel>) =>
                 statusBadgeHtml(p.value ? 'ENABLED' : 'DISABLED'),
         },
@@ -81,7 +83,7 @@ export class NotificationCenterComponent implements OnInit {
         {
             field: 'createdAt',
             headerName: 'Created',
-            width: 170,
+            minWidth: 170,
             valueFormatter: (p) => fmtDateTime(p.value),
         },
     ];
@@ -108,19 +110,20 @@ export class NotificationCenterComponent implements OnInit {
         {
             field: 'ts',
             headerName: 'When',
-            width: 180,
+            minWidth: 180,
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },
-        { field: 'channelId', headerName: 'Channel', width: 150 },
-        { field: 'channelKind', headerName: 'Kind', width: 110 },
+        { field: 'channelId', headerName: 'Channel', minWidth: 150 },
+        { field: 'channelKind', headerName: 'Kind', minWidth: 110 },
         { field: 'target', headerName: 'Target', flex: 1, minWidth: 180 },
-        { field: 'trigger', headerName: 'Trigger', width: 170 },
+        { field: 'trigger', headerName: 'Trigger', minWidth: 170 },
         { field: 'subject', headerName: 'Subject', flex: 2, minWidth: 220 },
         {
             field: 'status',
             headerName: 'Status',
-            width: 110,
+            minWidth: 110,
+            maxWidth: 110,
             cellRenderer: (p: ICellRendererParams<ChannelDelivery>) => statusBadgeHtml(p.value as string),
         },
     ];
@@ -131,10 +134,11 @@ export class NotificationCenterComponent implements OnInit {
         {
             field: 'minLevel',
             headerName: 'Min severity',
-            width: 130,
+            minWidth: 130,
+            maxWidth: 130,
             valueFormatter: (p) => p.value || 'Any',
         },
-        { field: 'category', headerName: 'Category', width: 120 },
+        { field: 'category', headerName: 'Category', minWidth: 120 },
         {
             field: 'titleTemplate',
             headerName: 'Title',
@@ -145,7 +149,8 @@ export class NotificationCenterComponent implements OnInit {
         {
             field: 'enabled',
             headerName: 'State',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<NotificationRule>) =>
                 statusBadgeHtml(p.value ? 'ENABLED' : 'DISABLED'),
         },

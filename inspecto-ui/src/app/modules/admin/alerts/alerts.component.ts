@@ -53,24 +53,26 @@ export class AlertsComponent implements OnInit {
     readonly loadError = signal(false);
     readonly evaluating = signal(false);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<FiredAlert>[] = [
         {
             field: 'epochMillis',
             headerName: 'When',
-            width: 180,
+            minWidth: 180,
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },
         {
             field: 'severity',
             headerName: 'Severity',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<FiredAlert>) => statusBadgeHtml(p.value as string),
         },
         { field: 'rule', headerName: 'Rule', flex: 1 },
         { field: 'pipeline', headerName: 'Pipeline', flex: 1 },
-        { field: 'metric', headerName: 'Metric', width: 140 },
-        { field: 'value', headerName: 'Value', width: 110 },
+        { field: 'metric', headerName: 'Metric', minWidth: 140 },
+        { field: 'value', headerName: 'Value', minWidth: 110 },
         {
             field: 'message',
             headerName: 'Message',
@@ -85,18 +87,19 @@ export class AlertsComponent implements OnInit {
         { field: 'metric', headerName: 'Metric', flex: 1, minWidth: 140 },
         {
             headerName: 'Condition',
-            width: 170,
+            minWidth: 170,
             valueGetter: (p) => (p.data ? `${p.data.comparator} ${p.data.threshold} / ${p.data.window}` : ''),
         },
         {
             field: 'severity',
             headerName: 'Severity',
-            width: 120,
+            minWidth: 120,
+            maxWidth: 120,
             cellRenderer: (p: ICellRendererParams<AlertRule>) => statusBadgeHtml(p.value as string),
         },
         {
             headerName: 'Scope',
-            width: 160,
+            minWidth: 160,
             valueGetter: (p) => p.data?.onPipeline || 'every pipeline',
         },
     ];

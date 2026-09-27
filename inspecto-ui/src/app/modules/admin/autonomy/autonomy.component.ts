@@ -72,26 +72,28 @@ export class AutonomyComponent implements OnInit {
     /** True once a policy read has failed (module absent / no L3 tier) — the editors are disabled then. */
     readonly unavailable = signal(false);
 
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
     readonly columnDefs: ColDef<AutonomyAction>[] = [
         {
             field: 'at',
             headerName: 'When',
-            width: 180,
+            minWidth: 180,
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },
-        { field: 'actionClass', headerName: 'Action', width: 150 },
+        { field: 'actionClass', headerName: 'Action', minWidth: 150 },
         {
             field: 'status',
             headerName: 'Outcome',
-            width: 130,
+            minWidth: 130,
+            maxWidth: 130,
             cellRenderer: (p: ICellRendererParams<AutonomyAction>) => statusBadgeHtml(p.value as string),
         },
-        { field: 'decision', headerName: 'Verdict', width: 110 },
+        { field: 'decision', headerName: 'Verdict', minWidth: 110, maxWidth: 110 },
         {
             colId: 'subject',
             headerName: 'Subject',
-            width: 220,
+            minWidth: 220,
             valueGetter: (p) => this.subjectLabel(p.data?.subject),
         },
         {
