@@ -404,10 +404,14 @@ final class PipelineBundleRoutes implements RouteModule {
             // THIS space now, instead of discovering them at the first poll. WARNING-level — see the helper.
             List<Map<String, Object>> requirements = classifyRequirements(api, manifest, retargeted, findings);
             if (SaveGate.refuses(findings)) {
-                journal.rollback();
+                List<String> notRolledBack = DataSourceRoutes.relative(writeRoot, journal.rollback());
                 done = true;
-                return new Imported(false, Map.of("written", false,
-                        "error", "config has ERROR-level findings; not written", "findings", findings));
+                Map<String, Object> refusal = new LinkedHashMap<>();
+                refusal.put("written", false);
+                refusal.put("error", "config has ERROR-level findings; not written");
+                refusal.put("findings", findings);
+                if (!notRolledBack.isEmpty()) refusal.put("notRolledBack", notRolledBack);
+                return new Imported(false, refusal);
             }
 
             // Companion enrichment(s): written before the pipeline too.
@@ -457,6 +461,12 @@ final class PipelineBundleRoutes implements RouteModule {
             r.put("findings", findings);
             done = true;
             return new Imported(true, r);
+        } catch (ApiException refused) {
+            done = true;
+            if (registeredHere) api.service().unregisterPipeline(target);
+            List<String> notRolledBack = DataSourceRoutes.relative(writeRoot, journal.rollback());
+            api.service().refreshConfigs();
+            throw DataSourceRoutes.withNotRolledBack(refused, notRolledBack);
         } finally {
             if (!done) {
                 if (registeredHere) api.service().unregisterPipeline(target);

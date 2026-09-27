@@ -653,6 +653,18 @@ integrity gate's 422, a registration's 422/409) unregisters what the import regi
 connections it replaced, rolls the tree back byte for byte, and re-reads the configs. `/pipelines/import`
 parses, judges and conflict-checks its companions before writing anything, and a SaveGate ERROR now restores
 an overwritten satellite (the old cleanup deleted every satellite, pre-existing ones included).
+**A rollback never clobbers a newer write** (`IMPORT-RESIDUALS-1` (3), 2026-09-28). There is no config write
+lock, so another request can save a file between an import's write and its rollback. `ImportJournal` also keeps
+a SHA-256 of what the import last wrote to each file and restores (or deletes) a file only while it still holds
+exactly those bytes; a file changed or deleted since is left as the other writer made it, logged, and named in
+the refusal — a `notRolledBack` list on `/import`'s 422 body and on a `/pipelines/import` / `/bundle/import`
+pipeline item's SaveGate refusal, `; changed concurrently, not rolled back: [...]` appended to any other
+refusal's message. Chosen over serialising imports behind a lock because none exists to reuse (`ComponentStore`
+and `/config/write` write through `AtomicFiles` unlocked) and a new one would have to be taken by every config
+writer to help. ⚠ The compare and the restore are two steps, not an atomic swap: a write landing in that
+sub-millisecond gap is still overwritten. Tests: `ImportJournalTest` (interleaved writes),
+`ControlApiImportConcurrentRollbackTest` (real HTTP; the `ImportJournal.beforeRollback` test seam saves the file
+between the write and the rollback).
 
 **The loader guard.** `ImportLoaderInventoryTest` scans every reactor module's `src/main/java` for fixed
 names: literal `.resolve("a").resolve("b")` chains, `AgentWriteRoot.resolve("x")` (as `agent/x`), and any
