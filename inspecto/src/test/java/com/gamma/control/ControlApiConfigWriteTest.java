@@ -446,7 +446,7 @@ class ControlApiConfigWriteTest {
             // using this to address the pipeline afterwards must get the key the routes are keyed by.
             assertEquals("legacy_feed", out.get("name").asText());
             try (var entries = Files.list(root)) {
-                assertEquals(1, entries.filter(p -> p.toString().endsWith(".toon")).count(),
+                assertEquals(1, entries.filter(ControlApiConfigWriteTest::isPipelineToon).count(),
                         "no second config forked beside the legacy one");
             }
         }
@@ -516,7 +516,7 @@ class ControlApiConfigWriteTest {
             assertEquals("Legacy-Feed_pipeline.toon", out.get("path").asText(), "the named file was adopted");
             assertTrue(out.get("overwritten").asBoolean());
             try (var entries = Files.list(root)) {
-                assertEquals(1, entries.filter(p -> p.toString().endsWith(".toon")).count(),
+                assertEquals(1, entries.filter(ControlApiConfigWriteTest::isPipelineToon).count(),
                         "no second config forked beside the named one");
             }
 
@@ -621,5 +621,11 @@ class ControlApiConfigWriteTest {
             assertEquals("team/etl/nested_pipeline.toon", out.get("path").asText());
             assertTrue(Files.exists(root.resolve("team").resolve("etl").resolve("nested_pipeline.toon")));
         }
+    }
+
+    /** A pipeline config, not the Space's reserved {@code egress.toon} (boot writes it into the config root). */
+    private static boolean isPipelineToon(Path p) {
+        String n = p.getFileName().toString();
+        return n.endsWith(".toon") && !n.equals(com.gamma.pipeline.exec.EgressAllowlist.FILE);
     }
 }

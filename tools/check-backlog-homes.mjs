@@ -207,7 +207,9 @@ for (const row of rows) {
 // 2026-09-25: 40 → 38. "AI drafting on a non-schema kind" shipped for `transform` (S0–S4 + S6) and took
 // its two pointers (→ ai-drafting-non-schema-design.md, inline-ai-authoring.md) with it; the grammar is
 // unchanged.
-const MIN_DOC_POINTERS = 38;
+// 2026-09-27: 38 → 37. QUERY-BOUND-WIDGET-1 shipped and took its pointer (→ studio.md) with it;
+// WEBHOOK-EGRESS-POLICY-1 and D-8 closed the same day with inline links, not `→` pointers. The grammar is unchanged.
+const MIN_DOC_POINTERS = 37;
 
 const scope =
     `scope: ${rows.length} board row(s), ${identified} with an identifier and ` +
