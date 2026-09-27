@@ -51,6 +51,8 @@ import java.util.function.Function;
  * bearer token is the profile's {@code password}, a {@link SecretResolver} reference resolved here at send
  * time and never logged. A profile declaring a tunnel or proxy is REFUSED: this sink does not dial through
  * either, and silently bypassing a proxy an administrator configured is a worse failure than refusing.
+ * At send time the transport applies the {@link EgressPolicy} with the Space's {@link EgressAllowlist}
+ * ({@code WEBHOOK-EGRESS-POLICY-1}): resolved once, every address checked, the connect pinned to the checked one.
  */
 @PublicApi(since = "4.0.0")
 public final class WebhookSink {

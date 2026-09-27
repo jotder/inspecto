@@ -514,6 +514,25 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    /** WEBHOOK-EGRESS-POLICY-1: the first read seeds from the Space's webhook Step targets; a PUT that empties it sticks. */
+    @Test
+    void theFirstReadSeedsTheAllowlistFromWebhookTargetsAndARemovalIsNeverReSeeded(@TempDir Path cfg, @TempDir Path tmp)
+            throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        Files.writeString(root.resolve("cbs_connection.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("connection",
+                Map.of("id", "cbs", "connector", "https", "host", "cbs.internal"))));
+        Files.writeString(root.resolve("orders_hook.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("webhook",
+                Map.of("connection", "cbs"))));
+        try (Ctx c = open(cfg, tmp, true)) {
+            Files.deleteIfExists(root.resolve(EgressRoutes.FILE));   // no allowlist recorded yet
+            assertEquals("[\"cbs.internal\"]",
+                    data(send(c, "GET", "/settings/egress", null, AUTHOR), 200).get("allow").toString());
+            data(send(c, "PUT", "/settings/egress", "{\"allow\":[]}", CHECKER), 200);
+            assertEquals(0, data(send(c, "GET", "/settings/egress", null, AUTHOR), 200).get("allow").size(),
+                    "a removed seed entry is not re-seeded");
+        }
+    }
+
     @Test
     void anHttpsConnectionWithUserinfoOrANumericTrickHostIsRefusedAtSave(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         try (Ctx c = open(cfg, tmp, true)) {

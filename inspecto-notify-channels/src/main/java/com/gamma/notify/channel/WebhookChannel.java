@@ -4,17 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationChannel;
 
+import javax.net.ssl.SSLSocketFactory;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Map;
 
 /**
  * Webhook delivery channel — POSTs each notification as JSON ({@link Notification#toMap()} shape, the
- * same document the {@code /notifications} API serves) to a configured URL. Pure-JDK
- * ({@link HttpClient}), so it lives in the lean core; it is inert until configured.
+ * same document the {@code /notifications} API serves) to a configured URL, through {@link WebhookEgress}: the
+ * host is resolved once, every address is checked against the egress policy less the current Space's allowlist,
+ * and the connect is pinned to the checked address ({@code WEBHOOK-EGRESS-POLICY-1}). Inert until configured.
  *
  * <p>Configuration (system properties, the engine's config idiom for operational backends):
  * <ul>
@@ -40,7 +39,7 @@ public final class WebhookChannel implements NotificationChannel {
     private final String url;
     private final String token;
     private final Duration timeout;
-    private final HttpClient client;
+    private final SSLSocketFactory tls = (SSLSocketFactory) SSLSocketFactory.getDefault();
 
     /** ServiceLoader constructor: reads {@code notify.webhook.*} system properties. */
     public WebhookChannel() {
@@ -53,7 +52,6 @@ public final class WebhookChannel implements NotificationChannel {
         this.url = url == null || url.isBlank() ? null : url.trim();
         this.token = token == null || token.isBlank() ? null : token.trim();
         this.timeout = Duration.ofSeconds(timeoutSeconds);
-        this.client = HttpClient.newBuilder().connectTimeout(timeout).build();
     }
 
     @Override public String id() { return ID; }
@@ -72,28 +70,8 @@ public final class WebhookChannel implements NotificationChannel {
     }
 
     private void post(Notification n, String deliveryId) throws Exception {
-        send(client, URI.create(url), token, timeout, JSON.writeValueAsString(n.toMap()),
+        WebhookEgress.post(tls, URI.create(url), token, timeout, JSON.writeValueAsString(n.toMap()),
                 deliveryId != null && !deliveryId.isBlank()
                         ? Map.of("X-Inspecto-Delivery-Id", deliveryId) : Map.of());
-    }
-
-    /**
-     * The one JSON POST both webhook transports make — this channel and {@link HttpWebhookSinkTransport}
-     * (the {@code sink.webhook} node): {@code Content-Type: application/json}, an optional
-     * {@code Authorization: Bearer} token, extra headers, and any non-2xx answer thrown as a failure.
-     * The client is built with the JDK default redirect policy, {@code NEVER}: a 3xx is a failure, so a
-     * receiver cannot bounce rows to a host the configuration never named.
-     */
-    static void send(HttpClient client, URI url, String token, Duration timeout, String json,
-                     Map<String, String> headers) throws Exception {
-        HttpRequest.Builder req = HttpRequest.newBuilder(url)
-                .timeout(timeout)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(json));
-        if (token != null) req.header("Authorization", "Bearer " + token);
-        headers.forEach(req::header);
-        HttpResponse<String> resp = client.send(req.build(), HttpResponse.BodyHandlers.ofString());
-        if (resp.statusCode() / 100 != 2)
-            throw new IllegalStateException("webhook returned HTTP " + resp.statusCode());
     }
 }

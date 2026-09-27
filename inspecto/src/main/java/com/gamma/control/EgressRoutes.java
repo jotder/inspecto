@@ -3,17 +3,14 @@ package com.gamma.control;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
+import com.gamma.pipeline.exec.EgressAllowlist;
 import com.gamma.pipeline.exec.EgressPolicy;
 import com.gamma.util.AtomicFiles;
-import com.gamma.util.ToonHelper;
 import com.sun.net.httpserver.HttpExchange;
 import dev.toonformat.jtoon.JToon;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,7 +21,9 @@ import java.util.Map;
  * A Space's <b>egress allowlist</b> ({@code ASSURE-ACTION-REQUESTS-1}, verification finding 1c): the host names and
  * CIDR ranges an Action Request may reach although the {@link EgressPolicy} denies their address class by default —
  * real targets (a CBS, a PCRF) often live on private networks. Persisted as {@code egress.toon} in the Space's
- * config tree ({@code allow: [tickets.internal, 10.20.0.0/16]}); default EMPTY.
+ * config tree ({@code allow: [tickets.internal, 10.20.0.0/16]}); read through {@link EgressAllowlist}, which seeds it
+ * ONCE from the Space's current webhook targets when none was ever recorded ({@code WEBHOOK-EGRESS-POLICY-1}).
+ * The same list governs the {@code sink.webhook} Step and the webhook notification channel.
  * <pre>
  *   GET /settings/egress     {allow: [...]}
  *   PUT /settings/egress     replace it — canAdminister, validated fail closed (422), audited before/after
@@ -36,8 +35,7 @@ import java.util.Map;
  */
 final class EgressRoutes implements RouteModule {
 
-    private static final Logger log = LoggerFactory.getLogger(EgressRoutes.class);
-    static final String FILE = "egress.toon";
+    static final String FILE = EgressAllowlist.FILE;
     static final int MAX_ENTRIES = 200;
 
     @Override
@@ -46,26 +44,14 @@ final class EgressRoutes implements RouteModule {
         api.put("/settings/egress", ApiContext.withCapability("canAdminister", (e, m) -> replace(api, e, api.body(e))));
     }
 
-    /** The Space's allowlist entries as written; empty when none (or unreadable). */
+    /** The Space's allowlist entries — seeded once from its webhook targets if none were recorded ({@link EgressAllowlist}). */
     static List<String> entries(Path root) {
-        if (root == null) return List.of();
-        Path f = root.resolve(FILE);
-        if (!Files.exists(f)) return List.of();
-        try {
-            Object allow = ToonHelper.load(f.toString()).get("allow");
-            List<String> out = new ArrayList<>();
-            if (allow instanceof List<?> l) for (Object o : l) out.add(String.valueOf(o));
-            EgressPolicy.Allowlist.of(out);   // validate
-            return out;
-        } catch (Exception bad) {
-            log.warn("[EGRESS] {} is unreadable or invalid ({}) — treating the egress allowlist as EMPTY", f, bad.getMessage());
-            return List.of();
-        }
+        return EgressAllowlist.entries(root);
     }
 
     /** The parsed allowlist of the Space whose config root is {@code root}. */
     static EgressPolicy.Allowlist allowlist(Path root) {
-        return EgressPolicy.Allowlist.of(entries(root));
+        return EgressAllowlist.of(root);
     }
 
     private Object replace(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {

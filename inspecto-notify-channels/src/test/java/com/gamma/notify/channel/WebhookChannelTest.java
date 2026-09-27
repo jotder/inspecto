@@ -40,13 +40,56 @@ class WebhookChannelTest {
         server.start();
     }
 
+    /** {@code hook.test} is allowlisted; see {@link EgressNet}. */
+    private final EgressNet net = new EgressNet("hook.test");
+
     @AfterEach
     void stop() {
+        net.close();
         server.stop(0);
     }
 
     private String url() {
-        return "http://localhost:" + server.getAddress().getPort() + "/hook";
+        return url("hook.test");
+    }
+
+    private String url(String host) {
+        return "http://" + host + ":" + server.getAddress().getPort() + "/hook";
+    }
+
+    // ── the egress policy (WEBHOOK-EGRESS-POLICY-1) ─────────────────────────────────────────────────────
+
+    @Test
+    void aPrivateAddressWithNoAllowlistEntryIsRefusedAndNeverDialled() {
+        WebhookChannel ch = new WebhookChannel(url("private.test"), null, 5);
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> ch.deliver(sample()));
+        assertTrue(e.getMessage().contains("egress refused") && e.getMessage().contains("private"), e.getMessage());
+        assertTrue(net.dialled.isEmpty());
+        assertTrue(bodies.isEmpty());
+    }
+
+    @Test
+    void theMetadataAddressIsRefused() {
+        WebhookChannel ch = new WebhookChannel(url("meta.test"), null, 5);
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> ch.deliver(sample()));
+        assertTrue(e.getMessage().contains("link-local"), e.getMessage());
+        assertTrue(net.dialled.isEmpty());
+    }
+
+    /** The old wire posted to {@code localhost}; loopback is never allowlistable, so it is refused now. */
+    @Test
+    void localhostIsRefused() {
+        WebhookChannel ch = new WebhookChannel(url("localhost"), null, 5);
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> ch.deliver(sample()));
+        assertTrue(e.getMessage().contains("loopback"), e.getMessage());
+        assertTrue(bodies.isEmpty());
+    }
+
+    @Test
+    void anAllowlistedHostIsDialledAtTheCheckedAddress() throws Exception {
+        new WebhookChannel(url(), null, 5).deliver(sample(), null, "d-1");
+        assertEquals(List.of(EgressNet.HOOK), net.dialled);
+        assertEquals(1, bodies.size());
     }
 
     private static Notification sample() {

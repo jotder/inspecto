@@ -51,18 +51,89 @@ class HttpWebhookSinkTransportTest {
         server.start();
     }
 
+    /** {@code hook.test} is allowlisted; see {@link EgressNet}. */
+    private EgressNet net = new EgressNet("hook.test");
+
     @AfterEach
     void stop() {
+        net.close();
         server.stop(0);
     }
 
     private String base() {
-        return "http://127.0.0.1:" + server.getAddress().getPort();
+        return base("hook.test");
+    }
+
+    private String base(String host) {
+        return "http://" + host + ":" + server.getAddress().getPort();
     }
 
     private void post(String token) throws Exception {
-        new HttpWebhookSinkTransport().post(URI.create(base() + "/ingest"), token, Duration.ofSeconds(5),
+        postTo("hook.test", token);
+    }
+
+    private void postTo(String host, String token) throws Exception {
+        new HttpWebhookSinkTransport().post(URI.create(base(host) + "/ingest"), token, Duration.ofSeconds(5),
                 "{\"batch\":1,\"rows\":[{\"id\":1}]}", Map.of("Idempotency-Key", "c-1:webhook:1"));
+    }
+
+    // ── the egress policy on post (WEBHOOK-EGRESS-POLICY-1) ─────────────────────────────────────────────
+
+    /** Deny by default: a private address with no allowlist entry is never dialled. */
+    @Test
+    void aPrivateAddressWithNoAllowlistEntryIsRefusedAndNeverDialled() {
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> postTo("private.test", "t"));
+        assertTrue(e.getMessage().contains("egress refused") && e.getMessage().contains("10.77.0.2")
+                && e.getMessage().contains("private"), e.getMessage());
+        assertTrue(net.dialled.isEmpty(), "nothing may be dialled: " + net.dialled);
+        assertTrue(bodies.isEmpty());
+    }
+
+    /** The metadata service is never liftable — not even by a host entry naming it. */
+    @Test
+    void theMetadataAddressIsRefusedEvenWhenItsNameIsAllowlisted() {
+        net.close();
+        net = new EgressNet("hook.test", "meta.test");
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> postTo("meta.test", "t"));
+        assertTrue(e.getMessage().contains("169.254.169.254") && e.getMessage().contains("link-local"), e.getMessage());
+        assertTrue(net.dialled.isEmpty());
+    }
+
+    /** A loopback literal is refused — the old wire dialled it. */
+    @Test
+    void aLoopbackLiteralIsRefused() {
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> postTo("127.0.0.1", "t"));
+        assertTrue(e.getMessage().contains("loopback"), e.getMessage());
+        assertTrue(bodies.isEmpty(), "the in-process server on 127.0.0.1 must not be reached");
+    }
+
+    /** A name that does not resolve fails closed, naming the host. */
+    @Test
+    void aNameThatDoesNotResolveIsRefused() {
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> postTo("nowhere.test", "t"));
+        assertTrue(e.getMessage().contains("'nowhere.test' does not resolve"), e.getMessage());
+    }
+
+    /** The host-syntax check still applies: a non-canonical numeric host never reaches the resolver. */
+    @Test
+    void aNonCanonicalNumericHostIsRefused() {
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> postTo("0x7f000001", "t"));
+        assertTrue(e.getMessage().contains("non-canonical"), e.getMessage());
+    }
+
+    /** Allowed via the allowlist, and pinned: the ONE checked address is dialled; the name travels as Host. */
+    @Test
+    void anAllowlistedHostIsDialledAtTheCheckedAddressWithTheNameAsHost() throws Exception {
+        List<String> hosts = new CopyOnWriteArrayList<>();
+        server.createContext("/hosted", ex -> {
+            hosts.add(ex.getRequestHeaders().getFirst("Host"));
+            ex.getRequestBody().readAllBytes();
+            ex.sendResponseHeaders(204, -1);
+            ex.close();
+        });
+        new HttpWebhookSinkTransport().post(URI.create(base() + "/hosted"), null, Duration.ofSeconds(5), "{}", Map.of());
+        assertEquals(List.of(EgressNet.HOOK), net.dialled);
+        assertEquals(List.of("hook.test:" + server.getAddress().getPort()), hosts);
     }
 
     @Test

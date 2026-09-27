@@ -111,9 +111,29 @@ Each attempt's checked address is recorded (`attemptLog[]`: attempt, address, st
 the approver sees the host AS PARSED, the port, the path and whether the allowlist names it (`egress` on the
 detail view, read live) before approving.
 
-⚠ **Scope:** applied to Action Requests only. The `sink.webhook` Step and the webhook notification channel keep
-their `HttpClient` path — they get the host-syntax check but not the address check or the pinned connect;
-existing sinks target private hosts with no allowlist entry. Filed as P2 `WEBHOOK-EGRESS-POLICY-1`.
+**Scope: all three outbound webhooks** (`WEBHOOK-EGRESS-POLICY-1`, 2026-09-27). The `sink.webhook` Step
+(`WebhookSink` → `HttpWebhookSinkTransport.post`) and the webhook notification channel (`WebhookChannel`) go
+through one helper, `WebhookEgress.post` (`inspecto-notify-channels`): host-syntax check → resolve once → every
+address checked against the policy less the **current Space's** allowlist → `PinnedHttp` POST to the checked
+address; non-2xx is a failure, a 3xx is never followed. Every refusal (bad host, no DNS answer, denied address)
+throws `webhook egress refused: …` and dials nothing. The JDK `HttpClient` is gone from both. ⚠ A Step refusal is
+retried by the Step's own `retry:` policy like any other failure (unlike an Action Request's); the result is the
+same failed branch. ⚠ Loopback is never liftable, so a webhook to `localhost` / `127.0.0.1` that worked before is
+now refused — by design.
+
+**The allowlist reader** is `EgressAllowlist` (`inspecto-engine`, `com.gamma.pipeline.exec`): `of(root)` for a
+caller holding the config root (the Action Request routes and dispatcher, via `EgressRoutes`), `forCurrentSpace()`
+(`SpaceConfigRoot.current()`, the Space MDC) for the two webhooks; no root ⇒ EMPTY. **One-time seeding**
+(operator decision 2026-09-27, "seed the allowlist"): the first read of a Space with no `egress.toon` seeds it
+from the hosts it targets today — each `sink.webhook` Step's Connection host (a flat `webhook: {connection}` block
+or a graph `sink.webhook` node, scanned from the config root's `*.toon`, depth 4, `.history` skipped; the host from
+`<id>_connection.toon`, else `ConnectionRegistry`), each `WEBHOOK` channel's URL host (`registry/channels/`), and
+the host of `-Dnotify.webhook.url` (what the channel actually posts to) — writes `{allow, seededAt}`, logs
+`[EGRESS] seeded …` and emits the audit `egress-allowlist.seeded`. The FILE'S EXISTENCE is the "recorded" marker,
+so an empty seed is still recorded and a later `PUT` that removes entries is never re-seeded; a target added after
+the seed needs an explicit entry. A seed host that can never be allowlisted (a loopback literal) is skipped and
+logged. If the seed cannot be persisted it is used for that read and retried on the next. ⚠ Seeding is shared: a
+seeded host also lifts Action Requests to that host (the allowlist is one per Space).
 ⚠ Embedded-IPv4 IPv6 forms other than IPv4-mapped (6to4, NAT64 `64:ff9b::/96`) are classified as public.
 
 ## Dispatch
