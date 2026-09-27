@@ -274,6 +274,26 @@ describe('typed projection ids (LA-17 D-M6)', () => {
         expect(endpointId(p, 'target', 'Bob')).toBe('entity:bob');
     });
 
+    it('a typed value whose key normalises to empty is skipped like a blank one: no node, no edge', () => {
+        const p = withColumnTypes({ datasetId: 'calls', sourceCol: 'a', targetCol: 'b' }, { a: msisdn });
+        const junk = ['N/A', 'unknown', '-'];
+        const g = projectTriples(
+            [...junk.map((v) => ({ source: v, target: 'Bob', kind: 'call', count: 1 })),
+                { source: '+44 78', target: 'Bob', kind: 'call', count: 1 }],
+            false,
+            p,
+        );
+        expect(g.nodes.map((n) => n.id)).toEqual(['msisdn:+4478', 'entity:bob']);
+        expect(g.edges).toHaveLength(1);
+        const rowsG = projectEntities(
+            [...junk.map((v) => ({ a: v, b: 'Bob' })), { a: '+44 78', b: 'Bob' }],
+            p,
+        ) as ProjectedGraph;
+        expect(rowsG.nodes.map((n) => n.id)).toEqual(['msisdn:+4478', 'entity:bob']);
+        expect(rowsG.edges).toHaveLength(1);
+        expect(endpointId(p, 'source', 'N/A')).toBeNull();
+    });
+
     it('a column type wins over the free-text entityType scope; absent columnTypes leave the mapping untyped', () => {
         const p = { datasetId: 'd', sourceCol: 'a', targetCol: 'b', entityType: 'person' };
         expect(endpointId(withColumnTypes(p, { b: msisdn }), 'target', '0044 1')).toBe('msisdn:+441');

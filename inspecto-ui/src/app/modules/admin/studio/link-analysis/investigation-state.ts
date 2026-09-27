@@ -56,6 +56,7 @@ export function workingSetToGraph(ws: WorkingSet, projection: EntityProjection):
     for (const e of ws.entities) {
         // A Working Set entity records no column (D-M6): take the id a link already drew, else mint it as a source.
         const id = resolveEntityId([projection], e.id, (x) => byId.has(x));
+        if (!id) continue; // an empty typed key mints no node, like a blank value
         const node = byId.get(id);
         if (!node) {
             const added = { id, data: { label: e.id, kind: 'entity', spellings: [e.id] } };

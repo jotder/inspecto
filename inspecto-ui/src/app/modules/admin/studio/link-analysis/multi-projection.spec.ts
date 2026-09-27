@@ -59,6 +59,21 @@ describe('projectMultiResult (LA-08)', () => {
         expect(g.edges[0].data).toMatchObject({ kind: 'paid · 5', count: 5, provenance: ['ledger', 'wires'] });
     });
 
+    it('a typed value whose key normalises to empty mints no node and no edge (never a `msisdn:` super-node)', () => {
+        const msisdn = { id: 'msisdn', normaliser: 'digits' as const };
+        const g = projectMultiResult({
+            nodes: [{ id: 'N/A', label: null, category: null, entityType: msisdn, __provenance_dataset: 'subs' }],
+            edges: [
+                { source: 'unknown', target: 'Bob', kind: 'call', count: 1, sourceType: msisdn, __provenance_dataset: 'c' },
+                { source: '-', target: 'Bob', kind: 'call', count: 1, sourceType: msisdn, __provenance_dataset: 'c' },
+            ],
+            mappings: [],
+            truncated: false,
+        } as MultiProjectionResult);
+        expect(g.nodes).toEqual([]);
+        expect(g.edges).toEqual([]);
+    });
+
     it('colours each category from the categorical palette, one colour per category; unmapped nodes stay uncoloured', () => {
         const g = projectMultiResult({
             nodes: [

@@ -12,6 +12,7 @@ import {
     GraphSourceQuery,
     mergeGraphs,
     normalizeEntityKey,
+    normalizeTypedKey,
     typedEntityKey,
 } from 'app/inspecto/graph';
 import {
@@ -90,13 +91,18 @@ export function entityId(entityType: string | undefined, value: string): string 
     return entityType ? `entity:${entityType}:${key}` : `entity:${key}`;
 }
 
-/** The node id for a value under an optional column type: typed `<type>:<key>` (D-M6), else {@link entityId}. */
+/**
+ * The node id for a value under an optional column type: typed `<type>:<key>` (D-M6), else {@link entityId}.
+ * `null` when the type's normaliser leaves an EMPTY key (`N/A` under `digits`): the value is treated like a blank
+ * one -- no node, no edge -- exactly as the server refuses an empty key, so it never becomes one `msisdn:` super-node.
+ */
 export function typedOrEntityId(
     type: EntityTypeRef | undefined,
     entityType: string | undefined,
     value: string,
-): string {
-    return type ? typedEntityKey(type.id, value, type.normaliser) : entityId(entityType, value);
+): string | null {
+    if (!type) return entityId(entityType, value);
+    return normalizeTypedKey(value, type.normaliser) ? typedEntityKey(type.id, value, type.normaliser) : null;
 }
 
 /**
@@ -104,7 +110,7 @@ export function typedOrEntityId(
  * (`sourceType` / `targetType`, server-resolved from the Dataset's classification) mints `<type>:<key>`
  * with that type's normaliser; an untyped column keeps {@link entityId}. Every projection path mints here.
  */
-export function endpointId(p: EntityIdMapping | undefined, end: 'source' | 'target', value: string): string {
+export function endpointId(p: EntityIdMapping | undefined, end: 'source' | 'target', value: string): string | null {
     return typedOrEntityId(end === 'source' ? p?.sourceType : p?.targetType, p?.entityType, value);
 }
 
@@ -120,8 +126,7 @@ export function entityIdCandidates(
     const other = prefer === 'source' ? 'target' : 'source';
     const out = new Set<string>();
     for (const m of mappings.length ? mappings : [undefined]) {
-        out.add(endpointId(m, prefer, value));
-        out.add(endpointId(m, other, value));
+        for (const id of [endpointId(m, prefer, value), endpointId(m, other, value)]) if (id) out.add(id);
     }
     return [...out];
 }
@@ -132,9 +137,9 @@ export function resolveEntityId(
     value: string,
     has: (id: string) => boolean,
     prefer: 'source' | 'target' = 'source',
-): string {
+): string | null {
     const c = entityIdCandidates(mappings, value, prefer);
-    return c.find(has) ?? c[0];
+    return c.find(has) ?? c[0] ?? null;
 }
 
 /**
@@ -225,6 +230,7 @@ export function projectEntities(
 
     const ensure = (value: string, column: string, end: 'source' | 'target'): string | null => {
         const id = endpointId(p, end, value);
+        if (!id) return null;
         if (!nodes.has(id)) {
             if (nodes.size >= projectionNodeCapValue()) {
                 truncated = true;
@@ -246,7 +252,7 @@ export function projectEntities(
     for (const row of rows) {
         const s = String(row[p.sourceCol] ?? '').trim();
         const t = String(row[p.targetCol] ?? '').trim();
-        if (!s || !t) continue;
+        if (!s || !t || !endpointId(p, 'source', s) || !endpointId(p, 'target', t)) continue;
         const sid = ensure(s, p.sourceCol, 'source');
         const tid = ensure(t, p.targetCol, 'target');
         if (!sid || !tid) continue;
@@ -285,6 +291,7 @@ export function projectTriples(
 
     const ensure = (value: string, column: string | undefined, end: 'source' | 'target'): string | null => {
         const id = endpointId(p, end, value);
+        if (!id) return null;
         if (!nodes.has(id)) {
             if (nodes.size >= projectionNodeCapValue()) {
                 truncated = true;
@@ -306,7 +313,7 @@ export function projectTriples(
     for (const t of triples) {
         const s = String(t.source ?? '').trim();
         const tv = String(t.target ?? '').trim();
-        if (!s || !tv) continue;
+        if (!s || !tv || !endpointId(p, 'source', s) || !endpointId(p, 'target', tv)) continue;
         const sid = ensure(s, p?.sourceCol, 'source');
         const tid = ensure(tv, p?.targetCol, 'target');
         if (!sid || !tid) continue;
@@ -449,6 +456,7 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
     ) => {
         if (type) types.set(type.id, type);
         const id = typedOrEntityId(type, undefined, value);
+        if (!id) return null;
         const node = nodes.get(id);
         if (node) {
             addSpelling(node, value);
@@ -477,7 +485,8 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
     for (const t of res.edges) {
         const s = String(t.source ?? '').trim();
         const tv = String(t.target ?? '').trim();
-        if (!s || !tv) continue;
+        if (!s || !tv || !typedOrEntityId(t.sourceType, undefined, s) || !typedOrEntityId(t.targetType, undefined, tv))
+            continue;
         const sid = ensure(s, t.__provenance_dataset, t.sourceType);
         const tid = ensure(tv, t.__provenance_dataset, t.targetType);
         if (!sid || !tid) continue;
@@ -554,7 +563,11 @@ export function recursivePathsToGraph(
     const linkBetween = (a: string, b: string): string | undefined =>
         [...edges.values()].find((e) => (e.source === a && e.target === b) || (e.source === b && e.target === a))?.id;
 
-    const paths: GraphSelection[] = res.paths.map((p) => {
+    // A hop with no mintable id (an empty typed key -- the server refuses those) drops its whole path.
+    const mintable = res.paths.filter((p) =>
+        p.nodes.every((raw) => entityIdCandidates(mappings, String(raw ?? '').trim()).length),
+    );
+    const paths: GraphSelection[] = mintable.map((p) => {
         const nodeIds = p.nodes.map((raw, i) => {
             const value = String(raw ?? '').trim();
             const id = resolveEntityId(mappings, value, (x) => nodes.has(x), i === 0 ? 'source' : 'target');
@@ -611,11 +624,12 @@ export function branchingResultToGraph(
     const nodes = new Map(base.nodes.map((n) => [n.id, n]));
     const edges = new Map(base.edges.map((e) => [e.id, e]));
     const minted = new Map<string, string>(); // raw value -> the id a leg endpoint minted it as
-    const node = (raw: string, end?: 'source' | 'target'): string => {
+    const node = (raw: string, end?: 'source' | 'target'): string | null => {
         const value = String(raw ?? '').trim();
         const id = end
             ? resolveEntityId(mappings, value, (x) => nodes.has(x), end)
             : (minted.get(value) ?? resolveEntityId(mappings, value, (x) => nodes.has(x), 'target'));
+        if (!id) return null; // an empty typed key: no node, like a blank value
         if (end && !minted.has(value)) minted.set(value, id);
         if (!nodes.has(id)) nodes.set(id, { id, data: { label: value, kind: 'entity', spellings: [value] } });
         else addSpelling(nodes.get(id)!, value);
@@ -625,6 +639,7 @@ export function branchingResultToGraph(
     for (const leg of res.edges) {
         const sid = node(leg.source, 'source');
         const tid = node(leg.target, 'target');
+        if (!sid || !tid) continue;
         const id = `${sid}->${tid}:${leg.kind}:${JSON.stringify(leg.attrs)}`;
         if (!edges.has(id))
             edges.set(id, {
@@ -636,9 +651,9 @@ export function branchingResultToGraph(
         legId.set(leg.id, id);
     }
     const matches: BranchingMatch[] = res.matches.map((m) => ({
-        nodeIds: m.nodeIds.map((v) => node(v)),
+        nodeIds: m.nodeIds.map((v) => node(v)).filter((id) => id !== null),
         edgeIds: m.edgeIds.map((id) => legId.get(id) ?? id),
-        layers: m.layers.map((layer) => layer.map((v) => node(v))),
+        layers: m.layers.map((layer) => layer.map((v) => node(v)).filter((id) => id !== null)),
     }));
     return {
         graph: { nodes: [...nodes.values()], edges: [...edges.values()] },
