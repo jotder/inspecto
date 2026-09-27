@@ -440,8 +440,10 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   stamps `data.color` per category from `CHART_CATEGORICAL_NEUTRAL` in first-seen order (unmapped endpoints
   stay plain `entity`, uncoloured); the canvas already honours `data.color` and `legendItemsFor` reads it
   (a saved `display.nodeColors` override still wins). The widget's legend + description already shipped.
-  ⚠ The telco `simbox_ring_jeddah` / `fraud_entity_graph` views still use `query.projection`, so they stay one
-  colour until the Space adds per-kind node Datasets and moves the view to `entity-projection-multi`.
+  ✅ The telco `simbox_ring_jeddah` / `fraud_entity_graph` views moved to `entity-projection-multi` on 2026-09-27
+  (operator: the generator split, not an id-prefix rule). There is one node Dataset per kind (SIM / Device / Cell /
+  Dealer) and one edge Dataset per link kind, all derived from the same link rows, so node ids and edge endpoints
+  match. Driven: the ring shows four colours and a four-row legend.
 * **"The ops module is absent" and "the Case lookup failed" are two states, and Attach-to-Case now says
   which** (found 2026-09-22 while grounding D-S1). The dialog fills its Case picker from
   `GET /objects?type=CASE` and used to fall back to `LinkAnalysisSnapshotsService.mockCases` on ANY error,
