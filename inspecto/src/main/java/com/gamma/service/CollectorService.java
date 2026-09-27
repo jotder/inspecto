@@ -2041,8 +2041,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         triggerWorkers.close();                        // drain in-flight cycle + event-triggered runs (T13)
         enrichment.close();   // drain in-flight recomputes first
         this.eventLog.removeSubscriber(eventObjectBridge);   // de-register the D2 gap→ALERT bridge
-        this.eventLog.removeSubscriber(notificationSubscriber);
-        this.eventLog.removeSubscriber(securityTriggers);   // de-register the B2 event→feed engine
+        this.eventLog.removeSubscriber(notificationSubscriber);   // de-register the B2 event→feed engine
+        this.eventLog.removeSubscriber(securityTriggers);   // de-register the security trigger evaluator
         try { notificationService.close(); } catch (Exception e) { log.warn("Error closing notification service: {}", e.getMessage()); }
         try { notifications.close(); } catch (Exception e) { log.warn("Error closing notification store: {}", e.getMessage()); }
         EventLog.unregister(spaceId);                  // stop MDC-routing to this space's log

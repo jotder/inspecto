@@ -46,8 +46,8 @@ final class NotificationRoutes implements RouteModule {
         // unread, so these three are self-service — open to any authenticated caller, and they touch only
         // the caller's NotificationReadState marks. See read() for the one shared side effect.
         api.post("/notifications/read-all", (e, m) -> Map.of("updated", readAll(api, ApiContext.actor(e))));
-        api.post("/notifications/([^/]+)/read", (e, m) -> read(api, ApiContext.actor(e), ApiContext.name(m)));
-        api.post("/notifications/([^/]+)/unread", (e, m) -> unread(api, ApiContext.actor(e), ApiContext.name(m)));
+        api.post("/notifications/([^/]+)/read", (e, m) -> read(api, e, ApiContext.actor(e), ApiContext.name(m)));
+        api.post("/notifications/([^/]+)/unread", (e, m) -> unread(api, e, ApiContext.actor(e), ApiContext.name(m)));
         // Preferences are two layers (ses-sns-adapter-design §7, fixes SEC review F2): the deployment DEFAULT
         // grid, and a sparse per-Subject override on top. PUT /notifications/preferences writes the CALLER's
         // override only, so it is self-service; the default changes every user's delivery, so its write is
@@ -170,6 +170,14 @@ final class NotificationRoutes implements RouteModule {
      * oversight view of every fired alert is {@code GET /alerts} and the Incidents it opens. Personal has no
      * Subject and so no owner could have been stamped; there, as before, everything stored is shown.
      */
+    /** {@link #existing}, but a notification the caller may not see (a {@code security} one for a non-admin)
+     *  is the same 404 as an unknown id — read/unread by id must not return a body the feed would hide. */
+    private static Notification existingVisible(ApiContext api, HttpExchange ex, String id) {
+        Notification n = existing(api, id);
+        if (!visible(api, ex, n)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no notification '" + id + "'");
+        return n;
+    }
+
     private static boolean visible(ApiContext api, HttpExchange ex, Notification n) {
         Subject s = ApiContext.subject(ex).orElse(null);
         if (s == null) return true;
@@ -222,16 +230,16 @@ final class NotificationRoutes implements RouteModule {
      * again, as it was before read state went per-reader. That effect can only let a repeat alert THROUGH,
      * never hide one, and no reader's feed reports it.
      */
-    private static Map<String, Object> read(ApiContext api, String reader, String id) {
-        Notification n = existing(api, id);
+    private static Map<String, Object> read(ApiContext api, HttpExchange ex, String reader, String id) {
+        Notification n = existingVisible(api, ex, id);
         readState(api).markRead(reader, id, System.currentTimeMillis());
         store(api).markRead(id);
         return view(api, reader, n);
     }
 
     /** {@code POST /notifications/{id}/unread} — mark it unread FOR THE CALLER. 404 unknown id. */
-    private static Map<String, Object> unread(ApiContext api, String reader, String id) {
-        Notification n = existing(api, id);
+    private static Map<String, Object> unread(ApiContext api, HttpExchange ex, String reader, String id) {
+        Notification n = existingVisible(api, ex, id);
         readState(api).markUnread(reader, id);
         return view(api, reader, n);
     }

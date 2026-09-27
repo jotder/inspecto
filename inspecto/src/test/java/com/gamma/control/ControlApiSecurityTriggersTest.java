@@ -80,6 +80,13 @@ class ControlApiSecurityTriggersTest {
             assertTrue(adminFeed.toString().contains("\"security\""), "an administrator sees it: " + adminFeed);
             JsonNode viewerFeed = V1Body.of(send(c.port, "GET", "/notifications", null, "Bearer viewer", null).body());
             assertFalse(viewerFeed.toString().contains("\"security\""), "a non-administrator does not");
+
+            String id = security.get(0).id();
+            for (String op : List.of("read", "unread"))
+                assertEquals(404, send(c.port, "POST", "/notifications/" + id + "/" + op, "{}", "Bearer viewer", null)
+                        .statusCode(), "a non-administrator cannot " + op + " it by id either");
+            assertEquals(200, send(c.port, "POST", "/notifications/" + id + "/read", "{}", "Bearer admin", null)
+                    .statusCode(), "an administrator can");
         }
     }
 

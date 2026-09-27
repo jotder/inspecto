@@ -313,12 +313,16 @@ timestamp: 2026-07-16T00:00:00Z
   | t1 | `ACCESS_DENIED` 403, not a delivery-status path | actor | 20 in 10 min |
   | t2 | `ACCESS_DENIED` 401 | audit IP | 50 in 10 min |
   | t3 | `ACCESS_DENIED` 403 on `/public/delivery-status/{adapter}` | adapter | 10 in 60 min |
-  | t4 | `AUDIT` of a 2xx (not 202-held) `PUT /access/roles` — the only `roles.toon` writer | actor | every change |
+  | t4 | `AUDIT` of a 2xx (not 202-held) `PUT /access/roles` — the only authoring door to `roles.toon` (import refuses reserved files) | actor | every change |
   * **Once per key per window**: a sliding window of at most `threshold` timestamps per (trigger, key); on firing
     the key is quiet until the window elapses. Keys live in ONE access-ordered LRU of `MAX_KEYS` = 10,000, so
     rotating keys can evict a count but never grow the heap.
   * **T2 and F3:** the key is `AuditAttrs.IP` = `ApiContext.ip` — `X-Forwarded-For` only from a
     `-Dcontrol.trustedProxies` peer, else the socket peer — so a spoofed header cannot mint keys.
+  * ⚠ **T4 does not see an admin-only `restore` Job** that overwrites `roles.toon` (`overwrite: true`): it writes
+    files, not a `PUT /access/roles`. Out of scope by decision — that Job already needs `canAdminister` at author
+    and run time (`MAINT-TASK-AUTHORITY-1`); watch it here only if a restore must alert too.
+  * **Read/unread by id** use the same `visible()` rule: a non-admin gets 404 for a `security` notification's id.
   * **Recipients = administrators.** In-app: `NotificationRoutes.visible` shows `security` only to a Subject
     holding `canAdminister` (Personal: everyone, no Subject). Personal email: `NotificationPreferenceOverrides`
     records an `admin` flag per enrolled Subject (on `PUT`, refreshed on `GET /notifications/preferences`);
