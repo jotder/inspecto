@@ -227,7 +227,8 @@ class ControlApiKpiTest {
             data(send(c, "POST", "/components/kpi", KPI, ALICE), 200);
             HttpResponse<String> r = send(c, "GET", "/kpis/revenue/value?asOf=2026-08-13", null, BOB);
             assertEquals("kpi 'revenue': no dataset 'orders'", error(r, 404));
-            assertFalse(r.body().contains("50"), "no value leaks: " + r.body());
+            // Assert on the KEY, not the digits: the error body carries a random correlationId that may contain "50".
+            assertFalse(r.body().contains("\"value\""), "no value leaks: " + r.body());
             assertEquals(50.0, data(send(c, "GET", "/kpis/revenue/value?asOf=2026-08-13", null, ALICE), 200)
                     .get("value").asDouble(), 1e-9);
         }
