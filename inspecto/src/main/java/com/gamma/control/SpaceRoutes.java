@@ -89,7 +89,10 @@ final class SpaceRoutes implements RouteModule {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "query param 'id' is required and must be a valid space id ([a-z0-9-], 1-63 chars)");
         try {
             return manifest(api.spaces().createFromBundle(SpaceId.of(id), e.getRequestBody().readAllBytes(),
-                    b -> DecisionRuleGuard.guardImport(e, null, b)));   // a NEW Space: no stored rule, no live registry
+                    b -> {   // IMPORT-CONNECTION-JOB-GATE-1: each carried kind needs its own route's gate
+                        ImportCapabilityGuard.checkFiles(e, b.configEntries());
+                        return DecisionRuleGuard.guardImport(e, null, b);   // a NEW Space: no stored rule, no live registry
+                    }));
         } catch (IllegalArgumentException badBundle) {   // not a bundle / invalid manifest / zip-slip
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, badBundle.getMessage());
         } catch (IllegalStateException conflict) {       // id / directory already exists

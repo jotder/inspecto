@@ -53,6 +53,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ControlApiImportReservedPathsTest {
 
     private static final String BUILDER = "Bearer builder", ADMIN = "Bearer admin";
+    /** A builder who may also onboard Connections — a data-source bundle carries one (IMPORT-CONNECTION-JOB-GATE-1). */
+    private static final String ONBOARDER = "Bearer onboarder";
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -77,6 +79,7 @@ class ControlApiImportReservedPathsTest {
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
             case BUILDER -> Optional.of(new Subject("builder-1", Set.of("canAuthorWorkbench")));
             case ADMIN -> Optional.of(new Subject("admin-1", Set.of("canAdminister")));
+            case ONBOARDER -> Optional.of(new Subject("builder-1", Set.of("canAuthorWorkbench", "canOnboardConnections")));
             default -> Optional.empty();
         });
     }
@@ -411,7 +414,7 @@ class ControlApiImportReservedPathsTest {
     void aLegitimateDataSourceBundleStillImports(@TempDir Path root) throws Exception {
         try (Ctx c = open(root, true)) {
             Map<String, String> ds = legitimateDataSource(root.resolve("alpha").resolve("data"), "orders", "orders_v2.toon");
-            HttpResponse<String> r = send(c, "POST", "/import", dataSourceZip(ds), BUILDER);
+            HttpResponse<String> r = send(c, "POST", "/import", dataSourceZip(ds), ONBOARDER);
             assertEquals(200, r.statusCode(), r.body());
             for (String path : ds.keySet()) assertTrue(Files.exists(c.config.resolve(path)), path);
             HttpResponse<String> ids = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port
@@ -446,7 +449,7 @@ class ControlApiImportReservedPathsTest {
             broken.putAll(legitimateDataSource(data, "fresh", "fresh_v1.toon"));
             broken.remove("fresh/fresh_v1.toon");
             Map<String, String> before = tree(c.config);
-            HttpResponse<String> r = send(c, "POST", "/import?on_conflict=overwrite", dataSourceZip(broken), BUILDER);
+            HttpResponse<String> r = send(c, "POST", "/import?on_conflict=overwrite", dataSourceZip(broken), ONBOARDER);
             assertEquals(422, r.statusCode(), r.body());
             assertEquals(before, tree(c.config), "the integrity refusal restored etl_pipeline.toon and removed the rest");
 
@@ -458,7 +461,7 @@ class ControlApiImportReservedPathsTest {
             Map<String, String> bad = legitimateDataSource(data, "second", "second_v1.toon");
             bad.put("second/second_mapping.csv", "targetColumn,sourceExpression,transformType\nbad-name!,ACCOUNT_NUMBER,DIRECT\n");
             unregistrable.putAll(bad);
-            HttpResponse<String> r2 = send(c, "POST", "/import?on_conflict=overwrite", dataSourceZip(unregistrable), BUILDER);
+            HttpResponse<String> r2 = send(c, "POST", "/import?on_conflict=overwrite", dataSourceZip(unregistrable), ONBOARDER);
             assertEquals(422, r2.statusCode(), r2.body());
             assertTrue(r2.body().contains("invalid pipeline second/second_pipeline.toon"), "a REGISTRATION refusal: " + r2.body());
             assertEquals(before, tree(c.config), "the registration refusal restored the tree");
@@ -470,7 +473,7 @@ class ControlApiImportReservedPathsTest {
             // (3) a pipeline id registered from ANOTHER file: refused before any write (the up-front pre-check)
             Map<String, String> clash = new LinkedHashMap<>(legitimateDataSource(data, "third", "third_v1.toon"));
             clash.put("elsewhere/elsewhere_pipeline.toon", etl);
-            assertEquals(409, send(c, "POST", "/import?on_conflict=overwrite", dataSourceZip(clash), BUILDER).statusCode());
+            assertEquals(409, send(c, "POST", "/import?on_conflict=overwrite", dataSourceZip(clash), ONBOARDER).statusCode());
             assertEquals(before, tree(c.config));
 
             // (4) the Pipeline door: a SaveGate ERROR after the satellites landed — the root schema they overwrote

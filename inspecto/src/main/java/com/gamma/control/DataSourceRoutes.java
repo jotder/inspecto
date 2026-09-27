@@ -235,6 +235,9 @@ final class DataSourceRoutes implements RouteModule {
         List<String> refused = com.gamma.service.ImportPaths.refusals(config, bundle.configEntries());
         if (!refused.isEmpty())
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "an import may not write " + refused);
+        // IMPORT-CONNECTION-JOB-GATE-1: an import is never a way around a kind's own route gate (a Connection needs
+        // canOnboardConnections, an event_prune Job canAdminister, …) — judged over every entry before any write.
+        ImportCapabilityGuard.checkFiles(e, bundle.configEntries());
         // Maker-checker (ASSURE-MAKER-CHECKER-1): under an approval policy an import cannot be one Pending Change,
         // so it is refused (409) when any entry is a governed kind or cannot be classified — before the first
         // write, so nothing reaches the journal.

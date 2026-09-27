@@ -322,6 +322,9 @@ final class BundleRoutes implements RouteModule {
         if (!reservedItems.isEmpty())
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "a bundle may not carry " + reservedItems
                     + " — the access config is written through /access/* only");
+        // IMPORT-CONNECTION-JOB-GATE-1: an item of a kind whose own route is stricter than this one's (connection,
+        // alert-rule, findings-spec, an event_prune job) needs that route's capability — before any write.
+        ImportCapabilityGuard.checkItems(exchange, ordered);
         // …and a `pipeline` item's closure files meet the import judge (ImportPaths) BEFORE any item is written:
         // a satellite no import may write refuses the whole bundle, not one item after the others landed.
         for (Map<String, Object> item : ordered) {
@@ -334,6 +337,7 @@ final class BundleRoutes implements RouteModule {
             } catch (IllegalArgumentException undecodable) {
                 continue;   // the item fails on its own when it is written
             }
+            ImportCapabilityGuard.checkFiles(exchange, entries);
             PipelineBundleRoutes.judgeClosure(api, api.writeRoot(), cast(m), entries, ApiContext.str(item, "id"));
         }
         // Maker-checker (ASSURE-MAKER-CHECKER-1): N items cannot be ONE Pending Change — under a policy for any

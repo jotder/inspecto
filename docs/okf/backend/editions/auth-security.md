@@ -661,9 +661,28 @@ literal (`"_x.toon"`, `".grammar.toon"`, `"_x.csv"`): each must be refused by `I
 subdirectory and under `registry/`, referenced or not, or sit on `SUFFIX_ALLOWED` (the data-source shapes, and
 the data-dir output sidecars) with a reason. Un-refusing `_workflow.toon` turns it red.
 
-**Still open, deliberately.** Connections and Jobs stay importable at `canAuthorWorkbench`, although
-`/connections` asks `canOnboardConnections`. That capability gate is a separate P3 row,
-`IMPORT-CONNECTION-JOB-GATE-1` (filed on the maker-checker branch, not yet on `master`).
+**An import is never a way around a kind's own route gate** (`IMPORT-CONNECTION-JOB-GATE-1`, session decision
+2026-09-27, overturnable). Every import door is `canAuthorWorkbench` (a new Space: `canAdminister`), but some
+kinds it can carry are written on their own route under a different capability. `ImportCapabilityGuard`
+requires THAT capability per carried item, at all four doors — `/import` and `/spaces/import` over the raw
+entries, `/pipelines/import` over its zip, `/bundle/import` over its items and each `pipeline` item's closure
+files — before the first write: the first missing capability is 403 naming the kind and the capability, and
+nothing is written.
+
+| Carried kind | Recognised by | Needs (its own route) |
+|---|---|---|
+| Connection | a `*_connection.toon` file, a `connection` item | `canOnboardConnections` (`/connections`) |
+| Alert Rule | `registry/alert-rules/`, an `alert-rule` item | `canAuthorAlertRules` (`/alerts/rules`) |
+| Findings Spec | `registry/findings-specs/`, a `findings-spec` item | `canManageIncidents` (`/components/findings-spec`) |
+| `event_prune` Job | a `*_job.toon` file or `job` item parsed by `JobConfig` as `maintenance`/`event_prune` | `canAdminister` (`/jobs`) |
+
+Every other Job, and every other importable kind, is `canAuthorWorkbench` on its own route too — no mismatch
+(swept 2026-09-27 over `CapabilityManifest` and the in-handler `requireCapability` calls). The access config,
+role table and settings documents are not on the table because no import writes them at all (below). ⚠ A
+`/bundle/import` `event_prune` Job is still refused per item even for an administrator (`JobBundleSource`,
+`ASSURE-AUDIT-CHAIN-1`); the guard only makes the non-administrator case atomic. Tests:
+`ControlApiImportCapabilityGateTest` (real HTTP, armed Subject; mutating the check to a no-op turns all 7 red,
+403 → 200).
 `SpaceManager.createFromBundle` (a new Space, `canAdminister`) keeps only the segment rules.
 
 Tests: `ControlApiImportReservedPathsTest` (real HTTP, armed Subject; every alias at all three doors on a
@@ -716,8 +735,8 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
   `..` or Windows device name); the allowlist (a file another carried config references, or a `.toon` / `.csv`
   of a known shape — at the config root only the conventional suffixes, under `registry/` only
   `registry/<importable kind>/<name>`); and the denylist below plus a real-path check (`toRealPath` +
-  `isSameFile` / prefix against every reserved file and directory, fail closed on I/O errors). Connections and
-  Jobs stay importable with `canAuthorWorkbench` — filed as `IMPORT-CONNECTION-JOB-GATE-1`.
+  `isSameFile` / prefix against every reserved file and directory, fail closed on I/O errors). A carried kind
+  whose own route is stricter needs that route's capability (`IMPORT-CONNECTION-JOB-GATE-1`, above).
 - **An import may never write the files a narrower gate owns** (D-P14, `ReservedConfigPaths`): `roles.toon`,
   `access-policies.toon`, the Access Catalog and Access Profiles, `approval.toon`, `pending-changes/`, every
   Space settings document, `rename.journal`, `recon-state/`, `.history/`, `audit/`. `/import` and a
