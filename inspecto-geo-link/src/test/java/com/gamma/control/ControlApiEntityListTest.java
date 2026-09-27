@@ -166,7 +166,7 @@ class ControlApiEntityListTest {
 
             JsonNode fact = JSON.readTree(Files.readString(facts(c).get(0)));
             assertEquals(List.of("seq", "at", "actor", "reason", "kind", "listId", "title", "purpose", "entityType",
-                    "prevHash"), iterable(fact.fieldNames()));
+                    "normaliser", "prevHash"),iterable(fact.fieldNames()));
             assertEquals("list.created", fact.get("kind").asText());
             assertEquals("FR-7 referral", fact.get("reason").asText());
             assertEquals("", fact.get("prevHash").asText(), "seq 1 has no predecessor");
@@ -447,6 +447,48 @@ class ControlApiEntityListTest {
                     "retire with the capability");
         } finally {
             Authenticators.forTest(null);
+        }
+    }
+
+    // ── D-M9: the sealed normaliser ────────────────────────────────────────────────────────────────────
+
+    /** D-M9 (LA17-NORMALISER-CHANGE-1): {@code list.created} seals the normaliser, so a settings change never strands members. */
+    @Test
+    void aListKeepsTheNormaliserSealedAtCreationWhenTheTypeChanges(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String digits = "{\"maskingMode\":\"none\",\"entityTypes\":[{\"id\":\"msisdn\",\"label\":\"MSISDN\","
+                    + "\"normaliser\":\"digits\",\"masked\":false,\"classifications\":[\"MSISDN\"]}]}";
+            status(200, send(c.port, "PUT", "/settings/link-analysis", digits, null), "msisdn under digits");
+            data(post(c, LISTS, WATCH), 201);
+            JsonNode added = data(post(c, "/inv/entity-lists/wl/members",
+                    "{\"add\":[\"+44 7700 900123\"],\"reason\":\"r\"}"), 200);
+            assertEquals(List.of("447700900123"), texts(added.get("members")));
+
+            status(200, send(c.port, "PUT", "/settings/link-analysis", digits.replace("digits", "e164"), null),
+                    "msisdn now under e164");
+            JsonNode removed = data(post(c, "/inv/entity-lists/wl/members",
+                    "{\"remove\":[\"+44 7700 900123\"],\"reason\":\"r\"}"), 200);
+            assertEquals(1, removed.get("changed").asInt(), "removed under the SEALED rule: " + removed);
+            assertEquals(List.of(), texts(removed.get("members")));
+            assertEquals("digits", removed.get("normaliser").asText(), "the summary shows the sealed normaliser");
+            assertEquals("digits", JSON.readTree(Files.readString(facts(c).get(0))).get("normaliser").asText());
+        }
+    }
+
+    /** D-M9: a {@code list.created} fact written before the field existed reads as {@code default}. */
+    @Test
+    void aListCreatedFactWithoutANormaliserReadsAsDefault(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            settings(c, "masking_mode: none\n");
+            data(post(c, LISTS, WATCH), 201);
+            Path first = facts(c).get(0);
+            String legacy = Files.readString(first).replace(",\"normaliser\":\"e164\"", "");
+            assertFalse(legacy.contains("normaliser"), legacy);
+            Files.writeString(first, legacy);   // a lone fact: nothing chains after it
+            JsonNode read = data(get(c, "/inv/entity-lists/wl"), 200);
+            assertEquals("default", read.get("normaliser").asText(), read.toString());
+            JsonNode added = data(post(c, "/inv/entity-lists/wl/members", "{\"add\":[\"+44 7700 900123\"],\"reason\":\"r\"}"), 200);
+            assertEquals(List.of("+44 7700 900123"), texts(added.get("members")), "normalised by default, not e164");
         }
     }
 }

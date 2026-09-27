@@ -123,7 +123,8 @@ public final class EntityListRoutes implements RouteModule {
         if (purpose == null || !PURPOSES.contains(purpose))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'purpose' must be one of " + PURPOSES);
         String entityType = ApiContext.str(body, "entityType");
-        if (entityType == null || type(root, entityType).isEmpty())
+        Optional<EntityTypes.EntityType> sealedType = entityType == null ? Optional.empty() : type(root, entityType);
+        if (sealedType.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'entityType' must be an Entity Type in force "
                     + typeIds(root) + ", got '" + entityType + "'");
         String given = ApiContext.str(body, "id");
@@ -143,6 +144,7 @@ public final class EntityListRoutes implements RouteModule {
             payload.put("title", title);
             payload.put("purpose", purpose);
             payload.put("entityType", entityType);
+            payload.put("normaliser", sealedType.get().normaliser());   // D-M9: sealed; member writes use this, not the type
             head = append(log, head, ex, reason, "list.created", id, payload);
             emit(ex, id, "list.created", 0, 0, head.headSeq());
             created = render(root, log, head, current(head, id), head.headSeq());
@@ -165,10 +167,10 @@ public final class EntityListRoutes implements RouteModule {
             EntityRegistry.EntityList l = EntityRegistry.fold(head.facts(), head.headSeq()).get(id);
             if (l == null) throw notFound(id, "");
             if (l.retired()) throw new ApiException(409, ErrorCodes.CONFLICT, "entity list '" + id + "' is retired");
-            EntityTypes.EntityType t = type(root, l.entityType()).orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT,
+            type(root, l.entityType()).orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT,
                     "entity list '" + id + "' is of Entity Type '" + l.entityType() + "', which is no longer in force"));
-            Set<String> toAdd = normalise(t, add, "add");
-            Set<String> toRemove = normalise(t, remove, "remove");
+            Set<String> toAdd = normalise(l, add, "add");
+            Set<String> toRemove = normalise(l, remove, "remove");
             for (String k : toAdd)
                 if (toRemove.contains(k))
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a value normalises to a key named in both "
@@ -257,13 +259,14 @@ public final class EntityListRoutes implements RouteModule {
         return out;
     }
 
-    private static Set<String> normalise(EntityTypes.EntityType t, List<String> raw, String key) {
+    /** Normalise with the list's SEALED normaliser (D-M9), never the Entity Type's current one. */
+    private static Set<String> normalise(EntityRegistry.EntityList l, List<String> raw, String key) {
         Set<String> out = new TreeSet<>();
         for (int i = 0; i < raw.size(); i++) {
-            String k = EntityTypes.normalise(t.normaliser(), raw.get(i));
+            String k = EntityTypes.normalise(l.normaliser(), raw.get(i));
             if (k.isEmpty())
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "[" + i + "]' is empty after the "
-                        + t.id() + " normaliser (" + t.normaliser() + ")");
+                        + l.entityType() + " list's sealed normaliser (" + l.normaliser() + ")");
             out.add(k);
         }
         return out;
@@ -283,6 +286,7 @@ public final class EntityListRoutes implements RouteModule {
         m.put("title", l.title());
         m.put("purpose", l.purpose());
         m.put("entityType", l.entityType());
+        m.put("normaliser", l.normaliser());
         m.put("size", l.members().size());
         m.put("retired", l.retired());
         m.put("createdAt", l.createdAt());

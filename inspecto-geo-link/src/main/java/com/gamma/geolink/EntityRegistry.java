@@ -15,7 +15,9 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  *
  * <p><b>Fold.</b> Facts with {@code seq <= atSeq} are applied in seq order:
  * <ul>
- *   <li>{@code list.created {title, purpose, entityType}} — a new, empty list;</li>
+ *   <li>{@code list.created {title, purpose, entityType, normaliser}} — a new, empty list. {@code normaliser} is the
+ *       Entity Type's rule SEALED at creation (D-M9): every later member write on the list normalises with it, whatever
+ *       the type says today. A fact written before the field existed reads as {@code default};</li>
  *   <li>{@code list.member.added {keys[]}} / {@code list.member.removed {keys[]}} — set union / difference. One fact
  *       carries every EFFECTIVE key of one call (normalised, sorted), not one fact per key, so a 5 000-key call is
  *       one file, not 5 000;</li>
@@ -32,8 +34,8 @@ final class EntityRegistry {
     private EntityRegistry() {}
 
     /** One Entity List as of a log position. {@code members} are normalised keys, sorted. */
-    record EntityList(String id, String title, String purpose, String entityType, String createdAt, String createdBy,
-                      boolean retired, long lastSeq, SortedSet<String> members) {}
+    record EntityList(String id, String title, String purpose, String entityType, String normaliser, String createdAt,
+                      String createdBy, boolean retired, long lastSeq, SortedSet<String> members) {}
 
     /** Every list that existed at {@code atSeq}, in creation order. */
     static Map<String, EntityList> fold(List<EntityFactLog.Fact> facts, long atSeq) {
@@ -44,7 +46,7 @@ final class EntityRegistry {
             String id = f.listId();
             if ("list.created".equals(f.kind())) {
                 lists.putIfAbsent(id, new Acc(id, str(b, "title"), str(b, "purpose"), str(b, "entityType"),
-                        str(b, "at"), str(b, "actor"), f.seq()));
+                        b.get("normaliser") == null ? "default" : str(b, "normaliser"), str(b, "at"), str(b, "actor"), f.seq()));
                 continue;
             }
             Acc l = lists.get(id);
@@ -58,7 +60,7 @@ final class EntityRegistry {
             l.lastSeq = f.seq();
         }
         Map<String, EntityList> out = new LinkedHashMap<>();
-        lists.forEach((id, l) -> out.put(id, new EntityList(l.id, l.title, l.purpose, l.entityType, l.createdAt,
+        lists.forEach((id, l) -> out.put(id, new EntityList(l.id, l.title, l.purpose, l.entityType, l.normaliser, l.createdAt,
                 l.createdBy, l.retired, l.lastSeq, Collections.unmodifiableSortedSet(l.members))));
         return out;
     }
@@ -69,16 +71,18 @@ final class EntityRegistry {
     }
 
     private static final class Acc {
-        final String id, title, purpose, entityType, createdAt, createdBy;
+        final String id, title, purpose, entityType, normaliser, createdAt, createdBy;
         final SortedSet<String> members = new TreeSet<>();
         boolean retired;
         long lastSeq;
 
-        Acc(String id, String title, String purpose, String entityType, String createdAt, String createdBy, long seq) {
+        Acc(String id, String title, String purpose, String entityType, String normaliser, String createdAt,
+            String createdBy, long seq) {
             this.id = id;
             this.title = title;
             this.purpose = purpose;
             this.entityType = entityType;
+            this.normaliser = normaliser;
             this.createdAt = createdAt;
             this.createdBy = createdBy;
             this.lastSeq = seq;

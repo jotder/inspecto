@@ -823,7 +823,7 @@ public final class InvestigationRoutes implements RouteModule {
         sealed.put("atSeq", head.headSeq());
         sealed.put("headHash", head.headHash());
         sealed.put("entityType", l.entityType());
-        sealed.put("normaliser", type.normaliser());
+        sealed.put("normaliser", l.normaliser());   // D-M9: the list's sealed rule — its members were stored under it
         sealed.put("purpose", l.purpose());
         sealed.put("masked", type.masked());   // the type's masking flag AS SEALED — EntityMasking reads only the log
         sealed.put("members", new ArrayList<>(l.members()));
