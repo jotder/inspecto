@@ -197,6 +197,9 @@ keeps it honest:
   for `v1.5.2`. *Session decisions:* fetch in CI, not commit the binary (no binaries in git) and not a desk
   download (Windows desk cannot run it); the ~20 MB per-run fetch is accepted, and DuckDB's own extension
   signature check still guards the LOAD over plain `http`, as it does for the release fetch.
+  **Proven 2026-09-27:** GitHub CI run `36299231097` (ubuntu, `15edfd6dc`) ran `PipelineDocumentXlsxTest`
+  5/5 with 0 skipped — the Linux `excel` binary LOADS and writes a real workbook; and `package.ps1 -Edition
+  Professional` ran green end to end on `15294b4ba` (boot smoke, `excel` staged, `jdk.management` in the runtime).
 
 ⚠ **`parse` and `map` serve `attributes: []` deliberately** — each has a richer editor of its own, so a
 generic attribute spec there would be a worse second way to author the same thing. And the palette publishes
