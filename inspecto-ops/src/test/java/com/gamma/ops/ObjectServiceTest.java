@@ -339,6 +339,19 @@ class ObjectServiceTest {
             assertFalse(svc.get(id).orElseThrow().attributes().containsKey(ObjectService.ATTR_SLA_BREACHED_AT), id);
     }
 
+    /** The sweep reads every Incident: one newest-first MAX_LIMIT page never reached the OLDEST overdue one. */
+    @Test
+    void slaSweepBreachesTheOldestOverdueIncidentBeyondOneQueryPage() {
+        InMemoryObjectStore store = new InMemoryObjectStore();
+        ObjectService svc = new ObjectService(store);
+        long now = System.currentTimeMillis();
+        store.create(stored("oldest", "IDENTIFIED", 1_000L, Map.of(ObjectService.ATTR_DUE_AT, Long.toString(now - 60_000))));
+        for (int i = 0; i < ObjectQuery.MAX_LIMIT + 5; i++)
+            store.create(stored("newer-" + i, "IDENTIFIED", 2_000L + i, Map.of()));
+        assertEquals(1, svc.sweepIncidentSla(now));
+        assertTrue(svc.get("oldest").orElseThrow().attributes().containsKey(ObjectService.ATTR_SLA_BREACHED_AT));
+    }
+
     // ── ASSURE-IMPACT-LEDGER-RESIDUALS-1 (1): rollups read every object, not one MAX_LIMIT page ──────────
 
     private static final int BEYOND_ONE_PAGE = ObjectQuery.MAX_LIMIT + 7;

@@ -474,9 +474,11 @@ public final class ObjectService {
      */
     public List<OperationalObject> active(ObjectType type, String correlationId) {
         Workflow wf = workflow(type);
-        return store.query(ObjectQuery.builder()
-                        .objectType(type).correlationId(correlationId).limit(ObjectQuery.MAX_LIMIT).build())
-                .stream().filter(o -> !wf.isTerminal(o.status())).toList();
+        List<OperationalObject> out = new ArrayList<>();   // every page, only the non-terminal ones kept
+        for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(type).correlationId(correlationId).build()))
+            if (!wf.isTerminal(o.status())) out.add(o);
+        return out.reversed();   // newest-first, as before
+
     }
 
     // ── analytics (GLOSSARY §9, C4) ───────────────────────────────────────────────────
@@ -700,7 +702,7 @@ public final class ObjectService {
      */
     public int backfillTagAssignments() {
         int created = 0;
-        for (OperationalObject o : store.query(ObjectQuery.builder().limit(ObjectQuery.MAX_LIMIT).build())) {
+        for (OperationalObject o : allMatching(ObjectQuery.builder().build())) {
             List<String> csv = csvTags(o.attributes().get(ATTR_TAGS));
             if (csv.isEmpty()) continue;
             List<String> known = tagsOf(o.id());
@@ -824,7 +826,7 @@ public final class ObjectService {
         TagRule rule = tagRule(name).orElseThrow(() -> new NoSuchElementException("no tag rule named '" + name + "'"));
         int matched = 0;
         int updated = 0;
-        for (OperationalObject o : store.query(ObjectQuery.builder().limit(ObjectQuery.MAX_LIMIT).build())) {
+        for (OperationalObject o : allMatching(ObjectQuery.builder().build())) {
             if (!rule.matches(o)) continue;
             matched++;
             if (tagsOf(o.id()).contains(rule.tag())) continue;
@@ -900,13 +902,11 @@ public final class ObjectService {
         CaseRule rule = caseRule(name).orElseThrow(() -> new NoSuchElementException("no case rule named '" + name + "'"));
         long now = System.currentTimeMillis();
         long cutoff = rule.windowMinutes() <= 0 ? 0 : now - rule.windowMinutes() * 60_000L;
-        List<OperationalObject> matches = store.query(ObjectQuery.builder()
-                        .objectType(ObjectType.INCIDENT).limit(ObjectQuery.MAX_LIMIT).build())
-                .stream()
-                .filter(o -> o.createdAt() >= cutoff)
-                .filter(rule::matches)
-                .filter(o -> !isCaseMember(o.id()))   // not already grouped under any case
-                .toList();
+        List<OperationalObject> matches = new ArrayList<>();   // every page; only the matches are held
+        for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()))
+            if (o.createdAt() >= cutoff && rule.matches(o) && !isCaseMember(o.id()))   // not already grouped
+                matches.add(o);
+        matches = matches.reversed();   // newest-first, as before: matches.get(0) seeds a new Case's correlationId
         if (matches.isEmpty()) return new CaseRuleEvaluation(0, 0, null, false);
 
         String existing = openCaseRaisedBy(name);
@@ -935,12 +935,11 @@ public final class ObjectService {
 
     /** The id of a still-open case previously raised by {@code ruleName}, or null. */
     private String openCaseRaisedBy(String ruleName) {
-        return store.query(ObjectQuery.builder().objectType(ObjectType.CASE).limit(ObjectQuery.MAX_LIMIT).build())
-                .stream()
-                .filter(c -> ruleName.equals(c.attributes().get(ATTR_RAISED_BY_RULE)))
-                .filter(c -> !workflow(ObjectType.CASE).isTerminal(c.status()))
-                .map(OperationalObject::id)
-                .findFirst().orElse(null);
+        Workflow wf = workflow(ObjectType.CASE);
+        String newest = null;   // oldest-first walk over every page, so the LAST hit is the newest, as before
+        for (OperationalObject c : allMatching(ObjectQuery.builder().objectType(ObjectType.CASE).build()))
+            if (ruleName.equals(c.attributes().get(ATTR_RAISED_BY_RULE)) && !wf.isTerminal(c.status())) newest = c.id();
+        return newest;
     }
 
 
@@ -1030,11 +1029,10 @@ public final class ObjectService {
      * @return the number of incidents newly breached by this sweep
      */
     public int sweepIncidentSla(long now) {
-        List<OperationalObject> incidents = store.query(ObjectQuery.builder()
-                .objectType(ObjectType.INCIDENT).limit(ObjectQuery.MAX_LIMIT).build());
         Workflow wf = workflow(ObjectType.INCIDENT);
         int breached = 0;
-        for (OperationalObject o : incidents) {
+        // Every Incident, a page at a time — one newest-first MAX_LIMIT page never reached the oldest overdue ones.
+        for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build())) {
             if (o.isClosed()) continue;                                      // closedAt stamped — settled
             if (wf.isTerminal(o.status())) continue;                         // any workflow terminal state
             if ("RESOLVED".equalsIgnoreCase(o.status())) continue;           // fixed — SLA clock stopped

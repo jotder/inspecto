@@ -413,6 +413,10 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
   OFFSET pages neither overlap nor skip on a tie. ⚠ Offset paging, not a snapshot: an object purged mid-walk
   can shift another across a page boundary. Pinned in both backends by
   `ObjectServiceTest.analyticsCountsEveryObjectBeyondOneQueryPage*` (10 007 objects sharing one `createdAt`).
+  The same complete read now backs `sweepIncidentSla` (a newest-first single page never reached the OLDEST
+  overdue Incidents — `slaSweepBreachesTheOldestOverdueIncidentBeyondOneQueryPage`), `active()`,
+  `evaluateCaseRule` (+ its open-Case lookup), `applyTagRule` and `backfillTagAssignments`; the list-returning
+  ones keep their newest-first order and hold only their filtered hits.
 
 ### 3.5 Cases
 
