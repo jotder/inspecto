@@ -392,7 +392,11 @@ in flight — a newer day cancels the older); only a real day not after today is
 `asOf` sends none, so the server's today in the KPI's zone applies — never the browser's today, which a zone ahead
 of the server's could make a "future" 400. ⚠ Distinct from the semantic model's
 descriptive **KPI catalog** (`kpis:` / `GET /catalog/kpis`), which is text for the assistant and runs nothing.
-Deferred: KPI packs inside Space Templates, and a bundle-imported KPI's Dataset is only checked structurally.
+A Space Template may carry `kpi` definitions (`config/registry/kpis/`, 2026-09-28): on `POST /spaces` with a
+`template` each meets the same gate — `canAuthorWorkbench` plus `requireMeasure` against the new Space's own
+Datasets, copied first — and the first refusal (403 / 422) creates no Space (`KpiRoutes.requireTemplateKpis`;
+`okf/capabilities/spaces/spaces.md` §3.5). ⚠ The Schema read refuses a KPI over a Dataset its template's pipeline
+has not filled yet, so no shipped template carries a KPI pack. A bundle-imported KPI meets the save gate too.
 
 **A schedule is a Job, not a new entity** (C6, 2026-07-04): `type: 'report'` with
 `params: {reportKind, dashboardId, format, recipients}`. ⚠ Dispatch keys on `params.dashboardId` being

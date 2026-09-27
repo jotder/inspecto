@@ -105,6 +105,7 @@ final class SpaceRoutes implements RouteModule {
      *  seeds the new space from {@code spaces/_templates/<template>/} (400 when no such template ships). */
     private Object createSpace(ApiContext api, HttpExchange e, Map<String, Object> body) throws IOException {
         requireMultiSpace(api);
+        boolean recovering = api.spaces().size() == 0;
         requireAdministerUnlessRecovering(api, e);
         String id = ApiContext.str(body, "id");
         if (id == null || !SpaceId.isValid(id))
@@ -115,7 +116,8 @@ final class SpaceRoutes implements RouteModule {
                     ? api.spaces().create(SpaceId.of(id),
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"))
                     : api.spaces().createFromTemplate(SpaceId.of(id),
-                            ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), template);
+                            ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), template,
+                            base -> KpiRoutes.requireTemplateKpis(e, base, !recovering));   // a KPI pack meets /components/kpi
             return manifest(ctx);
         } catch (IllegalArgumentException badTemplate) { // unknown template id
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, badTemplate.getMessage());

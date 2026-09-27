@@ -434,6 +434,19 @@ public final class SpaceManager implements AutoCloseable {
      */
     public SpaceContext createFromTemplate(SpaceId id, String displayName, String description,
                                            String templateId) throws IOException {
+        return createFromTemplate(id, displayName, description, templateId, base -> {});
+    }
+
+    /**
+     * {@link #createFromTemplate(SpaceId, String, String, String)} with {@code seedGate} run over the new Space's
+     * directory once the template's WHOLE tree is copied (so every Dataset it carries is on disk) and before it boots
+     * — the control plane's per-kind save gate for seeded components ({@code kpi},
+     * {@code ASSURE-KPI-DEFINITIONS-RESIDUALS-1}). It throws to refuse the template: the half-made directory is
+     * deleted and nothing is registered.
+     */
+    public SpaceContext createFromTemplate(SpaceId id, String displayName, String description,
+                                           String templateId, java.util.function.Consumer<Path> seedGate)
+            throws IOException {
         if (spacesRoot == null)
             throw new IllegalStateException("This server hosts a single space; set -Dspaces.root to manage many");
         Path tpl = templatesRoot().resolve(templateId);
@@ -450,6 +463,12 @@ public final class SpaceManager implements AutoCloseable {
             for (String sub : SPACE_SUBDIRS) Files.createDirectories(base.resolve(sub));
             copyTemplateTree(tpl.resolve("config"), base.resolve("config"), id.value(), true);
             copyTemplateTree(tpl.resolve("data"), base.resolve("data"), id.value(), false);
+            try {
+                seedGate.accept(base);
+            } catch (RuntimeException refused) {
+                deleteRecursively(base);   // a refused template leaves no Space behind
+                throw refused;
+            }
             String name = (displayName == null || displayName.isBlank())
                     ? com.gamma.util.ToonHelper.opt(tplMeta, "name", id.value()) : displayName.trim();
             String desc = (description == null || description.isBlank())

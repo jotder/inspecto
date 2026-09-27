@@ -188,6 +188,18 @@ two-step ask-the-minimum and renders whatever the server publishes. **What is pu
 `orders-starter`** — a pipeline, a quality rule, a dataset and a live dashboard. Nothing named Telecom,
 Fraud, Financial Audit or Link Analysis exists (§2, §5).
 
+**A template may carry a KPI pack** (`config/registry/kpis/`, `ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1),
+2026-09-28). `SpaceRoutes.createSpace` hands `createFromTemplate` a seed gate
+(`KpiRoutes.requireTemplateKpis`) that runs after the WHOLE tree is copied — so the template's Datasets are on
+disk — and before boot: the caller needs `canAuthorWorkbench` (the `/components/kpi` door's capability; the
+zero-Space recovery create asks none, as it asks no `canAdminister`), and each KPI meets
+`KpiRoutes.requireMeasure` against the NEW Space's registry and `data/`. The first refusal is a 403 / 422, the
+half-made directory is deleted and nothing is registered; a `kpis/*.toon` the registry cannot read is refused,
+never seeded unchecked. A KPI tile in the template binds by `options.kpi.kpiId` (no new mechanism). ⚠ The gate
+reads the Dataset's Schema, so a KPI over a Dataset that the template's own pipeline has not filled yet (a
+`physicalRef` store with no Parquet — every fresh `orders-starter` store) is REFUSED at apply; that is why
+`orders-starter` ships no KPI pack. Seed-gated kind: `kpi` only — the rest of the tree is still copied as-is.
+
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does
 
 A bundle is a *serialised, self-describing subgraph* of the component graph for **instance-to-instance
@@ -488,12 +500,13 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 |---|---|
 | `ControlApiSpacesTest` (4) | `/spaces` CRUD; `authenticatedCreateSucceedsWhenNoSpaceIsHostedYet`; `purgingTheLastSpaceOnDiskIsRefused` |
 | `ControlApiSpaceTemplatesTest` (2) | the gallery and `createFromTemplate` |
+| `ControlApiSpaceTemplateKpiTest` (3) | a template's KPI pack meets the `/components/kpi` save gate and capability; a refusal creates no Space |
 | `ControlApiMultiSpaceTest` (1) | a multi-Space server smoke |
 | `ControlApiBundleTest` (11) · `ControlApiBundleImportTest` (11) · `ControlApiBundleNewKindsTest` (10) · `ControlApiPipelineBundleTest` (7) | export / preview / import contract, ordering, the newer kinds, the `authored-pipeline` round trip |
 | `ExchangeAttributeScopeTest` · `NoExchangeShipsInThePersonalBuildTest` | exchange attributes private by default; Personal carries no exchange module |
 | `PostgresStateStoreTest` (opt-in, `-Dinspecto.test.pg.url`; 11 skipped otherwise) | the DB-backed stores against a real Postgres |
 
-About 87 `@Test` methods across the sixteen Space and bundle classes, all in the default reactor.
+About 90 `@Test` methods across the seventeen Space and bundle classes, all in the default reactor.
 
 ### 8.3 UI specs — vitest
 

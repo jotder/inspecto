@@ -163,11 +163,18 @@ final class KpiRoutes implements RouteModule {
      * @throws IllegalArgumentException naming what is wrong (→ 422 at the caller)
      */
     static KpiDefinition requireMeasure(ApiContext api, HttpExchange ex, String id, Map<String, Object> content) {
+        KpiDefinition.fromMap(id, content);   // structural refusal first, before the write-root 503
+        return requireMeasure(ex, WriteGates.requireWriteRoot(api, "kpi write"), api::dataRoot, id, content);
+    }
+
+    /** {@link #requireMeasure(ApiContext, HttpExchange, String, Map)} against explicit roots — a Space that is not
+     *  the request's (a template-seeded one, not booted yet). */
+    static KpiDefinition requireMeasure(HttpExchange ex, Path writeRoot, java.util.function.Supplier<Path> dataRoot,
+                                        String id, Map<String, Object> content) {
         KpiDefinition kpi = KpiDefinition.fromMap(id, content);
-        Path writeRoot = WriteGates.requireWriteRoot(api, "kpi write");
         if (readableDataset(ex, new ComponentStore(writeRoot.resolve("registry")), kpi.dataset()) == null)
             throw new IllegalArgumentException("kpi dataset '" + kpi.dataset() + "' does not exist");
-        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> writeRoot, api::dataRoot);
+        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> writeRoot, dataRoot);
         List<String> columns = probe.columns(kpi.dataset());
         String field = kpi.measure().field();
         if (field != null && !columns.contains(field))
@@ -181,5 +188,47 @@ final class KpiRoutes implements RouteModule {
             throw new IllegalArgumentException("kpi timeField '" + kpi.timeField() + "' is " + type
                     + "; a period can only be cut on a DATE, TIMESTAMP or TIMESTAMPTZ column");
         return kpi;
+    }
+    /**
+     * A Space Template's KPI pack ({@code ASSURE-KPI-DEFINITIONS-RESIDUALS-1} (1)): every {@code kpi} the template
+     * seeds into the new Space at {@code spaceBase} meets the {@code /components/kpi} door — its capability,
+     * {@code canAuthorWorkbench} (asked only when {@code checkCapability}: the zero-Space recovery create asks
+     * none), and {@link #requireMeasure} against the new Space's own registry and data, so the template's Datasets
+     * (copied with it) are the ones a KPI must find. Run by {@code SpaceManager.createFromTemplate} after the copy and
+     * before boot; the first refusal refuses the whole template (403 / 422) and the Space is not created. A
+     * {@code .toon} under {@code kpis/} the registry cannot read is refused too — never seeded unchecked.
+     */
+    static void requireTemplateKpis(HttpExchange ex, Path spaceBase, boolean checkCapability) {
+        Path config = spaceBase.resolve("config");
+        Path dir = config.resolve("registry").resolve(ComponentRegistry.dirForType(TYPE).orElseThrow());
+        if (!java.nio.file.Files.isDirectory(dir)) return;
+        List<Path> files;
+        try (java.util.stream.Stream<Path> s = java.nio.file.Files.list(dir)) {
+            files = s.filter(p -> p.getFileName().toString().endsWith(".toon")).sorted().toList();
+        } catch (IOException e) {
+            throw new java.io.UncheckedIOException(e);
+        }
+        if (files.isEmpty()) return;
+        if (checkCapability) {
+            try {
+                ApiContext.requireCapability(ex, Roles.CAN_AUTHOR_WORKBENCH);
+            } catch (ApiException denied) {
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "a template carrying a 'kpi' item needs "
+                        + "capability '" + Roles.CAN_AUTHOR_WORKBENCH + "' — the same gate as /components/kpi; nothing was created");
+            }
+        }
+        List<ComponentRegistry.Component> kpis = new ComponentStore(config.resolve("registry")).list(TYPE);
+        Path data = spaceBase.resolve("data");
+        for (Path file : files) {
+            ComponentRegistry.Component k = kpis.stream().filter(c -> file.equals(c.path())).findFirst()
+                    .orElseThrow(() -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template kpi file '"
+                            + file.getFileName() + "' is unreadable; nothing was created"));
+            try {
+                requireMeasure(ex, config, () -> data, k.name(), k.content());
+            } catch (IllegalArgumentException bad) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template kpi '" + k.name()
+                        + "' is refused: " + bad.getMessage() + "; nothing was created");
+            }
+        }
     }
 }
