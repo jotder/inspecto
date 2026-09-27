@@ -503,8 +503,8 @@ public final class PendingChanges {
      * Run {@code action} holding the Space's Pending Change store EXCLUSIVELY — across threads AND across
      * processes (`ASSURE-MAKER-CHECKER-MULTIPOD-1`): the JVM monitor first (an OS file lock is per-process, and a
      * second channel in the same JVM would throw {@code OverlappingFileLockException}), then an OS-level
-     * {@code FileChannel.lock()} on {@code pending-changes/.lock}, which a second Pod sharing the Space's
-     * directory blocks on. A read-check-write inside it is a compare-and-set: the loser re-reads the record the
+     * {@code FileChannel.tryLock()} (bounded wait, see {@link #acquire}) on {@code pending-changes/.lock}, which a second Pod sharing the Space's
+     * directory waits on. A read-check-write inside it is a compare-and-set: the loser re-reads the record the
      * winner saved (atomic temp + {@code ATOMIC_MOVE}, {@link AtomicFiles}). With no store directory yet there is
      * no record to race over, so only the monitor is taken (a read never creates the directory).
      */
@@ -513,8 +513,39 @@ public final class PendingChanges {
             Path d = dir(root);
             if (!Files.isDirectory(d)) return action.run();
             try (FileChannel ch = FileChannel.open(d.resolve(LOCK_FILE), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
-                 FileLock ignored = ch.lock()) {
+                 FileLock ignored = acquire(ch)) {
                 return action.run();
+            }
+        }
+    }
+
+    /** Bound on waiting for the store's file lock (ms); {@code -Dinspecto.pendingChanges.lockWaitMs} overrides. */
+    static final String PROP_LOCK_WAIT_MS = "inspecto.pendingChanges.lockWaitMs";
+    private static final long LOCK_POLL_MS = 25;
+
+    /**
+     * {@code tryLock} polled up to {@link #PROP_LOCK_WAIT_MS} (default 5 s) — a Pod that dies or stalls holding the
+     * lock must not hang every other Pod's request thread forever. On timeout: 503 {@code STORE_BUSY}, retryable.
+     * An {@code OverlappingFileLockException} (this JVM holds it outside the monitor) counts as busy too.
+     */
+    private static FileLock acquire(FileChannel ch) throws IOException {
+        long waitMs = Math.max(0L, Long.getLong(PROP_LOCK_WAIT_MS, 5000L));
+        long deadline = System.nanoTime() + waitMs * 1_000_000L;
+        while (true) {
+            try {
+                FileLock l = ch.tryLock();
+                if (l != null) return l;
+            } catch (java.nio.channels.OverlappingFileLockException busy) {
+                // held elsewhere in this JVM — treat like another process holding it
+            }
+            if (System.nanoTime() >= deadline)
+                throw new ApiException(503, ErrorCodes.STORE_BUSY, "the Pending Change store is locked by another "
+                        + "request or Pod and did not free up within " + waitMs + " ms — retry");
+            try {
+                Thread.sleep(LOCK_POLL_MS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException("interrupted waiting for the Pending Change store lock", e);
             }
         }
     }

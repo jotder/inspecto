@@ -750,8 +750,10 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
 - **Deciding is a cross-process compare-and-set** (`ASSURE-MAKER-CHECKER-MULTIPOD-1`, 2026-09-27). Every
   read-check-write on the Pending Change store — propose (the one-pending-per-target check), list/read (expiry),
   approve, decline — runs under `PendingChanges.underStoreLock`: the JVM monitor, then an OS-level
-  `FileChannel.lock()` on `<write-root>/pending-changes/.lock`, so two Pods sharing a Space's directory
-  serialise. Deciding re-reads the record under the lock and moves `status` off `pending` only if it is still
+  `FileChannel.tryLock()` on `<write-root>/pending-changes/.lock`, so two Pods sharing a Space's directory
+  serialise. The file-lock wait is BOUNDED (default 5000 ms, `-Dinspecto.pendingChanges.lockWaitMs`): a Pod
+  that stalls holding it yields 503 `STORE_BUSY` (retryable) on the others, never a hung request thread
+  (`PendingChangesLockTimeoutTest`). Deciding re-reads the record under the lock and moves `status` off `pending` only if it is still
   `pending`; the APPLY (the replay) runs inside the same lock, so a loser can never apply. The loser gets 409
   `pending change '<id>' is already approved (decided by <who> at <when>)`. Records are saved atomically (temp
   + `ATOMIC_MOVE`). ⚠ There is no OperationalDb-backed Pending Change store, so no conditional-UPDATE variant

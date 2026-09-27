@@ -21,6 +21,8 @@ public final class ErrorCodes {
     public static final String CONTROL_PLANE_READ_ONLY  = "CONTROL_PLANE_READ_ONLY";
     /** 503 — an optional module (e.g. the assist agent) is not on the classpath. */
     public static final String CAPABILITY_UNAVAILABLE   = "CAPABILITY_UNAVAILABLE";
+    /** 503 — a shared store's lock was not acquired within its bounded wait (another request/Pod holds it); retryable. */
+    public static final String STORE_BUSY               = "STORE_BUSY";
     /** 401 — missing/invalid credentials (Standard edition; the security module, W6). */
     public static final String UNAUTHENTICATED          = "UNAUTHENTICATED";
     /** 403 — an authenticated subject lacks the capability a route requires (Standard edition, W6). */
