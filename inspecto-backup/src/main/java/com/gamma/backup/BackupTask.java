@@ -22,7 +22,6 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.Instant;
@@ -367,7 +366,7 @@ final class BackupTask {
             Files.createDirectories(storeDir);
             Path parquet = storeDir.resolve("backup_" + stamp + "_out.parquet");
             com.gamma.util.DuckDbUtil.loadDriver();
-            try (Connection conn = DriverManager.getConnection("jdbc:duckdb:")) {
+            try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)))) {
                 try (Statement st = conn.createStatement()) {
                     st.execute("CREATE TABLE catalog_row (created VARCHAR, archive VARCHAR, archive_sha256 VARCHAR,"
                             + " source VARCHAR, file_count INTEGER, total_bytes BIGINT)");

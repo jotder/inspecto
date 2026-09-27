@@ -17,7 +17,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Instant;
@@ -85,7 +84,7 @@ final class MaterializeTask {
 
         long rows;
         List<ResultSetDescriptor.Column> derived;
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(dataRoot));
              Statement st = conn.createStatement()) {
             st.execute("CREATE VIEW " + q(source) + " AS " + relationSql);
             st.execute("COPY (" + sql + ") TO " + sqlStr(tmp.toString().replace('\\', '/')) + " (FORMAT PARQUET)");

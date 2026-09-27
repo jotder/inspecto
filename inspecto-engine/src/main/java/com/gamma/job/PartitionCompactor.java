@@ -12,7 +12,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.Statement;
 import java.time.Duration;
 import java.time.Instant;
@@ -78,7 +77,8 @@ final class PartitionCompactor {
         Instant cutoff = Instant.now().minus(Duration.ofDays(minAgeDays));
         int dirsCompacted = 0, filesMerged = 0;
         DuckDbUtil.loadDriver();
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        // Spill under the Space data root, not the walked store dir (null ⇒ java.io.tmpdir).
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()));
              Stream<Path> walk = Files.walk(root)) {
             for (Path dir : (Iterable<Path>) walk.filter(Files::isDirectory)::iterator) {
                 heal(dir);

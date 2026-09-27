@@ -14,7 +14,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
@@ -128,7 +127,8 @@ public final class ReferenceCompactor {
         if (dirs.isEmpty()) return Result.NOTHING;
 
         DuckDbUtil.loadDriver();
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:")) {
+        // Spill under the Space data root, not the walked store dir (null ⇒ java.io.tmpdir).
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()))) {
 
             long retained = stageRetained(conn, root, historyDays);
             int dirsCompacted = 0, filesMerged = 0;

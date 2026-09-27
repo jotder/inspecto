@@ -5,7 +5,6 @@ import com.gamma.etl.ExcelExtension;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,7 +59,8 @@ public final class PipelineDocumentXlsx {
     public static void write(PipelineDocumentModel.Doc doc, Path target) throws Exception {
         Path parent = target.toAbsolutePath().getParent();
         Files.createDirectories(parent);
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null);
              Statement st = conn.createStatement()) {
             ExcelExtension.ensureLoaded(conn);
 

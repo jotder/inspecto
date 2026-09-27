@@ -138,6 +138,41 @@ public final class DuckDbUtil {
         return DriverManager.getConnection(jdbcUrl(dbFile));
     }
 
+    /** Hidden spill directory name under a Space's data root; dot-prefixed so dataset scans skip it. */
+    public static final String SPILL_DIR_NAME = ".duckdb_tmp";
+
+    /** {@code <dataRoot>/.duckdb_tmp}, or {@code null} when there is no data root (⇒ {@code java.io.tmpdir}). */
+    public static Path spillDirUnder(Path dataRoot) {
+        return dataRoot == null ? null : dataRoot.resolve(SPILL_DIR_NAME);
+    }
+
+    /**
+     * Open an in-memory {@code jdbc:duckdb:} scratch connection with {@code memory_limit} resolved through
+     * {@link #memoryLimit} and {@code temp_directory} set to {@code spillDir}
+     * (DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1). ⚠ An in-memory database otherwise spills to {@code .tmp}
+     * relative to the CWD, which is why {@link #applyGlobalDuckDbSettings} is not used here.
+     * {@code spillDir == null} ⇒ {@code java.io.tmpdir}. The directory is created up front so DuckDB treats it
+     * as pre-existing and never removes it on close under a concurrent connection sharing it.
+     */
+    public static Connection openInMemory(Path spillDir) throws SQLException {
+        Path dir = spillDir != null ? spillDir : Path.of(System.getProperty("java.io.tmpdir"));
+        try {
+            loadDriver();
+            Files.createDirectories(dir);
+        } catch (IOException | ClassNotFoundException e) {
+            throw new SQLException("cannot open in-memory DuckDB with spill directory " + dir, e);
+        }
+        Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        try {
+            applyDuckDbSettings(conn, memoryLimit(null), dir.toAbsolutePath().toString(),
+                    System.getProperty(PROP_MAX_TEMP_DIRECTORY_SIZE));
+        } catch (SQLException | RuntimeException e) {
+            conn.close();
+            throw e;
+        }
+        return conn;
+    }
+
     /**
      * Cap a worker connection's internal DuckDB parallelism via {@code PRAGMA threads=N}.
      *

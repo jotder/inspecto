@@ -349,7 +349,8 @@ public final class SqlGuard {
 
     private static java.sql.Connection openParser() throws Exception {
         com.gamma.util.DuckDbUtil.loadDriver();
-        var c = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+        // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
+        var c = com.gamma.util.DuckDbUtil.openInMemory(null);
         try {
             SqlSandbox.disableExtensionAutoload(c);
             SqlSandbox.sealAllowing(c, List.of());

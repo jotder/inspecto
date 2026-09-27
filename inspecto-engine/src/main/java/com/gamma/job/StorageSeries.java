@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Duration;
@@ -68,7 +67,8 @@ final class StorageSeries {
         List<long[]> totals = new ArrayList<>();
         List<AxisTrend> axes = new ArrayList<>();
         com.gamma.util.DuckDbUtil.loadDriver();
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        // Spill under the Space data root (null ⇒ java.io.tmpdir).
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()));
              Statement st = conn.createStatement()) {
             try (ResultSet rs = st.executeQuery("SELECT created_ms, CAST(sum(bytes) AS BIGINT) FROM read_parquet("
                     + glob + ") WHERE created_ms >= " + cutoffMs + " GROUP BY created_ms ORDER BY created_ms")) {

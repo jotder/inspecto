@@ -90,7 +90,8 @@ public class SchemaExtractor {
         String[] headers;
         try (BufferedReader br = new BufferedReader(
                 new InputStreamReader(new FileInputStream(inputFile), StandardCharsets.UTF_8));
-             Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
+             Connection conn = DuckDbUtil.openInMemory(null);
              Statement stmt = conn.createStatement()) {
 
             // Skip junk lines that appear before the header

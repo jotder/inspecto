@@ -11,7 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.Statement;
@@ -64,7 +63,8 @@ public final class ExchangeSnapshotWriter {
 
         long rows;
         List<Map<String, Object>> columns;
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null);
              Statement st = conn.createStatement()) {
             st.execute("CREATE VIEW __src AS " + relationSql);
             st.execute("COPY (SELECT * FROM __src) TO " + sqlStr(unix(tmp)) + " (FORMAT PARQUET)");

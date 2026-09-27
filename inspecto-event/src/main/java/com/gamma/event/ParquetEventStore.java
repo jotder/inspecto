@@ -16,7 +16,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -124,7 +123,7 @@ public final class ParquetEventStore implements EventStore {
         try {
             Files.createDirectories(root);
             DuckDbUtil.loadDriver();
-            this.conn = DriverManager.getConnection("jdbc:duckdb:");   // in-memory scratch + reader
+            this.conn = DuckDbUtil.openInMemory(null);   // in-memory scratch + reader; no Space context: capped, spills under java.io.tmpdir
             try (Statement st = conn.createStatement()) {
                 st.execute("CREATE TABLE " + BUF_TABLE + " ("
                         + "event_id VARCHAR, ts_ms BIGINT, type VARCHAR, source VARCHAR, "

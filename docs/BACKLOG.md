@@ -13,8 +13,9 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **48<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 21<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
+> **47<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 20<!--count:backlog-p2--> × P2 · 27<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ⬇ **48 → 47 on 2026-09-27**: closed P2 `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` — every in-memory DuckDB open goes through `DuckDbUtil.openInMemory(spillDir)` (capped `memory_limit`, Space-data-root or `java.io.tmpdir` spill; as-built `okf/backend/engine/duckdb.md`).
 > ↔ **48 on 2026-09-27**: P2 `ASSURE-AUDIT-CHAIN-1` closed (wave 3.3 shipped); residuals re-filed as P3 `ASSURE-AUDIT-CHAIN-RESIDUALS-1`.
 > ↔ **48 on 2026-09-27**: P2 `ASSURE-KPI-DEFINITIONS-1` closed (wave 3.1 shipped); residuals re-filed as P3 `ASSURE-KPI-DEFINITIONS-RESIDUALS-1`.
 > ↔ **48 on 2026-09-27**: P2 `ASSURE-RISK-SCORE-1` closed (wave 3.2 shipped); residuals re-filed as P3 `ASSURE-RISK-SCORE-RESIDUALS-1`.
@@ -51,9 +52,9 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 21<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 20<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 27<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 48<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 47<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -289,7 +290,6 @@ targets and an empty drill table), G8 RBAC R5 evidence and G9 FIPS. Each closes 
 
 ### 3.10 Deployment, Packaging & Scale-out
 
-- **P2** · `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` — **the in-memory DuckDB scratch opens still assume ~80 % of RAM each** (the residual of GAP-4, whose code default shipped 2026-09-26). `DuckDbUtil.memoryLimit` now ends at a code default (`defaultMemoryLimit()`: 40 % of the JVM-visible RAM ÷ 4, floored at 1 GiB; reasoning in `okf/backend/engine/duckdb.md`), applied on the three paths that already resolved a limit — batch ingest, the Pipeline job and enrichment, all file-backed, so spill lands beside the scratch file. **Still uncapped:** the ~15 in-memory `DriverManager.getConnection("jdbc:duckdb:")` opens — the `MaterializeTask` / `PartitionCompactor` / `ReferenceCompactor` / `SqlTemplateJob` / `StorageReportTask` / `StorageSeries` / `ObjectsAnalyticsJob` / `BackupTask` job tasks, `ParquetEventStore`, `ExchangeSnapshotWriter`, `PipelineDocumentXlsx`, `TypeFlow`, `SchemaExtractor`, `SqlGuard` — each still assumes ~80 % of RAM, and the job tasks run inside the Run bound. ⛔ Do not just call `applyGlobalDuckDbSettings` on them: an in-memory database's `temp_directory` is `.tmp` relative to the CWD (probed, DuckDB 1.5.2.1), so a cap without a Space-root spill directory moves spill into the working directory. The fix is a `DuckDbUtil` in-memory opener that takes the Space's temp root. The rest of the deployment-topology gap ledger stays settled: GAP-3 is `DEPLOY-SERVICE-WRAPPER-1`; GAP-5 surge admission shipped as `IntakeGovernor` (its off-by-default cap is the §3.2 intake-cap row — ⛔ do not re-file it here); GAP-6 Vault/KMS is demand-gated — the `SecretsProvider` SPI seam exists, so a provider drops in with no core change; reopen only on a NAMED client policy; GAP-10 was refuted (`package.ps1` stages the whole `docs/` tree; a real bundle diff is confirmatory verification owed, not a defect).
 - **P2** · `DEPLOY-SERVICE-WRAPPER-1` — **the live acceptance is UNRUN.** The wrappers shipped 2026-09-11 (`SCR-3`): a systemd unit plus `install-service.sh`, and `install-service.ps1` (a Windows Scheduled Task at boot as SYSTEM, restart-on-failure; `sc.exe` was refused — `java.exe` never reaches the service dispatcher, error 1053). **This row needs a RUN, not a build:** `kill -9` → back on `/health`, plus the reboot leg, on both platforms; the installers print the exact commands. The hosts exist (confirmed 2026-09-15); access details are owed in §1. ⛔ `SCR-3`'s acceptance stays unmet until both are run. → `okf/capabilities/editions/editions.md` §3.14 · `inspecto/package.ps1`
 - **P2** · **Postgres multi-user** — trigger FIRED 2026-09-15 (a multi-operator install exists) and the §6 park is lifted. P1 (a HikariCP pool behind `JdbcDrivers`) and P2 (`browseConnection()` removed) **already shipped 2026-09-14** (`3844fc0f`, `OPS-03`) — ⛔ do not rebuild a live pool. Remaining: P3 **schema**-per-space URL wiring (⛔ NOT db-per-space); P4 a `CaseStore` interface plus a PG implementation (a JSONL ring today); `PostgresStateStoreTest` over the three uncovered stores plus a concurrency test. Keep events on Parquet. Not the same work as `OperationalDb`/PG-1 (shipped). ⚠ Acceptance needs a Postgres this checkout lacks — `PostgresStateStoreTest` skips here. → `archived-documents/plans-archive/postgres-multi-user-plan.md` §5–6
 - **P2** · `SPACES-FROM-PARTITION-MAP-1` — **answer `/spaces` from the partition map, not a disk scan.** `SpaceRoutes` still answers from `api.spaces().all()` (this Pod's roster) and calls `ApiContext.podScoped(e)`; the remedy is the one the scale-out plan §5.5 sanctions (`partition.toon` already declares every Space and its owner). **Not startable:** it needs ingress path-routing first, and `grep -rn "ingress" inspecto/src/main --include=*.java` is empty — building `/spaces` alone would offer Spaces the UI cannot open. ⛔ Ingress rules must be GENERATED from the map. Once it lands, remove `podScoped: true` from `/spaces` and `/bootstrap`, keeping it only on `GET /system/scheduler`. ⚠ Blocked by construction, so it is a candidate to move to §2. → `superpower/enterprise-scale-out-plan.md` §5.3, §5.5
@@ -495,7 +495,7 @@ someone asks what is still gated.
 | X-Actor full removal (§2) | `okf/backend/editions/auth-security.md` §Still-open · `EDITIONS.md` SEC-11 · `REQUIREMENTS.md` R4. 🔴 The §2 row's stated gate ("the API-v1 sunset") names apparatus **deleted 2026-07-25**, and `api-v1.md` never mentions X-Actor — re-state the gate before working it |
 | Completeness KPI hold (§2) | Completeness KPI K2/K4/K5 (§3) · `archived-documents/plans-archive/completeness-kpi-plan.md` |
 | Compliance program NFR-7 (§2) | SOC 2 Type II window (§2) — the same observation window, twice in one table |
-| Deployment topology live validation (§2) | `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (§3, was *Deployment topology gaps*) · §6 "D1–D8 signed as recommended" — the §3 row's gate is already discharged |
+| Deployment topology live validation (§2) | `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (closed 2026-09-27; was *Deployment topology gaps*) · §6 "D1–D8 signed as recommended" — the §3 row's gate is already discharged |
 | Postgres multi-user — 🔴 §6 park LIFTED 2026-09-15 (trigger fired), now a P2 build row | §3.10 Postgres multi-user row — now a P2 build row (park lifted 2026-09-15) (this row's "contradicts §6 / dead pointer" note was stale by 2026-09-08); `EDITIONS.md` OPS-03 |
 
 ---

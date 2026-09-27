@@ -34,11 +34,18 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   /system/scheduler` serves the computed value with source `default`. ⚠ **Scope: the three paths that already
   resolved a limit** (`ConsignmentIngestStrategy.configure`, `PipelineJobRunner`, `EnrichmentEngine`). All
   three are file-backed scratch databases, so spill lands in `<dbfile>.tmp` beside them — never the CWD.
-  The ~15 in-memory `DriverManager.getConnection("jdbc:duckdb:")` opens (the compaction / materialize /
-  storage / SQL-template job tasks, `ParquetEventStore`, `ObjectsAnalyticsJob`, …) are still uncapped:
-  an in-memory database's `temp_directory` is `.tmp` **relative to the CWD** (probed on 1.5.2.1), so capping
-  one without a Space-root spill directory would move its spill into the working directory. That residual is
-  `BACKLOG.md` `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1`. `SqlSandbox` keeps its own 1GB cap.
+  **In-memory opens capped 2026-09-27 (`DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1`).** Every in-memory
+  `jdbc:duckdb:` open now goes through `DuckDbUtil.openInMemory(spillDir)`: `memory_limit` via
+  `memoryLimit(null)`, `temp_directory` = `spillDir` (created up front so DuckDB never removes it on close),
+  plus the global `max_temp_directory_size` when set. ⛔ Not `applyGlobalDuckDbSettings`: an in-memory
+  database's default `temp_directory` is `.tmp` **relative to the CWD** (probed on 1.5.2.1). Spill choice:
+  callers with a Space data root use `DuckDbUtil.spillDirUnder(root)` = `<data root>/.duckdb_tmp` (dot-prefixed
+  so dataset scans skip it) — `MaterializeTask`, `SqlTemplateJob`, `StorageReportTask`, `BackupTask`,
+  `ConsignmentProcessJobType` (their `dataDir`/`dataRoot`), and `PartitionCompactor`, `ReferenceCompactor`,
+  `StorageSeries`, `ObjectsAnalyticsJob` via `SpaceConfigRoot.currentDataRoot()` (the compactors deliberately
+  NOT under the store dir they walk). No Space context ⇒ `spillDir = null` ⇒ `java.io.tmpdir`:
+  `ParquetEventStore`, `ExchangeSnapshotWriter`, `PipelineDocumentXlsx`, `TypeFlow`, `SchemaExtractor`,
+  `SqlGuard`. Test: `DuckDbSettingsTest.openInMemory*`. `SqlSandbox` keeps its own 1GB cap.
 * **Memory / spill caps (opt-in; one knob for every scratch connection).** `DuckDbUtil.applyDuckDbSettings`
   sets `memory_limit` / `temp_directory` (spill) / `max_temp_directory_size` when a value is configured;
   unset ⇒ DuckDB's own default (≈ 80% RAM **per instance** — the aggregate-overcommit hazard under

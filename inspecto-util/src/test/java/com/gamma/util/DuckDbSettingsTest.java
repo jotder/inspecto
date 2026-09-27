@@ -55,6 +55,33 @@ class DuckDbSettingsTest {
     }
 
     @Test
+    void openInMemoryCapsMemoryAndSpillsToTheGivenDirNotTheCwd(@TempDir Path dir) throws Exception {
+        String prior = System.getProperty(DuckDbUtil.PROP_MEMORY_LIMIT);
+        System.setProperty(DuckDbUtil.PROP_MEMORY_LIMIT, "512MB");
+        Path spill = DuckDbUtil.spillDirUnder(dir);
+        try (Connection conn = DuckDbUtil.openInMemory(spill)) {
+            assertTrue(currentSetting(conn, "memory_limit").contains("MiB"),
+                    "memory_limit should follow DuckDbUtil.memoryLimit, not DuckDB's ~80% default");
+            Path temp = Path.of(currentSetting(conn, "temp_directory")).toAbsolutePath().normalize();
+            assertEquals(spill.toAbsolutePath().normalize(), temp);
+            assertTrue(Files.isDirectory(spill), "spill dir is created up front");
+        } finally {
+            if (prior == null) System.clearProperty(DuckDbUtil.PROP_MEMORY_LIMIT);
+            else System.setProperty(DuckDbUtil.PROP_MEMORY_LIMIT, prior);
+        }
+    }
+
+    @Test
+    void openInMemoryWithoutASpaceSpillsUnderJavaIoTmpdir() throws Exception {
+        try (Connection conn = DuckDbUtil.openInMemory(null)) {
+            Path temp = Path.of(currentSetting(conn, "temp_directory")).toAbsolutePath().normalize();
+            assertEquals(Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize(), temp);
+            assertNotEquals(Path.of(".tmp").toAbsolutePath().normalize(), temp, "never the CWD-relative .tmp");
+            assertFalse(currentSetting(conn, "memory_limit").isBlank());
+        }
+    }
+
+    @Test
     void applyDuckDbSettingsIsNoOpWhenAllNull(@TempDir Path dir) throws Exception {
         DuckDbUtil.loadDriver();
         File db = DuckDbUtil.tempDbFile("duckdb_test_", dir);

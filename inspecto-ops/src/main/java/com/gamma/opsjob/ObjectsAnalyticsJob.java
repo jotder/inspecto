@@ -21,7 +21,6 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.sql.Timestamp;
@@ -267,7 +266,8 @@ public final class ObjectsAnalyticsJob implements Job {
     /** Amounts are {@code DECIMAL(21,6)} — exactly the bounds {@link Impact} admits, so no value is rounded. */
     private static void writeLedger(Path parquet, Instant sampledAt, List<LedgerRow> rows) throws Exception {
         com.gamma.util.DuckDbUtil.loadDriver();
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:")) {
+        // Spill under the Space data root (null ⇒ java.io.tmpdir).
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()))) {
             try (Statement st = conn.createStatement()) {
                 st.execute("CREATE TABLE impact_ledger (sampled_at TIMESTAMP, object_id VARCHAR, object_type VARCHAR, "
                         + "status VARCHAR, disposition VARCHAR, category VARCHAR, created_at TIMESTAMP, "
@@ -311,7 +311,8 @@ public final class ObjectsAnalyticsJob implements Job {
      *  quoting keeps it safe whatever the SQL dialect's reserved-word list does. */
     private static void writeParquet(Path parquet, Instant sampledAt, List<Object[]> rows) throws Exception {
         com.gamma.util.DuckDbUtil.loadDriver();
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:")) {
+        // Spill under the Space data root (null ⇒ java.io.tmpdir).
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(com.gamma.pipeline.SpaceConfigRoot.currentDataRoot()))) {
             try (Statement st = conn.createStatement()) {
                 st.execute("CREATE TABLE analytics_sample (sampled_at TIMESTAMP, object_type VARCHAR, "
                         + "axis VARCHAR, \"key\" VARCHAR, value DOUBLE)");

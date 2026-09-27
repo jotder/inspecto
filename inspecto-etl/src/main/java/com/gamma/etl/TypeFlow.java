@@ -1,7 +1,6 @@
 package com.gamma.etl;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -48,7 +47,8 @@ public final class TypeFlow {
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException("DuckDB JDBC driver not on the classpath", e);
         }
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null);
              Statement st = conn.createStatement()) {
             st.execute(scratchTableDdl(schemaConfig, src, typedSource));
             List<Column> out = new ArrayList<>();
@@ -97,7 +97,8 @@ public final class TypeFlow {
         } catch (ClassNotFoundException e) {
             throw new IllegalStateException("DuckDB JDBC driver not on the classpath", e);
         }
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null);
              Statement st = conn.createStatement()) {
             st.execute(inputScratchTableDdl(inputColumns));
             List<Column> out = new ArrayList<>();

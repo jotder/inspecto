@@ -11,7 +11,6 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.Statement;
 import java.time.Instant;
@@ -121,7 +120,7 @@ final class StorageReportTask {
             Files.createDirectories(storeDir);
             Path parquet = storeDir.resolve("storage_" + now.toEpochMilli() + "_out.parquet");
             com.gamma.util.DuckDbUtil.loadDriver();
-            try (Connection conn = DriverManager.getConnection("jdbc:duckdb:")) {
+            try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)))) {
                 try (Statement st = conn.createStatement()) {
                     st.execute("CREATE TABLE storage_sample (created VARCHAR, created_ms BIGINT, "
                             + "axis VARCHAR, files BIGINT, bytes BIGINT)");

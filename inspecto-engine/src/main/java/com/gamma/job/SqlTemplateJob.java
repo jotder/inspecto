@@ -16,7 +16,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
@@ -102,7 +101,7 @@ final class SqlTemplateJob implements Job {
 
         long rows;
         ResultSetMeta meta;
-        try (Connection conn = DriverManager.getConnection("jdbc:duckdb:");
+        try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)));
              Statement st = conn.createStatement()) {
             // The connection half, behind the lexical guard: nothing auto-installs/-loads, and once the
             // trusted views are registered the connection may reach only the data root — the sources it
