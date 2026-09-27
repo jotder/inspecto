@@ -121,6 +121,13 @@ retried by the Step's own `retry:` policy like any other failure (unlike an Acti
 same failed branch. ⚠ Loopback is never liftable, so a webhook to `localhost` / `127.0.0.1` that worked before is
 now refused — by design.
 
+**The object-store connectors too** (2026-09-27): S3 / GCS / Azure Blob (`AbstractHttpObjectStoreConnector.send`,
+`inspecto-connectors`) apply the same resolve-once → policy (current Space's allowlist) → pinned-connect path over
+their own wire, `PinnedObjectStoreHttp` (any method, the pre-signed headers, streamed bodies both ways — the capped
+JSON `PinnedHttp` cannot carry an object). `Host` = the SigV4-signed value; SNI/certificate use the name; a 3xx is
+never followed; a refusal is an `AcquisitionException` naming `egress refused: …` and dials nothing. Details in
+[connectors](../acquisition/connectors.md).
+
 **The allowlist reader** is `EgressAllowlist` (`inspecto-engine`, `com.gamma.pipeline.exec`): `of(root)` for a
 caller holding the config root (the Action Request routes and dispatcher, via `EgressRoutes`), `forCurrentSpace()`
 (`SpaceConfigRoot.current()`, the Space MDC) for the two webhooks. ⛔ **The read path never seeds**: no root or no
@@ -132,7 +139,8 @@ each Space it boots, `SpaceManager.single` for the default root. A Space with no
 hosts it targets at that moment — each `sink.webhook` Step's Connection host (a flat `webhook: {connection}` block
 or a graph `sink.webhook` node, scanned from the config root's `*.toon`, depth 4, `.history` skipped; the host from
 `<id>_connection.toon`, else `ConnectionRegistry`), each `WEBHOOK` channel's URL host (`registry/channels/`), and
-the host of `-Dnotify.webhook.url` (what the channel actually posts to) — writes `{allow, seededAt}`, logs
+the host of `-Dnotify.webhook.url` (what the channel actually posts to), and every object-store Connection's host
+(any `*_connection.toon` under the root with `connector: s3 | gcs | azure` — a MinIO on a LAN keeps working) — writes `{allow, seededAt}`, logs
 `[EGRESS] seeded …` and emits the audit `egress-allowlist.seeded`. A seed host that can never be allowlisted (a
 loopback literal) is skipped and logged. 🔴 **A Space created through the product** (`SpaceManager.create`,
 `createFromBundle`, `createFromTemplate`) gets an EMPTY `egress.toon` (`{allow: [], createdAt}`) written before it

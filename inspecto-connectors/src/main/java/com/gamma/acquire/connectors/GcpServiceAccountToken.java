@@ -44,7 +44,7 @@ final class GcpServiceAccountToken {
     private final String tokenUri;
     private final String scope;
     private final PrivateKey privateKey;
-    private final HttpClient http;
+    private final Sender http;
 
     private String cachedToken;
     private Instant cachedUntil = Instant.MIN;
@@ -52,9 +52,9 @@ final class GcpServiceAccountToken {
     /**
      * @param serviceAccountJson the resolved service-account key file content (never a {@code ${…}} reference)
      * @param scope              the OAuth scope, or {@code null}/blank for {@link #DEFAULT_SCOPE}
-     * @param http               the shared client used for the token exchange
+     * @param http               the connector's egress-checked send, used for the token exchange
      */
-    GcpServiceAccountToken(String serviceAccountJson, String scope, HttpClient http) {
+    GcpServiceAccountToken(String serviceAccountJson, String scope, Sender http) {
         JsonObject sa;
         try {
             sa = JsonParser.parseString(serviceAccountJson).getAsJsonObject();
@@ -67,6 +67,12 @@ final class GcpServiceAccountToken {
         this.scope = scope == null || scope.isBlank() ? DEFAULT_SCOPE : scope;
         this.privateKey = parsePkcs8Pem(requireField(sa, "private_key"));
         this.http = http;
+    }
+
+    /** One request/response, the body read whole — the connector's egress-checked {@code sendReadingBody}. */
+    @FunctionalInterface
+    interface Sender {
+        HttpResponse<byte[]> send(HttpRequest req) throws IOException, InterruptedException;
     }
 
     /** A valid bearer token, minted on first use and re-minted only once it is within 60s of expiry. */
@@ -90,25 +96,26 @@ final class GcpServiceAccountToken {
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .POST(HttpRequest.BodyPublishers.ofString(form, StandardCharsets.UTF_8))
                 .build();
-        HttpResponse<String> resp;
+        HttpResponse<byte[]> raw;
         try {
-            resp = http.send(req, HttpResponse.BodyHandlers.ofString());
+            raw = http.send(req);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("gcs token exchange interrupted", e);
         }
-        if (resp.statusCode() / 100 != 2)
-            throw new IOException("gcs token exchange failed for " + clientEmail + ": HTTP " + resp.statusCode()
-                    + errorDetail(resp.body()));
+        if (raw.statusCode() / 100 != 2)
+            throw new IOException("gcs token exchange failed for " + clientEmail + ": HTTP " + raw.statusCode()
+                    + errorDetail(new String(raw.body(), StandardCharsets.UTF_8)));
+        String body = new String(raw.body(), StandardCharsets.UTF_8);
 
         JsonObject tok;
         try {
-            tok = JsonParser.parseString(resp.body()).getAsJsonObject();
+            tok = JsonParser.parseString(body).getAsJsonObject();
         } catch (RuntimeException e) {
             throw new IOException("gcs token response is not valid JSON", e);
         }
         if (!tok.has("access_token"))
-            throw new IOException("gcs token response has no access_token" + errorDetail(resp.body()));
+            throw new IOException("gcs token response has no access_token" + errorDetail(body));
         String token = tok.get("access_token").getAsString();
         long expiresIn = tok.has("expires_in") ? tok.get("expires_in").getAsLong() : 3600L;
         cachedToken = token;

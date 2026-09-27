@@ -45,6 +45,7 @@ class AzureBlobConnectorTest {
 
     @BeforeEach
     void start() throws IOException {
+        ObjectStoreEgressFixture.allowLoopbackStubAsLan();
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", this::handle);
         server.start();
@@ -56,6 +57,7 @@ class AzureBlobConnectorTest {
 
     @AfterEach
     void stop() throws Exception {
+        ObjectStoreEgressFixture.reset();
         connector.close();
         server.stop(0);
     }

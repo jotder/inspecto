@@ -37,7 +37,8 @@ import java.util.stream.Stream;
  * Before this, the two webhooks dialled any address, so a Space may already send to private hosts with no entry.
  * At service start ({@link #migrate}) a Space that has no {@code egress.toon} is seeded from the hosts it already targets —
  * every {@code sink.webhook} Step's Connection host, every {@code WEBHOOK} channel's URL host, and the host of
- * {@code -Dnotify.webhook.url} (the URL the webhook channel actually posts to) — persists it with a
+ * {@code -Dnotify.webhook.url} (the URL the webhook channel actually posts to), and every object-store Connection's
+ * host ({@code *_connection.toon} with {@code connector: s3 | gcs | azure} — a MinIO on a LAN) — persists it with a
  * {@code seededAt} stamp, logs it and emits an {@code egress-allowlist.seeded} audit event. A Space created through the product gets an EMPTY file ({@link #recordEmpty}) and the read path never seeds. Once the file exists it
  * is never seeded again, so a later PUT that removes a seeded entry sticks. A seeded host that can never be
  * allowlisted (a loopback or link-local literal) is skipped and logged. Hosts only: a host entry lifts only the
@@ -51,6 +52,8 @@ public final class EgressAllowlist {
     public static final String FILE = "egress.toon";
     /** The Step type and the channel kind whose targets seed an allowlist. */
     static final String WEBHOOK_STEP = "sink.webhook";
+    /** The Connection connectors that dial their host through the egress policy ({@code AbstractHttpObjectStoreConnector}). */
+    static final Set<String> OBJECT_STORE_CONNECTORS = Set.of("s3", "gcs", "azure");
     private static final int MAX_SCAN_DEPTH = 4;
     private static final long MAX_SCAN_BYTES = 1L << 20;
 
@@ -126,10 +129,10 @@ public final class EgressAllowlist {
                         + "(deny) until an administrator writes it with PUT /settings/egress", f, e.getMessage());
                 return;
             }
-            log.info("[EGRESS] seeded the egress allowlist {} from this Space's current webhook targets: {}", f, hosts);
+            log.info("[EGRESS] seeded the egress allowlist {} from this Space's current outbound targets: {}", f, hosts);
             try {
                 EventLog.current().emit(Event.builder(EventType.AUDIT).source("audit")
-                        .message("the egress allowlist was seeded from the Space's webhook targets: " + hosts)
+                        .message("the egress allowlist was seeded from the Space's outbound targets: " + hosts)
                         .actor("system").actorType("system")
                         .action("egress-allowlist.seeded").actionCategory("configuration")
                         .attr("after", String.join(",", hosts)));
@@ -155,9 +158,10 @@ public final class EgressAllowlist {
     }
 
     /**
-     * The hosts this Space's webhooks target today: {@code sink.webhook} Step Connections (a flat
+     * The hosts this Space's outbound callers target today: {@code sink.webhook} Step Connections (a flat
      * {@code webhook: {connection}} block or a graph {@code sink.webhook} node), {@code WEBHOOK} channels in
-     * {@code registry/channels/}, and {@code -Dnotify.webhook.url}. Lower-cased, de-duplicated, in discovery order.
+     * {@code registry/channels/}, {@code -Dnotify.webhook.url}, and the host of every object-store Connection file
+     * under the root ({@link #OBJECT_STORE_CONNECTORS}). Lower-cased, de-duplicated, in discovery order.
      */
     static Set<String> currentTargetHosts(Path root) {
         Set<String> connections = new LinkedHashSet<>();
@@ -166,9 +170,13 @@ public final class EgressAllowlist {
             try (Stream<Path> s = Files.walk(root, MAX_SCAN_DEPTH)) {
                 for (Path p : (Iterable<Path>) s::iterator) {
                     String n = p.getFileName().toString();
-                    if (!n.endsWith(".toon") || n.endsWith("_connection.toon") || n.equals(FILE)) continue;
+                    if (!n.endsWith(".toon") || n.equals(FILE)) continue;
                     if (!Files.isRegularFile(p) || Files.size(p) > MAX_SCAN_BYTES) continue;
                     if (root.relativize(p).toString().contains(".history")) continue;
+                    if (n.endsWith("_connection.toon")) {
+                        objectStoreHost(p, hosts);
+                        continue;
+                    }
                     Map<String, Object> doc;
                     try {
                         doc = ToonHelper.load(p.toString());
@@ -200,6 +208,17 @@ public final class EgressAllowlist {
                 if (o instanceof Map<?, ?> node && WEBHOOK_STEP.equals(node.get("type"))
                         && node.get("config") instanceof Map<?, ?> c && c.get("connection") != null)
                     out.add(String.valueOf(c.get("connection")).trim());
+    }
+
+    private static void objectStoreHost(Path connectionFile, Set<String> out) {
+        try {
+            ConnectionProfile p = ConnectionProfile.load(connectionFile);
+            if (p.connector() != null && OBJECT_STORE_CONNECTORS.contains(p.connector().trim().toLowerCase(Locale.ROOT))
+                    && p.host() != null && !p.host().isBlank())
+                out.add(p.host().trim().toLowerCase(Locale.ROOT));
+        } catch (Exception unreadable) {
+            // not a loadable Connection — nothing to seed
+        }
     }
 
     private static void channelHost(Map<String, Object> doc, Set<String> out) {

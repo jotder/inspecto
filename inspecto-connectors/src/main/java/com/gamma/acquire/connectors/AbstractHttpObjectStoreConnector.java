@@ -1,15 +1,20 @@
 package com.gamma.acquire.connectors;
 
 import com.gamma.acquire.AcquisitionException;
+import com.gamma.pipeline.exec.EgressAllowlist;
+import com.gamma.pipeline.exec.EgressPolicy;
 
+import javax.net.ssl.SSLSocketFactory;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.InetAddress;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 /**
  * The HTTP plumbing shared by the three object-store connectors — {@link S3Connector},
@@ -30,6 +35,15 @@ import java.util.Map;
  *       breaks cancellation of a long fetch — precisely the kind of detail a fourth copy would drop.</li>
  * </ul>
  *
+ * <p><b>Egress policy</b> ({@code OBJECT-STORE-EGRESS-POLICY}, 2026-09-27): every request goes through {@link #send},
+ * the same rule as Action Requests and both webhooks — the Connection host must pass {@link EgressPolicy#checkHost};
+ * it is resolved ONCE per request and EVERY address is checked against the deny-by-default policy less the current
+ * Space's allowlist ({@link EgressAllowlist#forCurrentSpace()}); the signed request is then sent by
+ * {@link PinnedObjectStoreHttp} to the CHECKED address, with the name kept for {@code Host} (the signed value), SNI
+ * and certificate verification. A refusal dials nothing. <b>Redirects are never followed</b>: S3's 301/307 region
+ * redirects name a different host, which a SigV4 signature (it covers {@code host}) would not survive anyway, and
+ * GCS / Azure do not redirect these APIs — so a 3xx is an ordinary non-2xx failure, never a second, unchecked dial.
+ *
  * <p>⚠ The XML helpers ({@code parseXml}/{@code text}/{@code unquote}/{@code escapeXml}) stay duplicated
  * in {@link S3Connector} and {@link AzureBlobConnector} on purpose: GCS speaks JSON, so they are shared
  * by two of three, not three of three, and they belong to the wire FORMAT rather than to this transport.
@@ -42,13 +56,48 @@ abstract class AbstractHttpObjectStoreConnector {
     /** {@code scheme://host[:port]}, no path. */
     protected final URI endpoint;
 
-    /** One redirect-following client per connector — the build is identical for all three providers. */
-    protected final HttpClient http;
+    /** Name → addresses; a test swaps it. */
+    static volatile EgressPolicy.Resolver resolver = EgressPolicy.SYSTEM;
+    /** The allowlist in force; the current Space's in production. */
+    static volatile Supplier<EgressPolicy.Allowlist> allowlist = EgressAllowlist::forCurrentSpace;
+    /**
+     * Test seam ONLY: the address actually dialled for a checked one — identity in production. A test gives a name
+     * a private address (loopback is never allowlistable) and maps that address to its in-process server.
+     */
+    static volatile UnaryOperator<InetAddress> dial = UnaryOperator.identity();
+    /** The TLS socket factory; the platform default in production, a test trusts its own certificate. */
+    static volatile Supplier<SSLSocketFactory> tls = () -> (SSLSocketFactory) SSLSocketFactory.getDefault();
 
     protected AbstractHttpObjectStoreConnector(String provider, URI endpoint) {
         this.provider = provider;
         this.endpoint = endpoint;
-        this.http = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build();
+    }
+
+    /**
+     * Send one built request under the egress policy (see the class doc) and return its response with the body
+     * as a stream over the connection — the caller closes it. A refusal is an {@link IOException} naming why.
+     */
+    protected HttpResponse<InputStream> send(HttpRequest req) throws IOException, InterruptedException {
+        String host = req.uri().getHost();
+        if (host == null || req.uri().getUserInfo() != null)
+            throw new IOException("egress refused: '" + req.uri() + "' has no plain host");
+        String bare = host.startsWith("[") && host.endsWith("]") ? host.substring(1, host.length() - 1) : host;
+        InetAddress to;
+        try {
+            EgressPolicy.checkHost(bare);
+            to = EgressPolicy.resolve(bare, allowlist.get(), resolver);
+        } catch (IllegalArgumentException | EgressPolicy.Refused refused) {
+            throw new IOException("egress refused: " + refused.getMessage(), refused);
+        }
+        return PinnedObjectStoreHttp.send(tls.get(), req, dial.apply(to));
+    }
+
+    /** {@link #send} with the (small) body read whole and the connection closed. */
+    protected HttpResponse<byte[]> sendReadingBody(HttpRequest req) throws IOException, InterruptedException {
+        HttpResponse<InputStream> resp = send(req);
+        try (InputStream in = resp.body()) {
+            return PinnedObjectStoreHttp.withBody(resp, in.readAllBytes());
+        }
     }
 
     /**
@@ -63,8 +112,7 @@ abstract class AbstractHttpObjectStoreConnector {
                                            Map<String, String> headers, byte[] body, String what)
             throws AcquisitionException {
         try {
-            HttpResponse<byte[]> resp = http.send(request(method, path, query, headers, body),
-                    HttpResponse.BodyHandlers.ofByteArray());
+            HttpResponse<byte[]> resp = sendReadingBody(request(method, path, query, headers, body));
             if (resp.statusCode() / 100 != 2)
                 throw new AcquisitionException(provider + " " + what + " failed: HTTP " + resp.statusCode()
                         + errorDetail(resp.body()));
@@ -81,8 +129,7 @@ abstract class AbstractHttpObjectStoreConnector {
                                                          Map<String, String> headers, String what)
             throws AcquisitionException {
         try {
-            HttpResponse<InputStream> resp = http.send(request("GET", path, query, headers, null),
-                    HttpResponse.BodyHandlers.ofInputStream());
+            HttpResponse<InputStream> resp = send(request("GET", path, query, headers, null));
             if (resp.statusCode() / 100 != 2) {
                 byte[] err;
                 try (InputStream in = resp.body()) { err = in.readNBytes(2048); }

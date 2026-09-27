@@ -243,9 +243,8 @@ public final class S3Connector extends AbstractHttpObjectStoreConnector implemen
     @Override
     public Optional<RemoteFile> stat(String key) throws AcquisitionException {
         try {
-            HttpResponse<Void> resp = http.send(signed("HEAD", exportPath(key), Map.of(), Map.of(),
-                    AwsSigV4.EMPTY_PAYLOAD_SHA256, HttpRequest.BodyPublishers.noBody()),
-                    HttpResponse.BodyHandlers.discarding());
+            HttpResponse<byte[]> resp = sendReadingBody(signed("HEAD", exportPath(key), Map.of(), Map.of(),
+                    AwsSigV4.EMPTY_PAYLOAD_SHA256, HttpRequest.BodyPublishers.noBody()));
             if (resp.statusCode() == 404) return Optional.empty();
             if (resp.statusCode() / 100 != 2)
                 throw new AcquisitionException("S3 stat " + key + " failed: HTTP " + resp.statusCode());
@@ -268,7 +267,7 @@ public final class S3Connector extends AbstractHttpObjectStoreConnector implemen
             HttpRequest req = signed("PUT", exportPath(key), Map.of(),
                     Map.of("Content-MD5", java.util.Base64.getEncoder().encodeToString(java.util.HexFormat.of().parseHex(md5Hex))),
                     sha256Hex, HttpRequest.BodyPublishers.ofFile(file));
-            HttpResponse<byte[]> resp = http.send(req, HttpResponse.BodyHandlers.ofByteArray());
+            HttpResponse<byte[]> resp = sendReadingBody(req);
             if (resp.statusCode() / 100 != 2)
                 throw new AcquisitionException("S3 put " + key + " failed: HTTP " + resp.statusCode() + errorDetail(resp.body()));
         } catch (IOException | InterruptedException e) {

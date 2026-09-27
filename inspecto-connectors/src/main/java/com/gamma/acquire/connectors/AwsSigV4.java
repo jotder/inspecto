@@ -98,7 +98,7 @@ final class AwsSigV4 {
     }
 
     /** The Host header value: no port when it is the scheme default, else {@code host:port}. */
-    private static String hostHeader(URI uri) {
+    static String hostHeader(URI uri) {
         int port = uri.getPort();
         boolean defaultPort = port == -1
                 || ("https".equalsIgnoreCase(uri.getScheme()) && port == 443)

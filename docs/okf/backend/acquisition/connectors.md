@@ -68,7 +68,7 @@ The ordering is land-then-ack: a source-side `post` action that deletes the remo
 ### Object storage — deliberately SDK-free (ACQ-4)
 
 All three object-storage connectors hand-roll their cloud's auth on plain JDK crypto (`javax.crypto.Mac`,
-`MessageDigest`, `java.security.Signature`) and talk raw REST over `java.net.http.HttpClient` — **no cloud SDK
+`MessageDigest`, `java.security.Signature`) and talk raw REST (requests built as `java.net.http.HttpRequest`) — **no cloud SDK
 jar anywhere**, keeping the module's SBOM small and the build air-gappable. Each maps a `*_connection.toon`
 profile the same way: `base_path` = `bucket-or-container[/prefix]`; `password` = a `SecretResolver` reference
 resolved per use, never logged; `host`/`port`/`options.protocol` override the endpoint (for MinIO/Azurite/tests).
@@ -93,6 +93,22 @@ a listed object is atomic ⇒ `readiness` is always `READY`.
   parsed with gson — a **declared compile dependency** of this module (version parent-managed). It was already on the classpath transitively, so declaring it adds no new fat-JAR jar. The
   **"offline-blocked (no SDK jars)" label ACQ-4 carried for GCS-native was stale**: OAuth2 JWT signing is the
   same category of hand-rollable JDK crypto as SigV4/SharedKey, needs no SDK.
+
+**Egress policy (2026-09-27).** All three dial through `AbstractHttpObjectStoreConnector.send`, the same rule as
+Action Requests and the webhooks ([egress policy](../control-plane/action-requests.md#the-egress-policy)): host
+syntax → resolve ONCE per request → every address checked against deny-by-default less the current Space's
+allowlist (`EgressAllowlist.forCurrentSpace()`) → `PinnedObjectStoreHttp` sends the already-signed request to the
+CHECKED address. The JDK `HttpClient` is gone from these connectors. The `Host` header is `AwsSigV4.hostHeader(uri)`
+— the value SigV4 signed; SNI and certificate verification use the Connection's host name. Request bodies stream
+from the request's `BodyPublisher` (a file PUT is not buffered); response bodies stream off the socket
+(`Content-Length`, chunked, or to EOF) and closing the stream closes the connection. **Redirects are never
+followed** (previously `Redirect.NORMAL`): S3's region redirects name another host, which a SigV4 signature over
+`host` would not survive, and GCS/Azure do not redirect these APIs — a 3xx is a plain non-2xx failure. The GCS
+token exchange at the SA's `token_uri` goes through the same `send`. ⚠ A MinIO/Azurite on a private LAN needs its
+host (or range) in the Space allowlist — the boot migration seeds every `s3`/`gcs`/`azure` Connection host; a
+Connection added later needs `PUT /settings/egress`. Loopback is never liftable, so an object store on
+`localhost`/`127.0.0.1` is refused by design. Tests: `ObjectStoreEgressTest` (+ `ObjectStoreEgressFixture`, which
+the stub-server tests use to present `127.0.0.1` as an allowlisted LAN address).
 
 ## Profiles, secrets, registry
 

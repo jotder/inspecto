@@ -63,6 +63,7 @@ class ObjectStoreExportJobTest {
 
     @BeforeEach
     void start() throws IOException {
+        ObjectStoreEgressFixture.allowLoopbackStubAsLan();
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", this::handle);
         server.start();
@@ -77,6 +78,7 @@ class ObjectStoreExportJobTest {
 
     @AfterEach
     void stop() {
+        ObjectStoreEgressFixture.reset();
         ConnectionRegistry.remove("lake");
         server.stop(0);
     }

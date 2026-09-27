@@ -37,6 +37,7 @@ class AzureBlobConnectionWorkbenchTest {
 
     @BeforeEach
     void start() throws IOException {
+        ObjectStoreEgressFixture.allowLoopbackStubAsLan();
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", this::handle);
         server.start();
@@ -48,6 +49,7 @@ class AzureBlobConnectionWorkbenchTest {
 
     @AfterEach
     void stop() {
+        ObjectStoreEgressFixture.reset();
         server.stop(0);
     }
 

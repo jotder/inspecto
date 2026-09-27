@@ -104,6 +104,25 @@ class EgressAllowlistTest {
         assertFalse(Files.exists(root.resolve(EgressAllowlist.FILE)));
     }
 
+    /** Object-store Connections dial their host through the policy too, so a MinIO on a LAN is seeded at boot. */
+    @Test
+    void theBootMigrationAlsoSeedsEveryObjectStoreConnectionHost() throws Exception {
+        write("minio_connection.toon", Map.of("connection", Map.of("id", "minio", "connector", "s3", "host", "MinIO.lan")));
+        write("conns/blob_connection.toon", Map.of("connection", Map.of("id", "blob", "connector", "azure", "host", "10.30.0.7")));
+        write("gcs_connection.toon", Map.of("connection", Map.of("id", "gcs", "connector", "gcs", "host", "gcs.lan")));
+        write("db_connection.toon", Map.of("connection", Map.of("id", "db", "connector", "postgres", "host", "db.lan")));
+        EgressAllowlist.migrate(root);
+        assertEquals(java.util.Set.of("minio.lan", "10.30.0.7", "gcs.lan"), java.util.Set.copyOf(EgressAllowlist.entries(root)),
+                "every s3/gcs/azure Connection host is seeded; a non-object-store Connection is not a target");
+    }
+
+    @Test
+    void theReadPathNeverSeedsObjectStoreHostsEither() throws Exception {
+        write("minio_connection.toon", Map.of("connection", Map.of("id", "minio", "connector", "s3", "host", "minio.lan")));
+        assertEquals(List.of(), EgressAllowlist.entries(root));
+        assertFalse(Files.exists(root.resolve(EgressAllowlist.FILE)));
+    }
+
     /** A Space created through the product is recorded EMPTY, so a later boot never seeds it. */
     @Test
     void aSpaceRecordedEmptyAtCreateIsNeverSeeded() throws Exception {

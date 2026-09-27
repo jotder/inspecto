@@ -47,6 +47,7 @@ class GcsConnectorTest {
 
     @BeforeEach
     void start() throws Exception {
+        ObjectStoreEgressFixture.allowLoopbackStubAsLan();
         server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/", this::handle);
         server.start();
@@ -59,6 +60,7 @@ class GcsConnectorTest {
 
     @AfterEach
     void stop() throws Exception {
+        ObjectStoreEgressFixture.reset();
         connector.close();
         server.stop(0);
     }

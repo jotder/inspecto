@@ -76,7 +76,7 @@ public final class GcsConnector extends AbstractHttpObjectStoreConnector impleme
         if (saJson == null || saJson.isBlank())
             throw new IllegalArgumentException("gcs connection '" + profile.id() + "' needs password = the"
                     + " service-account key file content (e.g. ${FILE:/secure/gcs-sa.json})");
-        this.token = new GcpServiceAccountToken(saJson, profile.options().get("scope"), http);
+        this.token = new GcpServiceAccountToken(saJson, profile.options().get("scope"), this::sendReadingBody);
     }
 
     /** Endpoint override for tests / private deployments; default is public GCS. */
