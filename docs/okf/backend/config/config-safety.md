@@ -852,8 +852,9 @@ route that reaches neither `hold` nor `holdRefusing` unless it is on `NO_HOLD` w
 real HTTP, with an armed Authenticator, by `ControlApiPendingChangesTest`.
 
 ⚠ Known limits: the guard's closure stops at the file boundary (a write in another class is invisible);
-`channel` / `notification-rule` / `job` are not governable yet; an author cannot withdraw their own change
-(four-eyes forbids self-decline, as in Link Analysis) — it is declined by someone else or expires.
+`channel` / `notification-rule` / `job` are not governable yet. (Four-eyes still forbids self-decline, as in
+Link Analysis; since 2026-09-28 the author instead WITHDRAWS their own change — `POST /pending-changes/{id}/withdraw`,
+status `withdrawn`, author-only, see [auth-security](../editions/auth-security.md).)
 
 **The inbox (UI)** — `/pending-changes` (`modules/admin/pending-changes/`, nav *Operations ▸ Pending
 Changes*, beside the agent *Approvals Inbox*, which is untouched): the waiting (or all) changes in a
@@ -861,3 +862,5 @@ data-table; selecting one shows author, reason, expiry, decision and the diff th
 `<inspecto-line-diff>` (extracted from the Pipeline config-history dialog, which now uses it too). Approve /
 Decline, with an optional reason, show only with `LensService.canApproveChanges` (action node
 `changes.approve`); a server refusal — four-eyes, a stale base, the route's own 403/422 — is shown in place.
+**Withdraw** shows only to the change's author (`SessionService.actor` equals `author`) while it waits,
+behind `confirmDestructive`; a refusal toasts the server's message.

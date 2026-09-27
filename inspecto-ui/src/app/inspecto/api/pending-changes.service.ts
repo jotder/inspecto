@@ -5,7 +5,7 @@ import { LineDiff } from '../components/line-diff.component';
 import { apiUrl, toParams } from './api-base';
 
 /** Where a Pending Change is in its life (`ASSURE-MAKER-CHECKER-1`). */
-export type PendingChangeStatus = 'pending' | 'approved' | 'declined' | 'expired' | 'stale';
+export type PendingChangeStatus = 'pending' | 'approved' | 'declined' | 'withdrawn' | 'expired' | 'stale';
 
 /**
  * A **Pending Change** — a human config change a Space's Approval Policy held for approval instead of writing
@@ -70,7 +70,7 @@ export interface ApprovalPolicy {
 
 /**
  * The Pending Change inbox (`ASSURE-MAKER-CHECKER-1`): list, read and diff held config changes, approve or
- * decline one. Approve applies the change through the route it was proposed through, as the approver.
+ * decline one, or withdraw your own. Approve applies the change through the route it was proposed through, as the approver.
  * ⚠ Not the agent approvals inbox ({@link ApprovalsService}) — that one governs what the assistant may do.
  */
 @Injectable({ providedIn: 'root' })
@@ -102,6 +102,14 @@ export class PendingChangesService {
     decline(id: string, reason?: string): Observable<PendingChangeDecision> {
         return this.http.post<PendingChangeDecision>(
             apiUrl(`/pending-changes/${encodeURIComponent(id)}/decline`),
+            reason ? { reason } : {},
+        );
+    }
+
+    /** The AUTHOR takes back their own still-pending change (the server refuses anyone else, 403). */
+    withdraw(id: string, reason?: string): Observable<PendingChangeDecision> {
+        return this.http.post<PendingChangeDecision>(
+            apiUrl(`/pending-changes/${encodeURIComponent(id)}/withdraw`),
             reason ? { reason } : {},
         );
     }

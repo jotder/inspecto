@@ -25,6 +25,7 @@ import java.util.Optional;
  *   GET  /pending-changes/{id}/diff            a line diff of the two (the Pipeline history diff)
  *   POST /pending-changes/{id}/approve         apply it through the route it was proposed through
  *   POST /pending-changes/{id}/decline         close it unapplied
+ *   POST /pending-changes/{id}/withdraw        its AUTHOR takes it back, unapplied (no capability — author-only)
  * </pre>
  *
  * <p><b>Decide gates, in order</b> (the Link Analysis four-eyes pattern, D-U7): {@code canApproveChanges} (the
@@ -33,6 +34,12 @@ import java.util.Optional;
  * {@code approverCapability} 403 → with {@code fourEyes}, the author deciding their own change 403. Approve then
  * replays the original request ({@link ApiContext#replay}); the replay's own refusal comes back as its status
  * — a stale base is 409 and closes the change as {@code stale}, anything else leaves it pending.
+ *
+ * <p><b>Withdraw gates, in order</b> (`ASSURE-MAKER-CHECKER-RESIDUALS-1` (2)): an authenticated Subject 403 (as
+ * decide — without one there is no author to be) → write root 503 → reason 422 → an unsafe id 422 → no such
+ * change 404 → integrity 409 → already decided or expired 409 → the caller is not its author 403. No route
+ * capability: the only person who may withdraw a change is the one who proposed it, so the gate IS the
+ * author check (a {@code self-service} exemption in {@link CapabilityManifest}). Same compare-and-set as decide.
  *
  * <p>⚠ Deliberately apart from {@code /agent/approvals*}, the AI-agent tool-call governance inbox: that one
  * decides whether an assistant may act; this one decides whether a human's config change lands.
@@ -56,6 +63,8 @@ final class PendingChangeRoutes implements RouteModule {
                 (e, m) -> decide(api, e, ApiContext.name(m), true, api.body(e))));
         api.post("/pending-changes/([^/]+)/decline", ApiContext.withCapability("canApproveChanges",
                 (e, m) -> decide(api, e, ApiContext.name(m), false, api.body(e))));
+        // Author-only, so no capability wrap: the handler's author check is the gate (CapabilityManifest EXEMPTIONS).
+        api.post("/pending-changes/([^/]+)/withdraw", (e, m) -> withdraw(api, e, ApiContext.name(m), api.body(e)));
     }
 
     // ── policy ──────────────────────────────────────────────────────────────────────────────────
@@ -273,6 +282,44 @@ final class PendingChangeRoutes implements RouteModule {
             throw new ApiException(status, status == 409 ? ErrorCodes.CONFLICT : errorField(r.body(), "errorCode"),
                     "pending change '" + id + "' was not applied: " + (message == null
                             ? "its route answered " + r.status() + " without reaching the approved write" : message));
+        });
+    }
+
+    /**
+     * The author takes their own still-pending change back: status {@code withdrawn}, terminal, signed and
+     * audited exactly as a decline is. Under the store lock — so a withdraw racing an approve (on this Pod or
+     * another) leaves exactly one outcome, the loser 409.
+     */
+    private Object withdraw(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
+        if (ApiContext.subject(ex).isEmpty())
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "withdrawing a change needs an authenticated "
+                    + "Subject — without one, no caller can be told to be its author");
+        Path root = WriteGates.requireWriteRoot(api, "pending change withdrawal");
+        String reason = ApiContext.str(body, "reason");
+        if (reason != null && reason.length() > PendingChanges.MAX_REASON)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reason' is at most " + PendingChanges.MAX_REASON + " chars");
+        return PendingChanges.underStoreLock(root, () -> {
+            Map<String, Object> rec = PendingChanges.read(root, id);   // 422 on an unsafe id
+            if (rec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no pending change '" + id + "'");
+            if (PendingChanges.invalid(rec))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' fails its integrity check "
+                        + "(its MAC does not verify) — it cannot be withdrawn");
+            PendingChanges.expireIfDue(ex, root, rec);
+            if (!"pending".equals(rec.get("status")))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' is already " + rec.get("status")
+                        + (rec.get("decidedBy") == null ? "" : " (decided by " + rec.get("decidedBy") + " at " + rec.get("decidedAt") + ")"));
+            String by = ApiContext.actor(ex);
+            if (!by.equals(rec.get("author")))
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "only its author '" + rec.get("author")
+                        + "' may withdraw pending change '" + id + "' — an approver declines it instead");
+            rec.put("status", "withdrawn");
+            rec.put("decidedBy", by);
+            rec.put("decidedAt", Instant.now().truncatedTo(ChronoUnit.SECONDS).toString());
+            rec.put("decisionReason", reason);
+            PendingChanges.save(root, rec);
+            PendingChanges.audit(ex, "pending-change.withdrawn", rec.get("kind") + " '" + rec.get("name")
+                    + "' — " + id + " withdrawn by its author " + by, rec, b -> b.attr("reason", reason));
+            return Map.of("pendingChange", PendingChanges.summary(rec), "applied", false);
         });
     }
 

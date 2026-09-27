@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
@@ -9,6 +10,7 @@ import {
     PendingChangeDetail,
     PendingChangeDiff,
     PendingChangesService,
+    SessionService,
 } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
@@ -50,7 +52,11 @@ const DIFF: PendingChangeDiff = {
     ],
 };
 
-async function create(overrides: Partial<Record<keyof PendingChangesService, unknown>> = {}, canApprove = true) {
+async function create(
+    overrides: Partial<Record<keyof PendingChangesService, unknown>> = {},
+    canApprove = true,
+    actor: string | null = 'checker-1',
+) {
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
         list: vi.fn(() => of({ items: [CHANGE], total: 1, truncated: false })),
@@ -60,19 +66,21 @@ async function create(overrides: Partial<Record<keyof PendingChangesService, unk
             of({ pendingChange: { ...CHANGE, status: 'approved', decidedBy: 'checker-1' }, applied: true }),
         ),
         decline: vi.fn(() => of({ pendingChange: { ...CHANGE, status: 'declined' }, applied: false })),
+        withdraw: vi.fn(() =>
+            of({ pendingChange: { ...CHANGE, status: 'withdrawn', decidedBy: 'author-1' }, applied: false }),
+        ),
         ...overrides,
     } as unknown as PendingChangesService;
+    const confirm = { confirm: vi.fn(async () => true), confirmDestructive: vi.fn(async () => true) };
     TestBed.configureTestingModule({
         imports: [PendingChangesComponent],
         providers: [
             provideNoopAnimations(),
             { provide: PendingChangesService, useValue: api },
             { provide: ToastrService, useValue: toastr },
-            {
-                provide: InspectoConfirmService,
-                useValue: { confirm: vi.fn(async () => true), confirmDestructive: vi.fn(async () => true) },
-            },
+            { provide: InspectoConfirmService, useValue: confirm },
             { provide: LensService, useValue: { canApproveChanges: () => canApprove } },
+            { provide: SessionService, useValue: { actor: signal(actor) } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
@@ -80,7 +88,7 @@ async function create(overrides: Partial<Record<keyof PendingChangesService, unk
     await TestBed.compileComponents(); // data-table @defer block
     const fixture = TestBed.createComponent(PendingChangesComponent);
     fixture.detectChanges();
-    return { fixture, api, toastr };
+    return { fixture, api, toastr, confirm };
 }
 
 const buttons = (el: HTMLElement): string[] =>
@@ -148,6 +156,51 @@ describe('PendingChangesComponent', () => {
         await c.decline();
         expect(api.decline).toHaveBeenCalledWith(CHANGE.id, undefined);
         expect(c.selected()?.status).toBe('declined');
+    });
+
+    it('the author of a waiting change is offered Withdraw (and no decision without canApproveChanges)', async () => {
+        const { fixture } = await create({}, false, 'author-1');
+        fixture.componentInstance.open({ id: CHANGE.id });
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(buttons(el)).toContain('Withdraw');
+        expect(buttons(el)).not.toContain('Approve');
+        await expectNoA11yViolations(el);
+    });
+
+    it('no one but the author is offered Withdraw', async () => {
+        const { fixture } = await create({}, true, 'checker-1');
+        fixture.componentInstance.open({ id: CHANGE.id });
+        fixture.detectChanges();
+        expect(buttons(fixture.nativeElement)).not.toContain('Withdraw');
+    });
+
+    it('withdraw goes through the destructive confirm and reflects the withdrawn change', async () => {
+        const { fixture, api, toastr, confirm } = await create({}, false, 'author-1');
+        const c = fixture.componentInstance;
+        c.open({ id: CHANGE.id });
+        c.reason.setValue('proposed too early');
+        await c.withdraw();
+        fixture.detectChanges();
+        expect(confirm.confirmDestructive).toHaveBeenCalled();
+        expect(api.withdraw).toHaveBeenCalledWith(CHANGE.id, 'proposed too early');
+        expect(c.selected()?.status).toBe('withdrawn');
+        expect(toastr.success).toHaveBeenCalledWith('Change withdrawn');
+        expect(buttons(fixture.nativeElement)).not.toContain('Withdraw');
+    });
+
+    it('a refused withdraw (4xx) toasts the server message and the change stays pending', async () => {
+        const refusal = { status: 409, error: { error: { message: 'pending change is already approved' } } };
+        const { fixture, toastr } = await create(
+            { withdraw: vi.fn(() => throwError(() => refusal)) },
+            false,
+            'author-1',
+        );
+        const c = fixture.componentInstance;
+        c.open({ id: CHANGE.id });
+        await c.withdraw();
+        expect(toastr.error).toHaveBeenCalled();
+        expect(c.selected()?.status).toBe('pending');
     });
 
     it('the All filter lists every status', async () => {

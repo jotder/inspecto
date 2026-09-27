@@ -154,8 +154,8 @@ public final class PendingChanges {
             for (Map<String, Object> other : list(root))
                 if ("pending".equals(other.get("status")) && kind.equals(other.get("kind")) && name.equals(other.get("name")))
                     throw new ApiException(409, ErrorCodes.CONFLICT, "a change to " + kind + " '" + name
-                            + "' is already pending approval (" + other.get("id") + ") — it must be approved, declined "
-                            + "or expire before another is proposed");
+                            + "' is already pending approval (" + other.get("id") + ") — it must be approved, declined, "
+                            + "withdrawn or expire before another is proposed");
             save(root, rec);
             return null;
         });

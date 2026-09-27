@@ -16,6 +16,7 @@ import {
     PendingChangeDiff,
     PendingChangesService,
     PendingChangeStatus,
+    SessionService,
 } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoLineDiffComponent } from 'app/inspecto/components/line-diff.component';
@@ -37,7 +38,8 @@ export type PendingChangesFilter = 'pending' | 'all';
  *
  * The decide buttons show only with {@link LensService.canApproveChanges}; the server is the boundary and adds
  * the kind's own capability and four-eyes (an author approving their own change is refused, and the message is
- * shown). ⚠ Not the agent Approvals Inbox (`/approvals`): that one decides what the assistant may do.
+ * shown). Its author may **withdraw** their own waiting change ({@link canWithdraw} — identity is the session
+ * Subject, {@link SessionService.actor}; the server alone decides, and refuses anyone else). ⚠ Not the agent Approvals Inbox (`/approvals`): that one decides what the assistant may do.
  */
 @Component({
     selector: 'app-pending-changes',
@@ -65,6 +67,7 @@ export class PendingChangesComponent implements OnInit {
     private readonly toastr = inject(ToastrService);
     private readonly confirm = inject(InspectoConfirmService);
     protected readonly lens = inject(LensService);
+    private readonly session = inject(SessionService);
 
     readonly filter = signal<PendingChangesFilter>('pending');
     readonly changes = signal<PendingChange[]>([]);
@@ -79,6 +82,13 @@ export class PendingChangesComponent implements OnInit {
 
     /** Approve / Decline show only for an approver, and only on a change still waiting. */
     readonly canDecide = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'pending');
+
+    /** Withdraw shows only to the change's author (the signed-in Subject), and only while it waits. */
+    readonly canWithdraw = computed(() => {
+        const c = this.selected();
+        const me = this.session.actor();
+        return !!me && c?.status === 'pending' && c.author === me;
+    });
 
     readonly diffSummary = computed(() => {
         const d = this.diff();
@@ -177,6 +187,34 @@ export class PendingChangesComponent implements OnInit {
             { title: 'Decline the change?', confirmText: 'Decline' },
         );
         if (ok) this.decide('decline');
+    }
+
+    async withdraw(): Promise<void> {
+        const c = this.selected();
+        if (!c) return;
+        if (this.reason.invalid) {
+            this.reason.markAsTouched();
+            return;
+        }
+        const ok = await this.confirm.confirmDestructive(
+            `Withdraw your ${c.operation} of ${c.kind} '${c.name}'? Nothing is written, and no one can approve it afterwards; you can propose it again.`,
+            { title: 'Withdraw the change?', confirmText: 'Withdraw' },
+        );
+        if (!ok) return;
+        this.deciding.set(true);
+        this.api.withdraw(c.id, this.reason.value.trim() || undefined).subscribe({
+            next: (r) => {
+                this.deciding.set(false);
+                this.toastr.success('Change withdrawn');
+                this.selected.set({ ...c, ...r.pendingChange });
+                this.load();
+            },
+            error: (err) => {
+                this.deciding.set(false);
+                this.toastr.error(apiErrorMessage(err, 'The change could not be withdrawn'));
+                this.load();
+            },
+        });
     }
 
     private decide(verdict: 'approve' | 'decline'): void {

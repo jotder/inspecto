@@ -245,8 +245,9 @@ system: the evidence cannot say something the code does not.
 | POST | `/objects/([^/]+)/split` | gated | `canAdminister` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:87` |
 | POST | `/objects/([^/]+)/transition` | gated | `canWorkIncidents` | `inspecto-ops/src/main/java/com/gamma/opsapi/ObjectRoutes.java:81` |
 | POST | `/parsers/([^/]+)/preview` | exempt | provenance-gated | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:39` |
-| POST | `/pending-changes/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:55` |
-| POST | `/pending-changes/([^/]+)/decline` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:57` |
+| POST | `/pending-changes/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:62` |
+| POST | `/pending-changes/([^/]+)/decline` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:64` |
+| POST | `/pending-changes/([^/]+)/withdraw` | exempt | self-service | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:67` |
 | PUT | `/pipelines/([^/]+)/graph` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java:80` |
 | POST | `/pipelines/([^/]+)/history/([^/]+)/restore` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineHistoryRoutes.java:51` |
 | POST | `/pipelines/([^/]+)/label` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java:38` |
@@ -284,7 +285,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/runs/([^/]+)/retries/cancel` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:114` |
 | POST | `/runs/([^/]+)/retries/retry-now` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:112` |
 | POST | `/runs/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:50` |
-| PUT | `/settings/approval` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:50` |
+| PUT | `/settings/approval` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:57` |
 | PUT | `/settings/branding` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:50` |
 | PUT | `/settings/egress` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/EgressRoutes.java:44` |
 | PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:53` |

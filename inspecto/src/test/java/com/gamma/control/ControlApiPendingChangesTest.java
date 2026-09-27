@@ -302,6 +302,93 @@ class ControlApiPendingChangesTest {
         }
     }
 
+    // ── ASSURE-MAKER-CHECKER-RESIDUALS-1 (2): the author withdraws their own change ─────────────────
+
+    @Test
+    void onlyTheAuthorWithdrawsTheirOwnPendingChange(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            String id = propose(c, "p1");
+            HttpResponse<String> other = send(c, "POST", "/pending-changes/" + id + "/withdraw", "{}", CHECKER);
+            assertEquals(403, other.statusCode(), "an approver declines; only the author withdraws: " + other.body());
+            assertTrue(other.body().contains("only its author"), other.body());
+            assertEquals("pending", data(send(c, "GET", "/pending-changes/" + id, null, CHECKER), 200)
+                    .get("status").asText(), "a refused withdraw changes nothing");
+
+            // the author needs no capability: AUTHOR (a pipeline-developer) holds no canApproveChanges
+            JsonNode w = data(send(c, "POST", "/pending-changes/" + id + "/withdraw",
+                    "{\"reason\":\"proposed too early\"}", AUTHOR), 200);
+            assertFalse(w.get("applied").asBoolean(), w.toString());
+            assertEquals("withdrawn", w.at("/pendingChange/status").asText());
+            assertEquals("author-1", w.at("/pendingChange/decidedBy").asText());
+            assertEquals("proposed too early", w.at("/pendingChange/decisionReason").asText());
+            assertFalse(store(c).exists("pattern-pack", "p1"), "a withdrawn change writes nothing");
+            Map<String, Object> rec = PendingChanges.read(root, id);
+            assertFalse(PendingChanges.invalid(rec), "the withdrawn record is signed like a declined one");
+            assertEquals("withdrawn", rec.get("status"));
+
+            // terminal: nobody can decide or withdraw it again
+            assertEquals(409, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER).statusCode(),
+                    "approve after withdraw");
+            assertEquals(409, send(c, "POST", "/pending-changes/" + id + "/decline", "{}", CHECKER).statusCode());
+            assertEquals(409, send(c, "POST", "/pending-changes/" + id + "/withdraw", "{}", AUTHOR).statusCode());
+            assertEquals(1, data(send(c, "GET", "/pending-changes?status=withdrawn", null, AUTHOR), 200)
+                    .get("total").asInt());
+
+            HttpResponse<String> audit = send(c, "GET", "/audit/search?type=AUDIT&limit=500", null, ADMIN);
+            assertEquals(200, audit.statusCode(), audit.body());
+            JsonNode row = null;
+            for (JsonNode r : JSON.readTree(audit.body()).get("data")) {
+                JsonNode a = r.get("attributes");
+                if (a != null && "pending-change.withdrawn".equals(a.path("action").asText())) row = a;
+            }
+            assertTrue(row != null, "a pending-change.withdrawn audit row: " + audit.body());
+            assertEquals("author-1", row.path("actor").asText(), row.toString());
+            assertEquals(id, row.path("pendingChange").asText(), row.toString());
+            assertEquals("proposed too early", row.path("reason").asText(), row.toString());
+
+            propose(c, "p1");   // the target is free again
+        }
+    }
+
+    @Test
+    void theWithdrawGates(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            String id = propose(c, "p1");
+            assertEquals(401, send(c, "POST", "/pending-changes/" + id + "/withdraw", "{}", null).statusCode());
+            assertEquals(422, send(c, "POST", "/pending-changes/not-an-id/withdraw", "{}", AUTHOR).statusCode());
+            assertEquals(404, send(c, "POST", "/pending-changes/pc-20260101000000-abcdef/withdraw", "{}", AUTHOR)
+                    .statusCode());
+            assertEquals(422, send(c, "POST", "/pending-changes/" + id + "/withdraw",
+                    "{\"reason\":\"" + "x".repeat(PendingChanges.MAX_REASON + 1) + "\"}", AUTHOR).statusCode());
+
+            // a decided change: 409, whoever asks
+            data(send(c, "POST", "/pending-changes/" + id + "/decline", "{}", CHECKER), 200);
+            HttpResponse<String> decided = send(c, "POST", "/pending-changes/" + id + "/withdraw", "{}", AUTHOR);
+            assertEquals(409, decided.statusCode(), decided.body());
+            assertTrue(decided.body().contains("already declined"), decided.body());
+
+            // an expired change: 409
+            String late = propose(c, "p2");
+            Map<String, Object> rec = PendingChanges.read(root, late);
+            rec.put("expiresAt", "2020-01-01T00:00:00Z");
+            PendingChanges.save(root, rec);
+            assertEquals(409, send(c, "POST", "/pending-changes/" + late + "/withdraw", "{}", AUTHOR).statusCode());
+
+            // Personal-shaped (no Authenticator, no Subject): refused like approve / decline — no author to be
+            String open = propose(c, "p3");
+            Authenticators.forTest(null);
+            HttpResponse<String> anon = send(c, "POST", "/pending-changes/" + open + "/withdraw", "{}", null);
+            assertEquals(403, anon.statusCode(), anon.body());
+            assertTrue(anon.body().contains("authenticated"), anon.body());
+        }
+    }
+
     @Test
     void oneChangePerTargetAtATime(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir

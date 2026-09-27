@@ -744,8 +744,18 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
   by re-verification: a forged record naming `PUT /access/roles` had rewritten `roles.toon` while approve
   reported "not applied". ⚠ The MAC defends against a record written through any door that cannot READ the
   key (an import, an upload); a local administrator can read both.
+- **The author may withdraw their own change** (`POST /pending-changes/{id}/withdraw`,
+  `ASSURE-MAKER-CHECKER-RESIDUALS-1` (2), 2026-09-28). It closes `withdrawn` — terminal, `decidedBy` = the
+  author, the optional `reason` as `decisionReason`, MAC-signed and audited as a decline is. No capability on
+  the route (a recorded `self-service` exemption in `CapabilityManifest`): the only person who may withdraw is
+  the Subject who proposed it, so the author check IS the gate. Gates: no authenticated Subject 403 (Personal
+  is refused, as for decide) → write root 503 → `reason` over 500 chars 422 → unsafe id 422 → unknown 404 →
+  integrity 409 → not pending (decided, withdrawn, expired) 409 → not the author 403. It runs under the same
+  store lock as decide, so a withdraw racing an approve leaves one outcome (`PendingChangesMultiPodTest`). The
+  SPA offers **Withdraw** on the Pending Changes inbox to the session Subject (`SessionService.actor`) who
+  authored a waiting change.
 - **Every step is audited** as an `AUDIT` event, `actionCategory: configuration`: `pending-change.proposed`,
-  `.approved`, `.declined`, `.expired`, `.stale`, `.apply-refused`, and `approval-policy.changed` (the actor
+  `.approved`, `.declined`, `.withdrawn`, `.expired`, `.stale`, `.apply-refused`, and `approval-policy.changed` (the actor
   and the policy before and after, JSON). ⚠ Know which row says what: the approve REQUEST's own route-level
   row (`AuditTrail`) has the **approver** as actor; the replayed WRITE's row has the **author** as actor plus
   `approvedBy` and `pendingChange`; `pending-change.approved` has the approver as actor and the author as an
@@ -771,7 +781,7 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
   Space, `canAdminister`) still writes them — there is nothing there yet to overwrite.
 - **Deciding is a cross-process compare-and-set** (`ASSURE-MAKER-CHECKER-MULTIPOD-1`, 2026-09-27). Every
   read-check-write on the Pending Change store — propose (the one-pending-per-target check), list/read (expiry),
-  approve, decline — runs under `PendingChanges.underStoreLock`: the JVM monitor, then an OS-level
+  approve, decline, withdraw — runs under `PendingChanges.underStoreLock`: the JVM monitor, then an OS-level
   `FileChannel.tryLock()` on `<write-root>/pending-changes/.lock`, so two Pods sharing a Space's directory
   serialise. The file-lock wait is BOUNDED (default 5000 ms, `-Dinspecto.pendingChanges.lockWaitMs`): a Pod
   that stalls holding it yields 503 `STORE_BUSY` (retryable) on the others, never a hung request thread

@@ -85,7 +85,7 @@
                 <inspecto-alert class="mt-4" variant="error" title="Not decided">{{ decideError() }}</inspecto-alert>
             }
 
-            @if (canDecide()) {
+            @if (canDecide() || canWithdraw()) {
                 <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-start">
                     <mat-form-field class="flex-1" subscriptSizing="dynamic">
                         <mat-label>Reason (optional)</mat-label>
@@ -94,8 +94,19 @@
                             <mat-error>At most 500 characters.</mat-error>
                         }
                     </mat-form-field>
-                    <button mat-stroked-button color="warn" [disabled]="deciding()" (click)="decline()">Decline</button>
-                    <button mat-flat-button color="primary" [disabled]="deciding()" (click)="approve()">Approve</button>
+                    @if (canWithdraw()) {
+                        <button mat-stroked-button color="warn" [disabled]="deciding()" (click)="withdraw()">
+                            Withdraw
+                        </button>
+                    }
+                    @if (canDecide()) {
+                        <button mat-stroked-button color="warn" [disabled]="deciding()" (click)="decline()">
+                            Decline
+                        </button>
+                        <button mat-flat-button color="primary" [disabled]="deciding()" (click)="approve()">
+                            Approve
+                        </button>
+                    }
                 </div>
             }
         </section>

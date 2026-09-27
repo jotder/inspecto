@@ -107,11 +107,16 @@ class PendingChangesMultiPodTest {
 
     /** Fire both decisions at once from two threads released by one latch — CHECKER on Pod a, ADMIN on Pod b. */
     private List<HttpResponse<String>> race(Pod a, String pathA, Pod b, String pathB) throws Exception {
+        return race(a, pathA, CHECKER, b, pathB, ADMIN);
+    }
+
+    private List<HttpResponse<String>> race(Pod a, String pathA, String authA, Pod b, String pathB, String authB)
+            throws Exception {
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
             CountDownLatch go = new CountDownLatch(1);
-            Future<HttpResponse<String>> fa = pool.submit(() -> { go.await(); return send(a, "POST", pathA, "{}", CHECKER); });
-            Future<HttpResponse<String>> fb = pool.submit(() -> { go.await(); return send(b, "POST", pathB, "{}", ADMIN); });
+            Future<HttpResponse<String>> fa = pool.submit(() -> { go.await(); return send(a, "POST", pathA, "{}", authA); });
+            Future<HttpResponse<String>> fb = pool.submit(() -> { go.await(); return send(b, "POST", pathB, "{}", authB); });
             go.countDown();
             return List.of(fa.get(60, TimeUnit.SECONDS), fb.get(60, TimeUnit.SECONDS));
         } finally {
@@ -167,6 +172,29 @@ class PendingChangesMultiPodTest {
                 JsonNode rec = record(b, id);
                 boolean written = new ComponentStore(root.resolve("registry")).exists("pattern-pack", "d" + i);
                 assertEquals(approved ? "approved" : "declined", rec.get("status").asText(), rec.toString());
+                assertEquals(approved, written, "applied iff the approval won: " + rec);
+            }
+        }
+    }
+
+    /** `ASSURE-MAKER-CHECKER-RESIDUALS-1` (2): the author withdrawing on one Pod while a checker approves on another. */
+    @Test
+    void withdrawRacingApproveLeavesOneConsistentOutcome(@TempDir Path cfgA, @TempDir Path cfgB,
+                                                         @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Pod a = pod(cfgA, root); Pod b = pod(cfgB, root)) {
+            assertEquals(200, send(a, "PUT", "/settings/approval", POLICY, ADMIN).statusCode());
+            for (int i = 0; i < ROUNDS; i++) {
+                String id = propose(a, "w" + i);
+                List<HttpResponse<String>> rs = race(a, "/pending-changes/" + id + "/approve", CHECKER,
+                        b, "/pending-changes/" + id + "/withdraw", AUTHOR);
+                String both = rs.get(0).body() + " | " + rs.get(1).body();
+                assertEquals(1, count(rs, 200), both);
+                assertEquals(1, count(rs, 409), both);
+                boolean approved = rs.get(0).statusCode() == 200;
+                JsonNode rec = record(b, id);
+                boolean written = new ComponentStore(root.resolve("registry")).exists("pattern-pack", "w" + i);
+                assertEquals(approved ? "approved" : "withdrawn", rec.get("status").asText(), rec.toString());
                 assertEquals(approved, written, "applied iff the approval won: " + rec);
             }
         }
