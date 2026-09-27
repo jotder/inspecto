@@ -21,7 +21,9 @@ export type V1ErrorCode =
     | 'PERMISSION_DENIED'
     | 'RATE_LIMITED'
     | 'NOT_SUPPORTED'
-    | 'PAYLOAD_TOO_LARGE';
+    | 'PAYLOAD_TOO_LARGE'
+    | 'INTEGRITY_VIOLATION'
+    | 'STORE_BUSY';
 
 export interface V1EnvelopeMetadata {
     timestamp: string;

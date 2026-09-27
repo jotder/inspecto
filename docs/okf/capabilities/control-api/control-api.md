@@ -165,12 +165,13 @@ success  {data, metadata:{timestamp, durationMs, apiVersion:"v1", pagination?}, 
 error    {error:{errorCode, message, recoverable, correlationId, details?}}
 ```
 
-`ErrorCodes` (`ErrorCodes.java:11-33`) is the whole catalog — fifteen codes, pinned in both directions
+`ErrorCodes` (`ErrorCodes.java`) is the whole catalog — seventeen codes, pinned in both directions
 against the OpenAPI `ErrorCode` enum by `ApiContractTest`: `MALFORMED_REQUEST` · `NOT_FOUND` ·
 `METHOD_NOT_ALLOWED` · `PATH_JAIL_VIOLATION` · `CONFLICT` · `CONFLICT_STALE_VERSION` ·
 `CONFIG_VALIDATION_FAILED` · `INTERNAL` · `CONTROL_PLANE_READ_ONLY` · `CAPABILITY_UNAVAILABLE` ·
 `UNAUTHENTICATED` · `PERMISSION_DENIED` · `RATE_LIMITED` (429) · `NOT_SUPPORTED` (501) ·
-`PAYLOAD_TOO_LARGE` (413). `defaultFor(status)` maps a bare status to a code (`:36-50`).
+`PAYLOAD_TOO_LARGE` (413) · `INTEGRITY_VIOLATION` (500) · `STORE_BUSY` (503, a store lock's bounded wait timed
+out — the Pending Change store). `defaultFor(status)` maps a bare status to a code.
 **85 of 891** `new ApiException(` sites under `*/src/main` still take that default (2026-09-25, after the
 `AlertRoutes` / `CatalogRoutes` / `DataSourceRoutes` / `PipelineHistoryRoutes` / `RequirementRoutes` /
 `SpaceComparisonRoutes` / `WriteGates` / `BundleRoutes` / `DecisionRoutes` slice — 56 sites, all the status default
