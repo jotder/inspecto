@@ -2,18 +2,50 @@ import { AttributeSpec } from 'app/inspecto/component-model';
 
 /**
  * The Alert Rule kind's attribute declarations — drives `<inspecto-schema-form>` in
- * {@link AlertRuleFormDialog} (audit C3). An Alert Rule watches an observability **Metric**
- * against a threshold over a window (GLOSSARY §4/§8) — every field is a scalar, so the whole
- * form is spec-driven; nothing bespoke.
+ * {@link AlertRuleFormDialog} (audit C3). An Alert Rule watches either an observability **Metric**
+ * over a window of the batch ledger (GLOSSARY §4/§8) or a **Measure** over a Dataset's current data
+ * (BI-5), against a threshold. `kind` picks the shape and is FORM-ONLY — never written: the engine
+ * (`AlertRule.fromMap`) tells the two apart by `dataset`, so each kind's fields hang off `kind` via
+ * `dependsOn` and a hidden field is neither validated nor saved.
  */
 // 'name' (the rule id) is asked at save time (ui-design-review R9 — name-at-save), not declared
 // here; see AlertRuleFormDialog's `saveForm`.
 export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
     {
+        key: 'kind',
+        label: 'Watch',
+        type: 'select',
+        tier: 'required',
+        default: 'metric',
+        options: [
+            { value: 'metric', label: 'A Pipeline metric (over the batch ledger)' },
+            { value: 'measure', label: 'A Dataset Measure (over its current data)' },
+        ],
+    },
+    {
+        key: 'dataset',
+        label: 'Dataset',
+        type: 'autocomplete',
+        tier: 'required',
+        dependsOn: { key: 'kind', equals: 'measure' },
+        placeholder: 'e.g. fraud_cases_open',
+        help: 'The Dataset whose current data the Measure is computed over.',
+    },
+    {
+        key: 'measure',
+        label: 'Measure',
+        type: 'string',
+        tier: 'required',
+        dependsOn: { key: 'kind', equals: 'measure' },
+        placeholder: 'e.g. count, sum(exposure_sar)',
+        help: 'count, or agg(column) with agg one of count, countDistinct, sum, avg, min, max.',
+    },
+    {
         key: 'metric',
         label: 'Metric',
         type: 'autocomplete',
         tier: 'required',
+        dependsOn: { key: 'kind', equals: 'metric' },
         placeholder: 'e.g. error_rate, rejected_files, duration_ms',
         help: 'The observability metric to watch (as emitted by the engine).',
     },
@@ -38,6 +70,7 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         type: 'select',
         tier: 'required',
         default: '15m',
+        dependsOn: { key: 'kind', equals: 'metric' },
         options: [
             { value: '5m', label: '5 minutes' },
             { value: '15m', label: '15 minutes' },
@@ -57,6 +90,26 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
             { value: 'WARNING', label: 'Warning' },
             { value: 'CRITICAL', label: 'Critical' },
         ],
+    },
+    {
+        key: 'by',
+        label: 'One Alert per',
+        type: 'list',
+        tier: 'optional',
+        dependsOn: { key: 'kind', equals: 'measure' },
+        placeholder: 'e.g. msisdn',
+        help: 'Key columns of the Dataset: the Measure is computed per key and each breaching key raises its own Alert.',
+    },
+    {
+        key: 'stormCap',
+        label: 'Storm cap',
+        type: 'number',
+        tier: 'optional',
+        required: false,
+        min: 1,
+        dependsOn: { key: 'kind', equals: 'measure' },
+        placeholder: '100',
+        help: 'With One Alert per: above this many breaching keys, one storm Alert replaces them (default 100).',
     },
     {
         key: 'onPipeline',

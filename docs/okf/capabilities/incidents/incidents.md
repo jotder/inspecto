@@ -161,8 +161,8 @@ its id (`ComponentStore.write` stamps it). So `Row count on open cases is 10, ab
 Alert's `pipeline`, the event, the Signal and every attribute keep the id. Ledger metric ids read as words
 via `Alert.metricLabel` — `Error rate`, `Failed batches`, `Rejected files`, `Average duration (ms)` (it is
 the average), any other id snake_case → words — while the `metric` field / event attr stays e.g.
-`duration_ms`. Pipeline and Investigation scopes are unchanged. ⚠ The UI authoring form has no `description` field yet (and, being ledger-only, re-saving a
-rule through it drops fields it does not show).
+`duration_ms`. Pipeline and Investigation scopes are unchanged. The UI authoring form asks `description` and authors both the ledger-metric and the Measure shape; a re-save
+keeps every stored key it does not model ([alerts feature](../../frontend/features/alerts.md)).
 
 **Per-entity Measure rules — `by`** (`ASSURE-PER-ENTITY-ALERTS-1`, 2026-09-26). A Dataset Measure rule may
 add `by: [col, …]` (key columns; a list or one comma-separated string) and `stormCap` (default **100**,
@@ -208,8 +208,9 @@ neither key, and the rule takes the scalar path below. How it runs:
   ⚠ Outside `by`, `/components/alert-rule` still does not run `AlertRule` validation at all — a pre-existing gap.
 - **Case grouping** — no Case Rule change is needed: an existing Case Rule whose `q` matches the rule's title
   (e.g. its `description`) groups the per-key Incidents into one Case.
-- **UI** — the Alert Rule dialog authors ledger rules only; for a `by` rule it shows "One Alert per: <columns>
-  (at most N, then one storm Alert)" read-only and carries `by`/`stormCap` through a re-save.
+- **UI** — the Alert Rule dialog authors Measure rules too (2026-09-27): a *Watch* kind choice, Dataset, Measure,
+  **One Alert per** (`by`, column suggestions from the Dataset) and **Storm cap**; the save-time 422 renders in
+  the dialog ([alerts feature](../../frontend/features/alerts.md)).
 
 **Evaluation.** `AlertService` polls on a window-derived floor of 1 min, default 10 min
 (`AlertService.java:411-413`); a breach emits `EventType.ALERT_FIRED` (`:227`) and the canonical

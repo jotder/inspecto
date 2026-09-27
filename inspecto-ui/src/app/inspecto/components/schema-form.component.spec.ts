@@ -249,6 +249,51 @@ describe('InspectoSchemaFormComponent', () => {
     });
 
     /**
+     * A `list` field offers the host's optionLoader suggestions (the Alert Rule `by` columns): picked
+     * entries commit as chips, committed ones drop out of the list, and the draft filters it. Without a
+     * loader the draft input carries no combobox role — the plain list is unchanged.
+     */
+    it('a list field without an optionLoader has no suggestion combobox', () => {
+        const fixture = create(LIST_SPECS);
+        const input = fixture.nativeElement.querySelector('input[placeholder="^CALL"]') as HTMLInputElement;
+        expect(input.getAttribute('role')).toBeNull();
+    });
+
+    it('suggests list entries from an optionLoader and commits a picked one', async () => {
+        TestBed.configureTestingModule({
+            imports: [InspectoSchemaFormComponent],
+            providers: [provideNoopAnimations()],
+        });
+        const fixture = TestBed.createComponent(InspectoSchemaFormComponent);
+        const c = fixture.componentInstance;
+        c.optionLoaders = {
+            patterns: async () => [
+                { value: 'msisdn', label: 'msisdn (varchar)' },
+                { value: 'region', label: 'region (varchar)' },
+            ],
+        };
+        c.specs = LIST_SPECS;
+        fixture.detectChanges();
+        const spec = LIST_SPECS[0];
+        const input = fixture.nativeElement.querySelector('input[placeholder="^CALL"]') as HTMLInputElement;
+        expect(input.getAttribute('role')).toBe('combobox');
+        c.loadOptionsFor(spec);
+        await fixture.whenStable();
+        expect(c.listOptions(spec).map((o) => o.value)).toEqual(['msisdn', 'region']);
+
+        c.setListDraft('patterns', 'ms');
+        input.value = 'ms';
+        c.addListOption(spec, 'msisdn', input);
+        expect(c.form.get('patterns')?.value).toEqual(['msisdn']);
+        expect(c.listDraft('patterns')).toBe('');
+        expect(input.value).toBe('');
+        expect(c.listOptions(spec).map((o) => o.value)).toEqual(['region']); // committed ⇒ no longer offered
+
+        c.setListDraft('patterns', 'zzz');
+        expect(c.listOptions(spec)).toEqual([]); // the draft filters
+    });
+
+    /**
      * SCHEMA-FORM-EMPTY-LIST-1: "cleared" (null, the default applies) and "explicitly none" ([], the
      * `key[0]:` opt-out) are two states, and only a deliberate act produces the second.
      */

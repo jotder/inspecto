@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, effect, input, output, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
-import { MEASURE_AGGS, groupByError } from './measure-grammar';
+import { MEASURE_AGGS, groupByError } from 'app/inspecto/query/measure-grammar';
 import { MeasureRow, formatMeasures, measureRowError, needsField, parseMeasures } from './summarize-editor';
 
 /**

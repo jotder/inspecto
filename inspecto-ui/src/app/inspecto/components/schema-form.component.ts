@@ -264,16 +264,38 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                             <div class="flex flex-col gap-1">
                                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                                     <mat-label>{{ spec.label }}</mat-label>
+                                    <!-- Suggestions only when the host passes an optionLoader for this key
+                                         (e.g. columnOptionLoader). An open panel defers the blur-commit to
+                                         (closed): clicking an option blurs the draft first, and committing
+                                         there would add the half-typed text beside the picked option. -->
                                     <input
+                                        #listInput
                                         matInput
                                         type="text"
                                         [value]="listDraft(spec.key)"
                                         [placeholder]="spec.placeholder ?? ''"
                                         [attr.cdkFocusInitial]="first ? '' : null"
+                                        [matAutocomplete]="listAc"
+                                        [matAutocompleteDisabled]="!optionLoaders?.[spec.key]"
+                                        #listTrigger="matAutocompleteTrigger"
+                                        (focus)="loadOptionsFor(spec)"
                                         (input)="setListDraft(spec.key, $any($event.target).value)"
-                                        (keydown.enter)="addListItem(spec, $event)"
-                                        (blur)="addListItem(spec)"
+                                        (keydown.enter)="
+                                            listTrigger.activeOption
+                                                ? $event.preventDefault()
+                                                : addListItem(spec, $event)
+                                        "
+                                        (blur)="listTrigger.panelOpen || addListItem(spec)"
                                     />
+                                    <mat-autocomplete
+                                        #listAc="matAutocomplete"
+                                        (optionSelected)="addListOption(spec, $event.option.value, listInput)"
+                                        (closed)="commitListDraftIfLeft(spec, listInput)"
+                                    >
+                                        @for (opt of listOptions(spec); track opt.value) {
+                                            <mat-option [value]="opt.value">{{ opt.label }}</mat-option>
+                                        }
+                                    </mat-autocomplete>
                                     <button
                                         mat-icon-button
                                         matSuffix
@@ -977,6 +999,29 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
         const current = this.listValue(spec.key);
         if (!current.includes(text)) this.writeList(spec.key, [...current, text]);
         this.setListDraft(spec.key, '');
+    }
+
+    /** A `list` field's loaded suggestions, filtered by the draft and without entries already committed. */
+    listOptions(spec: AttributeSpec): AttributeOption[] {
+        const taken = new Set(this.listValue(spec.key));
+        const q = this.listDraft(spec.key).trim().toLowerCase();
+        return (this.loadedOptions()[spec.key] ?? []).filter(
+            (o) =>
+                !taken.has(o.value) && (!q || o.value.toLowerCase().includes(q) || o.label.toLowerCase().includes(q)),
+        );
+    }
+
+    /** A picked suggestion is committed as an entry; the draft (and the text the trigger wrote) is cleared. */
+    addListOption(spec: AttributeSpec, value: string, input: HTMLInputElement): void {
+        const current = this.listValue(spec.key);
+        if (value && !current.includes(value)) this.writeList(spec.key, [...current, value]);
+        this.setListDraft(spec.key, '');
+        input.value = '';
+    }
+
+    /** The panel closed with focus gone elsewhere (Tab away) — the blur-commit it deferred happens now. */
+    commitListDraftIfLeft(spec: AttributeSpec, input: HTMLInputElement): void {
+        if (input.ownerDocument.activeElement !== input) this.addListItem(spec);
     }
 
     removeListItem(spec: AttributeSpec, index: number): void {

@@ -43,7 +43,7 @@ import { companionSchemaName } from 'app/inspecto/segments';
 import { buildConfiguredNode, splitNodeConfig } from './node-config-build';
 import { PipelineExtraConfigComponent } from './pipeline-extra-config.component';
 import { PipelineFilterPredicateComponent } from './pipeline-filter-predicate.component';
-import { groupByValidator, measuresValidator } from './measure-grammar';
+import { groupByValidator, measuresValidator } from 'app/inspecto/query/measure-grammar';
 import { SummarizeEditorComponent } from './summarize-editor.component';
 import { nodeAttributesFor } from './node-attributes';
 

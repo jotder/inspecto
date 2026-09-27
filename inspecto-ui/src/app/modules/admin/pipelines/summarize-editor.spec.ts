@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MEASURE_AGGS } from './measure-grammar';
+import { MEASURE_AGGS } from 'app/inspecto/query/measure-grammar';
 import { formatMeasures, measureRowError, needsField, parseMeasures } from './summarize-editor';
 
 describe('parseMeasures / formatMeasures', () => {

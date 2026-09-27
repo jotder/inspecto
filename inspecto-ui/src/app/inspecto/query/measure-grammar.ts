@@ -6,6 +6,11 @@ import MEASURE_CONTRACT from 'app/inspecto/contracts/measure-grammar.contract.js
  * The `transform.summarize` grammar — client-side authoring validation for rules the pipeline itself
  * never checks. Covers **both** of the node's fields: `measures` and `group_by`.
  *
+ * <p>Shared (moved out of the Pipelines feature 2026-09-27) because the Alert Rule editor's Dataset-measure
+ * kind speaks the same grammar: `AlertRule` checks `measure` with `DatasetMeasureProbe.validMeasure`, whose
+ * pattern is built from the same `MeasureCompiler.AGGS` and identifier rule, and its `by` key columns are the
+ * same bare identifier a `group_by` entry is.
+ *
  * <p><b>Why this exists.</b> `processing.summarize` is authoring-only until the branch-aware executor
  * arms it (`PipelineConfig.prepare()` refuses `active && summarize != null`), so a pipeline carrying
  * measures never parses them. The only thing that does is `MaterializeTask.compileSpec` — a *separate*

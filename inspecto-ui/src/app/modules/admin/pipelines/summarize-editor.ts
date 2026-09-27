@@ -1,4 +1,4 @@
-import { MEASURE_AGGS, measureError } from './measure-grammar';
+import { MEASURE_AGGS, measureError } from 'app/inspecto/query/measure-grammar';
 
 /**
  * Step workbench — the `transform.summarize` grouping surface's pure logic (S4c).

@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { MEASURE_AGGS } from './measure-grammar';
+import { MEASURE_AGGS } from 'app/inspecto/query/measure-grammar';
 import { SummarizeEditorComponent } from './summarize-editor.component';
 
 function mount(columns: string[], groupBy: string[], measures: string[]) {
