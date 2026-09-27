@@ -67,8 +67,8 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   ambiguous. ⚠ The SQL can read only its own `sourceName` — any other relation is not in scope and 422s.
   A store rename (`POST /pipelines/{id}/rename`) rewrites `sourceName` AND the SQL's relation references
   (2026-09-27, `VIRTUAL-DATASET-SQL-RENAME-1`): `SqlGuard.renameBaseTable` locates each unqualified
-  `BASE_TABLE` named the old store in DuckDB's `json_serialize_sql` tree and splices the new name in at its
-  `query_location` — the author's text (comments, spacing) survives; columns, aliases and literals spelled
+  `BASE_TABLE` named the old store in DuckDB's `json_serialize_sql` tree and splices the new name (always double-quoted — a
+  new id may be a keyword) in at its `query_location` (a UTF-8 BYTE offset, converted to a char index) — the author's text (comments, spacing) survives; columns, aliases and literals spelled
   like the store are untouched. ⛔ Never regex, never `json_deserialize_sql` (it re-spells the statement).
   ⚠ Left unchanged (and so still 422 at read, fail closed): SQL that does not parse, a CTE shadowing the
   store name, a schema-qualified ref (`main.old`), or text at a location that is not the bare/quoted name.

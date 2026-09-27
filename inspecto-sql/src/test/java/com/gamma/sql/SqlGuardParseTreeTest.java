@@ -128,10 +128,19 @@ class SqlGuardParseTreeTest {
     /** VIRTUAL-DATASET-SQL-RENAME-1: exact relation refs only, located by the parse tree; fail closed. */
     @Test
     void renameBaseTableRewritesOnlyRelationReferences() {
-        assertEquals("SELECT o.x FROM new_s o JOIN new_s ON 1 WHERE y = 'old_s'",
+        assertEquals("SELECT o.x FROM \"new_s\" o JOIN \"new_s\" ON 1 WHERE y = 'old_s'",
                 SqlGuard.renameBaseTable("SELECT o.x FROM \"old_s\" o JOIN OLD_S ON 1 WHERE y = 'old_s'", "old_s", "new_s"));
-        assertEquals("SELECT * FROM (SELECT old_s FROM new_s) t",
+        assertEquals("SELECT * FROM (SELECT old_s FROM \"new_s\") t",
                 SqlGuard.renameBaseTable("SELECT * FROM (SELECT old_s FROM old_s) t", "old_s", "new_s"));
+        // query_location is a UTF-8 byte offset: non-ASCII text before a bare or quoted ref
+        assertEquals("SELECT 'é' AS x FROM \"new s\"",
+                SqlGuard.renameBaseTable("SELECT 'é' AS x FROM \"old_s\"", "old_s", "new s"));
+        String arabic = "-- مرحبا\n";
+        assertEquals(arabic + "SELECT * FROM \"new_s\"",
+                SqlGuard.renameBaseTable(arabic + "SELECT * FROM old_s", "old_s", "new_s"));
+        // a reserved-word new name is quoted, so the result still parses
+        assertEquals("SELECT * FROM \"select\"", SqlGuard.renameBaseTable("SELECT * FROM old_s", "old_s", "select"));
+        assertTrue(SqlGuard.parseTreeViolations("SELECT * FROM \"select\"", null).isEmpty());
         // a CTE shadowing the name, a qualified ref, and unparseable SQL are all left exactly as written
         String cte = "WITH old_s AS (SELECT 1) SELECT * FROM old_s";
         assertEquals(cte, SqlGuard.renameBaseTable(cte, "old_s", "new_s"));

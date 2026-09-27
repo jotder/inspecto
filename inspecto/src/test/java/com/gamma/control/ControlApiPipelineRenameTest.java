@@ -308,7 +308,7 @@ class ControlApiPipelineRenameTest {
 
             Map<String, Object> after = store.get("dataset", "mini_vds").orElseThrow().content();
             assertEquals("mini_v2", String.valueOf(after.get("sourceName")));
-            assertEquals("SELECT id, mini_etl, 'mini_etl' AS tag -- reads mini_etl\nFROM mini_v2 WHERE id > 1",
+            assertEquals("SELECT id, mini_etl, 'mini_etl' AS tag -- reads mini_etl\nFROM \"mini_v2\" WHERE id > 1",
                     String.valueOf(after.get("sql")),
                     "only the FROM relation is renamed; the column, literal and comment are untouched");
 

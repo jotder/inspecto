@@ -349,8 +349,8 @@ public final class SqlGuard {
 
     /**
      * {@code VIRTUAL-DATASET-SQL-RENAME-1}: {@code sql} with every unqualified {@code BASE_TABLE} reference to
-     * {@code oldName} (case-insensitive, as DuckDB binds) replaced by {@code newName} — located by the
-     * parser's own {@code query_location}, never by regex, so a column, alias or string literal spelled
+     * {@code oldName} (case-insensitive, as DuckDB binds) replaced by {@code newName} (always double-quoted) — located by the
+     * parser's own {@code query_location} (a UTF-8 byte offset, converted to a char index), never by regex, so a column, alias or string literal spelled
      * {@code oldName} is untouched and the author's text (comments, spacing) survives. Returns {@code sql}
      * UNCHANGED when it does not parse as one statement, when a CTE shadows {@code oldName}, or when any
      * reference's text at its location is not the bare/double-quoted name (fail closed).
@@ -374,10 +374,14 @@ public final class SqlGuard {
             java.util.TreeSet<Integer> locations = new java.util.TreeSet<>();
             if (!collectRefs(root.path("statements"), oldName, locations)) return sql;
             String quotedOld = "\"" + oldName.replace("\"", "\"\"") + "\"";
-            String replacement = newName.matches("[A-Za-z_][A-Za-z0-9_]*") ? newName
-                    : "\"" + newName.replace("\"", "\"\"") + "\"";
+            // Always quoted: a new name may be a reserved word (select, order, table) or need quoting anyway.
+            String replacement = "\"" + newName.replace("\"", "\"\"") + "\"";
+            byte[] utf8 = sql.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             StringBuilder out = new StringBuilder(sql);
-            for (int loc : locations.descendingSet()) {
+            for (int byteLoc : locations.descendingSet()) {
+                // query_location is a UTF-8 BYTE offset, not a char index.
+                if (byteLoc > utf8.length) return sql;
+                int loc = new String(utf8, 0, byteLoc, java.nio.charset.StandardCharsets.UTF_8).length();
                 int len;
                 if (sql.regionMatches(true, loc, quotedOld, 0, quotedOld.length())) {
                     len = quotedOld.length();
