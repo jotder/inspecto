@@ -107,15 +107,18 @@ final class PendingChangeRoutes implements RouteModule {
         List<Map<String, Object>> items = new ArrayList<>();
         int total = 0;
         if (root != null) {
-            synchronized (PendingChanges.lock()) {
+            int[] n = {0};
+            PendingChanges.underStoreLock(root, () -> {
                 for (Map<String, Object> rec : PendingChanges.list(root)) {
                     PendingChanges.expireIfDue(ex, root, rec);
                     if (status != null && !status.isBlank() && !status.equals(rec.get("status"))) continue;
                     if (kind != null && !kind.isBlank() && !kind.equals(rec.get("kind"))) continue;
-                    total++;
+                    n[0]++;
                     if (items.size() < LIST_CAP) items.add(PendingChanges.summary(rec));
                 }
-            }
+                return null;
+            });
+            total = n[0];
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("items", items);
@@ -157,12 +160,12 @@ final class PendingChangeRoutes implements RouteModule {
     private static Map<String, Object> require(ApiContext api, HttpExchange ex, String id) throws IOException {
         Path root = api.writeRoot();
         if (root == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no pending change '" + id + "'");
-        synchronized (PendingChanges.lock()) {
+        return PendingChanges.underStoreLock(root, () -> {
             Map<String, Object> rec = PendingChanges.read(root, id);
             if (rec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no pending change '" + id + "'");
             PendingChanges.expireIfDue(ex, root, rec);
             return rec;
-        }
+        });
     }
 
     // ── decide ──────────────────────────────────────────────────────────────────────────────────
@@ -178,7 +181,10 @@ final class PendingChangeRoutes implements RouteModule {
         String reason = ApiContext.str(body, "reason");
         if (reason != null && reason.length() > PendingChanges.MAX_REASON)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'reason' is at most " + PendingChanges.MAX_REASON + " chars");
-        synchronized (PendingChanges.lock()) {
+        // The compare-and-set (`ASSURE-MAKER-CHECKER-MULTIPOD-1`): read → still pending? → decide → save, all under
+        // the store's cross-process lock, and the APPLY (the replay) inside it too — so a second Pod deciding the
+        // same change blocks, then re-reads the winner's record and gets 409; it can never apply it again.
+        return PendingChanges.<Object, Exception>underStoreLock(root, () -> {
             Map<String, Object> rec = PendingChanges.read(root, id);   // 422 on an unsafe id
             if (rec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no pending change '" + id + "'");
             if (PendingChanges.invalid(rec))
@@ -186,7 +192,8 @@ final class PendingChangeRoutes implements RouteModule {
                         + "(its MAC does not verify: it was not written by this server, or was edited since) — it cannot be decided");
             PendingChanges.expireIfDue(ex, root, rec);
             if (!"pending".equals(rec.get("status")))
-                throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' is already " + rec.get("status"));
+                throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' is already " + rec.get("status")
+                        + (rec.get("decidedBy") == null ? "" : " (decided by " + rec.get("decidedBy") + " at " + rec.get("decidedAt") + ")"));
             ApiContext.requireCapability(ex, String.valueOf(rec.get("approverCapability")));
             String by = ApiContext.actor(ex);
             if (Boolean.TRUE.equals(rec.get("fourEyes")) && by.equals(rec.get("author")))
@@ -266,7 +273,7 @@ final class PendingChangeRoutes implements RouteModule {
             throw new ApiException(status, status == 409 ? ErrorCodes.CONFLICT : errorField(r.body(), "errorCode"),
                     "pending change '" + id + "' was not applied: " + (message == null
                             ? "its route answered " + r.status() + " without reaching the approved write" : message));
-        }
+        });
     }
 
     private static Object parse(String body) {

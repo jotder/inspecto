@@ -728,10 +728,18 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
   builder's `developer` role gained `canAdminister`); `/pipelines/import ?conflict=overwrite` could land it as
   a satellite, and `/bundle/import` could carry `access-profile` items. `SpaceManager.createFromBundle` (a NEW
   Space, `canAdminister`) still writes them — there is nothing there yet to overwrite.
-- 🔴 **Approval is single-process.** Deciding is serialised by one JVM lock (`PendingChanges.lock()`), and the
-  store is plain files. Two Pods sharing a Space could both approve (or approve and decline) the same change.
-  Multi-Pod needs a store-level compare-and-set on the Pending Change's status — filed as
-  `ASSURE-MAKER-CHECKER-MULTIPOD-1`.
+- **Deciding is a cross-process compare-and-set** (`ASSURE-MAKER-CHECKER-MULTIPOD-1`, 2026-09-27). Every
+  read-check-write on the Pending Change store — propose (the one-pending-per-target check), list/read (expiry),
+  approve, decline — runs under `PendingChanges.underStoreLock`: the JVM monitor, then an OS-level
+  `FileChannel.lock()` on `<write-root>/pending-changes/.lock`, so two Pods sharing a Space's directory
+  serialise. Deciding re-reads the record under the lock and moves `status` off `pending` only if it is still
+  `pending`; the APPLY (the replay) runs inside the same lock, so a loser can never apply. The loser gets 409
+  `pending change '<id>' is already approved (decided by <who> at <when>)`. Records are saved atomically (temp
+  + `ATOMIC_MOVE`). ⚠ There is no OperationalDb-backed Pending Change store, so no conditional-UPDATE variant
+  exists; the lock needs a filesystem whose locks are honoured across hosts (a local disk or a correctly
+  configured shared volume — NFSv3 without lockd is not). Proven by `PendingChangesMultiPodTest` (two
+  control planes over one directory racing approve/approve and approve/decline over real HTTP, and two JVM
+  processes racing on the lock).
 - The AI-agent approvals inbox (`/agent/approvals*`) is a different thing and is unchanged.
 
 As-built detail (the hold, the funnels, what is governable): [config safety](../config/config-safety.md#maker-checker--pending-changes-2026-09-26).

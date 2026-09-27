@@ -9,9 +9,12 @@ import com.gamma.util.AtomicFiles;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.channels.FileLock;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -47,7 +50,7 @@ import java.util.stream.Stream;
  *
  * <p><b>Storage</b> — one JSON document per Pending Change at {@code <write-root>/pending-changes/<id>.json},
  * the {@code ReconStateStore} pattern: per Space, atomic temp + move, fail closed on an unreadable document,
- * jailed under the write root. Not an OperationalDb family, so there is no backup / bundle-staging lockstep
+ * jailed under the write root, every read-check-write under {@link #underStoreLock} (a cross-process file lock). Not an OperationalDb family, so there is no backup / bundle-staging lockstep
  * to keep; it sits in the config tree a Space backup already carries. Outside the pipeline config history on
  * purpose: a Pending Change is a proposal, and nothing reads it as config.
  */
@@ -146,14 +149,16 @@ public final class PendingChanges {
         request.put("headers", headers);
         rec.put("request", request);
 
-        synchronized (LOCK) {
+        Files.createDirectories(dir(root));
+        underStoreLock(root, () -> {
             for (Map<String, Object> other : list(root))
                 if ("pending".equals(other.get("status")) && kind.equals(other.get("kind")) && name.equals(other.get("name")))
                     throw new ApiException(409, ErrorCodes.CONFLICT, "a change to " + kind + " '" + name
                             + "' is already pending approval (" + other.get("id") + ") — it must be approved, declined "
                             + "or expire before another is proposed");
             save(root, rec);
-        }
+            return null;
+        });
         audit(ex, "pending-change.proposed", kind + " '" + name + "' held for approval as " + rec.get("id"), rec);
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("status", "pending");
@@ -485,7 +490,34 @@ public final class PendingChanges {
         return true;
     }
 
-    static Object lock() { return LOCK; }
+    /** Work done while holding the store lock ({@link #underStoreLock}). */
+    @FunctionalInterface
+    interface StoreAction<T, E extends Exception> {
+        T run() throws E;
+    }
+
+    /** The per-store lock file, beside the records (not {@code .json}, so {@link #list} never reads it). */
+    static final String LOCK_FILE = ".lock";
+
+    /**
+     * Run {@code action} holding the Space's Pending Change store EXCLUSIVELY — across threads AND across
+     * processes (`ASSURE-MAKER-CHECKER-MULTIPOD-1`): the JVM monitor first (an OS file lock is per-process, and a
+     * second channel in the same JVM would throw {@code OverlappingFileLockException}), then an OS-level
+     * {@code FileChannel.lock()} on {@code pending-changes/.lock}, which a second Pod sharing the Space's
+     * directory blocks on. A read-check-write inside it is a compare-and-set: the loser re-reads the record the
+     * winner saved (atomic temp + {@code ATOMIC_MOVE}, {@link AtomicFiles}). With no store directory yet there is
+     * no record to race over, so only the monitor is taken (a read never creates the directory).
+     */
+    static <T, E extends Exception> T underStoreLock(Path root, StoreAction<T, E> action) throws IOException, E {
+        synchronized (LOCK) {
+            Path d = dir(root);
+            if (!Files.isDirectory(d)) return action.run();
+            try (FileChannel ch = FileChannel.open(d.resolve(LOCK_FILE), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                 FileLock ignored = ch.lock()) {
+                return action.run();
+            }
+        }
+    }
 
     static void audit(HttpExchange ex, String action, String message, Map<String, Object> rec) {
         audit(ex, action, message, rec, UnaryOperator.identity());
