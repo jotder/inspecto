@@ -314,6 +314,10 @@ export class DashboardEditorComponent implements OnInit {
     tileFilter(dataset: Dataset): ConditionGroup {
         return this.view.filterFor(dataset);
     }
+    /** The Dashboard's `asOf` day, which a KPI-bound tile evaluates its definition at (blank ⇒ today). */
+    tileAsOf(): string {
+        return this.view.asOf();
+    }
 
     /** The author picked a default range — it is also what the preview shows from now on. */
     setDefaultRange(selection: DateRangeSelection | null): void {

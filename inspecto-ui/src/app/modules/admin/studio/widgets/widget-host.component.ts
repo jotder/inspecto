@@ -159,6 +159,7 @@ export interface DrillEvent extends DrillPair {
                                     [title]="dataset.sourceName"
                                     [renderOptions]="widget.options"
                                     [kpiSize]="kpiSize()"
+                                    [kpiAsOf]="asOf()"
                                     (categoryClick)="onCategoryClick($event)"
                                     (channelClick)="onChannelClick($event)"
                                     (cellClick)="onCellClick($event)"
@@ -214,6 +215,8 @@ export class WidgetHostComponent {
      * for one answer.
      */
     readonly stale = input<StaleMark | null>(null);
+    /** The host Dashboard's `asOf` day (`YYYY-MM-DD`; blank ⇒ today) — handed to a KPI-bound Widget's evaluation. */
+    readonly asOf = input('');
     /** A category click, resolved to the field it should filter on (drill-down). */
     readonly drill = output<DrillEvent>();
 

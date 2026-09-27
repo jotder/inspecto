@@ -105,6 +105,8 @@ export class KpiComponent {
     readonly value = input<number>(0);
     /** A KPI definition id: when set, the server's evaluation replaces the hand-set inputs below. */
     readonly kpiId = input<string | undefined>(undefined);
+    /** The day a bound definition is evaluated at (`YYYY-MM-DD`, a Dashboard's `asOf`); blank ⇒ the server's today. */
+    readonly asOf = input<string | undefined>(undefined);
     /** The definition's evaluation, once loaded. */
     readonly definition = signal<KpiValue | null>(null);
     /** Resolved only when a `kpiId` is bound, so an unbound tile needs no HttpClient (every host spec). */
@@ -131,12 +133,13 @@ export class KpiComponent {
     constructor() {
         effect(() => {
             const id = this.kpiId();
+            const asOf = this.asOf() || undefined;
             this.definition.set(null);
             this.failed.set(false);
             if (!id) return;
             this.injector
                 .get(KpisService)
-                .value(id)
+                .value(id, asOf)
                 .pipe(takeUntilDestroyed(this.destroyRef))
                 .subscribe({ next: (v) => this.definition.set(v), error: () => this.failed.set(true) });
         });

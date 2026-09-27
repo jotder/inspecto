@@ -172,6 +172,9 @@ describe('VizRenderComponent', () => {
             target: undefined,
             better: 'higher',
         });
+        // A Dashboard tile's asOf reaches the KPI, so a kpiId-bound one is evaluated at that day.
+        fixture.componentRef.setInput('kpiAsOf', '2026-08-13');
+        expect(c.outletInputs()['asOf']).toBe('2026-08-13');
     });
 
     it('treemap: mounts the treemap component with its rows, format and limit, and re-emits its clicks as channelClick', () => {

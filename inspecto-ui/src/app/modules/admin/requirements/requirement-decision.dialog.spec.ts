@@ -5,7 +5,7 @@ import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ComponentsService, DecisionRulesService, JobsService, LensService, RunsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { buildRequirement, decideRequirement } from 'app/inspecto/requirement';
+import { buildRequirement, decideRequirement, deliverRequirement, Requirement } from 'app/inspecto/requirement';
 import { RequirementDecisionDialog, RequirementDecisionResult } from './requirement-decision.dialog';
 
 function create(requirement = buildRequirement('Daily churn KPI', 'kpi', 'Track churn.')) {
@@ -75,6 +75,46 @@ describe('RequirementDecisionDialog', () => {
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
         expect(Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('Accept'))).toBe(false);
+    });
+
+    describe('Create KPI (ASSURE-KPI-DEFINITIONS-1)', () => {
+        const delivered = (kind: Requirement['kind'] = 'kpi') =>
+            deliverRequirement(decideRequirement(buildRequirement('Refund exposure', kind, 'y'), true));
+        const createKpiButton = (el: HTMLElement) =>
+            Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Create KPI');
+
+        it('offers Create KPI on a delivered kpi requirement and closes with that action', async () => {
+            const { fixture, ref } = create(delivered());
+            const button = createKpiButton(fixture.nativeElement);
+            expect(button).toBeTruthy();
+            await expectNoA11yViolations(fixture.nativeElement);
+            button!.click();
+            expect(ref.close).toHaveBeenCalledWith({ action: 'createKpi' });
+        });
+
+        it('is hidden without canAuthorWorkbench (the Business lens)', () => {
+            const { fixture } = create(delivered());
+            TestBed.inject(LensService).selectLens('business');
+            fixture.detectChanges();
+            expect(createKpiButton(fixture.nativeElement)).toBeUndefined();
+        });
+
+        it('is hidden for a delivered requirement of another kind', () => {
+            const { fixture } = create(delivered('report'));
+            expect(createKpiButton(fixture.nativeElement)).toBeUndefined();
+        });
+
+        it('is hidden for a kpi requirement not yet delivered', () => {
+            const { fixture } = create(decideRequirement(buildRequirement('x', 'kpi', 'y'), true));
+            expect(createKpiButton(fixture.nativeElement)).toBeUndefined();
+        });
+
+        it('shows the created KPI id instead once the requirement has one', () => {
+            const { fixture } = create({ ...delivered(), kpi: 'refund_exposure' });
+            const el = fixture.nativeElement as HTMLElement;
+            expect(createKpiButton(el)).toBeUndefined();
+            expect(el.textContent).toContain('refund_exposure');
+        });
     });
 
     it('renders with no a11y violations', async () => {

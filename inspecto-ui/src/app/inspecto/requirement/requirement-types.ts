@@ -24,6 +24,8 @@ export interface Requirement {
      *  (picker-assisted; becomes Registry `delivered-by` edges) or free-text prose. */
     deliveredNote?: string;
     deliveredAt?: string;
+    /** The KPI definition this (delivered, `kpi`) requirement created — stamped by `POST /requirements/{id}/kpi`. */
+    kpi?: string;
 }
 
 /** Build a freshly submitted {@link Requirement} — the id is a slug + short suffix, not user-authored

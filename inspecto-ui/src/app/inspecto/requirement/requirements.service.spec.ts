@@ -52,6 +52,22 @@ describe('RequirementsService', () => {
         http.verify();
     });
 
+    it('creates a KPI via POST /requirements/{id}/kpi with the Builder body (empty by default)', () => {
+        const { svc, http } = setup();
+        const body = { dataset: 'orders', measure: 'sum(amount)', timeField: 'order_date', grain: 'month' as const };
+        let created: unknown;
+        svc.createKpi('refunds', body).subscribe((k) => (created = k));
+        const req = http.expectOne(apiUrl('/requirements/refunds/kpi'));
+        expect(req.request.method).toBe('POST');
+        expect(req.request.body).toEqual(body);
+        req.flush({ name: 'refunds', requirement: 'refunds', ...body });
+        expect(created).toMatchObject({ name: 'refunds' });
+
+        svc.createKpi('a b').subscribe();
+        expect(http.expectOne(apiUrl('/requirements/a%20b/kpi')).request.body).toEqual({});
+        http.verify();
+    });
+
     it('lists requirements via GET /requirements', () => {
         const { svc, http } = setup();
         let reqs: { id: string; title: string; status: string }[] = [];

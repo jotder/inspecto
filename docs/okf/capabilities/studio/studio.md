@@ -380,7 +380,14 @@ exactly as an absent one** — a KPI is never a way round Dataset sharing. The K
 read error; the hand-set Widget inputs apply only with no `kpiId`. A `band` KPI's delta and target lines drop the
 up/down wording and take their tone from the server's band. A delivered `kpi` Requirement creates one
 only by the explicit `POST /requirements/{id}/kpi` (`canAuthorWorkbench`), which takes its
-`target`/`unit`/`title` and reads the direction off its `comparator`. ⚠ Distinct from the semantic model's
+`target`/`unit`/`title` and reads the direction off its `comparator`. In the UI that is the **Create KPI** button
+on the Requirement detail (`requirement-decision.dialog`), shown for a delivered `kpi` Requirement with no `kpi`
+stamp yet and gated on `lens.canAuthorWorkbench()` (the server's capability); it asks ONLY the Dataset, Measure,
+date column and period (`requirement-kpi.dialog`) — the KPI id defaults to the Requirement's — and a 202 hold
+toasts "waiting for approval". A KPI-bound tile evaluates at its Dashboard's `asOf` day
+(`DashboardViewStore.asOf` → tile → widget host → `VizRenderComponent.kpiAsOf` → `KpiComponent.asOf`); a blank
+`asOf` sends none, so the server's today in the KPI's zone applies — never the browser's today, which a zone ahead
+of the server's could make a "future" 400. ⚠ Distinct from the semantic model's
 descriptive **KPI catalog** (`kpis:` / `GET /catalog/kpis`), which is text for the assistant and runs nothing.
 Deferred: KPI packs inside Space Templates, and a bundle-imported KPI's Dataset is only checked structurally.
 

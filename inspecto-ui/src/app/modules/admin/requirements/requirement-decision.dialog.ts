@@ -14,7 +14,8 @@ import { Requirement } from 'app/inspecto/requirement';
 
 export type RequirementDecisionResult =
     | { action: 'decide'; accept: boolean; note?: string }
-    | { action: 'deliver'; note?: string };
+    | { action: 'deliver'; note?: string }
+    | { action: 'createKpi' };
 
 /**
  * Requirement detail — full description + the Builder-queue triage actions (Wave-3 interview decision,
@@ -24,6 +25,9 @@ export type RequirementDecisionResult =
  * "Delivered via" is a cross-kind component picker (C1 follow-up): suggestions are the app's
  * components in `<kind>/<id>` form — picking one makes the note a real Registry `delivered-by`
  * edge (`requirementRefs`); free text stays valid (suggestions assist, they never constrain).
+ *
+ * A delivered `kpi` requirement offers **Create KPI** (ASSURE-KPI-DEFINITIONS-1) to a lens that may author — the
+ * server gates `POST /requirements/{id}/kpi` on the same `canAuthorWorkbench` — until it has created one.
  */
 @Component({
     selector: 'app-requirement-decision-dialog',
@@ -86,6 +90,15 @@ export type RequirementDecisionResult =
                 </mat-form-field>
                 <button mat-flat-button color="primary" (click)="deliver()">Mark delivered</button>
             }
+            @if (data.kpi) {
+                <p class="text-secondary text-sm">
+                    <span class="font-medium">KPI:</span> <span class="font-mono">{{ data.kpi }}</span>
+                </p>
+            } @else if (canCreateKpi()) {
+                <div>
+                    <button mat-flat-button color="primary" (click)="createKpi()">Create KPI</button>
+                </div>
+            }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button type="button" mat-button mat-dialog-close>Close</button>
@@ -127,6 +140,15 @@ export class RequirementDecisionDialog {
 
     decide(accept: boolean): void {
         this.ref.close({ action: 'decide', accept, note: this.note.value || undefined });
+    }
+
+    /** A delivered `kpi` requirement that has not created its KPI yet, in a lens that may author one. */
+    canCreateKpi(): boolean {
+        return this.data.kind === 'kpi' && this.data.status === 'delivered' && this.lens.canAuthorWorkbench();
+    }
+
+    createKpi(): void {
+        this.ref.close({ action: 'createKpi' });
     }
 
     deliver(): void {

@@ -1,8 +1,17 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { apiUrl } from 'app/inspecto/api';
+import { apiUrl, KpiDefinition, PendingChange } from 'app/inspecto/api';
 import { Requirement, RequirementKind } from './requirement-types';
+
+/** `POST /requirements/{id}/kpi` body — what only a Builder knows; the Requirement supplies title/target/unit and
+ *  the direction its comparator states. Omitted keys fall back to those (and `id` to the Requirement's id). */
+export type RequirementKpiBody = Partial<KpiDefinition> & { id?: string };
+
+/** The KPI written (its stored content, `name` = the KPI id), or the maker-checker hold (202, nothing written). */
+export type RequirementKpiResult =
+    | (KpiDefinition & { name: string; requirement: string })
+    | { status: 'pending'; written: false; pendingChange: PendingChange };
 
 /**
  * Requirement store (UI-6 + SEC-7(c)) — the Business→Builder lifecycle over the dedicated
@@ -36,5 +45,10 @@ export class RequirementsService {
 
     deliver(id: string, note?: string): Observable<Requirement> {
         return this.http.post<Requirement>(apiUrl(`/requirements/${encodeURIComponent(id)}/deliver`), { note });
+    }
+
+    /** Create a KPI definition from a delivered `kpi` Requirement — server-gated on `canAuthorWorkbench`. */
+    createKpi(id: string, body: RequirementKpiBody = {}): Observable<RequirementKpiResult> {
+        return this.http.post<RequirementKpiResult>(apiUrl(`/requirements/${encodeURIComponent(id)}/kpi`), body);
     }
 }

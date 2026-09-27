@@ -159,6 +159,8 @@ export class VizRenderComponent {
     /** KPI only: the in-place size, when the HOST owns the size control (a Dashboard tile's action set). Absent ⇒
      *  the KPI keeps its own card and size button. */
     readonly kpiSize = input<KpiMode | undefined>(undefined);
+    /** KPI only: the day a `kpiId`-bound KPI is evaluated at (the host Dashboard's `asOf`); blank ⇒ today. */
+    readonly kpiAsOf = input<string | undefined>(undefined);
     /** Emits the clicked category's label (bar/line/area/pie/bubble) — the drill-down seam. Gauge has no filterable
      *  categories, so it never emits. */
     readonly categoryClick = output<string>();
@@ -623,6 +625,7 @@ export class VizRenderComponent {
                   target: this.renderOptions()?.kpi?.target,
                   better: this.renderOptions()?.kpi?.better ?? 'higher',
                   kpiId: this.renderOptions()?.kpi?.kpiId,
+                  asOf: this.kpiAsOf(),
                   size: this.kpiSize(),
               }
             : this.viewBinding() === undefined

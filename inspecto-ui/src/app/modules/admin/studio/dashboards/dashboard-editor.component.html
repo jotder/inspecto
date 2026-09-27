@@ -266,6 +266,7 @@
                                 [dataset]="dataset"
                                 [stale]="staleOf(tile)"
                                 [filter]="tileFilter(dataset)"
+                                [asOf]="tileAsOf()"
                                 (drill)="onDrill($event)"
                             >
                                 <ng-container tileActions [ngTemplateOutlet]="tileControls" />

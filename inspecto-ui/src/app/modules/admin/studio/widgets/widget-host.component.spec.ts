@@ -1,7 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { KpisService } from 'app/inspecto/api';
 import { GammaConfigService } from '@gamma/services/config';
 import { registerBuiltinViz } from 'app/inspecto/viz/plugins';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
@@ -283,6 +284,26 @@ describe('WidgetHostComponent', () => {
         expect(el.querySelector('inspecto-viz-render')).toBeNull();
         expect(el.querySelector('inspecto-empty-state')).toBeNull();
         await expectNoA11yViolations(el);
+    });
+
+    it("evaluates a kpiId-bound KPI at the host Dashboard's asOf day", async () => {
+        const value = vi.fn(() => of(null as never));
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: { run: () => Promise.resolve({ ok: true, rows: [{ sum_duration_s: 5 }] }) },
+            },
+            { provide: KpisService, useValue: { value } },
+        ]);
+        fixture.componentRef.setInput('widget', { ...WIDGET, options: { kpi: { kpiId: 'refunds' } } });
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.componentRef.setInput('asOf', '2026-08-13');
+        fixture.detectChanges();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(value).toHaveBeenCalledWith('refunds', '2026-08-13');
     });
 
     it('the KPI size cycle lives in the tile action set and drives the KPI (which drops its own button)', async () => {

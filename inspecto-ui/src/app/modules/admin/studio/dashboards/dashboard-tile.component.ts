@@ -26,6 +26,7 @@ import { DrillEvent, WidgetHostComponent } from '../widgets/widget-host.componen
         [dataset]="dataset()"
         [filter]="filter()"
         [stale]="stale()"
+        [asOf]="asOf()"
         (drill)="drill.emit($event)"
         ><ng-container tileActions><ng-content select="[tileActions]" /></ng-container
     ></app-widget-host>`,
@@ -37,5 +38,7 @@ export class DashboardTileComponent {
     readonly filter = input<ConditionGroup | null>(null);
     /** Resolved by the dashboard, not here — see WidgetHostComponent.stale. */
     readonly stale = input<StaleMark | null>(null);
+    /** The Dashboard's `asOf` day (`YYYY-MM-DD`; blank ⇒ today) — what a KPI-bound tile evaluates at. */
+    readonly asOf = input('');
     readonly drill = output<DrillEvent>();
 }

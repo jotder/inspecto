@@ -9,9 +9,10 @@ import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component'
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime, InspectoRowAction } from 'app/inspecto/grid';
-import { buildRequirement, Requirement, RequirementsService } from 'app/inspecto/requirement';
+import { buildRequirement, Requirement, RequirementKpiBody, RequirementsService } from 'app/inspecto/requirement';
 import { RequirementFormDialog, RequirementFormResult } from './requirement-form.dialog';
 import { RequirementDecisionDialog, RequirementDecisionResult } from './requirement-decision.dialog';
+import { RequirementKpiDialog } from './requirement-kpi.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 
 /**
@@ -114,6 +115,10 @@ export class RequirementsComponent implements OnInit {
             .open(RequirementDecisionDialog, { data: r, width: '520px' })
             .afterClosed()
             .subscribe((result?: RequirementDecisionResult) => {
+                if (result?.action === 'createKpi') {
+                    this.createKpi(r);
+                    return;
+                }
                 if (!result || !this.lens.canTriageRequirements()) return;
                 const updated$ =
                     result.action === 'decide'
@@ -125,6 +130,26 @@ export class RequirementsComponent implements OnInit {
                         this.load();
                     },
                     error: (e) => this.toastr.error(apiErrorMessage(e, `Could not update "${r.title}"`)),
+                });
+            });
+    }
+
+    /** Ask the Measure and period, then `POST /requirements/{id}/kpi` — gated on the server's `canAuthorWorkbench`. */
+    createKpi(r: Requirement): void {
+        if (!this.lens.canAuthorWorkbench()) return;
+        this.dialog
+            .open(RequirementKpiDialog, { data: r, width: '560px' })
+            .afterClosed()
+            .subscribe((body?: RequirementKpiBody) => {
+                if (!body) return;
+                this.api.createKpi(r.id, body).subscribe({
+                    next: (res) => {
+                        if ('pendingChange' in res)
+                            this.toastr.info(`The KPI for "${r.title}" is waiting for approval in Pending Changes`);
+                        else this.toastr.success(`KPI "${res.name}" created — find it under KPI & Reports`);
+                        this.load();
+                    },
+                    error: (e) => this.toastr.error(apiErrorMessage(e, `Could not create a KPI from "${r.title}"`)),
                 });
             });
     }

@@ -74,6 +74,16 @@ describe('DashboardTileComponent', () => {
         expect(host.plugin()?.meta.type).toBe('kpi');
     });
 
+    it("hands the Dashboard's asOf day to the widget host, which gives it to a KPI tile's evaluation", () => {
+        const fixture = create();
+        const host = fixture.debugElement.query(By.directive(WidgetHostComponent))
+            .componentInstance as WidgetHostComponent;
+        expect(host.asOf()).toBe('');
+        fixture.componentRef.setInput('asOf', '2026-08-13');
+        fixture.detectChanges();
+        expect(host.asOf()).toBe('2026-08-13');
+    });
+
     it('renders with no a11y violations', async () => {
         await expectNoA11yViolations(create().nativeElement);
     });
