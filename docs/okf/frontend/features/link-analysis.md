@@ -685,9 +685,9 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   snapshots…*, which lists `GET /inv/snapshots` (ids only, newest first, `limit=100`, `total`/`truncated`
   shown) as checkboxes capped at 20 (`DossierRoutes.MAX_SNAPSHOTS`). The downloads reuse the on-screen
   dossier's `at` AND `snapshots`, so file and view agree. ⚠ The list is NOT filtered to this Investigation —
-  the route cannot tell — and the SPA's own sealing (`graph-snapshot.ts`) never writes `investigationId`, so
-  today every SPA-sealed snapshot is refused 422 *not anchored* (surfaced verbatim). Anchoring on seal is the
-  missing half, owned by the snapshot lane.
+  the route cannot tell — so a snapshot sealed under ANOTHER Investigation (or none) is refused 422 *not
+  anchored* (surfaced verbatim). Since 2026-09-28 the SPA anchors a snapshot to the open Investigation when it
+  seals it (`investigationId`), so snapshots sealed while this Investigation is open are accepted.
 * **The Working Set is addressable as rows** (LA-20, backend shipped 2026-09-23; `WorkingSetRoutes`).
   `GET /inv/investigations/{id}/working-set?of=entities|links|excluded&limit&offset` answers a relation with
   fixed columns carrying provenance (`opSeq`, `seedId`, `hop`, and `reason` for exclusions), bounded with the
