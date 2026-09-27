@@ -48,7 +48,9 @@ final class QueryRoutes implements RouteModule {
         Path writeRoot = WriteGates.requireWriteRoot(api, "query execution");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
 
+        // R3: a query the caller cannot view is indistinguishable from a missing one (same 404, same text).
         Map<String, Object> query = component(store, "query", id)
+                .filter(q -> ComponentAccess.canView(ex, q))
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no query '" + id + "'"));
 
         String type = ApiContext.str(query, "type");
@@ -78,6 +80,7 @@ final class QueryRoutes implements RouteModule {
         String relationSql = null;
         if (datasetId != null) {
             Map<String, Object> dataset = component(store, "dataset", datasetId)
+                    .filter(d -> ComponentAccess.canView(ex, d))   // same refusal as BiRoutes: shared-away ⇒ absent
                     .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "query '" + id + "' references unknown dataset '" + datasetId + "'"));
             try {
                 relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));

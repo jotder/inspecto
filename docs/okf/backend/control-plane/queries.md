@@ -20,6 +20,13 @@ renderings (Widgets, Dashboards, exports). Vocabulary: [`GLOSSARY.md`](../../../
   `$`-Parameter resolution** (`$today`, `$day(-7)`, user-declared `$name`, …) and returns rows plus the
   **Result Set** descriptor (columns with type + analytic role: dimension / measure / temporal) that
   the Presentation layer matches renderings against.
+* **Access (R3, fixed 2026-09-27)** — `/run` applies the same component-access model as `/bi/query`
+  (`ComponentAccess.canView`): a Query the caller cannot view is a 404 byte-identical to a missing one
+  (`no query '<id>'`), and a Query over a Dataset the caller cannot view gets the same 404
+  (`references unknown dataset`) — rows are never returned. Before this fix the route loaded both with
+  no check, so any caller who knew an id ran an owner-only Query. Query CRUD/list/versions go through
+  the generic `/components/query` routes, which already enforce the model. Held by
+  `ControlApiQueryRunAccessTest` (armed authenticator; both checks mutation-verified).
 * **Three parameter namespaces, deliberately distinct** — `$name` (runtime query Parameters, resolved
   server-side here) · `:fieldValue` (Expectation/rule templates) · `${ENV:…}` (secret references). Each
   resolver leaves the other two untouched.
