@@ -663,7 +663,10 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   alone. ⛔ **No server-side graph algorithm exists**, so the dossier computes no centrality. Its score tables
   are the vectors a snapshot sealed, computed client-side, each labelled with the snapshot, its time and its
   node count. A snapshot must be **anchored**, meaning its body's `investigationId` names this Investigation,
-  or it is refused (422), so a dossier cannot be used to read another analyst's snapshot. Access matches the
+  or it is refused (422), so a dossier cannot be used to read another analyst's snapshot. The SPA writes that
+  anchor (2026-09-28): a snapshot sealed while an Investigation is open carries its id (the open
+  `InvestigationSessionStore.activeId`); one sealed with none open has no `investigationId` key and so cannot be
+  included in any Dossier. The anchor is outside `manifestHash`. Access matches the
   Investigation: owner-only, plus the R3 Dataset check. Neither route persists anything; both are audited
   (`LINK_DOSSIER_BUILT` / `LINK_DOSSIER_VERIFIED`). The SPA's snapshot `manifestHash` is SHA-256 too
   (2026-09-28): Web Crypto over the UTF-8 bytes of the canonical JSON, written `sha256:<hex>` — the server's

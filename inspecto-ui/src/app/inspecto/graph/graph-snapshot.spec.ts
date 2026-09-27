@@ -66,6 +66,17 @@ describe('graph-snapshot', () => {
             now,
         });
         expect(same.manifestHash).toBe(s.manifestHash); // title is not part of the evidence
+        expect('investigationId' in s).toBe(false);
+        const anchored = await snapshotGraph({
+            title: 'Chain',
+            graph: G,
+            origin,
+            metrics: { degree: { a: 2 } },
+            now,
+            investigationId: 'inv-7',
+        });
+        expect(anchored.investigationId).toBe('inv-7');
+        expect(anchored.manifestHash).toBe(s.manifestHash); // the anchor is provenance, not evidence content
 
         const tampered = { ...s, edges: [] };
         expect(await verifySnapshot(tampered)).toBe(false);

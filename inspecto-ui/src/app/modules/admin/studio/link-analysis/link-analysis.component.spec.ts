@@ -760,12 +760,26 @@ describe('LinkAnalysisComponent', () => {
         )[1].data;
         expect(snapData.graph.nodes).toHaveLength(5);
         expect(snapData.origin).toMatchObject({ sourceId: 'entity-projection', dataset: 'links-ds' });
+        expect((snapData as { investigationId?: string }).investigationId).toBeUndefined(); // none open
         const attachData = (open.mock.calls[1] as unknown as [unknown, { data: { snapshot: unknown } }])[1].data;
         expect(attachData.snapshot).toBe(snap);
         expect(c.latestSnapshot()).toBe(snap);
 
         await runQuery(fixture); // a fresh graph is a new answer — the old snapshot no longer describes it
         expect(c.latestSnapshot()).toBeNull();
+    });
+    it('evidence: a snapshot taken while an Investigation is open carries its id (the Dossier anchor)', async () => {
+        const { fixture } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+        const open = vi
+            .spyOn(fixture.debugElement.injector.get(MatDialog), 'open')
+            .mockReturnValueOnce({ afterClosed: () => of(undefined) } as never);
+        c.investigation.activeId.set('inv-7');
+        await c.openSnapshot();
+        const data = (open.mock.calls[0] as unknown as [unknown, { data: { investigationId?: string } }])[1].data;
+        expect(data.investigationId).toBe('inv-7');
     });
     it('level of detail: drops labels above the cap while on, and the footer states the published caps', async () => {
         const big: G6GraphData = {

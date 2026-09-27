@@ -1007,6 +1007,7 @@ export class LinkAnalysisComponent implements OnInit {
             suggestedTitle: `${this.sourceLabel()} — ${g.nodes.filter((n) => !n.data.missing).length} nodes`,
             caseId: this.deepLinkedCaseId(),
             selectedNodeIds: this.emphasis()?.nodeIds ?? [],
+            investigationId: this.investigation.activeId() ?? undefined,
         };
     }
 

@@ -33,6 +33,11 @@ export interface GraphSnapshot {
     manifestHash: string;
     /** Which Case ids this snapshot is attached to (UI-first: kept in the browser session). */
     attachedTo: string[];
+    /**
+     * The Investigation open when it was sealed. The server's Dossier includes a snapshot only when this equals
+     * the Investigation's id (else 422 "not anchored"). Absent when none was open. Not part of `manifestHash`.
+     */
+    investigationId?: string;
 }
 
 /** Canonical JSON: object keys sorted recursively, so a hash is stable across insertion order. */
@@ -74,6 +79,7 @@ export interface SnapshotInput {
     origin: GraphSnapshot['origin'];
     viewport?: GraphSnapshot['viewport'];
     annotations?: GraphSnapshot['annotations'];
+    investigationId?: string;
     /** Injected for determinism in tests. */
     now?: Date;
 }
@@ -101,6 +107,7 @@ export async function snapshotGraph(input: SnapshotInput): Promise<GraphSnapshot
         annotations: input.annotations ?? [],
         manifestHash,
         attachedTo: [],
+        ...(input.investigationId ? { investigationId: input.investigationId } : {}),
     };
 }
 

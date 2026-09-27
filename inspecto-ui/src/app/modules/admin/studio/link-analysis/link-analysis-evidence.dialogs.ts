@@ -28,6 +28,8 @@ export interface SnapshotDialogData {
     caseId?: string;
     /** The nodes emphasised on the canvas — the default pick when a new Case is minted from the graph. */
     selectedNodeIds?: string[];
+    /** The Investigation open while sealing — anchors the snapshot so its Dossier may include it. */
+    investigationId?: string;
 }
 
 /** A predicate tree as one line, for the frozen-content summary. */
@@ -326,6 +328,7 @@ export class LinkAnalysisSnapshotDialog {
                     predicate: this.data.predicate,
                     origin: this.data.origin,
                     viewport: { layout: this.data.layout },
+                    investigationId: this.data.investigationId,
                 }));
         } catch (e: unknown) {
             this.saving.set(false);

@@ -129,7 +129,7 @@ describe('LinkAnalysisSnapshotDialog', () => {
 });
 
 describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
-    function create(list: () => unknown, caseId = '') {
+    function create(list: () => unknown, caseId = '', investigationId?: string) {
         const close = vi.fn();
         const store = fakeSnapshots();
         TestBed.configureTestingModule({
@@ -149,6 +149,7 @@ describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
                         layout: 'dagre',
                         suggestedTitle: 'Chain',
                         caseId,
+                        investigationId,
                     },
                 },
             ],
@@ -165,6 +166,14 @@ describe('LinkAnalysisSnapshotDialog — the Case is optional', () => {
         expect(await verifySnapshot(snap)).toBe(true);
         expect(snap.attachedTo).toEqual([]); // saved, unattached — a legitimate outcome
         expect(store.snapshots()).toHaveLength(1);
+        expect('investigationId' in store.snapshots()[0]).toBe(false); // none open — no anchor key at all
+    });
+
+    it('anchors the sealed snapshot to the open Investigation, so its Dossier can include it', async () => {
+        const { fixture, store } = create(() => of([]), '', 'inv-7');
+        await fixture.componentInstance.save();
+        // What the store POSTs to /inv/snapshots; DossierRoutes 422s unless this equals the Investigation id.
+        expect(store.snapshots()[0].investigationId).toBe('inv-7');
     });
 
     it('attaches in the same action when a Case IS chosen', async () => {
