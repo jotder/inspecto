@@ -9086,9 +9086,9 @@
     "/kpis/{kpiId}/value" : {
       "get" : {
         "tags" : [ "kpis" ],
-        "summary" : "GET /kpis/{kpiId}/value (generated skeleton)",
+        "summary" : "Evaluate a KPI definition for the period to date",
         "operationId" : "getKpisByKpiIdValue",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Evaluates the `kpi` registry component's Measure over the current `grain` period to date and over the SAME elapsed length of the comparison period (KpiEvaluator), in ONE explicit zone: the KPI's `timezone`, else UTC. A read, so ungated. 503 write root unset · 400 unsafe id or bad `asOf` · 404 unknown or shared-away KPI, and a Dataset that is absent OR unreadable by the caller (the same answer on purpose) · 422 a stored KPI that no longer validates, or a failed relation / DuckDB read.",
         "parameters" : [ {
           "name" : "kpiId",
           "in" : "path",
@@ -9096,21 +9096,55 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "name" : "asOf",
+          "in" : "query",
+          "required" : false,
+          "description" : "The day the period runs to (inclusive): YYYY-MM-DD, or an ISO instant read as its date in the KPI's zone. Absent: today in that zone. A future day, one before year 1, or an unplaceable instant is a 400.",
+          "schema" : {
+            "type" : "string"
+          }
         } ],
         "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          "200" : {
+            "description" : "The KPI's value, comparison and RAG band.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/KpiValue"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "400" : {
+            "$ref" : "#/components/responses/BadRequest"
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "422" : {
+            "$ref" : "#/components/responses/ValidationFailed"
+          },
+          "503" : {
+            "$ref" : "#/components/responses/WriteDisabled"
           }
-        },
-        "x-generated" : true
+        }
       }
     },
     "/requirements/{requirementId}/kpi" : {
       "post" : {
         "tags" : [ "requirements" ],
-        "summary" : "POST /requirements/{requirementId}/kpi (generated skeleton)",
+        "summary" : "Create a KPI definition from a delivered kpi Requirement",
         "operationId" : "postRequirementsByRequirementIdKpi",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "An explicit authoring action — delivering a Requirement never creates a KPI by itself. Requires canAuthorWorkbench (403 PERMISSION_DENIED otherwise). The Requirement supplies what Business authored on it: `title`, `target`, `unit`, and the good `direction` read off its `comparator` (>= / > → up, <= / < → down); the body supplies what only a Builder knows. Body keys win. The KPI is saved through the same gate as /components/kpi (KpiRoutes.requireMeasure: the Dataset exists and is readable by the author, the measure field and `timeField` are in its Schema, `timeField` is DATE/TIMESTAMP/TIMESTAMPTZ), then the maker-checker hold, then the write, and the Requirement is stamped `kpi: <id>`. 503 write root unset · 404 unknown Requirement · 422 unsafe id, not a kpi Requirement, an invalid KPI or a Measure that does not exist for this author · 409 not delivered, already created one, or a KPI of that id exists.",
         "parameters" : [ {
           "name" : "requirementId",
           "in" : "path",
@@ -9119,12 +9153,91 @@
             "type" : "string"
           }
         } ],
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/RequirementKpiRequest"
+              }
+            }
           }
         },
-        "x-generated" : true
+        "responses" : {
+          "200" : {
+            "description" : "The KPI written — its stored content, with `name` = the KPI id and `requirement` = the Requirement id.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/KpiDefinition"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "202" : {
+            "description" : "Held by the Space's Approval Policy for `kpi` — nothing was written, and the Requirement is not stamped until the Pending Change is approved (the approval replays this request).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "status", "written", "pendingChange" ],
+                        "properties" : {
+                          "status" : {
+                            "type" : "string",
+                            "enum" : [ "pending" ]
+                          },
+                          "written" : {
+                            "type" : "boolean",
+                            "enum" : [ false ]
+                          },
+                          "pendingChange" : {
+                            "type" : "object",
+                            "description" : "The Pending Change record without its content (id, kind, name, operation, status, author, createdAt, expiresAt, approverCapability, fourEyes, …) — GET /pending-changes/{id} reads it in full."
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The caller lacks canAuthorWorkbench (PERMISSION_DENIED) — Professional edition only.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "409" : {
+            "$ref" : "#/components/responses/Conflict"
+          },
+          "422" : {
+            "$ref" : "#/components/responses/ValidationFailed"
+          },
+          "503" : {
+            "$ref" : "#/components/responses/WriteDisabled"
+          }
+        }
       }
     },
     "/audit/verify" : {
@@ -10130,6 +10243,258 @@
             "type" : "integer"
           },
           "message" : {
+            "type" : [ "string", "null" ]
+          }
+        }
+      },
+      "KpiWindow" : {
+        "type" : "object",
+        "description" : "A KPI period in the KPI's zone: `from` inclusive, `to` EXCLUSIVE (a month read on the 13th is from the 1st to the 14th).",
+        "required" : [ "from", "to" ],
+        "properties" : {
+          "from" : {
+            "type" : "string",
+            "format" : "date"
+          },
+          "to" : {
+            "type" : "string",
+            "format" : "date"
+          }
+        }
+      },
+      "KpiBands" : {
+        "type" : "object",
+        "description" : "RAG bands. Direction up/down: two thresholds — up is green at or above `green`, amber at or above `amber` (amber <= green); down mirrors it. Direction band: two [lo, hi] intervals, the green one inside the amber one. Outside amber is RED.",
+        "required" : [ "green", "amber" ],
+        "properties" : {
+          "green" : {
+            "oneOf" : [ {
+              "type" : "number"
+            }, {
+              "type" : "array",
+              "items" : {
+                "type" : "number"
+              },
+              "minItems" : 2,
+              "maxItems" : 2
+            } ]
+          },
+          "amber" : {
+            "oneOf" : [ {
+              "type" : "number"
+            }, {
+              "type" : "array",
+              "items" : {
+                "type" : "number"
+              },
+              "minItems" : 2,
+              "maxItems" : 2
+            } ]
+          }
+        }
+      },
+      "KpiDefinition" : {
+        "type" : "object",
+        "description" : "The content of a `kpi` registry component (KpiDefinition.fromMap validates it fail closed; an unknown key other than `x-*` is a 422).",
+        "required" : [ "name", "dataset", "measure", "timeField", "grain" ],
+        "properties" : {
+          "name" : {
+            "type" : "string",
+            "description" : "The KPI id."
+          },
+          "title" : {
+            "type" : [ "string", "null" ]
+          },
+          "description" : {
+            "type" : [ "string", "null" ]
+          },
+          "dataset" : {
+            "type" : "string",
+            "description" : "The Dataset the Measure reads."
+          },
+          "measure" : {
+            "type" : "string",
+            "description" : "count, or agg(field) with agg one of MeasureCompiler.AGGS.",
+            "examples" : [ "sum(amount)" ]
+          },
+          "timeField" : {
+            "type" : "string",
+            "description" : "The DATE / TIMESTAMP / TIMESTAMPTZ column a period is cut on."
+          },
+          "grain" : {
+            "type" : "string",
+            "enum" : [ "day", "week", "month", "quarter", "year" ]
+          },
+          "comparison" : {
+            "type" : "string",
+            "enum" : [ "previous", "last-year", "none" ],
+            "default" : "previous"
+          },
+          "direction" : {
+            "type" : "string",
+            "enum" : [ "up", "down", "band" ],
+            "description" : "The good direction; `band` needs `bands`."
+          },
+          "target" : {
+            "type" : [ "number", "null" ]
+          },
+          "bands" : {
+            "$ref" : "#/components/schemas/KpiBands"
+          },
+          "unit" : {
+            "type" : [ "string", "null" ]
+          },
+          "format" : {
+            "type" : [ "object", "null" ]
+          },
+          "timezone" : {
+            "type" : [ "string", "null" ],
+            "description" : "An IANA region zone (e.g. Asia/Kolkata); offset forms are refused. Absent: UTC."
+          },
+          "owner" : {
+            "type" : [ "string", "null" ]
+          },
+          "shares" : {
+            "type" : [ "array", "null" ]
+          },
+          "requirement" : {
+            "type" : [ "string", "null" ],
+            "description" : "The kpi Requirement this KPI was created from (POST /requirements/{id}/kpi)."
+          }
+        }
+      },
+      "RequirementKpiRequest" : {
+        "type" : "object",
+        "description" : "POST /requirements/{id}/kpi body — what only a Builder knows. Merged over what the Requirement supplies (title, target, unit, direction from its comparator); body keys win. `dataset`, `measure`, `timeField` and `grain` are required of the merged KPI, and the Requirement supplies none of them.",
+        "required" : [ "dataset", "measure", "timeField", "grain" ],
+        "properties" : {
+          "id" : {
+            "type" : "string",
+            "description" : "The KPI id. Default: the Requirement's id."
+          },
+          "dataset" : {
+            "type" : "string"
+          },
+          "measure" : {
+            "type" : "string",
+            "examples" : [ "sum(amount)" ]
+          },
+          "timeField" : {
+            "type" : "string"
+          },
+          "grain" : {
+            "type" : "string",
+            "enum" : [ "day", "week", "month", "quarter", "year" ]
+          },
+          "comparison" : {
+            "type" : "string",
+            "enum" : [ "previous", "last-year", "none" ]
+          },
+          "direction" : {
+            "type" : "string",
+            "enum" : [ "up", "down", "band" ],
+            "description" : "Overrides the direction read off the Requirement's comparator."
+          },
+          "bands" : {
+            "$ref" : "#/components/schemas/KpiBands"
+          },
+          "format" : {
+            "type" : "object"
+          },
+          "timezone" : {
+            "type" : "string"
+          }
+        }
+      },
+      "KpiValue" : {
+        "type" : "object",
+        "description" : "GET /kpis/{id}/value. Every key is always present; the nullable ones are null when there is nothing to report (no rows, comparison `none`, no target or bands).",
+        "required" : [ "kpi", "dataset", "measure", "grain", "comparison", "direction", "asOf", "timezone", "period", "value", "tone" ],
+        "properties" : {
+          "kpi" : {
+            "type" : "string",
+            "description" : "The KPI id."
+          },
+          "title" : {
+            "type" : [ "string", "null" ]
+          },
+          "dataset" : {
+            "type" : "string"
+          },
+          "measure" : {
+            "type" : "string"
+          },
+          "grain" : {
+            "type" : "string",
+            "enum" : [ "day", "week", "month", "quarter", "year" ]
+          },
+          "comparison" : {
+            "type" : "string",
+            "enum" : [ "previous", "last-year", "none" ]
+          },
+          "direction" : {
+            "type" : "string",
+            "enum" : [ "up", "down", "band" ]
+          },
+          "asOf" : {
+            "type" : "string",
+            "format" : "date",
+            "description" : "The day evaluated to (inclusive), in `timezone`."
+          },
+          "timezone" : {
+            "type" : "string",
+            "description" : "The zone the periods were cut in (the region id `UTC` by default)."
+          },
+          "period" : {
+            "$ref" : "#/components/schemas/KpiWindow"
+          },
+          "value" : {
+            "type" : [ "number", "null" ]
+          },
+          "comparisonPeriod" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/KpiWindow"
+            }, {
+              "type" : "null"
+            } ],
+            "description" : "The same elapsed length of the comparison period; null for comparison `none`."
+          },
+          "comparisonValue" : {
+            "type" : [ "number", "null" ]
+          },
+          "delta" : {
+            "type" : [ "number", "null" ]
+          },
+          "deltaPct" : {
+            "type" : [ "number", "null" ],
+            "description" : "(value - comparisonValue) / |comparisonValue| × 100; with a zero comparison value it is 0 when the value is also 0, else null."
+          },
+          "target" : {
+            "type" : [ "number", "null" ]
+          },
+          "bands" : {
+            "oneOf" : [ {
+              "$ref" : "#/components/schemas/KpiBands"
+            }, {
+              "type" : "null"
+            } ]
+          },
+          "band" : {
+            "type" : [ "string", "null" ],
+            "enum" : [ "GREEN", "AMBER", "RED", null ]
+          },
+          "tone" : {
+            "type" : "string",
+            "enum" : [ "success", "warning", "error", "neutral" ],
+            "description" : "The band as a statusTone word; neutral when there is no band."
+          },
+          "unit" : {
+            "type" : [ "string", "null" ]
+          },
+          "format" : {
+            "type" : [ "object", "null" ]
+          },
+          "owner" : {
             "type" : [ "string", "null" ]
           }
         }
