@@ -203,7 +203,13 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
         expect(get.request.method).toBe('GET');
         get.flush({});
 
-        const body = { purpose: 'warrant 7', params: { seed1: ['a'] }, dataset: 'calls2', sourceCol: 'A', targetCol: 'B' };
+        const body = {
+            purpose: 'warrant 7',
+            params: { seed1: ['a'] },
+            dataset: 'calls2',
+            sourceCol: 'A',
+            targetCol: 'B',
+        };
         svc.instantiateTemplate('tpl-1', body).subscribe();
         const inst = httpMock.expectOne(`${base}/inv/investigation-templates/tpl-1/instantiate`);
         expect(inst.request.method).toBe('POST');

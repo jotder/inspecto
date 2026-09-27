@@ -143,7 +143,9 @@ export class DashboardViewStore {
             : multi
               ? [
                     ...current.items.filter((item) => !isEqOnPairField(item)),
-                    ...pairs.map(({ field, value }) => ({ kind: 'condition', field, operator: '=', value }) as Condition),
+                    ...pairs.map(
+                        ({ field, value }) => ({ kind: 'condition', field, operator: '=', value }) as Condition,
+                    ),
                 ]
               : [
                     ...current.items,

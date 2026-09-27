@@ -59,7 +59,9 @@ export const CHART_TONE: Readonly<Record<'error' | 'warning' | 'info' | 'success
 
 /** UIE-2: the categorical palette minus its red and green, for series that carry no status meaning — a neutral
  *  series must never look like a failure or a pass. */
-export const CHART_CATEGORICAL_NEUTRAL: readonly string[] = CHART_CATEGORICAL.filter((c) => c !== '#EF4444' && c !== '#22C55E');
+export const CHART_CATEGORICAL_NEUTRAL: readonly string[] = CHART_CATEGORICAL.filter(
+    (c) => c !== '#EF4444' && c !== '#22C55E',
+);
 
 const CHART_MONOCHROME: readonly string[] = ['#4f46e5', '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe', '#e0e7ff'];
 

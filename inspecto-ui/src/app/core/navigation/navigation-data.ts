@@ -65,7 +65,13 @@ export const defaultNavigation: GammaNavigationItem[] = [
                 icon: 'heroicons_outline:signal',
                 link: '/processing-status',
             },
-            { id: 'events', title: 'Signal Ledger', type: 'basic', icon: 'heroicons_outline:queue-list', link: '/events' },
+            {
+                id: 'events',
+                title: 'Signal Ledger',
+                type: 'basic',
+                icon: 'heroicons_outline:queue-list',
+                link: '/events',
+            },
             { id: 'audit', title: 'Audit log', type: 'basic', icon: 'heroicons_outline:shield-check', link: '/audit' },
             {
                 id: 'diagnoses',

@@ -49,7 +49,12 @@ export function formatNumber(value: number, format?: NumberFormat): string {
     if (f.style === 'percent') return `${new Intl.NumberFormat(LOCALE, base).format(value)} %`;
     if (f.style === 'currency' && f.currency) {
         try {
-            return new Intl.NumberFormat(LOCALE, { ...base, style: 'currency', currency: f.currency, currencyDisplay: 'code' })
+            return new Intl.NumberFormat(LOCALE, {
+                ...base,
+                style: 'currency',
+                currency: f.currency,
+                currencyDisplay: 'code',
+            })
                 .format(value)
                 .replace(/\s/g, ' ');
         } catch {

@@ -253,8 +253,8 @@
                 <ul class="m-0 flex list-none flex-col gap-0.5 p-0 text-xs">
                     @for (a of store.workingSet()!.annotations; track a.step + ':' + a.id) {
                         <li>
-                            <strong>{{ a.id }}</strong> — {{ a.note }}{{ a.confidence ? ' [' + a.confidence + ']' : '' }}
-                            (step {{ a.step }})
+                            <strong>{{ a.id }}</strong> — {{ a.note
+                            }}{{ a.confidence ? ' [' + a.confidence + ']' : '' }} (step {{ a.step }})
                         </li>
                     }
                 </ul>

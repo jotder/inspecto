@@ -19,7 +19,8 @@ import type { InvestigationRef } from './investigation-state';
  * holds now. 🔴 An analyst who reads a reopened view as the graph they saved is reading a different graph
  * with the same name; in investigative use that is a false finding, not a stale cache.
  */
-export const SAVED_VIEW_NOT_EVIDENCE = 'Saved views re-project live data — a reopened view may differ from the one you saved.';
+export const SAVED_VIEW_NOT_EVIDENCE =
+    'Saved views re-project live data — a reopened view may differ from the one you saved.';
 
 export interface LinkAnalysisView {
     id: string;

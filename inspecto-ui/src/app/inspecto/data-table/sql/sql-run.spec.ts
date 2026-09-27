@@ -47,7 +47,11 @@ describe('runSql', () => {
         // Regression: a Dataset's sourceName can mirror its storage path (e.g. a pipeline's
         // "<name>/database" output dir); the table must be registered under that exact name, not a
         // sanitized stand-in, or the editor's own default `FROM "<source>"` query 404s against itself.
-        const res = await runSql('SELECT * FROM "mule_transfers/database" WHERE "type" = \'CALL\'', 'mule_transfers/database', rows);
+        const res = await runSql(
+            'SELECT * FROM "mule_transfers/database" WHERE "type" = \'CALL\'',
+            'mule_transfers/database',
+            rows,
+        );
         expect(res.ok).toBe(true);
         expect(res.rows.length).toBe(2);
     });

@@ -97,7 +97,10 @@ const COVERAGE: InvestigationCoverage = {
         { date: '2026-09-03', rows: 0 },
     ],
     readAt: '',
-    collectors: { assessed: false, note: 'per-Collector coverage is not assessed: a Dataset row carries no Collector attribution' },
+    collectors: {
+        assessed: false,
+        note: 'per-Collector coverage is not assessed: a Dataset row carries no Collector attribution',
+    },
 };
 
 const refused = (message: string) =>

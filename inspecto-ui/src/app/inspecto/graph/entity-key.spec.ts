@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { ENTITY_NORMALISERS, EntityNormaliser, normalizeEntityKey, normalizeTypedKey, typedEntityKey } from './entity-key';
+import {
+    ENTITY_NORMALISERS,
+    EntityNormaliser,
+    normalizeEntityKey,
+    normalizeTypedKey,
+    typedEntityKey,
+} from './entity-key';
 import fixture from './entity-normaliser-parity.fixture.json';
 
 /**

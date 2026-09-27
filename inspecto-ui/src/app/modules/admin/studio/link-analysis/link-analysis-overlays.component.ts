@@ -32,7 +32,11 @@ export function legendItemsFor(g: G6GraphData | null, nodeColors: Record<string,
     }
     return [...counts.entries()]
         .sort((a, b) => b[1] - a[1])
-        .map(([kind, count]) => ({ kind, count, color: nodeColors[kind] ?? stamped.get(kind) ?? nodeColor(kind as NodeKind) }));
+        .map(([kind, count]) => ({
+            kind,
+            count,
+            color: nodeColors[kind] ?? stamped.get(kind) ?? nodeColor(kind as NodeKind),
+        }));
 }
 
 /** The link kinds present, without their folded ` · N` count suffix, sorted. */

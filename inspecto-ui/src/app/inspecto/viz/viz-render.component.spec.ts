@@ -165,7 +165,13 @@ describe('VizRenderComponent', () => {
         expect(c.renderKind()).toBe('component');
         expect(c.outletComponent()).toBeTruthy();
         // UIE-1: the widget card carries the title, so the tile gets the value and what it means — no source-name label.
-        expect(c.outletInputs()).toEqual({ value: 99, compare: undefined, format: undefined, target: undefined, better: 'higher' });
+        expect(c.outletInputs()).toEqual({
+            value: 99,
+            compare: undefined,
+            format: undefined,
+            target: undefined,
+            better: 'higher',
+        });
     });
 
     it('treemap: mounts the treemap component with its rows, format and limit, and re-emits its clicks as channelClick', () => {

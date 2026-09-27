@@ -266,7 +266,12 @@ export function refreshAllCells(e: { api: GridApi }): void {
  * and the min width grows with it so a snake_case name fits on one line (sort + filter icons included).
  */
 export function dataColumn(field: string): ColDef {
-    return { field, headerName: field, headerTooltip: field, minWidth: Math.max(110, Math.round(field.length * 7.5) + 72) };
+    return {
+        field,
+        headerName: field,
+        headerTooltip: field,
+        minWidth: Math.max(110, Math.round(field.length * 7.5) + 72),
+    };
 }
 
 /** Derive simple columns from the keys of loose-map rows (audit rows etc.). */

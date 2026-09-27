@@ -56,15 +56,13 @@ export class LinkAnalysisSnapshotsService {
 
     /** Record that a sealed snapshot was attached to a Case. Returns every Case it is now attached to. */
     attachTo(snapshotId: string, caseId: string): Observable<string[]> {
-        return this.http
-            .post<{ attachedTo?: string[] }>(apiUrl('/inv/snapshots/attach'), { snapshotId, caseId })
-            .pipe(
-                map((r) => r?.attachedTo ?? []),
-                tap((attached) =>
-                    this.snapshots.update((all) =>
-                        all.map((s) => (s.id === snapshotId ? { ...s, attachedTo: attached } : s)),
-                    ),
+        return this.http.post<{ attachedTo?: string[] }>(apiUrl('/inv/snapshots/attach'), { snapshotId, caseId }).pipe(
+            map((r) => r?.attachedTo ?? []),
+            tap((attached) =>
+                this.snapshots.update((all) =>
+                    all.map((s) => (s.id === snapshotId ? { ...s, attachedTo: attached } : s)),
                 ),
-            );
+            ),
+        );
     }
 }

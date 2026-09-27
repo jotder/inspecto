@@ -27,7 +27,8 @@ export function seriesColors(labels: readonly string[]): string[] {
     });
     for (const i of neutral) {
         let slot = hash(labels[i]) % palette.length;
-        for (let tries = 0; tries < palette.length && used.has(palette[slot]); tries++) slot = (slot + 1) % palette.length;
+        for (let tries = 0; tries < palette.length && used.has(palette[slot]); tries++)
+            slot = (slot + 1) % palette.length;
         out[i] = palette[slot];
         used.add(out[i]);
     }

@@ -116,7 +116,8 @@ export class ExploreControlsComponent {
     readonly noFields: string[] = [];
     readonly selectedFieldsByChannel = computed<Record<string, string[]>>(() => {
         const out: Record<string, string[]> = {};
-        for (const channel of Object.keys(this.values())) out[channel] = this.selectedFields(channel as ControlSpec['channel']);
+        for (const channel of Object.keys(this.values()))
+            out[channel] = this.selectedFields(channel as ControlSpec['channel']);
         return out;
     });
     aggFor(channel: ControlSpec['channel']): Aggregation {

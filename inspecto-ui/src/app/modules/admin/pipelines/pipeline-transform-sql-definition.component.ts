@@ -296,9 +296,7 @@ export class PipelineTransformSqlDefinitionComponent {
      * early, so editing hand-written SQL saved NOTHING and said nothing. The binder check above already
      * guards what is typed there.
      */
-    readonly canApply = computed(
-        () => this.counts().problems === 0 && !this.binderError() && !this.slotSqlRefusal(),
-    );
+    readonly canApply = computed(() => this.counts().problems === 0 && !this.binderError() && !this.slotSqlRefusal());
 
     /**
      * In the projection slot, SQL that is more than a projection cannot be applied: the slot is saved as

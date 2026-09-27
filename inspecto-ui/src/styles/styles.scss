@@ -116,7 +116,8 @@
         }
     }
 
-    .mat-calendar-body-cell:hover:not(.mat-calendar-body-disabled) .mat-calendar-body-cell-content:not(.mat-calendar-body-selected) {
+    .mat-calendar-body-cell:hover:not(.mat-calendar-body-disabled)
+        .mat-calendar-body-cell-content:not(.mat-calendar-body-selected) {
         background-color: var(--gamma-bg-hover) !important;
     }
 }
@@ -369,13 +370,18 @@ body.dark {
  * own palette, and that palette is light unless the page declares `color-scheme`. Follow the scheme class
  * that the layout component sets on <html> and <body>. Also ensure CDK overlays and native selects/options
  * adhere to the active color-scheme and dark theme surfaces. */
-:root, html {
+:root,
+html {
     color-scheme: light;
 }
-:root.dark, html.dark, body.dark {
+:root.dark,
+html.dark,
+body.dark {
     color-scheme: dark;
 }
-:root.light, html.light, body.light {
+:root.light,
+html.light,
+body.light {
     color-scheme: light;
 }
 
@@ -423,4 +429,3 @@ select.bg-transparent optgroup {
     background-color: var(--gamma-bg-card) !important;
     color: var(--gamma-text-default) !important;
 }
-

@@ -370,7 +370,12 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
             truncated = true;
             return null;
         }
-        const data: G6Node['data'] = { label: label || value, kind: category || 'entity', spellings: [value], provenance: [provenance] };
+        const data: G6Node['data'] = {
+            label: label || value,
+            kind: category || 'entity',
+            spellings: [value],
+            provenance: [provenance],
+        };
         if (category) data.color = categoryColor(category);
         nodes.set(id, { id, data });
         return id;

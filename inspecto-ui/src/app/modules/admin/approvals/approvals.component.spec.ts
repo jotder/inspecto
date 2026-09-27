@@ -51,7 +51,10 @@ async function create(
                 provide: InspectoConfirmService,
                 useValue: { confirm: vi.fn(async () => confirmed), confirmDestructive: vi.fn(async () => confirmed) },
             },
-            { provide: LensService, useValue: { canAdminister: () => canAdminister, canOperateRuns: () => canOperate } },
+            {
+                provide: LensService,
+                useValue: { canAdminister: () => canAdminister, canOperateRuns: () => canOperate },
+            },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],

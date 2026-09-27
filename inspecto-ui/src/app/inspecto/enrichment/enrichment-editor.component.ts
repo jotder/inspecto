@@ -121,11 +121,7 @@ export interface EnrichmentEditorValue {
                                 } @else {
                                     <mat-form-field class="min-w-52 flex-1" subscriptSizing="dynamic">
                                         <mat-label>File path</mat-label>
-                                        <input
-                                            matInput
-                                            formControlName="path"
-                                            placeholder="data/ref/region_dim.csv"
-                                        />
+                                        <input matInput formControlName="path" placeholder="data/ref/region_dim.csv" />
                                     </mat-form-field>
                                     <mat-form-field class="w-32" subscriptSizing="dynamic">
                                         <mat-label>Format</mat-label>

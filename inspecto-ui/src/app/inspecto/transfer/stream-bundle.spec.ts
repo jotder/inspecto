@@ -271,9 +271,7 @@ describe('stream-bundle — import plan', () => {
         });
         const e = planStreamImport(b, { name: 'orders_copy' }).enrichment!.config;
         expect((e['input'] as Record<string, unknown>)['database']).toBe('data/orders_copy/database');
-        expect((e['output'] as Record<string, unknown>)['database']).toBe(
-            'data/enriched/orders_copy_enrich',
-        );
+        expect((e['output'] as Record<string, unknown>)['database']).toBe('data/enriched/orders_copy_enrich');
         expect((e['triggers'] as Record<string, unknown>)['on_pipeline']).toBe('orders_copy');
         expect(e['transform']).toBe('SELECT * FROM input'); // the author's logic is untouched
         expect((e['input'] as Record<string, unknown>)['format']).toBe('PARQUET');

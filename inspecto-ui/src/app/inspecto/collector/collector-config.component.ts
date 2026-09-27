@@ -54,7 +54,12 @@ export type CollectorMode = 'local' | 'connection' | 'dataset';
         <div class="flex flex-col gap-4">
             <div>
                 <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wider">Collect from</div>
-                <mat-button-toggle-group [value]="mode()" [disabled]="readOnly" (change)="setMode($event.value)" aria-label="Collect from">
+                <mat-button-toggle-group
+                    [value]="mode()"
+                    [disabled]="readOnly"
+                    (change)="setMode($event.value)"
+                    aria-label="Collect from"
+                >
                     <mat-button-toggle value="local" matTooltip="Read files from the pipeline's inbox folder">
                         Local inbox
                     </mat-button-toggle>

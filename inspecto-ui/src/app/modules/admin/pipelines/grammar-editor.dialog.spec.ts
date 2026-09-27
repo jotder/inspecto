@@ -267,7 +267,13 @@ describe('GrammarEditorDialog', () => {
         it('opens with the thread sample in its sample box, and re-saving it keeps the parsed rows', async () => {
             const thread = new DefinitionStateService();
             thread.captureSample('orders.csv', SAMPLE);
-            thread.parsePreview.set({ frontend: 'delimited', columns: ['id'], rows: [{ id: '1' }], rowCount: 1, rejectedRows: 0 });
+            thread.parsePreview.set({
+                frontend: 'delimited',
+                columns: ['id'],
+                rows: [{ id: '1' }],
+                rowCount: 1,
+                rejectedRows: 0,
+            });
             const { c, editor, fixture } = await create({ thread });
             expect(editor.sampleText()).toBe(SAMPLE);
             expect((fixture.nativeElement as HTMLElement).querySelector('textarea')?.value).toBe(SAMPLE);
@@ -280,8 +286,16 @@ describe('GrammarEditorDialog', () => {
         it('a FAILED re-parse clears the parsed hop rather than leaving stale columns downstream', async () => {
             const thread = new DefinitionStateService();
             thread.captureSample('orders.csv', SAMPLE);
-            thread.parsePreview.set({ frontend: 'delimited', columns: ['id'], rows: [{ id: '1' }], rowCount: 1, rejectedRows: 0 });
-            const preview = vi.fn(() => throwError(() => ({ status: 422, error: { error: { message: 'bad quote' } } })));
+            thread.parsePreview.set({
+                frontend: 'delimited',
+                columns: ['id'],
+                rows: [{ id: '1' }],
+                rowCount: 1,
+                rejectedRows: 0,
+            });
+            const preview = vi.fn(() =>
+                throwError(() => ({ status: 422, error: { error: { message: 'bad quote' } } })),
+            );
             const { editor } = await create({ thread, preview });
             editor.test();
             expect(thread.parsePreview()).toBeNull();
@@ -358,8 +372,15 @@ describe('GrammarEditorDialog', () => {
         });
 
         it('a node that already names a schema keeps it: no write, even after a Test parse', async () => {
-            const node: AuthoredNode = { ...NEW_NODE, config: { ...NEW_NODE.config, schema_file: 'web_orders_schema.toon' } };
-            const { c, editor, close, config } = await create({ node, pipeline: 'web_orders', preview: vi.fn(() => of(TYPED)) });
+            const node: AuthoredNode = {
+                ...NEW_NODE,
+                config: { ...NEW_NODE.config, schema_file: 'web_orders_schema.toon' },
+            };
+            const { c, editor, close, config } = await create({
+                node,
+                pipeline: 'web_orders',
+                preview: vi.fn(() => of(TYPED)),
+            });
             editor.onSampleText('order_id,amount\n1,12.5\n');
             editor.test();
             c.save();

@@ -16,8 +16,17 @@ const SCORE: RiskScore = {
     runId: 'r2',
     scoredAt: '2026-09-02 00:00:00',
     factors: [
-        { indicator: 'failed', label: 'Failed top-ups', value: 2, missing: false, weight: 30, cap: 45,
-          capped: true, contribution: 45, evidence: [] },
+        {
+            indicator: 'failed',
+            label: 'Failed top-ups',
+            value: 2,
+            missing: false,
+            weight: 30,
+            cap: 45,
+            capped: true,
+            contribution: 45,
+            evidence: [],
+        },
         { indicator: 'spend', value: 10, missing: false, weight: 1, capped: false, contribution: 10, evidence: [] },
         { indicator: 'swaps', value: null, missing: true, weight: 20, capped: false, contribution: 0, evidence: [] },
     ],
@@ -38,7 +47,12 @@ function mount(api: Partial<RiskScoresService>) {
 describe('RiskScorePanelComponent', () => {
     it('renders the score and one bar per factor relative to the largest contribution', async () => {
         const calls: string[] = [];
-        const fixture = mount({ latest: (m: string, k: string) => { calls.push(`${m}/${k}`); return of(SCORE); } });
+        const fixture = mount({
+            latest: (m: string, k: string) => {
+                calls.push(`${m}/${k}`);
+                return of(SCORE);
+            },
+        });
         await fixture.whenStable();
         fixture.detectChanges();
         const el: HTMLElement = fixture.nativeElement;

@@ -38,7 +38,9 @@ export function nextSpan(span: unknown): TileSpan {
 
 /** How the width is said in a tooltip or an aria-label. */
 export function spanLabel(span: unknown): string {
-    return ({ 1: 'quarter width', 2: 'half width', 3: 'three-quarter width', 4: 'full width' } as const)[tileSpan(span)];
+    return ({ 1: 'quarter width', 2: 'half width', 3: 'three-quarter width', 4: 'full width' } as const)[
+        tileSpan(span)
+    ];
 }
 
 /** What a tile will hold once its data arrives — picks the tile card's loading skeleton. */
