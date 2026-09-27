@@ -128,6 +128,8 @@ final class ConfigFileSupport {
                         String f = p.getFileName().toString();
                         return f.equals(suffixed) || f.equals(bare);
                     })
+                    // CONFIG-WRITE-REGISTRY-1: a registry component or reserved file is no satellite
+                    .filter(p -> !WriteGates.isReservedConfigTarget(writeRoot, p))
                     .limit(2)   // one more than we accept — enough to detect ambiguity, no more work
                     .toList();
             return hits.size() == 1 ? hits.get(0) : byConvention;

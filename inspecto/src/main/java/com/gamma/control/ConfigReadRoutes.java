@@ -238,6 +238,10 @@ final class ConfigReadRoutes implements RouteModule {
             dir = WriteGates.jail(writeRoot, writeRoot.resolve(sub), "subdir");
         }
         Path target = ConfigFileSupport.resolveRegisteredConfigFile(api, writeRoot, dir, type, fileName, subdir);
+        // CONFIG-WRITE-REGISTRY-1 (read side): a registry component is read through /components/<kind>, which
+        // applies ComponentAccess.requireView; a reserved file (roles, demo-users, approval) is never served
+        // here. Before the 404, so no existence oracle; the satellite scan below skips such hits for the same reason.
+        WriteGates.refuseReservedConfigTarget(writeRoot, target);
         // A satellite (schema/mapping/enrichment) lives beside its pipeline, not at the write root —
         // resolve it there when the convention path misses. READ ONLY; see resolveSatelliteForRead.
         target = ConfigFileSupport.resolveSatelliteForRead(writeRoot, target, type, fileName, subdir);

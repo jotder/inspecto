@@ -183,7 +183,56 @@ class ControlApiConfigWriteRegistryJailTest {
             assertEquals(403, write(c, "alias/kpis", "planted", true).statusCode());
             assertEquals(403, write(c, "alias/kpis", "revenue", true).statusCode());
             assertEquals(403, send(c, "DELETE", "/config/meta/revenue?subdir=alias/kpis", null).statusCode());
+            assertEquals(403, send(c, "GET", "/config/meta/revenue?subdir=alias/kpis", null).statusCode());
             assertEquals(before, tree(c.root));
+        }
+    }
+
+    // ── the read side ────────────────────────────────────────────────────────────────────────────
+
+    /** {@code GET /config/{type}/{name}} is ungated, so a registry read here skipped the
+     *  {@code ComponentAccess.requireView} that {@code /components/<kind>} applies to a private / shared-away one. */
+    @Test
+    void readsUnderTheRegistryAreRefusedInEverySpelling(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            for (String[] k : KINDS) {
+                for (String id : List.of(k[2], "absent")) {   // present and absent alike: no existence oracle
+                    HttpResponse<String> r = send(c, "GET", "/config/meta/" + id + "?subdir=registry/" + k[0], null);
+                    assertEquals(403, r.statusCode(), k[0] + "/" + id + ": " + r.body());
+                    assertTrue(r.body().contains("/components/" + k[1]), r.body());
+                }
+            }
+            for (String q : List.of("registry%2Fkpis", "registry%5Ckpis", "registry%252Fkpis", "Registry%2Fkpis",
+                    "REGISTRY%2FKPIS", "registry.%2Fkpis", "x%2F..%2Fregistry%2Fkpis", "registry%2F..%2Fregistry%2Fkpis",
+                    ".%2Fregistry%2Fkpis", "registry")) {
+                HttpResponse<String> r = send(c, "GET", "/config/meta/revenue?subdir=" + q, null);
+                assertEquals(403, r.statusCode(), q + ": " + r.body());
+                assertFalse(r.body().contains("\"config\""), "no content served: " + r.body());
+            }
+        }
+    }
+
+    /** With no subdir a schema read falls back to a bounded scan of the write root — which must not find a
+     *  registry schema either. Skipped, not refused: a 404 exactly like an absent name, so no oracle. */
+    @Test
+    void theSatelliteScanDoesNotServeARegistrySchema(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            Path schemas = Files.createDirectories(c.root.resolve("registry/schemas"));
+            Files.writeString(schemas.resolve("orphan.toon"), "raw:\n  name: orphan\n");
+            assertEquals(404, send(c, "GET", "/config/schema/orphan", null).statusCode());
+            assertEquals(404, send(c, "GET", "/config/schema/never-existed", null).statusCode());
+        }
+    }
+
+    @Test
+    void theReservedSpaceDocumentsAreNotReadable(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            Files.writeString(c.root.resolve("demo-users.toon"), "name: demo-users\n");
+            for (String name : List.of("approval", "demo-users", "roles", "access-policies", "egress", "space")) {
+                HttpResponse<String> r = send(c, "GET", "/config/meta/" + name, null);
+                assertEquals(403, r.statusCode(), name + ": " + r.body());
+                assertFalse(r.body().contains("\"config\""), name + " served: " + r.body());
+            }
         }
     }
 
@@ -214,6 +263,9 @@ class ControlApiConfigWriteRegistryJailTest {
                 assertEquals(200, r.statusCode(), sub + ": " + r.body());
                 Path f = (sub == null ? c.root : c.root.resolve(sub)).resolve("semantics.toon");
                 assertTrue(Files.isRegularFile(f), f.toString());
+                HttpResponse<String> read = send(c, "GET", "/config/meta/semantics" + (sub == null ? "" : "?subdir=" + sub), null);
+                assertEquals(200, read.statusCode(), sub + " read: " + read.body());
+                assertEquals("semantics", V1Body.of(read.body()).at("/config/name").asText());
             }
             assertEquals(200, send(c, "POST", "/config/patch",
                     "{\"type\":\"meta\",\"name\":\"semantics\",\"subdir\":\"orders\",\"patch\":{\"version\":2}}").statusCode());

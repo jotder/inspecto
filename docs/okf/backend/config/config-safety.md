@@ -202,8 +202,17 @@ the 422 content gate and before any existence check (so a refusal is not an exis
 ⛔ No shipped caller wrote under `registry/` through these routes: the UI's `subdir` is always a Pipeline's own
 config directory, and `schema-editor.dialog.ts` already routes a registry schema through `/components/schema`
 (its comment explains why `subdir: 'registry/schemas'` was wrong anyway — the component read does no
-sibling-CSV merge). ⚠ The `GET /config/{type}/{name}` read is deliberately left alone: it is ungated like every
-read, and `/components/<kind>` already serves the same bytes. Pinned by `ControlApiConfigWriteRegistryJailTest`
+sibling-CSV merge).
+
+**The read side follows the same rule** (review follow-up, same day). `GET /config/{type}/{name}` is ungated, so a
+`?subdir=registry/<dir>` read skipped the `ComponentAccess.requireView` that `/components/<kind>` applies to a
+private or shared-away component, and `/config/meta/demo-users` (or `roles`, `approval`) served a reserved file by
+name. The read now calls the same check on its convention target → 403 before the 404. Its no-`subdir` satellite
+scan (`ConfigFileSupport.resolveSatelliteForRead`) **skips** registry and reserved hits instead of refusing them — a
+403 there would itself say "a registry file by that name exists"; skipped, the answer is the same 404 as an absent
+name. ⛔ No UI or test read goes through `/config/*` for a registry component or a reserved file: the UI's reads
+all name a Pipeline's `subdir`, and registry schemas are read via `/components/schema`. Pinned by
+`ControlApiConfigWriteRegistryJailTest`
 (its symlink case needs link privilege and skips on a stock Windows account).
 
 ## Decision 2026-09-23 — a relative DATA path resolves under the Space directory

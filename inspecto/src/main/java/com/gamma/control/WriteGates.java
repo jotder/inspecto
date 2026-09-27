@@ -89,6 +89,17 @@ public final class WriteGates {
      * Windows drops, so {@code Registry/}, {@code registry./}, {@code x/../registry/} and a link to the
      * registry all count. Call it on the FINAL target, before any existence check (no existence oracle).
      */
+    /** {@link #refuseReservedConfigTarget} as a predicate — for a file the SERVER found (a satellite scan hit),
+     *  which is skipped rather than refused, so the scan cannot say what exists under {@code registry/}. */
+    static boolean isReservedConfigTarget(Path root, Path target) {
+        try {
+            refuseReservedConfigTarget(root, target);
+            return false;
+        } catch (ApiException refused) {
+            return true;
+        }
+    }
+
     static void refuseReservedConfigTarget(Path root, Path target) {
         Path base = root.toAbsolutePath().normalize();
         Path abs = target.toAbsolutePath().normalize();
