@@ -86,7 +86,10 @@ export class ReconciliationsComponent implements OnInit {
             // search matches either.
             field: 'name',
             headerName: 'Reconciliation',
-            flex: 2,
+            flex: 3,
+            // A title plus its id runs to ~650px; at 1440px the column is ~370px, so wrap rather than clip.
+            wrapText: true,
+            autoHeight: true,
             valueGetter: (p) => (p.data ? reconciliationTitle(p.data) : ''),
             getQuickFilterText: (p) => (p.data ? `${reconciliationTitle(p.data)} ${p.data.id}` : ''),
             cellRenderer: (p: ICellRendererParams<ReconciliationRow>) => {
@@ -101,11 +104,13 @@ export class ReconciliationsComponent implements OnInit {
         },
         sideColumn('leftDataset', 'leftLabel', 'Left'),
         sideColumn('rightDataset', 'rightLabel', 'Right'),
-        { headerName: 'Keys', width: 140, valueGetter: (p) => (p.data?.keyColumns ?? []).join(', ') },
+        { headerName: 'Keys', maxWidth: 140, valueGetter: (p) => (p.data?.keyColumns ?? []).join(', ') },
         {
             field: 'lastRunAt',
             headerName: 'Last run',
-            width: 180,
+            // The DataTable's default `flex: 1` overrides a bare `width` (it clipped the time); min = max pins it.
+            minWidth: 180,
+            maxWidth: 180,
             valueFormatter: (p) => (p.value === undefined ? '—' : p.value ? fmtDateTime(p.value) : 'never'),
         },
     ];

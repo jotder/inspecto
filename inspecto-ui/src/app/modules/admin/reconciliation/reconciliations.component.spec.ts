@@ -104,11 +104,14 @@ describe('ReconciliationsComponent', () => {
         ) as HTMLElement[];
         const texts = cells.map((c) => c.textContent?.trim());
         expect(texts).toContain('Offer fee billed: CRM vs CBS (daily, 0.01 SAR tolerance)ra_c02_offer_fee');
-        // A recon without a description falls back to its name, with its (different) id alongside.
-        expect(texts).toContain('switch vs billingswitch_vs_billing');
 
         const col = fixture.componentInstance.columns[0];
         const params = (data: Reconciliation) => ({ data }) as never;
+        // A recon without a description falls back to its name, with its (different) id alongside. Asserted on the
+        // renderer: the title column wraps (`autoHeight`), and jsdom's zero heights leave ag-Grid drawing one row.
+        const html = (col.cellRenderer as (p: never) => string)(params(RECON));
+        expect(html).toContain('<span>switch vs billing</span>');
+        expect(html).toContain('>switch_vs_billing</span>');
         expect((col.valueGetter as (p: never) => string)(params(offerFee))).toBe(
             'Offer fee billed: CRM vs CBS (daily, 0.01 SAR tolerance)',
         );

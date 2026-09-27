@@ -371,12 +371,18 @@ export class ObjectMailComponent implements OnInit {
 
     // ── grid ──────────────────────────────────────────────────────────────────────
     // Untyped ColDef[]: escalated/category/tags are derived (attribute-bag) columns, not model fields.
+    // Sized by min/max + flex weights (the DataTable's default `flex: 1` overrides a bare `width`). The minimums
+    // sum to ~850px, so the list fits beside the folders at 1440px with no horizontal scroll; 110px is the floor
+    // for a header with sort + filter icons (narrower, the word breaks mid-letter).
     readonly columnDefs: ColDef[] = [
         {
             field: 'escalated',
             headerName: 'Escalated', // narrow column: visually truncated, present for AT (axe empty-table-header)
             headerTooltip: 'Escalated',
-            width: 60,
+            // No header wrap: truncated on purpose; wrapped letter by letter it made the header row tall.
+            minWidth: 60,
+            maxWidth: 60,
+            wrapHeaderText: false,
             valueGetter: (p: ValueGetterParams<OperationalObject>) => (p.data ? isEscalated(p.data) : false),
             cellRenderer: (p: ICellRendererParams<OperationalObject>) =>
                 p.value
@@ -386,21 +392,22 @@ export class ObjectMailComponent implements OnInit {
         {
             field: 'priority',
             headerName: 'Priority',
-            width: 116,
+            minWidth: 116,
+            maxWidth: 116,
             cellRenderer: (p: ICellRendererParams<OperationalObject>) =>
                 p.value ? statusBadgeHtml(p.value as string) : '—',
         },
         {
             field: 'category',
             headerName: 'Category',
-            width: 210,
+            flex: 2,
+            minWidth: 140,
             valueGetter: (p: ValueGetterParams<OperationalObject>) => (p.data ? objectCategory(p.data) : ''),
             tooltipValueGetter: (p) => (p.data ? objectCategory(p.data) : ''),
         },
         {
             field: 'tags',
             headerName: 'Tags',
-            width: 170,
             valueGetter: (p: ValueGetterParams<OperationalObject>) => (p.data ? objectTags(p.data).join(', ') : ''),
             cellRenderer: (p: ICellRendererParams<OperationalObject>) =>
                 p.data
@@ -412,8 +419,8 @@ export class ObjectMailComponent implements OnInit {
         {
             field: 'title',
             headerName: 'Description',
-            flex: 1,
-            minWidth: 260,
+            flex: 3,
+            minWidth: 150,
             cellRenderer: (p: ICellRendererParams<OperationalObject>) => {
                 const o = p.data;
                 if (!o) return '';
@@ -424,14 +431,16 @@ export class ObjectMailComponent implements OnInit {
         {
             field: 'status',
             headerName: 'Status',
-            width: 130,
+            minWidth: 120,
+            maxWidth: 120,
             valueGetter: (p: ValueGetterParams<OperationalObject>) => (p.data ? displayStatus(p.data) : ''),
             cellRenderer: (p: ICellRendererParams<OperationalObject>) => statusBadgeHtml(p.value as string),
         },
         {
             field: 'updatedAt',
             headerName: 'Date',
-            width: 100,
+            minWidth: 110,
+            maxWidth: 110,
             valueFormatter: (p) => mailDate(p.value as number),
         },
     ];
