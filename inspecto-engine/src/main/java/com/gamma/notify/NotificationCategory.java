@@ -8,11 +8,10 @@ import java.util.Optional;
  *
  * <ul>
  *   <li>{@link #available} — whether this product version actually emits the category. {@code PIPELINE},
- *       {@code JOB} and {@code OPS} fire today; {@code COLLABORATION} and {@code SECURITY} are shown in
- *       the grid but inert until their (future) trigger modules land.</li>
+ *       {@code JOB}, {@code OPS} and {@code SECURITY} (the {@link SecurityTriggers} T1–T4) fire today;
+ *       {@code COLLABORATION} is shown in the grid but inert until its trigger module lands.</li>
  *   <li>{@link #critical} — a non-mutable transactional class (e.g. security alerts) that bypasses
- *       opt-out: it is always delivered and its toggles are locked. Latent in the auth-free core (no
- *       security triggers yet), but enforced now so an edition that adds them inherits the guarantee.</li>
+ *       opt-out: it is always delivered and its toggles are locked.</li>
  * </ul>
  *
  * @since 4.0.0
@@ -23,7 +22,7 @@ public enum NotificationCategory {
     JOB("job", "Job alerts", false, true),
     OPS("ops", "Operational alerts", false, true),
     COLLABORATION("collaboration", "Collaboration & comments", false, false),
-    SECURITY("security", "Security", true, false);
+    SECURITY("security", "Security", true, true);
 
     private final String id;
     private final String label;

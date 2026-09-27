@@ -597,6 +597,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         if (this.jobs != null) this.jobs.notificationService(this.notificationService);
         this.notificationSubscriber = notificationService::onEvent;
         this.eventLog.addSubscriber(notificationSubscriber);
+        // ses-sns §8: the built-in security triggers (T1–T4) read the audit rows of this log and emit
+        // SECURITY_TRIGGERED back into it, which the builtin-security-triggered rule turns into a notification.
+        final com.gamma.event.EventLog triggerLog = this.eventLog;
+        this.securityTriggers = new com.gamma.notify.SecurityTriggers(triggerLog::emit);
+        this.eventLog.addSubscriber(securityTriggers);
         String viewsFile = System.getProperty("events.views.file");
         this.savedViews = new SavedViewStore(viewsFile == null ? null : Path.of(viewsFile));
         CatalogOverlay.Stage2Reads stage2 = new CatalogOverlay.Stage2Reads() {
@@ -767,6 +772,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private final com.gamma.notify.NotificationService notificationService;
     private final com.gamma.notify.DeliveryReceiptStore deliveryReceipts;
     private final java.util.function.Consumer<com.gamma.event.Event> notificationSubscriber;
+    private final com.gamma.notify.SecurityTriggers securityTriggers;
 
     /** The alert engine (always present; empty until a rule is armed) — backs {@code /alerts}. */
     public java.util.Optional<com.gamma.alert.AlertService> alertService() {
@@ -2035,7 +2041,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         triggerWorkers.close();                        // drain in-flight cycle + event-triggered runs (T13)
         enrichment.close();   // drain in-flight recomputes first
         this.eventLog.removeSubscriber(eventObjectBridge);   // de-register the D2 gap→ALERT bridge
-        this.eventLog.removeSubscriber(notificationSubscriber);   // de-register the B2 event→feed engine
+        this.eventLog.removeSubscriber(notificationSubscriber);
+        this.eventLog.removeSubscriber(securityTriggers);   // de-register the B2 event→feed engine
         try { notificationService.close(); } catch (Exception e) { log.warn("Error closing notification service: {}", e.getMessage()); }
         try { notifications.close(); } catch (Exception e) { log.warn("Error closing notification store: {}", e.getMessage()); }
         EventLog.unregister(spaceId);                  // stop MDC-routing to this space's log

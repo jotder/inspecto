@@ -304,8 +304,36 @@ timestamp: 2026-07-16T00:00:00Z
   In-app feed copies stay per-event — only the external destination delivery batches. Package-private
   `flushDigest(id)` is the test seam. Tests: `NotificationServiceTest` (buffer+combined flush,
   empty-flush no-op), `ControlApiNotificationChannelsTest` (default/round-trip/negative-422).
-* Deferred to editions/follow-ons: time-based retention sweep, GeoIP, auth-gated security-event triggers /
-  per-user prefs.
+* **Security triggers T1–T4** (2026-09-28, ses-sns-adapter-design §8) — `SecurityTriggers` (engine,
+  `com.gamma.notify`) is a second `EventLog` subscriber beside `NotificationService`, wired per
+  `CollectorService`; it reads the audit rows and emits `EventType.SECURITY_TRIGGERED` back into the same log,
+  which the built-in rule `builtin-security-triggered` maps to category `security` (now `available = true`).
+  | id | input | key | default (`-Dnotify.security.<id>.threshold` / `.windowMinutes`) |
+  |---|---|---|---|
+  | t1 | `ACCESS_DENIED` 403, not a delivery-status path | actor | 20 in 10 min |
+  | t2 | `ACCESS_DENIED` 401 | audit IP | 50 in 10 min |
+  | t3 | `ACCESS_DENIED` 403 on `/public/delivery-status/{adapter}` | adapter | 10 in 60 min |
+  | t4 | `AUDIT` of a 2xx (not 202-held) `PUT /access/roles` — the only `roles.toon` writer | actor | every change |
+  * **Once per key per window**: a sliding window of at most `threshold` timestamps per (trigger, key); on firing
+    the key is quiet until the window elapses. Keys live in ONE access-ordered LRU of `MAX_KEYS` = 10,000, so
+    rotating keys can evict a count but never grow the heap.
+  * **T2 and F3:** the key is `AuditAttrs.IP` = `ApiContext.ip` — `X-Forwarded-For` only from a
+    `-Dcontrol.trustedProxies` peer, else the socket peer — so a spoofed header cannot mint keys.
+  * **Recipients = administrators.** In-app: `NotificationRoutes.visible` shows `security` only to a Subject
+    holding `canAdminister` (Personal: everyone, no Subject). Personal email: `NotificationPreferenceOverrides`
+    records an `admin` flag per enrolled Subject (on `PUT`, refreshed on `GET /notifications/preferences`);
+    `securityRecipients()` is the list. Critical, so no layer can opt out. Mail goes through the per-recipient
+    `DigestBuffer` (`security-digest:<subject>`, window `-Dnotify.security.digestMinutes`, default 10, 0 =
+    immediate). Operator `ChannelConfig` destinations get it too, with their own digest setting.
+  * Dedupe key includes the firing's `ts`, so a second window (or a second roles write) is not collapsed into
+    an unread first one.
+  * ⚠ Limits: counts are in memory, per Space log (a 401 with no Space in scope lands in the global log, i.e.
+    the default Space's evaluator); an admin who never saved preferences gets in-app only; the admin flag is
+    as fresh as the Subject's last preferences visit.
+  * Tests: `SecurityTriggersTest` (threshold−1, once per window, sliding window, T2/T3 keys, 10,000-key LRU,
+    T4, cannot be opted out + admin-only digest), `ControlApiSecurityTriggersTest` (real HTTP: 12 403s → one
+    notification, admin-only feed; spoofed XFF counts against 127.0.0.1; a roles write fires T4).
+* Deferred to editions/follow-ons: time-based retention sweep, GeoIP and trigger T5 (operator decision D12).
 
 ### Inbound delivery-status webhooks (BACKLOG D8, shipped 2026-07-26)
 

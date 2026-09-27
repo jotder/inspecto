@@ -43,6 +43,6 @@ class NotificationPreferencesTest {
         Map<String, Object> security = grid.stream()
                 .filter(r -> "security".equals(r.get("category"))).findFirst().orElseThrow();
         assertEquals(Boolean.TRUE, security.get("critical"));
-        assertEquals(Boolean.FALSE, security.get("available"), "shown but inert until triggers exist");
+        assertEquals(Boolean.TRUE, security.get("available"), "emitted by the ses-sns §8 security triggers");
     }
 }

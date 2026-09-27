@@ -30,6 +30,11 @@ public final class EventType {
     /** An attempt to reach a forbidden/unknown API route (the auth-free analogue of 401/403):
      *  a non-GET request that matched no route (404) or a disallowed method on a read-only route (405). */
     public static final String ACCESS_DENIED = "ACCESS_DENIED";
+    /** A built-in security trigger crossed its threshold (ses-sns-adapter-design §8, T1–T4) — emitted by
+     *  {@code com.gamma.notify.SecurityTriggers} once per (trigger, key) per window; attributes {@code trigger},
+     *  {@code title}, {@code key}, {@code count}, {@code windowMinutes}. Maps to notification category
+     *  {@code security}. */
+    public static final String SECURITY_TRIGGERED = "SECURITY_TRIGGERED";
 
     // ── service / pipeline lifecycle ──────────────────────────────────────────────
     public static final String SERVICE_STARTED     = "SERVICE_STARTED";

@@ -483,6 +483,13 @@ A body that tries to set an email address is ignored.
 
 ## 8. Security triggers
 
+> ✅ **T1–T4 BUILT 2026-09-28** (T5 waits on GeoIP, i.e. operator decision D12). As built:
+> [`events-metrics.md`](../okf/backend/control-plane/events-metrics.md) § *Security triggers*. Two
+> corrections to the text below: T4 keys on the AUDIT row of a successful `PUT /access/roles` (the only
+> route that writes `roles.toon` — no `config.written` action exists for it, and `/config/write` and bundle
+> import refuse the reserved file); and the F3 precondition held — the audit IP is `ApiContext.ip`, the
+> trusted-proxy-resolved client or else the socket peer.
+
 **What exists.** `NotificationCategory.SECURITY` is `critical = true, available = false`: shown in
 the grid, but never emitted (`inspecto-engine/src/main/java/com/gamma/notify/NotificationCategory.java:26`).
 The built-in Notification Rules cover only operational events

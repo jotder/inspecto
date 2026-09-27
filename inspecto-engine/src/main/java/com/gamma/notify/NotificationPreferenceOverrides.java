@@ -69,6 +69,9 @@ public final class NotificationPreferenceOverrides {
     private final Map<String, String> emails = new LinkedHashMap<>();
     /** subject id → category → channel → on. */
     private final Map<String, Map<String, Map<String, Boolean>>> overrides = new LinkedHashMap<>();
+    /** Subjects that held {@code canAdminister} when last seen saving or reading their preferences — the
+     *  recipients of personal {@code security} email (ses-sns §8). Refreshed on every such visit. */
+    private final java.util.Set<String> admins = new java.util.LinkedHashSet<>();
 
     private NotificationPreferenceOverrides(Path file, boolean writable) {
         this.file = file;
@@ -100,7 +103,11 @@ public final class NotificationPreferenceOverrides {
         if (doc.get("subjects") instanceof List<?> subjects)
             for (Object o : subjects)
                 if (o instanceof Map<?, ?> m && m.get("id") != null)
+                {
                     emails.put(String.valueOf(m.get("id")), m.get("email") == null ? "" : String.valueOf(m.get("email")));
+                    if (Boolean.TRUE.equals(m.get("admin")) || "true".equals(String.valueOf(m.get("admin"))))
+                        admins.add(String.valueOf(m.get("id")));
+                }
         if (doc.get("overrides") instanceof List<?> rows)
             for (Object o : rows) {
                 if (!(o instanceof Map<?, ?> m)) continue;
@@ -156,6 +163,31 @@ public final class NotificationPreferenceOverrides {
         return out;
     }
 
+    /** Enrolled Subjects that held {@code canAdminister} when last seen — who gets personal security email. */
+    public synchronized List<Enrolled> securityRecipients() {
+        List<Enrolled> out = new ArrayList<>();
+        for (Enrolled e : enrolled()) if (admins.contains(e.subject())) out.add(e);
+        return out;
+    }
+
+    /**
+     * Refresh whether an ENROLLED Subject holds {@code canAdminister} (a demotion must stop security email
+     * without waiting for the Subject's next save). A Subject that never saved is not enrolled and is left
+     * alone; nothing is written unless the flag changed, or when the file is unreadable.
+     */
+    public synchronized void noteAdministrator(String subject, boolean admin) throws IOException {
+        if (subject == null || !emails.containsKey(subject) || !writable) return;
+        if (admin == admins.contains(subject)) return;
+        if (admin) admins.add(subject); else admins.remove(subject);
+        persist();
+    }
+
+    /** {@link #apply(String, String, boolean, Map)} keeping the Subject's recorded administrator flag. */
+    public synchronized void apply(String subject, String email, Map<String, ? extends Map<String, Boolean>> changes)
+            throws IOException {
+        apply(subject, email, admins.contains(subject), changes);
+    }
+
     /**
      * Apply one Subject's edits and persist. {@code changes} is category → channel → value, where a
      * {@code null} value RESETS that cell to the default. Unknown/critical categories, non-personal channels
@@ -164,12 +196,13 @@ public final class NotificationPreferenceOverrides {
      *
      * @throws IllegalStateException when the deployment file exists but could not be read
      */
-    public synchronized void apply(String subject, String email, Map<String, ? extends Map<String, Boolean>> changes)
-            throws IOException {
+    public synchronized void apply(String subject, String email, boolean admin,
+                                   Map<String, ? extends Map<String, Boolean>> changes) throws IOException {
         if (!writable)
             throw new IllegalStateException("notification preference overrides " + file + " are unreadable; "
                     + "personal saves are refused until the file is repaired");
         emails.put(subject, blank(email) ? "" : email.trim());
+        if (admin) admins.add(subject); else admins.remove(subject);
         Map<String, Map<String, Boolean>> mine = overrides.computeIfAbsent(subject, k -> new LinkedHashMap<>());
         changes.forEach((category, channels) -> {
             if (channels == null) return;
@@ -223,6 +256,7 @@ public final class NotificationPreferenceOverrides {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", s);
             m.put("email", e);
+            m.put("admin", admins.contains(s));
             subjects.add(m);
         });
         List<Map<String, Object>> rows = new ArrayList<>();

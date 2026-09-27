@@ -411,12 +411,21 @@ public final class NotificationService implements NotificationAccess, AutoClosea
     private void deliverPersonalEmail(NotificationPreferenceOverrides personal, Notification n) {
         NotificationChannel email = channelByKind(NotificationPreferences.EMAIL);
         if (email == null) return;
-        for (NotificationPreferenceOverrides.Enrolled s : personal.enrolled()) {
+        boolean security = NotificationCategory.SECURITY.id().equals(n.category());
+        for (NotificationPreferenceOverrides.Enrolled s : security ? personal.securityRecipients() : personal.enrolled()) {
             if (!n.addressedTo(s.subject())) continue;
             if (!personal.enabled(prefs, n.category(), NotificationPreferences.EMAIL, s.subject(), s.email())) continue;
             java.util.Optional<String> suppressed = suppression.reasonToSuppress(s.email(), System.currentTimeMillis());
             if (suppressed.isPresent()) {
                 log.info("personal email to subject {} SUPPRESSED: {}", s.subject(), suppressed.get());
+                continue;
+            }
+            // ses-sns §8: security mail goes through the per-recipient DigestBuffer, so however many triggers
+            // fire in a window an administrator receives at most one message per window (0 = immediate).
+            int window = securityDigestMinutes();
+            if (security && window > 0) {
+                bufferForDigest(new ChannelConfig("security-digest:" + s.subject(), NotificationPreferences.EMAIL,
+                        s.email(), "security digest", true, 0L, null, window), n);
                 continue;
             }
             String deliveryId = openReceipt(n.id(), null, s.email(), false);
@@ -427,6 +436,12 @@ public final class NotificationService implements NotificationAccess, AutoClosea
                 log.warn("personal email to subject {} failed: {}", s.subject(), ex.getMessage());
             }
         }
+    }
+
+    /** {@code -Dnotify.security.digestMinutes}: the security email digest window, default 10; 0 = immediate. */
+    static int securityDigestMinutes() {
+        Integer v = Integer.getInteger("notify.security.digestMinutes", 10);
+        return v == null || v < 0 ? 10 : v;
     }
 
     private NotificationChannel channelByKind(String kind) {

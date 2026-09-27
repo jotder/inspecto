@@ -11,8 +11,8 @@ import java.util.function.Supplier;
 /**
  * The active set of {@link NotificationRule}s. Ships with built-in defaults that turn the operational
  * failure signals the engine already emits into user-facing alerts for the single {@code appUser}
- * operator — the categories that matter in this product today. (The requirement's Collaboration and
- * Security categories are future: their triggers need the unbuilt collaboration / security modules.)
+ * operator — the categories that matter in this product today — plus the {@link SecurityTriggers} output
+ * (category {@code security}). The requirement's Collaboration category is future.
  *
  * <p>An operator can author additional rules at runtime via the {@code /notifications/rules*} admin CRUD
  * (persisted as {@code notification-rule} components, mirrors {@link ChannelConfig}); {@link #forEvent}
@@ -79,7 +79,14 @@ public final class NotificationRules {
                         EventLevel.WARN, "ops",
                         "Conservation {{attributes.kind}} in {{pipeline}}",
                         "{{attributes.node}}: {{attributes.recordsIn}} in vs {{attributes.recordsOut}} out",
-                        "conservation:{{pipeline}}:{{attributes.node}}", true)));
+                        "conservation:{{pipeline}}:{{attributes.node}}", true),
+                // ses-sns §8: SecurityTriggers already aggregates (once per key per window), so each firing is
+                // its own notification — the dedupe key carries the firing's timestamp, or a second window's
+                // firing (or a second roles write, T4) would collapse into an unread first one and vanish.
+                new NotificationRule("builtin-security-triggered", EventType.SECURITY_TRIGGERED, null, "security",
+                        "Security: {{attributes.title}}",
+                        "{{message}}",
+                        "security:{{attributes.trigger}}:{{attributes.key}}:{{ts}}", true)));
     }
 
     /** The first rule that matches {@code e}, if any — operator-authored rules are checked first. */

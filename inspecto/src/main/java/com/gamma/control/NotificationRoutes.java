@@ -113,6 +113,11 @@ final class NotificationRoutes implements RouteModule {
     private static Object myPreferences(ApiContext api, HttpExchange ex) {
         Subject s = ApiContext.subject(ex).orElse(null);
         if (s == null) return api.service().notificationPreferences().grid();
+        try {   // keep the security-recipient flag current (a demotion stops security mail)
+            overrides(api).noteAdministrator(s.id(), s.capabilities().contains(Roles.CAN_ADMINISTER));
+        } catch (IOException ignore) {
+            // best effort — reading one's own grid must not fail on a write
+        }
         return overrides(api).grid(api.service().notificationPreferences(), s.id(), s.email());
     }
 
@@ -127,7 +132,7 @@ final class NotificationRoutes implements RouteModule {
         Subject s = ApiContext.subject(ex).orElse(null);
         if (s == null) return savePreferences(api, body);
         try {
-            overrides(api).apply(s.id(), s.email(), cells(body));
+            overrides(api).apply(s.id(), s.email(), s.capabilities().contains(Roles.CAN_ADMINISTER), cells(body));
         } catch (IllegalStateException unreadable) {
             throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY, unreadable.getMessage());
         }
@@ -169,6 +174,9 @@ final class NotificationRoutes implements RouteModule {
         Subject s = ApiContext.subject(ex).orElse(null);
         if (s == null) return true;
         if (!n.addressedTo(s.id())) return false;
+        // ses-sns §8: security notifications are for administrators only.
+        if (NotificationCategory.SECURITY.id().equals(n.category())
+                && !s.capabilities().contains(Roles.CAN_ADMINISTER)) return false;
         if (NotificationCategory.byId(n.category()).isEmpty()) return true;
         return overrides(api).enabled(api.service().notificationPreferences(), n.category(),
                 NotificationPreferences.IN_APP, s.id(), s.email());
