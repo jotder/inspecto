@@ -398,8 +398,14 @@ final class JobRoutes implements RouteModule {
      * (Personal), like every capability check.
      */
     static void requireAdministerForEventPrune(HttpExchange ex, JobConfig c) {
-        if (c != null && "maintenance".equals(c.type()) && "event_prune".equals(c.opt("task", "")))
-            ApiContext.requireCapability(ex, "canAdminister");
+        if (isEventPrune(c)) ApiContext.requireCapability(ex, "canAdminister");
+    }
+
+    /** Judged as {@code MaintenanceJob} dispatches it — the task is lower-cased there, so {@code EVENT_PRUNE} runs
+     *  the prune and must meet the same gate. */
+    static boolean isEventPrune(JobConfig c) {
+        return c != null && "maintenance".equals(c.type())
+                && "event_prune".equals(c.opt("task", "").toLowerCase(java.util.Locale.ROOT));
     }
 
     private static JobConfig parseJob(Map<String, Object> body) {

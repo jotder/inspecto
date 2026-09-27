@@ -46,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class ControlApiImportCapabilityGateTest {
 
-    private static final String BUILDER = "Bearer builder", BOTH = "Bearer both";
+    private static final String BUILDER = "Bearer builder", BOTH = "Bearer both", ADMIN = "Bearer admin";
     private static final ObjectMapper JSON = new ObjectMapper();
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -62,6 +62,7 @@ class ControlApiImportCapabilityGateTest {
     void arm() {
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
             case BUILDER -> Optional.of(new Subject("builder-1", Set.of("canAuthorWorkbench")));
+            case ADMIN -> Optional.of(new Subject("admin-1", Set.of("canAuthorWorkbench", "canAdminister")));
             case BOTH -> Optional.of(new Subject("lead-1", Set.of("canAuthorWorkbench", "canOnboardConnections",
                     "canAdminister")));
             default -> Optional.empty();
@@ -247,6 +248,55 @@ class ControlApiImportCapabilityGateTest {
             Map<String, String> before = tree(c.config);
             refused(send(c, "POST", "/pipelines/import?name=copy", zip(entries), BUILDER), "connection", "canOnboardConnections");
             assertEquals(before, tree(c.config), "nothing written");
+        }
+    }
+
+    // ── adversarial additions (verifier 2026-09-27) ──────────────────────────────────────────────
+
+    @Test
+    void aTaskSpelledInAnotherCaseIsStillAnEventPruneJob(@TempDir Path root) throws Exception {
+        // MaintenanceJob lower-cases the task before dispatch, so EVENT_PRUNE runs the prune
+        try (Ctx c = open(root)) {
+            byte[] prune = dataSourceZip("jobs/retention_job.toon", PRUNE_JOB.replace("event_prune", "EVENT_Prune"));
+            Map<String, String> before = tree(c.config);
+            refused(send(c, "POST", "/import", prune, BUILDER), "job (event_prune)", "canAdminister");
+            assertEquals(before, tree(c.config), "nothing written");
+        }
+    }
+
+    @Test
+    void aMixedRawImportWhoseForbiddenEntryComesLastWritesNothing(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            Map<String, byte[]> all = new LinkedHashMap<>();
+            all.put("bundle.toon", "kind: datasource\n".getBytes(StandardCharsets.UTF_8));
+            all.put("jobs/tidy_job.toon", "job:\n  name: tidy\n  type: maintenance\n  task: heartbeat\n"
+                    .getBytes(StandardCharsets.UTF_8));
+            all.put("jobs/retention_job.toon", PRUNE_JOB.getBytes(StandardCharsets.UTF_8));
+            Map<String, String> before = tree(c.config);
+            refused(send(c, "POST", "/import", zip(all), BUILDER), "job (event_prune)", "canAdminister");
+            assertEquals(before, tree(c.config), "the harmless entry ahead of the refused one is not written either");
+        }
+    }
+
+    @Test
+    void aNewSpaceBundleCarryingAConnectionNeedsCanOnboardConnectionsEvenForAnAdministrator(@TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(root)) {
+            byte[] body = dataSourceZip("connections/carried_connection.toon",
+                    "connection:\n  id: carried\n  connector: local\n");
+            HttpResponse<String> r = client.send(HttpRequest.newBuilder(URI.create(
+                            "http://localhost:" + c.port + "/api/v1/spaces/import?id=beta"))
+                    .header("Authorization", ADMIN).POST(HttpRequest.BodyPublishers.ofByteArray(body)).build(),
+                    HttpResponse.BodyHandlers.ofString());
+            refused(r, "connection", "canOnboardConnections");
+            assertTrue(Files.notExists(root.resolve("beta")), "no Space directory is created");
+
+            HttpResponse<String> ok = client.send(HttpRequest.newBuilder(URI.create(
+                            "http://localhost:" + c.port + "/api/v1/spaces/import?id=beta"))
+                    .header("Authorization", BOTH).POST(HttpRequest.BodyPublishers.ofByteArray(body)).build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, ok.statusCode(), ok.body());
+            assertTrue(Files.exists(root.resolve("beta/config/connections/carried_connection.toon")));
         }
     }
 }

@@ -86,7 +86,7 @@ final class ImportCapabilityGuard {
         j.putIfAbsent("name", "import");
         try {
             JobConfig c = JobConfig.fromMap(Map.of("job", j));
-            return "maintenance".equals(c.type()) && "event_prune".equals(c.opt("task", ""));
+            return JobRoutes.isEventPrune(c);
         } catch (RuntimeException unparseable) {
             return false;   // the spec gate refuses a malformed job
         }
