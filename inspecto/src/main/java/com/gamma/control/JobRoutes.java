@@ -398,15 +398,23 @@ final class JobRoutes implements RouteModule {
      * (Personal), like every capability check.
      */
     static void requireAdministerForEventPrune(HttpExchange ex, JobConfig c) {
-        if (isEventPrune(c)) ApiContext.requireCapability(ex, "canAdminister");
+        if (isAdministerOnlyMaintenance(c)) ApiContext.requireCapability(ex, "canAdminister");
     }
 
-    /** Judged as {@code MaintenanceJob} dispatches it — the task is lower-cased there, so {@code EVENT_PRUNE} runs
-     *  the prune and must meet the same gate. */
-    static boolean isEventPrune(JobConfig c) {
+    /**
+     * The maintenance tasks only an administrator may author, judged as {@code MaintenanceJob} dispatches them
+     * (the task is lower-cased there, so {@code RESTORE} runs the restore). {@code event_prune}: see above.
+     * {@code restore} (MAINT-RESTORE-ESCALATION-1): it writes an archive's files into any jailed directory — the
+     * config root included — and its only integrity check is a sidecar that carries its own hash, so a planted
+     * zip + sidecar restored with {@code overwrite: true} rewrote {@code roles.toon} for a canAuthorWorkbench user.
+     * ⚠ Every Job-authoring door must ask THIS predicate — the import doors do, through {@code ImportCapabilityGuard}.
+     */
+    static boolean isAdministerOnlyMaintenance(JobConfig c) {
         return c != null && "maintenance".equals(c.type())
-                && "event_prune".equals(c.opt("task", "").toLowerCase(java.util.Locale.ROOT));
+                && ADMINISTER_ONLY_TASKS.contains(c.opt("task", "").toLowerCase(java.util.Locale.ROOT));
     }
+
+    private static final java.util.Set<String> ADMINISTER_ONLY_TASKS = java.util.Set.of("event_prune", "restore");
 
     private static JobConfig parseJob(Map<String, Object> body) {
         JobConfig cfg;

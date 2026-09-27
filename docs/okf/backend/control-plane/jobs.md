@@ -500,6 +500,22 @@ for Alert Rules. A `backup`'s `maintenance_backups` catalog row registers in the
 (`SpaceConfigRoot.current()`, beside the Space's data root), never the JVM-wide `-Dassist.write.root`
 (`BACKUP-CATALOG-SPACE-ROOT-1`, 2026-09-25).
 
+🔴 **`restore` and `event_prune` are administrator-authored** (`MAINT-RESTORE-ESCALATION-1`, 2026-09-27). A
+`restore`'s only integrity check is the sidecar manifest, which carries **its own** hash — so it proves the archive
+is intact, never that the product wrote it: anyone who can place a zip + sidecar under a jailed root can make one
+"valid". Restored over the config root with `overwrite: true`, a planted archive rewrote `roles.toon`, and a `power`
+user (canAuthorWorkbench + canOperateRuns) granted themselves `canAdminister` — proven over real HTTP. Authoring or
+editing a Job whose task is in `JobRoutes.isAdministerOnlyMaintenance` (`event_prune`, `restore`) needs
+`canAdminister` at `POST`/`PUT /jobs` and `/config/write` type `job`, judged **lower-cased** as `MaintenanceJob`
+dispatches it (`RESTORE` runs the restore). ⚠ Every Job-authoring door must ask that predicate — the import doors
+included (their guard lands separately). ⚠ Enforcement is at **authoring time only**: a Job records no author, so
+the runner cannot refuse a restore whose author lacked the capability; a restore Job already on disk before the
+gate still runs. Other tasks judged: `backup` / `backup_verify` read and write only archives, the prunes and
+`compact` forget or merge data but write no config — authoring-level; `cleanup` can retire files under any jailed
+dir (config included) — deletion, not escalation, left open in `MAINT-TASK-AUTHORITY-1`. Test:
+`inspecto-backup` `ControlApiRestoreJobGateTest` (the only classpath holding `restore`, so the admin probe really
+runs it).
+
 * **Dry run (MNT-1)** — `POST /jobs/{name}/trigger?dryRun=true` (v1 202 body echoes it); `JobContext.dryRun()`;
   tasks with no preview do nothing on a dry run (fail-closed).
   🔴 **A dry run and its sweep are two call sites of ONE predicate** (`PRUNE-PREVIEW-DRIFT-1`, closed
