@@ -1,9 +1,18 @@
 import { ChangeDetectionStrategy, Component, effect, inject, input, signal, untracked } from '@angular/core';
+import { AbstractControl, FormControl, ReactiveFormsModule, ValidationErrors } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
 import { firstValueFrom } from 'rxjs';
-import { Dossier, DossierVerifyResult, InvService } from 'app/inspecto/api';
+import { Dossier, DossierQuery, DossierVerifyResult, InvService, SealedSnapshotIds } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { investigationErrorMessage } from './investigation-state';
+
+/** `DossierRoutes.MAX_SNAPSHOTS` — the server refuses more with a 422. */
+export const DOSSIER_MAX_SNAPSHOTS = 20;
+/** How many sealed ids the picker lists (`GET /inv/snapshots` defaults to 100, clamps to 1 000). */
+const SNAPSHOT_LIST_LIMIT = 100;
 
 /** Trigger a client-side download of an already-fetched Blob (the bearer travelled with the fetch). */
 function saveBlob(blob: Blob, name: string): void {
@@ -20,14 +29,22 @@ function saveBlob(blob: Blob, name: string): void {
 /**
  * **Link Analysis — Dossier** (LA-12, SPA half) over `DossierRoutes`: build the Investigation's dossier from the
  * sealed log, read its summary / topology / ledger / score tables, download the steps and method renderings, and
- * verify a manifest (the one just issued, or one uploaded as JSON) against the store as it is NOW. Nothing here
- * persists — both routes are read-shaped and audited server-side.
+ * verify a manifest (the one just issued, or one uploaded as JSON) against the store as it is NOW. The dossier can
+ * cover a PREFIX of the log (`at`, 0..steps; blank = the head) and embed up to 20 sealed snapshots' score tables
+ * (`snapshots`). Nothing here persists — the routes are read-shaped and audited server-side.
  */
 @Component({
     selector: 'inspecto-link-analysis-dossier',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatButtonModule, InspectoAlertComponent],
+    imports: [
+        ReactiveFormsModule,
+        MatButtonModule,
+        MatCheckboxModule,
+        MatFormFieldModule,
+        MatInputModule,
+        InspectoAlertComponent,
+    ],
     host: { class: 'block' },
     template: `
         <section
@@ -41,6 +58,49 @@ function saveBlob(blob: Blob, name: string): void {
                     {{ dossier() ? 'Rebuild' : 'Build dossier' }}
                 </button>
             </div>
+            <div class="flex flex-wrap items-start gap-2" aria-label="Dossier scope">
+                <mat-form-field class="w-40" subscriptSizing="dynamic">
+                    <mat-label>At step</mat-label>
+                    <input matInput type="number" min="0" [attr.max]="steps()" [formControl]="atControl" />
+                    <mat-hint>{{ steps() == null ? 'Blank = the head' : 'Blank = the head, 0–' + steps() }}</mat-hint>
+                    @if (atControl.hasError('range')) {
+                        <mat-error>{{ atError() }}</mat-error>
+                    }
+                </mat-form-field>
+                <div class="flex flex-col gap-1">
+                    <button mat-button [disabled]="busy()" (click)="loadSnapshots()">
+                        {{ snapshotList() ? 'Reload snapshots' : 'Include snapshots…' }}
+                    </button>
+                    <span class="text-secondary tabular-nums" aria-live="polite">
+                        {{ selected().length }} of at most {{ maxSnapshots }} snapshots included
+                    </span>
+                </div>
+            </div>
+            @if (snapshotError()) {
+                <inspecto-alert variant="error" title="Snapshots">{{ snapshotError() }}</inspecto-alert>
+            }
+            @if (snapshotList(); as list) {
+                @if (list.ids.length) {
+                    <fieldset class="m-0 flex flex-col border-0 p-0">
+                        <legend class="text-secondary">
+                            Sealed snapshots, newest first — only those anchored to this Investigation are accepted
+                            @if (list.truncated) {
+                                (showing {{ list.ids.length }} of {{ list.total }})
+                            }
+                        </legend>
+                        @for (id of list.ids; track id) {
+                            <mat-checkbox
+                                [checked]="selected().includes(id)"
+                                [disabled]="!selected().includes(id) && selected().length >= maxSnapshots"
+                                (change)="toggleSnapshot(id, $event.checked)"
+                                >{{ id }}</mat-checkbox
+                            >
+                        }
+                    </fieldset>
+                } @else {
+                    <p class="text-secondary m-0">No sealed snapshots in this Space.</p>
+                }
+            }
             @if (error()) {
                 <inspecto-alert variant="error" title="Dossier">{{ error() }}</inspecto-alert>
             }
@@ -165,6 +225,13 @@ export class LinkAnalysisDossierComponent {
     readonly verifyResult = signal<DossierVerifyResult | null>(null);
     readonly busy = signal(false);
     readonly error = signal('');
+    readonly maxSnapshots = DOSSIER_MAX_SNAPSHOTS;
+    /** The log length, known once a dossier has been built (its `summary.steps`). */
+    readonly steps = signal<number | null>(null);
+    readonly snapshotList = signal<SealedSnapshotIds | null>(null);
+    readonly selected = signal<string[]>([]);
+    readonly snapshotError = signal('');
+    readonly atControl = new FormControl<number | null>(null, (c) => this.atRange(c));
 
     constructor() {
         // Another Investigation opened: the dossier on screen documents the previous one — clear it.
@@ -174,24 +241,66 @@ export class LinkAnalysisDossierComponent {
                 this.dossier.set(null);
                 this.verifyResult.set(null);
                 this.error.set('');
+                this.steps.set(null);
+                this.snapshotList.set(null);
+                this.selected.set([]);
+                this.snapshotError.set('');
+                this.atControl.reset(null);
             });
         });
     }
 
     build(): Promise<void> {
+        if (this.atControl.invalid) {
+            this.atControl.markAsTouched();
+            return Promise.resolve();
+        }
+        const q: DossierQuery = { at: this.atControl.value ?? undefined, snapshots: this.selected() };
         return this.run('Could not build the dossier.', async () => {
             this.verifyResult.set(null);
-            this.dossier.set(await firstValueFrom(this.inv.dossier(this.investigationId())));
+            const d = await firstValueFrom(this.inv.dossier(this.investigationId(), q));
+            this.dossier.set(d);
+            this.steps.set(d.summary.steps);
+            this.atControl.updateValueAndValidity();
         });
     }
 
-    /** The rendering at the SAME step as the dossier on screen, so the file and the view agree. */
+    /** The rendering at the SAME step and snapshots as the dossier on screen, so the file and the view agree. */
     download(format: 'steps' | 'method'): Promise<void> {
-        const at = this.dossier()?.summary.at;
+        const d = this.dossier();
+        const q: DossierQuery = { at: d?.summary.at, snapshots: d?.summary.snapshots };
         return this.run(`Could not download the ${format} rendering.`, async () => {
-            const blob = await firstValueFrom(this.inv.dossierRendering(this.investigationId(), format, { at }));
+            const blob = await firstValueFrom(this.inv.dossierRendering(this.investigationId(), format, q));
             saveBlob(blob, `${this.investigationId()}-${format}.txt`);
         });
+    }
+
+    async loadSnapshots(): Promise<void> {
+        this.snapshotError.set('');
+        try {
+            this.snapshotList.set(await firstValueFrom(this.inv.sealedSnapshotIds(SNAPSHOT_LIST_LIMIT)));
+        } catch (err) {
+            this.snapshotError.set(investigationErrorMessage(err, 'Could not list the sealed snapshots.'));
+        }
+    }
+
+    toggleSnapshot(id: string, on: boolean): void {
+        const cur = this.selected().filter((s) => s !== id);
+        if (on && cur.length < DOSSIER_MAX_SNAPSHOTS) cur.push(id);
+        this.selected.set(cur);
+    }
+
+    atError(): string {
+        const s = this.steps();
+        return s == null ? 'A whole number, 0 or more.' : `A whole number from 0 to ${s}.`;
+    }
+
+    /** `?at=` must be a whole number in 0..steps (the server answers 422 otherwise); blank = the head. */
+    private atRange(c: AbstractControl): ValidationErrors | null {
+        const v = c.value as number | null;
+        if (v == null) return null;
+        const s = this.steps();
+        return Number.isInteger(v) && v >= 0 && (s == null || v <= s) ? null : { range: true };
     }
 
     downloadManifest(): void {

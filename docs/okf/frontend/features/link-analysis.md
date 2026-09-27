@@ -673,8 +673,14 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   (never a bare href — it would skip the bearer), and verifies either the manifest just issued or an uploaded
   file holding a manifest or a whole dossier. A failed verify names *why*: an edited manifest
   (`selfConsistent:false`), a store whose own hashes disagree (`intact:false`), a moved root, and every changed,
-  missing, added and content-changed artefact. ⚠ It always covers the head with no exhibits — the `at` and
-  `snapshots` pickers are deferred.
+  missing, added and content-changed artefact. **Scope pickers (2026-09-27):** an *At step* field (blank = the
+  head; validated 0..`summary.steps` once a dossier is known, since the server 422s outside it) and *Include
+  snapshots…*, which lists `GET /inv/snapshots` (ids only, newest first, `limit=100`, `total`/`truncated`
+  shown) as checkboxes capped at 20 (`DossierRoutes.MAX_SNAPSHOTS`). The downloads reuse the on-screen
+  dossier's `at` AND `snapshots`, so file and view agree. ⚠ The list is NOT filtered to this Investigation —
+  the route cannot tell — and the SPA's own sealing (`graph-snapshot.ts`) never writes `investigationId`, so
+  today every SPA-sealed snapshot is refused 422 *not anchored* (surfaced verbatim). Anchoring on seal is the
+  missing half, owned by the snapshot lane.
 * **The Working Set is addressable as rows** (LA-20, backend shipped 2026-09-23; `WorkingSetRoutes`).
   `GET /inv/investigations/{id}/working-set?of=entities|links|excluded&limit&offset` answers a relation with
   fixed columns carrying provenance (`opSeq`, `seedId`, `hop`, and `reason` for exclusions), bounded with the

@@ -564,6 +564,13 @@ export interface Dossier {
     renderings: { json: unknown; steps: string[]; method: string };
 }
 
+/** `GET /inv/snapshots` — sealed snapshot ids, newest first; `total` is the TRUE count, so a bounded page says so. */
+export interface SealedSnapshotIds {
+    ids: string[];
+    total: number;
+    truncated: boolean;
+}
+
 /** `POST …/dossier/verify` — the manifest rebuilt from the store NOW, compared with the one submitted. */
 export interface DossierVerifyResult {
     id: string;
@@ -813,6 +820,11 @@ export class InvService {
     /** LA-12: one rendering as a file — a Blob through HttpClient, so the bearer travels (never a bare href). */
     dossierRendering(id: string, format: 'steps' | 'method', q: DossierQuery = {}): Observable<Blob> {
         return this.http.get(invPath(id, 'dossier'), { params: dossierParams(q, format), responseType: 'blob' });
+    }
+
+    /** LA-03: the sealed snapshot ids (not filtered by Investigation — the dossier refuses one not anchored to it). */
+    sealedSnapshotIds(limit?: number): Observable<SealedSnapshotIds> {
+        return this.http.get<SealedSnapshotIds>(apiUrl('/inv/snapshots'), { params: toParams({ limit }) });
     }
 
     /** LA-12: check a held manifest against the store as it is NOW. Persists nothing. */

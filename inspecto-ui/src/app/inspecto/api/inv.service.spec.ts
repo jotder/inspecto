@@ -182,6 +182,14 @@ describe('InvService (LA-08 multi projection, LA-11 recursive paths)', () => {
         verify.flush({});
     });
 
+    it('lists the sealed snapshot ids with a bounded limit', () => {
+        svc.sealedSnapshotIds(100).subscribe();
+        const req = httpMock.expectOne((r) => r.url === `${base}/inv/snapshots`);
+        expect(req.request.method).toBe('GET');
+        expect(req.request.params.get('limit')).toBe('100');
+        req.flush({ ids: [], total: 0, truncated: false });
+    });
+
     it('reads a Working Set relation page with of/limit/offset', () => {
         svc.workingSetRelation('inv-1', { of: 'links', limit: 200, offset: 400 }).subscribe();
         const req = httpMock.expectOne((r) => r.url === `${base}/inv/investigations/inv-1/working-set`);

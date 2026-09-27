@@ -94,6 +94,9 @@ function create(overrides: Partial<Record<keyof InvService, unknown>> = {}) {
         dossier: vi.fn(() => of(DOSSIER)),
         dossierRendering: vi.fn(() => of(new Blob(['steps']))),
         verifyDossier: vi.fn(() => of(FAILED)),
+        sealedSnapshotIds: vi.fn(() =>
+            of({ ids: Array.from({ length: 22 }, (_, i) => `s${i}`), total: 30, truncated: true }),
+        ),
         ...overrides,
     };
     TestBed.configureTestingModule({
@@ -112,7 +115,7 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         const { f, c, el, inv } = create();
         await c.build();
         f.detectChanges();
-        expect(inv.dossier).toHaveBeenCalledWith('inv-1');
+        expect(inv.dossier).toHaveBeenCalledWith('inv-1', { at: undefined, snapshots: [] });
         expect(el.querySelector('[aria-label="Dossier summary"]')?.textContent).toContain('5 entities');
         expect(el.textContent).toContain('Log intact');
         expect(el.querySelectorAll('table[aria-label="Ledger"] tbody tr').length).toBe(2);
@@ -129,7 +132,7 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: revoke });
         await c.build();
         await c.download('method');
-        expect(inv.dossierRendering).toHaveBeenCalledWith('inv-1', 'method', { at: 2 });
+        expect(inv.dossierRendering).toHaveBeenCalledWith('inv-1', 'method', { at: 2, snapshots: [] });
         expect(createUrl).toHaveBeenCalled();
         expect(revoke).toHaveBeenCalledWith('blob:x');
     });
@@ -154,6 +157,46 @@ describe('LinkAnalysisDossierComponent (LA-12)', () => {
         const file = { name: 'd.json', text: () => Promise.resolve(JSON.stringify({ manifest: MANIFEST })) };
         await c.upload({ target: { files: [file], value: 'x' } } as unknown as Event);
         expect(inv.verifyDossier).toHaveBeenCalledWith('inv-1', MANIFEST);
+    });
+
+    it('builds at a chosen step with chosen snapshots, capped at 20, and refuses a step beyond the log', async () => {
+        const { f, c, el, inv } = create();
+        await c.build();
+        await c.loadSnapshots();
+        f.detectChanges();
+        expect(inv.sealedSnapshotIds).toHaveBeenCalledWith(100);
+        expect(el.textContent).toContain('(showing 22 of 30)');
+        for (let i = 0; i < 22; i++) c.toggleSnapshot(`s${i}`, true);
+        expect(c.selected().length).toBe(20);
+        f.detectChanges();
+        const boxes = Array.from(el.querySelectorAll<HTMLInputElement>('mat-checkbox input'));
+        expect(boxes.filter((b) => b.disabled).length).toBe(2);
+        await expectNoA11yViolations(el);
+
+        c.toggleSnapshot('s0', false);
+        c.atControl.setValue(3); // the log has 2 steps
+        await c.build();
+        f.detectChanges();
+        expect(inv.dossier).toHaveBeenCalledTimes(1);
+        expect(el.querySelector('mat-error')?.textContent).toContain('from 0 to 2');
+
+        c.atControl.setValue(1);
+        await c.build();
+        expect(inv.dossier).toHaveBeenCalledWith('inv-1', {
+            at: 1,
+            snapshots: Array.from({ length: 19 }, (_, i) => `s${i + 1}`),
+        });
+    });
+
+    it('explains a 503 on the snapshot list in place', async () => {
+        const { f, c, el } = create({
+            sealedSnapshotIds: vi.fn(() =>
+                throwError(() => new HttpErrorResponse({ status: 503, error: { error: 'no write root' } })),
+            ),
+        });
+        await c.loadSnapshots();
+        f.detectChanges();
+        expect(el.textContent).toContain('Investigations are not available here');
     });
 
     it('explains a 404 as not-yours-or-absent', async () => {
