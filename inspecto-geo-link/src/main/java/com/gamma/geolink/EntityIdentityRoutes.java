@@ -42,7 +42,8 @@ import java.util.TreeSet;
  * {@code a}/{@code b} typed {@code <type>:<value>}, the type in force, the value non-empty after the type's normaliser;
  * the two keys differ after normalising) → retract: unknown or already-retracted assertion 409 → append under the log's
  * JVM lock. Keys are normalised with the type's normaliser AT ASSERT TIME and sealed in the fact, so a later settings
- * change never re-keys an assertion (D-M9's stance). Reads need Space access and a write root (503), as the list reads.
+ * change never re-keys an assertion (D-M9's stance). Reads need {@code canManageIncidents} too, then a write root (503):
+ * under masking a Space-only caller could probe the group read with a guessed RAW key and learn its membership.
  *
  * <p><b>Masking</b> at render, per member key, as {@link EntityListRoutes}: under {@code typed} a key whose Entity Type is
  * {@code masked: true} — or is no longer in force, failing closed — is masked; {@code all} masks every key; {@code none}
@@ -61,8 +62,10 @@ public final class EntityIdentityRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         // ⚠ String LITERALS on purpose — CapabilityManifestTest's scanner matches only a literal argument.
-        api.get("/inv/entity-identities", (e, m) -> groups(api, e));
-        api.get("/inv/entity-identities/group", (e, m) -> group(api, e));
+        // Reads need the write capability too: under masking the group-by-key read is a membership oracle for a
+        // guessed RAW key (member count, token), so both identity reads fail closed (review 2026-09-27).
+        api.get("/inv/entity-identities", ApiContext.withCapability("canManageIncidents", (e, m) -> groups(api, e)));
+        api.get("/inv/entity-identities/group", ApiContext.withCapability("canManageIncidents", (e, m) -> group(api, e)));
         api.post("/inv/entity-identities", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> assertIdentity(api, e, api.body(e))));
         api.post("/inv/entity-identities/([^/]+)/retract", ApiContext.withCapability("canManageIncidents",

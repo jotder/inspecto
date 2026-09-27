@@ -49,6 +49,8 @@ final class CapabilityManifest {
             new Entry("POST", "/inv/entity-lists/([^/]+)/members", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/entity-lists/([^/]+)/retire", Roles.CAN_MANAGE_INCIDENTS),
             // EntityIdentityRoutes (LA-17 slice 2) — identity assertions share the same fact log, same capability.
+            new Entry("GET", "/inv/entity-identities", Roles.CAN_MANAGE_INCIDENTS),
+            new Entry("GET", "/inv/entity-identities/group", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/entity-identities", Roles.CAN_MANAGE_INCIDENTS),
             new Entry("POST", "/inv/entity-identities/([^/]+)/retract", Roles.CAN_MANAGE_INCIDENTS),
             // InvestigationRoutes, LA-19 controls (operator 2026-09-24) — revealing a masked entity (D-U6) and

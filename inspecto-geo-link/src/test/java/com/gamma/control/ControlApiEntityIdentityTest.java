@@ -136,7 +136,7 @@ class ControlApiEntityIdentityTest {
     }
 
     @Test
-    void writesNeedCanManageIncidentsAndReadsNeedOnlySpaceAccess(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void writesNeedCanManageIncidents(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             status(401, send(c, "POST", IDS, assertion("imsi:1", "msisdn:+441"), null), "no credential");
             status(403, send(c, "POST", IDS, assertion("imsi:1", "msisdn:+441"), VIEWER), "assert needs the capability");
@@ -144,8 +144,27 @@ class ControlApiEntityIdentityTest {
             assertEquals(0, facts(c), "no refused caller wrote a fact");
             JsonNode made = data(post(c, IDS, assertion("imsi:1", "msisdn:+441")), 201);
             assertEquals("analyst-1", made.at("/assertion/actor").asText(), "the actor is the Subject");
-            status(200, send(c, "GET", IDS, null, VIEWER), "reads are open to the Space");
-            status(200, send(c, "GET", IDS + "/group?key=imsi:1", null, VIEWER), "reads are open to the Space");
+            status(200, get(c, IDS), "the capability holder reads groups");
+            status(200, get(c, IDS + "/group?key=imsi:1"), "the capability holder reads a group");
+        }
+    }
+
+    /**
+     * Membership-oracle probe: under masking a Space-only caller could send a GUESSED raw key to the group read and
+     * learn from the member count whether it sits in a multi-member identity group (and read its token, to match
+     * against Entity List members). Both identity reads therefore need the write capability, always (fail closed).
+     */
+    @Test
+    void identityReadsNeedCanManageIncidentsSoARawKeyCannotBeProbed(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            data(post(c, IDS, assertion("msisdn:+447700900123", "handset:H-1")), 201);
+            HttpResponse<String> hit = send(c, "GET", IDS + "/group?key=msisdn:%2B447700900123", null, VIEWER);
+            HttpResponse<String> miss = send(c, "GET", IDS + "/group?key=msisdn:%2B447700900999", null, VIEWER);
+            status(403, hit, "a guessed key that IS grouped");
+            status(403, miss, "a guessed key that is not");
+            status(403, send(c, "GET", IDS, null, VIEWER), "the list-groups read");
+            status(401, send(c, "GET", IDS + "/group?key=msisdn:%2B447700900123", null, null), "no credential");
+            assertEquals(2, data(get(c, IDS + "/group?key=msisdn:%2B447700900123"), 200).at("/group/members").size());
         }
     }
 
