@@ -435,6 +435,13 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   column and no per-mapping filter), so the data needs one Dataset (or view) per entity kind — e.g. SIMs, IMEIs,
   Cells, Dealers — each listing its ids, plus the existing link Dataset as `query.multi.edges[]`. Deriving kind
   from a value prefix ("SIM …", "IMEI …") would be a new product rule, not built.
+  ✅ **Category colours (2026-09-27, R3-04):** a category is free-form (not a catalog `NodeKind`), so
+  `nodeColor()` used to paint every one the fallback grey even on the multi path. `projectMultiResult` now
+  stamps `data.color` per category from `CHART_CATEGORICAL_NEUTRAL` in first-seen order (unmapped endpoints
+  stay plain `entity`, uncoloured); the canvas already honours `data.color` and `legendItemsFor` reads it
+  (a saved `display.nodeColors` override still wins). The widget's legend + description already shipped.
+  ⚠ The telco `simbox_ring_jeddah` / `fraud_entity_graph` views still use `query.projection`, so they stay one
+  colour until the Space adds per-kind node Datasets and moves the view to `entity-projection-multi`.
 * **"The ops module is absent" and "the Case lookup failed" are two states, and Attach-to-Case now says
   which** (found 2026-09-22 while grounding D-S1). The dialog fills its Case picker from
   `GET /objects?type=CASE` and used to fall back to `LinkAnalysisSnapshotsService.mockCases` on ANY error,

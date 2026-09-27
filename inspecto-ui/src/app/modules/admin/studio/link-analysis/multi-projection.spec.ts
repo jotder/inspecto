@@ -10,6 +10,8 @@ import {
     projectMultiResult,
     recursivePathsToGraph,
 } from './entity-projection';
+import { legendItemsFor } from './link-analysis-overlays.component';
+import { CHART_CATEGORICAL_NEUTRAL } from 'app/inspecto/theme/chart-tokens';
 
 /**
  * LA-08 + LA-11 SPA half: mapping the two server answers into the studio's graph model. Every entity id is
@@ -55,6 +57,30 @@ describe('projectMultiResult (LA-08)', () => {
         expect(g.edges).toHaveLength(1);
         expect(g.edges[0]).toMatchObject({ source: sid, target: tid });
         expect(g.edges[0].data).toMatchObject({ kind: 'paid · 5', count: 5, provenance: ['ledger', 'wires'] });
+    });
+
+    it('colours each category from the categorical palette, one colour per category; unmapped nodes stay uncoloured', () => {
+        const g = projectMultiResult({
+            nodes: [
+                { id: 'SIM-1', label: null, category: 'SIM', __provenance_dataset: 'sims' },
+                { id: 'SIM-2', label: null, category: 'SIM', __provenance_dataset: 'sims' },
+                { id: 'IMEI-1', label: null, category: 'IMEI', __provenance_dataset: 'imeis' },
+            ],
+            edges: [{ source: 'SIM-1', target: 'CELL-9', kind: 'on', count: 1, __provenance_dataset: 'links' }],
+            mappings: [],
+            truncated: false,
+        });
+        const color = (v: string) => g.nodes.find((n) => n.id === entityId(undefined, v))!.data.color;
+        expect(color('SIM-1')).toBe(CHART_CATEGORICAL_NEUTRAL[0]);
+        expect(color('SIM-2')).toBe(CHART_CATEGORICAL_NEUTRAL[0]);
+        expect(color('IMEI-1')).toBe(CHART_CATEGORICAL_NEUTRAL[1]);
+        expect(color('CELL-9')).toBeUndefined();
+        // The legend reads the stamped colour, so it matches the canvas.
+        expect(legendItemsFor(g)).toEqual([
+            { kind: 'SIM', count: 2, color: CHART_CATEGORICAL_NEUTRAL[0] },
+            { kind: 'IMEI', count: 1, color: CHART_CATEGORICAL_NEUTRAL[1] },
+            { kind: 'entity', count: 1, color: expect.any(String) },
+        ]);
     });
 
     it('carries the server truncated flag and the per-mapping summary through unchanged', () => {

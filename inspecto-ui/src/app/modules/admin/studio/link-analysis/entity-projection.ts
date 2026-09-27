@@ -21,6 +21,7 @@ import {
     apiErrorMessage,
 } from 'app/inspecto/api';
 import { firstValueFrom } from 'rxjs';
+import { CHART_CATEGORICAL_NEUTRAL } from 'app/inspecto/theme/chart-tokens';
 import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 
 /**
@@ -347,6 +348,15 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
     const nodes = new Map<string, G6Node>();
     const edges = new Map<string, G6Edge & { data: { kind: string; count: number } }>();
     let truncated = res.truncated;
+    // A mapping's category is a free-form entity kind (SIM, IMEI, Cell…), not a catalog NodeKind, so the
+    // catalog accent map would draw every one the fallback grey: give each category, in first-seen order, the
+    // next categorical palette colour. Nodes no mapping named stay the plain `entity` kind.
+    const categoryColors = new Map<string, string>();
+    const categoryColor = (c: string) => {
+        if (!categoryColors.has(c))
+            categoryColors.set(c, CHART_CATEGORICAL_NEUTRAL[categoryColors.size % CHART_CATEGORICAL_NEUTRAL.length]);
+        return categoryColors.get(c)!;
+    };
 
     const ensure = (value: string, provenance: string, label?: string | null, category?: string | null) => {
         const id = entityId(undefined, value);
@@ -360,10 +370,9 @@ export function projectMultiResult(res: MultiProjectionResult): MultiProjectedGr
             truncated = true;
             return null;
         }
-        nodes.set(id, {
-            id,
-            data: { label: label || value, kind: category || 'entity', spellings: [value], provenance: [provenance] },
-        });
+        const data: G6Node['data'] = { label: label || value, kind: category || 'entity', spellings: [value], provenance: [provenance] };
+        if (category) data.color = categoryColor(category);
+        nodes.set(id, { id, data });
         return id;
     };
 

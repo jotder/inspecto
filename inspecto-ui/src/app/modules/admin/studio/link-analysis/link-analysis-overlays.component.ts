@@ -22,15 +22,17 @@ export interface LegendItem {
 export function legendItemsFor(g: G6GraphData | null, nodeColors: Record<string, string> = {}): LegendItem[] {
     if (!g) return [];
     const counts = new Map<string, number>();
+    const stamped = new Map<string, string>(); // a source-stamped node colour (LA-08 category) per kind
     // A super-node is a stand-in, not an entity: counting it as a kind would misstate how many of
     // that kind the analyst is looking at, and it has no real kind to be counted under anyway.
     for (const n of g.nodes) {
         if (n.data.kind === SUPER_NODE_KIND) continue;
         counts.set(n.data.kind, (counts.get(n.data.kind) ?? 0) + 1);
+        if (n.data.color && !stamped.has(n.data.kind)) stamped.set(n.data.kind, n.data.color);
     }
     return [...counts.entries()]
         .sort((a, b) => b[1] - a[1])
-        .map(([kind, count]) => ({ kind, count, color: nodeColors[kind] ?? nodeColor(kind as NodeKind) }));
+        .map(([kind, count]) => ({ kind, count, color: nodeColors[kind] ?? stamped.get(kind) ?? nodeColor(kind as NodeKind) }));
 }
 
 /** The link kinds present, without their folded ` · N` count suffix, sorted. */
