@@ -154,7 +154,7 @@ class JobPackParserTest {
         buildParserPackJar(work, packs.resolve("cdr-2.jar"), "acme_cdr", "OtherCdr", false);
         JobPackManagerTest.trustEveryJarIn(packs);
         try (JobPackManager mgr = manager(packs, new JobTypeRegistry(), new Sink())) {
-            Map<String, Object> s = mgr.rescan();   // directory order: cdr-1 before cdr-2
+            Map<String, Object> s = mgr.rescan();   // name order: cdr-1 before cdr-2
             assertEquals(List.of("cdr-1.jar"), s.get("loaded"));
             assertEquals(List.of("cdr-2.jar"), s.get("rejected"));
             assertEquals("pack:cdr-1.jar", Parsers.sourceOf("acme_cdr"), "first pack wins");

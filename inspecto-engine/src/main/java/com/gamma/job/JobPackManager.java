@@ -27,6 +27,7 @@ import java.security.CodeSigner;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.TreeMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -223,7 +224,9 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         if (!enabled() || !Files.isDirectory(dir))
             return summary(loadedNow, reloaded, unloaded, rejected);
 
-        Map<String, Path> present = new LinkedHashMap<>();
+        // Sorted by file name: directory order is filesystem-defined (Linux ext4 hash order), and it decides
+        // which of two packs claiming the same parser id wins — that must not differ between hosts.
+        Map<String, Path> present = new TreeMap<>();
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, "*.jar")) {
             for (Path p : ds) if (Files.isRegularFile(p)) present.put(p.getFileName().toString(), p);
         } catch (IOException e) {
