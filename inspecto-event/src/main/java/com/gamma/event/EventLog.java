@@ -178,6 +178,19 @@ public final class EventLog {
         }
     }
 
+    /**
+     * Detach {@code owned} when its owner closes: if it is still the backing store, a fresh bootstrap ring takes its
+     * place WITHOUT draining — so the next {@link #installStore} (a later service on this log, e.g. the default
+     * Space's {@link #global()}) cannot carry a closed store's history, audit rows included, into its own store and
+     * chain. No-op if another store has been installed since.
+     */
+    public void releaseStore(EventStore owned) {
+        if (owned == null) return;
+        synchronized (chain) {
+            if (store.compareAndSet(owned, new InMemoryEventStore())) chain.reset();
+        }
+    }
+
     /** This log's audit hash chain — one per log, so one per Space (see {@link AuditChain}). Its monitor is held
      *  across link + append, which is what makes the chain a single total order. */
     private final AuditChain chain = new AuditChain();

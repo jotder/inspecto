@@ -208,4 +208,30 @@ class ControlApiAuditChainTest {
             assertEquals("unavailable", V1Body.of(v.body()).get("anchors").asText());
         }
     }
+
+    /**
+     * A closed service's store must not be drained into the next default-space service's store. The default space
+     * shares {@code EventLog.global()}; before the fix the closed store stayed installed there, so the next
+     * {@code installStore} carried every retained event (re-linked from seq 1) into the fresh store — enough of
+     * them (a full ring, after enough earlier tests in one fork) and seq 1 fell off before the new service had emitted
+     * a single audit row (CI run 36299231097: verify {@code from:2 … fromGenesis:false}).
+     */
+    @Test
+    void aFreshServiceDoesNotInheritAClosedServicesAuditRows(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir.resolve("a"), false)) {
+            for (int i = 0; i < 3; i++)
+                c.svc().eventLog().emit(Event.builder(com.gamma.event.EventType.AUDIT).message("closed-svc-" + i));
+        }
+        try (Ctx c = open(dir.resolve("b"), true)) {
+            assertTrue(c.svc().events().recent(Integer.MAX_VALUE).stream()
+                    .noneMatch(e -> e.message() != null && e.message().startsWith("closed-svc-")),
+                    "a fresh service's store holds none of a closed service's events");
+            send(c, "GET", "/audit/verify", "Bearer viewer");
+            Event first = c.svc().events().chainPage(1, 1).get(0);
+            assertEquals(1, AuditChain.seq(first));
+            assertFalse(first.message().startsWith("closed-svc-"), "seq 1 is this service's own row: " + first);
+            JsonNode v = V1Body.of(send(c, "GET", "/audit/verify", "Bearer admin").body());
+            assertTrue(v.get("fromGenesis").asBoolean(), v.toString());
+        }
+    }
 }

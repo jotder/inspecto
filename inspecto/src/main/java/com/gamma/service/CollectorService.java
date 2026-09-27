@@ -2033,6 +2033,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         log.info("CollectorService stopped");
         // Close last so the "stopped" log line above is itself captured, then flushed to disk.
         try { events.close(); } catch (Exception e) { log.warn("Error closing event store: {}", e.getMessage()); }
+        // …then detach it, or the next service on this log (the default Space shares EventLog.global()) drains
+        // this closed store's history into its own store and chain on installStore.
+        this.eventLog.releaseStore(events);
     }
 
     // ── CLI ────────────────────────────────────────────────────────────────────

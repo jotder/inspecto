@@ -34,6 +34,26 @@ class EventLogAndAppenderTest {
     }
 
     @Test
+    void aReleasedStoreIsNotDrainedIntoTheNextOne() {
+        EventLog log = EventLog.create();
+        InMemoryEventStore closed = new InMemoryEventStore(100);
+        log.installStore(closed);
+        log.emit(Event.builder(EventType.AUDIT).message("closed-owner"));
+        log.releaseStore(closed);
+        assertNotSame(closed, log.store());
+
+        InMemoryEventStore next = new InMemoryEventStore(100);
+        log.installStore(next);
+        log.emit(Event.builder(EventType.AUDIT).message("own"));
+        List<Event> held = next.recent(1000);
+        assertEquals(List.of("own"), held.stream().map(Event::message).toList(), "nothing carried from a released store");
+        assertEquals(1, AuditChain.seq(held.get(0)), "the new store's chain starts at genesis");
+
+        log.releaseStore(closed);   // no longer installed: a no-op
+        assertSame(next, log.store());
+    }
+
+    @Test
     void slf4jCaptureRecordsInfoAndAboveButNotDebug() {
         InMemoryEventStore store = new InMemoryEventStore(1000);
         EventLog.global().installStore(store);
