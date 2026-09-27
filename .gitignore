@@ -84,6 +84,9 @@
 # lives OUTSIDE its config tree in the sibling <space>/config.secrets/ — neither is ever committed.
 /spaces/*/config/pending-changes/
 /spaces/*/config.secrets/
+# WEBHOOK-EGRESS-POLICY-1: each Space's egress allowlist is written by the boot-time migration (or recorded empty
+# when a Space is created) — runtime state per install, never committed.
+/spaces/*/config/egress.toon
 /spaces/*/duckdb/
 /spaces/*/flows/
 # The UAT space is fully GENERATED (config cloned from spaces/demo by tools/seed-uat.ps1) — never commit it.
