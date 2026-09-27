@@ -63,7 +63,7 @@ public final class GcsConnector extends AbstractHttpObjectStoreConnector impleme
     private final GcpServiceAccountToken token;
 
     public GcsConnector(ConnectionProfile profile) {
-        super("GCS", resolveEndpoint(profile));
+        super("GCS", resolveEndpoint(profile), profile.options());
         String bp = profile.basePath() == null ? "" : profile.basePath().trim();
         String stripped = bp.startsWith("/") ? bp.substring(1) : bp;
         if (stripped.isBlank())

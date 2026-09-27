@@ -63,7 +63,7 @@ public final class AzureBlobConnector extends AbstractHttpObjectStoreConnector i
     private final String account;
 
     public AzureBlobConnector(ConnectionProfile profile) {
-        super("Azure", endpointOf(profile));
+        super("Azure", endpointOf(profile), profile.options());
         this.profile = profile;
         String bp = profile.basePath() == null ? "" : profile.basePath().trim();
         String stripped = bp.startsWith("/") ? bp.substring(1) : bp;

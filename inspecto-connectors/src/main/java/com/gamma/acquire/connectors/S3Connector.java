@@ -68,7 +68,7 @@ public final class S3Connector extends AbstractHttpObjectStoreConnector implemen
     private final String region;
 
     public S3Connector(ConnectionProfile profile) {
-        super("S3", endpointOf(profile));
+        super("S3", endpointOf(profile), profile.options());
         this.profile = profile;
         String bp = profile.basePath() == null ? "" : profile.basePath().trim();
         String stripped = bp.startsWith("/") ? bp.substring(1) : bp;

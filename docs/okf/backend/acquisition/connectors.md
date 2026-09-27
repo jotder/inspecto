@@ -101,7 +101,13 @@ allowlist (`EgressAllowlist.forCurrentSpace()`) → `PinnedObjectStoreHttp` send
 CHECKED address. The JDK `HttpClient` is gone from these connectors. The `Host` header is `AwsSigV4.hostHeader(uri)`
 — the value SigV4 signed; SNI and certificate verification use the Connection's host name. Request bodies stream
 from the request's `BodyPublisher` (a file PUT is not buffered); response bodies stream off the socket
-(`Content-Length`, chunked, or to EOF) and closing the stream closes the connection. **Redirects are never
+(`Content-Length`, chunked, or to EOF) and closing the stream closes the connection. Hardened against an odd or
+hostile server: 1xx interim responses are skipped; a negative or unparseable chunk size, more than 200 response
+headers or more than 64 KiB of header bytes is an `IOException` (an `AcquisitionException` at the connector), never
+an index error; an outgoing header name or value with a C0 control or DEL (CR, LF, NUL, …; HTAB allowed in a value)
+is refused. **Read timeout**: 120 s by default, per Connection via `options.read_timeout_ms` (a positive integer —
+anything else refuses the Connection at construction); `ConnectionProfile` has no timeout field, so this is a
+free-form option, the same shape as the tester's `test_timeout_ms`. Connect timeout 30 s. **Redirects are never
 followed** (previously `Redirect.NORMAL`): S3's region redirects name another host, which a SigV4 signature over
 `host` would not survive, and GCS/Azure do not redirect these APIs — a 3xx is a plain non-2xx failure. The GCS
 token exchange at the SA's `token_uri` goes through the same `send`. ⚠ A MinIO/Azurite on a private LAN needs its

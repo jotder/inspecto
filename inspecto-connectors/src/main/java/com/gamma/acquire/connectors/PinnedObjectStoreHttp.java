@@ -52,8 +52,17 @@ final class PinnedObjectStoreHttp {
     private PinnedObjectStoreHttp() {}
 
     private static final int CONNECT_TIMEOUT_MS = 30_000;
+    /** The socket read timeout when neither the request nor the Connection ({@code read_timeout_ms}) sets one. */
+    static final int DEFAULT_READ_TIMEOUT_MS = 120_000;
+    /** Response header limits: a server cannot make us buffer an unbounded header block. */
+    static final int MAX_HEADERS = 200;
+    static final int MAX_HEADER_BYTES = 64 * 1024;
 
-    static HttpResponse<InputStream> send(SSLSocketFactory tls, HttpRequest req, InetAddress connectTo)
+    /**
+     * @param readTimeoutMs the socket read timeout when the request sets none (the Connection's, else
+     *                      {@link #DEFAULT_READ_TIMEOUT_MS})
+     */
+    static HttpResponse<InputStream> send(SSLSocketFactory tls, HttpRequest req, InetAddress connectTo, int readTimeoutMs)
             throws IOException, InterruptedException {
         URI url = req.uri();
         String scheme = url.getScheme() == null ? "" : url.getScheme().toLowerCase(Locale.ROOT);
@@ -84,7 +93,8 @@ final class PinnedObjectStoreHttp {
         boolean handedOff = false;
         try {
             raw.connect(new InetSocketAddress(connectTo, port), CONNECT_TIMEOUT_MS);
-            raw.setSoTimeout(req.timeout().map(d -> (int) Math.min(Integer.MAX_VALUE, Math.max(1, d.toMillis()))).orElse(0));
+            raw.setSoTimeout(req.timeout().map(d -> (int) Math.min(Integer.MAX_VALUE, Math.max(1, d.toMillis())))
+                    .orElse(readTimeoutMs > 0 ? readTimeoutMs : DEFAULT_READ_TIMEOUT_MS));
             Socket s = raw;
             if (scheme.equals("https")) {
                 SSLSocket ssl = (SSLSocket) tls.createSocket(raw, bareHost, port, true);
@@ -101,17 +111,15 @@ final class PinnedObjectStoreHttp {
             out.flush();
 
             InputStream in = new BufferedInputStream(s.getInputStream());
-            int status = status(line(in));
-            Map<String, List<String>> headers = new LinkedHashMap<>();
-            for (String h = line(in); !h.isEmpty(); h = line(in)) {
-                int c = h.indexOf(':');
-                if (c > 0)
-                    headers.computeIfAbsent(h.substring(0, c).trim().toLowerCase(Locale.ROOT), k -> new ArrayList<>())
-                            .add(h.substring(c + 1).trim());
-            }
+            int status;
+            Map<String, List<String>> headers;
+            do {   // a 1xx is an interim response: its header block is read and dropped, the real one follows
+                status = status(line(in));
+                headers = headers(in);
+            } while (status / 100 == 1);
             HttpHeaders hh = HttpHeaders.of(headers, (k, v) -> true);
             InputStream body;
-            if (method.equals("HEAD") || status / 100 == 1 || status == 204 || status == 304) {
+            if (method.equals("HEAD") || status == 204 || status == 304) {
                 body = InputStream.nullInputStream();
             } else if (hh.firstValue("transfer-encoding").map(v -> v.toLowerCase(Locale.ROOT).contains("chunked")).orElse(false)) {
                 body = new Chunked(in);
@@ -182,11 +190,36 @@ final class PinnedObjectStoreHttp {
         }
     }
 
-    private static void header(StringBuilder req, String name, String value) throws IOException {
-        if (name.indexOf('\r') >= 0 || name.indexOf('\n') >= 0 || name.indexOf(':') >= 0
-                || value.indexOf('\r') >= 0 || value.indexOf('\n') >= 0)
-            throw new IOException("refused a header carrying CR/LF: " + name);
+    static void header(StringBuilder req, String name, String value) throws IOException {
+        if (name.indexOf(':') >= 0 || hasControl(name, false) || hasControl(value, true))
+            throw new IOException("refused a header carrying a control character (CR, LF, NUL, …): " + name);
         req.append(name).append(": ").append(value).append("\r\n");
+    }
+
+    /** Whether {@code s} carries a C0 control or DEL — HTAB allowed only where {@code tabOk} (a value). */
+    private static boolean hasControl(String s, boolean tabOk) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if ((c < 0x20 && !(tabOk && c == '\t')) || c == 0x7f) return true;
+        }
+        return false;
+    }
+
+    /** One header block, bounded by {@link #MAX_HEADERS} lines and {@link #MAX_HEADER_BYTES} bytes. */
+    private static Map<String, List<String>> headers(InputStream in) throws IOException {
+        Map<String, List<String>> headers = new LinkedHashMap<>();
+        int count = 0;
+        long bytes = 0;
+        for (String h = line(in); !h.isEmpty(); h = line(in)) {
+            if (++count > MAX_HEADERS) throw new IOException("the response has more than " + MAX_HEADERS + " headers");
+            bytes += h.length() + 2;
+            if (bytes > MAX_HEADER_BYTES) throw new IOException("the response headers exceed " + MAX_HEADER_BYTES + " bytes");
+            int c = h.indexOf(':');
+            if (c > 0)
+                headers.computeIfAbsent(h.substring(0, c).trim().toLowerCase(Locale.ROOT), k -> new ArrayList<>())
+                        .add(h.substring(c + 1).trim());
+        }
+        return headers;
     }
 
     private static int status(String line) throws IOException {
@@ -261,6 +294,7 @@ final class PinnedObjectStoreHttp {
             } catch (NumberFormatException e) {
                 throw new IOException("a malformed chunk size '" + size + "'");
             }
+            if (left < 0) throw new IOException("a negative chunk size '" + size + "'");
             if (left == 0) {
                 for (String t = line(in); !t.isEmpty(); t = line(in)) { /* trailers */ }
                 eof = true;

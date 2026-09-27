@@ -68,9 +68,33 @@ abstract class AbstractHttpObjectStoreConnector {
     /** The TLS socket factory; the platform default in production, a test trusts its own certificate. */
     static volatile Supplier<SSLSocketFactory> tls = () -> (SSLSocketFactory) SSLSocketFactory.getDefault();
 
-    protected AbstractHttpObjectStoreConnector(String provider, URI endpoint) {
+    /** The Connection option naming the socket read timeout in ms ({@code options.read_timeout_ms}). */
+    static final String READ_TIMEOUT_OPTION = "read_timeout_ms";
+
+    /** The socket read timeout when a request sets none: the Connection's option, else the wire's default. */
+    private final int readTimeoutMs;
+
+    protected AbstractHttpObjectStoreConnector(String provider, URI endpoint, Map<String, String> options) {
         this.provider = provider;
         this.endpoint = endpoint;
+        String t = options == null ? null : options.get(READ_TIMEOUT_OPTION);
+        int ms = PinnedObjectStoreHttp.DEFAULT_READ_TIMEOUT_MS;
+        if (t != null && !t.isBlank()) {
+            try {
+                ms = Integer.parseInt(t.trim());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException(provider + " connection option " + READ_TIMEOUT_OPTION
+                        + " must be a whole number of milliseconds, got '" + t + "'");
+            }
+            if (ms <= 0) throw new IllegalArgumentException(provider + " connection option " + READ_TIMEOUT_OPTION
+                    + " must be positive, got " + ms);
+        }
+        this.readTimeoutMs = ms;
+    }
+
+    /** The socket read timeout in force when a request sets none. */
+    int readTimeoutMs() {
+        return readTimeoutMs;
     }
 
     /**
@@ -89,7 +113,7 @@ abstract class AbstractHttpObjectStoreConnector {
         } catch (IllegalArgumentException | EgressPolicy.Refused refused) {
             throw new IOException("egress refused: " + refused.getMessage(), refused);
         }
-        return PinnedObjectStoreHttp.send(tls.get(), req, dial.apply(to));
+        return PinnedObjectStoreHttp.send(tls.get(), req, dial.apply(to), readTimeoutMs);
     }
 
     /** {@link #send} with the (small) body read whole and the connection closed. */
