@@ -441,3 +441,14 @@ the step sits. ✅ **FIXED 2026-09-17: the fifteen pure-Node guards now run as t
 follows is kept as the record of why it was owed a decision. ⚠ Was recorded rather than fixed: making the doc guards non-aborting (collect all, fail at
 the end) or moving them *after* the test step would have surfaced all three in one run instead of three.
 That is a real change to `ci.yml` job structure and is owed a decision, not a drive-by edit.
+
+## Instance, 2026-09-27: coverage switched OFF while the floors step still demanded it (`CI-JACOCO-JDK27-1`)
+On 2026-09-18 `maven.compiler.release` went to 27, and jacoco 0.8.13 cannot parse class file v71. The fix set
+`<skip>true</skip>` in both `coverage` profiles (the root `pom.xml` and `asn-parser/asn-decoders/pom.xml`).
+`ci.yml`'s *Coverage floors* step still ran `check-coverage.mjs --backend`, which fails on purpose when
+`jacoco.csv` is missing, so CI could not pass from that day on. Nobody saw it for nine days: every run before
+`d46739d55` died earlier, in the reactor. **Restored 2026-09-27** with jacoco **0.8.15** (ASM 9.10.1 reads
+v71) and the skip removed in both profiles. The full `-Pcoverage` reactor: 33/33 modules, 12,754 tests, 0
+failures; instructions 84.66% against a 78% floor, branches 71.51% against 64%. Lesson: when you switch a
+guard's input off, switch the guard off in the same change, or it fails every run and a failure earlier in
+CI hides it.

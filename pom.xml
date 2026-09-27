@@ -174,13 +174,10 @@
              in only the inspecto + inspecto-agent child POMs; centralised here so all modules
              (intelligence + agent-hosted + connectors + security included) report coverage.
 
-             🔴 CI-JACOCO-JDK27-1 (docs/BACKLOG.md, 2026-09-18): `maven.compiler.release` is now 27
-             (below), so every module's class files are major version 71 — jacoco-maven-plugin 0.8.13
-             cannot parse those ("Unsupported class file major version 71"). Confirmed by building the
-             full reactor: `inspecto-util`, the first module after `asn-decoders`, fails identically.
-             Skipped here for the same reason and in the same shape as the mirrored profile in
-             `asn-parser/asn-decoders/pom.xml`. Real tests are unaffected; only coverage reporting stops,
-             repo-wide, until a jacoco release supports class file v71. -->
+             CI-JACOCO-JDK27-1: `maven.compiler.release` is 27, so class files are v71, which jacoco 0.8.13
+             cannot parse. Coverage was skipped from 2026-09-18 (while CI's `Coverage floors` step still
+             demanded the report, so it failed on every run) and restored 2026-09-27 with 0.8.15 (ASM 9.10.1
+             reads v71). Keep in step with the mirrored profile in `asn-parser/asn-decoders/pom.xml`. -->
         <profile>
             <id>coverage</id>
             <build>
@@ -188,10 +185,7 @@
                     <plugin>
                         <groupId>org.jacoco</groupId>
                         <artifactId>jacoco-maven-plugin</artifactId>
-                        <version>0.8.13</version>
-                        <configuration>
-                            <skip>true</skip>
-                        </configuration>
+                        <version>0.8.15</version>
                         <executions>
                             <execution>
                                 <id>prepare-agent</id>
