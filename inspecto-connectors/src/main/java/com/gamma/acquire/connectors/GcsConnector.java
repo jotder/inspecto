@@ -15,7 +15,6 @@ import com.google.gson.JsonParser;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -33,7 +32,7 @@ import static com.gamma.acquire.CollectorConnector.Capability.*;
 
 /**
  * A <b>native Google Cloud Storage</b> {@link CollectorConnector} (ACQ-4) speaking the GCS <b>JSON API</b>
- * ({@code /storage/v1/…}) directly over the JDK {@link HttpClient}, authenticated by a service-account
+ * ({@code /storage/v1/…}) directly over the pinned egress HTTP/1.1 client ({@link PinnedObjectStoreHttp}), authenticated by a service-account
  * OAuth 2.0 bearer token ({@link GcpServiceAccountToken}) — <b>no Google SDK</b>, so the air-gapped build and
  * the small SBOM are preserved (the same discipline as {@link S3Connector}/{@link AzureBlobConnector}).
  *

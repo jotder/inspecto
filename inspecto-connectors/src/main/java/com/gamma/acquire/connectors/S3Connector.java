@@ -21,7 +21,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -39,8 +38,8 @@ import java.util.Optional;
 import static com.gamma.acquire.CollectorConnector.Capability.*;
 
 /**
- * An S3-compatible object-storage {@link CollectorConnector} (ACQ-4) speaking the S3 REST API directly over the
- * JDK {@link HttpClient} with {@link AwsSigV4} header signing — <b>no AWS SDK</b>, so the air-gapped build and
+ * An S3-compatible object-storage {@link CollectorConnector} (ACQ-4) speaking the S3 REST API directly over
+ * the pinned egress HTTP/1.1 client ({@link PinnedObjectStoreHttp}) with {@link AwsSigV4} header signing — <b>no AWS SDK</b>, so the air-gapped build and
  * the small SBOM are preserved. One implementation covers AWS S3, MinIO, and any S3-compatible store
  * (GCS in interoperability mode included); requests use path-style addressing
  * ({@code https://endpoint/bucket/key}), which every S3-compatible implementation accepts.

@@ -18,7 +18,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
@@ -36,8 +35,8 @@ import java.util.Map;
 import static com.gamma.acquire.CollectorConnector.Capability.*;
 
 /**
- * An <b>Azure Blob Storage</b> {@link CollectorConnector} (ACQ-4) speaking the Blob REST API directly over the
- * JDK {@link HttpClient} with {@link AzureSharedKey} signing — <b>no Azure SDK</b>, the same discipline as
+ * An <b>Azure Blob Storage</b> {@link CollectorConnector} (ACQ-4) speaking the Blob REST API directly over
+ * the pinned egress HTTP/1.1 client ({@link PinnedObjectStoreHttp}) with {@link AzureSharedKey} signing — <b>no Azure SDK</b>, the same discipline as
  * {@link S3Connector}. Covers real Azure and Azurite/emulator endpoints.
  *
  * <p><b>Profile mapping</b> ({@code *_connection.toon}, {@code connector: azure}): {@code host}/{@code port} =
