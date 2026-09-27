@@ -695,6 +695,7 @@ Access Profile — which WIDENS that subject's access — or save a Requirement 
 every import door except Space creation (`/spaces/import`, which may seed them). ⚠ **Breaking change:** a
 `/bundle/import` or `/import` bundle carrying a `requirement` (item or `registry/requirements/` file) is
 refused WHOLE — nothing is written; move Requirements with `POST /requirements` instead.
+⚠ **The Space-creation exemption is effectively "`canAdminister` OR an empty server".** `SpaceRoutes.requireAdministerUnlessRecovering` skips the capability check while zero Spaces are hosted (recorded `CapabilityManifest` exemption `recovery-route`), so on a blank server ANY authenticated caller can seed `access-profile` / `access-catalog` / `requirement` files into the first Space. ⚠ `checkFiles` classifies an entry by its FIRST `/registry/` segment — safe only while no import door re-roots entry paths (a door that strips or re-prefixes paths before writing must re-classify).
 **Classification is spelling-proof:** each raw entry is classified after `ImportCapabilityGuard.normalizedPath`
 (case, `.`/empty segments, the trailing dots and spaces Windows drops), and a file under `registry/` whose kind
 cannot be told is refused (defence in depth behind `ImportPaths`' shape rule); `DecisionRuleGuard.guardImport`
