@@ -17,10 +17,7 @@ import { AlertRule, AlertRuleUpsert, AlertsService, apiErrorMessage } from 'app/
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
-import {
-    datasetOptionLoader,
-    pipelineOptionLoader,
-} from 'app/inspecto/components/entity-option-loaders';
+import { datasetOptionLoader, pipelineOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { datasetColumnOptionLoader } from 'app/modules/admin/studio/datasets/dataset-column-option-loader';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { firstValueFrom } from 'rxjs';
