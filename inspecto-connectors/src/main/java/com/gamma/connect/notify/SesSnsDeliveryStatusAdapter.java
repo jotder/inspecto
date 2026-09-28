@@ -77,6 +77,73 @@ public final class SesSnsDeliveryStatusAdapter implements DeliveryStatusAdapter 
         }
     });
 
+    /** Must never be set while this adapter is armed (design §3.2, T-S7): it would switch off TLS name checks. */
+    static final String HOSTNAME_VERIFICATION_OFF = "jdk.internal.httpclient.disableHostnameVerification";
+
+    /**
+     * ServiceLoader constructor. System properties (the delivery-status adapters' idiom):
+     * <ul>
+     *   <li>{@code notify.deliverystatus.sns.topicArns} — REQUIRED, comma-separated; empty ⇒ inert (404)</li>
+     *   <li>{@code notify.deliverystatus.sns.signingCert} — a local PEM; set ⇒ pinned mode, never fetches (D1)</li>
+     *   <li>{@code notify.deliverystatus.sns.autoConfirm} — default {@code true} (D8)</li>
+     *   <li>{@code notify.deliverystatus.sns.allowPrivateAddresses} — default {@code false}; for SNS VPC endpoints (D3)</li>
+     *   <li>{@code notify.deliverystatus.sns.useProxy} — default {@code false}; the JVM proxy selector (D9)</li>
+     *   <li>{@code notify.deliverystatus.sns.maxFetchesPerHour} — default 12</li>
+     *   <li>{@code notify.deliverystatus.sns.freshnessSeconds} / {@code .futureSkewSeconds} — 3600 / 300 (D6)</li>
+     * </ul>
+     * An unreadable or untrusted pinned certificate, or {@value #HOSTNAME_VERIFICATION_OFF} being set, leaves the
+     * adapter inert and says why in the log — it fails closed, never open.
+     */
+    public SesSnsDeliveryStatusAdapter() {
+        this(fromProperties());
+    }
+
+    private SesSnsDeliveryStatusAdapter(Wiring w) {
+        this(w.topics(), w.certs(), w.confirmer(),
+                Long.getLong("notify.deliverystatus.sns.freshnessSeconds", DEFAULT_FRESHNESS_SECONDS),
+                Long.getLong("notify.deliverystatus.sns.futureSkewSeconds", DEFAULT_FUTURE_SKEW_SECONDS));
+    }
+
+    private record Wiring(Set<String> topics, CertSource certs, Confirmer confirmer) {}
+
+    private static Wiring fromProperties() {
+        Set<String> topics = new java.util.LinkedHashSet<>();
+        for (String t : System.getProperty("notify.deliverystatus.sns.topicArns", "").split(",")) {
+            if (!t.isBlank()) topics.add(t.trim());
+        }
+        if (topics.isEmpty()) return new Wiring(Set.of(), null, null);
+        if (System.getProperty(HOSTNAME_VERIFICATION_OFF) != null) {
+            log.error("SES/SNS adapter NOT armed: -D{} is set, which would disable TLS hostname verification",
+                    HOSTNAME_VERIFICATION_OFF);
+            return new Wiring(Set.of(), null, null);
+        }
+        try {
+            for (String t : topics) SnsSigningCerts.expectedHost(t);   // a malformed ARN is a config error
+            SnsCertTrust trust = SnsCertTrust.jvmDefault();
+            List<X509Certificate> pinned = null;
+            String pem = System.getProperty("notify.deliverystatus.sns.signingCert");
+            if (pem != null && !pem.isBlank()) {
+                pinned = SnsSigningCerts.parsePem(java.nio.file.Files.readAllBytes(java.nio.file.Path.of(pem.trim())));
+                // step 10 at boot, against the first topic's host: an untrusted pin never arms
+                trust.check(pinned.get(0), pinned.subList(1, pinned.size()),
+                        SnsSigningCerts.expectedHost(topics.iterator().next()), System.currentTimeMillis());
+            }
+            SnsSigningCerts.Budget budget = new SnsSigningCerts.Budget(
+                    Integer.getInteger("notify.deliverystatus.sns.maxFetchesPerHour",
+                            SnsSigningCerts.DEFAULT_MAX_FETCHES_PER_HOUR), System::currentTimeMillis);
+            SnsHttpsFetcher fetcher = SnsHttpsFetcher.system(
+                    Boolean.getBoolean("notify.deliverystatus.sns.allowPrivateAddresses"),
+                    Boolean.getBoolean("notify.deliverystatus.sns.useProxy"));
+            return new Wiring(topics, new SnsSigningCerts(fetcher, trust, pinned, budget, System::currentTimeMillis),
+                    new SnsSubscriptionConfirmer(fetcher, budget,
+                            Boolean.parseBoolean(System.getProperty("notify.deliverystatus.sns.autoConfirm", "true")),
+                            SnsSubscriptionConfirmer.boundedExecutor()));
+        } catch (Exception e) {
+            log.error("SES/SNS adapter NOT armed: {}", e.getMessage());
+            return new Wiring(Set.of(), null, null);
+        }
+    }
+
     SesSnsDeliveryStatusAdapter(Set<String> topicArns, CertSource certs, Confirmer confirmer, long freshnessSeconds,
                                 long futureSkewSeconds) {
         this.topicArns = topicArns == null ? Set.of() : Set.copyOf(topicArns);

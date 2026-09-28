@@ -1,2 +1,3 @@
 com.gamma.connect.notify.SendGridDeliveryStatusAdapter
 com.gamma.connect.notify.HmacDeliveryStatusAdapter
+com.gamma.connect.notify.SesSnsDeliveryStatusAdapter
