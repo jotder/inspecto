@@ -23,6 +23,8 @@ import java.util.regex.Pattern;
  *       {@code /dry-run}, {@code /assist/*}) are skipped as non-mutating, and so is every POST that
  *       {@link CapabilityManifest#EXEMPTIONS} declares {@code read-shaped} ({@code /bi/query},
  *       {@code /db/query}, {@code /validate}, …) — the manifest is the one list of them (R2-12).</li>
+ *   <li>The same requests when they FAIL with a 5xx (an Exception or Error thrown mid-handler), as an
+ *       attempted action: one row, "(failed, HTTP n)", carrying the Correlation-ID of the ERROR log line.</li>
  *   <li>{@code GET .../export}, and a read-shaped {@code POST .../export} — data-export actions (Category B).</li>
  *   <li>{@link #accessDenied} — a non-GET request to a forbidden/unknown route (404) or a disallowed
  *       method on a read-only route (405): the auth-free analogue of a 401/403 attempt.</li>
@@ -51,9 +53,12 @@ final class AuditTrail {
             String actor = ApiContext.actor(ex);
             String targetType = resource(path);
             String targetId = targetId(path);
-            // Say so when the action was REFUSED. The action name is the one that was attempted, so a
-            // 4xx/5xx must not read as an accomplished mutation in the one log an investigator trusts.
-            String outcome = status >= 400 ? " (refused, HTTP " + status + ")" : "";
+            // Say so when the action was REFUSED (4xx) or FAILED (5xx). The action name is the one that was
+            // attempted, so neither may read as an accomplished mutation in the one log an investigator trusts.
+            // AUDIT-ERRORED-REQUEST-UNRECORDED-1 (2026-09-28): a 5xx is a server fault, not a refusal; the
+            // write may have got part of the way, and that is what an investigator must be told.
+            String outcome = status >= 500 ? " (failed, HTTP " + status + ")"
+                    : status >= 400 ? " (refused, HTTP " + status + ")" : "";
             // The capability this request was PRIVILEGED by — present iff a capability check ran and
             // passed on the way in (ApiContext.requireCapability, Subject attached). Its absence on an
             // AUDIT row therefore means "an ordinary mutation, or Personal where nothing is checked";
@@ -67,6 +72,8 @@ final class AuditTrail {
                     .action(action.name()).actionCategory(action.category())
                     .target(targetType, targetId)
                     .ip(ApiContext.ip(ex)).userAgent(ApiContext.userAgent(ex))
+                    // The request's Correlation-ID, so a failed request's row joins its ERROR log line.
+                    .correlationId(ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID) instanceof String c ? c : null)
                     .attr(AuditAttrs.HTTP_METHOD, method)
                     .attr(AuditAttrs.HTTP_PATH, path)
                     .attr(AuditAttrs.HTTP_STATUS, status);

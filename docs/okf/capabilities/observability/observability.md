@@ -296,6 +296,29 @@ request. The SPA never sends the header, so no demo showed it. Pinned by
 `ControlApiAuditTest.idempotencyReplayOfASpacePrefixedRequestIsAuditedLikeTheOriginal`, red before the fix
 (`space.paused /spaces/default/runs/…`, `space.created /spaces/default/bi/query`).
 
+**A request that fails is recorded as an attempted action (session decision, 2026-09-28,
+`AUDIT-ERRORED-REQUEST-UNRECORDED-1`).** A mutating request whose handler throws (an `Exception` or an
+`Error`, `OutOfMemoryError` included) and is answered with a 5xx writes **one** `AUDIT` row with that status.
+Its message ends "(failed, HTTP 500)", never "(refused, …)": a 5xx is a server fault, and the write may have
+got part of the way. Before this, `ControlApi.routeDispatch` recorded only after the handler returned, so an
+errored mutation left no trace at all. The rules:
+- **Same classification as a success.** A read-shaped POST that fails writes nothing, like one that succeeds.
+- **Exactly one row.** The failure is recorded in `routeDispatch`'s catch around the handler and then rethrown to
+  `errorBoundary`, which shapes the answer. The throw skips the success record, so there is never a second
+  row. The catch sits there, not in `errorBoundary`, because only there is the route known to have matched
+  and the Space MDC still bound. The status mirrors the boundary's answer (`failureStatus`): the
+  `ApiException`'s own 5xx, 503 for no Space hosted, 500 otherwise. A client disconnect writes no row,
+  because the boundary answers none.
+- **An `OutOfMemoryError` is recorded before `errorBoundary` rethrows it.**
+- **Every `AUDIT` row now carries the request's Correlation-ID** (`correlationId`), so a failed row joins its
+  ERROR log line and `/audit/search?correlationId=` finds it.
+⚠ An `ApiException` with a 4xx other than 401/403 (409, 422, …) is still not recorded; that was never in
+scope. A handler that answers a 5xx itself and returns is recorded by the success path, now worded "failed".
+Pinned by `ControlApiErrorBoundaryTest` (a throwing mutation → one `AUDIT:500` row with the cid; a failing
+read-shaped `/inv/projection` → none, against its recorded mutating sibling `/inv/investigations`; a
+success → one row; the OOM rethrow → one row). The suite goes red with the record removed and again with it
+doubled.
+
 **Durability claims, exactly.** The trail is **append-only by construction** — one write seam, no update
 or delete route, 405 inherent to dispatch — and that is the whole claim. It is **not tamper-evident** (no
 hash chain, no signature), not permission-hardened (no `PosixFilePermission` call exists repo-wide), and
@@ -623,6 +646,7 @@ the form authors the kind), and per-measure limits.
 | 2026-09-08 | This spec: OPS-2's "ungated" cell, OPS-3's "tamper-evident"/"sign-ins", OPS-4's "off by default" and the 7-field GLOSSARY envelope corrected; `OPS`/Ops-Lens naming applied to REQUIREMENTS §3.7 | this file §2 |
 | 2026-09-24 | `DUCKLE-C8` baseline Expectation kind shipped with its durable profile store; acceptance only on a whole successful run (the sweep counts as one run); accept/clear gated `canOperateRuns` and audited with the replaced value | §3.10 |
 | 2026-09-26 | Read-shaped POSTs, as declared in `CapabilityManifest.EXEMPTIONS`, are not audited — the manifest is the single list; a read is classified like a GET, so a read-shaped export stays audited as an export (R2-12) | operator; §3.3 Layer 3 |
+| 2026-09-28 | A mutating request that fails with a 5xx is audited as an attempted action: one `AUDIT` row, "(failed, HTTP n)", classified like a success, carrying the Correlation-ID; recorded on the failure path in `routeDispatch`, so never twice (`AUDIT-ERRORED-REQUEST-UNRECORDED-1`) | session decision; §3.3 Layer 3 |
 
 ## 5. Not built
 

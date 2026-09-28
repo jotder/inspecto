@@ -13,8 +13,9 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **41<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** —
+> **40<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ⬇ **41 → 40 on 2026-09-28**: closed P3 `AUDIT-ERRORED-REQUEST-UNRECORDED-1` — a mutating request that fails with a 5xx (an Exception or Error thrown mid-handler) now writes ONE AUDIT row, "(failed, HTTP n)", classified like a success and carrying the Correlation-ID of its ERROR log line (as-built `okf/capabilities/observability/observability.md` §3.3 Layer 3).
 > ⬇ **42 → 41 on 2026-09-28** (telco shift 8 integration): closed P3 `ASSURE-BREAK-RECURRENCE-REACH-1` (an auto-closed Break is kept 3 absent runs) and P3 `ASSURE-IMPACT-LEDGER-RESIDUALS-1` (the ledger Job types declare `requires: objects`; impact amounts are exact strings); filed P3 `AUDIT-ERRORED-REQUEST-UNRECORDED-1`; Platform Services S2-2 measured.
 > ↔ **on 2026-09-28**: closed P2 `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (row already gone 2026-09-27) is now GUARDED — `RiskScoreEvaluator` had reintroduced a raw in-memory open; it is routed through `DuckDbUtil.openInMemory` and `NoRawInMemoryDuckDbOpenContractTest` fails on the next one (as-built `okf/backend/engine/duckdb.md`).
 > ⬆ **42 → 43 on 2026-09-28**: filed P1 `EXCHANGE-OWNING-SPACE-AUTHZ-1` (§3.8, cross-Space consequence D3) — an Exchange owner-side act (approve/deny/revoke/expiry, offer/refresh) must be authorized in the OWNER Space's roles, consumer acts (request/pin) in the consumer's. ⬇ **43 → 42 the same day**: closed — the gates had shipped `67ce12f96` (2026-09-24); this change repaired the pinning test, whose "capability only in the bound Space" negatives were vacuous (`SpaceManager.current()` is alphabetical, so the bound Space was the consumer, not `hub`) and are now mutation-checked (as-built `okf/backend/control-plane/exchange-sharing.md`).
@@ -67,8 +68,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 25<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 41<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 24<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 40<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -262,7 +263,6 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 #### Exchange & jobs
 
-- **P3** · `AUDIT-ERRORED-REQUEST-UNRECORDED-1` — **a request that errors writes no AUDIT row** (found 2026-09-28 by the `errorBoundary` fix). `routeDispatch` records only after the handler returns, so an Exception or Error thrown mid-mutation leaves no trace; `ControlApiErrorBoundaryTest` pins the current (matching) behaviour. Decide whether a 5xx on a mutating route is recorded as an attempted action (like the refused-4xx rows) and build it.
 - **P3** · **Bundle / Exchange — "load as draft" residuals** — ✅ **every slice SHIPPED 2026-09-25** (all eight calls answered that day): **Import as draft…** beside **Import…** in the Dashboard, Widget, Dataset, authored Pipeline, Link Analysis view and Geo map view editors — prerequisites write-through imported first, the target held unsaved in memory under a shared banner, Save through the editor's own route (`If-Match` + a diff for an existing id), advisory integrity findings from `POST /bundle/preview` re-checked just before Save. As-built: `okf/backend/control-plane/metadata-bundle.md`; design archived. Re-ranked P2 → P3. Left: `/bundle/preview` checks no references for Pipelines or LA/Geo views, so their banner says "not checked" (nothing checks a view's `datasetId`); a browser pass over the six editors. → `okf/backend/control-plane/metadata-bundle.md`
 - **P3** · **Job framework — space-to-space comparison (residuals)** — ✅ the comparison SHIPPED 2026-09-24 (`space.comparison` Job Type + `POST /space-comparisons` on `canAdminister`; all four design decisions taken "go with recommendations", each recorded with how to reverse it in `archived-documents/plans-archive/space-comparison-design.md` §5). Left, each waiting for a real ask: (a) **a scheduled / authored cross-Space comparison** — refused by design today (no Subject ⇒ own-Space-only grant); needs a persisted, attributable, revocable grant, which is a new operator decision, not plumbing · (b) *compare every registered Space* — only with a `SpaceConfigRoot` enumeration decision (design Q1 (b) / Q4) · (c) persisting comparison rows — the data-residency call (Q3) · (d) no UI surface; API only. Predictive maintenance stays deferred to AGT-5 regardless. → `okf/backend/control-plane/jobs.md` § *Space comparison*
 

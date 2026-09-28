@@ -765,6 +765,14 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         respond(ex, 500, Map.of("error", message));
     }
 
+    /** The 5xx {@link #errorBoundary} answers a non-{@link ApiException} failure with, or 0 when it answers none
+     *  (a client disconnect is not a server fault). Kept beside the boundary so the two cannot drift apart. */
+    private static int failureStatus(Throwable t) {
+        if (t instanceof SpaceManager.NoSpaceHostedException) return 503;
+        if (t instanceof Exception && isClientDisconnect(t)) return 0;
+        return 500;
+    }
+
     /** True when an exception is the socket giving way because the peer went first, not a server fault. */
     private static boolean isClientDisconnect(Throwable t) {
         for (Throwable c = t; c != null; c = c.getCause()) {
@@ -916,19 +924,29 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 throw ae;
             }
             authorize(ex, method, path);
-            Object result;
             try {
-                result = r.handler.handle(ex, m);
+                Object result = r.handler.handle(ex, m);
+                if (result != HANDLED) respond(ex, 200, result);
             } catch (ApiException ae) {
                 if (ae.status == 401 || ae.status == 403) AuditTrail.accessDenied(ex, method, path, ae.status);
+                else if (ae.status >= 500) AuditTrail.record(ex, method, path, ae.status);
                 throw ae;
             } catch (PendingChanges.Held held) {
                 // ASSURE-MAKER-CHECKER-1: the write became a Pending Change; nothing was written.
                 respond(ex, 202, held.body());
                 AuditTrail.record(ex, method, path, 202);
                 return;
+            } catch (Exception | Error t) {
+                // AUDIT-ERRORED-REQUEST-UNRECORDED-1 (2026-09-28): a request that fails mid-mutation is an
+                // attempted action and is recorded with the 5xx errorBoundary answers it with. It is recorded
+                // HERE, on the way out to the boundary, not in errorBoundary itself: only here is the route known
+                // to have matched and the Space MDC still bound (bindSpace's finally has run by the boundary).
+                // The success record below is skipped by the throw, so a request writes exactly one row. An
+                // OutOfMemoryError passes through here too, so it is recorded before errorBoundary rethrows it.
+                int failed = failureStatus(t);
+                if (failed > 0) AuditTrail.record(ex, method, path, failed);
+                throw t;
             }
-            if (result != HANDLED) respond(ex, 200, result);
             // The REAL status, not a literal 200. A handler that responds itself and returns HANDLED
             // routinely sends 422 (a rejected config write, a failed compatibility gate) — recording
             // those as 200 made a refused write indistinguishable from a successful one in the audit

@@ -34,6 +34,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * the fix the Error escaped {@code ControlApi.errorBoundary} to the JDK HttpServer, which dropped the
  * connection without a log line; the client read "header parser received no bytes".
  *
+ * <p>AUDIT-ERRORED-REQUEST-UNRECORDED-1 (2026-09-28): a mutating request that fails with a 5xx writes one
+ * AUDIT row, "(failed, HTTP n)", with its Correlation-ID; the audit tests at the foot of this class pin it.
+ *
  * <p>Each probe route is registered on the live context under a path nothing else owns, so no route
  * inventory or API contract changes.
  */
@@ -125,7 +128,8 @@ class ControlApiErrorBoundaryTest {
      * An OutOfMemoryError is not swallowed: it is logged, answered with a best-effort 500, and then RETHROWN
      * out of the handler. The JDK HttpServer is where it lands ({@code ServerImpl.Exchange.run} catches every
      * Throwable and logs it at TRACE on {@code com.sun.net.httpserver}), so that TRACE record is the observable
-     * proof of the rethrow. The server keeps serving.
+     * proof of the rethrow. The server keeps serving. The probe is a mutating POST, so it also proves the
+     * failed attempt reached the audit trail before the Error was rethrown.
      */
     @Test
     void anOutOfMemoryErrorIsLoggedAnsweredAndRethrown(@TempDir Path dir) throws Exception {
@@ -144,9 +148,12 @@ class ControlApiErrorBoundaryTest {
         jdk.addHandler(capture);
         try (Ctx c = open(dir)) {
             String path = "/test-error-boundary/oom";
-            throwing(c, path, () -> new OutOfMemoryError("probe heap"));
+            c.api.post(path, ApiContext.withCapability("canAdminister",
+                    (ex, m) -> { throw new OutOfMemoryError("probe heap"); }));
             String cid = UUID.randomUUID().toString();
-            assert500Logged(c, get(c, path, cid), path, cid, OutOfMemoryError.class, "probe heap");
+            assert500Logged(c, post(c, path, cid), path, cid, OutOfMemoryError.class, "probe heap");
+            // AUDIT-ERRORED-REQUEST-UNRECORDED-1: the failed mutation is recorded BEFORE the rethrow.
+            assertOneFailedRow(c, path, cid, 500);
 
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
             while (reachedTheServer.stream().noneMatch(ControlApiErrorBoundaryTest::isProbeOom)
@@ -171,8 +178,8 @@ class ControlApiErrorBoundaryTest {
 
     /**
      * Audit parity: an errored mutation leaves the same audit trace whether it failed with an Exception or an
-     * Error. Today that trace is NONE: {@code routeDispatch} records after the handler returns, so neither
-     * kind of 500 writes an AUDIT row (reported, not changed here).
+     * Error, and since AUDIT-ERRORED-REQUEST-UNRECORDED-1 (2026-09-28) that trace is ONE failed AUDIT row with
+     * the 500. Until then it was none: {@code routeDispatch} recorded only after the handler returned.
      */
     @Test
     void anErrorLeavesTheSameAuditTraceAsAnException(@TempDir Path dir) throws Exception {
@@ -189,14 +196,91 @@ class ControlApiErrorBoundaryTest {
                         .POST(BodyPublishers.noBody()).build(), BodyHandlers.ofString());
                 assertEquals(500, r.statusCode(), p + " " + r.body());
             }
+            assertEquals(List.of("AUDIT:500"), auditTrace(c, viaException));
             assertEquals(auditTrace(c, viaException), auditTrace(c, viaError));
         }
     }
 
-    /** The {@code type:status} of every AUDIT / ACCESS_DENIED event whose http_path is {@code path}. */
-    private static List<String> auditTrace(Ctx c, String path) {
+    /** A mutation that throws writes exactly one AUDIT row: the 5xx, "(failed, ...)" not "(refused, ...)", and
+     *  the request's Correlation-ID, which is the one on the ERROR log line. */
+    @Test
+    void aMutationThatThrowsWritesOneFailedRowJoinedToItsLogLine(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String path = "/test-error-boundary/mutation-fails";
+            c.api.post(path, ApiContext.withCapability("canAdminister",
+                    (ex, m) -> { throw new IllegalStateException("probe failure"); }));
+            String cid = UUID.randomUUID().toString();
+            assert500Logged(c, post(c, path, cid), path, cid, IllegalStateException.class, "probe failure");
+            assertOneFailedRow(c, path, cid, 500);
+        }
+    }
+
+    /**
+     * A failed request gets the same classification as a successful one, so a read-shaped POST that fails
+     * writes no row. Two shapes: a manifest read-shaped POST ({@code /inv/projection}, answered 503 by the
+     * absent Link Analysis module's stub) and a literal diagnostic POST that throws. The mutating sibling of
+     * the first, {@code POST /inv/investigations}, fails the same way and IS recorded: the probe that would
+     * otherwise succeed.
+     */
+    @Test
+    void aReadShapedPostThatFailsWritesNoRow(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            assertEquals(503, post(c, "/inv/projection", UUID.randomUUID().toString()).statusCode());
+            assertEquals(List.of(), auditTrace(c, "/inv/projection"));
+
+            String preview = "/test-error-boundary/read/preview";
+            c.api.post(preview, ApiContext.withCapability("canAdminister",
+                    (ex, m) -> { throw new IllegalStateException("probe failure"); }));
+            assertEquals(500, post(c, preview, UUID.randomUUID().toString()).statusCode());
+            assertEquals(List.of(), auditTrace(c, preview));
+
+            String cid = UUID.randomUUID().toString();
+            assertEquals(503, post(c, "/inv/investigations", cid).statusCode());
+            assertOneFailedRow(c, "/inv/investigations", cid, 503);
+        }
+    }
+
+    /** A successful mutation still writes ONE row, not two: the failure record must not also fire on success. */
+    @Test
+    void aSuccessfulMutationStillWritesOneRow(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String path = "/test-error-boundary/mutation-ok";
+            c.api.post(path, ApiContext.withCapability("canAdminister", (ex, m) -> Map.of("ok", true)));
+            String cid = UUID.randomUUID().toString();
+            assertEquals(200, post(c, path, cid).statusCode());
+            List<Map<String, Object>> rows = auditRows(c, path);
+            assertEquals(List.of("AUDIT:200"), auditTrace(c, path), rows.toString());
+            assertFalse(String.valueOf(rows.get(0).get("message")).contains("HTTP"), rows.toString());
+            assertEquals(cid, rows.get(0).get("correlationId"));
+        }
+    }
+
+    private HttpResponse<String> post(Ctx c, String path, String cid) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path))
+                .header("Correlation-ID", cid).timeout(java.time.Duration.ofSeconds(10))
+                .POST(BodyPublishers.noBody()).build(), BodyHandlers.ofString());
+    }
+
+    /** Exactly one AUDIT row for {@code path}: the 5xx, worded as a failure, joined by Correlation-ID. */
+    private static void assertOneFailedRow(Ctx c, String path, String cid, int status) {
+        List<Map<String, Object>> rows = auditRows(c, path);
+        assertEquals(List.of("AUDIT:" + status), auditTrace(c, path), rows.toString());
+        String message = String.valueOf(rows.get(0).get("message"));
+        assertTrue(message.endsWith("(failed, HTTP " + status + ")"), message);
+        assertFalse(message.contains("refused"), message);
+        assertEquals(cid, rows.get(0).get("correlationId"), rows.toString());
+    }
+
+    /** Every AUDIT / ACCESS_DENIED event whose http_path is {@code path}, as maps. */
+    private static List<Map<String, Object>> auditRows(Ctx c, String path) {
         return c.svc.events().page(500, null, null).stream().map(Event::toMap)
                 .filter(e -> e.get("attributes") instanceof Map<?, ?> a && path.equals(a.get("http_path")))
+                .toList();
+    }
+
+    /** The {@code type:status} of every AUDIT / ACCESS_DENIED event whose http_path is {@code path}. */
+    private static List<String> auditTrace(Ctx c, String path) {
+        return auditRows(c, path).stream()
                 .map(e -> e.get("type") + ":" + ((Map<?, ?>) e.get("attributes")).get("http_status"))
                 .toList();
     }
