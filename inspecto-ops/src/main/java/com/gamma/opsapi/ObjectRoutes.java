@@ -105,7 +105,7 @@ public final class ObjectRoutes implements RouteModule {
         // (WS-10, ASSURE-IMPACT-LEDGER-1) the typed financial impact of an Incident or Case, on canWorkIncidents like
         // postmortem / category: recording what an Incident cost is part of finishing it. Its own narrow PUT, not
         // the canAdminister PATCH, for the same reason those two are.
-        api.put("/objects/([^/]+)/impact", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> saveImpact(api, e, ApiContext.name(m), api.body(e)))));
+        api.put("/objects/([^/]+)/impact", ApiContext.withCapability("canWorkIncidents", scoped(api, (e, m) -> saveImpact(api, e, ApiContext.name(m), exactBody(api, e)))));
         api.patch("/objects/([^/]+)", ApiContext.withCapability("canAdminister", scoped(api, (e, m) -> patchObject(api, ApiContext.name(m), api.body(e)))));
         api.get("/objects/([^/]+)", scoped(api, (e, m) -> objectById(api, ApiContext.name(m))));
         api.get("/rca/templates", (e, m) -> rcaTemplateList(api));
@@ -858,6 +858,22 @@ public final class ObjectRoutes implements RouteModule {
      * (late recoveries) → 409; unknown or out-of-scope id → 404. Audited with {@link ApiContext#actor}, the stored
      * value before and after.
      */
+    /** Floats parse as {@link java.math.BigDecimal}, never {@code double}: an amount is money (see {@link #exactBody}). */
+    private static final com.fasterxml.jackson.databind.ObjectMapper EXACT = new com.fasterxml.jackson.databind.ObjectMapper()
+            .enable(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
+
+    /**
+     * The request body with every JSON number kept EXACT. {@link ApiContext#body} parses a fractional number into a
+     * {@code double}, so an amount sent as {@code 123456789012345.123456} (a script, an integration, an older SPA)
+     * was stored as {@code 123456789012345.12} with a 200. {@code api.body} runs first, so a malformed body still
+     * answers its 400.
+     */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> exactBody(ApiContext api, HttpExchange ex) throws IOException {
+        Map<String, Object> parsed = api.body(ex);
+        return parsed.isEmpty() ? parsed : EXACT.readValue(api.rawBody(ex), Map.class);
+    }
+
     private Object saveImpact(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) {
         if (!(body.get(Impact.ATTR) instanceof Map<?, ?> values))
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'impact' as an object");

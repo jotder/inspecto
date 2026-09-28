@@ -241,6 +241,28 @@ class ControlApiImpactTest {
         }
     }
 
+    /**
+     * An amount sent as a JSON NUMBER is stored exactly as written. The body used to be parsed into a
+     * {@code double} first, so {@code 123456789012345.123456} was stored as {@code 123456789012345.12} with a 200:
+     * a script, an integration or an older SPA silently rewrote the money.
+     */
+    @Test
+    void anAmountSentAsAJsonNumberIsStoredExactlyNotThroughADouble(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String inc = open(c, ObjectType.INCIDENT);
+            HttpResponse<String> r = send(c.port, "/objects/" + inc + "/impact",
+                    "{\"impact\":{\"confirmed\":123456789012345.123456,\"recovered\":0.1,\"currency\":\"USD\"}}",
+                    "operations");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode impact = V1Body.of(r.body()).get("impact");
+            assertEquals("123456789012345.123456", impact.get("confirmed").asText(), r.body());
+            assertEquals("0.1", impact.get("recovered").asText(), r.body());
+            HttpResponse<String> scale = send(c.port, "/objects/" + inc + "/impact",
+                    "{\"impact\":{\"confirmed\":1E-7,\"currency\":\"USD\"}}", "operations");
+            assertEquals(422, scale.statusCode(), "an exponent-form number is still bounds-checked: " + scale.body());
+        }
+    }
+
     @Test
     void anAnalystRecordsImpactOutstandingIsDerivedAndTheChangeIsAudited(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
