@@ -203,7 +203,8 @@ class OidcAuthenticatorTest {
                 Roles.CAN_APPROVE_SHARES, Roles.CAN_TRIAGE_REQUIREMENTS,
                 Roles.CAN_OFFER_DATASETS, Roles.CAN_CURATE_MENUS, Roles.CAN_MANAGE_INCIDENTS,
                 Roles.CAN_WORK_INCIDENTS, Roles.CAN_ADMINISTER, Roles.CAN_REVEAL_LINK_ENTITIES,
-                Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_APPROVE_CHANGES),
+                Roles.CAN_APPROVE_LINK_EXPANSIONS, Roles.CAN_APPROVE_CHANGES,
+                Roles.CAN_OFFER_SIGNALS),   // cross-Space consequence D7, 2026-09-28
                 admin.capabilities());
         assertFalse(admin.capabilities().contains(Roles.CAN_AUTHOR_WORKBENCH),
                 "canAuthorWorkbench stays Builder-only");
@@ -306,7 +307,8 @@ class OidcAuthenticatorTest {
                         Roles.CAN_ADMINISTER,    // ROUTE-UNGATED-DEFAULT-1, 2026-09-15 — the eleventh
                         Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_APPROVE_LINK_EXPANSIONS,  // LA-19, 2026-09-24
                         Roles.CAN_WORK_INCIDENTS,    // operator, 2026-09-26
-                        Roles.CAN_APPROVE_CHANGES),  // ASSURE-MAKER-CHECKER-1, 2026-09-26
+                        Roles.CAN_APPROVE_CHANGES,   // ASSURE-MAKER-CHECKER-1, 2026-09-26
+                        Roles.CAN_OFFER_SIGNALS),    // cross-Space consequence D7, 2026-09-28
                 subject.get().capabilities());
     }
 
