@@ -110,6 +110,12 @@ export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly s
 export interface GraphDisplayOptions {
     nodeLabels: boolean;
     edgeLabels: boolean;
+    /**
+     * Show EVERY link label even on a dense graph. Absent/false = the density rule
+     * ({@link edgeLabelsHiddenByDensity}): above {@link DENSE_EDGE_LABEL_CAP} edges, labels show only on
+     * hover/click of the edge or an endpoint.
+     */
+    allEdgeLabels?: boolean;
     /** node kind → stroke colour (a chart-token swatch). */
     nodeColors: Record<string, string>;
     /** edge (relationship) kind → stroke colour. */
@@ -120,6 +126,19 @@ export interface GraphDisplayOptions {
     edgePatterns: Record<string, EdgePattern>;
     /** edge (relationship) kind → line width in px. */
     edgeSizes: Record<string, number>;
+}
+
+/**
+ * Above this many edges, link labels are hidden until hovered/clicked. 20: at the canvas' 9px label size a
+ * link label is ~60px wide, and past ~20 links on an auto-fitted canvas they start colliding with each other
+ * and with node labels (the telco demo ring, 18 nodes / 42 links, was unreadable); a small investigation
+ * (a subscriber, its devices and cells) stays fully labelled. The legend still names every link type.
+ */
+export const DENSE_EDGE_LABEL_CAP = 20;
+
+/** Whether the density rule hides link labels by default (still revealed on hover/click). */
+export function edgeLabelsHiddenByDensity(display: GraphDisplayOptions | null | undefined, edgeCount: number): boolean {
+    return display?.edgeLabels !== false && !display?.allEdgeLabels && edgeCount > DENSE_EDGE_LABEL_CAP;
 }
 
 /** The node shapes the Display menu offers per kind (value = G6 node type; glyph = the picker face). */
@@ -309,6 +328,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     @ViewChild('host') private hostEl!: ElementRef<HTMLDivElement>;
     private graph: Graph | null = null;
+    /** Edges whose label is revealed by hover (transient) / click (pinned until the next click). */
+    private hoverLabelled: string[] = [];
+    private pinnedLabelled: string[] = [];
     private dark = false;
     private ready = false;
     private resizeObserver: ResizeObserver | null = null;
@@ -455,6 +477,37 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         void this.graph?.fitView();
     }
 
+    /**
+     * The edges whose label the density rule reveals for a hovered/clicked element: the edge itself, or
+     * every edge touching a node. Empty when the rule is not hiding labels.
+     */
+    edgesToReveal(id: string | undefined, kind: 'node' | 'edge'): string[] {
+        if (!id || !this.data || !edgeLabelsHiddenByDensity(this.display, this.data.edges.length)) return [];
+        if (kind === 'edge') return [id];
+        return this.data.edges.filter((e) => e.source === id || e.target === id).map((e) => String(e.id));
+    }
+
+    /** Apply the `labelled` state: hover replaces the transient set, click replaces the pinned set. */
+    private revealEdgeLabels(id: string | undefined, kind: 'node' | 'edge', pin: boolean): void {
+        const graph = this.graph;
+        if (!graph) return;
+        const next = this.edgesToReveal(id, kind);
+        const before = new Set([...this.hoverLabelled, ...this.pinnedLabelled]);
+        if (pin) this.pinnedLabelled = next;
+        else this.hoverLabelled = next;
+        const after = new Set([...this.hoverLabelled, ...this.pinnedLabelled]);
+        const states: Record<string, string[]> = {};
+        try {
+            // Keep any other state (hover-activate's `active`) — only `labelled` is toggled here.
+            const others = (e: string): string[] => graph.getElementState(e).filter((st) => st !== 'labelled');
+            for (const e of before) if (!after.has(e)) states[e] = others(e);
+            for (const e of after) if (!before.has(e)) states[e] = [...others(e), 'labelled'];
+            if (Object.keys(states).length) void graph.setElementState(states);
+        } catch {
+            // An id no longer on the canvas (data swapped under the pointer) — nothing to reveal.
+        }
+    }
+
     /** Short hover details: node → label/kind/degree, edge → kind + endpoint labels. */
     private tooltipHtml(items: ElementDatum[]): string {
         const d = items[0];
@@ -553,6 +606,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
      * or an attribute-only change therefore redraws exactly in place.
      */
     private applyData(dataKey: string): void {
+        this.hoverLabelled = [];
+        this.pinnedLabelled = [];
         const graph = this.graph;
         if (!graph) {
             this.create();
@@ -595,6 +650,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
 
     /** Build a brand-new G6 instance. The last resort - see {@link ngOnChanges}. */
     private create(): void {
+        this.hoverLabelled = [];
+        this.pinnedLabelled = [];
         this.destroyGraph();
         if (!this.data?.nodes.length) {
             this.snapshotKeys();
@@ -666,12 +723,16 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                         const w = (d.data as { weight?: number }).weight;
                         return w && w > 0 ? Math.min(12, 1.5 + Math.log2(w + 1)) : 1.5;
                     },
-                    label: () => this.display?.edgeLabels !== false,
+                    label: () =>
+                        this.display?.edgeLabels !== false &&
+                        !edgeLabelsHiddenByDensity(this.display, this.data?.edges.length ?? 0),
                     labelText: (d): string => (d.data as { kind: string }).kind,
                     labelFill: () => this.styleFg,
                     labelFontSize: 9,
                     labelBackground: false,
                 },
+                // The density rule's reveal: set on hover/click by revealEdgeLabels(), over the base style.
+                state: { labelled: { label: true } },
             },
             layout: layoutConfig(this.layout) as LayoutOptions,
             behaviors: [
@@ -693,14 +754,21 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 ...(buildPluginList(this.plugins, ICON_COLOR_SWATCHES) as unknown as never[]),
             ],
         });
+        const targetId = (e: unknown): string | undefined => (e as { target?: { id?: string } }).target?.id;
         graph.on(NodeEvent.CLICK, (e) => {
-            const id = (e as unknown as { target?: { id?: string } }).target?.id;
+            const id = targetId(e);
             if (id) this.nodeClick.emit(id);
+            this.revealEdgeLabels(id, 'node', true);
         });
         graph.on(EdgeEvent.CLICK, (e) => {
-            const id = (e as unknown as { target?: { id?: string } }).target?.id;
+            const id = targetId(e);
             if (id) this.edgeClick.emit(id);
+            this.revealEdgeLabels(id, 'edge', true);
         });
+        graph.on(NodeEvent.POINTER_ENTER, (e) => this.revealEdgeLabels(targetId(e), 'node', false));
+        graph.on(EdgeEvent.POINTER_ENTER, (e) => this.revealEdgeLabels(targetId(e), 'edge', false));
+        graph.on(NodeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'node', false));
+        graph.on(EdgeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'edge', false));
         void graph.render();
         this.graph = graph;
         this.snapshotKeys();

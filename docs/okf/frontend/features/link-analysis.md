@@ -228,6 +228,24 @@ operator still presses Run and Save, so the human stays the actor.
   a model problem. `projection_author` joins the shared `{kind,id,clean,findings,draft}` branch.
 * ⚠ **The tool count in `InspectoPackTest` is hard-coded** (21 → 22). Any new belt tool trips it.
 
+## Dense-graph link labels (as-built 2026-09-28)
+
+A dense canvas drew every link-type label, so the telco demo ring (18 nodes / 42 links) was unreadable.
+The shared `GraphViewComponent` (`inspecto-ui/src/app/modules/admin/catalog/graph-view.component.ts`) now
+applies a **density rule**: above `DENSE_EDGE_LABEL_CAP = 20` links (`edgeLabelsHiddenByDensity`), link
+labels are hidden and revealed by a custom G6 `labelled` edge state — on hover of the link or of an
+endpoint node (every link touching it), and pinned by a click until the next click. It uses its own pointer
+events, not `hover-activate`, so it also works in the menu-leaf `link-view-widget`, which passes no
+behaviors; other states (e.g. `active`) are preserved. Sparse graphs (≤ 20) keep labels exactly as before;
+node labels are untouched; the legend still names every link type.
+
+- **Why 20:** a 9px link label is ~60px wide; past ~20 links on an auto-fitted canvas they collide with each
+  other and with node labels, while a small investigation stays fully labelled.
+- **Override:** the Display menu and View toolbox gain **All link labels** (disabled while *Link labels* is
+  off). It persists in the saved view as `display.allEdgeLabels: true` (omitted when off, so older views
+  and views without it get the density rule); undo/redo snapshots it.
+- Not driven live in the browser this change — covered by vitest only.
+
 ## Grounded limits and consequences (code read 2026-09-20 / 2026-09-22)
 
 Durable as-built facts distilled from the archived `link-analysis-spec.md`. Open work against them is

@@ -112,6 +112,7 @@ import {
 } from './link-analysis-overlays.component';
 import { ICON_COLOR_SWATCHES } from 'app/inspecto/theme/chart-tokens';
 import {
+    DENSE_EDGE_LABEL_CAP,
     EdgePattern,
     GRAPH_EDGE_PATTERNS,
     GRAPH_EDGE_SIZES,
@@ -123,6 +124,7 @@ import {
     GraphViewComponent,
     GraphViewPlugins,
     baseEdgeKind,
+    edgeLabelsHiddenByDensity,
     stableKey,
 } from 'app/modules/admin/catalog/graph-view.component';
 import { LinkAnalysisSettingsService } from 'app/inspecto/api/link-analysis-settings.service';
@@ -185,6 +187,7 @@ interface PresentationSnapshot {
     collapsedRoots: string[];
     nodeLabels: boolean;
     edgeLabels: boolean;
+    allEdgeLabels: boolean;
     nodeColors: Record<string, string>;
     edgeColors: Record<string, string>;
     nodeShapes: Record<string, string>;
@@ -674,6 +677,13 @@ export class LinkAnalysisComponent implements OnInit {
     // ── display options (persisted with a saved view; applied on load) ──
     readonly nodeLabels = signal(true);
     readonly edgeLabels = signal(true);
+    /** Override the density rule: label every link even on a dense graph (persisted as `display.allEdgeLabels`). */
+    readonly allEdgeLabels = signal(false);
+    readonly denseEdgeLabelCap = DENSE_EDGE_LABEL_CAP;
+    /** True while the density rule is hiding link labels (drives the toolbox hint). */
+    readonly edgeLabelsDense = computed(() =>
+        edgeLabelsHiddenByDensity(this.displayOptions(), this.displayed()?.edges.length ?? 0),
+    );
     readonly nodeColors = signal<Record<string, string>>({});
     readonly edgeColors = signal<Record<string, string>>({});
     readonly nodeShapes = signal<Record<string, string>>({});
@@ -700,6 +710,7 @@ export class LinkAnalysisComponent implements OnInit {
         () => ({
             nodeLabels: this.nodeLabels() && !this.lodLabelsOff(),
             edgeLabels: this.edgeLabels() && !this.lodLabelsOff(),
+            ...(this.allEdgeLabels() ? { allEdgeLabels: true } : {}),
             nodeColors: this.nodeColors(),
             edgeColors: this.edgeColors(),
             nodeShapes: this.nodeShapes(),
@@ -717,6 +728,7 @@ export class LinkAnalysisComponent implements OnInit {
         () =>
             !this.nodeLabels() ||
             !this.edgeLabels() ||
+            this.allEdgeLabels() ||
             Object.keys(this.nodeColors()).length > 0 ||
             Object.keys(this.edgeColors()).length > 0 ||
             Object.keys(this.nodeShapes()).length > 0 ||
@@ -1171,6 +1183,7 @@ export class LinkAnalysisComponent implements OnInit {
             collapsedRoots: this.collapsedRoots(),
             nodeLabels: this.nodeLabels(),
             edgeLabels: this.edgeLabels(),
+            allEdgeLabels: this.allEdgeLabels(),
             nodeColors: this.nodeColors(),
             edgeColors: this.edgeColors(),
             nodeShapes: this.nodeShapes(),
@@ -1188,6 +1201,7 @@ export class LinkAnalysisComponent implements OnInit {
         this.collapsedRoots.set(s.collapsedRoots);
         this.nodeLabels.set(s.nodeLabels);
         this.edgeLabels.set(s.edgeLabels);
+        this.allEdgeLabels.set(s.allEdgeLabels);
         this.nodeColors.set(s.nodeColors);
         this.edgeColors.set(s.edgeColors);
         this.nodeShapes.set(s.nodeShapes);
@@ -1232,6 +1246,7 @@ export class LinkAnalysisComponent implements OnInit {
     private applyDisplay(display: GraphDisplayOptions | undefined): void {
         this.nodeLabels.set(display?.nodeLabels ?? true);
         this.edgeLabels.set(display?.edgeLabels ?? true);
+        this.allEdgeLabels.set(display?.allEdgeLabels ?? false);
         this.nodeColors.set(display?.nodeColors ?? {});
         this.edgeColors.set(display?.edgeColors ?? {});
         this.nodeShapes.set(display?.nodeShapes ?? {});

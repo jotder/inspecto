@@ -415,6 +415,15 @@
                         <mat-checkbox [checked]="edgeLabels()" (change)="edgeLabels.set($event.checked)"
                             >Link labels</mat-checkbox
                         >
+                        <mat-checkbox
+                            [checked]="allEdgeLabels()"
+                            [disabled]="!edgeLabels()"
+                            (change)="allEdgeLabels.set($event.checked)"
+                            >All link labels
+                            <span class="text-secondary text-xs"
+                                >(else hover-only above {{ denseEdgeLabelCap }} links)</span
+                            ></mat-checkbox
+                        >
                         <span class="text-secondary mt-1 text-xs font-medium uppercase tracking-wide">Node colors</span>
                         @for (k of nodeKinds(); track k) {
                             <div class="flex items-center gap-1.5">
@@ -929,6 +938,18 @@
                                 </mat-checkbox>
                                 <mat-checkbox [checked]="edgeLabels()" (change)="edgeLabels.set($event.checked)">
                                     Link labels
+                                </mat-checkbox>
+                                <mat-checkbox
+                                    [checked]="allEdgeLabels()"
+                                    [disabled]="!edgeLabels()"
+                                    (change)="allEdgeLabels.set($event.checked)"
+                                >
+                                    All link labels
+                                    @if (edgeLabelsDense()) {
+                                        <span class="text-secondary text-xs"
+                                            >(hidden above {{ denseEdgeLabelCap }} links — hover to show)</span
+                                        >
+                                    }
                                 </mat-checkbox>
                                 <mat-checkbox [checked]="levelOfDetail()" (change)="levelOfDetail.set($event.checked)">
                                     Level of detail

@@ -525,6 +525,31 @@ describe('LinkAnalysisComponent', () => {
         expect(c.displayCustomized()).toBe(false); // a view without display resets to defaults
     });
 
+    it('all-link-labels toggle: off by default, persisted in the saved view display, restored on load', async () => {
+        const { fixture, save } = create();
+        fixture.detectChanges();
+        await runQuery(fixture);
+        const c = fixture.componentInstance;
+
+        expect(c.allEdgeLabels()).toBe(false);
+        expect(c.displayOptions().allEdgeLabels).toBeUndefined(); // absent = the density rule applies
+        c.allEdgeLabels.set(true);
+        expect(c.displayOptions().allEdgeLabels).toBe(true);
+        expect(c.edgeLabelsDense()).toBe(false);
+        expect(c.displayCustomized()).toBe(true);
+
+        c.saveForm.patchValue({ name: 'All labels' });
+        await c.saveView();
+        const saved = save.mock.calls[0][0];
+        expect(saved.display.allEdgeLabels).toBe(true);
+
+        c.allEdgeLabels.set(false);
+        await c.loadView(saved);
+        expect(c.allEdgeLabels()).toBe(true);
+        await c.loadView({ id: 'plain', name: 'Plain', sourceId: 'entity-projection', query: {} });
+        expect(c.allEdgeLabels()).toBe(false);
+    });
+
     it('layout: defaults to dagre, gates tree layouts on the graph shape, and travels with a saved view', async () => {
         const { fixture, save } = create();
         fixture.detectChanges();

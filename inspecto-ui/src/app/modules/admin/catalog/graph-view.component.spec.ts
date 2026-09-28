@@ -4,7 +4,16 @@ import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { G6GraphData } from './catalog-graph';
-import { GRAPH_LAYOUTS, GraphViewComponent, buildPluginList, layoutConfig, stableKey } from './graph-view.component';
+import {
+    DENSE_EDGE_LABEL_CAP,
+    GRAPH_LAYOUTS,
+    GraphDisplayOptions,
+    GraphViewComponent,
+    buildPluginList,
+    edgeLabelsHiddenByDensity,
+    layoutConfig,
+    stableKey,
+} from './graph-view.component';
 
 /** G6 can't instantiate in jsdom (per the angular-ui skill) — only the empty/no-data path is testable
  *  here; `rebuild()` returns before touching the canvas when there are no nodes. */
@@ -257,5 +266,39 @@ describe('stableKey', () => {
 
     it('separates Sets the same way', () => {
         expect(stableKey(new Set(['a']))).not.toBe(stableKey(new Set(['b'])));
+    });
+});
+
+describe('dense-graph link labels (telco demo ring, 2026-09-27)', () => {
+    const disp = (o: Partial<GraphDisplayOptions> = {}): GraphDisplayOptions =>
+        ({ nodeLabels: true, edgeLabels: true, ...o }) as GraphDisplayOptions;
+
+    it('hides labels only ABOVE the cap, unless all-labels is on or labels are off anyway', () => {
+        expect(DENSE_EDGE_LABEL_CAP).toBe(20);
+        expect(edgeLabelsHiddenByDensity(disp(), 20)).toBe(false); // sparse keeps today's labels
+        expect(edgeLabelsHiddenByDensity(disp(), 21)).toBe(true);
+        expect(edgeLabelsHiddenByDensity(disp(), 42)).toBe(true); // the demo ring
+        expect(edgeLabelsHiddenByDensity(null, 42)).toBe(true); // a saved view with no display block
+        expect(edgeLabelsHiddenByDensity(disp({ allEdgeLabels: true }), 42)).toBe(false);
+        expect(edgeLabelsHiddenByDensity(disp({ edgeLabels: false }), 42)).toBe(false); // off is off, not "dense"
+    });
+
+    it('reveals the hovered edge, or every edge touching a hovered node — only while dense', () => {
+        const fixture = create(null);
+        const comp = fixture.componentInstance;
+        const edges = Array.from({ length: 21 }, (_, i) => ({
+            id: `e${i}`,
+            source: i === 0 ? 'hub' : `n${i}`,
+            target: i < 3 ? 'hub' : 'x',
+        }));
+        comp.data = { nodes: [], edges } as unknown as G6GraphData;
+        expect(comp.edgesToReveal('e7', 'edge')).toEqual(['e7']);
+        expect(comp.edgesToReveal('hub', 'node')).toEqual(['e0', 'e1', 'e2']);
+        expect(comp.edgesToReveal(undefined, 'node')).toEqual([]);
+        comp.display = disp({ allEdgeLabels: true });
+        expect(comp.edgesToReveal('hub', 'node')).toEqual([]); // every label already shows
+        comp.display = null;
+        comp.data = { nodes: [], edges: edges.slice(0, 20) } as unknown as G6GraphData;
+        expect(comp.edgesToReveal('hub', 'node')).toEqual([]); // sparse: nothing hidden to reveal
     });
 });
