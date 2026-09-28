@@ -213,6 +213,25 @@ Tests: `PipelineNodeTypesPackOverlayTest` (every built-in `LOWERED`; pack `LOWER
 undeclared accepted), `PipelineValidatorModeTest` (undeclared is refused at arming; `EXECUTED` and
 built-ins arm), `JobPackManagerTest.aPackNodeTypeDeclaringLoweredIsRejectedWhole` (real jar).
 
+## 7b. S2-2 — the bridge spike, measured (2026-09-28)
+
+This is a measurement only, from `BridgeSpikeBenchmark` (test scope, skipped unless `-Dbench.run=true`).
+The method, host and deviations are in design §5.2. The fixture is 2M generated mixed-type rows. Each
+variant ends in the same Parquet `COPY`. Figures are the median of 5 warm runs; *÷ fused* is the total
+over the fused total.
+
+| Between map and the write | 10 cols rows/s | ÷ fused | 50 cols rows/s | ÷ fused |
+|---|---:|---:|---:|---:|
+| V0 nothing (flat lane, fused) | 4,806,419 | 1.00× | 814,714 | 1.00× |
+| V1 one built-in CTAS (graph-lane node) | 3,468,811 | 1.39× | 618,290 | 1.32× |
+| V2 no-op executed Step (JDBC read + appender) | 150,267 | 31.99× | 20,829 | 39.11× |
+
+Per-node materialisation is cheap. The JVM row round trip is the cost: ~0.6–0.9 µs per **cell**, so it
+scales with columns × rows. V3 (Arrow) was not measured, because no current Arrow Java is available
+offline. Under D-4 the Arrow bridge is therefore out of S2-3's scope. S2-3's `StepContext` should
+stream typed values straight to the engine-owned appender, not a boxed row. Anything SQL can express
+stays a built-in `LOWERED` verb.
+
 ## 8. What is still open
 
 Stage 2 (the open Step-kind registry, `LOWERED`/`EXECUTED`) and Stage 3 (pack-contributed services)

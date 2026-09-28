@@ -239,6 +239,30 @@ is forced alongside `skip_tail_columns > 0`.
   measurable cost over a single partition. Thousands of partitions (high-cardinality
   partition keys) is where the parallel reveal above earns its keep.
 
+## Executed-Step bridge cost (S2-2, 2026-09-28)
+
+This prices an `EXECUTED` pipeline Step, which is imperative JVM code between map and the write,
+against the fused flat lane. The source is `BridgeSpikeBenchmark` in
+`inspecto-engine/src/test/java/com/gamma/pipeline/exec/`, run on JDK 27 and DuckDB 1.5.2 with 12
+cores, an in-memory database and 2M mixed-type rows. Figures are the median of 5 warm runs, node plus
+the same Parquet `COPY`.
+
+| Variant | 10 cols rows/s | 50 cols rows/s | ÷ fused (10 / 50) |
+|---|---:|---:|---|
+| V0 fused (nothing between) | 4.81M | 815K | 1.00× / 1.00× |
+| V1 one extra built-in CTAS | 3.47M | 618K | 1.39× / 1.32× |
+| V2 JDBC read + Appender write | 150K | 20.8K | 32× / 39× |
+
+The bridge costs ~0.6–0.9 µs per cell. That is the same order as the Java CSV parse above, and it scales
+with cells the same way. The full method and the conclusions are in
+[Platform Services §7b](../control-plane/platform-services.md#7b-s2-2--the-bridge-spike-measured-2026-09-28).
+
+Reproduce:
+
+```
+mvn -o -pl inspecto-engine -am test -Dtest=BridgeSpikeBenchmark -Dsurefire.failIfNoSpecifiedTests=false     -Dbench.run=true -Dbench.rows=2000000 -Dbench.cols=10,50 -Dbench.runs=5
+```
+
 ## Very large single files (3.10.0)
 
 For a multi-hundred-GB / TB single file the bottleneck is **scratch**, not CPU — DuckDB's
