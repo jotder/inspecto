@@ -330,6 +330,9 @@ Every `ComponentStore` kind accepts an optional `owner` + `shares: [{subjectType
 access: view|edit}]` envelope (R3). **No `shares` key ⇒ byte-identical behaviour** (every pre-R3 document);
 once present the component is restricted: owner and `canConfigureAccess` holders have full access, shares
 grant `view`/`edit`, everyone else gets the SEC-7d contract (filtered lists, `404`) on read *and* mutate.
+**The owner is the creator** (operator, 2026-09-28, `OWNER-IS-CREATOR`): a create body naming another
+`owner`, or a first claim of an owner-less component for someone else, is `403 PERMISSION_DENIED` unless the
+caller holds `canConfigureAccess` or `canAdminister`; with no Subject (Personal) nothing changes.
 Role matching rides `ComponentAccess.ATTR_HELD_ROLES`, stamped by the authenticator and never serialized.
 The `user` subject is the opaque IdP `sub`. Cross-Space sharing is the **Exchange** family
 (`inspecto-exchange`, `ShareGrant` — fail-closed `requested → active | denied → revoked | expired`, every

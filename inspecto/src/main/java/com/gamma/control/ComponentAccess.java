@@ -89,13 +89,27 @@ public final class ComponentAccess {
     }
 
     /** Create-path shaping: validate the envelope (422) and stamp {@code owner} from the
-     *  authenticated subject when absent (provenance; no restriction until shares are added). */
+     *  authenticated subject when absent (provenance; no restriction until shares are added).
+     *  OWNER-IS-CREATOR (operator, 2026-09-28): a body {@code owner} naming anyone but the caller is a 403
+     *  unless the caller holds canConfigureAccess or canAdminister, since owner-routed alerting would
+     *  otherwise let a creator address a rule's alerts to anyone. */
     static Map<String, Object> onCreate(HttpExchange ex, Map<String, Object> content) {
         Map<String, Object> out = new LinkedHashMap<>(content);
         if (ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s && !out.containsKey(OWNER))
             out.put(OWNER, s.id());
         validate(out);
+        requireOwnerIsCaller(ex, out.get(OWNER));
         return out;
+    }
+
+    /** 403 when {@code owner} names someone other than the authenticated caller, unless the caller holds
+     *  canConfigureAccess or canAdminister. No subject (Personal): no check. */
+    private static void requireOwnerIsCaller(HttpExchange ex, Object owner) {
+        if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s)) return;
+        if (s.capabilities().contains(Roles.CAN_CONFIGURE_ACCESS) || s.capabilities().contains(Roles.CAN_ADMINISTER)) return;
+        if (owner != null && !trimOrEmpty(owner).equals(s.id()))
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
+                    "'owner' must be the caller ('" + s.id() + "'); only an access admin may name another owner");
     }
 
     /**
@@ -116,6 +130,9 @@ public final class ComponentAccess {
         if (envelopeChanged && !ownsEnvelope(ex, current))
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
                     "only the owner may change 'owner'/'shares' on " + type + " component '" + id + "'");
+        // OWNER-IS-CREATOR (operator, 2026-09-28): a first claim of an owner-less component claims it for the caller.
+        if (trimOrEmpty(current.get(OWNER)).isEmpty() && !Objects.equals(current.get(OWNER), merged.get(OWNER)))
+            requireOwnerIsCaller(ex, merged.get(OWNER));
         return merged;
     }
 

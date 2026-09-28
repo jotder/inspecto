@@ -47,6 +47,7 @@ class ControlApiComponentSharesTest {
             case "bob"   -> subject(ex, "bob", Set.of("canAuthorWorkbench"), Set.of("developer"));
             case "olly"  -> subject(ex, "olly", Set.of("canAuthorWorkbench"), Set.of("operations"));
             case "root"  -> subject(ex, "root", Set.of("canAuthorWorkbench", "canConfigureAccess"), Set.of("admin"));
+            case "boss"  -> subject(ex, "boss", Set.of("canAuthorWorkbench", "canAdminister"), Set.of("admin"));
             default      -> Optional.empty();
         };
     };
@@ -172,6 +173,67 @@ class ControlApiComponentSharesTest {
 
             // the owner may delete
             assertEquals(200, send(c.port, "DELETE", "/components/dashboard/ops_board", null, "alice").statusCode());
+        }
+    }
+
+    // ── OWNER-IS-CREATOR (operator, 2026-09-28) ──────────────────────────────────────
+
+    @Test
+    void aNonAdminMayNotNameAnotherOwner(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, true)) {
+            for (String kind : List.of("dataset", "widget", "dashboard")) {
+                HttpResponse<String> r = send(c.port, "POST", "/components/" + kind,
+                        "{\"id\":\"x1\",\"owner\":\"bob\"}", "alice");
+                assertEquals(403, r.statusCode(), kind + " " + r.body());
+                assertEquals(ErrorCodes.PERMISSION_DENIED,
+                        V1Body.envelope(r.body()).get("error").get("errorCode").asText(), r.body());
+                assertEquals(404, send(c.port, "GET", "/components/" + kind + "/x1", null, "alice").statusCode(),
+                        "nothing was written");
+            }
+        }
+    }
+
+    @Test
+    void aNonAdminNamingThemselvesOrOmittingTheOwnerIsAccepted(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, true)) {
+            HttpResponse<String> self = send(c.port, "POST", "/components/dataset",
+                    "{\"id\":\"d1\",\"owner\":\"alice\"}", "alice");
+            assertEquals(200, self.statusCode(), self.body());
+            assertEquals("alice", json(self).get("content").get("owner").asText());
+            HttpResponse<String> omitted = send(c.port, "POST", "/components/dataset", "{\"id\":\"d2\"}", "alice");
+            assertEquals(200, omitted.statusCode(), omitted.body());
+            assertEquals("alice", json(omitted).get("content").get("owner").asText());
+        }
+    }
+
+    @Test
+    void anAdminMayNameAnotherOwner(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, true)) {
+            for (String admin : List.of("root", "boss")) {   // canConfigureAccess, canAdminister
+                HttpResponse<String> r = send(c.port, "POST", "/components/dataset",
+                        "{\"id\":\"by_" + admin + "\",\"owner\":\"bob\"}", admin);
+                assertEquals(200, r.statusCode(), admin + " " + r.body());
+                assertEquals("bob", json(r).get("content").get("owner").asText());
+            }
+        }
+    }
+
+    @Test
+    void aFirstClaimMayOnlyClaimForTheCaller(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, false)) {   // Personal: no Subject, so no owner is stamped
+            assertEquals(200, send(c.port, "POST", "/components/dataset", "{\"id\":\"legacy\"}", null).statusCode());
+        }
+        try (Ctx c = open(dir, true)) {
+            assertFalse(json(send(c.port, "GET", "/components/dataset/legacy", null, "alice"))
+                    .get("content").has("owner"), "the component starts owner-less");
+            HttpResponse<String> forBob = send(c.port, "PUT", "/components/dataset/legacy",
+                    "{\"owner\":\"bob\"}", "alice");
+            assertEquals(403, forBob.statusCode(), forBob.body());
+            assertEquals(ErrorCodes.PERMISSION_DENIED,
+                    V1Body.envelope(forBob.body()).get("error").get("errorCode").asText(), forBob.body());
+            HttpResponse<String> forSelf = send(c.port, "PUT", "/components/dataset/legacy",
+                    "{\"owner\":\"alice\"}", "alice");
+            assertEquals(200, forSelf.statusCode(), forSelf.body());
         }
     }
 

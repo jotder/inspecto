@@ -282,9 +282,12 @@ Session decisions (2026-09-26, recorded here, reversible):
   alert as before; the per-owner destination is the Subject's own verified email from
   `NotificationPreferenceOverrides`, which already existed — no per-owner channel was added.
 * **The key is `recipient`, not `owner`, on the event**: Exchange events already use `owner` for a Space.
-* ⚠ Inherited from R3, not new: a creator may name an `owner` in the create body (and anyone with edit
-  access may first-claim an owner-less rule), which addresses that rule's alerts to the named Subject. The
-  routing only narrows who is told; it discloses nothing a broadcast did not.
+* **The owner is the creator, unless the caller is an admin** (operator, 2026-09-28, `OWNER-IS-CREATOR`).
+  Until then R3 let a creator name any `owner` in the create body, and anyone with edit access first-claim
+  an owner-less rule for anyone, which addressed that rule's alerts to the named Subject. Now a body `owner`
+  other than the caller is a `403 PERMISSION_DENIED`, and a first claim may only claim for the caller, unless
+  the caller holds `canConfigureAccess` or `canAdminister`. It applies to every R3 component kind, not only
+  alert rules. No Subject (Personal): unchanged. Pinned by `ControlApiComponentSharesTest`.
 
 Pinned by `AlertOwnerRoutingTest` (engine), `NotificationServiceTest` (the `owned`/`unowned`/opt-out/template
 cases) and `ControlApiAlertOwnerTest` (real HTTP, with Subjects).
