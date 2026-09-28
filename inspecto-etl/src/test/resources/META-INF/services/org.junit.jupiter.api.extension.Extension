@@ -1,1 +1,2 @@
 com.gamma.testsupport.EventLogLeakDetector
+com.gamma.testsupport.CwdJobsAuditLeakDetector

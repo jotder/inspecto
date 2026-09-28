@@ -27,6 +27,23 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ControlApiJobProvenanceTest {
 
+    // CollectorService over SpaceRoot.legacy() resolves its job audit dir CWD-relative ("jobs_audit") unless
+    // -Djobs.audit.dir is set — read at construction AND lazily by jobServiceOrCreate(), so it spans the class.
+    @TempDir static Path auditDir;
+    private static String priorAuditDir;
+
+    @org.junit.jupiter.api.BeforeAll
+    static void pinJobsAuditDir() {
+        priorAuditDir = System.getProperty("jobs.audit.dir");
+        System.setProperty("jobs.audit.dir", auditDir.resolve("jobs_audit").toString());
+    }
+
+    @org.junit.jupiter.api.AfterAll
+    static void restoreJobsAuditDir() {
+        if (priorAuditDir != null) System.setProperty("jobs.audit.dir", priorAuditDir);
+        else System.clearProperty("jobs.audit.dir");
+    }
+
     private final HttpClient client = HttpClient.newHttpClient();
 
     private record Ctx(CollectorService svc, ControlApi api, int port) implements AutoCloseable {
