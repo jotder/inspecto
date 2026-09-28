@@ -11,11 +11,12 @@ import java.nio.file.attribute.PosixFilePermissions;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /**
  * {@link SpaceManager#createFromTemplate(SpaceId, String, String, String, java.util.function.Consumer)}: a template
- * refused by its seed gate leaves no Space — and when the cleanup of the half-made tree itself fails (a Windows
- * lock), the gate's refusal is still what the caller sees and the leftover never blocks the id nor boots.
+ * refused by its seed gate leaves no Space — and when the cleanup of the half-made tree itself fails (a locked
+ * file), the gate's refusal is still what the caller sees and the leftover never blocks the id nor boots.
  */
 class SpaceManagerTemplateGateTest {
 
@@ -27,11 +28,16 @@ class SpaceManagerTemplateGateTest {
                 "physicalRef: d/database\n");
     }
 
-    /** Make {@code file} undeletable: DOS read-only on Windows, a non-writable parent directory elsewhere. */
+    private static final boolean WINDOWS = System.getProperty("os.name").toLowerCase().startsWith("windows");
+
+    /**
+     * Make {@code file} undeletable: DOS read-only on Windows, a non-writable parent directory elsewhere. Chosen by
+     * OS, not by which attribute view exists: Linux also exposes a {@code dos} view (backed by xattrs), but its
+     * read-only bit never blocks an unlink — on POSIX only the parent directory's write bit does.
+     */
     private static Path lock(Path file) throws Exception {
-        DosFileAttributeView dos = Files.getFileAttributeView(file, DosFileAttributeView.class);
-        if (dos != null) {
-            dos.setReadOnly(true);
+        if (WINDOWS) {
+            Files.getFileAttributeView(file, DosFileAttributeView.class).setReadOnly(true);
             return file;
         }
         Files.setPosixFilePermissions(file.getParent(), PosixFilePermissions.fromString("r-xr-xr-x"));
@@ -39,13 +45,14 @@ class SpaceManagerTemplateGateTest {
     }
 
     private static void unlock(Path locked) throws Exception {
-        DosFileAttributeView dos = Files.getFileAttributeView(locked, DosFileAttributeView.class);
-        if (dos != null) dos.setReadOnly(false);
+        if (WINDOWS) Files.getFileAttributeView(locked, DosFileAttributeView.class).setReadOnly(false);
         else Files.setPosixFilePermissions(locked, PosixFilePermissions.fromString("rwxr-xr-x"));
     }
 
     @Test
     void aRefusalWhoseCleanupFailsStaysTheRefusalAndNeverBlocksTheId(@TempDir Path root) throws Exception {
+        // root ignores directory permissions, so no portable lock can make the cleanup fail there
+        assumeFalse(!WINDOWS && "root".equals(System.getProperty("user.name")), "cannot block a delete as root");
         seedTemplate(root);
         Path[] locked = new Path[1];
         try (SpaceManager spaces = SpaceManager.discover(root)) {
