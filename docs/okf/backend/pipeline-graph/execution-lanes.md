@@ -189,6 +189,9 @@ behaviour above, byte for byte (the default path gains one boolean test per memb
 `<quarantine>/…/rejects_all_or_nothing/` with its reject sidecar moved beside it, and its audit row reads
 `QUARANTINED_MISMATCH` (the member vocabulary is unchanged) with the reason
 `rejects_all_or_nothing: N record(s) rejected, nothing landed (reject_mode all_or_nothing)` and `error_rows = N`.
+A "reject" here is only a record the parser sends to the `_errors.csv` sidecar (a parse or field-count
+mismatch); type-cast failures (NULLed and counted) and later-stage checks (Expectations, Decision Rules,
+dedup, steps) do not count.
 **The unit is the FILE** (the Consignment member), like every other per-member quarantine: its clean
 batch-mates still land, and a Consignment whose only member was refused ends `EMPTY`. Per ingest path —
 the decision is always taken after the reject count is final and **before any of the file's rows are
