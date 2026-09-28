@@ -13,11 +13,12 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **40<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** —
+> **40<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ↔ **40 on 2026-09-28 (integration `integ5`)**: twenty lane commits merged (Step seam S2-3, Safety Policy S1, audit 5xx + GeoIP/T5, approval `job` kind, SES via SNS S0–S4, Entity Lists); each lane counted from its own base, so the dated lines below are per lane and the head figure is re-derived, not summed.
 > ⬇ **41 → 40 on 2026-09-28**: closed P3 `AUDIT-ERRORED-REQUEST-UNRECORDED-1` — a mutating request that fails with a 5xx (an Exception or Error thrown mid-handler) now writes ONE AUDIT row, "(failed, HTTP n)", classified like a success and carrying the Correlation-ID of its ERROR log line (as-built `okf/capabilities/observability/observability.md` §3.3 Layer 3).
-> ⬇ **41 → 40 on 2026-09-28**: closed P2 `ASSURE-MAKER-CHECKER-MULTIPOD-1` — its last open item is decided (operator: a Job's run-time writes stay outside the hold); P3 `ASSURE-MAKER-CHECKER-RESIDUALS-1` narrowed to `channel` / `notification-rule` (`job` is governable; `PUT /settings/approval` refuses an empty body and a build with no Authenticator; as-built `okf/backend/config/config-safety.md`).
-> ↔ **41 on 2026-09-28** (`ASSURE-ENTITY-LISTS-1` lane): the P2 shipped once the operator lifted its hold — range / CIDR and expiring entries, the sidecar, four-eyes and the Risk Score watch-list feed on `LA-17`'s store — and its residuals became P3 `ASSURE-ENTITY-LISTS-RESIDUALS-1`.
+> ⬇ **on 2026-09-28**: closed P2 `ASSURE-MAKER-CHECKER-MULTIPOD-1` — its last open item is decided (operator: a Job's run-time writes stay outside the hold); P3 `ASSURE-MAKER-CHECKER-RESIDUALS-1` narrowed to `channel` / `notification-rule` (`job` is governable; `PUT /settings/approval` refuses an empty body and a build with no Authenticator; as-built `okf/backend/config/config-safety.md`).
+> ↔ **on 2026-09-28** (`ASSURE-ENTITY-LISTS-1` lane): the P2 shipped once the operator lifted its hold — range / CIDR and expiring entries, the sidecar, four-eyes and the Risk Score watch-list feed on `LA-17`'s store — and its residuals became P3 `ASSURE-ENTITY-LISTS-RESIDUALS-1`.
 > ⬇ **42 → 41 on 2026-09-28** (telco shift 8 integration): closed P3 `ASSURE-BREAK-RECURRENCE-REACH-1` (an auto-closed Break is kept 3 absent runs) and P3 `ASSURE-IMPACT-LEDGER-RESIDUALS-1` (the ledger Job types declare `requires: objects`; impact amounts are exact strings); filed P3 `AUDIT-ERRORED-REQUEST-UNRECORDED-1`; Platform Services S2-2 measured.
 > ↔ **on 2026-09-28**: closed P2 `DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1` (row already gone 2026-09-27) is now GUARDED — `RiskScoreEvaluator` had reintroduced a raw in-memory open; it is routed through `DuckDbUtil.openInMemory` and `NoRawInMemoryDuckDbOpenContractTest` fails on the next one (as-built `okf/backend/engine/duckdb.md`).
 > ⬆ **42 → 43 on 2026-09-28**: filed P1 `EXCHANGE-OWNING-SPACE-AUTHZ-1` (§3.8, cross-Space consequence D3) — an Exchange owner-side act (approve/deny/revoke/expiry, offer/refresh) must be authorized in the OWNER Space's roles, consumer acts (request/pin) in the consumer's. ⬇ **43 → 42 the same day**: closed — the gates had shipped `67ce12f96` (2026-09-24); this change repaired the pinning test, whose "capability only in the bound Space" negatives were vacuous (`SpaceManager.current()` is alphabetical, so the bound Space was the consumer, not `hub`) and are now mutation-checked (as-built `okf/backend/control-plane/exchange-sharing.md`).
@@ -69,8 +70,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 24<!--count:backlog-p3--> P3 rows are mostly a list of things
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
+> §0 defines P3 as demand-gated, so those 25<!--count:backlog-p3--> P3 rows are mostly a list of things
 > deliberately NOT being built, and reading all 40<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
@@ -149,7 +150,7 @@ something to build and find nothing. Answer an owed input by **deleting its row*
 | 3.7 | Bundle "load as draft" | none — all eight calls answered 2026-09-25: D1 in-memory · D2 save via the pane's route · D3 advisory findings · D4 write-through prerequisites first · D5 Dashboard/Widget/Dataset, then authored Pipeline, then LA/Geo views, never `connection` · D6 existing id ⇒ unsaved edits + diff · D7 as-built in the Metadata Bundles concept · D8 "Import as draft…" beside "Import…" in editors only |
 | 3.8 | policy-authoring UX | none — D1 answered 2026-09-25: guard ALL nine failure modes F1–F9 at save time rather than wait for the incident report; D2–D9 take the design's recommendations |
 | 3.8 | `DUCKLE-C6-POLICY-NARROWING-1` | none — D1–D16 answered 2026-09-28 (operator, every recommendation accepted) in `superpower/policy-narrowing-design.md` §8 |
-| 3.9 | D6 `findings-spec` UI | 5 calls (D5 advanced tier · D6 technical properties · D7 removal impact · D8 Components pane · D10 acceptance) in `superpower/findings-spec-authoring-ui-design.md`; decided 2026-09-25: D1 `canManageIncidents` (BUILT) · D2 Case only · D3 validate the existing `attributes.findings` blob · D4 a dialog in the Cases toolbar · D9 the UI word is **Findings field** |
+| 3.9 | D6 `findings-spec` UI | none — all ten calls decided 2026-09-25 (`superpower/findings-spec-authoring-ui-design.md` §9): D1 `canManageIncidents` (BUILT) · D2 Case only · D3 validate the existing `attributes.findings` blob · D4 a dialog in the Cases toolbar · D5 no `advanced` tier (Always / Under *More* only) · D6 technical properties only under a collapsed "Technical details" · D7 the generic removal warning, no count read · D8 off the Components pane · D9 the UI word is **Findings field** · D10 one think-aloud session with a real Case-desk lead (acceptance owed) |
 
 **Decided 2026-09-25, not tied to a row** (operator; each lands in its owning OKF concept when built):
 
