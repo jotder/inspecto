@@ -2,8 +2,8 @@
 
 **Row:** `BACKLOG.md` §3.5 *Signal / Decision networks — cross-Space consequence* (P2, trigger FIRED
 2026-09-15, re-grounded 2026-09-17). **Status:** written 2026-09-24; **all §8 decisions made 2026-09-28 (operator)**. Slices 0–4 SHIPPED
-(0 `67ce12f96`; 1–4 on 2026-09-28, D10 acceptance green); slice 5 (connector-direct emission) and the
-plan archive (slice 6) remain — see §6. Owners once built: `okf/backend/control-plane/signal-backbone.md`
+(0 `67ce12f96`; 1–4 on 2026-09-28, D10 acceptance green); slice 5 (the in-product emitter: a Decision Rule `emit-signal`
+payload, D14) SHIPPED 2026-09-28; the plan archive (slice 6) remains — see §6. Owners once built: `okf/backend/control-plane/signal-backbone.md`
 and `okf/backend/control-plane/decision-rules.md`.
 
 **Scope.** The consequence the trigger names: *a Signal in one Space must cause something in another.*
@@ -193,7 +193,7 @@ reuses the Share Grant ledger, audit and revoke; ✅ the apply path is untouched
 | 2 | ✅ **SHIPPED `49ac00c14`** — Exchange kind `signal` (route `POST /exchange/signal-offers`; exact types only, `prefix.*` deferred): offer / request / approve with `payloadKeys`; route + `openapi-v1.json` entry + capability manifest | `inspecto-exchange` | offers listable, grants transition; no delivery yet |
 | 3 | ✅ **SHIPPED `0f9c8bf9e`** — Forwarder (§5.5; an `EventLog` process-wide tap; loops cut per correlation id) with MDC binding and delivered/undeliverable Signals | `inspecto-exchange`, `inspecto-event` | N3–N6, N8, N10, N11 |
 | 4 | ✅ **SHIPPED `b305cbc99`** — new `incident.open` Job type — B-side consumption — acceptance test for the concrete consequence named in D10 | `inspecto-engine` | N9 + the D10 end-to-end test (a B Job runs in B, not A) |
-| 5 | ⏳ **NOT BUILT** — Connector-direct emission for the emitters D10 needs | `inspecto-acquire` | typed Signal on the Collector's own ledger, offerable |
+| 5 | ✅ **SHIPPED 2026-09-28** — the emitter D10 needs is a Decision Rule `emit-signal` payload, not a named Collector (D14): `params.offerTo` names the consumer Space, `params.type` the Signal type, `params.payload` maps `{signalKey: recordField}` from the `/apply` body's `record` | `inspecto`, `inspecto-exchange` | `ControlApiDecisionRuleSignalOfferTest` (5): delivered to the named Space only, allowlist kept; 403 without `canOfferSignals` (mutation-checked); 422 for no grant / no Space alike; config refused on save |
 | 6 | Docs: GLOSSARY §Space amendment (D11) and Exchange family kind; OKF `signal-backbone.md` + `decision-rules.md` as-built; EDITIONS cell; archive this plan | docs | vocabulary + link guards green |
 
 ⛔ New mutating routes must clear the route-gating boot check, `CapabilityManifestTest` (literal capability
@@ -202,8 +202,7 @@ strings) and the `openapi-v1.json` contract — see `okf/backend/editions/auth-s
 ---
 
 **As-built gaps (2026-09-28).** (a) The D10 test emits the origin `fraud.alert` straight onto opco's ledger.
-No in-product emitter carries `caseId`/`typology`/`impact` yet: a Decision Rule `emit-signal` carries only
-`{rule}`. That is slice 5's (or an `emit-signal` payload's) job. (b) N8 is cut on the CHAIN's depth, not a per-correlation
+✅ Closed by slice 5 (D14): a Decision Rule `emit-signal` maps the applied record's fields onto its payload. (b) N8 is cut on the CHAIN's depth, not a per-correlation
 count. That count (the first cut) dropped real cases: a verifier found one Run's 21st Signal
 `undeliverable` (fixed 2026-09-28). The delivered Signal carries origin `chainDepth` + 1. A Run always stamps
 its own system depth on what it emits (`RunContext`, `put` not `putIfAbsent`), so a payload cannot reset the
@@ -215,6 +214,22 @@ matching Signal, each carrying its Signal; `incident.open` defaults to it. The D
 Incidents, no MSISDN (red when coalescing is forced on). (c) D12 covers the Space-naming body fields of
 `/exchange/signal-offers` and `/exchange/requests`; a grant-scoped route whose Space was deleted still answers
 404 via the shared resolver. (d) The SPA access catalog lists `canOfferSignals` (2026-09-28).
+
+**Slice 5 as-built (2026-09-28, D14).** `DecisionRoutes` `emit-signal` accepts `params.payload`
+(`{signalKey: recordField}`, values read from `POST /decision-rules/{name}/apply` body `{"record": {...}}`) and
+`params.offerTo` (the ONE consumer Space). Not `targetSpace`: D1 still stands — the rule acts only in its own
+Space, and `targetSpace`/`space` stay 422. Save and apply both run `validateEmitSignals` (fail closed, 422): a
+mapping key must match the offer's key charset and may not be `rule` or `chainDepth` (the loop cut's depth is
+never author-set); a value must be a field name; an `offerTo` must be a valid Space id with an explicit dotted
+`type` and no other params. Before ANY consequence runs, apply refuses a mapped field the record lacks (422),
+demands `canOfferSignals` in the origin (bound) Space — the manual offer's gate — (403), and asks the
+`SignalOfferGrants` seam (installed by `inspecto-exchange`; absent ⇒ refused) for an offer plus an ACTIVE grant
+to that Space (422, one message for "no grant" and "no such Space", D12). The Signal is emitted on the origin's
+own ledger with an `offerTo` event attribute; `ExchangeSignalForwarder` then delivers ONLY to that consumer's
+grant (an attribute can only narrow delivery), with the unchanged allowlist, chain-depth cut and
+`exchange.signal.delivered`/`undeliverable` audit. **Left open:** no automatic caller applies a rule yet (the
+`record` comes from the person applying it); a Collector connector emitting typed Signals is no longer planned
+for this row (D14).
 
 ## 7. Test plan
 
@@ -287,3 +302,6 @@ before a push touching the Exchange/ControlApi seams.
     is refused — a `SKIPPED` Run plus a `job.signal.refused` WARN Signal naming it (`refusedSignalId`). A queue
     bound, not a time window: it caps memory and a real Run's burst of cases fits in it. Pinned by
     `JobServiceTest.aNonCoalescingJobRunsOncePerSignalWhileTheDefaultFolds` / `…RefusesSignalsPastItsBurstBound`.
+14. **D14 — DECIDED 2026-09-28 (operator): slice 5's emitter is a Decision Rule `emit-signal` payload, not a named
+    Collector.** The rule names the target Space (`offerTo`) and the Signal type and maps payload fields; it goes
+    through the same `canOfferSignals` gate, audit and chain-depth loop cut as a manual offer. As-built under §6.

@@ -63,6 +63,12 @@ public final class ExchangeRoutes implements RouteModule {
         com.gamma.query.SharedRefResolver.install(new ExchangeRefResolver(api.spaces()));
         // Cross-Space consequence slice 3: deliver consented Signals between this installation's Spaces.
         ExchangeSignalForwarder.install(api.spaces());
+        // Slice 5: a Decision Rule emit-signal with offerTo asks this before it emits (absent module => refused).
+        com.gamma.control.SignalOfferGrants.install((owner, consumer, type) -> {
+            Exchange ex = Exchange.under(api.spaces().containerRoot());
+            return ex.enabled() && ex.activeGrant(consumer, owner, Exchange.SIGNAL, type).isPresent()
+                    && ex.offer(owner, Exchange.SIGNAL, type).isPresent();
+        });
         // The core's delete fence (ComponentRoutes) asks THIS for "is the item still shared?" — it used to
         // reach into com.gamma.exchange by fully-qualified name, which is why an import census missed it and
         // why the core could not drop this package. Absent module ⇒ SharedItemConsumers.NONE ⇒ empty, which

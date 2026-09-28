@@ -50,6 +50,15 @@ The `normalize()` default for an absent `when` was corrected to the canonical
 `{kind:'group', op:'AND', items:[]}` (was `{op:'and', conditions:[]}`) so a filter-less rule reads
 identically to what the UI authors and `ConditionTree` evaluates.
 
+## `emit-signal` payload mapping and cross-Space offer (operator, 2026-09-28)
+
+An `emit-signal` may map the applied record onto its payload (`params.payload: {signalKey: recordField}`, values
+from the `/apply` body's `record`) and offer the Signal to ONE other Space (`params.offerTo`). The offer needs
+`canOfferSignals` in the rule's Space and an ACTIVE Exchange signal grant to that Space, and is delivered by the
+Exchange forwarder under that grant's allowlist and chain-depth cut. Malformed config is 422 on save and on apply.
+`targetSpace`/`space` stay refused (only Signals cross). Design: cross-Space consequence slice 5, D14
+(`superpower/cross-space-consequence-design.md`).
+
 ## Record-routing consequences run during live pipeline execution
 
 `apply` executes real platform consequences on demand (`emit-signal`, `start-job`,

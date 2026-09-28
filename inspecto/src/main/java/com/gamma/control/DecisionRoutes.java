@@ -62,7 +62,7 @@ final class DecisionRoutes implements RouteModule {
         api.post("/decision-rules/([^/]+)/simulate", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> simulate(api, ApiContext.name(m), api.body(e))));
         api.post("/decision-rules/([^/]+)/apply", ApiContext.withCapability("canOperateRuns",
-                (e, m) -> apply(api, ApiContext.name(m), ApiContext.actor(e))));
+                (e, m) -> apply(api, e, ApiContext.name(m))));
     }
 
     // ── CRUD ──────────────────────────────────────────────────────────────────────
@@ -139,11 +139,14 @@ final class DecisionRoutes implements RouteModule {
 
     /** {@code POST /decision-rules/{name}/apply} — a PERSON applying the rule ({@code automatic=false}),
      *  attributed to the request's actor. */
-    private Object apply(ApiContext api, String name, String actor) throws IOException {
+    private Object apply(ApiContext api, com.sun.net.httpserver.HttpExchange e, String name) throws IOException {
         Map<String, Object> rule = RouteErrors.existing(store(api), TYPE, "decision rule", name);
         refuseTargetSpace(rule);
         refuseExchangeNamespace(rule);
-        return applyConsequences(api, name, rule, false, actor);
+        validateEmitSignals(rule);   // a rule stored before the save guard is refused, never half-run
+        Map<String, Object> record = applyRecord(api.body(e));
+        refuseUnmappableOrUngrantedEmits(e, rule, record);
+        return applyConsequences(api, name, rule, false, ApiContext.actor(e), record);
     }
 
     /**
@@ -161,10 +164,18 @@ final class DecisionRoutes implements RouteModule {
     @SuppressWarnings("unchecked")
     static Map<String, Object> applyConsequences(ApiContext api, String name, Map<String, Object> rule,
                                                  boolean automatic, String actor) {
+        return applyConsequences(api, name, rule, automatic, actor, Map.of());
+    }
+
+    /** {@link #applyConsequences} with the matched {@code record} an {@code emit-signal}'s {@code payload}
+     *  mapping reads its values from. */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> applyConsequences(ApiContext api, String name, Map<String, Object> rule,
+                                                 boolean automatic, String actor, Map<String, Object> record) {
         List<Map<String, Object>> consequences = (List<Map<String, Object>>) (List<?>)
                 (rule.get("consequences") instanceof List<?> l ? l : List.of());
         List<Map<String, Object>> executed = consequences.stream()
-                .map(c -> executeOne(api, name, rule, c, automatic, actor)).toList();
+                .map(c -> executeOne(api, name, rule, c, automatic, actor, record)).toList();
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("rule", name);
         result.put("executed", executed);
@@ -172,7 +183,8 @@ final class DecisionRoutes implements RouteModule {
     }
 
     private static Map<String, Object> executeOne(ApiContext api, String ruleName, Map<String, Object> rule,
-                                                  Map<String, Object> c, boolean automatic, String actor) {
+                                                  Map<String, Object> c, boolean automatic, String actor,
+                                                  Map<String, Object> record) {
         String action = String.valueOf(c.get("action"));
         String status = "skipped";
         String detail;
@@ -181,9 +193,14 @@ final class DecisionRoutes implements RouteModule {
         switch (action) {
             case "emit-signal" -> {
                 String type = paramStr(c, "type", "decision-rule." + ruleName);
-                emitSignal(actor, type, "decision-rule:" + ruleName, Map.of("rule", ruleName));
+                Map<String, Object> payload = new LinkedHashMap<>();
+                payload.put("rule", ruleName);
+                payloadMap(c).forEach((key, field) -> payload.put(key, record.get(String.valueOf(field))));
+                String offerTo = params(c).get(OFFER_TO) instanceof String to ? to : null;
+                emitSignal(actor, type, "decision-rule:" + ruleName, payload,
+                        offerTo == null ? Map.of() : Map.of(SignalOfferGrants.ATTR_OFFER_TO, offerTo));
                 status = "executed";
-                detail = "emitted signal '" + type + "'";
+                detail = "emitted signal '" + type + "'" + (offerTo == null ? "" : " offered to '" + offerTo + "'");
             }
             case "create-alert" -> {
                 String alertName = paramStr(c, "rule", ruleName);
@@ -420,11 +437,115 @@ final class DecisionRoutes implements RouteModule {
      *  the rule (null when the engine applied it) — cross-Space consequence slice 1: an Exchange forwarder's
      *  {@code originActor} is meaningless while the origin leaves both null. */
     private static void emitSignal(String actor, String type, String source, Map<String, Object> payload) {
+        emitSignal(actor, type, source, payload, Map.of());
+    }
+
+    private static void emitSignal(String actor, String type, String source, Map<String, Object> payload,
+                                   Map<String, String> extraAttrs) {
         EventLog el = EventLog.current();
         if (el == null) return;
         Ref who = actor == null || actor.isBlank() ? null : Ref.of("user", actor);
-        el.emit(new Signal(null, type, Instant.now(), Severity.INFO, Ref.parseCompact(source), null,
-                null, null, EventLog.currentSpaceId(), who, type, payload, 1).toEvent());
+        com.gamma.event.Event ev = new Signal(null, type, Instant.now(), Severity.INFO, Ref.parseCompact(source), null,
+                null, null, EventLog.currentSpaceId(), who, type, payload, 1).toEvent();
+        if (!extraAttrs.isEmpty()) {
+            Map<String, String> attrs = new LinkedHashMap<>(ev.attributes());
+            attrs.putAll(extraAttrs);
+            ev = new com.gamma.event.Event(ev.eventId(), ev.ts(), ev.level(), ev.type(), ev.source(), ev.pipeline(),
+                    ev.correlationId(), ev.message(), attrs, ev.payload());
+        }
+        el.emit(ev);
+    }
+
+    // -- emit-signal: payload mapping + cross-Space offer (slice 5) --------------
+
+    /** The {@code emit-signal} param naming the ONE Space the Signal is offered to (cross-Space consequence
+     *  slice 5, operator 2026-09-28). Not {@code targetSpace}: the rule acts only in its own Space (D1); the
+     *  Signal crosses only under that Space's ACTIVE Exchange grant. */
+    static final String OFFER_TO = "offerTo";
+    /** Params an {@code emit-signal} carrying {@code offerTo} may hold; anything else is refused. */
+    static final java.util.Set<String> OFFER_PARAMS = java.util.Set.of("type", OFFER_TO, "payload");
+    /** Payload keys the rule itself or the loop cut writes; a mapping may not set them. */
+    static final java.util.Set<String> RESERVED_PAYLOAD_KEYS = java.util.Set.of("rule", "chainDepth");
+    /** Same charsets as the Exchange's signal offer ({@code ExchangeRoutes.SIGNAL_TYPE} / {@code PAYLOAD_KEY}). */
+    static final String SIGNAL_TYPE = "[a-z0-9][a-z0-9_-]*(\\.[a-z0-9_-]+)*";
+    static final String PAYLOAD_KEY = "[A-Za-z_][A-Za-z0-9_-]{0,63}";
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> payloadMap(Map<String, Object> c) {
+        return params(c).get("payload") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+    }
+
+    private static ApiException invalid(String msg) {
+        return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "emit-signal: " + msg);
+    }
+
+    /** Fail-closed shape check of every {@code emit-signal}'s {@code payload} mapping and {@code offerTo}, on save
+     *  AND on apply: a mapping is {@code {signalKey: recordField}}; an offer names a valid Space id and an
+     *  explicit Signal type and nothing else. */
+    @SuppressWarnings("unchecked")
+    static void validateEmitSignals(Map<String, Object> rule) {
+        if (!(rule.get("consequences") instanceof List<?> l)) return;
+        for (Object o : l) {
+            if (!(o instanceof Map<?, ?> raw) || !"emit-signal".equals(String.valueOf(raw.get("action")))) continue;
+            Map<String, Object> p = params((Map<String, Object>) raw);
+            if (p.containsKey("payload")) {
+                if (!(p.get("payload") instanceof Map<?, ?> m) || m.isEmpty())
+                    throw invalid("'payload' must be a non-empty map of signal key to record field");
+                for (Map.Entry<?, ?> en : m.entrySet()) {
+                    String key = String.valueOf(en.getKey());
+                    if (!key.matches(PAYLOAD_KEY)) throw invalid("invalid payload key '" + key + "'");
+                    if (RESERVED_PAYLOAD_KEYS.contains(key))
+                        throw invalid("payload key '" + key + "' is written by the platform, not mapped");
+                    if (!(en.getValue() instanceof String f) || f.isBlank())
+                        throw invalid("payload key '" + key + "' must map to a record field name");
+                }
+            }
+            if (!p.containsKey(OFFER_TO)) continue;
+            if (!(p.get(OFFER_TO) instanceof String to) || !com.gamma.service.SpaceId.isValid(to))
+                throw invalid("'offerTo' must be a valid space id");
+            for (String k : p.keySet())
+                if (!OFFER_PARAMS.contains(k)) throw invalid("unknown param '" + k + "' on an offered Signal");
+            if (!(p.get("type") instanceof String type) || !type.matches(SIGNAL_TYPE))
+                throw invalid("an offered Signal needs an explicit dotted 'type' (e.g. fraud.alert)");
+        }
+    }
+
+    /** The apply body's {@code record}: the matched row an {@code emit-signal} payload mapping reads. */
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> applyRecord(Map<String, Object> body) {
+        Object r = body.get("record");
+        if (r == null) return Map.of();
+        if (!(r instanceof Map<?, ?> m))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'record' must be a JSON object");
+        return (Map<String, Object>) m;
+    }
+
+    /**
+     * Before ANY consequence runs: every mapped field must be on the record (422), and an {@code offerTo} passes
+     * the SAME gate as a manual {@code POST /exchange/signal-offers} ({@code canOfferSignals}, here in the origin
+     * = bound Space, 403) and needs an ACTIVE Exchange signal grant for that type to that Space (422, one answer
+     * for "no such Space" and "no grant", D12). Delivery, its audit ({@code exchange.signal.delivered} /
+     * {@code undeliverable} on this ledger) and the chain-depth loop cut stay the Exchange forwarder's.
+     */
+    @SuppressWarnings("unchecked")
+    private static void refuseUnmappableOrUngrantedEmits(com.sun.net.httpserver.HttpExchange e,
+                                                         Map<String, Object> rule, Map<String, Object> record) {
+        if (!(rule.get("consequences") instanceof List<?> l)) return;
+        for (Object o : l) {
+            if (!(o instanceof Map<?, ?> raw) || !"emit-signal".equals(String.valueOf(raw.get("action")))) continue;
+            Map<String, Object> c = (Map<String, Object>) raw;
+            for (Map.Entry<String, Object> en : payloadMap(c).entrySet())
+                if (!record.containsKey(String.valueOf(en.getValue())))
+                    throw invalid("payload key '" + en.getKey() + "' maps record field '" + en.getValue()
+                            + "', which the apply request's 'record' does not carry");
+            if (!(params(c).get(OFFER_TO) instanceof String to)) continue;
+            ApiContext.requireCapability(e, "canOfferSignals");
+            String owner = EventLog.currentSpaceId();
+            String type = String.valueOf(params(c).get("type"));
+            if (to.equals(owner)) throw invalid("a Signal is not offered to its own Space");
+            if (!SignalOfferGrants.global().granted(owner, to, type))
+                throw invalid("no ACTIVE Exchange signal grant for '" + type + "' to '" + to + "'");
+        }
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────
@@ -494,6 +615,7 @@ final class DecisionRoutes implements RouteModule {
         Object priority = rule.get("priority");
         rule.put("priority", priority instanceof Number num ? num.intValue() : 100);
         rule.put("enabled", !"false".equalsIgnoreCase(String.valueOf(rule.getOrDefault("enabled", true))));
+        validateEmitSignals(rule);
         return rule;
     }
 

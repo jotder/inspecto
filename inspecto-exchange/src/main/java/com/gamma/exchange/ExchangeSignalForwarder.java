@@ -82,7 +82,8 @@ public final class ExchangeSignalForwarder implements java.util.function.BiConsu
             if (m == null) continue;
             Optional<SpaceContext> origin = hostOf(m, log);
             if (origin.isPresent()) {
-                forward(m, origin.get(), log, Signal.fromEvent(event));
+                forward(m, origin.get(), log, Signal.fromEvent(event),
+                        event.attributes().get(com.gamma.control.SignalOfferGrants.ATTR_OFFER_TO));
                 return;
             }
         }
@@ -96,11 +97,13 @@ public final class ExchangeSignalForwarder implements java.util.function.BiConsu
         }
     }
 
-    private void forward(SpaceManager m, SpaceContext origin, EventLog originLog, Signal sig) {
+    /** {@code offerTo} non-null (a Decision Rule's emit-signal named ONE Space): only that consumer's grant. */
+    private void forward(SpaceManager m, SpaceContext origin, EventLog originLog, Signal sig, String offerTo) {
         Exchange ex = Exchange.under(m.containerRoot());
         String owner = origin.id().value();
         List<ShareGrant> grants = ex.grants().stream()
                 .filter(g -> Exchange.SIGNAL.equals(g.kind()) && owner.equals(g.owner()) && sig.type().equals(g.item()))
+                .filter(g -> offerTo == null || offerTo.equals(g.consumer()))
                 .toList();
         for (ShareGrant g : grants) {
             String reason = deliver(m, ex, origin, g, sig);
