@@ -1,0 +1,52 @@
+{
+  "eventType": "Open",
+  "open": {
+    "ipAddress": "192.0.2.1",
+    "timestamp": "2026-09-28T12:05:00.000Z",
+    "userAgent": "Mozilla/5.0"
+  },
+  "mail": {
+    "timestamp": "2026-09-28T11:59:58.000Z",
+    "source": "alerts@example.test",
+    "sourceArn": "arn:aws:ses:us-east-1:123456789012:identity/example.test",
+    "sendingAccountId": "123456789012",
+    "messageId": "0100019a1b2c3d4e-5f6a7b8c-9d0e-4f1a-8b2c-3d4e5f6a7b8c-000000",
+    "destination": [
+      "ops@example.test"
+    ],
+    "headersTruncated": false,
+    "headers": [
+      {
+        "name": "From",
+        "value": "alerts@example.test"
+      },
+      {
+        "name": "To",
+        "value": "ops@example.test"
+      },
+      {
+        "name": "Message-ID",
+        "value": "<inspecto.d0a1b2c3@example.test>"
+      },
+      {
+        "name": "Subject",
+        "value": "Inspecto alert"
+      }
+    ],
+    "commonHeaders": {
+      "from": [
+        "alerts@example.test"
+      ],
+      "to": [
+        "ops@example.test"
+      ],
+      "messageId": "<inspecto.d0a1b2c3@example.test>",
+      "subject": "Inspecto alert"
+    },
+    "tags": {
+      "ses:configuration-set": [
+        "inspecto"
+      ]
+    }
+  }
+}
