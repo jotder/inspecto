@@ -135,7 +135,9 @@ public final class SesSnsDeliveryStatusAdapter implements DeliveryStatusAdapter 
                     Boolean.getBoolean("notify.deliverystatus.sns.allowPrivateAddresses"),
                     Boolean.getBoolean("notify.deliverystatus.sns.useProxy"));
             return new Wiring(topics, new SnsSigningCerts(fetcher, trust, pinned, budget, System::currentTimeMillis),
-                    new SnsSubscriptionConfirmer(fetcher, budget,
+                    // its own budget (review finding 1): made-up certificate URLs cannot starve confirmations
+                    new SnsSubscriptionConfirmer(fetcher, new SnsSigningCerts.Budget(SnsSubscriptionConfirmer.QUEUE,
+                            System::currentTimeMillis),
                             Boolean.parseBoolean(System.getProperty("notify.deliverystatus.sns.autoConfirm", "true")),
                             SnsSubscriptionConfirmer.boundedExecutor()));
         } catch (Exception e) {

@@ -33,11 +33,12 @@ import java.util.regex.Pattern;
  *       {@code /SimpleNotificationService-<32 hex>.pem}, no query, no fragment. The fixed grammar is what bounds
  *       the number of distinct URLs an attacker can make us miss on.</li>
  *   <li><b>Pinned mode</b> (D1 opt-in): the operator's certificate, and NO fetch ever — the URL rules still apply.</li>
- *   <li><b>Cache</b>: 8 entries LRU by exact URL, each re-checked on use (so expiry bites); failures cached 10
- *       minutes; in process only — persisting it would create a second trust anchor to protect.</li>
+ *   <li><b>Cache</b>: 8 entries LRU by host and path, each re-checked on use (so expiry bites); failures cached
+ *       10 minutes (1 minute for a transport error); in process only — persisting it would create a second trust anchor to protect.</li>
  *   <li><b>Single-flight</b>: concurrent misses for one URL share one fetch.</li>
- *   <li><b>Global budget</b>: at most {@code maxFetchesPerHour} (default 12) across the process, shared with the
- *       subscription confirmer. Spent ⇒ the miss is refused and makes no request.</li>
+ *   <li><b>Global budget</b>: at most {@code maxFetchesPerHour} (default 12) across the process for certificate
+ *       URLs never seen to work (the subscription confirmer has its own). Spent ⇒ the miss is refused and makes
+ *       no request. A URL whose certificate once passed trust is re-fetched outside the budget.</li>
  *   <li><b>Trust</b> ({@link SnsCertTrust}), independent of how the certificate arrived.</li>
  * </ol>
  */
@@ -52,7 +53,11 @@ final class SnsSigningCerts implements SesSnsDeliveryStatusAdapter.CertSource {
     }
 
     static final int CACHE_ENTRIES = 8;
+    /** Only a certificate that passed trust gets in, so an attacker cannot fill it; larger than the cache. */
+    static final int KNOWN_GOOD = 32;
     static final long NEGATIVE_TTL_MILLIS = 10 * 60_000L;
+    /** A transport failure (timeout, reset, 5xx-as-IOException) is likelier transient: a shorter blackout. */
+    static final long IO_NEGATIVE_TTL_MILLIS = 60_000L;
     static final int DEFAULT_MAX_FETCHES_PER_HOUR = 12;
     /** A PEM file may carry the leaf and its intermediates, never a bundle. */
     static final int MAX_CERTS_IN_PEM = 4;
@@ -80,6 +85,17 @@ final class SnsSigningCerts implements SesSnsDeliveryStatusAdapter.CertSource {
             return size() > 64;
         }
     };
+    /**
+     * URLs whose certificate once passed trust (review finding 1). A miss on one of these — after a
+     * cache eviction — does NOT draw on the hourly budget, so an attacker who spends the budget on made-up
+     * URLs cannot stop us re-fetching a certificate AWS really serves. Still bounded: 32 URLs, each at most once
+     * per negative-cache window.
+     */
+    private final Map<String, Boolean> knownGood = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String, Boolean> eldest) {
+            return size() > KNOWN_GOOD;
+        }
+    };
     private final ConcurrentHashMap<String, CompletableFuture<Cached>> inflight = new ConcurrentHashMap<>();
 
     SnsSigningCerts(Fetcher fetcher, SnsCertTrust trust, List<X509Certificate> pinned, Budget budget, LongSupplier clock) {
@@ -99,10 +115,12 @@ final class SnsSigningCerts implements SesSnsDeliveryStatusAdapter.CertSource {
             trust.check(pinned.get(0), pinned.subList(1, pinned.size()), host, now);
             return pinned.get(0);
         }
-        String key = url.toString();
+        String key = host + url.getRawPath();   // host:443 and host are one URL, one cache and budget key
         Cached hit;
+        boolean reserved;
         synchronized (this) {
             hit = cache.get(key);
+            reserved = knownGood.containsKey(key);
             Long until = failedUntil.get(key);
             if (hit == null && until != null && until > now)
                 throw new SecurityException("the signing certificate at " + key + " failed recently; not re-fetched");
@@ -113,11 +131,14 @@ final class SnsSigningCerts implements SesSnsDeliveryStatusAdapter.CertSource {
         }
         CompletableFuture<Cached> mine = new CompletableFuture<>();
         CompletableFuture<Cached> shared = inflight.putIfAbsent(key, mine);
-        if (shared != null) return shared.join().cert();   // single-flight: another request is fetching it
+        if (shared != null) {   // single-flight: another request is fetching it; never wait past its deadline
+            return shared.get(SnsHttpsFetcher.DEADLINE.toMillis() + 1_000, java.util.concurrent.TimeUnit.MILLISECONDS).cert();
+        }
         try {
-            Cached e = fetchAndCheck(url, host, now);
+            Cached e = fetchAndCheck(url, host, now, reserved);
             synchronized (this) {
                 cache.put(key, e);
+                knownGood.put(key, Boolean.TRUE);
                 failedUntil.remove(key);
             }
             mine.complete(e);
@@ -127,7 +148,7 @@ final class SnsSigningCerts implements SesSnsDeliveryStatusAdapter.CertSource {
             throw spent;
         } catch (Exception failed) {
             synchronized (this) {
-                failedUntil.put(key, now + NEGATIVE_TTL_MILLIS);
+                failedUntil.put(key, now + (failed instanceof IOException && !(failed instanceof SnsHttpsFetcher.Refused) ? IO_NEGATIVE_TTL_MILLIS : NEGATIVE_TTL_MILLIS));
             }
             mine.completeExceptionally(failed);
             throw failed;
@@ -136,8 +157,8 @@ final class SnsSigningCerts implements SesSnsDeliveryStatusAdapter.CertSource {
         }
     }
 
-    private Cached fetchAndCheck(URI url, String host, long now) throws Exception {
-        budget.acquire();
+    private Cached fetchAndCheck(URI url, String host, long now, boolean reserved) throws Exception {
+        if (!reserved) budget.acquire();
         Fetcher.Fetched got = fetcher.get(url);
         List<X509Certificate> certs = parsePem(got.body());
         List<X509Certificate> intermediates = new ArrayList<>(certs.subList(1, certs.size()));

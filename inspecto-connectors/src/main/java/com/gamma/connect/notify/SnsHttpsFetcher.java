@@ -56,6 +56,11 @@ import java.util.function.Function;
  */
 final class SnsHttpsFetcher implements SnsSigningCerts.Fetcher {
 
+    /** A deliberate refusal (policy, status, size, deadline) — as opposed to a transport failure, which may pass. */
+    static final class Refused extends IOException {
+        Refused(String message) { super(message); }
+    }
+
     static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
     static final Duration DEADLINE = Duration.ofSeconds(5);
     static final int BODY_CAP = 16 * 1024;
@@ -95,12 +100,12 @@ final class SnsHttpsFetcher implements SnsSigningCerts.Fetcher {
     @Override
     public Fetched get(URI url) throws IOException {
         if (!"https".equals(url.getScheme()) || url.getRawUserInfo() != null || url.getHost() == null)
-            throw new IOException("refused: not a plain https URL");
+            throw new Refused("refused: not a plain https URL");
         String host = url.getHost().toLowerCase(Locale.ROOT);
         try {
             EgressPolicy.checkHost(host);
         } catch (IllegalArgumentException refused) {
-            throw new IOException("refused: " + refused.getMessage());
+            throw new Refused("refused: " + refused.getMessage());
         }
         return useProxy ? viaProxy(url) : direct(url, host);
     }
@@ -113,14 +118,14 @@ final class SnsHttpsFetcher implements SnsSigningCerts.Fetcher {
         try {
             all = resolver.resolve(host);
         } catch (java.net.UnknownHostException e) {
-            throw new IOException("refused: " + host + " does not resolve");
+            throw new Refused("refused: " + host + " does not resolve");
         }
-        if (all == null || all.length == 0) throw new IOException("refused: " + host + " does not resolve");
+        if (all == null || all.length == 0) throw new Refused("refused: " + host + " does not resolve");
         for (InetAddress a : all) {
-            if (IPV6_METADATA.equals(a)) throw new IOException("refused: " + host + " resolves to the metadata address");
+            if (IPV6_METADATA.equals(a)) throw new Refused("refused: " + host + " resolves to the metadata address");
             String cls = EgressPolicy.deniedClass(a);
             if (cls != null && !allow.permits(host, a, cls))
-                throw new IOException("refused: " + host + " resolves to " + a.getHostAddress() + ", a " + cls + " address");
+                throw new Refused("refused: " + host + " resolves to " + a.getHostAddress() + ", a " + cls + " address");
         }
         InetAddress to = all[0];
         Socket raw = new Socket();
@@ -141,7 +146,7 @@ final class SnsHttpsFetcher implements SnsSigningCerts.Fetcher {
             byte[] body = readResponse(ssl.getInputStream());
             return new Fetched(body, chainOf(ssl.getSession().getPeerCertificates()));
         } catch (IOException e) {
-            if (guard.isDone()) throw new IOException("refused: the exchange exceeded " + deadline.toMillis() + " ms");
+            if (guard.isDone()) throw new Refused("refused: the exchange exceeded " + deadline.toMillis() + " ms");
             throw e;
         } finally {
             guard.cancel(false);
@@ -149,34 +154,41 @@ final class SnsHttpsFetcher implements SnsSigningCerts.Fetcher {
         }
     }
 
+    /**
+     * The D9 path. The WHOLE exchange — headers and capped body — runs as one future bounded by the deadline
+     * ({@code HttpRequest.timeout} alone covers only the headers); on expiry the client is shut down, which aborts
+     * the exchange, and the client is closed either way so no selector thread outlives the call (review finding 2).
+     */
     private Fetched viaProxy(URI url) throws IOException {
-        HttpClient client = HttpClient.newBuilder().proxy(ProxySelector.getDefault())
-                .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(CONNECT_TIMEOUT).build();
         HttpRequest req = HttpRequest.newBuilder(url).timeout(deadline).GET().build();
-        HttpResponse<InputStream> r;
-        try {
-            r = client.send(req, HttpResponse.BodyHandlers.ofInputStream());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new IOException("interrupted");
-        }
-        try (InputStream in = r.body()) {
-            ScheduledFuture<?> guard = WATCHDOG.schedule(() -> closeQuietly(in), deadline.toMillis(), TimeUnit.MILLISECONDS);
+        try (HttpClient client = HttpClient.newBuilder().proxy(ProxySelector.getDefault())
+                .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(CONNECT_TIMEOUT).build()) {
+            var exchange = client.sendAsync(req, HttpResponse.BodyHandlers.ofInputStream()).thenApply(r -> {
+                try (InputStream in = r.body()) {
+                    if (r.statusCode() != 200)
+                        throw new Refused("refused: HTTP " + r.statusCode() + " (redirects are never followed)");
+                    long declared = r.headers().firstValueAsLong("content-length").orElse(-1);
+                    if (declared > BODY_CAP) throw new Refused("refused: body of " + declared + " bytes is over the cap");
+                    byte[] body = readCapped(in);
+                    List<X509Certificate> chain = List.of();
+                    if (r.sslSession().isPresent()) chain = chainOf(r.sslSession().get().getPeerCertificates());
+                    return new Fetched(body, chain);
+                } catch (IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+            });
             try {
-                if (r.statusCode() != 200) throw new IOException("refused: HTTP " + r.statusCode() + " (redirects are never followed)");
-                long declared = r.headers().firstValueAsLong("content-length").orElse(-1);
-                if (declared > BODY_CAP) throw new IOException("refused: body of " + declared + " bytes is over the cap");
-                byte[] body = readCapped(in);
-                List<X509Certificate> chain = r.sslSession().map(s -> {
-                    try {
-                        return chainOf(s.getPeerCertificates());
-                    } catch (Exception e) {
-                        return List.<X509Certificate>of();
-                    }
-                }).orElse(List.of());
-                return new Fetched(body, chain);
-            } finally {
-                guard.cancel(false);
+                return exchange.get(deadline.toMillis(), TimeUnit.MILLISECONDS);
+            } catch (java.util.concurrent.TimeoutException e) {
+                client.shutdownNow();
+                throw new Refused("refused: the exchange exceeded " + deadline.toMillis() + " ms");
+            } catch (InterruptedException e) {
+                client.shutdownNow();
+                Thread.currentThread().interrupt();
+                throw new IOException("interrupted");
+            } catch (java.util.concurrent.ExecutionException e) {
+                Throwable c = e.getCause() instanceof java.io.UncheckedIOException u ? u.getCause() : e.getCause();
+                throw c instanceof IOException io ? io : new IOException(String.valueOf(c));
             }
         }
     }
@@ -186,8 +198,8 @@ final class SnsHttpsFetcher implements SnsSigningCerts.Fetcher {
         int[] budget = { HEADER_CAP };
         String status = line(in, budget);
         String[] parts = status.split(" ", 3);
-        if (parts.length < 2 || !parts[0].startsWith("HTTP/1.")) throw new IOException("refused: not an HTTP response");
-        if (!"200".equals(parts[1])) throw new IOException("refused: HTTP " + parts[1] + " (redirects are never followed)");
+        if (parts.length < 2 || !parts[0].startsWith("HTTP/1.")) throw new Refused("refused: not an HTTP response");
+        if (!"200".equals(parts[1])) throw new Refused("refused: HTTP " + parts[1] + " (redirects are never followed)");
         long length = -1;
         boolean chunked = false;
         for (String h = line(in, budget); !h.isEmpty(); h = line(in, budget)) {
@@ -198,13 +210,13 @@ final class SnsHttpsFetcher implements SnsSigningCerts.Fetcher {
                 try {
                     length = Long.parseLong(v);
                 } catch (NumberFormatException e) {
-                    throw new IOException("refused: bad Content-Length");
+                    throw new Refused("refused: bad Content-Length");
                 }
             } else if (k.equals("transfer-encoding")) {
                 chunked = v.toLowerCase(Locale.ROOT).contains("chunked");
             }
         }
-        if (length > BODY_CAP) throw new IOException("refused: body of " + length + " bytes is over the cap");
+        if (length > BODY_CAP) throw new Refused("refused: body of " + length + " bytes is over the cap");
         if (!chunked) return length >= 0 ? readExactly(in, (int) length) : readCapped(in);
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         while (true) {
@@ -214,9 +226,9 @@ final class SnsHttpsFetcher implements SnsSigningCerts.Fetcher {
             try {
                 size = Integer.parseInt((semi < 0 ? sizeLine : sizeLine.substring(0, semi)).trim(), 16);
             } catch (NumberFormatException e) {
-                throw new IOException("refused: bad chunk size");
+                throw new Refused("refused: bad chunk size");
             }
-            if (size < 0 || out.size() + (long) size > BODY_CAP) throw new IOException("refused: body is over the cap");
+            if (size < 0 || out.size() + (long) size > BODY_CAP) throw new Refused("refused: body is over the cap");
             if (size == 0) return out.toByteArray();
             out.write(readExactly(in, size));
             line(in, budget);
@@ -225,22 +237,22 @@ final class SnsHttpsFetcher implements SnsSigningCerts.Fetcher {
 
     private static byte[] readExactly(InputStream in, int n) throws IOException {
         byte[] b = in.readNBytes(n);
-        if (b.length != n) throw new IOException("refused: truncated body");
+        if (b.length != n) throw new Refused("refused: truncated body");
         return b;
     }
 
     /** Up to {@link #BODY_CAP} bytes to EOF; one byte more is a refusal, and nothing further is read. */
     private static byte[] readCapped(InputStream in) throws IOException {
         byte[] b = in.readNBytes(BODY_CAP + 1);
-        if (b.length > BODY_CAP) throw new IOException("refused: body is over the cap");
+        if (b.length > BODY_CAP) throw new Refused("refused: body is over the cap");
         return b;
     }
 
     private static String line(InputStream in, int[] budget) throws IOException {
         StringBuilder sb = new StringBuilder();
         for (int c = in.read(); ; c = in.read()) {
-            if (c < 0) throw new IOException("refused: truncated response");
-            if (--budget[0] < 0) throw new IOException("refused: response headers are over the cap");
+            if (c < 0) throw new Refused("refused: truncated response");
+            if (--budget[0] < 0) throw new Refused("refused: response headers are over the cap");
             if (c == '\n') return sb.toString();
             if (c != '\r') sb.append((char) c);
         }

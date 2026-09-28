@@ -181,8 +181,8 @@ class SnsFetchSecurityTest {
         AtomicInteger calls = new AtomicInteger();
         SnsSigningCerts c = certs(u -> { calls.incrementAndGet(); return fetcher().get(u); }, 100);
         c.certificateFor(env(SnsFixtures.CERT_URL));   // control
-        c.certificateFor(env("https://" + HOST + ":443/SimpleNotificationService-0000000000000000000000000000000c.pem"));
-        assertEquals(2, calls.get(), "controls: the plain URL and an explicit :443 are both served");
+        c.certificateFor(env("https://" + HOST + ":443/SimpleNotificationService-0000000000000000000000000000000a.pem"));
+        assertEquals(1, calls.get(), "an explicit :443 is the same URL: one cache key, one fetch");
         calls.set(0);
         String p = "/SimpleNotificationService-0000000000000000000000000000000b.pem";
         List<String> tricks = List.of(
@@ -357,6 +357,36 @@ class SnsFetchSecurityTest {
         clock.addAndGet(SnsSigningCerts.NEGATIVE_TTL_MILLIS + 1);
         c.certificateFor(env(SnsFixtures.CERT_URL));
         assertEquals(2, hits.size());
+    }
+
+    @Test
+    void aSpentBudgetDoesNotStopRefetchingACertificateThatOnceWorked() throws Exception {
+        SnsSigningCerts c = certs(fetcher(), 12);
+        c.certificateFor(env(certUrl(1)));                       // genuine: passes trust, becomes known-good
+        for (int i = 2; i <= 9; i++) c.certificateFor(env(certUrl(i)));   // eight more evict it from the cache
+        mode = "notfound";
+        for (int i = 10; i <= 12; i++) {                          // an attacker spends the rest of the budget
+            int n = i;
+            assertThrows(Exception.class, () -> c.certificateFor(env(certUrl(n))));
+        }
+        assertThrows(Exception.class, () -> c.certificateFor(env(certUrl(99))), "control: the budget is spent");
+        int before = hits.size();
+        mode = "cert";
+        c.certificateFor(env(certUrl(1)));
+        assertEquals(before + 1, hits.size(), "the known-good URL was re-fetched outside the budget");
+    }
+
+    @Test
+    void aTransportFailureIsNegativelyCachedForOneMinuteNotTen() throws Exception {
+        AtomicInteger calls = new AtomicInteger();
+        SnsSigningCerts c = certs(u -> {
+            if (calls.incrementAndGet() == 1) throw new IOException("connection reset");
+            return fetcher().get(u);
+        }, 12);
+        assertThrows(Exception.class, () -> c.certificateFor(env(SnsFixtures.CERT_URL)));
+        clock.addAndGet(SnsSigningCerts.IO_NEGATIVE_TTL_MILLIS + 1);
+        c.certificateFor(env(SnsFixtures.CERT_URL));
+        assertEquals(2, calls.get());
     }
 
     @Test
