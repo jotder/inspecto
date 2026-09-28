@@ -101,7 +101,8 @@ public final class ConservationCheck {
             if (i < 0) continue;
             String node = e.getKey().substring(0, i);
             String rel = e.getKey().substring(i + 1);
-            out.add(new RelCount(node, rel, e.getValue(), REJECT_RELS.contains(rel)));
+            out.add(new RelCount(node, rel, e.getValue(),
+                    REJECT_RELS.contains(rel) || PipelineRel.isReject(rel)));   // S2-3: a Step's reject:<reason>
         }
         return out;
     }

@@ -146,6 +146,51 @@ class ScaffoldTemplatesTest {
                 "the Executor re-grew a private SQL-quoting copy — call SqlIdent instead");
     }
 
+    /**
+     * S2-3: the {@code step} template is a real pack. It compiles (its test included), loads through
+     * {@link JobPackManager} — so it carries no raw executor and its node type is {@code EXECUTED} — and the
+     * engine runs it: the NULL row lands on its declared reject stream.
+     */
+    @Test
+    void theStepTemplateCompilesLoadsAndRuns(@TempDir Path work) throws Exception {
+        Path project = stamp(templates().resolve("step"), work.resolve("project"));
+        Path classes = compile(project, work.resolve("classes"));
+        Path jar = work.resolve("acme-reconcile-step.jar");
+        packageJar(jar, classes, project.resolve("src/main/resources"));
+
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        Files.copy(jar, packsDir.resolve(jar.getFileName()));
+        JobPackManagerTest.trustEveryJarIn(packsDir);
+        List<String> signals = new ArrayList<>();
+        String type = "transform.acme_reconcile";
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(),
+                new JobTypeRegistry(new PlatformServiceRegistry()), ExpressionRegistry.withBuiltins(),
+                (t, sev, payload) -> signals.add(t));
+             java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+             java.sql.Statement st = conn.createStatement()) {
+            mgr.scanAtStartup();
+            assertTrue(com.gamma.pipeline.exec.StepExecutors.get(type).isPresent(),
+                    "the scaffolded Step pack did not load: " + signals + " " + mgr.inventory());
+
+            st.execute("CREATE TABLE src AS SELECT * FROM (VALUES ('a', 1), (NULL, 2)) t(msisdn, n)");
+            Map<String, String> out = new LinkedHashMap<>();
+            for (var r : com.gamma.pipeline.exec.RowShaper.shape(conn,
+                    com.gamma.pipeline.PipelineNode.of("n", type, Map.of("required", "msisdn")), "src", "n"))
+                out.put(r.rel(), r.table());
+            assertEquals(List.of("data", "reject:missing"), out.keySet().stream().sorted().toList());
+            try (java.sql.ResultSet rs = st.executeQuery("SELECT (SELECT count(*) FROM \"" + out.get("data")
+                    + "\"), (SELECT count(*) FROM \"" + out.get("reject:missing") + "\")")) {
+                rs.next();
+                assertEquals(1, rs.getInt(1));
+                assertEquals(1, rs.getInt(2), "the NULL row is on the reject stream");
+            }
+        } finally {
+            com.gamma.pipeline.PipelineNodeTypes.deregister(jar.getFileName().toString());
+            com.gamma.pipeline.exec.StepExecutors.deregister(jar.getFileName().toString());
+            JobPackManagerTest.clearTrust();
+        }
+    }
+
     // ── the scaffolder's substitution, in Java ────────────────────────────────
 
     /** Walk up from the module dir to the repo root, which is where {@code tools/templates} lives. */

@@ -21,8 +21,10 @@ import java.util.concurrent.CopyOnWriteArraySet;
  * close. The engine layer cannot see {@code com.gamma.job}, hence the seam. Every installed leaser is
  * pinned — one per Space's {@code JobService}, all sharing the process-wide node registries.
  *
- * <p>Node-type owners are enough: a pack executor is only accepted for its own pack's node type
- * ({@link PipelineNodeExecutors#register}), so no pack code runs in a walk whose node types it does not own.
+ * <p>Node-type owners are enough: a pack Step is only accepted for its own pack's node type
+ * ({@link StepExecutors#register}), so no pack code runs in a walk whose node types it does not own. A Step's
+ * own thread also takes a lease for as long as it lives ({@code StepRunner}), so an abandoned Step keeps
+ * its pack pinned after the walk ends.
  */
 public final class PackRunLeases {
 

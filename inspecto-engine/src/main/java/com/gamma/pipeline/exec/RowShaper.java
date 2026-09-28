@@ -115,10 +115,24 @@ public final class RowShaper {
      * @param ledger        the durable ledger; {@code null} means "none registered", which refuses too
      */
     public record ExecutionContext(String pipeline, String consignmentId,
-                                   com.gamma.consignment.DbDedupLedger ledger) {
+                                   com.gamma.consignment.DbDedupLedger ledger, boolean dryRun) {
 
         /** The no-context default: a windowed {@code transform.dedup} refuses loudly (see class doc). */
         public static final ExecutionContext NONE = new ExecutionContext(null, null, null);
+
+        /** An armed context ({@code dryRun = false}). */
+        public ExecutionContext(String pipeline, String consignmentId, com.gamma.consignment.DbDedupLedger ledger) {
+            this(pipeline, consignmentId, ledger, false);
+        }
+
+        /**
+         * This context as a dry run (S2-3): a contributed Step sees {@link StepContext#dryRun()} {@code true}
+         * and its mutating services record instead of act. Every preview path passes one; the armed paths
+         * never do.
+         */
+        public ExecutionContext asDryRun() {
+            return new ExecutionContext(pipeline, consignmentId, ledger, true);
+        }
 
         /** A run's context, over whatever ledger the calling space registered (possibly none). */
         public static ExecutionContext forRun(String pipeline, String consignmentId) {
@@ -161,10 +175,14 @@ public final class RowShaper {
         // The plugin seam's EXECUTION half. Consulted before the built-ins, deliberately, so a provider may
         // specialise a core verb as well as add a new one — the same rule PipelineNodeTypes applies to
         // descriptors ("an edition can specialise a node type without forking the core"). A PACK cannot:
-        // PipelineNodeExecutors.register refuses a pack executor for a built-in (S2-0). Empty in a stock
-        // build, so this costs one map lookup and changes nothing that ships.
+        // PipelineNodeExecutors is classpath-only since S2-3 (D-2): JobPackManager rejects a pack carrying
+        // one. Empty in a stock build, so this costs one map lookup and changes nothing that ships.
         Optional<PipelineNodeExecutor> contributed = PipelineNodeExecutors.get(type);
         if (contributed.isPresent()) return contributed.get().shape(conn, node, input, outPrefix, references);
+        // S2-3: a contributed EXECUTED Step — the only seam a pack may run through. StepRunner owns its
+        // statements, its tables, its deadline and its failure grain; the Step never sees `conn`.
+        Optional<StepExecutors.Registration> step = StepExecutors.get(type);
+        if (step.isPresent()) return StepRunner.run(conn, node, input, outPrefix, step.get(), ctx);
         if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(type))     return join(conn, node, input, outPrefix, references);
         if (BuiltinNodeType.TRANSFORM_FILTER.type().equals(type))   return filter(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_LOOKUP.type().equals(type))   return lookup(conn, node, input, outPrefix);
@@ -838,7 +856,7 @@ public final class RowShaper {
     }
 
     /** A safe, unique DuckDB table identifier for {@code <prefix>__<relkey>}. */
-    private static String table(String prefix, String rel) {
+    static String table(String prefix, String rel) {
         return sanitize(prefix) + "__" + sanitize(rel);
     }
 

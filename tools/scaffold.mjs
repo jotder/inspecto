@@ -5,7 +5,7 @@
 //   node tools/scaffold.mjs new job       --id acme.reconcile --name "Acme Reconcile"
 //   node tools/scaffold.mjs new processor --id acme.masker    --name "Acme Masker"
 //   node tools/scaffold.mjs new nodetype  --id acme.redact    --name "Acme Redact"
-//   node tools/scaffold.mjs new step      ...   # refuses until the Step-kind registry lands (S2-3)
+//   node tools/scaffold.mjs new step      --id acme.score     --name "Acme Score"
 //   node tools/scaffold.mjs new service   ...   # refuses until contributed services land (S3-1)
 //
 // Design notes, each one load-bearing:
@@ -19,8 +19,8 @@
 //     dependency that does not resolve.
 //   * TOKENS ARE {{name}}, NOT ${name}. A generated pom.xml legitimately contains Maven's own
 //     ${...} properties (${project.version}); sharing the delimiter would mean stamping over them.
-//   * REFUSALS ARE HONEST. `new step` and `new service` do not emit a half-working skeleton for a
-//     mount the engine cannot host yet; they name the slice that unlocks them and exit non-zero.
+//   * REFUSALS ARE HONEST. `new service` does not emit a half-working skeleton for a mount the
+//     engine cannot host yet; it names the slice that unlocks it and exits non-zero.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -32,19 +32,12 @@ const templateRoot = join(repoRoot, 'tools', 'templates');
 const KINDS = {
     job: { template: 'job', gate: null },
     processor: { template: 'processor', gate: null },
-    // A node type is a pipeline STEP deployed on the engine CLASSPATH — the same delivery as a
-    // processor, and deliberately NOT the gated `step` kind below, which is pack-hosted (isolated
-    // classloader, StepContext, watchdog) and still owned by platform-services S2-3.
+    // A node type is a pipeline STEP deployed on the engine CLASSPATH (PipelineNodeType +
+    // PipelineNodeExecutor, raw SQL on the batch connection) — the same delivery as a processor.
     nodetype: { template: 'nodetype', gate: null },
-    step: {
-        gate: 'PACK-hosted Steps are not hosted yet. The Step-kind registry opens at S2-3 of '
-            + 'docs/superpower/platform-services-plan.md (StepContext, the services ceiling, failure '
-            + 'mapping and the watchdog), which is itself gated on the branch-aware executor becoming '
-            + 'the armed path — until then a pack-loaded Step could not run. '
-            + 'For a Step you can ship TODAY, scaffold a `nodetype`: it is a node type deployed on the '
-            + 'engine CLASSPATH (PipelineNodeType + PipelineNodeExecutor), which runs now. What it does '
-            + 'NOT get is what this gate is about — hot deploy, an isolated classloader, and a watchdog.',
-    },
+    // A `step` is PACK-hosted (platform-services S2-3): an isolated classloader, a StepContext instead
+    // of a connection, a requires: grant, and a watchdog. A pack may not carry a raw executor (D-2).
+    step: { template: 'step', gate: null },
     service: {
         gate: 'Packs cannot contribute Platform Services yet. That is S3-1 of '
             + 'docs/superpower/platform-services-plan.md (the ServiceProvider SPI + collision '
@@ -71,7 +64,7 @@ function parseArgs(argv) {
 
 function usage() {
     return [
-        'usage: node tools/scaffold.mjs new <job|processor|nodetype> --id <id> --name "<Name>" [--package <pkg>] [--out <dir>]',
+        'usage: node tools/scaffold.mjs new <job|processor|nodetype|step> --id <id> --name "<Name>" [--package <pkg>] [--out <dir>]',
         '',
         '  --id       the type id authors reference, e.g. acme.reconcile (lowercase, dot-separated)',
         '  --name     the human title shown in the UI',
@@ -193,7 +186,7 @@ if (existsSync(outDir)) fail(`${relative(repoRoot, outDir)} already exists — d
 const tokens = {
     id,
     name: flags.name,
-    // A node type's discriminator is `transform.<suffix>`: dots are not legal inside it, because
+    // A node type's (and a step's) discriminator is `transform.<suffix>`: dots are not legal inside it, because
     // RowShaper matches the type STRING exactly and `transform.dedup*` is already prefix-matched.
     typeSuffix: id.replace(/\./g, '_'),
     className: classNameOf(id),

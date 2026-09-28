@@ -348,20 +348,54 @@ class JobPackManagerTest {
         }
     }
 
-    // ── S2-0: a pack executor may only run the pack's OWN node type ───────────────────────────
+    // ── S2-0 / S2-3: a pack Step may only run the pack's OWN node type ────────────────────────
+
+    /** Every row of the input to {@code data} — so a hijacked filter is visible as "kept all three rows". */
+    private static final String COPY_ALL =
+            "StepInput in = ctx.in(); StepOutput out = ctx.emit(\"data\"); while (in.next()) out.copyRow(in);";
+
+    /**
+     * ⛔ D-2 (S2-3): a pack carrying the raw-{@code Connection} {@code PipelineNodeExecutor} is rejected
+     * whole — its own legal node type included — because that seam writes third-party SQL on the batch
+     * connection. The seam stays open to the classpath only.
+     */
+    @Test
+    void aPackCarryingARawConnectionExecutorIsRejectedWhole(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildNodePackJar(work, packsDir.resolve("raw-1.jar"), "RawPack", "acme.raw",
+                "transform.acme_raw", "transform.acme_raw");
+
+        Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
+                ExpressionRegistry.withBuiltins(), sink)) {
+            try {
+                assertEquals(List.of("raw-1.jar"), mgr.rescan().get("rejected"), "refused, not loaded");
+                assertTrue(sink.types.contains("job.pack.rejected"));
+                assertTrue(mgr.inventory().get(0).get("cause").toString().contains("StepExecutor"),
+                        "the refusal names the seam to use instead: " + mgr.inventory());
+                assertFalse(com.gamma.pipeline.PipelineNodeTypes.isKnown("transform.acme_raw"),
+                        "atomic: the pack's node type is rolled back with it");
+                assertTrue(com.gamma.pipeline.exec.PipelineNodeExecutors.get("transform.acme_raw").isEmpty());
+            } finally {
+                com.gamma.pipeline.PipelineNodeTypes.deregister("raw-1.jar");
+            }
+        }
+    }
 
     /**
      * 🔴 A jar dropped in the packs dir must not change how a BUILT-IN verb runs for every pipeline.
-     * {@code RowShaper.shape} consults the executor registry before its built-in chain, so an executor for
+     * {@code RowShaper.shape} consults the Step registry before its built-in chain, so a Step for
      * {@code transform.filter} would silently replace the filter everywhere. The pack is rejected whole —
      * its own (legal) node type included — and the built-in still decides which rows survive.
      */
     @Test
-    void aPackExecutorForABuiltInVerbIsRefusedWholeAndTheBuiltInStillRuns(@TempDir Path work) throws Exception {
+    void aPackStepForABuiltInVerbIsRefusedWholeAndTheBuiltInStillRuns(@TempDir Path work) throws Exception {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
         Path packsDir = Files.createDirectories(work.resolve("packs"));
-        buildNodePackJar(work, packsDir.resolve("hijack-1.jar"), "HijackPack", "acme.hijack",
-                "transform.acme_hijack", "transform.filter");
+        buildStepPackJar(work, packsDir.resolve("hijack-1.jar"), "HijackPack", "acme.hijack",
+                "transform.acme_hijack", "transform.filter", "EXECUTED", "", COPY_ALL);
 
         Sink sink = new Sink();
         trustEveryJarIn(packsDir);
@@ -372,58 +406,58 @@ class JobPackManagerTest {
 
                 assertEquals(List.of("hijack-1.jar"), summary.get("rejected"), "refused, not loaded");
                 assertTrue(sink.types.contains("job.pack.rejected"), "rejected loudly, not skipped quietly");
-                assertTrue(com.gamma.pipeline.exec.PipelineNodeExecutors.get("transform.filter").isEmpty(),
-                        "no pack executor may sit in front of the built-in filter");
+                assertTrue(com.gamma.pipeline.exec.StepExecutors.get("transform.filter").isEmpty(),
+                        "no pack Step may sit in front of the built-in filter");
                 assertFalse(com.gamma.pipeline.PipelineNodeTypes.isKnown("transform.acme_hijack"),
                         "atomic: the pack's own node type is rolled back with it");
                 assertEquals(List.of(1, 3), shapeIds(com.gamma.pipeline.PipelineNode.of("f", "transform.filter",
                         Map.of("where", "amt >= 100"))), "the built-in filter still decides (the hijack keeps all 3)");
             } finally {
                 com.gamma.pipeline.PipelineNodeTypes.deregister("hijack-1.jar");
-                com.gamma.pipeline.exec.PipelineNodeExecutors.deregister("hijack-1.jar");
+                com.gamma.pipeline.exec.StepExecutors.deregister("hijack-1.jar");
             }
         }
     }
 
-    /** An executor for a kind NO node type of the same pack declares is refused too — it is not the pack's. */
+    /** A Step for a kind NO node type of the same pack declares is refused too — it is not the pack's. */
     @Test
-    void aPackExecutorForAKindItsPackDoesNotDeclareIsRefused(@TempDir Path work) throws Exception {
+    void aPackStepForAKindItsPackDoesNotDeclareIsRefused(@TempDir Path work) throws Exception {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
         Path packsDir = Files.createDirectories(work.resolve("packs"));
-        buildNodePackJar(work, packsDir.resolve("orphan-1.jar"), "OrphanPack", "acme.orphan",
-                null, "transform.acme_orphan");
+        buildStepPackJar(work, packsDir.resolve("orphan-1.jar"), "OrphanPack", "acme.orphan",
+                null, "transform.acme_orphan", "EXECUTED", "", COPY_ALL);
 
         trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
                 ExpressionRegistry.withBuiltins(), new Sink())) {
             try {
                 assertEquals(List.of("orphan-1.jar"), mgr.rescan().get("rejected"));
-                assertTrue(com.gamma.pipeline.exec.PipelineNodeExecutors.get("transform.acme_orphan").isEmpty());
+                assertTrue(com.gamma.pipeline.exec.StepExecutors.get("transform.acme_orphan").isEmpty());
             } finally {
-                com.gamma.pipeline.exec.PipelineNodeExecutors.deregister("orphan-1.jar");
+                com.gamma.pipeline.exec.StepExecutors.deregister("orphan-1.jar");
             }
         }
     }
 
-    /** The positive twin: an executor for the pack's own declared kind loads and is what runs it. */
+    /** The positive twin: a Step for the pack's own declared kind loads and is what runs it. */
     @Test
-    void aPackExecutorForItsOwnDeclaredKindLoadsAndRuns(@TempDir Path work) throws Exception {
+    void aPackStepForItsOwnDeclaredKindLoadsAndRuns(@TempDir Path work) throws Exception {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
         Path packsDir = Files.createDirectories(work.resolve("packs"));
-        buildNodePackJar(work, packsDir.resolve("own-1.jar"), "OwnPack", "acme.own",
-                "transform.acme_own", "transform.acme_own");
+        buildStepPackJar(work, packsDir.resolve("own-1.jar"), "OwnPack", "acme.own",
+                "transform.acme_own", "transform.acme_own", "EXECUTED", "", COPY_ALL);
 
         trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
                 ExpressionRegistry.withBuiltins(), new Sink())) {
             try {
                 assertEquals(List.of("own-1.jar"), mgr.rescan().get("loaded"));
-                assertTrue(com.gamma.pipeline.exec.PipelineNodeExecutors.get("transform.acme_own").isPresent());
+                assertTrue(com.gamma.pipeline.exec.StepExecutors.get("transform.acme_own").isPresent());
                 assertEquals(List.of(1, 2, 3), shapeIds(com.gamma.pipeline.PipelineNode.of("n", "transform.acme_own",
-                        Map.of())), "the pack's executor shapes its own kind (keeps every row)");
+                        Map.of())), "the pack's Step shapes its own kind (keeps every row)");
             } finally {
                 com.gamma.pipeline.PipelineNodeTypes.deregister("own-1.jar");
-                com.gamma.pipeline.exec.PipelineNodeExecutors.deregister("own-1.jar");
+                com.gamma.pipeline.exec.StepExecutors.deregister("own-1.jar");
             }
         }
     }
@@ -436,8 +470,8 @@ class JobPackManagerTest {
     void aPackNodeTypeDeclaringLoweredIsRejectedWhole(@TempDir Path work) throws Exception {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
         Path packsDir = Files.createDirectories(work.resolve("packs"));
-        buildNodePackJar(work, packsDir.resolve("lowered-1.jar"), "LoweredPack", "acme.lowered",
-                "transform.acme_lowered", "transform.acme_lowered", "LOWERED");
+        buildStepPackJar(work, packsDir.resolve("lowered-1.jar"), "LoweredPack", "acme.lowered",
+                "transform.acme_lowered", "transform.acme_lowered", "LOWERED", "", COPY_ALL);
 
         Sink sink = new Sink();
         trustEveryJarIn(packsDir);
@@ -447,11 +481,134 @@ class JobPackManagerTest {
                 assertEquals(List.of("lowered-1.jar"), mgr.rescan().get("rejected"));
                 assertTrue(sink.types.contains("job.pack.rejected"));
                 assertFalse(com.gamma.pipeline.PipelineNodeTypes.isKnown("transform.acme_lowered"));
-                assertTrue(com.gamma.pipeline.exec.PipelineNodeExecutors.get("transform.acme_lowered").isEmpty(),
-                        "atomic: the executor is rolled back with the descriptor");
+                assertTrue(com.gamma.pipeline.exec.StepExecutors.get("transform.acme_lowered").isEmpty(),
+                        "atomic: the Step is rolled back with the descriptor");
             } finally {
                 com.gamma.pipeline.PipelineNodeTypes.deregister("lowered-1.jar");
-                com.gamma.pipeline.exec.PipelineNodeExecutors.deregister("lowered-1.jar");
+                com.gamma.pipeline.exec.StepExecutors.deregister("lowered-1.jar");
+            }
+        }
+    }
+
+    // ── S2-3: a pack Step's requires: grant, dry run and ceiling ─────────────────────────────
+
+    /**
+     * S2-3: a pack Step runs armed and in a dry run, and knows which. It writes {@code ctx.dryRun()} into its
+     * output and notifies through its declared {@code notifications} grant: armed, the host feed receives it;
+     * dry, the dry-run stand-in records it and the feed stays empty.
+     */
+    @Test
+    void aPackStepRunsArmedAndInADryRunAndKnowsWhich(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildStepPackJar(work, packsDir.resolve("dry-1.jar"), "DryPack", "acme.dry",
+                "transform.acme_dry", "transform.acme_dry", "EXECUTED", "\"notifications\"", """
+                        com.gamma.notify.NotificationAccess feed =
+                                ctx.services().get(com.gamma.notify.NotificationAccess.class);
+                        feed.notify(com.gamma.notify.Notification.create("step", "STEP_RUN", ctx.nodeId(),
+                                "from the step", "dry=" + ctx.dryRun(), "pack:step"));
+                        StepInput in = ctx.in();
+                        StepOutput out = ctx.emit("data", List.of(new TypeFlow.Column("id", "INTEGER"),
+                                new TypeFlow.Column("dry", "BOOLEAN")));
+                        while (in.next()) out.beginRow().append(in.getInt(in.column("id"))).append(ctx.dryRun()).endRow();
+                        """);
+
+        List<com.gamma.notify.Notification> feed = new CopyOnWriteArrayList<>();
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        platform.register("notifications", com.gamma.notify.NotificationAccess.class, n -> {
+            feed.add(n);
+            return java.util.Optional.of(n);
+        });
+        trustEveryJarIn(packsDir);
+        java.io.File db = com.gamma.util.DuckDbUtil.tempDbFile("steprun_");
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(platform),
+                ExpressionRegistry.withBuiltins(), new Sink());
+             java.sql.Connection conn = com.gamma.util.DuckDbUtil.openConnection(db);
+             java.sql.Statement st = conn.createStatement()) {
+            try {
+                assertEquals(List.of("dry-1.jar"), mgr.rescan().get("loaded"));
+                st.execute("CREATE TABLE parsed AS SELECT * FROM (VALUES (1,150),(2,50),(3,200)) t(id,amt)");
+                com.gamma.pipeline.PipelineGraph g = linear("DRY", "transform.acme_dry");
+
+                var dry = com.gamma.pipeline.exec.PipelineExecutor.dryRun(conn, g, "parse", "parsed");
+                assertEquals(List.of(true), distinct(st, dry.produced().get("n").get("data"), "dry"),
+                        "the dry run tells the Step it is one");
+                assertTrue(feed.isEmpty(), "a dry run's mutating service records instead of acting: " + feed);
+                st.execute("DROP TABLE \"" + dry.produced().get("n").get("data") + "\"");   // the preview's scratch
+
+                List<String> written = new java.util.ArrayList<>();
+                var coordinator = new com.gamma.pipeline.exec.BranchCommitCoordinator(
+                        new com.gamma.pipeline.exec.BranchCommitLog(work.resolve("commit.csv").toString()));
+                com.gamma.pipeline.exec.PipelineExecutor.execute(conn, g, "parse", "parsed", "b1", coordinator,
+                        (sink, table) -> written.add(table), () -> {});
+                assertEquals(1, written.size());
+                assertEquals(List.of(false), distinct(st, written.get(0), "dry"), "armed, the Step knows it is armed");
+                assertEquals(1, feed.size(), "armed, the declared grant reaches the real feed");
+                assertEquals("dry=false", feed.get(0).body());
+            } finally {
+                com.gamma.pipeline.PipelineNodeTypes.deregister("dry-1.jar");
+                com.gamma.pipeline.exec.StepExecutors.deregister("dry-1.jar");
+            }
+        } finally {
+            com.gamma.util.DuckDbUtil.deleteTempDb(db);
+        }
+    }
+
+    /** S2-3 (R4): a service the Step did not declare is invisible, though the host binds it. */
+    @Test
+    void aPackStepSeesNoServiceItDidNotDeclare(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildStepPackJar(work, packsDir.resolve("blind-1.jar"), "BlindPack", "acme.blind",
+                "transform.acme_blind", "transform.acme_blind", "EXECUTED", "", """
+                        if (ctx.services().find(com.gamma.notify.NotificationAccess.class).isPresent())
+                            throw new IllegalStateException("an undeclared service was visible");
+                        """ + COPY_ALL);
+
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        platform.register("notifications", com.gamma.notify.NotificationAccess.class, n -> java.util.Optional.of(n));
+        trustEveryJarIn(packsDir);
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(platform),
+                ExpressionRegistry.withBuiltins(), new Sink())) {
+            try {
+                assertEquals(List.of("blind-1.jar"), mgr.rescan().get("loaded"));
+                assertEquals(List.of(1, 2, 3), shapeIds(com.gamma.pipeline.PipelineNode.of("n", "transform.acme_blind",
+                        Map.of())), "the Step ran to completion and saw no notifications service");
+            } finally {
+                com.gamma.pipeline.PipelineNodeTypes.deregister("blind-1.jar");
+                com.gamma.pipeline.exec.StepExecutors.deregister("blind-1.jar");
+            }
+        }
+    }
+
+    /** S2-3: a Step requiring a service above the stage-2 data-path ceiling ({@code mail}), or an unbound
+     *  one, is rejected whole at load — even though the host binds {@code mail}. */
+    @Test
+    void aPackStepRequiringAServiceAboveTheCeilingIsRejectedWhole(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildStepPackJar(work, packsDir.resolve("mailer-1.jar"), "MailerPack", "acme.mailer",
+                "transform.acme_mailer", "transform.acme_mailer", "EXECUTED", "\"mail\"", COPY_ALL);
+        buildStepPackJar(work, packsDir.resolve("typo-1.jar"), "TypoPack", "acme.typo",
+                "transform.acme_typo", "transform.acme_typo", "EXECUTED", "\"notifcations\"", COPY_ALL);
+
+        PlatformServiceRegistry platform = new PlatformServiceRegistry();
+        platform.register("mail", com.gamma.notify.MailAccess.class, (com.gamma.notify.MailAccess) java.lang.reflect.Proxy
+                .newProxyInstance(getClass().getClassLoader(), new Class<?>[]{com.gamma.notify.MailAccess.class},
+                        (p, m, a) -> null));
+        trustEveryJarIn(packsDir);
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(platform),
+                ExpressionRegistry.withBuiltins(), new Sink())) {
+            try {
+                assertEquals(List.of("mailer-1.jar", "typo-1.jar"), mgr.rescan().get("rejected"));
+                assertTrue(mgr.inventory().get(0).get("cause").toString().contains("ceiling"), mgr.inventory().toString());
+                assertFalse(com.gamma.pipeline.PipelineNodeTypes.isKnown("transform.acme_mailer"), "rolled back whole");
+                assertTrue(com.gamma.pipeline.exec.StepExecutors.get("transform.acme_typo").isEmpty());
+            } finally {
+                for (String p : List.of("mailer-1.jar", "typo-1.jar")) {
+                    com.gamma.pipeline.PipelineNodeTypes.deregister(p);
+                    com.gamma.pipeline.exec.StepExecutors.deregister(p);
+                }
             }
         }
     }
@@ -461,15 +618,15 @@ class JobPackManagerTest {
     /**
      * 🔴 Only {@code JobService}'s Job path held the pack lease, so a pipeline whose Step is a pack's
      * node type could have that pack's classloader closed under it mid-run. The run blocks inside the walk
-     * (its sink write, after the pack's executor has run); an unload arriving then must DEFER the close
+     * (its sink write, after the pack's Step has run); an unload arriving then must DEFER the close
      * until the run finishes.
      */
     @Test
     void anUnloadDuringAnInFlightPipelineRunIsDeferredUntilTheRunCompletes(@TempDir Path work) throws Exception {
         assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
         Path packsDir = Files.createDirectories(work.resolve("packs"));
-        Path jar = buildNodePackJar(work, packsDir.resolve("lease-1.jar"), "LeasePack", "acme.lease",
-                "transform.acme_lease", "transform.acme_lease");
+        Path jar = buildStepPackJar(work, packsDir.resolve("lease-1.jar"), "LeasePack", "acme.lease",
+                "transform.acme_lease", "transform.acme_lease", "EXECUTED", "", COPY_ALL);
 
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
         java.util.concurrent.CountDownLatch inRun = new java.util.concurrent.CountDownLatch(1);
@@ -485,13 +642,7 @@ class JobPackManagerTest {
                 try (java.sql.Statement st = conn.createStatement()) {
                     st.execute("CREATE TABLE parsed AS SELECT * FROM (VALUES (1,150),(2,50),(3,200)) t(id,amt)");
                 }
-                com.gamma.pipeline.PipelineGraph g = new com.gamma.pipeline.PipelineGraph("LEASED", true,
-                        List.of(com.gamma.pipeline.PipelineNode.of("parse", "parser"),
-                                com.gamma.pipeline.PipelineNode.of("n", "transform.acme_lease", Map.of()),
-                                com.gamma.pipeline.PipelineNode.of("sink", "sink.persistent",
-                                        Map.of(com.gamma.pipeline.PipelineStores.CONFIG_STORE, "out"))),
-                        List.of(com.gamma.pipeline.PipelineEdge.data("parse", "n"),
-                                com.gamma.pipeline.PipelineEdge.data("n", "sink")));
+                com.gamma.pipeline.PipelineGraph g = linear("LEASED", "transform.acme_lease");
                 var coordinator = new com.gamma.pipeline.exec.BranchCommitCoordinator(
                         new com.gamma.pipeline.exec.BranchCommitLog(work.resolve("commit.csv").toString()));
 
@@ -516,16 +667,36 @@ class JobPackManagerTest {
                 proceed.countDown();
                 run.get(20, java.util.concurrent.TimeUnit.SECONDS);
                 assertFalse(mgr.isDraining("lease-1.jar"), "the close finishes once the run completes");
-                assertEquals(3, sinkRows.get(), "the walk completed correctly: the pack executor's 3 rows reached the sink");
+                assertEquals(3, sinkRows.get(), "the walk completed correctly: the pack Step's 3 rows reached the sink");
             } finally {
                 proceed.countDown();
                 pool.shutdownNow();
                 com.gamma.pipeline.PipelineNodeTypes.deregister("lease-1.jar");
-                com.gamma.pipeline.exec.PipelineNodeExecutors.deregister("lease-1.jar");
+                com.gamma.pipeline.exec.StepExecutors.deregister("lease-1.jar");
             }
         } finally {
             com.gamma.util.DuckDbUtil.deleteTempDb(db);
         }
+    }
+
+    /** {@code parse → n (<type>) → sink}. */
+    private static com.gamma.pipeline.PipelineGraph linear(String name, String type) {
+        return new com.gamma.pipeline.PipelineGraph(name, true,
+                List.of(com.gamma.pipeline.PipelineNode.of("parse", "parser"),
+                        com.gamma.pipeline.PipelineNode.of("n", type, Map.of()),
+                        com.gamma.pipeline.PipelineNode.of("sink", "sink.persistent",
+                                Map.of(com.gamma.pipeline.PipelineStores.CONFIG_STORE, "out"))),
+                List.of(com.gamma.pipeline.PipelineEdge.data("parse", "n"),
+                        com.gamma.pipeline.PipelineEdge.data("n", "sink")));
+    }
+
+    /** The distinct values of {@code column} in {@code table}. */
+    private static List<Object> distinct(java.sql.Statement st, String table, String column) throws Exception {
+        List<Object> out = new java.util.ArrayList<>();
+        try (java.sql.ResultSet rs = st.executeQuery("SELECT DISTINCT \"" + column + "\" FROM \"" + table + "\"")) {
+            while (rs.next()) out.add(rs.getObject(1));
+        }
+        return out;
     }
 
     /** Run {@code node} through {@code RowShaper.shape} over {@code src(id,amt)} = (1,150)(2,50)(3,200);
@@ -706,9 +877,8 @@ class JobPackManagerTest {
 
     /**
      * Compile a pack with an optional {@link com.gamma.pipeline.PipelineNodeType} ({@code nodeType}, or
-     * {@code null} for none) and a {@link com.gamma.pipeline.exec.PipelineNodeExecutor} for
-     * {@code executorKind} that copies every input row to {@code data} — so a hijacked filter is visible as
-     * "kept all three rows".
+     * {@code null} for none) and a raw-{@code Connection} {@link com.gamma.pipeline.exec.PipelineNodeExecutor}
+     * for {@code executorKind} — the seam a pack may no longer carry (D-2).
      */
     private static Path buildNodePackJar(Path work, Path jar, String cls, String packId,
                                          String nodeType, String executorKind) throws Exception {
@@ -751,6 +921,50 @@ class JobPackManagerTest {
         Map<String, String> services = new java.util.LinkedHashMap<>();
         if (nodeType != null) services.put("com.gamma.pipeline.PipelineNodeType", "com.acme.pack." + cls + "$Type");
         services.put("com.gamma.pipeline.exec.PipelineNodeExecutor", "com.acme.pack." + cls + "$Exec");
+        writeJar(jar, classes, packId, services);
+        return jar;
+    }
+
+    /**
+     * Compile a pack with an optional {@link com.gamma.pipeline.PipelineNodeType} ({@code nodeType}, or
+     * {@code null} for none) declaring {@code ExecutionMode.<mode>}, and a
+     * {@link com.gamma.pipeline.exec.StepExecutor} for {@code stepKind} that requires
+     * {@code [<requiresLiteral>]} and runs {@code body} (with {@code ctx} in scope).
+     */
+    private static Path buildStepPackJar(Path work, Path jar, String cls, String packId, String nodeType,
+                                         String stepKind, String mode, String requiresLiteral, String body)
+            throws Exception {
+        String src = """
+                package com.acme.pack;
+                import com.gamma.etl.TypeFlow;
+                import com.gamma.pipeline.PipelineNodeType;
+                import com.gamma.pipeline.exec.StepContext;
+                import com.gamma.pipeline.exec.StepExecutor;
+                import com.gamma.pipeline.exec.StepInput;
+                import com.gamma.pipeline.exec.StepOutput;
+                import java.util.List;
+                import java.util.Set;
+                public class %s {
+                    public static class Type implements PipelineNodeType {
+                        public String type() { return "%s"; }
+                        public java.util.Optional<com.gamma.pipeline.ExecutionMode> mode() {
+                            return java.util.Optional.of(com.gamma.pipeline.ExecutionMode.%s);
+                        }
+                    }
+                    public static class Step implements StepExecutor {
+                        public String type() { return "%s"; }
+                        public Set<String> requires() { return Set.of(%s); }
+                        public void execute(StepContext ctx) throws Exception {
+                            %s
+                        }
+                    }
+                }
+                """.formatted(cls, nodeType == null ? "unused" : nodeType, mode, stepKind, requiresLiteral, body);
+
+        Path classes = compile(work, "com/acme/pack/" + cls + ".java", src);
+        Map<String, String> services = new java.util.LinkedHashMap<>();
+        if (nodeType != null) services.put("com.gamma.pipeline.PipelineNodeType", "com.acme.pack." + cls + "$Type");
+        services.put("com.gamma.pipeline.exec.StepExecutor", "com.acme.pack." + cls + "$Step");
         writeJar(jar, classes, packId, services);
         return jar;
     }
@@ -844,8 +1058,10 @@ class JobPackManagerTest {
         Files.writeString(srcFile, src);
         Path classes = Files.createDirectories(stage.resolve("classes"));
 
+        // The engine's own code source, plus the running test classpath: a StepContext signature names
+        // inspecto-etl/inspecto-util types (TypeFlow, RunLog) that live in other jars.
         String apiCp = Path.of(JobTypeProvider.class.getProtectionDomain().getCodeSource().getLocation().toURI())
-                .toString();
+                + java.io.File.pathSeparator + System.getProperty("java.class.path");
         JavaCompiler jc = ToolProvider.getSystemJavaCompiler();
         try (StandardJavaFileManager fm = jc.getStandardFileManager(null, null, StandardCharsets.UTF_8)) {
             List<String> opts = List.of("-classpath", apiCp, "-d", classes.toString());

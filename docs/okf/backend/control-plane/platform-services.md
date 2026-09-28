@@ -98,6 +98,7 @@ granted"), and a `requires:` on it refuses registration naming the edition/flag.
 ```bash
 node tools/scaffold.mjs new job       --id acme.reconcile --name "Acme Reconcile"
 node tools/scaffold.mjs new processor --id acme.masker    --name "Acme Masker"
+node tools/scaffold.mjs new step      --id acme.score     --name "Acme Score"
 ```
 
 - **No archetype**, because archetypes resolve from a repository and this build is air-gapped: plain
@@ -106,8 +107,8 @@ node tools/scaffold.mjs new processor --id acme.masker    --name "Acme Masker"
 - **The engine coordinates are read out of `inspecto-engine/pom.xml` at generation time**, never
   hardcoded, so an artifactId or version change cannot leave the script emitting a dependency that
   does not resolve.
-- **`new step` and `new service` refuse** with a pointer to the slice that unlocks them, rather than
-  emitting a skeleton for a mount the engine cannot host.
+- **`new service` refuses** with a pointer to the slice that unlocks it (S3-1), rather than emitting a
+  skeleton for a mount the engine cannot host. `new step` opened at S2-3 (§7c).
 
 **`PackTestHarness`** (`com.gamma.job`, main scope) is the real deliverable: it fires one Run without
 booting the engine, applying the *same* registration-time `requires:` check, Parameter resolution,
@@ -169,7 +170,8 @@ the tests are in `JobPackManagerTest` and `PipelineNodeTypesPackOverlayTest`. Th
 inside its sink write (after the pack executor ran), unloads the pack, and asserts the close is deferred AND,
 since 2026-09-28, that the resumed walk still delivers the pack executor's 3 rows to the sink.
 
-1. **A pack executor may run only its own pack's node type.** `PipelineNodeTypes.register` already
+1. **A pack executor may run only its own pack's node type.** (Since S2-3 the rule lives in
+   `StepExecutors.register`, the only pack-facing execution seam; §7c.) `PipelineNodeTypes.register` already
    refused a pack node type that reuses a built-in name, but `PipelineNodeExecutors.register` did not.
    `RowShaper.shape` checks for a contributed executor *before* the built-in chain, so a jar in the
    packs dir could change how `transform.filter` ran for every pipeline. The registry now refuses a
@@ -232,13 +234,74 @@ offline. Under D-4 the Arrow bridge is therefore out of S2-3's scope. S2-3's `St
 stream typed values straight to the engine-owned appender, not a boxed row. Anything SQL can express
 stays a built-in `LOWERED` verb.
 
+## 7c. S2-3 — the pack Step seam (as built, 2026-09-28)
+
+A pack runs a node type through **`StepExecutor`** (`com.gamma.pipeline.exec`): `type()`, `requires()`,
+`timeout()`, `execute(StepContext)`. `StepTypeProvider` is not a class; under D-1 it is only the name of
+the pack-facing pair, `PipelineNodeType` + `StepExecutor`.
+
+1. **D-2: a pack may not carry a raw-`Connection` executor.** `JobPackManager` rejects a pack whose
+   `META-INF/services` lists a `PipelineNodeExecutor`, naming `StepExecutor` in the cause. The pack
+   overlay on `PipelineNodeExecutors` is gone, so that registry is classpath-only. The S2-0 rules (not a
+   built-in, only the same pack's node type, first pack wins) moved to `StepExecutors.register`.
+2. **`StepContext` has no connection.** `in()` is a forward cursor with typed getters (`getLong`,
+   `getString`, `getDate`, …, JDBC-style `wasNull()`). The engine issues its one statement,
+   `SELECT * FROM <input>`; a Step writes no SQL at all, so there is nothing for `SqlGuard` to check. This is
+   stricter than the design's "through `SqlGuard`". `emit(rel)` and `emit(rel, columns)` return a typed
+   appender writer. `copyRow(in)` passes the current row through. The engine refuses a relation the node type
+   does not `emits()`. Explicit columns take only `BOOLEAN`/`INTEGER`/`BIGINT`/`DOUBLE`/`VARCHAR`/`DATE`/
+   `TIMESTAMP` (a closed set, so no author text reaches DDL). `copyRow` also carries `DECIMAL`. An input
+   of any other type must be cast upstream. The context also has `attributes()`, `schema()`, `log()`,
+   `signals()`, `dryRun()` and `services()`. Every data call throws once the Step has returned, failed or
+   timed out.
+3. **`requires:` resolves at pack load**, fail-closed, against the loading Space's
+   `PlatformServiceRegistry` (the same strict rule as a pack Job Type). An unknown id, or any id with no
+   registry wired, rejects the pack. The stage-2 ceiling is `StepExecutors.CEILING = {mail}`: a Step
+   requiring `mail` rejects the pack even when the host binds it. No Dataset-writing service exists yet.
+   The grant is bound to the registration, so a pack Step runs with the services of the Space that loaded
+   it. A classpath `StepExecutor` has no loading Space and is granted nothing. A dry run wraps the grant in
+   `DryRunServices`, as a Job's is. `signals()` only logs in a dry run.
+4. **Dry run.** `RowShaper.ExecutionContext` gained `dryRun`. `PipelineExecutor.dryRun` and
+   `ComponentPreview` pass `ExecutionContext.NONE.asDryRun()`. Every armed path passes a context with
+   `dryRun = false`, including `NONE` itself, which the ingest lane uses.
+5. **Failure grain.** Any throw, a timeout or a failed flush drops **every table the Step created** and
+   throws `StepFailure` (a `RuntimeException`) with `code()` `STEP_FAILED` / `STEP_TIMEOUT` /
+   `STEP_DISABLED`. The batch fails through the existing path. A declared `data` or `reject:*` relation the
+   Step never wrote is created **empty** with the input's columns, so a zero count reaches provenance
+   instead of a missing branch.
+6. **Reject streams.** `PipelineRel.REJECT_PREFIX` = `reject:`. `ConservationCheck.relCounts` tags a
+   `reject:<reason>` relation as diverted, as it does the four built-in reject reasons.
+7. **Watchdog (D-7).** `execute` runs on its own virtual thread. The deadline is `timeout()` (default
+   5 min), overridden by the node's `timeout_seconds` attribute (decimals allowed), capped by
+   `-Dpipeline.step.timeoutCeilingSeconds` (default 1800). On expiry the context closes, the input
+   statement is `cancel()`ed and the thread is interrupted. A thread still alive 1 s later is
+   **abandoned**: it keeps its pack pinned, because the thread holds its own `PackRunLeases` lease for its
+   whole life; the kind is disabled until its pack is deregistered (replaced or removed); and a CRITICAL
+   `pipeline.step.abandoned` Signal is emitted. A pure-Java loop that ignores interrupts cannot be killed
+   on this JVM. ⚠ An abandoned thread may still hold appenders on tables the teardown drops; that is the
+   honest limit.
+8. 🔴 **A DuckDB appender is thread-confined.** Closed from another thread it refuses to flush, and the
+   rows are silently lost. The Step's own thread therefore closes its appenders before it signals done.
+9. **Cost.** `BridgeSpikeBenchmark` gained variant **S**: the V2 no-op as a real `StepExecutor` through
+   `StepRunner`. It asserts that S's node time is within 1.5× of V2's. On 2026-09-28, at 2M rows × 10
+   columns and 3 runs, S took 5,808 ms and V2 took 6,254 ms: the seam adds no overhead to the bridge.
+10. **Scaffold.** `node tools/scaffold.mjs new step` generates a pack (template `tools/templates/step/`):
+    an `EXECUTED` node type emitting `data` + `reject:missing`, a `StepExecutor`, both service files, and a
+    test that runs it through `RowShaper.shape`. `ScaffoldTemplatesTest.theStepTemplateCompilesLoadsAndRuns`
+    compiles it, loads it through `JobPackManager` and runs it.
+
+Tests: `StepRunnerTest` (armed vs dry run, throw ⇒ no tables, undeclared emit, `reject:` tagging, empty
+declared relation, deadline kill, abandon ⇒ disable ⇒ re-enable, deadline resolution, closed context),
+`JobPackManagerTest` (D-2, built-in/orphan/own Step, `LOWERED`, armed and dry run with a real grant,
+undeclared service invisible, ceiling and unknown id, the lease), `PipelineNodeTypesPackOverlayTest`,
+`ScaffoldTemplatesTest`. Each was mutation-checked red.
+
 ## 8. What is still open
 
-Stage 2 (the open Step-kind registry, `LOWERED`/`EXECUTED`) and Stage 3 (pack-contributed services)
-are **not built**; Stage 2 stays gated on the branch-aware executor becoming the armed path. The open
-items live in [`BACKLOG.md`](../../../BACKLOG.md) §4 under *Platform Services*. Neither side has
-timeout or cancellation, which is hardest for a future `EXECUTED` Step (it would stall a poll cycle):
-a watchdog is mandatory scope for that slice, and a Job-side watchdog is a recorded gap.
+Stage 2 is built through S2-3. S2-4 (`graphLaneCarries` admits intervening nodes) and S2-5 (recipe
+spelling and catalog visibility) remain, as does Stage 3 (pack-contributed services). The open items
+live in [`BACKLOG.md`](../../../BACKLOG.md) §4 under *Platform Services*. A Job-side watchdog is still a
+recorded gap; the Step watchdog is §7c.
 
 Related: [Job vs Pipeline Step](job-vs-step.md) · [Jobs & Scheduling](jobs.md) ·
 [Signal backbone](signal-backbone.md) · [API stability policy](api-stability.md) ·

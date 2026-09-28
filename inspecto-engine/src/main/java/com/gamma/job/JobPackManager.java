@@ -6,7 +6,8 @@ import com.gamma.signal.Severity;
 import com.gamma.pipeline.PipelineNodeType;
 import com.gamma.pipeline.PipelineNodeTypes;
 import com.gamma.pipeline.exec.PipelineNodeExecutor;
-import com.gamma.pipeline.exec.PipelineNodeExecutors;
+import com.gamma.pipeline.exec.StepExecutor;
+import com.gamma.pipeline.exec.StepExecutors;
 import com.gamma.pipeline.exec.PackRunLeases;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +32,7 @@ import java.util.TreeMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.ServiceConfigurationError;
 import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
@@ -48,8 +50,10 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_MODIFY;
  * Hot-deployable Job Packs (R8, {@code docs/job-framework-design.md} §12). A Pack is a single jar
  * dropped into {@code -Djobs.packs.dir} bundling one or more providers plus their shaded deps —
  * {@link JobTypeProvider}s (SPI + {@link JobTypeMeta}), {@link ExpressionProvider}s, and since
- * 2026-08-31 {@link PipelineNodeType}s and {@link PipelineNodeExecutor}s (pipeline spec gap 7, whose
- * remaining half was exactly that a contributed node type had to sit on the classpath at boot), and since
+ * 2026-08-31 {@link PipelineNodeType}s with their executors (pipeline spec gap 7, whose remaining half was
+ * exactly that a contributed node type had to sit on the classpath at boot) — since S2-3 a pack's executor
+ * is a {@link StepExecutor}, and a pack carrying a raw-Connection {@link PipelineNodeExecutor} is rejected
+ * (D-2) — and since
  * 2026-09-25 {@link ParserPlugin}s (the drop-in parser jar, parser-plugins-trust-design.md slice P2). A pack
  * carrying only ONE of those kinds is valid; the property keeps its {@code jobs.} name so no deployment's
  * configuration changes. Each jar loads in its own parent-first
@@ -291,18 +295,25 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             List<PipelineNodeType> nodeTypes = new ArrayList<>();
             for (PipelineNodeType t : ServiceLoader.load(PipelineNodeType.class, loader))
                 if (t.getClass().getClassLoader() == loader) nodeTypes.add(t);
-            List<PipelineNodeExecutor> nodeExecutors = new ArrayList<>();
+            // ⛔ D-2 (S2-3): a pack may not carry the raw-Connection executor — it would write third-party SQL
+            // on the batch connection (R2). The pack is rejected whole; its Steps implement StepExecutor.
             for (PipelineNodeExecutor e : ServiceLoader.load(PipelineNodeExecutor.class, loader))
-                if (e.getClass().getClassLoader() == loader) nodeExecutors.add(e);
+                if (e.getClass().getClassLoader() == loader)
+                    throw new IllegalStateException("pack carries a raw-Connection PipelineNodeExecutor ("
+                            + e.getClass().getName() + " for '" + e.type() + "') — that seam is classpath-only; "
+                            + "implement com.gamma.pipeline.exec.StepExecutor instead");
+            List<StepExecutor> steps = new ArrayList<>();
+            for (StepExecutor e : ServiceLoader.load(StepExecutor.class, loader))
+                if (e.getClass().getClassLoader() == loader) steps.add(e);
             // The fifth kind (parser-plugins-trust-design.md slice P2, operator D1 2026-09-25): a pack may
             // contribute ParserPlugins — the drop-in parser jar, through this one loader and trust gate.
             List<ParserPlugin> parsers = new ArrayList<>();
             for (ParserPlugin p : ServiceLoader.load(ParserPlugin.class, loader))
                 if (p.getClass().getClassLoader() == loader) parsers.add(p);
-            if (providers.isEmpty() && exprProviders.isEmpty() && nodeTypes.isEmpty() && nodeExecutors.isEmpty()
+            if (providers.isEmpty() && exprProviders.isEmpty() && nodeTypes.isEmpty() && steps.isEmpty()
                     && parsers.isEmpty())
                 throw new IllegalStateException(
-                        "no JobTypeProvider, ExpressionProvider, PipelineNodeType, PipelineNodeExecutor or "
+                        "no JobTypeProvider, ExpressionProvider, PipelineNodeType, StepExecutor or "
                                 + "ParserPlugin in META-INF/services");
 
             List<String> ids = new ArrayList<>();
@@ -327,7 +338,9 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             // owns) must reject the pack BEFORE any executor is registered, and the catch below takes both
             // overlays back — so a pack is never half-registered into the pipeline vocabulary.
             for (PipelineNodeType t : nodeTypes) PipelineNodeTypes.register(t, name);
-            for (PipelineNodeExecutor e : nodeExecutors) PipelineNodeExecutors.register(e, name);
+            // S2-3: a Step's requires: resolves here, fail-closed and pack-atomically, against this Space's
+            // Platform Service registry — the same check a pack Job Type gets — under the stage-2 ceiling.
+            for (StepExecutor e : steps) StepExecutors.register(e, name, stepGrant(e));
             // Parsers.register refuses a built-in/classpath id, another pack's id or ingester; the catch
             // below deregisters every kind, so a colliding parser rejects the pack whole.
             for (ParserPlugin p : parsers) Parsers.register(p, name);
@@ -352,7 +365,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
             registry.deregister(name);                                  // roll back any partial registration
             expressions.deregister(name);                               // all five registries, or the pack
             PipelineNodeTypes.deregister(name);                         // half-loads — a refused node type
-            PipelineNodeExecutors.deregister(name);                     // must not leave an executor behind
+            StepExecutors.deregister(name);                             // must not leave a Step behind
             Parsers.deregister(name);                                   // ... nor a parser (the fifth kind)
             if (loader != null) try { loader.close(); } catch (IOException ignore) { /* best effort */ }
             if (staged != null) try { Files.deleteIfExists(staged); } catch (IOException ignore) { /* best effort */ }
@@ -369,6 +382,28 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         }
     }
 
+    /**
+     * A pack Step's grant (S2-3): its {@code requires:} ids resolved against this Space's Platform Service
+     * registry. Refuses an id above the stage-2 data-path ceiling ({@link StepExecutors#CEILING}), an unknown
+     * id, and any id when no registry is wired — the strict rule a pack Job Type gets. A dry run wraps the
+     * grant exactly as a Job's is wrapped ({@link DryRunServices}).
+     */
+    private StepExecutors.Grant stepGrant(StepExecutor step) {
+        Set<String> ids = Set.copyOf(step.requires());
+        for (String id : ids) {
+            if (StepExecutors.CEILING.contains(id))
+                throw new IllegalStateException("Step '" + step.type() + "' requires '" + id + "', which a mid-walk "
+                        + "Step may not be granted (the stage-2 data-path ceiling: " + StepExecutors.CEILING + ")");
+            PlatformServiceRegistry platform = registry.platform();
+            if (platform == null || !platform.has(id))
+                throw new IllegalStateException("Step '" + step.type() + "' requires unavailable Platform Service '"
+                        + id + "' (available: " + (platform == null ? Set.of() : platform.ids()) + ")");
+        }
+        if (ids.isEmpty()) return StepExecutors.Grant.NONE;
+        PlatformServices granted = registry.platform().grant(ids);
+        return (dryRun, log) -> dryRun ? DryRunServices.wrap(granted, log) : granted;
+    }
+
     /** Deregister a pack's types immediately, but only close its loader (release the jar file handle)
      *  once no Run is still executing its code — see {@link #acquireRun}/{@link #releaseRun}. */
     private void unload(String name) {
@@ -379,7 +414,7 @@ final class JobPackManager implements AutoCloseable, PackRunLeases.Leaser {
         // ⚠ A stored pipeline naming an unloaded node type stops loading — the same exposure a Job typed
         // on an unloaded pack already has, which is why a pack is normally REPLACED rather than removed.
         PipelineNodeTypes.deregister(name);
-        PipelineNodeExecutors.deregister(name);
+        StepExecutors.deregister(name);
         Parsers.deregister(name);   // a Pipeline naming its ingester then fails its next Run with a named error
         log.info("[PACKS] unloaded {} ({}): {}{}", pack.id(), name, removed,
                 removedTokens.isEmpty() ? "" : " + tokens " + removedTokens);

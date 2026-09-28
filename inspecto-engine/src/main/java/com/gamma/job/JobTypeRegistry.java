@@ -30,6 +30,11 @@ final class JobTypeRegistry {
      *  Built-ins are the one exception when it is {@code null} (see {@link #register}). */
     private final PlatformServiceRegistry platform;
 
+    /** The Platform Service registry {@code requires:} resolves against; {@code null} when none is wired. */
+    PlatformServiceRegistry platform() {
+        return platform;
+    }
+
     JobTypeRegistry() {
         this(null);
     }

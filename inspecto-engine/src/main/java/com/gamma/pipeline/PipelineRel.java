@@ -75,6 +75,24 @@ public final class PipelineRel {
     /** Records dropped by {@code transform.dedup.*}. */
     public static final String DUPLICATE = "duplicate";
 
+    /**
+     * Prefix for a contributed Step's declared reject streams, e.g. {@code reject:bad_score} (S2-3). An
+     * {@code EXECUTED} Step rejects rows by emitting them to a {@code reject:<reason>} relation it declares
+     * in {@link PipelineNodeType#emits()}, never by throwing — and {@code ConservationCheck} tags the
+     * relation as diverted, as it does the four built-in reject reasons above.
+     */
+    public static final String REJECT_PREFIX = "reject:";
+
+    /** Build a named reject relationship: {@code reject("bad_score")} → {@code "reject:bad_score"}. */
+    public static String reject(String reason) {
+        return REJECT_PREFIX + reason;
+    }
+
+    /** Whether {@code rel} is a named reject stream ({@code reject:*}). */
+    public static boolean isReject(String rel) {
+        return rel != null && rel.startsWith(REJECT_PREFIX) && rel.length() > REJECT_PREFIX.length();
+    }
+
     /** Prefix for operator-defined content-routing branches, e.g. {@code route:emea}. */
     public static final String ROUTE_PREFIX = "route:";
 

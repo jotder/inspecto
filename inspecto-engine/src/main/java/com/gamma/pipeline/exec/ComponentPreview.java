@@ -103,7 +103,8 @@ public final class ComponentPreview {
             // connection, so the previewed execution is the same execution, statement for statement.
             SqlRecorder recorder = new SqlRecorder();
             List<RowShaper.Relation> produced =
-                    RowShaper.shape(recorder.wrap(conn), node, INPUT, "preview_" + node.id());
+                    RowShaper.shape(recorder.wrap(conn), node, INPUT, "preview_" + node.id(),
+                            RowShaper.ReferenceResolver.NONE, RowShaper.ExecutionContext.NONE.asDryRun());   // S2-3
 
             List<RelationPreview> out = new ArrayList<>();
             for (RowShaper.Relation r : produced) {

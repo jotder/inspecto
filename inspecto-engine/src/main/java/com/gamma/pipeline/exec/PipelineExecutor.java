@@ -366,8 +366,9 @@ public final class PipelineExecutor {
                 for (PipelineEdge e : inbound) inputs.add(tableOf(e, produced));
                 produced.put(nodeId, index(RowShaper.merge(conn, node, inputs, nodeId)));
             } else if (isShapeable(node.type())) {
+                // S2-3: a dry run — a contributed Step sees dryRun() and its mutating services record.
                 produced.put(nodeId, index(RowShaper.shape(conn, node, tableOf(inbound.get(0), produced),
-                        nodeId, references)));
+                        nodeId, references, RowShaper.ExecutionContext.NONE.asDryRun())));
             } else if (!PipelineNodeTypes.isCategory(node.type(), NodeCategory.CONTROL)) {
                 // e.g. `enrichment` — a post-commit Stage-2 job, not a walk step. Reached, not run: record
                 // it so the preview names it instead of answering as if the branch simply ended here.

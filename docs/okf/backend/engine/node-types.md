@@ -74,10 +74,12 @@ time**. The seam was descriptor-only in the literal sense: you could describe a 
   `tools/templates/nodetype/`). ⚠ Building it outside the reactor resolves `inspecto-engine` from
   `~/.m2`, so install a current one first (`mvn -o install -DskipTests -pl inspecto-engine -am`) or it
   fails with *"cannot find symbol: class PipelineNodeExecutor"*.
-* ⛔ **`scaffold.mjs new step` remains GATED and is a different thing** — that kind is *pack-hosted*
-  (isolated classloader, `StepContext`, services ceiling, watchdog) and is owned by platform-services
-  S2-3. A `nodetype` deploys on the engine **classpath**, like a Consignment Processor: it runs today,
-  and it gets no hot deploy, no isolated classloader and no watchdog.
+* ⛔ **`scaffold.mjs new step` is a different thing** — that kind is *pack-hosted* (isolated
+  classloader, `StepExecutor` + `StepContext`, services ceiling, watchdog), shipped by platform-services
+  S2-3 (2026-09-28, [Platform Services §7c](../control-plane/platform-services.md)). A `nodetype` deploys
+  on the engine **classpath**, like a Consignment Processor: it gets no hot deploy, no isolated classloader
+  and no watchdog. ⛔ Since S2-3 (D-2) a **pack** carrying a `PipelineNodeExecutor` is rejected whole;
+  the raw-`Connection` executor is classpath-only.
 * The in-repo test fixture `FakeNodeExecutor` (`inspecto-engine/src/test`) contributes `transform.take`
   through the executor service file. ⚠ It deliberately registers **no descriptor**, and that is a finding worth
   keeping: **the served node-type catalog is a COMMITTED CONTRACT** (`NodeAttributesContractTest` vs

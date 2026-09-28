@@ -2,7 +2,7 @@
 
 **Row:** `BACKLOG.md` §3.2 *Platform Services Stage 2 / 3* (P2).
 **Owner concept:** [`okf/backend/control-plane/platform-services.md`](../okf/backend/control-plane/platform-services.md).
-**Status:** written 2026-09-24. **All 10 decisions in §7 decided 2026-09-28 (operator: every recommendation accepted; D-10 deferred).** S2-0 ✅ shipped (`6edebc398`, 2026-09-24); S2-1 ✅ shipped 2026-09-28; S2-2 ✅ measured 2026-09-28 (§5.2); S2-3…S2-5 and Stage 3 are still in flight — this doc stays the plan for them.
+**Status:** written 2026-09-24. **All 10 decisions in §7 decided 2026-09-28 (operator: every recommendation accepted; D-10 deferred).** S2-0 ✅ shipped (`6edebc398`, 2026-09-24); S2-1 ✅ shipped 2026-09-28; S2-2 ✅ measured 2026-09-28 (§5.2); S2-3 ✅ built 2026-09-28 (§5.3); S2-4, S2-5 and Stage 3 are still in flight — this doc stays the plan for them.
 **Scope fence:** new Step Processors are ⛔ **ON HOLD** (operator, 2026-09-23). This document designs the
 *registry and SPI* a Step kind is contributed through. It adds no processor to the catalog; the only Step
 it builds is a test-scope no-op for the S2-2 spike.
@@ -186,7 +186,7 @@ Each slice is independently green; unit tests per change (`-pl inspecto-engine -
 | **S2-0b** ✅ `6edebc398` | A walk pins the owning pack of every contributed node it will execute | new test: load a pack node, start a walk that blocks inside it, rescan with the jar removed — the classloader close is deferred until the walk ends; without the pin the step fails with a linkage error (the reproduction) |
 | **S2-1** ✅ 2026-09-28 | `mode()` on `PipelineNodeType`; built-ins `LOWERED`; a pack `LOWERED` rejected; a mode-less contributed type refused at arming | every committed pipeline arms identically (existing suites); regenerate the node-attributes contract if `mode` is served; `NodeAttributesContractTest` green |
 | **S2-2** ✅ 2026-09-28 | **Bridge spike** — measurement only, test scope, behind a system property, excluded from the default suite | see §5.1; results and conclusion in §5.2 (`BridgeSpikeBenchmark`) |
-| **S2-3** | `StepExecutor` + `StepContext` + `requires:` + dry-run + failure mapping + watchdog; pack raw-`Connection` executors rejected; `scaffold.mjs new step` unlocked | a pack Step runs armed and in a dry run (and knows which); a throwing Step leaves no node tables and fails the batch; a `reject:` emit is tagged as a reject stream by `ConservationCheck`; a sleeping Step is killed at its deadline with `STEP_TIMEOUT`; an undeclared service is invisible; `ScaffoldTemplatesTest` compiles and loads the new template |
+| **S2-3** ✅ 2026-09-28 (§5.3) | `StepExecutor` + `StepContext` + `requires:` + dry-run + failure mapping + watchdog; pack raw-`Connection` executors rejected; `scaffold.mjs new step` unlocked | a pack Step runs armed and in a dry run (and knows which); a throwing Step leaves no node tables and fails the batch; a `reject:` emit is tagged as a reject stream by `ConservationCheck`; a sleeping Step is killed at its deadline with `STEP_TIMEOUT`; an undeclared service is invisible; `ScaffoldTemplatesTest` compiles and loads the new template |
 | **S2-4** | `graphLaneCarries` admits intervening nodes | `IngestLaneFlagTest`; the whole suite under `-Dingest.lane=graph` with zero refusals (the Row 15 parity gate, re-run); dedup / join / summarize between map and sink produce the same rows as today's at-rest run |
 | **S2-5** | Recipe spelling for a contributed kind (D-5) and catalog visibility (D-6) | `RecipeCompilerTest` round trip; contract JSONs regenerated in the same change |
 | **S3-1** | `ServiceProvider` via packs; overlay registry; collision rejects the pack; mandatory dry-run stand-in; `new service` unlocked | a service from pack A consumed by a Job in pack B; a colliding pack rejected whole with nothing left registered; a dry run of a Job using a contributed mutating service records, does not act |
@@ -275,6 +275,36 @@ and at 50 columns, mixed BIGINT, VARCHAR (one nullable), DOUBLE, DATE, TIMESTAMP
 * **D-7 watchdog (5 min default).** At the measured rate, one node gets through ~48M rows at 10
   columns, or ~6.4M rows at 50, before the default deadline. That is enough for a Consignment-sized
   batch. The 30 min ceiling covers ~6× that.
+
+### 5.3 S2-3 — as built (2026-09-28)
+
+As-built facts are in the owner concept, [`platform-services.md`](../okf/backend/control-plane/platform-services.md)
+§7c. The design calls this slice made where §4 left room:
+
+1. **`in()` carries no author SQL at all.** §4 said "through `SqlGuard`, as `ConsignmentReader` does". The
+   built reader is a typed cursor over the one statement the engine issues, `SELECT * FROM <input>`. A
+   Step cannot filter or aggregate in SQL, which is consistent with §5.2: anything SQL can express stays
+   `LOWERED`. The engine holds the statement, so the watchdog can `cancel()` it.
+2. **`requires()` and `timeout()` live on `StepExecutor`, not on the descriptor.** This keeps
+   `PipelineNodeType`, which the palette serves, unchanged, so no contract regenerates.
+3. **The grant is bound when the pack loads**, against the loading Space's registry. Node-type registries
+   are process-wide and a pack's kinds belong to the Space that loaded them, so no per-walk service plumbing
+   was added to the three walk callers. A classpath `StepExecutor` is granted nothing.
+4. **The stage-2 ceiling is `{mail}`.** No Dataset-writing service exists yet, so that half of the ceiling
+   has nothing to deny.
+5. **Declared `data` / `reject:*` relations the Step never wrote are produced empty**, so a branch reads
+   zero instead of disappearing.
+6. **In a dry run, `signals()` logs instead of emitting.** An emitted Signal can fire `on_signal` Jobs,
+   which a preview must not do.
+7. **`ComponentPreview` counts as a dry run** as well as `PipelineExecutor.dryRun`.
+8. **`ConservationCheck.imbalances` does not treat a Step as conserving.** A contributed kind may
+   aggregate or amplify. Only `relCounts` learned the `reject:` prefix.
+9. **Abandon grace is 1 s** after the interrupt; it is not configurable.
+
+**S2-4 was not started with S2-3.** Its gate is a full-suite parity run under `-Dingest.lane=graph` (the
+Row 15 gate), and it changes ingest behaviour: `prepare()` refuses dedup/join/summarize for the graph
+lane, and the ingest lane passes no reference or run context (`ReferenceResolver.NONE`,
+`ExecutionContext.NONE`). So it is its own slice, not a small follow-on.
 
 ## 6. Deliberately not designed here
 

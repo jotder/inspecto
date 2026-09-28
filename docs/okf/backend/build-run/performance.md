@@ -257,6 +257,12 @@ The bridge costs ~0.6–0.9 µs per cell. That is the same order as the Java CSV
 with cells the same way. The full method and the conclusions are in
 [Platform Services §7b](../control-plane/platform-services.md#7b-s2-2--the-bridge-spike-measured-2026-09-28).
 
+S2-3 added variant **S**: the V2 no-op as a real `StepExecutor`, run through `StepRunner` with its own
+thread, watchdog and engine-owned appender. The harness asserts that S's node time is within 1.5× of
+V2's. On 2026-09-28, at 2M rows × 10 columns and 3 runs, S took 5,808 ms against V2's 6,254 ms. The
+seam adds nothing to the bridge. That day's host was about twice as fast as the S2-2 run: V2 came in at
+27.9× fused, not 32×.
+
 Reproduce:
 
 ```

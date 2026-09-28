@@ -1,15 +1,16 @@
 package com.gamma.pipeline;
 
-import com.gamma.pipeline.exec.PipelineNodeExecutor;
-import com.gamma.pipeline.exec.PipelineNodeExecutors;
+import com.gamma.pipeline.exec.StepContext;
+import com.gamma.pipeline.exec.StepExecutor;
+import com.gamma.pipeline.exec.StepExecutors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * The pack overlay on both node registries (pipeline spec gap 7): a hot-deployed pack may contribute a
- * node type and/or its executor, keyed by the owning jar, and an unload takes back exactly that pack's
+ * The pack overlay on the node-type and Step registries (pipeline spec gap 7, S2-3): a hot-deployed pack
+ * may contribute a node type and/or the Step that runs it, keyed by the owning jar, and an unload takes back exactly that pack's
  * contributions.
  *
  * <p>⚠ These tests mutate process-wide static registries, so every one of them deregisters in
@@ -24,21 +25,16 @@ class PipelineNodeTypesPackOverlayTest {
     /** A minimal contributed type — only {@code type()} is required; the rest defaults. */
     private record Contributed(String type) implements PipelineNodeType {}
 
-    private record ContributedExec(String type) implements PipelineNodeExecutor {
-        @Override
-        public java.util.List<com.gamma.pipeline.exec.RowShaper.Relation> shape(
-                java.sql.Connection conn, PipelineNode node, String input, String outPrefix,
-                com.gamma.pipeline.exec.RowShaper.ReferenceResolver references) {
-            return java.util.List.of();
-        }
+    private record ContributedStep(String type) implements StepExecutor {
+        @Override public void execute(StepContext ctx) {}
     }
 
     @AfterEach
     void cleanup() {
         PipelineNodeTypes.deregister(OWNER);
         PipelineNodeTypes.deregister(OTHER);
-        PipelineNodeExecutors.deregister(OWNER);
-        PipelineNodeExecutors.deregister(OTHER);
+        StepExecutors.deregister(OWNER);
+        StepExecutors.deregister(OTHER);
     }
 
     @Test
@@ -101,42 +97,42 @@ class PipelineNodeTypesPackOverlayTest {
     }
 
     @Test
-    void aPackExecutorRegistersAndUnloadsToo() {
-        assertTrue(PipelineNodeExecutors.get("transform.acme").isEmpty());
+    void aPackStepRegistersAndUnloadsToo() {
+        assertTrue(StepExecutors.get("transform.acme").isEmpty());
         PipelineNodeTypes.register(new Contributed("transform.acme"), OWNER);
-        PipelineNodeExecutors.register(new ContributedExec("transform.acme"), OWNER);
-        assertTrue(PipelineNodeExecutors.get("transform.acme").isPresent());
-        PipelineNodeExecutors.deregister(OWNER);
-        assertTrue(PipelineNodeExecutors.get("transform.acme").isEmpty());
+        StepExecutors.register(new ContributedStep("transform.acme"), OWNER, null);
+        assertTrue(StepExecutors.get("transform.acme").isPresent());
+        StepExecutors.deregister(OWNER);
+        assertTrue(StepExecutors.get("transform.acme").isEmpty());
     }
 
     /**
-     * S2-0: a pack may NOT specialise a built-in verb. {@code RowShaper} consults this registry before its
-     * built-in chain, so a pack executor for {@code transform.dedup} would change how every pipeline
-     * dedups. Both registries now refuse a built-in; a classpath provider (an edition) still may.
+     * S2-0: a pack may NOT specialise a built-in verb. {@code RowShaper} consults the Step registry before its
+     * built-in chain, so a pack Step for {@code transform.dedup} would change how every pipeline dedups. Both
+     * registries refuse a built-in; a classpath provider (an edition) still may.
      */
     @Test
-    void aPackExecutorMayNotSpecialiseABuiltInVerb() {
+    void aPackStepMayNotSpecialiseABuiltInVerb() {
         String type = "transform.dedup";
-        boolean hadOne = PipelineNodeExecutors.get(type).isPresent();
+        boolean hadOne = StepExecutors.get(type).isPresent();
         IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> PipelineNodeExecutors.register(new ContributedExec(type), OWNER));
+                () -> StepExecutors.register(new ContributedStep(type), OWNER, null));
         assertTrue(ex.getMessage().contains("built-in"), ex.getMessage());
-        assertEquals(hadOne, PipelineNodeExecutors.get(type).isPresent(), "the refusal left nothing behind");
+        assertEquals(hadOne, StepExecutors.get(type).isPresent(), "the refusal left nothing behind");
     }
 
-    /** S2-0: an executor must run a node type the SAME pack declared — not another pack's, not nobody's. */
+    /** S2-0: a Step must run a node type the SAME pack declared — not another pack's, not nobody's. */
     @Test
-    void aPackExecutorMustRunItsOwnPacksNodeType() {
+    void aPackStepMustRunItsOwnPacksNodeType() {
         assertThrows(IllegalStateException.class,
-                () -> PipelineNodeExecutors.register(new ContributedExec("transform.acme"), OWNER),
+                () -> StepExecutors.register(new ContributedStep("transform.acme"), OWNER, null),
                 "no node type declared at all");
         PipelineNodeTypes.register(new Contributed("transform.acme"), OTHER);
         IllegalStateException ex = assertThrows(IllegalStateException.class,
-                () -> PipelineNodeExecutors.register(new ContributedExec("transform.acme"), OWNER),
+                () -> StepExecutors.register(new ContributedStep("transform.acme"), OWNER, null),
                 "declared by a different pack");
         assertTrue(ex.getMessage().contains(OWNER), ex.getMessage());
-        assertTrue(PipelineNodeExecutors.get("transform.acme").isEmpty());
+        assertTrue(StepExecutors.get("transform.acme").isEmpty());
     }
 
     /** The contracts are generated in a JVM with no packs, so an overlay must never be in force there. */

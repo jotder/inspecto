@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Platform Services Stage 2, slice S2-2 — the <b>bridge spike</b> (measurement only; design
@@ -34,6 +35,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *       {@link RowShaper}: the per-node materialisation every graph-lane node already pays.</li>
  *   <li><b>V2</b> — a no-op executed Step on the live {@link PipelineNodeExecutor} seam: every input row read
  *       through JDBC and written back through a {@link DuckDBAppender}. The JVM round trip — the bridge.</li>
+ *   <li><b>S</b> (S2-3) — the same no-op as a real {@link StepExecutor} ({@code copyRow} from {@code in()} to
+ *       {@code emit("data")}), run by {@link RowShaper#shape} through {@code StepRunner}: its own thread, the
+ *       watchdog, the engine-owned statement and appender. It must cost what V2 costs — the seam adds no
+ *       material overhead to the bridge — and the harness asserts it (S within 1.5× of V2's node time).</li>
  * </ul>
  *
  * <p>V3 (an Arrow stream) is not measured: the only Arrow Java in the offline repository is 0.8.0, which
@@ -102,6 +107,11 @@ class BridgeSpikeBenchmark {
 
     record Timing(double nodeMs, double writeMs) { double totalMs() { return nodeMs + writeMs; } }
 
+    /** S2-3's variant S: the V2 no-op, as a registered StepExecutor. */
+    private static final String STEP_TYPE = "transform.bench_noop_step";
+    private static final String STEP_OWNER = "bench-step.jar";
+    private static final int VARIANTS = 4;
+
     @Test
     void measureTheBridge(@TempDir Path dir) throws Exception {
         Assumptions.assumeTrue(Boolean.getBoolean("bench.run"),
@@ -111,6 +121,20 @@ class BridgeSpikeBenchmark {
         int[] widths = Arrays.stream(System.getProperty("bench.cols", "10,50").split(","))
                 .mapToInt(s -> Integer.parseInt(s.trim())).toArray();
 
+        com.gamma.pipeline.PipelineNodeTypes.register(new com.gamma.pipeline.PipelineNodeType() {
+            @Override public String type() { return STEP_TYPE; }
+            @Override public java.util.Optional<com.gamma.pipeline.ExecutionMode> mode() {
+                return java.util.Optional.of(com.gamma.pipeline.ExecutionMode.EXECUTED);
+            }
+        }, STEP_OWNER);
+        StepExecutors.register(new StepExecutor() {
+            @Override public String type() { return STEP_TYPE; }
+            @Override public void execute(StepContext ctx) throws Exception {
+                StepInput in = ctx.in();
+                StepOutput out = ctx.emit("data");
+                while (in.next()) out.copyRow(in);
+            }
+        }, STEP_OWNER, StepExecutors.Grant.NONE);
         try (Connection conn = DriverManager.getConnection("jdbc:duckdb:")) {
             System.out.printf("%n=== BridgeSpikeBenchmark (S2-2): %,d rows, widths %s, 1 warm-up + %d runs ===%n",
                     rows, Arrays.toString(widths), runs);
@@ -123,16 +147,24 @@ class BridgeSpikeBenchmark {
             for (int cols : widths) {
                 generate(conn, rows, cols);
                 String checksum = checksum(conn, "mapped");
-                List<List<Timing>> results = List.of(new ArrayList<>(), new ArrayList<>(), new ArrayList<>());
+                List<List<Timing>> results = new ArrayList<>();
+                for (int v = 0; v < VARIANTS; v++) results.add(new ArrayList<>());
                 for (int r = 0; r <= runs; r++) {           // r == 0 is the warm-up, not recorded
-                    for (int v = 0; v < 3; v++) {
+                    for (int v = 0; v < VARIANTS; v++) {
                         Timing t = runVariant(conn, v, dir, checksum, rows);
                         if (r > 0) results.get(v).add(t);
                     }
                 }
                 report(cols, rows, results);
+                double v2 = median(results.get(2).stream().mapToDouble(Timing::nodeMs).toArray());
+                double step = median(results.get(3).stream().mapToDouble(Timing::nodeMs).toArray());
+                assertTrue(step <= 1.5 * v2, String.format(
+                        "S2-3: the Step seam must cost what the raw bridge costs — S node %.0f ms vs V2 %.0f ms", step, v2));
                 exec(conn, "DROP TABLE mapped");
             }
+        } finally {
+            StepExecutors.deregister(STEP_OWNER);
+            com.gamma.pipeline.PipelineNodeTypes.deregister(STEP_OWNER);
         }
     }
 
@@ -144,6 +176,7 @@ class BridgeSpikeBenchmark {
             case 0 -> "mapped";
             case 1 -> RowShaper.shape(conn, PipelineNode.of("n", "transform.sql",
                     Map.of("sql", "SELECT * FROM input")), "mapped", prefix).getFirst().table();
+            case 3 -> RowShaper.shape(conn, PipelineNode.of("n", STEP_TYPE), "mapped", prefix).getFirst().table();
             default -> new NoOpBridgeExecutor().shape(conn, PipelineNode.of("n", "bench.noop"), "mapped",
                     prefix, RowShaper.ReferenceResolver.NONE).getFirst().table();
         };
@@ -163,10 +196,10 @@ class BridgeSpikeBenchmark {
         System.out.printf("%-4s %12s %12s %12s %14s %14s %9s%n",
                 "var", "node ms", "write ms", "total ms", "spread ms", "rows/s", "vs V0");
         double v0 = median(results.get(0).stream().mapToDouble(Timing::totalMs).toArray());
-        for (int v = 0; v < 3; v++) {
+        for (int v = 0; v < VARIANTS; v++) {
             double[] total = results.get(v).stream().mapToDouble(Timing::totalMs).toArray();
             double med = median(total);
-            System.out.printf("V%-3d %12.0f %12.0f %12.0f %6.0f–%-7.0f %14.0f %8.2fx%n", v,
+            System.out.printf("%-4s %12.0f %12.0f %12.0f %6.0f–%-7.0f %14.0f %8.2fx%n", v == 3 ? "S" : "V" + v,
                     median(results.get(v).stream().mapToDouble(Timing::nodeMs).toArray()),
                     median(results.get(v).stream().mapToDouble(Timing::writeMs).toArray()),
                     med, Arrays.stream(total).min().orElse(0), Arrays.stream(total).max().orElse(0),
