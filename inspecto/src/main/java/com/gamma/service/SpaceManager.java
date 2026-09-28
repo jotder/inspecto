@@ -460,15 +460,25 @@ public final class SpaceManager implements AutoCloseable {
             Path base = spacesRoot.resolve(id.value());
             if (Files.exists(base))
                 throw new IllegalStateException("Space directory already exists: " + base);
-            for (String sub : SPACE_SUBDIRS) Files.createDirectories(base.resolve(sub));
-            copyTemplateTree(tpl.resolve("config"), base.resolve("config"), id.value(), true);
-            copyTemplateTree(tpl.resolve("data"), base.resolve("data"), id.value(), false);
+            // Seeded and gated in a unique staging dir under the `_staging` sentinel (discovery boots only a
+            // `<root>/<id>/config`, so it never admits one), then renamed into place. A refusal whose cleanup
+            // fails (a Windows lock) leaves only that staging dir: it never blocks the id and never boots.
+            Path staging = spacesRoot.resolve("_staging").resolve(id.value() + "-" + System.nanoTime());
+            for (String sub : SPACE_SUBDIRS) Files.createDirectories(staging.resolve(sub));
+            copyTemplateTree(tpl.resolve("config"), staging.resolve("config"), id.value(), true);
+            copyTemplateTree(tpl.resolve("data"), staging.resolve("data"), id.value(), false);
             try {
-                seedGate.accept(base);
+                seedGate.accept(staging);
             } catch (RuntimeException refused) {
-                deleteRecursively(base);   // a refused template leaves no Space behind
-                throw refused;
+                try {
+                    deleteRecursively(staging);   // a refused template leaves no Space behind
+                } catch (IOException | RuntimeException cleanup) {
+                    log.warn("Could not remove refused template staging dir {}: {}", staging, cleanup.toString());
+                    refused.addSuppressed(cleanup);
+                }
+                throw refused;                    // the refusal stays the answer, never the cleanup failure
             }
+            Files.move(staging, base);
             String name = (displayName == null || displayName.isBlank())
                     ? com.gamma.util.ToonHelper.opt(tplMeta, "name", id.value()) : displayName.trim();
             String desc = (description == null || description.isBlank())

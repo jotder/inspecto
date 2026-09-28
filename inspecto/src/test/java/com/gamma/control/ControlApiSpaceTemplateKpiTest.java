@@ -137,6 +137,23 @@ class ControlApiSpaceTemplateKpiTest {
     }
 
     @Test
+    void aSharedAwayTemplateDatasetIsRefusedAsAnAccessRefusalNotAsAbsence(@TempDir Path root) throws Exception {
+        seedTemplate(root, VALID_KPI);
+        Files.writeString(root.resolve("_templates/kpi-pack/config/registry/datasets/orders.toon"), """
+                view: orders_view
+                owner: carol
+                shares[1]{subjectType,subjectId,access}:
+                  user,dave,view
+                """);
+        try (Ctx c = open(root)) {
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"kpi-pack\"}", ADMIN);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("'orders' is shared away from you"), r.body());
+            assertFalse(Files.exists(root.resolve("acme")));
+        }
+    }
+
+    @Test
     void aTemplateKpiPackNeedsTheComponentsKpiCapability(@TempDir Path root) throws Exception {
         seedTemplate(root, VALID_KPI);
         try (Ctx c = open(root)) {

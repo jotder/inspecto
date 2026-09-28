@@ -122,15 +122,26 @@
       },
       "post" : {
         "tags" : [ "spaces" ],
-        "summary" : "POST /spaces (generated skeleton)",
+        "summary" : "Create a Space, optionally seeded from a Space Template",
         "operationId" : "postSpaces",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "Body {id, display_name?, description?, template?}. Gated in the handler: canAdminister whenever at least one Space is hosted (the zero-Space recovery create asks none; CapabilityManifest recovery-route). A template carrying a KPI pack (config/registry/kpis/) also needs canAuthorWorkbench, and each KPI meets the /components/kpi save gate against the template's own Datasets; the first refusal creates no Space (ASSURE-KPI-DEFINITIONS-RESIDUALS-1).",
         "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          "200" : {
+            "description" : "The created Space manifest (id, displayName, description)."
+          },
+          "400" : {
+            "$ref" : "#/components/responses/BadRequest"
+          },
+          "403" : {
+            "description" : "canAdminister missing on a populated server, or a template KPI pack without canAuthorWorkbench; nothing was created."
+          },
+          "409" : {
+            "$ref" : "#/components/responses/Conflict"
+          },
+          "422" : {
+            "description" : "A template KPI refused by the /components/kpi save gate (unknown or shared-away Dataset, a field or timeField not in its Schema, a timeField that is not a date); nothing was created."
           }
-        },
-        "x-generated" : true
+        }
       }
     },
     "/config/spec/{type}" : {

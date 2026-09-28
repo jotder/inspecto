@@ -65,6 +65,12 @@ it deployed. The evidence cites both deliberately.
 3. **Compare boots.** The `route.inventory.snapshot` audit event records that digest once per boot; a digest
    that changes between boots means the route surface moved.
 
+⚠ **`POST /spaces` is `exempt | recovery-route` and gated IN its handler** — `canAdminister` whenever a Space is
+hosted; with a `template` that carries a KPI pack it also needs `canAuthorWorkbench` on the same condition, and each
+KPI meets the `/components/kpi` save gate: 403 / 422, and nothing is created (`ControlApiSpaceTemplateKpiTest`,
+2026-09-28). The table's posture column cannot show an in-handler condition; `CapabilityManifest`'s exemption reason
+names it.
+
 ## The mutating-route inventory
 
 🔴 **This table is GENERATED — never hand-typed.** `tools/route-gating-report.mjs` derives it from the same

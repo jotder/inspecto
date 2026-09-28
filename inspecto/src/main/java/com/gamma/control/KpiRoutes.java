@@ -224,6 +224,13 @@ final class KpiRoutes implements RouteModule {
                     .orElseThrow(() -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template kpi file '"
                             + file.getFileName() + "' is unreadable; nothing was created"));
             try {
+                // The authoring door answers an unreadable Dataset exactly as an absent one (no existence leak).
+                // A template's Datasets are the server's own shipped content, so here the refusal says which it is.
+                // With no Subject (Personal; an unauthenticated recovery create) ComponentAccess is fail-open.
+                String ds = KpiDefinition.fromMap(k.name(), k.content()).dataset();
+                ComponentStore seeded = new ComponentStore(config.resolve("registry"));
+                if (readableDataset(ex, seeded, ds) == null && seeded.exists("dataset", ds))
+                    throw new IllegalArgumentException("kpi dataset '" + ds + "' is shared away from you");
                 requireMeasure(ex, config, () -> data, k.name(), k.content());
             } catch (IllegalArgumentException bad) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template kpi '" + k.name()

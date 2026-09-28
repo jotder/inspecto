@@ -194,8 +194,12 @@ Fraud, Financial Audit or Link Analysis exists (§2, §5).
 disk — and before boot: the caller needs `canAuthorWorkbench` (the `/components/kpi` door's capability; the
 zero-Space recovery create asks none, as it asks no `canAdminister`), and each KPI meets
 `KpiRoutes.requireMeasure` against the NEW Space's registry and `data/`. The first refusal is a 403 / 422, the
-half-made directory is deleted and nothing is registered; a `kpis/*.toon` the registry cannot read is refused,
-never seeded unchecked. A KPI tile in the template binds by `options.kpi.kpiId` (no new mechanism). ⚠ The gate
+half-made tree is deleted and nothing is registered; a `kpis/*.toon` the registry cannot read is refused,
+never seeded unchecked. The tree is seeded in a unique `_staging/<id>-<nanos>/` (discovery never boots it) and
+renamed into place only once the gate passes, so a cleanup that fails (a Windows lock) is logged and suppressed —
+the refusal stays the answer — and the leftover never blocks the id. With no Subject (Personal, an unauthenticated
+recovery create) Dataset access is fail-open; a template Dataset shared away from the caller is refused as
+"shared away", not as absent (template content is the server's own, so there is nothing to hide). A KPI tile in the template binds by `options.kpi.kpiId` (no new mechanism). ⚠ The gate
 reads the Dataset's Schema, so a KPI over a Dataset that the template's own pipeline has not filled yet (a
 `physicalRef` store with no Parquet — every fresh `orders-starter` store) is REFUSED at apply; that is why
 `orders-starter` ships no KPI pack. Seed-gated kind: `kpi` only — the rest of the tree is still copied as-is.
@@ -486,6 +490,7 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 | Class | Proves |
 |---|---|
 | `SpaceManagerTest` (12) | create / update / delete / discover, CRUD lifecycle, close-with-deadline |
+| `SpaceManagerTemplateGateTest` (1) | a refused template whose cleanup fails keeps the refusal and never blocks the id |
 | `SpaceBootstrapTest` (3) | booting a `SpaceContext` from disk |
 | `SpaceLayoutContractTest` (5) | the convention directories; `flows/` and `pipelines/` both tolerated |
 | `SpaceIdTest` (2) | the id charset and length |
@@ -500,13 +505,13 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 |---|---|
 | `ControlApiSpacesTest` (4) | `/spaces` CRUD; `authenticatedCreateSucceedsWhenNoSpaceIsHostedYet`; `purgingTheLastSpaceOnDiskIsRefused` |
 | `ControlApiSpaceTemplatesTest` (2) | the gallery and `createFromTemplate` |
-| `ControlApiSpaceTemplateKpiTest` (3) | a template's KPI pack meets the `/components/kpi` save gate and capability; a refusal creates no Space |
+| `ControlApiSpaceTemplateKpiTest` (4) | a template's KPI pack meets the `/components/kpi` save gate and capability; a refusal creates no Space |
 | `ControlApiMultiSpaceTest` (1) | a multi-Space server smoke |
 | `ControlApiBundleTest` (11) · `ControlApiBundleImportTest` (11) · `ControlApiBundleNewKindsTest` (10) · `ControlApiPipelineBundleTest` (7) | export / preview / import contract, ordering, the newer kinds, the `authored-pipeline` round trip |
 | `ExchangeAttributeScopeTest` · `NoExchangeShipsInThePersonalBuildTest` | exchange attributes private by default; Personal carries no exchange module |
 | `PostgresStateStoreTest` (opt-in, `-Dinspecto.test.pg.url`; 11 skipped otherwise) | the DB-backed stores against a real Postgres |
 
-About 90 `@Test` methods across the seventeen Space and bundle classes, all in the default reactor.
+About 92 `@Test` methods across the eighteen Space and bundle classes, all in the default reactor.
 
 ### 8.3 UI specs — vitest
 
