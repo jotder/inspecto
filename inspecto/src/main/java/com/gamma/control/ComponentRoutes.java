@@ -694,10 +694,16 @@ final class ComponentRoutes implements RouteModule {
      * so a bundle cannot plant a model the authoring route refuses.
      */
     static void validateKind(ApiContext api, String type, String id, Map<String, Object> content) {
+        validateKind(api.writeRoot(), api::dataRoot, type, id, content);
+    }
+
+    /** {@link #validateKind(ApiContext, String, String, Map)} against explicit roots (a Space Template's staged tree). */
+    static void validateKind(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
+                             String type, String id, Map<String, Object> content) {
         validateKind(type, id, content);
         if (RiskScoreRoutes.TYPE.equals(type))
-            RiskScoreRoutes.requireStorable(api, com.gamma.risk.RiskScoreModel.fromMap(id, content));
-        if ("dataset".equals(type) || "sink".equals(type)) RiskScoreRoutes.requireNotReserved(api, type, id, content);
+            RiskScoreRoutes.requireStorable(writeRoot, dataRoot, com.gamma.risk.RiskScoreModel.fromMap(id, content));
+        if ("dataset".equals(type) || "sink".equals(type)) RiskScoreRoutes.requireNotReserved(writeRoot, type, id, content);
     }
 
     static void validateKind(String type, String id, Map<String, Object> content) {

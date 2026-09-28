@@ -108,7 +108,8 @@ public final class ComponentStore {
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");
 
     /** File suffix for a component type: CSV kinds persist as {@code .csv}, everything else {@code .toon}. */
-    private static String suffixFor(String type) {
+    /** The file suffix a {@code type}'s component is stored under ({@code .csv} for a CSV-backed kind). */
+    public static String suffixFor(String type) {
         return ComponentRegistry.CSV_KINDS.contains(type) ? ".csv" : TOON;
     }
 

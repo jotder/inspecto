@@ -212,13 +212,16 @@ kind→capability table `/spaces/import` and `/components/{kind}` use (`connecti
 `canAdminister`; a `registry/` file whose kind cannot be told is refused); skipped on the zero-Space recovery
 create, like the KPI capability; (2) **save validation** — every `ComponentStore.WRITABLE_TYPES` component meets
 what `ComponentRoutes.writeComponent` runs before its write: `validateKind(api, …)`, `AlertRoutes.parse` for an
-`alert-rule` (edition feature, Investigation refusal, `by` Schema check), `DecisionRuleGuard.prepare` (the
-invoke-api gate, result discarded — no stamps are seeded) for a `decision-rule` — judged through a staged
-`ApiContext` whose `writeRoot`/`dataRoot` are the NEW Space's `config/` / `data/`; an unreadable registry `.toon` is
-refused; (3) `kpi` as above. First refusal → 403 / 422 naming the kind, no Space. `ControlApiSpaceTemplateSeedGateTest`
+`alert-rule` (edition feature, Investigation refusal, `by` Schema check), `DecisionRuleGuard.prepare` for a
+`decision-rule` (the invoke-api gate, with the template's own `*_connection.toon` Connections counted as carried,
+as `/spaces/import` counts them) — judged against the NEW Space's `config/` / `data/` through explicit-root overloads
+(`validateKind`, `AlertRoutes.parse`, `RiskScoreRoutes.requireStorable`/`requireNotReserved`); a registry file of the
+kind's own suffix (`ComponentStore.suffixFor` — `.csv` for a mapping) the store cannot read is refused. A seeded
+Decision Rule is rewritten with `prepare`'s stamps: the applying actor is creator and maker, and the template's
+`createdBy`/`updatedBy`/`restoredMakers` are dropped. The recovery create skips the kind-table capability but still
+asks an invoke-api rule's `canWorkIncidents` (deliberate: outbound calls always need it); (3) `kpi` as above. First refusal → 403 / 422 naming the kind, no Space. `ControlApiSpaceTemplateSeedGateTest`
 applies EVERY shipped template and pins both refusals. ⚠ Not gated: the CONTENT of a template's non-registry configs
-(Pipelines, Connections, Jobs — the `SaveGate` `/config/write` runs); only their capability. A template
-`decision-rule` with an `invoke-api` consequence finds no Connection (none are counted as carried), so it is refused.
+(Pipelines, Connections, Jobs — the `SaveGate` `/config/write` runs); only their capability. 
 
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does
 

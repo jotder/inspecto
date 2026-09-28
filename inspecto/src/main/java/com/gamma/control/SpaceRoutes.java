@@ -117,7 +117,7 @@ final class SpaceRoutes implements RouteModule {
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"))
                     : api.spaces().createFromTemplate(SpaceId.of(id),
                             ApiContext.str(body, "display_name"), ApiContext.str(body, "description"), template,
-                            base -> TemplateSeedGate.require(api, e, base, !recovering));   // every seeded kind meets its own route
+                            base -> TemplateSeedGate.require(e, base, !recovering));   // every seeded kind meets its own route
             return manifest(ctx);
         } catch (IllegalArgumentException badTemplate) { // unknown template id
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, badTemplate.getMessage());

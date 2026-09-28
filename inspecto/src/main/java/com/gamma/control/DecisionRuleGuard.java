@@ -132,10 +132,10 @@ public final class DecisionRuleGuard {
      * entry is {@link #prepare}d against the stored rule of that name and re-encoded, all BEFORE the first write —
      * one refusal refuses the whole import. Returns the bundle to write.
      */
-    static BundleImporter.Bundle guardImport(HttpExchange ex, Path config, BundleImporter.Bundle bundle) {
-        LinkedHashMap<String, byte[]> entries = new LinkedHashMap<>(bundle.configEntries());
+    /** The Connections a config tree carries ({@code *_connection.toon}): id → connector. */
+    static Map<String, String> carriedConnections(Map<String, byte[]> configEntries) {
         Map<String, String> carried = new LinkedHashMap<>();
-        for (Map.Entry<String, byte[]> e : bundle.configEntries().entrySet()) {
+        for (Map.Entry<String, byte[]> e : configEntries.entrySet()) {
             if (!e.getKey().endsWith("_connection.toon")) continue;
             try {
                 if (ConfigCodec.toMap(new String(e.getValue(), StandardCharsets.UTF_8)).get("connection") instanceof Map<?, ?> c
@@ -145,6 +145,12 @@ public final class DecisionRuleGuard {
                 // not a Connection this bundle can vouch for
             }
         }
+        return carried;
+    }
+
+    static BundleImporter.Bundle guardImport(HttpExchange ex, Path config, BundleImporter.Bundle bundle) {
+        LinkedHashMap<String, byte[]> entries = new LinkedHashMap<>(bundle.configEntries());
+        Map<String, String> carried = carriedConnections(bundle.configEntries());
         boolean changed = false;
         ComponentStore store = config == null ? null : new ComponentStore(config.resolve("registry"));
         for (Map.Entry<String, byte[]> e : bundle.configEntries().entrySet()) {

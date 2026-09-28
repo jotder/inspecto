@@ -119,9 +119,13 @@ final class RiskScoreRoutes implements RouteModule {
      * </ol>
      */
     static void requireStorable(ApiContext api, RiskScoreModel model) {
-        Path writeRoot = api.writeRoot();
+        requireStorable(api.writeRoot(), api::dataRoot, model);
+    }
+
+    /** {@link #requireStorable(ApiContext, RiskScoreModel)} against explicit roots. */
+    static void requireStorable(Path writeRoot, java.util.function.Supplier<Path> dataRoots, RiskScoreModel model) {
         if (writeRoot == null) throw new IllegalArgumentException("risk-score write needs a write root");
-        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> writeRoot, api::dataRoot);
+        DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> writeRoot, dataRoots);
         for (Map.Entry<String, Set<String>> e : model.referencedColumns().entrySet()) {
             List<String> columns;
             try {
@@ -136,7 +140,7 @@ final class RiskScoreRoutes implements RouteModule {
                         + " are not in the Schema of dataset '" + e.getKey() + "' (have: " + columns + ")");
         }
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        Path dataRoot = api.dataRoot();
+        Path dataRoot = dataRoots.get();
         for (String out : List.of(model.scoresDataset(), model.latestDataset())) {
             if (dataRoot != null && Files.exists(dataRoot.resolve(out))
                     && !com.gamma.risk.RiskScoreEvaluator.ownedBy(dataRoot.resolve(out), model.id()))
@@ -169,6 +173,11 @@ final class RiskScoreRoutes implements RouteModule {
      * equal {@code risk_scores_<model>_latest}, and that model exists.
      */
     static void requireNotReserved(ApiContext api, String type, String id, Map<String, Object> content) {
+        requireNotReserved(api.writeRoot(), type, id, content);
+    }
+
+    /** {@link #requireNotReserved(ApiContext, String, String, Map)} against an explicit write root. */
+    static void requireNotReserved(Path writeRoot, String type, String id, Map<String, Object> content) {
         String prefix = RiskScoreModel.SCORES_PREFIX;
         java.util.List<String> named = new java.util.ArrayList<>();
         named.add(id);
@@ -177,9 +186,9 @@ final class RiskScoreRoutes implements RouteModule {
                 .anyMatch(n -> n.toLowerCase(java.util.Locale.ROOT).startsWith(prefix));
         if (!reserved) return;
         if ("dataset".equals(type) && id != null && id.equals(content.get("physicalRef"))
-                && named.size() == 2 && id.endsWith(RiskScoreModel.LATEST_SUFFIX) && api.writeRoot() != null) {
+                && named.size() == 2 && id.endsWith(RiskScoreModel.LATEST_SUFFIX) && writeRoot != null) {
             String model = id.substring(prefix.length(), id.length() - RiskScoreModel.LATEST_SUFFIX.length());
-            if (id.startsWith(prefix) && new ComponentStore(api.writeRoot().resolve("registry")).exists(TYPE, model))
+            if (id.startsWith(prefix) && new ComponentStore(writeRoot.resolve("registry")).exists(TYPE, model))
                 return;   // the documented Alert Rule Dataset over risk_scores_<model>_latest
         }
         throw new IllegalArgumentException(type + " '" + id + "' names a store under the reserved prefix '" + prefix

@@ -46,7 +46,8 @@ class ControlApiSpaceTemplateSeedGateTest {
         com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
             case ADMIN -> Optional.of(new Subject("admin-1", Set.of(Roles.CAN_ADMINISTER, Roles.CAN_AUTHOR_WORKBENCH,
-                    Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_MANAGE_INCIDENTS)));
+                    Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_ONBOARD_CONNECTIONS, Roles.CAN_MANAGE_INCIDENTS,
+                    "canWorkIncidents")));
             case OPS -> Optional.of(new Subject("ops-1", Set.of(Roles.CAN_ADMINISTER)));
             default -> Optional.empty();
         });
@@ -55,16 +56,21 @@ class ControlApiSpaceTemplateSeedGateTest {
     @AfterEach
     void disarm() {
         Authenticators.forTest(null);
+        com.gamma.acquire.ConnectionRegistry.clear();
         com.gamma.etl.EditionFeatures.overrideForTest(null);
     }
 
     private Ctx open(Path root) throws Exception {
+        return open(root, true);
+    }
+
+    private Ctx open(Path root, boolean hostFirst) throws Exception {
         SpaceManager spaces = SpaceManager.discover(root);
         ControlApi api = new ControlApi(spaces, 0);
         api.start();
         Ctx c = new Ctx(spaces, api, api.port());
-        // a hosted Space first: the zero-Space recovery create asks no capability at all
-        assertEquals(200, send(c, "POST", "/spaces", "{\"id\":\"first\"}", ADMIN).statusCode());
+        // a hosted Space first: the zero-Space recovery create skips the kind-table capability
+        if (hostFirst) assertEquals(200, send(c, "POST", "/spaces", "{\"id\":\"first\"}", ADMIN).statusCode());
         return c;
     }
 
@@ -138,6 +144,59 @@ class ControlApiSpaceTemplateSeedGateTest {
             // the same template, by a caller who holds the capability, applies
             HttpResponse<String> ok = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"alerting\"}", ADMIN);
             assertEquals(200, ok.statusCode(), ok.body());
+        }
+    }
+
+    @Test
+    void aTemplateCsvMappingIsValidatedLikeEveryOtherKind(@TempDir Path root) throws Exception {
+        Path cfg = root.resolve("_templates").resolve("mapped").resolve("config");
+        Files.createDirectories(cfg.resolve("registry").resolve("mappings"));
+        Files.writeString(cfg.getParent().resolve("template.toon"), "name: Mapped\n");
+        Files.writeString(cfg.resolve("registry").resolve("mappings").resolve("std.csv"),
+                "targetColumn,sourceExpression,transformType\nA,A,NOT_A_TRANSFORM\n");
+        try (Ctx c = open(root)) {
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"mapped\"}", ADMIN);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("template mapping"), r.body());
+            assertFalse(Files.exists(root.resolve("acme")));
+        }
+    }
+
+    private static void seedInvokeApiTemplate(Path root) throws Exception {
+        Path cfg = root.resolve("_templates").resolve("actions").resolve("config");
+        Files.createDirectories(cfg.resolve("connections"));
+        Files.createDirectories(cfg.resolve("registry").resolve("decision-rules"));
+        Files.writeString(cfg.getParent().resolve("template.toon"), "name: Actions\n");
+        Files.writeString(cfg.resolve("connections").resolve("hook_connection.toon"),
+                "connection:\n  id: hook\n  connector: https\n  host: tickets.test\n  port: 443\n  base_path: api\n");
+        Files.writeString(cfg.resolve("registry").resolve("decision-rules").resolve("leak.toon"),
+                com.gamma.config.io.ConfigCodec.toToon(java.util.Map.of("name", "leak", "enabled", true,
+                        "createdBy", "author-9", "updatedBy", "author-9", "restoredMakers", List.of("author-0"),
+                        "consequences", List.of(java.util.Map.of("action", "invoke-api",
+                                "params", java.util.Map.of("connection", "hook"))))));
+    }
+
+    @Test
+    void anInvokeApiRuleOverTheTemplatesOwnConnectionAppliesStampedByTheApplier(@TempDir Path root) throws Exception {
+        seedInvokeApiTemplate(root);
+        try (Ctx c = open(root)) {
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"actions\"}", ADMIN);
+            assertEquals(200, r.statusCode(), r.body());
+            String stored = Files.readString(root.resolve("acme/config/registry/decision-rules/leak.toon"));
+            assertTrue(stored.contains("createdBy: admin-1") && stored.contains("updatedBy: admin-1"), stored);
+            assertFalse(stored.contains("author-9") || stored.contains("author-0") || stored.contains("restoredMakers"),
+                    "the template file's makers are not trusted: " + stored);
+        }
+    }
+
+    @Test
+    void theRecoveryCreateStillAsksTheInvokeApiCapability(@TempDir Path root) throws Exception {
+        seedInvokeApiTemplate(root);
+        try (Ctx c = open(root, false)) {
+            HttpResponse<String> r = send(c, "POST", "/spaces", "{\"id\":\"acme\",\"template\":\"actions\"}", OPS);
+            assertEquals(403, r.statusCode(), r.body());
+            assertTrue(r.body().contains("canWorkIncidents"), r.body());
+            assertFalse(Files.exists(root.resolve("acme")));
         }
     }
 

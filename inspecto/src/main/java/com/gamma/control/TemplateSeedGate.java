@@ -1,18 +1,18 @@
 package com.gamma.control;
 
+import com.gamma.config.io.ConfigCodec;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
@@ -26,11 +26,17 @@ import java.util.stream.Stream;
  *       {@code findings-spec}, administer-only Jobs; a {@code registry/} file whose kind cannot be told is refused);</li>
  *   <li>save validation — every registry component the template seeds meets what {@code /components/{kind}} runs
  *       before its write: {@link ComponentRoutes#validateKind}, {@link AlertRoutes#parse} for an {@code alert-rule},
- *       {@link DecisionRuleGuard}'s invoke-api gate for a {@code decision-rule} — judged against the NEW Space's own
- *       registry and data (a staged {@link ApiContext}), and a {@code .toon} the registry cannot read is refused;</li>
+ *       {@link DecisionRuleGuard#prepare} for a {@code decision-rule} (its invoke-api gate, with the Connections the
+ *       template itself carries counted as registered) — judged against the NEW Space's own registry and data, and a
+ *       registry file (of the kind's own suffix, {@code .csv} for a mapping) the store cannot read is refused. A
+ *       seeded Decision Rule is rewritten with the stamps {@code prepare} returns: the applying actor is its creator
+ *       and maker, and the template file's {@code createdBy} / {@code updatedBy} / {@code restoredMakers} are dropped
+ *       (template content is not a record of who made it);</li>
  *   <li>{@code kpi} — {@link KpiRoutes#requireTemplateKpis} (its capability and Measure check).</li>
  * </ol>
- * {@code checkCapability} false (the zero-Space recovery create) skips the capability half, as it asks none.
+ * {@code checkCapability} false (the zero-Space recovery create) skips step 1 and the KPI capability. It does NOT
+ * skip a Decision Rule's {@code canWorkIncidents} (asked by {@link DecisionRuleGuard#checkInvokeApi}): a rule that
+ * sends outbound calls always needs it, whoever applies it — with no Subject that check is a no-op anyway.
  * ⚠ Not gated here: a template's non-registry configs (Pipelines, Connections', Jobs' content) are not run through
  * {@code SaveGate} — only their capability.
  */
@@ -38,7 +44,7 @@ final class TemplateSeedGate {
 
     private TemplateSeedGate() {}
 
-    static void require(ApiContext api, HttpExchange ex, Path spaceBase, boolean checkCapability) {
+    static void require(HttpExchange ex, Path spaceBase, boolean checkCapability) {
         Path config = spaceBase.resolve("config");
         if (checkCapability) {
             try {
@@ -48,7 +54,9 @@ final class TemplateSeedGate {
                         + "; nothing was created");
             }
         }
-        ApiContext staged = staged(api, config, spaceBase.resolve("data"));
+        Path data = spaceBase.resolve("data");
+        Supplier<Path> dataRoot = () -> data;
+        Map<String, String> carried = DecisionRuleGuard.carriedConnections(configEntries(config));
         Path registry = config.resolve("registry");
         ComponentStore store = new ComponentStore(registry);
         for (String type : ComponentStore.WRITABLE_TYPES.stream().sorted().toList()) {
@@ -56,12 +64,12 @@ final class TemplateSeedGate {
             Path dir = registry.resolve(ComponentRegistry.dirForType(type).orElse(type));
             if (!Files.isDirectory(dir)) continue;
             List<ComponentRegistry.Component> seeded = store.list(type);
-            for (Path file : toonFiles(dir)) {
+            for (Path file : files(dir, ComponentStore.suffixFor(type))) {
                 ComponentRegistry.Component c = seeded.stream().filter(k -> file.equals(k.path())).findFirst()
                         .orElseThrow(() -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template "
                                 + type + " file '" + file.getFileName() + "' is unreadable; nothing was created"));
                 try {
-                    validate(staged, ex, type, c.name(), c.content());
+                    validate(config, dataRoot, carried, ex, type, c);
                 } catch (IllegalArgumentException bad) {
                     throw refused(type, c.name(), bad.getMessage());
                 } catch (ApiException bad) {
@@ -74,33 +82,31 @@ final class TemplateSeedGate {
     }
 
     /** What {@code ComponentRoutes.writeComponent} runs before its write, over the content as stored. */
-    private static void validate(ApiContext staged, HttpExchange ex, String type, String id, Map<String, Object> content) {
-        Map<String, Object> body = new LinkedHashMap<>(content);
-        ComponentRoutes.validateKind(staged, type, id, body);
-        if (DecisionRuleGuard.TYPE.equals(type)) DecisionRuleGuard.prepare(ex, body, null, Map.of(), false);
+    private static void validate(Path config, Supplier<Path> dataRoot, Map<String, String> carried, HttpExchange ex,
+                                 String type, ComponentRegistry.Component c) {
+        String id = c.name();
+        Map<String, Object> body = new LinkedHashMap<>(c.content());
+        ComponentRoutes.validateKind(config, dataRoot, type, id, body);
+        if (DecisionRuleGuard.TYPE.equals(type)) {
+            body.remove("createdBy");
+            body.remove("updatedBy");
+            body.remove(DecisionRuleGuard.RESTORED_MAKERS);
+            Map<String, Object> stamped = DecisionRuleGuard.prepare(ex, body, null, carried, false);
+            try {
+                Files.writeString(c.path(), ConfigCodec.toToon(stamped));
+            } catch (IOException e) {
+                throw new UncheckedIOException(e);
+            }
+        }
         if ("alert-rule".equals(type)) {
             body.put("name", id);
-            AlertRoutes.parse(staged, body);
+            AlertRoutes.parse(config, dataRoot, body);
         }
     }
 
     private static ApiException refused(String type, String id, String why) {
         return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template " + type + " '" + id
                 + "' is refused: " + why + "; nothing was created");
-    }
-
-    /** {@code api} with its write root and data root moved onto the staged Space. */
-    private static ApiContext staged(ApiContext api, Path config, Path data) {
-        return (ApiContext) Proxy.newProxyInstance(ApiContext.class.getClassLoader(), new Class<?>[]{ApiContext.class},
-                (proxy, m, args) -> {
-                    if (m.getParameterCount() == 0 && "writeRoot".equals(m.getName())) return config;
-                    if (m.getParameterCount() == 0 && "dataRoot".equals(m.getName())) return data;
-                    try {
-                        return m.invoke(api, args);
-                    } catch (InvocationTargetException e) {
-                        throw e.getCause();
-                    }
-                });
     }
 
     /** config-relative path ({@code /}-separated) → bytes, the shape {@link ImportCapabilityGuard#checkFiles} judges. */
@@ -116,9 +122,9 @@ final class TemplateSeedGate {
         return out;
     }
 
-    private static List<Path> toonFiles(Path dir) {
+    private static List<Path> files(Path dir, String suffix) {
         try (Stream<Path> s = Files.list(dir)) {
-            return s.filter(p -> p.getFileName().toString().endsWith(".toon")).sorted().toList();
+            return s.filter(p -> p.getFileName().toString().endsWith(suffix)).sorted().toList();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }

@@ -194,6 +194,12 @@ final class AlertRoutes implements RouteModule {
      *  {@code POST /bundle/import} item ({@code BundleRoutes}, a per-item failure). {@code BiTemplates} writes only
      *  {@code widget} / {@code dashboard}. */
     static AlertRule parse(ApiContext api, Map<String, Object> body) {
+        return parse(api.writeRoot(), api::dataRoot, body);
+    }
+
+    /** {@link #parse(ApiContext, Map)} against explicit roots (a Space Template's staged tree). */
+    static AlertRule parse(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
+                           Map<String, Object> body) {
         if (!EditionFeatures.present(EditionFeatures.ALERT_DISPATCH))   // the consequence's door (G9)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH));
         AlertRule rule;
@@ -208,7 +214,7 @@ final class AlertRoutes implements RouteModule {
         if (rule.isInvestigationRule())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an Alert Rule over an Investigation (investigation:) is authored through "
                     + "POST /inv/investigations/{id}/alert-rules, which checks that you own the Investigation");
-        requireGroupingColumns(api, rule);
+        requireGroupingColumns(writeRoot, dataRoot, rule);
         return rule;
     }
 
@@ -219,12 +225,15 @@ final class AlertRoutes implements RouteModule {
      * rather than arming a rule whose every sweep would silently compute nothing. A rule with no {@code by} is
      * not looked at. Runs inside {@link #parse}.
      */
-    static void requireGroupingColumns(ApiContext api, AlertRule rule) {
+    static void requireGroupingColumns(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
+                                       AlertRule rule) {
         if (!rule.isGrouped()) return;
-        java.nio.file.Path writeRoot = WriteGates.requireWriteRoot(api, "alert rule write");
+        if (writeRoot == null)
+            throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY,
+                    "alert rule write disabled: set -Dassist.write.root to enable");   // WriteGates.requireWriteRoot's answer
         List<String> columns;
         try {
-            columns = new com.gamma.query.DatasetMeasureProbe(() -> writeRoot, api::dataRoot).columns(rule.dataset());
+            columns = new com.gamma.query.DatasetMeasureProbe(() -> writeRoot, dataRoot).columns(rule.dataset());
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "alert.by cannot be checked against "
                     + "the Schema of dataset '" + rule.dataset() + "': " + e.getMessage());
