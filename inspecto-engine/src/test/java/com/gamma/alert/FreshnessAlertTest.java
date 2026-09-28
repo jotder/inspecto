@@ -38,6 +38,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class FreshnessAlertTest {
 
+    /** Subscribers this class adds to the event log — removed after each test so none leak into the fork. */
+    private final java.util.List<java.util.function.Consumer<com.gamma.event.Event>> subscribed = new java.util.ArrayList<>();
+
+    private void subscribe(java.util.function.Consumer<com.gamma.event.Event> s) {
+        subscribed.add(s);
+        EventLog.current().addSubscriber(s);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void unsubscribe() {
+        subscribed.forEach(EventLog.current()::removeSubscriber);
+        subscribed.clear();
+    }
+
     private static final long HOUR = Duration.ofHours(1).toMillis();
 
     private static ConfigSource configs(PipelineConfig cfg) {
@@ -153,7 +167,7 @@ class FreshnessAlertTest {
     @Test
     void recoveryEmitsAnAllClearThatNoCooldownCanHold(@TempDir Path dir) throws Exception {
         List<Event> seen = new CopyOnWriteArrayList<>();
-        EventLog.current().addSubscriber(seen::add);
+        subscribe(seen::add);
 
         AlertService svc = service(dir, freshnessRule("sales_ds", "1h"));
         AtomicLong lastWrite = new AtomicLong(0L);
@@ -206,7 +220,7 @@ class FreshnessAlertTest {
     @Test
     void anAllClearFiresOnTheEdgeOnly(@TempDir Path dir) throws Exception {
         List<Event> seen = new CopyOnWriteArrayList<>();
-        EventLog.current().addSubscriber(seen::add);
+        subscribe(seen::add);
         AlertService svc = service(dir, freshnessRule("edge_ds", "1h"));
         svc.freshnessProbe(dataset -> OptionalLong.of(10 * HOUR));
 

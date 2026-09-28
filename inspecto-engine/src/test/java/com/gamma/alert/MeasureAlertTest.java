@@ -27,6 +27,20 @@ import static org.junit.jupiter.api.Assertions.*;
 /** BI-5 measure alerts: dataset+measure rules evaluated via the wired probe, cooldown, validation. */
 class MeasureAlertTest {
 
+    /** Subscribers this class adds to the event log — removed after each test so none leak into the fork. */
+    private final java.util.List<java.util.function.Consumer<com.gamma.event.Event>> subscribed = new java.util.ArrayList<>();
+
+    private void subscribe(java.util.function.Consumer<com.gamma.event.Event> s) {
+        subscribed.add(s);
+        EventLog.current().addSubscriber(s);
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void unsubscribe() {
+        subscribed.forEach(EventLog.current()::removeSubscriber);
+        subscribed.clear();
+    }
+
     private static ConfigSource configs(PipelineConfig cfg) {
         return new ConfigSource() {
             @Override public List<PipelineConfig> pipelines() { return List.of(cfg); }
@@ -105,7 +119,7 @@ class MeasureAlertTest {
     @Test
     void aScalarMeasureRuleHealsOnTheEdgeAndARelapseFiresAtOnce(@TempDir Path dir) throws Exception {
         List<Event> seen = new CopyOnWriteArrayList<>();
-        EventLog.current().addSubscriber(seen::add);
+        subscribe(seen::add);
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         AlertService svc = new AlertService(
                 List.of(measureRule("heal_ds", "sum(amount)", "lt", 1000)), configs(cfg), emptyStore());
@@ -135,7 +149,7 @@ class MeasureAlertTest {
     void aDeletedAndRecreatedRuleThatStillBreachesFiresAtOnceAndClearsOnlyWhatItRaised(@TempDir Path dir)
             throws Exception {
         List<Event> seen = new CopyOnWriteArrayList<>();
-        EventLog.current().addSubscriber(seen::add);
+        subscribe(seen::add);
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         AlertRule rule = measureRule("recreate_ds", "sum(amount)", "lt", 1000);
         AlertService svc = new AlertService(List.of(rule), configs(cfg), emptyStore());
@@ -155,7 +169,7 @@ class MeasureAlertTest {
     @Test
     void anUnknownValueNeitherFiresNorHealsAndANeverBreachedRuleIsNeverCleared(@TempDir Path dir) throws Exception {
         List<Event> seen = new CopyOnWriteArrayList<>();
-        EventLog.current().addSubscriber(seen::add);
+        subscribe(seen::add);
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
         AlertService svc = new AlertService(
                 List.of(measureRule("unknown_ds", "sum(amount)", "lt", 1000)), configs(cfg), emptyStore());
