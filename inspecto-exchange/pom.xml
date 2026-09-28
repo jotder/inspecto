@@ -57,6 +57,15 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- The cross-Space consequence acceptance test (D10) opens a REAL hub Incident: the operational-object
+             engine is the optional inspecto-ops module, so it is on this module's TEST classpath only. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-ops</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>

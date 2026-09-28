@@ -31,6 +31,7 @@ final class RunContext implements JobContext {
     private final ArtifactRecorder artifacts;
     private volatile Map<String, String> params = Map.of();   // resolved by the framework before run (P3a)
     private volatile boolean dryRun;                          // installed by the framework before run (MNT-1)
+    private volatile Map<String, Object> signalPayload = Map.of();   // the firing Signal's payload (on_signal)
     private volatile PlatformServices services = PlatformServices.none();   // grant-filtered by the framework (S1-1)
     /** X2: what the job reported reading — drained by JobService into the run store after the run. */
     private final java.util.List<com.gamma.consignment.ConsignmentSource> consignmentsRead =
@@ -59,6 +60,7 @@ final class RunContext implements JobContext {
     @Override public SignalEmitter signals()      { return signals; }
     @Override public ArtifactRecorder artifacts() { return artifacts; }
     @Override public boolean dryRun()              { return dryRun; }
+    @Override public Map<String, Object> signalPayload() { return signalPayload; }
     @Override public PlatformServices services()   { return services; }
 
     @Override public void readConsignments(java.util.List<com.gamma.consignment.ConsignmentSource> sources) {
@@ -75,6 +77,9 @@ final class RunContext implements JobContext {
 
     /** The framework installs the grant-filtered Platform Services just before {@code Job.run(ctx)} (S1-1). */
     void services(PlatformServices services) { this.services = services; }
+
+    /** The framework installs the firing Signal's payload just before {@code Job.run(ctx)}. */
+    void signalPayload(Map<String, Object> payload) { this.signalPayload = payload == null ? Map.of() : payload; }
 
     /** The framework marks a preview fire (MNT-1) just before {@code Job.run(ctx)}. */
     void dryRun(boolean dryRun) { this.dryRun = dryRun; }

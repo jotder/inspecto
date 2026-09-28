@@ -57,6 +57,12 @@ public interface JobContext {
      * say so — never fall through to the real action. Only manual triggers can request it
      * ({@code POST /jobs/{name}/trigger?dryRun=true}); cron/event/signal fires are always real.
      */
+    /** The payload of the Signal that fired this Run ({@code on_signal}); empty for any other trigger. What a
+     *  cross-Space delivered Signal carries was already cut to its offer's allowlist at the Space boundary. */
+    default Map<String, Object> signalPayload() {
+        return Map.of();
+    }
+
     default boolean dryRun() {
         return false;
     }

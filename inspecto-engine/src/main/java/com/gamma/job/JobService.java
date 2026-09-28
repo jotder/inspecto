@@ -551,6 +551,17 @@ public final class JobService implements AutoCloseable {
                 List.of(ParameterDecl.required("reconciliation", ParamType.STRING, "Saved reconciliation component id")),
                 List.of("recon.run.completed"), List.of()),
                 c -> new ReconRunJob(c, dataDir, () -> this.objects)));
+        // incident.open (cross-Space consequence D10): open an Incident in THIS Space from the firing Signal,
+        // carrying only the payload keys the Job names. Needs the operational-objects module at run time.
+        registry.register(JobTypeProvider.of(new JobTypeDescriptor("incident.open", "Open Incident",
+                "Opens an Incident in this Space from the Signal that fired the Job, carrying only the named payload fields.",
+                List.of(ParameterDecl.required("title", ParamType.STRING, "Incident title (may bind $signal.<field>)"),
+                        ParameterDecl.optional("description", ParamType.STRING, null, "Incident description (defaults to the title)"),
+                        ParameterDecl.optional("severity", ParamType.STRING, "WARNING", "Incident severity"),
+                        ParameterDecl.optional("fields", ParamType.STRING, "", "Comma-separated payload keys copied onto the Incident"),
+                        ParameterDecl.optional("dedupe_key", ParamType.STRING, null, "One open Incident per value (e.g. $signal.caseId)")),
+                List.of(), List.of()),
+                c -> new IncidentOpenJob(c, () -> this.objects)));
         // ⛔ caserule.evaluate and objects.analytics are NOT registered here any more (EDG-01 cell 7).
         // Both call ObjectService.evaluateCaseRule / the analytics rollups, which the ObjectAccess seam
         // deliberately does not expose — they are whole operational-object features, not narrow consumers,
@@ -1414,6 +1425,7 @@ public final class JobService implements AutoCloseable {
         if (!pr.undeclared().isEmpty())
             ctx.log().warn(ParameterResolver.undeclaredWarning(job.type(), pr.undeclared()));
         ctx.params(pr.resolved());
+        ctx.signalPayload(firing.signalPayload());
         // DUCKLE-C4: the parameter RECEIPT — which layer each value came from and what it overrode. Built here
         // (the values are resolved), written AFTER the run body (below) so a run's OUTPUT artifacts keep their
         // positions — readers that take artifacts.get(0) as "the output" predate the receipt.
