@@ -432,6 +432,24 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // accessor, so it resolves the engine at call time rather than capturing a not-yet-assigned field.
         platformServices.register("alerts", com.gamma.alert.AlertAccess.class,
                 com.gamma.alert.AlertAccess.over(() -> alertService().orElse(null)));
+        // Object Engine (EDITIONS CP-11): discovered, not constructed. The optional inspecto-ops module
+        // contributes an ObjectEngineProvider; absent it this is empty and every operational-object
+        // surface answers 503, while events are still recorded and the audit trail is untouched.
+        // Opened here, BEFORE the Job engine, so the "objects" Platform Service below exists when it registers.
+        this.objectEngine = OptionalSpi.first(ObjectEngineProvider.class)
+                .map(provider -> provider.open(root, System.getProperty("data.dir", root.dataDir())));
+        // ⚠ The seam is also a Platform Service (EDG-01 cell 7) — that is how a Job Type contributed by
+        // the optional inspecto-ops module reaches it: a ServiceLoader-discovered JobTypeProvider gets only
+        // a JobConfig, but a RUNNING job has JobContext.services(), holding what its descriptor requires:.
+        //
+        // 🔴 Two placement constraints. AFTER objectEngine is assigned: this passes the value EAGERLY (the
+        // "incidents" line above defers through a supplier), and registering it first threw NPE on every
+        // CollectorService construction — 632 errors across 40-odd test classes. And BEFORE the JobService
+        // constructs: requires: validates at registration, so a boot-time JobService built ahead of it
+        // refused objects.analytics / caserule.evaluate (they require "objects" since 2026-09-28 —
+        // until then they required nothing, got no grant, and failed every run; OpsJobTypesRunInAServiceTest).
+        platformServices.register("objects", com.gamma.objects.ObjectAccess.class,
+                objects().orElse(null));
         this.jobs              = jobConfigs.isEmpty()
                 ? null
                 : new JobService(jobConfigs, bus, scheduler, reports,
@@ -466,11 +484,6 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             }
         };
         this.configSource = configSource;
-        // Object Engine (EDITIONS CP-11): discovered, not constructed. The optional inspecto-ops module
-        // contributes an ObjectEngineProvider; absent it this is empty and every operational-object
-        // surface answers 503, while events are still recorded and the audit trail is untouched.
-        this.objectEngine = OptionalSpi.first(ObjectEngineProvider.class)
-                .map(provider -> provider.open(root, System.getProperty("data.dir", root.dataDir())));
         // D7 phase 2: adopt tags that exist only in the legacy attributes CSV into the assignment store, so
         // the two cannot disagree. Idempotent, and a no-op on a fresh Space; logged only when it does work.
         int adopted = this.objectEngine.map(ObjectEngineProvider.ObjectEngine::adoptedTagAssignments).orElse(0);
@@ -478,17 +491,6 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // Give the Job engine this space's seam so the recon.run built-in can promote a breach to an
         // Incident (deduped per reconciliation). Wired after both exist; a null-safe no-op when no jobs.
         if (this.jobs != null) this.jobs.objects(this.objectEngine.map(ObjectEngineProvider.ObjectEngine::access).orElse(null));
-        // ⚠ The seam is also a Platform Service (EDG-01 cell 7) — that is how a Job Type contributed by
-        // the optional inspecto-ops module reaches it: a ServiceLoader-discovered JobTypeProvider gets only
-        // a JobConfig, but a RUNNING job has JobContext.services().
-        //
-        // 🔴 Registered HERE, after objectEngine is assigned, and that placement is load-bearing. It first
-        // sat beside the "incidents" registration ~40 lines above, which reads the same field — but that
-        // one wraps its access in a SUPPLIER and so defers it, whereas this passes the value EAGERLY. The
-        // field was still null there, so every CollectorService construction threw NPE: 632 errors across
-        // 40-odd test classes, from one line that looked symmetrical with its neighbour.
-        platformServices.register("objects", com.gamma.objects.ObjectAccess.class,
-                objects().orElse(null));
 
         // Phase D2: promote selected domain events to managed objects (SEQUENCE_GAP → ALERT) via an EventLog
         // subscriber. ⚠ Now ASKED FOR rather than constructed: core used to do

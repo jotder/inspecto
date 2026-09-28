@@ -122,12 +122,27 @@ class CaseRuleEvalJobTest {
         assertThrows(IllegalStateException.class, () -> job.run(new CapturingContext(Map.of())));
     }
 
+    /** A host binding every id CollectorService binds ({@code requires:} validates against them) — "objects" too. */
+    static PlatformServiceRegistry objectsHost() {
+        PlatformServiceRegistry host = new PlatformServiceRegistry();
+        host.register("notifications", com.gamma.notify.NotificationAccess.class, null);
+        host.register("mail", com.gamma.notify.MailAccess.class, null);
+        host.register("incidents", com.gamma.objects.IncidentAccess.class, null);
+        host.register("schema", com.gamma.pipeline.SchemaAccess.class, null);
+        host.register("consignment-status", com.gamma.consignment.ConsignmentStatusAccess.class, null);
+        host.register("alerts", com.gamma.alert.AlertAccess.class, null);
+        host.register("objects", com.gamma.objects.ObjectAccess.class, null);
+        return host;
+    }
+
     @Test
     void caseRuleEvaluateIsRegisteredAsABuiltInType() throws Exception {
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
-                     "audit", null, null, "data")) {
+                     "audit", null, null, "data", null, objectsHost())) {
             assertTrue(js.jobType("caserule.evaluate").isPresent(), "caserule.evaluate registered as a built-in");
+            assertEquals(List.of("objects"), js.jobType("caserule.evaluate").get().requires(),
+                    "it requires the objects service - the only way its run reaches the engine");
             assertEquals("Case Rule Evaluation", js.jobType("caserule.evaluate").get().title());
         }
     }

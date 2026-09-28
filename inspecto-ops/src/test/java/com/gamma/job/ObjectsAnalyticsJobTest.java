@@ -338,8 +338,10 @@ class ObjectsAnalyticsJobTest {
     void objectsAnalyticsIsRegisteredAsABuiltInType() throws Exception {
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(), new ConsignmentEventBus(), s, null,
-                     "audit", null, null, "data")) {
+                     "audit", null, null, "data", null, CaseRuleEvalJobTest.objectsHost())) {
             assertTrue(js.jobType("objects.analytics").isPresent(), "registered as a built-in");
+            assertEquals(List.of("objects"), js.jobType("objects.analytics").get().requires(),
+                    "it requires the objects service - the only way its run reaches the engine");
             JobTypeDescriptor d = js.jobType("objects.analytics").get();
             assertEquals("Object Analytics Sample", d.title());
             assertTrue(d.emits().contains("objects.analytics.completed"));

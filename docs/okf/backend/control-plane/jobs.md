@@ -219,9 +219,21 @@ Design of record (all phases + resolved decisions + TOON config gallery):
     silently at `ObjectQuery.MAX_LIMIT` = 10 000 per type — `ASSURE-IMPACT-LEDGER-RESIDUALS-1` (1), fixed
     2026-09-28, `ObjectsAnalyticsJobTest.ledgerReadsEveryImpactedObjectBeyondOneQueryPage`); the rows
     themselves are still collected in memory before the write. ⚠ **Freshness = the job's cadence**: a Measure over it lags a live edit until the next run — there is
-    still no live view of `inspecto_ops_objects` (single-writer DB, the non-goal below). Pinned by
+    still no live view of `inspecto_ops_objects` (single-writer DB, the non-goal below). **Decided 2026-09-28
+    (session, `ASSURE-IMPACT-LEDGER-RESIDUALS-1` (2)): that stays the design** — refresh on demand is
+    `POST /jobs/{id}/trigger` (`canOperateRuns`) on the Space's `objects.analytics` Job; a live relation over
+    the objects table is the row-level surface the non-goal below declines, and event-driven re-writes would
+    add a Parquet file per impact edit. Reopen only on a named consumer that needs sub-cadence figures. Pinned by
     `ObjectsAnalyticsJobTest.writesTheImpactLedgerAsADatasetAnyMeasureCanRead` (read back through
     `DatasetRelation`, plus a per-currency `sum(outstanding)` over the latest snapshot).
+  * 🔴 **Both `inspecto-ops` Job Types declare `requires: objects`** (fixed 2026-09-28). They reach the engine
+    only through `JobContext.services()`, which holds exactly what the descriptor requires (S1-2); declaring
+    nothing, **every `objects.analytics` and `caserule.evaluate` run in a deployed build failed** "needs the
+    space Object Engine … not installed" — so the ledger was never written outside tests, which construct the
+    Job directly and never pass the grant. Found by the impact-ledger browser pass. `CollectorService` now
+    opens the Object Engine and registers the `objects` service **before** the boot-time JobService, which
+    validates `requires:` at registration. Pinned end to end by `OpsJobTypesRunInAServiceTest` (lazy and boot
+    JobService, a real `CollectorService`).
   * A write failure emits `objects.analytics.completed` at `WARN` **and rethrows** — the write *is* the work,
     so a swallowed failure would report a silent no-op success. Dry run computes the rows and writes nothing.
   * **Deliberate non-goals:** no Parquet/view surface for *raw* `inspecto_ops_objects` rows (row-level export

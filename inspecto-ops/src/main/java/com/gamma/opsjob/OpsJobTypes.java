@@ -31,10 +31,17 @@ import java.util.List;
  * seam, and {@code spaceId()}, which this module maps to its own per-Space data root. So resolution is
  * deferred to run time, and on a bundle whose engine is missing the job fails with a clear message instead
  * of the provider failing to load.
+ *
+ * <p>🔴 {@code JobContext.services()} holds only what the descriptor {@code requires:} (platform-services S1-2 —
+ * grants are honest). Both types must declare {@link #OBJECTS}: without it every run in a deployed build failed
+ * "needs the space Object Engine", while the direct-construction tests passed ({@code OpsJobTypesRunInAServiceTest}).
  */
 public final class OpsJobTypes {
 
     private OpsJobTypes() {}
+
+    /** The Platform Service id core registers the {@link ObjectAccess} seam under ({@code CollectorService}). */
+    static final List<String> OBJECTS = List.of("objects");
 
     /** The engine for a running job's Space, or {@code null} when none is installed. */
     static ObjectService engineFor(com.gamma.job.JobContext ctx) {
@@ -51,7 +58,7 @@ public final class OpsJobTypes {
             return new JobTypeDescriptor("caserule.evaluate", "Case Rule Evaluation",
                     "Evaluates a saved Case Rule, grouping matching Incidents into a Case; emits a completion signal.",
                     List.of(ParameterDecl.required("rule", ParamType.STRING, "Saved case rule name")),
-                    List.of("caserule.evaluate.completed"), List.of());
+                    List.of("caserule.evaluate.completed"), List.of(), OBJECTS);
         }
 
         /** ⚠ No supplier: the job resolves its Space's engine from the {@code JobContext} at run time. */
@@ -71,7 +78,7 @@ public final class OpsJobTypes {
                                     "CSV of ALERT | INCIDENT | CASE | TASK (default: all four)"),
                             ParameterDecl.optional("retention_days", ParamType.INTEGER, "0",
                                     "Forget samples older than N days (0 = keep forever)")),
-                    List.of("objects.analytics.completed"), List.of());
+                    List.of("objects.analytics.completed"), List.of(), OBJECTS);
         }
 
         /** ⚠ No supplier and no data root: both are resolved from the {@code JobContext} at run time. */
