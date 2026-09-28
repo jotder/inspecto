@@ -74,4 +74,21 @@ class ControlApiNotificationStreamTest {
             resp.body().close();
         }
     }
+
+    @Test
+    void closeEndsLiveStream(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            HttpRequest req = HttpRequest.newBuilder(
+                    URI.create("http://localhost:" + c.port + "/api/v1" + "/notifications/stream")).GET().build();
+            HttpResponse<InputStream> resp = client.send(req, BodyHandlers.ofInputStream());
+            assertEquals(200, resp.statusCode());
+            BufferedReader reader = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8));
+            assertEquals(": connected", reader.readLine());
+            assertEquals(1, c.api.sseStreams().size());
+
+            c.api.close();
+            assertEquals(0, c.api.sseStreams().size(), "close() ended (and deregistered) the stream");
+            assertTrue(ControlApiSignalsStreamTest.readsToEnd(reader), "the client sees end-of-stream");
+        }
+    }
 }

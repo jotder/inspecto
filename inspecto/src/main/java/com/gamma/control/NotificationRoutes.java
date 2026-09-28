@@ -420,6 +420,8 @@ final class NotificationRoutes implements RouteModule {
         // seeing the headers and the listener being live.
         svc.addListener(listener);
         svc.onClose(closer);
+        // ControlApi.close() ends the stream too: drops the listener, interrupts the poll, closes the exchange.
+        SseStreams.Stream registration = api.sseStreams().register(ex, () -> svc.removeListener(listener));
         ex.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
         ex.getResponseHeaders().set("Cache-Control", "no-cache");
         ex.getResponseHeaders().set("Connection", "keep-alive");
@@ -440,6 +442,7 @@ final class NotificationRoutes implements RouteModule {
         } finally {
             svc.removeListener(listener);
             svc.removeOnClose(closer);
+            registration.close();
         }
         return ApiContext.HANDLED;
     }

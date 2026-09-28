@@ -38,18 +38,8 @@ class ControlApiSignalsStreamTest {
     private final HttpClient client = HttpClient.newHttpClient();
 
     private record Ctx(CollectorService svc, ControlApi api, int port, int baseline) implements AutoCloseable {
-        /** An SSE handler only notices its client left on its next write (a heartbeat is 15 s away), so its
-         *  EventLog listener — on the process-wide global log — would outlive this class. Nudge it with a frame
-         *  that passes every test's filter until the handler has de-registered, then close. */
-        public void close() throws InterruptedException {
-            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
-            while (svc.eventLog().subscriberCount() > baseline && System.nanoTime() < deadline) {
-                svc.eventLog().emit(sig("job.run.failed", Severity.CRITICAL, "drain").toEvent());
-                Thread.sleep(50);
-            }
-            api.close();
-            svc.close();
-        }
+        /** ControlApi.close() ends every live stream and drops its EventLog subscriber. */
+        public void close() { api.close(); svc.close(); }
     }
 
     private Ctx open(Path dir) throws Exception {
@@ -106,6 +96,41 @@ class ControlApiSignalsStreamTest {
             assertFalse(dataLine.contains("\"job.run.started\""), "the filtered-out signal never arrives");
             resp.body().close();
         }
+    }
+
+    @Test
+    void closeEndsLiveStreamAndDropsItsSubscriber(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            HttpRequest req = HttpRequest.newBuilder(
+                    URI.create("http://localhost:" + c.port + "/api/v1" + "/signals/stream")).GET().build();
+            HttpResponse<InputStream> resp = client.send(req, BodyHandlers.ofInputStream());
+            assertEquals(200, resp.statusCode());
+            assertEquals(c.baseline + 1, c.svc.eventLog().subscriberCount(), "the stream's subscriber is live");
+            BufferedReader reader = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8));
+            assertEquals(": connected", reader.readLine());
+
+            long t0 = System.nanoTime();
+            c.api.close();
+            long deadline = t0 + TimeUnit.SECONDS.toNanos(1);
+            while (c.svc.eventLog().subscriberCount() > c.baseline && System.nanoTime() < deadline) Thread.sleep(10);
+            assertEquals(c.baseline, c.svc.eventLog().subscriberCount(), "close() dropped the subscriber within 1 s");
+            assertEquals(0, c.api.sseStreams().size());
+            assertTrue(readsToEnd(reader), "the client sees end-of-stream");
+            assertTrue(System.nanoTime() - t0 < TimeUnit.SECONDS.toNanos(5), "well inside one 15 s heartbeat");
+            c.api.close();   // idempotent
+        }
+    }
+
+    /** True when the stream reaches EOF (readLine null) within 2 s, with no heartbeat needed. */
+    static boolean readsToEnd(BufferedReader reader) throws Exception {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                while (reader.readLine() != null) { /* drain */ }
+                return true;
+            } catch (java.io.IOException e) {
+                return false;
+            }
+        }).get(2, TimeUnit.SECONDS);
     }
 
     private static String readDataLine(HttpResponse<InputStream> resp) throws Exception {

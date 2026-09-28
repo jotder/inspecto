@@ -163,6 +163,8 @@ final class SignalRoutes implements RouteModule {
         // Register before the response is committed so no signal can slip through between the client
         // seeing the headers and the listener being live.
         log.addSubscriber(listener);
+        // ControlApi.close() ends the stream: drops the subscriber, interrupts the poll, closes the exchange.
+        SseStreams.Stream registration = api.sseStreams().register(ex, () -> log.removeSubscriber(listener));
         ex.getResponseHeaders().set("Content-Type", "text/event-stream; charset=utf-8");
         ex.getResponseHeaders().set("Cache-Control", "no-cache");
         ex.getResponseHeaders().set("Connection", "keep-alive");
@@ -181,6 +183,7 @@ final class SignalRoutes implements RouteModule {
             // client went away — normal SSE termination
         } finally {
             log.removeSubscriber(listener);
+            registration.close();
         }
         return ApiContext.HANDLED;
     }

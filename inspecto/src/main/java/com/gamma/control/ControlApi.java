@@ -419,6 +419,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     @Override
     public void close() {
+        sseStreams.closeAll();   // before http.stop: it neither interrupts handler threads nor ends SSE loops
         if (anchorRoll != null) anchorRoll.shutdownNow();
         http.stop(SHUTDOWN_DRAIN_SECONDS);
         if (com.gamma.job.JobService.runAuthority() == runAuthority) com.gamma.job.JobService.installRunAuthority(null);
@@ -1338,6 +1339,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     @Override
     public CollectorService service() { return currentContext().service(); }
+
+    /** Live SSE streams, ended by {@link #close()} (their loops otherwise outlive it by a heartbeat). */
+    private final SseStreams sseStreams = new SseStreams();
+
+    @Override
+    public SseStreams sseStreams() { return sseStreams; }
 
     @Override
     public SpaceManager spaces() { return spaces; }
