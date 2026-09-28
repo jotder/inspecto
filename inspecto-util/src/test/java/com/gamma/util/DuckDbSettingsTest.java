@@ -9,6 +9,8 @@ import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -78,6 +80,69 @@ class DuckDbSettingsTest {
             assertEquals(Path.of(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize(), temp);
             assertNotEquals(Path.of(".tmp").toAbsolutePath().normalize(), temp, "never the CWD-relative .tmp");
             assertFalse(currentSetting(conn, "memory_limit").isBlank());
+        }
+    }
+
+    /**
+     * The defect, reproduced: a raw in-memory open spills into {@code <CWD>/.tmp}. A 64MB cap is set only to
+     * force the spill on any host; {@code temp_directory} is left at DuckDB's own default, as a raw open had it.
+     */
+    @Test
+    void aRawInMemoryOpenSpillsIntoTheCwd() throws Exception {
+        Path cwdTmp = Path.of(".tmp").toAbsolutePath().normalize();
+        boolean existed = Files.exists(cwdTmp);
+        try (Connection conn = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+             Statement st = conn.createStatement()) {
+            st.execute("SET memory_limit='64MB'");
+            assertEquals(cwdTmp, Path.of(currentSetting(conn, "temp_directory")).toAbsolutePath().normalize(),
+                    "an in-memory database's default temp_directory is .tmp relative to the CWD");
+            List<Path> spilled = forceSpill(conn);
+            assertFalse(spilled.isEmpty(), "the fill must spill, or this test proves nothing");
+            assertTrue(spilled.stream().allMatch(p -> p.startsWith(cwdTmp)), "spill landed in the CWD: " + spilled);
+        } finally {
+            if (!existed) deleteTree(cwdTmp);
+        }
+    }
+
+    @Test
+    void openInMemorySpillLandsInTheSpillDirNotTheCwd(@TempDir Path dir) throws Exception {
+        String prior = System.getProperty(DuckDbUtil.PROP_MEMORY_LIMIT);
+        System.setProperty(DuckDbUtil.PROP_MEMORY_LIMIT, "64MB");
+        Path spill = DuckDbUtil.spillDirUnder(dir).toAbsolutePath().normalize();
+        Path cwdTmp = Path.of(".tmp").toAbsolutePath().normalize();
+        boolean cwdTmpExisted = Files.exists(cwdTmp);
+        try (Connection conn = DuckDbUtil.openInMemory(spill)) {
+            List<Path> spilled = forceSpill(conn);
+            assertFalse(spilled.isEmpty(), "the fill must spill under the 64MB cap, or this test proves nothing");
+            assertTrue(spilled.stream().allMatch(p -> p.startsWith(spill)), "spill left the spill dir: " + spilled);
+            try (Stream<Path> inSpill = Files.list(spill)) {
+                assertTrue(inSpill.findAny().isPresent(), "the spill files are on disk in the spill dir");
+            }
+            assertFalse(!cwdTmpExisted && Files.exists(cwdTmp), "nothing was created under the CWD's .tmp");
+        } finally {
+            if (prior == null) System.clearProperty(DuckDbUtil.PROP_MEMORY_LIMIT);
+            else System.setProperty(DuckDbUtil.PROP_MEMORY_LIMIT, prior);
+            if (!cwdTmpExisted) deleteTree(cwdTmp);
+        }
+    }
+
+    /** Fill an in-memory table well past a 64MB cap; returns the spill files DuckDB reports holding. */
+    private static List<Path> forceSpill(Connection conn) throws Exception {
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE TABLE fill AS SELECT i, md5(i::VARCHAR) || md5((i + 1)::VARCHAR) AS s"
+                    + " FROM range(3000000) r(i)");
+            List<Path> out = new java.util.ArrayList<>();
+            try (ResultSet rs = st.executeQuery("SELECT path FROM duckdb_temporary_files()")) {
+                while (rs.next()) out.add(Path.of(rs.getString(1)).toAbsolutePath().normalize());
+            }
+            return out;
+        }
+    }
+
+    private static void deleteTree(Path root) throws java.io.IOException {
+        if (!Files.exists(root)) return;
+        try (Stream<Path> walk = Files.walk(root)) {
+            for (Path p : walk.sorted(java.util.Comparator.reverseOrder()).toList()) Files.deleteIfExists(p);
         }
     }
 

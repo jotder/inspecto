@@ -41,7 +41,7 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   database's default `temp_directory` is `.tmp` **relative to the CWD** (probed on 1.5.2.1). Spill choice:
   callers with a Space data root use `DuckDbUtil.spillDirUnder(root)` = `<data root>/.duckdb_tmp` (dot-prefixed
   so dataset scans skip it) — `MaterializeTask`, `SqlTemplateJob`, `StorageReportTask`, `BackupTask`,
-  `ConsignmentProcessJobType` (their `dataDir`/`dataRoot`), and `PartitionCompactor`, `ReferenceCompactor`,
+  `ConsignmentProcessJobType`, `RiskScoreEvaluator` (their `dataDir`/`dataRoot`), and `PartitionCompactor`, `ReferenceCompactor`,
   `StorageSeries`, `ObjectsAnalyticsJob` via `SpaceConfigRoot.currentDataRoot()` (the compactors deliberately
   NOT under the store dir they walk). No Space context ⇒ `spillDir = null` ⇒ `java.io.tmpdir`:
   `ParquetEventStore`, `ExchangeSnapshotWriter`, `PipelineDocumentXlsx`, `TypeFlow`, `SchemaExtractor`,
@@ -49,6 +49,17 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
   `DuckDbUtil.regularFilesSkippingSpill` (no descent into `.duckdb_tmp`, vanished entries tolerated) so
   concurrent spill is never archived/counted and cannot fail the walk. Test: `DuckDbSettingsTest.openInMemory*`,
   `BackupTaskTest.backupNeverArchivesDuckDbSpill`, `MaintenanceLibraryTest.storageReportIgnoresDuckDbSpill`. `SqlSandbox` keeps its own 1GB cap.
+  **Guard + spill proof (2026-09-28).** `RiskScoreEvaluator` reintroduced a raw open the day the row closed,
+  so `NoRawInMemoryDuckDbOpenContractTest` (`inspecto-util`) now scans every top-level module's
+  `src/main/java` for the in-memory URL literal not followed by `+` and fails on a hit; exempt by file:
+  `DuckDbUtil` (the factory), `OperationalDbReport` (scheme allow-list), `JdbcDrivers` (prefix dispatch).
+  `DuckDbSettingsTest.aRawInMemoryOpenSpillsIntoTheCwd` reproduces the defect on 1.5.2 (a 64MB-capped fill
+  leaves `duckdb_temp_storage_*.tmp` under `<CWD>/.tmp`, per `duckdb_temporary_files()`), and
+  `openInMemorySpillLandsInTheSpillDirNotTheCwd` shows the factory's spill in `spillDir`. Mutation-checked:
+  dropping the factory's `temp_directory` or `memory_limit`, or restoring the raw Risk Score open, each turns
+  a test red. **Session decision (no-Space fallback):** `java.io.tmpdir`, not a new configured scratch root —
+  it is the only writable directory every opener already has, it is outside the CWD, and it needs no jail
+  (the path is the JVM's own, never user input); a caller that gains a Space data root should pass it.
 * **Memory / spill caps (opt-in; one knob for every scratch connection).** `DuckDbUtil.applyDuckDbSettings`
   sets `memory_limit` / `temp_directory` (spill) / `max_temp_directory_size` when a value is configured;
   unset ⇒ DuckDB's own default (≈ 80% RAM **per instance** — the aggregate-overcommit hazard under

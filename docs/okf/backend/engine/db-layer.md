@@ -879,6 +879,14 @@ shared file; leave them unset in multi-space mode so each space keeps its own `d
 `SpaceRootTest`): repo-checked-out spaces gitignore `duckdb/` and DuckDB does not create parent
 dirs, so without the mkdir every DB-backed store silently degraded to in-memory on a fresh checkout.
 
+**In-memory scratch spill (`DUCKDB-INMEMORY-SCRATCH-UNCAPPED-1`).** Transient in-memory DuckDB
+connections (job tasks, compactors, Risk Score writes, `SqlGuard`, `TypeFlow`) are not stores, but they
+spill: an in-memory database's default `temp_directory` is `.tmp` relative to the **process CWD**. Every such
+open goes through `DuckDbUtil.openInMemory(spillDir)` — spill lands in `<data root>/.duckdb_tmp` when the
+caller has a Space data root, else in `java.io.tmpdir` (session decision 2026-09-28: the JVM temp dir is the
+only writable directory every opener has, and it is never the CWD). Details and the full caller list:
+[duckdb.md](duckdb.md); `NoRawInMemoryDuckDbOpenContractTest` fails the build on a new raw open.
+
 ---
 
 ## 5. Running operational data on Postgres

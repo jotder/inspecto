@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
+import com.gamma.util.DuckDbUtil;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -14,7 +15,6 @@ import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -177,7 +177,7 @@ public final class RiskScoreEvaluator {
         String stamp = scoredAt.toEpochMilli() + "-" + runId.replaceAll("[^A-Za-z0-9_-]", "_");
         Path histTmp = history.resolve("scores-" + stamp + ".parquet.tmp");
         Path latestTmp = latest.resolve("scores-" + stamp + ".parquet.tmp");
-        try (Connection c = DriverManager.getConnection("jdbc:duckdb:");
+        try (Connection c = DuckDbUtil.openInMemory(DuckDbUtil.spillDirUnder(dataDir));
              Statement st = c.createStatement()) {
             st.execute("CREATE TABLE s (model VARCHAR, entity_type VARCHAR, entity_key VARCHAR, score DOUBLE, "
                     + "high BOOLEAN, factors VARCHAR, model_version VARCHAR, run_id VARCHAR, scored_at TIMESTAMP)");
