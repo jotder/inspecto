@@ -53,9 +53,12 @@ export function timezoneValidator(c: AbstractControl): { timezone: true } | null
     if (!v) return null;
     if (!ZONE_NAME.test(v) || v === 'Z') return { timezone: true };
     if (!KNOWN_ZONES || KNOWN_ZONES.has(v)) return null;
+    // Intl matches names case-insensitively; Java's ZoneId.of does not. Every IANA segment starts with a capital
+    // (UTC, GMT0, EST5EDT, Asia/Calcutta), and a name Intl only re-cases (Asia/CALCUTTA) is refused too.
+    if (v.split('/').some((seg) => !/^[A-Z]/.test(seg))) return { timezone: true };
     try {
-        new Intl.DateTimeFormat('en', { timeZone: v });
-        return null;
+        const resolved = new Intl.DateTimeFormat('en', { timeZone: v }).resolvedOptions().timeZone;
+        return resolved !== v && resolved.toLowerCase() === v.toLowerCase() ? { timezone: true } : null;
     } catch {
         return { timezone: true };
     }

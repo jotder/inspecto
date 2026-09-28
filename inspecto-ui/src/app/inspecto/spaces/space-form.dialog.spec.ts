@@ -80,7 +80,7 @@ describe('SpaceFormDialog', () => {
         const space: Space = { id: 'beta', displayName: 'Beta', description: 'd', createdAt: '' };
         const { fixture, spaceSave, tzSave } = create({ space });
         const c = fixture.componentInstance;
-        for (const bad of ['+05:30', 'Z', 'UTC+5', 'Mars/Olympus']) {
+        for (const bad of ['+05:30', 'Z', 'UTC+5', 'Mars/Olympus', 'asia/kolkata', 'utc', 'Asia/CALCUTTA']) {
             c.form.patchValue({ timezone: bad });
             expect(c.form.get('timezone')!.hasError('timezone')).toBe(true);
         }
@@ -89,7 +89,7 @@ describe('SpaceFormDialog', () => {
         expect(spaceSave).not.toHaveBeenCalled();
         expect(tzSave).not.toHaveBeenCalled();
         expect(fixture.nativeElement.textContent).toContain('Not an IANA timezone name');
-        for (const ok of ['', 'UTC', 'Asia/Kolkata', 'EST5EDT']) {
+        for (const ok of ['', 'UTC', 'Asia/Kolkata', 'Asia/Calcutta', 'EST5EDT']) {
             c.form.patchValue({ timezone: ok });
             expect(c.form.get('timezone')!.valid).toBe(true);
         }
