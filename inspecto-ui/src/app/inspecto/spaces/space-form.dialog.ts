@@ -9,7 +9,14 @@ import { MatInputModule } from '@angular/material/input';
 import { forkJoin, of, switchMap } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { environment } from 'environments/environment';
-import { apiErrorMessage, Branding, BrandingService, Space, SpacesService } from 'app/inspecto/api';
+import {
+    apiErrorMessage,
+    Branding,
+    BrandingService,
+    Space,
+    SpacesService,
+    TimezoneSettingsService,
+} from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 
@@ -147,6 +154,11 @@ export interface SpaceFormData {
                     <mat-label>Footer text</mat-label>
                     <input matInput formControlName="footerText" autocomplete="off" />
                 </mat-form-field>
+                <mat-form-field class="w-full" subscriptSizing="dynamic">
+                    <mat-label>Default timezone</mat-label>
+                    <input matInput formControlName="timezone" autocomplete="off" placeholder="UTC" />
+                    <mat-hint>An IANA zone such as Asia/Kolkata. KPIs without their own timezone use it.</mat-hint>
+                </mat-form-field>
             </mat-dialog-content>
             <mat-dialog-actions align="end">
                 <button type="button" mat-button (click)="requestClose()">Cancel</button>
@@ -161,6 +173,7 @@ export class SpaceFormDialog {
     private fb = inject(FormBuilder);
     private api = inject(SpacesService);
     private brandingApi = inject(BrandingService);
+    private timezoneApi = inject(TimezoneSettingsService);
     private toastr = inject(ToastrService);
     private ref = inject(MatDialogRef<SpaceFormDialog, Space>);
     private confirm = inject(InspectoConfirmService);
@@ -193,6 +206,7 @@ export class SpaceFormDialog {
         description: [''],
         caption: [''],
         footerText: [''],
+        timezone: [''],
     });
 
     constructor() {
@@ -213,6 +227,10 @@ export class SpaceFormDialog {
                     });
                 },
                 error: () => undefined, // degrade gracefully — branding fields start empty
+            });
+            this.timezoneApi.getFor(s.id).subscribe({
+                next: (t) => this.form.patchValue({ timezone: t.timezone ?? '' }),
+                error: () => undefined, // degrade gracefully — the field starts empty (UTC)
             });
         } else {
             // Create mode: keep the id slug in sync with the name until the user overrides it.
@@ -280,6 +298,7 @@ export class SpaceFormDialog {
                     forkJoin({
                         space: of(space),
                         _: this.brandingApi.saveFor(space.id, branding),
+                        tz: this.timezoneApi.saveFor(space.id, String(v.timezone ?? '').trim() || null),
                     }),
                 ),
             )

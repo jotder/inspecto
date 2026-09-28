@@ -100,6 +100,14 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
      * @throws IllegalArgumentException naming the first thing wrong (→ 422 at the route)
      */
     public static KpiDefinition fromMap(String name, Map<String, Object> m) {
+        return fromMap(name, m, UTC);
+    }
+
+    /**
+     * {@link #fromMap(String, Map)}, with {@code defaultZone} — the Space's default timezone — used when the KPI states
+     * no {@code timezone} of its own. The KPI's own zone always wins.
+     */
+    public static KpiDefinition fromMap(String name, Map<String, Object> m, java.time.ZoneId defaultZone) {
         if (m == null) throw new IllegalArgumentException("kpi content is required");
         List<String> unknown = m.keySet().stream().filter(k -> !KEYS.contains(k) && !k.startsWith("x-")).sorted().toList();
         if (!unknown.isEmpty())
@@ -128,7 +136,7 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
         if (m.get("unit") != null && !(m.get("unit") instanceof String))
             throw new IllegalArgumentException("kpi 'unit' must be text");
         return new KpiDefinition(name, dataset, measure, measureText, timeField, grain, comparison, direction, target, bands,
-                zone(trimToNull(m.get("timezone"))));
+                zone(trimToNull(m.get("timezone")), defaultZone == null ? UTC : defaultZone));
     }
 
     /** A region zone name (never an offset form), default UTC — the zone a KPI's periods are cut in. */
@@ -137,14 +145,23 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
     /** The default zone. A region id ("UTC"), not ZoneOffset.UTC, whose id "Z" DuckDB does not know. */
     public static final java.time.ZoneId UTC = java.time.ZoneId.of("UTC");
 
-    private static java.time.ZoneId zone(String s) {
-        if (s == null) return UTC;
+    private static java.time.ZoneId zone(String s, java.time.ZoneId fallback) {
+        if (s == null) return fallback;
+        java.time.ZoneId z = regionZone(s);
+        if (z != null) return z;
+        throw new IllegalArgumentException("kpi 'timezone' must be an IANA zone name such as Asia/Kolkata, got '" + s + "'");
+    }
+
+    /** {@code s} as an IANA region zone (never an offset form), or {@code null} when it is not one. Shared with the
+     *  Space default-timezone setting so the two accept exactly the same names. */
+    public static java.time.ZoneId regionZone(String s) {
+        if (s == null) return null;
         try {
             if (ZONE_NAME.matcher(s).matches()) return java.time.ZoneId.of(s);
         } catch (java.time.DateTimeException ignored) {
-            // fall through to the refusal
+            // not a zone
         }
-        throw new IllegalArgumentException("kpi 'timezone' must be an IANA zone name such as Asia/Kolkata, got '" + s + "'");
+        return null;
     }
 
     private static Grain grain(String s) {

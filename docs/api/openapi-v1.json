@@ -7900,6 +7900,30 @@
         }
       }
     },
+    "/settings/timezone" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "Read the Space's default timezone",
+        "operationId" : "getSettingsTimezone",
+        "description" : "Returns {timezone, effectiveTimezone}: the IANA zone a KPI without its own timezone is evaluated in. timezone null = UTC.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      },
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "Set the Space's default timezone",
+        "operationId" : "putSettingsTimezone",
+        "description" : "Body {timezone}: an IANA region zone name (e.g. Asia/Kolkata), or null/blank for UTC; an unknown name or an offset form is 422. Stored as timezone.toon in the Space's config root. A KPI's own timezone always wins. Gated on canAuthorWorkbench; 503 when writes are disabled.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
     "/inv/schema/overlap-profile" : {
       "post" : {
         "tags" : [ "inv" ],

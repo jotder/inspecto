@@ -19,6 +19,9 @@ import java.util.Map;
  *   GET /settings/pipeline-history   the space's {keep, effectiveKeep, defaultKeep, maxKeep} — Pipeline config
  *                                    versions kept per Pipeline (keep null = the shipped default)
  *   PUT /settings/pipeline-history   replace it (same gates as branding)
+ *   GET /settings/timezone   the space's {timezone, effectiveTimezone} — the default zone a KPI without its own
+ *                            timezone is evaluated in (timezone null = UTC)
+ *   PUT /settings/timezone   replace it (same gates as branding; a non-IANA name is 422)
  *   GET /config/icon-map     the space's processor-icon map { "&lt;type&gt;": {glyph,color}, … } ({} = none) [v5.0.0]
  *   PUT /config/icon-map     replace the space's icon map (same gates as branding)                          [v5.0.0]
  * </pre>
@@ -61,6 +64,32 @@ final class SettingsRoutes implements RouteModule {
         api.get("/config/icon-map", (e, m) -> ETags.respond(e, readIconMap(api)));
         api.put("/config/icon-map", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> writeIconMap(api, api.body(e))));
+        api.get("/settings/timezone", (e, m) -> ETags.respond(e, timezoneShape(TimezoneSettings.forRoot(api.writeRoot()))));
+        api.put("/settings/timezone", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> writeTimezone(api, api.body(e))));
+    }
+
+    /** {@code timezone}: {@code null}/blank = UTC; else an IANA region zone name or 422 — never an offset form. */
+    private Object writeTimezone(ApiContext api, Map<String, Object> body) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "timezone settings write");
+        Object raw = body.get("timezone");
+        java.time.ZoneId zone = null;
+        if (raw != null && !String.valueOf(raw).isBlank()) {
+            zone = com.gamma.query.KpiDefinition.regionZone(String.valueOf(raw).trim());
+            if (zone == null)
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                        "timezone must be an IANA zone name such as Asia/Kolkata, got '" + raw + "'");
+        }
+        TimezoneSettings s = new TimezoneSettings(zone);
+        s.write(root.resolve(TimezoneSettings.FILE));
+        return timezoneShape(s);
+    }
+
+    private static Map<String, Object> timezoneShape(TimezoneSettings s) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("timezone", s.timezone() == null ? null : s.timezone().getId());
+        m.put("effectiveTimezone", s.effective().getId());
+        return m;
     }
 
     private Object readBranding(ApiContext api) {

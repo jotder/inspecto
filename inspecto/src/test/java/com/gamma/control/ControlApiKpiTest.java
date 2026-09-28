@@ -211,6 +211,37 @@ class ControlApiKpiTest {
         }
     }
 
+    @Test
+    void theSpaceDefaultTimezoneAppliesAndAKpisOwnZoneWins(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedOrders(c, "orders", Map.of());
+            data(send(c, "POST", "/components/kpi", KPI, ALICE), 200);
+            data(send(c, "POST", "/components/kpi", KPI.replace("\"revenue\"", "\"revenue_ny\"")
+                    .replace("\"grain\"", "\"timezone\":\"America/New_York\",\"grain\""), ALICE), 200);
+            String instant = "2026-08-13T20:00:00Z";   // 14 Aug in Kolkata, 13 Aug in UTC and New York
+
+            assertEquals("UTC", data(send(c, "GET", "/settings/timezone", null, ALICE), 200).get("effectiveTimezone").asText());
+            assertTrue(error(send(c, "PUT", "/settings/timezone", "{\"timezone\":\"Mars/Olympus\"}", ALICE), 422)
+                    .contains("IANA zone name"));
+            assertEquals(422, send(c, "PUT", "/settings/timezone", "{\"timezone\":\"+05:30\"}", ALICE).statusCode(),
+                    "an offset form is refused, as on a KPI");
+            assertEquals(403, send(c, "PUT", "/settings/timezone", "{\"timezone\":\"Asia/Kolkata\"}", BUSINESS).statusCode());
+            JsonNode set = data(send(c, "PUT", "/settings/timezone", "{\"timezone\":\"Asia/Kolkata\"}", ALICE), 200);
+            assertEquals("Asia/Kolkata", set.get("timezone").asText());
+
+            JsonNode v = data(send(c, "GET", "/kpis/revenue/value?asOf=" + instant, null, ALICE), 200);
+            assertEquals("Asia/Kolkata", v.get("timezone").asText(), "no zone on the KPI ⇒ the Space default");
+            assertEquals("2026-08-14", v.get("asOf").asText());
+            JsonNode ny = data(send(c, "GET", "/kpis/revenue_ny/value?asOf=" + instant, null, ALICE), 200);
+            assertEquals("America/New_York", ny.get("timezone").asText(), "the KPI's own zone wins");
+            assertEquals("2026-08-13", ny.get("asOf").asText());
+
+            data(send(c, "PUT", "/settings/timezone", "{\"timezone\":null}", ALICE), 200);
+            assertEquals("UTC", data(send(c, "GET", "/kpis/revenue/value?asOf=" + instant, null, ALICE), 200)
+                    .get("timezone").asText(), "cleared ⇒ UTC again");
+        }
+    }
+
     // ── the Dataset sharing boundary ─────────────────────────────────────────────
 
     @Test

@@ -59,7 +59,7 @@ final class KpiRoutes implements RouteModule {
         ComponentAccess.requireView(ex, TYPE, id, content);   // R3: shared-away ⇒ indistinguishable 404
         KpiDefinition kpi;
         try {
-            kpi = KpiDefinition.fromMap(id, content);
+            kpi = KpiDefinition.fromMap(id, content, TimezoneSettings.forRoot(writeRoot).effective());   // own zone → Space default → UTC
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "kpi '" + id + "' is invalid: " + bad.getMessage());
         }

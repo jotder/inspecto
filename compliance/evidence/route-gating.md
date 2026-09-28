@@ -142,7 +142,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/components/transform/describe` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:97` |
 | POST | `/components/transform/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ComponentRoutes.java:90` |
 | DELETE | `/config/([^/]+)/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigReadRoutes.java:36` |
-| PUT | `/config/icon-map` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:62` |
+| PUT | `/config/icon-map` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:65` |
 | POST | `/config/patch` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ConfigWriteRoutes.java:44` |
 | POST | `/config/preview/parsing` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:43` |
 | POST | `/config/preview/schema` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:46` |
@@ -292,12 +292,13 @@ system: the evidence cannot say something the code does not.
 | POST | `/runs/([^/]+)/retries/retry-now` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:112` |
 | POST | `/runs/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:50` |
 | PUT | `/settings/approval` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:57` |
-| PUT | `/settings/branding` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:50` |
+| PUT | `/settings/branding` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:53` |
 | PUT | `/settings/egress` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/EgressRoutes.java:44` |
-| PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:53` |
-| PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:56` |
-| PUT | `/settings/pipeline-history` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:59` |
+| PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:56` |
+| PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:59` |
+| PUT | `/settings/pipeline-history` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:62` |
 | PUT | `/settings/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:77` |
+| PUT | `/settings/timezone` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:68` |
 | POST | `/space-comparisons` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceComparisonRoutes.java:42` |
 | POST | `/spaces` | exempt | recovery-route | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:72` |
 | DELETE | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:79` |

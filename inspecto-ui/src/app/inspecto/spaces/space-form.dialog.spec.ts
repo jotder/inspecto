@@ -5,7 +5,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
-import { BrandingService, Space, SpacesService } from 'app/inspecto/api';
+import { BrandingService, Space, SpacesService, TimezoneSettingsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { SpaceFormData, SpaceFormDialog } from './space-form.dialog';
 
@@ -14,6 +14,7 @@ const NO_BRANDING = { logoDataUrl: null, caption: null, footerText: null };
 function create(data: SpaceFormData | null = null) {
     const getFor = vi.fn(() => of(NO_BRANDING));
     const saveFor = vi.fn(() => of(NO_BRANDING));
+    const tzGetFor = vi.fn(() => of({ timezone: 'Asia/Kolkata', effectiveTimezone: 'Asia/Kolkata' }));
     TestBed.configureTestingModule({
         imports: [SpaceFormDialog],
         providers: [
@@ -22,6 +23,7 @@ function create(data: SpaceFormData | null = null) {
             { provide: MAT_DIALOG_DATA, useValue: data },
             { provide: SpacesService, useValue: { availableSpaces: signal([{ id: 'taken' }]) } },
             { provide: BrandingService, useValue: { getFor, saveFor } },
+            { provide: TimezoneSettingsService, useValue: { getFor: tzGetFor, saveFor: vi.fn() } },
             { provide: ToastrService, useValue: {} },
         ],
     });
@@ -63,6 +65,7 @@ describe('SpaceFormDialog', () => {
         expect(c.form.get('id')).toBeNull();
         expect(c.form.get('display_name')!.value).toBe('Beta');
         expect(getFor).toHaveBeenCalledWith('beta');
+        expect(c.form.get('timezone')!.value).toBe('Asia/Kolkata'); // the Space default timezone is prefilled
     });
 
     it('has no a11y violations', async () => {

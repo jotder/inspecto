@@ -55,6 +55,7 @@ export * from './decision-rules.service';
 export * from './geo-settings.service';
 export * from './geo.service';
 export * from './branding.service';
+export * from './timezone-settings.service';
 export * from './scheduler-settings.service';
 export * from './egress-settings.service';
 export * from './inv.service';

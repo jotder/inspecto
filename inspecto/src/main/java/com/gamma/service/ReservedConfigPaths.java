@@ -21,7 +21,7 @@ import java.util.Set;
  *       assist agent's autonomy {@code policy.json}, {@code approvals.jsonl} and run logs), and the Data
  *       Exchange {@code offers.toon} / {@code grants.toon};</li>
  *   <li>Space settings documents — {@code branding.toon}, {@code geo.toon}, {@code link-analysis.toon},
- *       {@code pipeline-history.toon}, {@code icon-map.toon}, {@code scheduler.toon}, {@code nav-menus.toon},
+ *       {@code pipeline-history.toon}, {@code timezone.toon}, {@code icon-map.toon}, {@code scheduler.toon}, {@code nav-menus.toon},
  *       {@code notification-preferences.toon}, {@code partition.toon}, {@code space.toon};</li>
  *   <li>operational state — {@code rename.journal} (what {@code /pipelines/rename/resume} acts on),
  *       {@code recon-state/}, {@code expectation-baselines/} (audited accept/clear ops), the config history
@@ -41,7 +41,7 @@ public final class ReservedConfigPaths {
     /** Reserved files, matched at the config root. */
     static final Set<String> FILES = Set.of(
             "roles.toon", "demo-users.toon", "access-policies.toon", "approval.toon", "egress.toon", "offers.toon", "grants.toon",
-            "branding.toon", "geo.toon", "link-analysis.toon", "pipeline-history.toon", "icon-map.toon",
+            "branding.toon", "geo.toon", "link-analysis.toon", "pipeline-history.toon", "timezone.toon", "icon-map.toon",
             "scheduler.toon", "nav-menus.toon", "notification-preferences.toon", "partition.toon", "space.toon",
             "rename.journal", "dataset-publications.tsv");
 

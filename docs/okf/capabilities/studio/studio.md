@@ -370,7 +370,7 @@ the Dataset must exist AND be readable by the author, with the measure field and
 against the SAME elapsed length of the comparison period (a month read on the 13th compares 13 days with 13
 days), through `MeasureCompiler` + `SqlGuard`, and answers value, comparison, delta, Δ%, the `timezone`, `band`
 (`GREEN`/`AMBER`/`RED`, the `statusTone` words) and `tone`. 🔴 **A KPI evaluates in ONE explicit zone** — its
-`timezone`, else a Space setting if one existed (none does today), else **UTC**: the window is local midnight in
+`timezone`, else the **Space default timezone** (`GET|PUT /settings/timezone`, `{timezone}` stored as `timezone.toon` in the Space config root — `TimezoneSettings`; the same region-name rule as a KPI, 422 otherwise; `canAuthorWorkbench`; since 2026-09-28), else **UTC**: the window is local midnight in
 that zone, written as typed `TIMESTAMPTZ` literals, and the DuckDB session `TimeZone` is SET to the same zone for
 the query (`QueryExecutor.run(req, policy, zone)`), because DuckDB otherwise follows the HOST. The default `asOf` is
 today in that zone; a future `asOf`, one before year 1, or an Instant the calendar cannot place is a 400. Offset
