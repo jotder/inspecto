@@ -196,29 +196,45 @@ public final class ParquetEventStore implements EventStore {
             }
             if (!flushed.isEmpty())
                 log.info("Event journal {}: {} event(s) were already flushed; not written again", file, flushed.size());
-            if (!hold.isEmpty()) {
-                // Written (atomically) BEFORE the journal is removed, so a kill in between loses nothing.
-                StringBuilder sb = new StringBuilder();
-                for (Event e : hold) sb.append(toJournal(e)).append('\n');
-                Path tmp = root.resolve(HELD + ".tmp");
-                Files.writeString(tmp, sb, StandardCharsets.UTF_8);
-                Files.move(tmp, held, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
-                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+            // The held file keeps every event not yet proven on disk — the still-held AND the released — until the
+            // replay flush lands: a released event lives only in the buffer, so dropping it from the held file first
+            // would lose it to a failed flush followed by a crash. Written atomically before the journal goes.
+            for (Event e : hold) if (AuditChain.chained(e)) heldChained++;
+            if (!hold.isEmpty() || Files.exists(held)) {
+                List<Event> keep = new ArrayList<>(hold);
+                keep.addAll(buffer);
+                writeHeld(held, keep);
+            }
+            if (!hold.isEmpty())
                 log.error("Event journal {}: {} event(s) held back, not replayed: an unreadable Parquet file ({}) may"
                         + " already hold them; retried on every open until it is readable or removed",
                         file, hold.size(), String.join(", ", unreadableUnits()));
-            }
             if (!buffer.isEmpty()) {
                 log.info("Event journal {}: replaying {} event(s) a previous run did not flush", file, buffer.size());
                 flushLocked();
             }
             if (buffer.isEmpty()) {   // kept if the replay flush failed: retried next open
-                Files.deleteIfExists(file);
                 if (hold.isEmpty()) Files.deleteIfExists(held);
+                else writeHeld(held, hold);
+                Files.deleteIfExists(file);
             }
         } catch (IOException | RuntimeException e) {
             log.warn("Event journal {} could not be replayed: {}", file, e.getMessage());
         }
+    }
+
+    /** Held chained (audit) rows: their seqs are invisible to {@link #chainHead}, so while any is held the store
+     *  reports the hold as an unreadable unit — linking refuses (a new row would reuse a held seq and fork the
+     *  chain once the hold is released) and verify names why the seqs are missing. Cleared by a reopen. */
+    private int heldChained;
+
+    private void writeHeld(Path held, List<Event> events) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        for (Event e : events) sb.append(toJournal(e)).append('\n');
+        Path tmp = root.resolve(HELD + ".tmp");
+        Files.writeString(tmp, sb, StandardCharsets.UTF_8);
+        Files.move(tmp, held, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                java.nio.file.StandardCopyOption.ATOMIC_MOVE);
     }
 
     /** {@code true} when an unreadable Parquet file could hold {@code e}: one in its own level/day partition, or
@@ -567,6 +583,9 @@ public final class ParquetEventStore implements EventStore {
     public synchronized List<String> unreadableUnits() {
         List<String> out = new ArrayList<>();
         for (Path f : unreadable.keySet()) out.add(rel(f));
+        if (heldChained > 0)
+            out.add(HELD + " (" + heldChained + " audit row(s) held back from the journal replay: an unreadable file"
+                    + " may already hold them; released on a reopen once it reads or is removed)");
         return out;
     }
 

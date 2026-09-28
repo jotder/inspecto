@@ -216,6 +216,13 @@ timestamp: 2026-07-16T00:00:00Z
       file is removed. Events in other partitions replay normally. `presentIds` answers from the readable files
       but THROWS when an id is unresolved while any file is unreadable ("absent" would let `installStore` append
       a carried row twice). ⚠ A held event is invisible to reads until released.
+      Review fixes (same day): **a held audit row blocks linking** — its seq is invisible to `chainHead`, so while
+      any is held `unreadableUnits()` also lists `pending.held.jsonl (N audit row(s) held back …)`; `AuditChain`
+      then refuses to link (new rows are stored unlinked) rather than reuse the held seq, and `/audit/verify`'s
+      `unreadable-file` names the hold as the reason for the gap. It clears on a reopen that releases the rows.
+      The held file keeps every not-yet-flushed event (held AND released) until the replay flush lands, so a
+      failed flush plus a crash loses none. `EventLog.installStore` carries per event: a row `presentIds` cannot
+      resolve is left out (it may already be there) with an ERROR event naming it, and the rest still carry.
     - *The anchors are a chain.* Each anchor carries `prevAnchorMac` in its MAC input and must start at the
       previous `lastSeq + 1`; a garbled line (`anchor-unreadable`), a removed or reordered anchor
       (`anchor-chain-broken`) and a finished day (before yesterday) no anchor covers (`anchor-missing`) all

@@ -227,6 +227,45 @@ class ParquetEventStoreTest {
         assertFalse(java.nio.file.Files.exists(dir.resolve(ParquetEventStore.HELD)), "hold released");
     }
 
+    /** (9) review: a held event released while another stays held must survive a failed replay flush and a crash —
+     *  the held file is never rewritten to drop an event before that event is on disk. */
+    @Test
+    void aReleasedHeldEventSurvivesAFailedFlushAndACrash(@TempDir Path dir) throws Exception {
+        ParquetEventStore crashed = new ParquetEventStore(dir, 1000, 0, 100);
+        crashed.append(ev(1_000L, EventLevel.INFO, EventType.LOG, null, "E1"));
+        crashed.append(ev(1_000L, EventLevel.WARN, EventType.LOG, null, "E2"));
+        byte[] journal = java.nio.file.Files.readAllBytes(dir.resolve(ParquetEventStore.JOURNAL));
+        crashed.flush();
+        crashed.simulateCrash();
+        java.nio.file.Files.write(dir.resolve(ParquetEventStore.JOURNAL), journal);
+        Path f1 = parquetIn(dir.resolve("level=INFO/year=1970/month=01/day=01")).get(0);
+        Path warn = dir.resolve("level=WARN");
+        byte[] good1 = java.nio.file.Files.readAllBytes(f1);
+        java.nio.file.Files.writeString(f1, "not a parquet file");
+        java.nio.file.Files.writeString(parquetIn(warn.resolve("year=1970/month=01/day=01")).get(0), "bad");
+        new ParquetEventStore(dir, 1000, 0, 100).close();              // both held
+
+        deleteTree(warn);                                                // E2's file is gone: E2 is released ...
+        Path staging = dir.resolve(".staging");
+        if (java.nio.file.Files.exists(staging)) deleteTree(staging);
+        java.nio.file.Files.writeString(staging, "a file where the staging directory must go");  // ... its flush fails
+        new ParquetEventStore(dir, 1000, 0, 100).simulateCrash();       // and the process dies
+        java.nio.file.Files.delete(staging);
+        java.nio.file.Files.write(f1, good1);
+
+        try (ParquetEventStore again = new ParquetEventStore(dir, 1000, 0, 100)) {
+            List<String> msgs = again.query(EventQuery.recent(100)).stream().map(Event::message).toList();
+            assertEquals(1, msgs.stream().filter("E2"::equals).count(), "E2 not lost: " + msgs);
+            assertEquals(1, msgs.stream().filter("E1"::equals).count(), "E1 exactly once: " + msgs);
+        }
+    }
+
+    private static void deleteTree(Path p) throws Exception {
+        try (var w = java.nio.file.Files.walk(p)) {
+            for (Path x : w.sorted(java.util.Comparator.reverseOrder()).toList()) java.nio.file.Files.delete(x);
+        }
+    }
+
     /** ASSURE-AUDIT-CHAIN-RESIDUALS-1 (4): one corrupt file in the middle of the store is skipped and REPORTED —
      *  search, keyset page and count still answer from every other file, never an empty "complete" result. */
     @Test

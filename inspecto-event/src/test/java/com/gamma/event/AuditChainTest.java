@@ -383,4 +383,47 @@ class AuditChainTest {
             assertEquals(before.get(0), AuditChain.storedHash(back));
         }
     }
+
+    private static List<Path> parquetUnder(Path dir) throws Exception {
+        try (var w = Files.walk(dir)) {
+            return w.filter(p -> p.toString().endsWith(".parquet")).sorted().toList();
+        }
+    }
+
+    /** ASSURE-AUDIT-CHAIN-RESIDUALS-1 (9) review: a HELD audit row carries a seq the chain head cannot see. Once
+     *  the unreadable file is gone, a new row must not be linked onto the visible head — it would take the held
+     *  row's seq and, when the hold is released, two rows would claim it. The hold blocks linking fail-closed. */
+    @Test
+    void aHeldAuditRowBlocksLinkingSoItsSeqIsNeverReused(@TempDir Path dir) throws Exception {
+        ParquetEventStore crashed = new ParquetEventStore(dir, 1000, 0, 100);
+        EventLog before = EventLog.create();
+        before.installStore(crashed);
+        before.emit(audit(1_000, "A"));                                    // linked as seq 1
+        byte[] journal = Files.readAllBytes(dir.resolve(ParquetEventStore.JOURNAL));
+        crashed.flush();
+        crashed.simulateCrash();
+        Files.write(dir.resolve(ParquetEventStore.JOURNAL), journal);    // the truncate never happened
+        Path f = parquetUnder(dir).get(0);
+        Files.writeString(f, "not a parquet file");
+
+        try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertTrue(reopened.unreadableUnits().stream().anyMatch(u -> u.startsWith(ParquetEventStore.HELD)),
+                    "the hold is reported, so verify names why seq 1 is missing");
+            Files.delete(f);                                              // the unreadable file goes away
+            reopened.rebuildChainIndex();
+            EventLog after = EventLog.create();
+            after.installStore(reopened);
+            after.emit(audit(2_000, "B"));
+            Event b = reopened.query(EventQuery.builder().type(EventType.AUDIT).limit(10).build()).stream()
+                    .filter(e -> "B".equals(e.message())).findFirst().orElseThrow();
+            assertEquals("true", b.attributes().get(AuditAttrs.AUDIT_UNLINKED), "B is not linked past the hold");
+            assertNull(b.attributes().get(AuditAttrs.AUDIT_SEQ));
+        }
+        try (ParquetEventStore released = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertTrue(released.unreadableUnits().isEmpty());
+            List<Event> chain = released.chainPage(1, 100);
+            assertEquals(List.of(1L), chain.stream().map(AuditChain::seq).toList(), "seq 1 exactly once: A");
+            assertEquals("A", chain.get(0).message());
+        }
+    }
 }

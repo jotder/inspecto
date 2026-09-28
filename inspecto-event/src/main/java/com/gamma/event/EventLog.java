@@ -168,17 +168,39 @@ public final class EventLog {
             // linked onto the OUTGOING store's chain, so it is re-linked onto the incoming one — appended as it
             // was, it would claim a seq the incoming chain already holds (ASSURE-AUDIT-CHAIN-1).
             chain.reset();
+            List<Event> carry;
             try {
-                List<Event> carry = prev.recent(Integer.MAX_VALUE);   // newest-first
-                for (int i = carry.size() - 1; i >= 0; i--) {         // re-append oldest-first
-                    Event e = carry.get(i);
+                carry = prev.recent(Integer.MAX_VALUE);   // newest-first
+            } catch (RuntimeException ignore) {
+                return;   // best effort — never block the swap
+            }
+            for (int i = carry.size() - 1; i >= 0; i--) {         // re-append oldest-first
+                Event e = carry.get(i);
+                try {   // per event: one row that fails must not drop the rest of the carry-over
                     // A carried row the incoming store ALREADY holds (a Space restart re-installing onto its own
                     // directory) is not appended again — re-linked, it would sit in the chain twice.
-                    if (AuditChain.chained(e) && !next.presentIds(List.of(e.eventId())).isEmpty()) continue;
+                    if (AuditChain.chained(e)) {
+                        java.util.Set<String> present;
+                        try {
+                            present = next.presentIds(List.of(e.eventId()));
+                        } catch (RuntimeException unknown) {
+                            // Fail-closed: the store cannot say whether it holds the row, so it is NOT appended
+                            // (it may already be there — a duplicate is a forked chain). Announced, not silent.
+                            next.append(Event.builder(EventType.LOG).level(EventLevel.ERROR)
+                                    .source(EventLog.class.getName())
+                                    .message("audit row " + e.eventId() + " not carried into the new store: it cannot"
+                                            + " tell whether it already holds it: " + unknown.getMessage())
+                                    .attr("uncarried_event_id", e.eventId()).build());
+                            System.err.println("ERROR audit row " + e.eventId() + " not carried into the new store: "
+                                    + unknown.getMessage());
+                            continue;
+                        }
+                        if (!present.isEmpty()) continue;
+                    }
                     next.append(AuditChain.chained(e) ? linkOrKeep(e, next) : e);
+                } catch (RuntimeException ignore) {
+                    // best effort — never block the swap
                 }
-            } catch (RuntimeException ignore) {
-                // best effort — never block the swap
             }
         }
     }

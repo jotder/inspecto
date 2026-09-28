@@ -89,4 +89,35 @@ class EventLogAndAppenderTest {
         assertEquals("java.lang.IllegalStateException", e.attributes().get("exception"));
         assertEquals("kaboom", e.attributes().get("exceptionMessage"));
     }
+
+    /** ASSURE-AUDIT-CHAIN-RESIDUALS-1 (9) review: presentIds refusing for ONE carried audit row must not drop the
+     *  rest of the carry-over. That row is left out (fail-closed: it may already be there) and announced. */
+    @Test
+    void aCarriedRowPresentIdsCannotResolveIsSkippedAndTheRestStillCarry() {
+        EventLog log = EventLog.create();
+        InMemoryEventStore first = new InMemoryEventStore(100);
+        log.installStore(first);
+        log.emit(Event.builder(EventType.AUDIT).message("unresolvable"));
+        log.emit(Event.builder(EventType.AUDIT).message("audit-ok"));
+        log.emit(Event.builder("JOB_STARTED").message("plain"));
+        String bad = first.recent(10).stream().filter(e -> "unresolvable".equals(e.message())).findFirst()
+                .orElseThrow().eventId();
+
+        InMemoryEventStore d = new InMemoryEventStore(100);
+        EventStore next = new EventStore() {
+            @Override public void append(Event e) { d.append(e); }
+            @Override public List<Event> query(EventQuery q) { return d.query(q); }
+            @Override public List<Event> recent(int n) { return d.recent(n); }
+            @Override public List<Event> page(int n, Long t, String id) { return d.page(n, t, id); }
+            @Override public java.util.Set<String> presentIds(java.util.Collection<String> ids) {
+                if (ids.contains(bad)) throw new IllegalStateException("cannot tell");
+                return d.presentIds(ids);
+            }
+        };
+        log.installStore(next);
+        List<String> msgs = d.recent(100).stream().map(Event::message).toList();
+        assertTrue(msgs.contains("audit-ok") && msgs.contains("plain"), "the rest carried: " + msgs);
+        assertFalse(msgs.contains("unresolvable"), "the unresolvable audit row is not appended (maybe a duplicate)");
+        assertTrue(msgs.stream().anyMatch(m -> m.contains(bad)), "and it is announced: " + msgs);
+    }
 }
