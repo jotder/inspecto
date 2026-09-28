@@ -174,7 +174,9 @@ final class JobAuthority {
             Roles.Def d = defs.get(r);
             if (d != null) caps.addAll(d.capabilities());
         }
-        caps.removeAll(AccessGrants.deniedCapabilities(root, roles));
+        // Only roles the table defines, as DemoAuthenticator.authenticate passes them: AccessGrants reads any
+        // unprofiled role name as "allow everywhere", so an undefined one would void every deny (fail-open).
+        caps.removeAll(AccessGrants.deniedCapabilities(root, roles.stream().filter(defs::containsKey).toList()));
         return caps;
     }
 

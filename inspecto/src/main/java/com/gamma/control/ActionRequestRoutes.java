@@ -244,6 +244,9 @@ final class ActionRequestRoutes implements RouteModule {
         if (who == null) return UNKNOWN;
         // decide also needs visible(): the linked object must pass the approver's data scope and row policy, which
         // is not evaluable here without their request. So a scoped holder, or any authored Access Policy, reads unknown.
+        // Only AUTHORED Access Policies count; the seeded space-isolation policies (inspecto-policy) do not. Safe today:
+        // they engage only when an IdP 'space' claim is mapped, and the only Authenticator that enumerates principals
+        // (so the only way to reach OK) is Demo sign-in, which carries no claims. Revisit if an enumerating IdP lands.
         boolean rowPolicies = !AccessPolicies.load(root).policies().isEmpty() || AccessPolicies.load(root).unreadable();
         Map<String, Roles.Def> defs = Roles.effective(root);
         boolean scopedHolder = false;
