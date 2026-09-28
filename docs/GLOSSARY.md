@@ -152,6 +152,14 @@ the dataset-side families (Expectation / Alert Rule / Decision Rule). Authoring 
 ships only in the Enterprise `inspecto-policy` module. *(Added 2026-07-23, ABAC A2 —
 `okf/backend/editions/auth-security.md`.)*
 
+**Safety Policy** — What a Space's **runs may touch**: filesystem roots, network hosts, Connector schemes,
+DuckDB extensions, output formats, caps and progress-state advances. One `safety-policy.toon` per tier —
+the **server** file (operator, on disk) and a **Space** file — and a lower tier can only **narrow**: permits
+AND, allow-sets intersect, denies union, caps take the minimum, `mode` is server-only. Code: `SafetyPolicy`
+(the effective policy the `ConfigSafetyValidator` enforces) and `SafetyPolicyTier` (one tier, and the fold).
+Distinct from an **Access Policy**, which says which Subject may call which route. ⛔ Never bare *Policy*.
+*(Added 2026-09-28, D1 of `superpower/policy-narrowing-design.md`.)*
+
 **Attribute** — A named **subject / resource / environment fact** an Access Policy conditions on:
 subject = `id`, `capabilities`, `dataScopes`, plus IdP claims allowlisted in `roles.toon`
 `identity.attributeClaims` (never the raw token); resource = the component/object envelope (`kind`,

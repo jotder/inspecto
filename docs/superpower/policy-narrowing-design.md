@@ -1,6 +1,6 @@
 # Safety Policy narrowing — design
 
-**Status: DESIGN ONLY (2026-09-24). Nothing built. Sixteen operator decisions open (§8).**
+**Status: IN FLIGHT (2026-09-28). D1–D16 answered — every recommendation accepted (§8). S0 probes recorded (§6.1); S1 built (`SafetyPolicyTier`, `HostPattern`). S2–S7 open.**
 Row: `docs/BACKLOG.md` §3.8 `DUCKLE-C6-POLICY-NARROWING-1` (P3, adopted 2026-09-15 from duckle §1 C6 —
 `archived-documents/plans-archive/duckle-concepts-candidates.md` row C6). Owner concept once built:
 [`okf/backend/config/config-safety.md`](../okf/backend/config/config-safety.md).
@@ -332,6 +332,39 @@ file tightened mid-run applies to the **next** run (D8).
 
 S1 → S2 are the spine; S3–S6 are independent once S2 lands.
 
+### 6.1 As built
+
+**S0 — probes (2026-09-28, DuckDB `1.5.2.1`, JDK 27, a local `HttpServer` stub counting requests).**
+
+- **P0-a — positive.** A bare `jdbc:duckdb:` connection (the `SqlTemplateJob` shape) ran
+  `SELECT count(*) FROM read_csv('http://127.0.0.1:<port>/x.csv')`, returned the row, and the stub counted
+  **2** requests (HEAD + GET): `httpfs` autoloaded from the local extension cache. Filed as its own row,
+  `SQL-TEMPLATE-EGRESS-1` (BACKLOG §3.8).
+- **P0-b — observed, one setting at a time, fresh in-memory database each:** `autoinstall_known_extensions=false`
+  + `autoload_known_extensions=false` → the query fails, **0** requests; `enable_external_access=false` → fails,
+  0; `disabled_filesystems='HTTPFileSystem'` → fails, 0; `allowed_directories=[…]` with external access off →
+  fails, 0; after `lock_configuration=true`, `SET enable_external_access=true` is refused ("the configuration
+  has been locked"). ⚠ The failure surfaces through the JDBC driver as a generic *"unsuccessful or closed
+  pending query result"*, not DuckDB's own message — S5's tests must assert the stub count, not the text.
+  `allowed_directories` alone (external access on) was **not** measured; S5 measures it before relying on it.
+- **P0-c — already closed.** `CROSS-SPACE-JAIL-1` (2026-09-24) made `SafetyPolicy.defaultPolicy()` →
+  `forSpace(CurrentSpace.id())`: the operator's `-Dassist.safety.roots` plus **that** Space's base only,
+  pinned by `ControlApiCrossSpaceJailTest`. That is D4's default, so D4's precondition is met; §1.1's union
+  describes the pre-fix code.
+
+**S1 — model** (`inspecto-config/.../config/safety/`). `SafetyPolicyTier` is one tier (every field `null` =
+absent) and, after `fold(server, space)`, the effective policy: permits AND, allow-sets intersect through a
+covers-matcher (`PathJail::contains` for roots, `HostPattern::covers` for hosts), denies union, caps MIN,
+`mode` server-only (a Space tier stating it throws). `HostPattern` is the D13 grammar — exact / `*.suffix` /
+CIDR — IDNA + case-folded, parsed with `InetAddress.ofLiteral` so it never resolves a name;
+`deniesAddress(InetAddress)` is the connect-time resolved-address check S4 calls. `objectPrefixCovers` is
+the object-store matcher; the three connectors still carry their own trailing-`/` line — lifting them onto
+it is S4. The existing `SafetyPolicy` record is **not yet** changed: S2 attaches the pinned effective tier to
+it and folds its caps (D14: the validator's caps are the ceiling, `capThreads(base)` etc.).
+Tests: `SafetyPolicyTierTest` — E1–E12, T1–T4 at matcher level, T13 over 2000 random tier pairs
+(mutation-checked: a space-wins overlay for hosts, caps and `install_extensions` turns 5 of 13 red, T13
+included).
+
 ---
 
 ## 7. Test plan
@@ -359,43 +392,43 @@ gate is also **mutation-checked**: revert the gate line, and the negative must g
 
 ---
 
-## 8. Decisions owed (operator)
+## 8. Decisions (operator) — all answered 2026-09-28, as recommended
 
-1. **D1 — Name.** Recommend **Safety Policy**, extending the existing `SafetyPolicy` record; GLOSSARY §1-A
+1. **D1 — Name.** **Answered (operator, 2026-09-28): as recommended.** Recommend **Safety Policy**, extending the existing `SafetyPolicy` record; GLOSSARY §1-A
    entry beside Access Policy with ⛔ bare *Policy*. Alternative: a new type — rejected, it would be a second
    home for roots and caps.
-2. **D2 — Tiers.** Recommend **server + Space now**; the Pipeline tier later. The law already makes a Pipeline
+2. **D2 — Tiers.** **Answered (operator, 2026-09-28): as recommended.** Recommend **server + Space now**; the Pipeline tier later. The law already makes a Pipeline
    tier safe to add, and nothing asks for it yet.
-3. **D3 — Server file location.** Recommend `safety-policy.toon` in the server config directory, with
+3. **D3 — Server file location.** **Answered (operator, 2026-09-28): as recommended.** Recommend `safety-policy.toon` in the server config directory, with
    `-Dassist.safety.roots` read as the server's `allow.roots` when the file does not state them, so existing
    deployments keep working. Breaking changes are free here (nothing after 3.x shipped), so the `-D` can be
    retired later rather than shimmed.
-4. **D4 — Default Space roots.** Recommend a Space's effective roots default to **its own base + the
+4. **D4 — Default Space roots.** **Answered (operator, 2026-09-28): as recommended.** Recommend a Space's effective roots default to **its own base + the
    operator's declared roots**, not every hosted Space's (closes §1.1). Gate on P0-c's result.
-5. **D5 — `mode` values.** Recommend `enforce | audit`, server file only, default `enforce`; `audit` records a
+5. **D5 — `mode` values.** **Answered (operator, 2026-09-28): as recommended.** Recommend `enforce | audit`, server file only, default `enforce`; `audit` records a
    would-refuse event and lets the act proceed. Alternative: `enforce` only — simpler; loses a safe rollout.
-6. **D6 — Unreadable server file.** Recommend **refuse runs, keep serving**, `/health` degraded. Refusing to
+6. **D6 — Unreadable server file.** **Answered (operator, 2026-09-28): as recommended.** Recommend **refuse runs, keep serving**, `/health` degraded. Refusing to
    boot would also take down the UI an operator uses to see why.
-7. **D7 — Naming Space files.** Recommend the server file may list Spaces whose policy is **required**; a
+7. **D7 — Naming Space files.** **Answered (operator, 2026-09-28): as recommended.** Recommend the server file may list Spaces whose policy is **required**; a
    named-but-missing file is unreadable; an un-named absent file narrows nothing.
-8. **D8 — Mid-run changes.** Recommend a snapshot pinned per run at plan time; changes apply to the next run.
+8. **D8 — Mid-run changes.** **Answered (operator, 2026-09-28): as recommended.** Recommend a snapshot pinned per run at plan time; changes apply to the next run.
    Alternative: re-read at every act — catches a tightening sooner, but one run could then pass half its
    gates under each version.
-9. **D9 — `advance_state false`.** Recommend **refuse at plan time** (a read-only run already exists as the dry
+9. **D9 — `advance_state false`.** **Answered (operator, 2026-09-28): as recommended.** Recommend **refuse at plan time** (a read-only run already exists as the dry
    run). Alternative: run without advancing — produces duplicates on every re-run, so rejected unless asked.
-10. **D10 — Rewind.** Recommend a separate `permit.rewind_state` (M8), default `true`, so "may not advance"
+10. **D10 — Rewind.** **Answered (operator, 2026-09-28): as recommended.** Recommend a separate `permit.rewind_state` (M8), default `true`, so "may not advance"
     does not also block the operator's reprocess.
-11. **D11 — Edition.** Recommend **core, every edition, Personal included**: this is config safety, not ABAC,
+11. **D11 — Edition.** **Answered (operator, 2026-09-28): as recommended.** Recommend **core, every edition, Personal included**: this is config safety, not ABAC,
     and the unreadable refusal must not vanish on a classpath without `inspecto-policy` (§1.5).
-12. **D12 — Kafka brokers.** Recommend checking every partition leader host before the first fetch of a cycle.
+12. **D12 — Kafka brokers.** **Answered (operator, 2026-09-28): as recommended.** Recommend checking every partition leader host before the first fetch of a cycle.
     Alternative: bootstrap only — leaves the metadata-advertised hops unchecked, which is the row's "every hop".
-13. **D13 — Host grammar.** Recommend exact host, `*.suffix` at a dot boundary, CIDR for IP literals; plus
+13. **D13 — Host grammar.** **Answered (operator, 2026-09-28): as recommended.** Recommend exact host, `*.suffix` at a dot boundary, CIDR for IP literals; plus
     checking the **resolved** address against `deny` CIDRs at connect time (the metadata address
     `169.254.169.254` via a DNS name). No regex.
-14. **D14 — Caps.** Recommend caps fold by **MIN** — "permissions AND" applied to numbers — and that
+14. **D14 — Caps.** **Answered (operator, 2026-09-28): as recommended.** Recommend caps fold by **MIN** — "permissions AND" applied to numbers — and that
     `ConfigSafetyValidator`'s existing caps (`SafetyPolicy.java:34-40`) become the server tier's defaults.
 
-15. **D15 — Server-configured egress.** Recommend N10–N12 (notification channels, OIDC, the loopback client)
+15. **D15 — Server-configured egress.** **Answered (operator, 2026-09-28): as recommended.** Recommend N10–N12 (notification channels, OIDC, the loopback client)
     stay **outside** the Space tier — no Space run drives them — and are listed as exempt in the explain route.
-16. **D16 — `POST` operational-DB test (N8).** Recommend it passes the **server** tier's `EgressGate`, since its
+16. **D16 — `POST` operational-DB test (N8).** **Answered (operator, 2026-09-28): as recommended.** Recommend it passes the **server** tier's `EgressGate`, since its
     URL comes from a request body.
