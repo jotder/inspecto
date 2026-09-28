@@ -816,6 +816,8 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
   configured shared volume — NFSv3 without lockd is not). Proven by `PendingChangesMultiPodTest` (two
   control planes over one directory racing approve/approve and approve/decline over real HTTP, and two JVM
   processes racing on the lock).
+  **(operator, 2026-09-28): kept closed — shared DB-backed Pending Changes with CAS transitions; a live two-pod
+  test is owed at the first HA deployment** (tracked on `BACKLOG.md` §2, *Deployment topology live validation*).
 - The AI-agent approvals inbox (`/agent/approvals*`) is a different thing and is unchanged.
 
 As-built detail (the hold, the funnels, what is governable): [config safety](../config/config-safety.md#maker-checker--pending-changes-2026-09-26).

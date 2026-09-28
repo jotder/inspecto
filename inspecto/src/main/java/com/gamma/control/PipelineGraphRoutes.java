@@ -150,7 +150,7 @@ final class PipelineGraphRoutes implements RouteModule {
             } catch (IOException e) {
                 throw e;
             } catch (Exception e) {
-                throw new ApiException(500, ErrorCodes.INTERNAL, "could not render the workbook: " + e.getMessage());
+                throw ServerFaults.internal("could not render the workbook", e);
             } finally {
                 java.nio.file.Files.deleteIfExists(tmp);
             }
@@ -657,7 +657,7 @@ final class PipelineGraphRoutes implements RouteModule {
             // past ~260 chars (WINDOWS-LONG-SCRATCH-PATH-QUARANTINES-1).
             scratch = Files.createTempDirectory("itr_");
         } catch (IOException e) {
-            throw new ApiException(500, ErrorCodes.INTERNAL, "could not create a scratch root: " + e.getMessage());
+            throw ServerFaults.internal("could not create a scratch root", e);
         }
         try {
             PipelineTestRun.Result parsed = PipelineTestRun.run(cfg, picked, scratch);

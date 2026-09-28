@@ -766,7 +766,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         Object cid = ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID);
         log.error("{} {} failed (Correlation-ID {})", ex.getRequestMethod(), path(ex), cid, t);
         if (ex.getResponseCode() > 0) return;
-        respond(ex, 500, Map.of("error", "Internal error — correlation id " + cid));
+        respond(ex, 500, Map.of("error", ServerFaults.internalMessage(cid)));
     }
 
     /** The 5xx {@link #errorBoundary} answers a non-{@link ApiException} failure with, or 0 when it answers none

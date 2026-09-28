@@ -140,7 +140,7 @@ final class ConnectionRoutes implements RouteModule {
         try (ConnectionWorkbench wb = workbench(api, id)) {
             return ConnectionWorkbench.ResourceNode.toMaps(wb.explore(path));
         } catch (AcquisitionException e) {
-            throw new ApiException(502, ErrorCodes.INTERNAL, "explore failed: " + e.getMessage());
+            throw ServerFaults.curated(502, ErrorCodes.INTERNAL, "explore failed", "upstream error", e);
         } catch (ConnectionWorkbench.PathEscape e) {
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, e.getMessage());
         } catch (ConnectionWorkbench.NoSuchPath e) {
@@ -156,7 +156,7 @@ final class ConnectionRoutes implements RouteModule {
         try (ConnectionWorkbench wb = workbench(api, id)) {
             return wb.sample(path, intOf(limit, 50)).toMap();
         } catch (AcquisitionException e) {
-            throw new ApiException(502, ErrorCodes.INTERNAL, "sample failed: " + e.getMessage());
+            throw ServerFaults.curated(502, ErrorCodes.INTERNAL, "sample failed", "upstream error", e);
         } catch (ConnectionWorkbench.PathEscape e) {
             throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, e.getMessage());
         } catch (ConnectionWorkbench.NoSuchPath e) {

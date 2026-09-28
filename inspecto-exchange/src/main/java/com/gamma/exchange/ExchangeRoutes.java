@@ -151,7 +151,7 @@ public final class ExchangeRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (Exception fail) {
-            throw new ApiException(500, ErrorCodes.INTERNAL, "snapshot failed: " + fail.getMessage());
+            throw com.gamma.control.ServerFaults.internal("snapshot failed", fail);
         }
     }
 

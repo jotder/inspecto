@@ -100,7 +100,7 @@ final class QueryRoutes implements RouteModule {
         } catch (SQLException sql) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "query failed: " + DuckDbUtil.withoutPendingQueryPreamble(sql.getMessage()));
         } catch (IOException io) {
-            throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable: " + io.getMessage());
+            throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", io);
         }
 
         return response(result);
