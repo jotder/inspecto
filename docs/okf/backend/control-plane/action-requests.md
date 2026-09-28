@@ -212,7 +212,10 @@ restore, which lands there), `/import`, `/bundle/import`, a new Space's bundle; 
 `target` only; the agent's fix drafts refuse the kind. `createdBy` / `updatedBy` are **server-stamped** — body
 values are discarded. An import carrying an invoke-api rule by someone without `canWorkIncidents` is 403 before
 anything is written (all-or-nothing). A Space created from a bundle (`POST /spaces/import`) is pinned end to end in
-`ControlApiSpaceBundleActionRequestsTest`: the importer becomes the rule's maker (and a refused co-author), and the
+`ControlApiSpaceBundleActionRequestsTest`: the importer becomes the rule's editor, and — since no version history
+travels with a bundle — the bundled `updatedBy` and a well-formed `restoredMakers` stay makers beside the importer
+(an imported value can only ADD refused approvers; a malformed `restoredMakers` is 422); every other door strips it and
+recomputes. The
 new Space's empty Egress Allowlist denies the target until that Space lifts it. `DecisionRuleWritersTest` enumerates `ConfigWriteFunnelTest`'s writer
 inventory and fails for a new writer that neither calls the guard nor is listed with its reason.
 

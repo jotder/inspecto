@@ -44,7 +44,8 @@ import java.util.Set;
  * walk would stop at the version the restore replaced and forget who wrote the restored consequence. The restore
  * therefore stamps {@code restoredMakers} — the restored version's own makers, computed from the history AT that
  * version ({@link #restoredMakers}) — and {@link #makers} adds every chained version's {@code restoredMakers}. The
- * field is server-only: {@link #prepare} discards any body value. A restore of a version whose makers the history
+ * field is server-only: {@link #prepare} discards any body value — except a NEW Space's bundle, which has no history
+ * to recompute it from and keeps its recorded makers (see {@code bundledMakers}). A restore of a version whose makers the history
  * cannot say is refused (409) — fail closed.
  */
 public final class DecisionRuleGuard {
@@ -85,8 +86,28 @@ public final class DecisionRuleGuard {
         out.put("createdBy", created == null ? actor : created);
         out.put("updatedBy", actor);
         out.remove(RESTORED_MAKERS);   // server-only, like the stamps above
+        if (!live) restoredMakers = bundledMakers(content);   // a NEW Space has no history to recompute them from
         if (restoredMakers != null && !restoredMakers.isEmpty()) out.put(RESTORED_MAKERS, List.copyOf(restoredMakers));
         return out;
+    }
+
+    /**
+     * A new Space's bundle carries the rule but no version history, so the importer alone would be its maker and the
+     * rule's recorded author could approve what it raises there. The bundle's {@code updatedBy} and a well-formed
+     * {@code restoredMakers} are therefore kept as makers alongside the importer — an imported value can only ADD
+     * people four-eyes refuses, never remove one. A malformed {@code restoredMakers} refuses the import (422).
+     */
+    private static List<String> bundledMakers(Map<String, Object> content) {
+        Set<String> out = new LinkedHashSet<>();
+        if (content.get("updatedBy") instanceof String by && !by.isBlank()) out.add(by);
+        Object restored = content.get(RESTORED_MAKERS);
+        if (restored != null) {
+            if (!(restored instanceof List<?> list) || list.stream().anyMatch(m -> !(m instanceof String s) || s.isBlank()))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "Decision Rule '" + content.get("name")
+                        + "': restoredMakers must be a list of editor ids");
+            for (Object m : list) out.add((String) m);
+        }
+        return List.copyOf(out);
     }
 
     /**

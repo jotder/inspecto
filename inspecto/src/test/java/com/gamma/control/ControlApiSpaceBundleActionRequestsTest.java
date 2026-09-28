@@ -42,8 +42,8 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * {@code ASSURE-ACTION-REQUESTS-RESIDUALS-1} (2), over real HTTP with an ARMED Authenticator: a new Space created from
  * a bundle ({@code POST /spaces/import}) carrying a Decision Rule with an {@code invoke-api} consequence gets the same
- * treatment as one saved through {@code /decision-rules} — the import needs {@code canWorkIncidents}, the bundle's
- * forged editor is replaced by the importer, the importer is a co-author the four-eyes check refuses, and the NEW
+ * treatment as one saved through {@code /decision-rules} — the import needs {@code canWorkIncidents}, the bundle
+ * stamps become the importer, the importer AND the bundle's recorded makers are co-authors four-eyes refuses, and the NEW
  * Space's empty Egress Allowlist denies the target until an administrator of that Space lifts it.
  *
  * <p>The dispatcher runs inline over {@link ActionDispatcherTest.LoopbackWire} behind a scheme rewrite, as in
@@ -53,7 +53,8 @@ class ControlApiSpaceBundleActionRequestsTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String IMPORTER = "Bearer importer", NO_INCIDENTS = "Bearer no-incidents",
-            OPERATOR = "Bearer operator", CHECKER = "Bearer checker";
+            OPERATOR = "Bearer operator", CHECKER = "Bearer checker", ORIGINAL = "Bearer original",
+            RESTORED = "Bearer restored";
     private final HttpClient client = HttpClient.newHttpClient();
 
     private HttpServer target;
@@ -115,6 +116,8 @@ class ControlApiSpaceBundleActionRequestsTest {
             case OPERATOR -> Optional.of(new Subject("operator-1", Set.of("canOperateRuns", "canWorkIncidents")));
             case CHECKER -> Optional.of(new Subject("checker-1", Set.of("canAdminister", "canWorkIncidents",
                     "canApproveChanges")));
+            case ORIGINAL -> Optional.of(new Subject("author-9", Set.of("canWorkIncidents", "canApproveChanges")));
+            case RESTORED -> Optional.of(new Subject("author-0", Set.of("canWorkIncidents", "canApproveChanges")));
             default -> Optional.empty();
         };
     }
@@ -145,14 +148,14 @@ class ControlApiSpaceBundleActionRequestsTest {
         return new Ctx(spaces, api, api.port());
     }
 
-    /** A new-Space bundle: an https Connection to the stub target and an invoke-api rule with a FORGED editor. */
+    /** A new-Space bundle: an https Connection to the stub target and an invoke-api rule with its recorded makers. */
     private byte[] bundle() throws Exception {
         Map<String, String> all = new LinkedHashMap<>();
         all.put("bundle.toon", "kind: datasource\n");
         all.put("connections/hook_connection.toon", "connection:\n  id: hook\n  connector: https\n  host: tickets.test\n"
                 + "  port: " + target.getAddress().getPort() + "\n  base_path: api\n");
         all.put("registry/decision-rules/leak.toon", ConfigCodec.toToon(Map.of("name", "leak", "enabled", true,
-                "createdBy", "someone-else", "updatedBy", "someone-else",
+                "createdBy", "author-9", "updatedBy", "author-9", "restoredMakers", List.of("author-0"),
                 "consequences", List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook"))))));
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (ZipOutputStream z = new ZipOutputStream(bytes)) {
@@ -194,18 +197,23 @@ class ControlApiSpaceBundleActionRequestsTest {
 
             JsonNode stored = data(beta(c, "GET", "/components/decision-rule/leak", null, IMPORTER), 200);
             assertEquals("importer-1", stored.at("/content/updatedBy").asText(), stored.toString());
-            assertEquals("importer-1", stored.at("/content/createdBy").asText(), "the bundle's editor is never trusted");
+            assertEquals("importer-1", stored.at("/content/createdBy").asText(), "the stamps are the importer's");
 
             JsonNode applied = data(beta(c, "POST", "/decision-rules/leak/apply", "{}", OPERATOR), 200).at("/executed/0");
             String id = applied.path("actionRequestId").asText();
             assertFalse(id.isBlank(), "the bundle-created rule raised an Action Request: " + applied);
             JsonNode rec = data(beta(c, "GET", "/action-requests/" + id, null, CHECKER), 200);
-            assertEquals(List.of("importer-1"), JSON.convertValue(rec.get("coAuthors"), List.class), rec.toString());
+            assertEquals(List.of("importer-1", "author-9", "author-0"), JSON.convertValue(rec.get("coAuthors"), List.class), rec.toString());
             assertEquals("pending", rec.get("status").asText());
 
             HttpResponse<String> maker = beta(c, "POST", "/action-requests/" + id + "/approve", "{}", IMPORTER);
             assertEquals(403, maker.statusCode(), "the importer made the rule: " + maker.body());
             assertEquals(403, beta(c, "POST", "/action-requests/" + id + "/decline", "{}", IMPORTER).statusCode());
+            // No history travels with a bundle: the rule's recorded makers stay co-authors in the new Space.
+            assertEquals(403, beta(c, "POST", "/action-requests/" + id + "/approve", "{}", ORIGINAL).statusCode(),
+                    "the bundled rule's author");
+            assertEquals(403, beta(c, "POST", "/action-requests/" + id + "/approve", "{}", RESTORED).statusCode(),
+                    "the bundled rule's restored-version author");
 
             // A new Space starts with an EMPTY allowlist: the private target is denied, nothing dialled.
             JsonNode done = data(beta(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER), 200);
