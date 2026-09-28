@@ -141,6 +141,7 @@ final class DecisionRoutes implements RouteModule {
      *  attributed to the request's actor. */
     private Object apply(ApiContext api, String name, String actor) throws IOException {
         Map<String, Object> rule = RouteErrors.existing(store(api), TYPE, "decision rule", name);
+        refuseTargetSpace(rule);
         return applyConsequences(api, name, rule, false, actor);
     }
 
@@ -179,7 +180,7 @@ final class DecisionRoutes implements RouteModule {
         switch (action) {
             case "emit-signal" -> {
                 String type = paramStr(c, "type", "decision-rule." + ruleName);
-                emitSignal(type, "decision-rule:" + ruleName, Map.of("rule", ruleName));
+                emitSignal(actor, type, "decision-rule:" + ruleName, Map.of("rule", ruleName));
                 status = "executed";
                 detail = "emitted signal '" + type + "'";
             }
@@ -187,7 +188,7 @@ final class DecisionRoutes implements RouteModule {
                 String alertName = paramStr(c, "rule", ruleName);
                 String severity = paramStr(c, "severity", "warning");
                 // Always record the decision on the ledger.
-                emitSignal("decision-rule.create-alert", "decision-rule:" + ruleName,
+                emitSignal(actor, "decision-rule.create-alert", "decision-rule:" + ruleName,
                         Map.of("alert", alertName, "severity", severity));
                 status = "executed";
                 // Author a real Alert Rule (S6) through the exact same validation/persistence path as the
@@ -300,7 +301,7 @@ final class DecisionRoutes implements RouteModule {
                 actionRequestId = made[2];
             }
             case "render-widget", "generate-report" -> {
-                emitSignal("decision-rule." + action, "decision-rule:" + ruleName, Map.of("action", action));
+                emitSignal(actor, "decision-rule." + action, "decision-rule:" + ruleName, Map.of("action", action));
                 status = "executed";
                 detail = "recorded " + action + " stub signal (execution engine not built yet)";
             }
@@ -414,14 +415,36 @@ final class DecisionRoutes implements RouteModule {
         return hasComparatorAndThreshold && (ledgerMetric || measureRule);
     }
 
-    private static void emitSignal(String type, String source, Map<String, Object> payload) {
+    /** A Decision Rule's Signal, stamped with the Space whose ledger records it and the person who applied
+     *  the rule (null when the engine applied it) — cross-Space consequence slice 1: an Exchange forwarder's
+     *  {@code originActor} is meaningless while the origin leaves both null. */
+    private static void emitSignal(String actor, String type, String source, Map<String, Object> payload) {
         EventLog el = EventLog.current();
         if (el == null) return;
+        Ref who = actor == null || actor.isBlank() ? null : Ref.of("user", actor);
         el.emit(new Signal(null, type, Instant.now(), Severity.INFO, Ref.parseCompact(source), null,
-                null, null, null, null, type, payload, 1).toEvent());
+                null, null, EventLog.currentSpaceId(), who, type, payload, 1).toEvent());
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────────
+
+    /** The consequence params that would name ANOTHER Space. D1 (operator 2026-09-28): only Signals cross
+     *  Spaces (through a consented Exchange grant), so the apply path never gains a target-space parameter. */
+    static final java.util.Set<String> TARGET_SPACE_PARAMS = java.util.Set.of("targetSpace", "space");
+
+    /** 422 before ANY consequence runs when one names a target Space — fail closed, so an author never
+     *  believes a cross-Space effect happened (cross-Space consequence D1, test N7). */
+    @SuppressWarnings("unchecked")
+    private static void refuseTargetSpace(Map<String, Object> rule) {
+        if (!(rule.get("consequences") instanceof List<?> l)) return;
+        for (Object o : l)
+            if (o instanceof Map<?, ?> c)
+                for (String k : TARGET_SPACE_PARAMS)
+                    if (params((Map<String, Object>) c).containsKey(k))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                                "a consequence cannot name another Space ('" + k + "'): only Signals cross"
+                                        + " Spaces, through a consented Exchange signal grant");
+    }
 
     private ComponentStore store(ApiContext api) {
         return new ComponentStore(WriteGates.requireWriteRoot(api, "decision rule").resolve("registry"));
