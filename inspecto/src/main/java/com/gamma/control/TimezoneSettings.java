@@ -26,6 +26,10 @@ import java.util.Map;
  */
 record TimezoneSettings(ZoneId timezone) {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(TimezoneSettings.class);
+    /** Paths already warned about, so a bad file logs once, not on every KPI evaluation. */
+    private static final java.util.Set<Path> WARNED = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     static final String FILE = "timezone.toon";
     static final TimezoneSettings EMPTY = new TimezoneSettings(null);
 
@@ -51,10 +55,19 @@ record TimezoneSettings(ZoneId timezone) {
         if (!Files.exists(path)) return EMPTY;
         try {
             Map<String, Object> m = ToonHelper.load(path.toString());
-            ZoneId z = KpiDefinition.regionZone(ToonHelper.opt(m, "timezone", "").trim());
-            return z == null ? EMPTY : new TimezoneSettings(z);
+            String raw = ToonHelper.opt(m, "timezone", "").trim();
+            if (raw.isEmpty()) return EMPTY;
+            ZoneId z = KpiDefinition.regionZone(raw);
+            if (z != null) return new TimezoneSettings(z);
+            warnOnce(path, "'" + raw + "' is not an IANA zone name");
         } catch (Exception e) {
-            return EMPTY;
+            warnOnce(path, e.getMessage());
         }
+        return EMPTY;
+    }
+
+    private static void warnOnce(Path path, String why) {
+        if (WARNED.add(path.toAbsolutePath()))
+            log.warn("Ignoring Space timezone setting {} — using UTC: {}", path, why);
     }
 }

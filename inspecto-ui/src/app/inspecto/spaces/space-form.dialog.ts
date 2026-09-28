@@ -6,7 +6,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { forkJoin, of, switchMap } from 'rxjs';
+import { catchError, forkJoin, map, Observable, of, switchMap } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { environment } from 'environments/environment';
 import {
@@ -31,6 +31,34 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
         )
             ? { duplicate: true }
             : null;
+}
+
+/** The backend's region-name rule (`KpiDefinition.ZONE_NAME`): never an offset form such as `+05:30` or `Z`. */
+const ZONE_NAME = /^[A-Za-z][A-Za-z0-9]*(\/[A-Za-z0-9_+-]+)*$/;
+
+/** The zones this runtime knows, when it can list them (`Intl.supportedValuesOf`). */
+const KNOWN_ZONES: ReadonlySet<string> | null = (() => {
+    const intl = Intl as unknown as { supportedValuesOf?: (key: string) => string[] };
+    try {
+        return intl.supportedValuesOf ? new Set(intl.supportedValuesOf('timeZone')) : null;
+    } catch {
+        return null;
+    }
+})();
+
+/** Blank (= UTC) or an IANA region zone name → valid; anything else → `{ timezone: true }`. The list omits
+ *  aliases and `UTC`, so a name the runtime still accepts as a `timeZone` also passes. */
+export function timezoneValidator(c: AbstractControl): { timezone: true } | null {
+    const v = String(c.value ?? '').trim();
+    if (!v) return null;
+    if (!ZONE_NAME.test(v) || v === 'Z') return { timezone: true };
+    if (!KNOWN_ZONES || KNOWN_ZONES.has(v)) return null;
+    try {
+        new Intl.DateTimeFormat('en', { timeZone: v });
+        return null;
+    } catch {
+        return { timezone: true };
+    }
 }
 
 /** Derive a SpaceId-legal slug from a display name: lowercase, non-alphanumeric → hyphen, trimmed, ≤ 63. */
@@ -157,6 +185,9 @@ export interface SpaceFormData {
                 <mat-form-field class="w-full" subscriptSizing="dynamic">
                     <mat-label>Default timezone</mat-label>
                     <input matInput formControlName="timezone" autocomplete="off" placeholder="UTC" />
+                    <mat-error
+                        >Not an IANA timezone name — use one such as Asia/Kolkata, or leave empty for UTC.</mat-error
+                    >
                     <mat-hint>An IANA zone such as Asia/Kolkata. KPIs without their own timezone use it.</mat-hint>
                 </mat-form-field>
             </mat-dialog-content>
@@ -206,7 +237,7 @@ export class SpaceFormDialog {
         description: [''],
         caption: [''],
         footerText: [''],
-        timezone: [''],
+        timezone: ['', [timezoneValidator]],
     });
 
     constructor() {
@@ -292,20 +323,32 @@ export class SpaceFormDialog {
                   description: v.description || undefined,
               });
 
+        // The timezone is saved only when it was touched (never a null PUT on create), and AFTER the Space: a
+        // refusal there must not read as the whole save failing — the Space is already saved.
+        const tz = String(v.timezone ?? '').trim() || null;
+        const saveTz = this.form.controls['timezone'].dirty && !(!existing && tz === null);
         save$
             .pipe(
-                switchMap((space) =>
-                    forkJoin({
-                        space: of(space),
-                        _: this.brandingApi.saveFor(space.id, branding),
-                        tz: this.timezoneApi.saveFor(space.id, String(v.timezone ?? '').trim() || null),
-                    }),
-                ),
+                switchMap((space) => forkJoin({ space: of(space), _: this.brandingApi.saveFor(space.id, branding) })),
+                switchMap(({ space }) => {
+                    const done: Observable<unknown> = saveTz ? this.timezoneApi.saveFor(space.id, tz) : of(null);
+                    return done.pipe(
+                        map(() => ({ space, tzError: null as unknown })),
+                        catchError((e: unknown) => of({ space, tzError: e })),
+                    );
+                }),
             )
             .subscribe({
-                next: ({ space }) => {
+                next: ({ space, tzError }) => {
                     this.saving.set(false);
-                    this.toastr.success(`Space "${space.id}" ${existing ? 'updated' : 'created'}`);
+                    if (tzError) {
+                        this.toastr.warning(
+                            `Space "${space.id}" was saved, but its default timezone was not: ` +
+                                apiErrorMessage(tzError, 'the timezone was refused.'),
+                        );
+                    } else {
+                        this.toastr.success(`Space "${space.id}" ${existing ? 'updated' : 'created'}`);
+                    }
                     this.ref.close(space);
                 },
                 error: (e) => {

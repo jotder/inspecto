@@ -2,18 +2,23 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it, vi } from 'vitest';
 import { BrandingService, Space, SpacesService, TimezoneSettingsService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { SpaceFormData, SpaceFormDialog } from './space-form.dialog';
 
+const toastr = { success: vi.fn(), warning: vi.fn(), error: vi.fn() };
 const NO_BRANDING = { logoDataUrl: null, caption: null, footerText: null };
 
-function create(data: SpaceFormData | null = null) {
+function create(
+    data: SpaceFormData | null = null,
+    tzSave = vi.fn(() => of({ timezone: null, effectiveTimezone: 'UTC' })),
+) {
     const getFor = vi.fn(() => of(NO_BRANDING));
     const saveFor = vi.fn(() => of(NO_BRANDING));
+    const spaceSave = vi.fn(() => of({ id: 'beta', displayName: 'Beta', description: '', createdAt: '' }));
     const tzGetFor = vi.fn(() => of({ timezone: 'Asia/Kolkata', effectiveTimezone: 'Asia/Kolkata' }));
     TestBed.configureTestingModule({
         imports: [SpaceFormDialog],
@@ -21,15 +26,18 @@ function create(data: SpaceFormData | null = null) {
             provideNoopAnimations(),
             { provide: MatDialogRef, useValue: { close: () => {} } },
             { provide: MAT_DIALOG_DATA, useValue: data },
-            { provide: SpacesService, useValue: { availableSpaces: signal([{ id: 'taken' }]) } },
+            {
+                provide: SpacesService,
+                useValue: { availableSpaces: signal([{ id: 'taken' }]), create: spaceSave, update: spaceSave },
+            },
             { provide: BrandingService, useValue: { getFor, saveFor } },
-            { provide: TimezoneSettingsService, useValue: { getFor: tzGetFor, saveFor: vi.fn() } },
-            { provide: ToastrService, useValue: {} },
+            { provide: TimezoneSettingsService, useValue: { getFor: tzGetFor, saveFor: tzSave } },
+            { provide: ToastrService, useValue: toastr },
         ],
     });
     const fixture = TestBed.createComponent(SpaceFormDialog);
     fixture.detectChanges();
-    return { fixture, getFor };
+    return { fixture, getFor, spaceSave, tzSave };
 }
 
 /** The `<mat-form-field>` hosting `control` inside `scope`, so a mat-error assertion is scoped to that one field. */
@@ -66,6 +74,52 @@ describe('SpaceFormDialog', () => {
         expect(c.form.get('display_name')!.value).toBe('Beta');
         expect(getFor).toHaveBeenCalledWith('beta');
         expect(c.form.get('timezone')!.value).toBe('Asia/Kolkata'); // the Space default timezone is prefilled
+    });
+
+    it('an invalid timezone blocks submit inline — nothing is saved', () => {
+        const space: Space = { id: 'beta', displayName: 'Beta', description: 'd', createdAt: '' };
+        const { fixture, spaceSave, tzSave } = create({ space });
+        const c = fixture.componentInstance;
+        for (const bad of ['+05:30', 'Z', 'UTC+5', 'Mars/Olympus']) {
+            c.form.patchValue({ timezone: bad });
+            expect(c.form.get('timezone')!.hasError('timezone')).toBe(true);
+        }
+        c.submit();
+        fixture.detectChanges();
+        expect(spaceSave).not.toHaveBeenCalled();
+        expect(tzSave).not.toHaveBeenCalled();
+        expect(fixture.nativeElement.textContent).toContain('Not an IANA timezone name');
+        for (const ok of ['', 'UTC', 'Asia/Kolkata', 'EST5EDT']) {
+            c.form.patchValue({ timezone: ok });
+            expect(c.form.get('timezone')!.valid).toBe(true);
+        }
+    });
+
+    it('create mode never PUTs an empty timezone', () => {
+        const { fixture, spaceSave, tzSave } = create();
+        const c = fixture.componentInstance;
+        c.form.patchValue({ display_name: 'Beta' });
+        c.submit();
+        expect(spaceSave).toHaveBeenCalled();
+        expect(tzSave).not.toHaveBeenCalled();
+        expect(toastr.success).toHaveBeenCalled();
+    });
+
+    it('a refused timezone says the Space was saved and the timezone was not', () => {
+        toastr.error.mockClear();
+        const space: Space = { id: 'beta', displayName: 'Beta', description: 'd', createdAt: '' };
+        const refused = vi.fn(() => throwError(() => ({ status: 403 })));
+        const { fixture, spaceSave } = create({ space }, refused as never);
+        const c = fixture.componentInstance;
+        c.form.controls['timezone'].setValue('Europe/Paris');
+        c.form.controls['timezone'].markAsDirty();
+        c.submit();
+        expect(spaceSave).toHaveBeenCalled();
+        expect(refused).toHaveBeenCalledWith('beta', 'Europe/Paris');
+        expect(toastr.warning).toHaveBeenCalledWith(
+            expect.stringContaining('was saved, but its default timezone was not'),
+        );
+        expect(toastr.error).not.toHaveBeenCalled();
     });
 
     it('has no a11y violations', async () => {

@@ -140,7 +140,7 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
     }
 
     /** A region zone name (never an offset form), default UTC — the zone a KPI's periods are cut in. */
-    private static final java.util.regex.Pattern ZONE_NAME = java.util.regex.Pattern.compile("[A-Za-z]+(/[A-Za-z0-9_+-]+)*");
+    private static final java.util.regex.Pattern ZONE_NAME = java.util.regex.Pattern.compile("[A-Za-z][A-Za-z0-9]*(/[A-Za-z0-9_+-]+)*");
 
     /** The default zone. A region id ("UTC"), not ZoneOffset.UTC, whose id "Z" DuckDB does not know. */
     public static final java.time.ZoneId UTC = java.time.ZoneId.of("UTC");
@@ -157,7 +157,9 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
     public static java.time.ZoneId regionZone(String s) {
         if (s == null) return null;
         try {
-            if (ZONE_NAME.matcher(s).matches()) return java.time.ZoneId.of(s);
+            // the first segment may carry digits after a letter (EST5EDT, GMT0); "Z" parses to a ZoneOffset — refused
+            if (ZONE_NAME.matcher(s).matches() && java.time.ZoneId.of(s) instanceof java.time.ZoneId z
+                    && !(z instanceof java.time.ZoneOffset)) return z;
         } catch (java.time.DateTimeException ignored) {
             // not a zone
         }

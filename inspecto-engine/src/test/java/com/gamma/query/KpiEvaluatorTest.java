@@ -152,11 +152,14 @@ class KpiEvaluatorTest {
 
     @Test
     void anOffsetOrUnknownZoneIsRefused() {
-        for (String z : java.util.List.of("+05:30", "Mars/Olympus", "UTC+1"))
+        for (String z : java.util.List.of("+05:30", "Mars/Olympus", "UTC+1", "UTC+5", "Z", "UTC5"))
             assertThrows(IllegalArgumentException.class, () -> KpiDefinition.fromMap("k", Map.of("dataset", "o",
                     "measure", "count", "timeField", "d", "grain", "day", "timezone", z)), z);
         assertEquals(java.time.ZoneId.of("UTC"), KpiDefinition.fromMap("k", Map.of("dataset", "o", "measure", "count",
                 "timeField", "d", "grain", "day")).zone(), "absent ⇒ UTC");
+        for (String z : java.util.List.of("EST5EDT", "CST6CDT", "PST8PDT", "GMT0", "Etc/GMT+5", "Asia/Kolkata"))
+            assertEquals(z, KpiDefinition.fromMap("k", Map.of("dataset", "o", "measure", "count", "timeField", "d",
+                    "grain", "day", "timezone", z)).zone().getId(), z + " is an IANA id");
     }
 
     @Test
