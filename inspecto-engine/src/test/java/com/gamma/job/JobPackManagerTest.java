@@ -428,6 +428,34 @@ class JobPackManagerTest {
         }
     }
 
+    // ── S2-1: a pack node type must declare EXECUTED ─────────────────────────────────────────
+
+    /** ⛔ A pack declaring LOWERED would put third-party SQL in the engine's query (R2): the pack is
+     *  rejected whole, with the reason on the {@code job.pack.rejected} signal. */
+    @Test
+    void aPackNodeTypeDeclaringLoweredIsRejectedWhole(@TempDir Path work) throws Exception {
+        assumeTrue(ToolProvider.getSystemJavaCompiler() != null, "needs a JDK (javac) to build the pack jar");
+        Path packsDir = Files.createDirectories(work.resolve("packs"));
+        buildNodePackJar(work, packsDir.resolve("lowered-1.jar"), "LoweredPack", "acme.lowered",
+                "transform.acme_lowered", "transform.acme_lowered", "LOWERED");
+
+        Sink sink = new Sink();
+        trustEveryJarIn(packsDir);
+        try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
+                ExpressionRegistry.withBuiltins(), sink)) {
+            try {
+                assertEquals(List.of("lowered-1.jar"), mgr.rescan().get("rejected"));
+                assertTrue(sink.types.contains("job.pack.rejected"));
+                assertFalse(com.gamma.pipeline.PipelineNodeTypes.isKnown("transform.acme_lowered"));
+                assertTrue(com.gamma.pipeline.exec.PipelineNodeExecutors.get("transform.acme_lowered").isEmpty(),
+                        "atomic: the executor is rolled back with the descriptor");
+            } finally {
+                com.gamma.pipeline.PipelineNodeTypes.deregister("lowered-1.jar");
+                com.gamma.pipeline.exec.PipelineNodeExecutors.deregister("lowered-1.jar");
+            }
+        }
+    }
+
     // ── S2-0: a PIPELINE run executing pack code pins the pack, as a Job run does ────────────────
 
     /**
@@ -684,6 +712,12 @@ class JobPackManagerTest {
      */
     private static Path buildNodePackJar(Path work, Path jar, String cls, String packId,
                                          String nodeType, String executorKind) throws Exception {
+        return buildNodePackJar(work, jar, cls, packId, nodeType, executorKind, "EXECUTED");
+    }
+
+    /** As above, with the descriptor declaring {@code ExecutionMode.<mode>} (S2-1). */
+    private static Path buildNodePackJar(Path work, Path jar, String cls, String packId,
+                                         String nodeType, String executorKind, String mode) throws Exception {
         String src = """
                 package com.acme.pack;
                 import com.gamma.pipeline.PipelineNode;
@@ -694,6 +728,9 @@ class JobPackManagerTest {
                 public class %s {
                     public static class Type implements PipelineNodeType {
                         public String type() { return "%s"; }
+                        public java.util.Optional<com.gamma.pipeline.ExecutionMode> mode() {
+                            return java.util.Optional.of(com.gamma.pipeline.ExecutionMode.%s);
+                        }
                     }
                     public static class Exec implements PipelineNodeExecutor {
                         public String type() { return "%s"; }
@@ -708,7 +745,7 @@ class JobPackManagerTest {
                         }
                     }
                 }
-                """.formatted(cls, nodeType == null ? "unused" : nodeType, executorKind);
+                """.formatted(cls, nodeType == null ? "unused" : nodeType, mode, executorKind);
 
         Path classes = compile(work, "com/acme/pack/" + cls + ".java", src);
         Map<String, String> services = new java.util.LinkedHashMap<>();

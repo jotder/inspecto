@@ -64,12 +64,19 @@ public final class PipelineNodeTypes {
      * Contribute a pack's node type. Refuses a built-in discriminator, and refuses one another loaded
      * pack already owns — first pack wins, so load order cannot silently change a deployment's meaning.
      *
-     * @throws IllegalStateException if the type is a built-in or is already owned by another pack
+     * <p>S2-1: also refuses a type declaring {@link ExecutionMode#LOWERED} — a pack may contribute only
+     * {@code EXECUTED} types. An UNDECLARED mode loads; {@link PipelineValidator} refuses it at arming.
+     *
+     * @throws IllegalStateException if the type is a built-in, declares {@code LOWERED}, or is already
+     *                               owned by another pack
      */
     public static synchronized void register(PipelineNodeType type, String owner) {
         String id = type.type();
         if (isBuiltin(id))
             throw new IllegalStateException("node type '" + id + "' is a built-in and cannot be replaced by a pack");
+        if (type.mode().orElse(null) == ExecutionMode.LOWERED)
+            throw new IllegalStateException("node type '" + id + "' declares mode LOWERED — a pack may only "
+                    + "contribute EXECUTED node types (no third-party SQL in the engine's query)");
         String existing = OWNERS.get(id);
         if (existing != null && !existing.equals(owner))
             throw new IllegalStateException("node type '" + id + "' is already contributed by pack '" + existing + "'");

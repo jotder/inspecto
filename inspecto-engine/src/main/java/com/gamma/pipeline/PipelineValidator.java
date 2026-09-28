@@ -78,6 +78,12 @@ public final class PipelineValidator {
     public static final String ILLEGAL_PAIRING = "ILLEGAL_PAIRING";
     public static final String UNKNOWN_TYPE = "UNKNOWN_TYPE";
     /**
+     * A node whose registered (contributed) type declares no {@link PipelineNodeType#mode() mode} (S2-1).
+     * ERROR, so the graph is refused at arming ({@code validateOrThrow} in {@code PipelineExecutor.execute}
+     * / {@code dryRun}) — an undeclared type says neither how it runs nor that it keeps SQL out of the query.
+     */
+    public static final String NODE_MODE_UNDECLARED = "NODE_MODE_UNDECLARED";
+    /**
      * A {@code transform.sql} node — legal, not broken (sql-transform-v1-plan.md B5, mirroring the
      * {@code EXPR} mapping-rule warning shipped 2026-08-29): its {@code sql} attribute runs
      * author-owned SQL verbatim and is deliberately excluded from the batch's cast-failure audit, the
@@ -279,6 +285,10 @@ public final class PipelineValidator {
             if (!PipelineNodeTypes.isKnown(n.type())) {
                 issues.add(new Issue(Severity.WARNING, UNKNOWN_TYPE,
                         "Node '" + n.id() + "' has unregistered type '" + n.type() + "' — wiring not validated."));
+            } else if (PipelineNodeTypes.get(n.type()).flatMap(PipelineNodeType::mode).isEmpty()) {
+                issues.add(new Issue(Severity.ERROR, NODE_MODE_UNDECLARED,
+                        "Node '" + n.id() + "' has type '" + n.type() + "', which declares no execution mode "
+                                + "(LOWERED or EXECUTED) — it cannot run until its provider declares one."));
             }
             // ⚠ Conditional since 2026-09-05: a node authored as FIELDS compiles through
             // RecordTransform, so its coercing columns ARE counted by the cast-failure audit. Only

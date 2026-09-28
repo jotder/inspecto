@@ -1,5 +1,6 @@
 package {{packageName}};
 
+import com.gamma.pipeline.ExecutionMode;
 import com.gamma.pipeline.NodeCategory;
 import com.gamma.pipeline.PipelineNodeType;
 import com.gamma.pipeline.PipelineRel;
@@ -32,6 +33,15 @@ public final class {{className}}NodeType implements PipelineNodeType {
     @Override
     public String type() {
         return TYPE;
+    }
+
+    /**
+     * ⚠ Required: a pack node type runs as Java ({@code EXECUTED}). A pack declaring {@code LOWERED} is
+     * rejected at load, and one declaring nothing is refused when a pipeline using it is armed.
+     */
+    @Override
+    public java.util.Optional<ExecutionMode> mode() {
+        return java.util.Optional.of(ExecutionMode.EXECUTED);
     }
 
     @Override

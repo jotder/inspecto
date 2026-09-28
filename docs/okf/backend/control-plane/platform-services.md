@@ -192,6 +192,27 @@ since 2026-09-28, that the resumed walk still delivers the pack executor's 3 row
    owners are enough, because rule 1 guarantees that no pack executor runs a kind its pack does not own.
    ⚠ `ComponentPreview` (single-node preview) calls `RowShaper.shape` directly and holds no lease.
 
+## 7a. S2-1 — execution mode on the node type (as built, 2026-09-28)
+
+`PipelineNodeType.mode()` returns `Optional<ExecutionMode>` (`LOWERED` | `EXECUTED`); the default is
+empty, meaning **undeclared**.
+
+1. Every `BuiltinNodeType` answers `LOWERED`: each one compiles to SQL inside `RowShaper`.
+2. `PipelineNodeTypes.register` (the pack overlay) refuses a type declaring `LOWERED`, so no third-party
+   SQL reaches the engine's query (R2). The throw happens inside the atomic pack load, so the whole pack is
+   rejected and signalled `job.pack.rejected`, executor included. A classpath provider may declare either mode.
+3. An undeclared type still **loads**, so it renders and its wiring validates. `PipelineValidator` then
+   reports ERROR `NODE_MODE_UNDECLARED` for any node using it. Arming is `validateOrThrow` in
+   `PipelineExecutor.execute` / `dryRun`, so such a graph cannot run. A save through the graph routes
+   also sees the ERROR.
+4. `mode` is **not served** in the palette catalog (`PipelineProjection.catalog`), so the node-attributes
+   contract is unchanged.
+5. The `nodetype` scaffold template declares `EXECUTED`.
+
+Tests: `PipelineNodeTypesPackOverlayTest` (every built-in `LOWERED`; pack `LOWERED` refused, `EXECUTED` and
+undeclared accepted), `PipelineValidatorModeTest` (undeclared is refused at arming; `EXECUTED` and
+built-ins arm), `JobPackManagerTest.aPackNodeTypeDeclaringLoweredIsRejectedWhole` (real jar).
+
 ## 8. What is still open
 
 Stage 2 (the open Step-kind registry, `LOWERED`/`EXECUTED`) and Stage 3 (pack-contributed services)

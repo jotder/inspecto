@@ -146,4 +146,34 @@ class PipelineNodeTypesPackOverlayTest {
         assertTrue(PipelineNodeTypes.catalog().size() >= builtins);
         assertTrue(PipelineNodeTypes.all().stream().noneMatch(t -> t.startsWith("transform.acme")));
     }
+
+    // ── S2-1: execution mode ─────────────────────────────────────────────────────────────────
+
+    private record Moded(String type, ExecutionMode m) implements PipelineNodeType {
+        @Override public java.util.Optional<ExecutionMode> mode() { return java.util.Optional.of(m); }
+    }
+
+    @Test
+    void everyBuiltInIsLowered() {
+        for (BuiltinNodeType b : BuiltinNodeType.values())
+            org.junit.jupiter.api.Assertions.assertEquals(java.util.Optional.of(ExecutionMode.LOWERED), b.mode(), b.type());
+    }
+
+    @Test
+    void aPackTypeDeclaringLoweredIsRefusedAndExecutedIsAccepted() {
+        try {
+            IllegalStateException e = org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException.class,
+                    () -> PipelineNodeTypes.register(new Moded("transform.acme_low", ExecutionMode.LOWERED), OWNER));
+            org.junit.jupiter.api.Assertions.assertTrue(e.getMessage().contains("LOWERED"), e.getMessage());
+            org.junit.jupiter.api.Assertions.assertFalse(PipelineNodeTypes.isKnown("transform.acme_low"));
+
+            PipelineNodeTypes.register(new Moded("transform.acme_exec", ExecutionMode.EXECUTED), OWNER);
+            org.junit.jupiter.api.Assertions.assertTrue(PipelineNodeTypes.isKnown("transform.acme_exec"));
+            // undeclared still LOADS — it is refused at arming (PipelineValidatorModeTest), not here
+            PipelineNodeTypes.register(new Contributed("transform.acme_undeclared"), OWNER);
+            org.junit.jupiter.api.Assertions.assertTrue(PipelineNodeTypes.isKnown("transform.acme_undeclared"));
+        } finally {
+            PipelineNodeTypes.deregister(OWNER);
+        }
+    }
 }

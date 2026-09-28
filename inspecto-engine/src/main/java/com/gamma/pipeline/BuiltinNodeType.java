@@ -271,6 +271,8 @@ public enum BuiltinNodeType implements PipelineNodeType {
     public String stepKind() { return stepKind; }
 
     @Override public String type() { return type; }
+    /** Every built-in compiles to SQL inside {@code RowShaper} (S2-1). */
+    @Override public java.util.Optional<ExecutionMode> mode() { return java.util.Optional.of(ExecutionMode.LOWERED); }
     @Override public NodeCategory category() { return category; }
     @Override public String label() { return label; }
     @Override public String description() { return description; }

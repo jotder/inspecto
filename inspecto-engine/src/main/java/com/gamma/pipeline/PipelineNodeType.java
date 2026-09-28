@@ -38,6 +38,19 @@ public interface PipelineNodeType {
         return NodeCategory.TRANSFORM;
     }
 
+    /**
+     * How this node type executes (S2-1): {@link ExecutionMode#LOWERED} (compiled to SQL by the engine)
+     * or {@link ExecutionMode#EXECUTED} (runs as Java). Every {@link BuiltinNodeType} is {@code LOWERED};
+     * a pack-contributed type must be {@code EXECUTED}.
+     *
+     * <p>The default is {@link Optional#empty()} — <b>undeclared</b>. An undeclared contributed type still
+     * loads, renders and validates its wiring, but {@link PipelineValidator} refuses a graph using it with
+     * {@link PipelineValidator#NODE_MODE_UNDECLARED}, so it cannot be armed (run or dry-run).
+     */
+    default Optional<ExecutionMode> mode() {
+        return Optional.empty();
+    }
+
     /** Short human label for the UI palette / node inspector (defaults to {@link #type()}). */
     default String label() {
         return type();

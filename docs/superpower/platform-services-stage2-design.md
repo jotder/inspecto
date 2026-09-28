@@ -2,7 +2,7 @@
 
 **Row:** `BACKLOG.md` §3.2 *Platform Services Stage 2 / 3* (P2).
 **Owner concept:** [`okf/backend/control-plane/platform-services.md`](../okf/backend/control-plane/platform-services.md).
-**Status:** written 2026-09-24. **All 10 decisions in §7 decided 2026-09-28 (operator: every recommendation accepted; D-10 deferred).** S2-0 ✅ shipped (`6edebc398`, 2026-09-24); S2-1…S2-5 and Stage 3 are still in flight — this doc stays the plan for them.
+**Status:** written 2026-09-24. **All 10 decisions in §7 decided 2026-09-28 (operator: every recommendation accepted; D-10 deferred).** S2-0 ✅ shipped (`6edebc398`, 2026-09-24); S2-1 ✅ shipped 2026-09-28; S2-2…S2-5 and Stage 3 are still in flight — this doc stays the plan for them.
 **Scope fence:** new Step Processors are ⛔ **ON HOLD** (operator, 2026-09-23). This document designs the
 *registry and SPI* a Step kind is contributed through. It adds no processor to the catalog; the only Step
 it builds is a test-scope no-op for the S2-2 spike.
@@ -184,7 +184,7 @@ Each slice is independently green; unit tests per change (`-pl inspecto-engine -
 |---|---|---|
 | **S2-0a** ✅ `6edebc398` | `PipelineNodeExecutors.register` refuses a built-in type **from a pack** (classpath layer unchanged) | `JobPackManagerTest`: a real pack jar contributing an executor for `transform.filter` is rejected whole, `transform.filter` still runs the built-in; a mutant that removes the check goes red on that assertion |
 | **S2-0b** ✅ `6edebc398` | A walk pins the owning pack of every contributed node it will execute | new test: load a pack node, start a walk that blocks inside it, rescan with the jar removed — the classloader close is deferred until the walk ends; without the pin the step fails with a linkage error (the reproduction) |
-| **S2-1** | `mode()` on `PipelineNodeType`; built-ins `LOWERED`; a pack `LOWERED` rejected; a mode-less contributed type refused at arming | every committed pipeline arms identically (existing suites); regenerate the node-attributes contract if `mode` is served; `NodeAttributesContractTest` green |
+| **S2-1** ✅ 2026-09-28 | `mode()` on `PipelineNodeType`; built-ins `LOWERED`; a pack `LOWERED` rejected; a mode-less contributed type refused at arming | every committed pipeline arms identically (existing suites); regenerate the node-attributes contract if `mode` is served; `NodeAttributesContractTest` green |
 | **S2-2** | **Bridge spike** — measurement only, test scope, behind a system property, excluded from the default suite | see §5.1; the deliverable is a published number, not a pass/fail |
 | **S2-3** | `StepExecutor` + `StepContext` + `requires:` + dry-run + failure mapping + watchdog; pack raw-`Connection` executors rejected; `scaffold.mjs new step` unlocked | a pack Step runs armed and in a dry run (and knows which); a throwing Step leaves no node tables and fails the batch; a `reject:` emit is tagged as a reject stream by `ConservationCheck`; a sleeping Step is killed at its deadline with `STEP_TIMEOUT`; an undeclared service is invisible; `ScaffoldTemplatesTest` compiles and loads the new template |
 | **S2-4** | `graphLaneCarries` admits intervening nodes | `IngestLaneFlagTest`; the whole suite under `-Dingest.lane=graph` with zero refusals (the Row 15 parity gate, re-run); dedup / join / summarize between map and sink produce the same rows as today's at-rest run |
