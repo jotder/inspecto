@@ -16,11 +16,11 @@ const CASE: OperationalObject = {
     status: 'INVESTIGATING',
     attributes: {},
     impact: {
-        suspected: 5000,
-        confirmed: 1200.5,
-        recovered: 200.25,
+        suspected: '5000',
+        confirmed: '1200.5',
+        recovered: '200.25',
         prevented: null,
-        outstanding: 1000.25,
+        outstanding: '1000.25',
         currency: 'EUR',
         period: '2026-09',
         basis: 'rated vs billed CDRs',
@@ -116,6 +116,38 @@ describe('ImpactPanelComponent (WS-10)', () => {
         expect(c.form.controls.prevented.enabled).toBe(true);
         expect(c.form.controls.confirmed.disabled).toBe(true);
         expect(c.form.controls.currency.disabled).toBe(true);
+    });
+
+    /**
+     * Browser pass 2026-09-28: a late recovery could never be saved — the currency control is disabled, the
+     * group validator read `value` (which omits disabled controls) and always said "a currency is required";
+     * and the untouched confirmed went back rounded through a double, which the server 409s as a change.
+     */
+    it('saves a late recovery on a RESOLVED Incident, resending the untouched amounts exactly', () => {
+        const exact = '123456789012345.123456';
+        const inc: OperationalObject = {
+            ...CASE,
+            objectType: 'INCIDENT',
+            status: 'RESOLVED',
+            impact: { ...CASE.impact!, suspected: null, confirmed: exact, recovered: '1', outstanding: '0' },
+        };
+        const { c, saveImpact, fixture, el } = create(inc);
+        c.startEdit();
+        expect(c.form.controls.confirmed.value).toBe(exact);
+        c.form.patchValue({ recovered: '5' });
+        c.save();
+        fixture.detectChanges();
+        expect(el.textContent).not.toContain('A currency is required');
+        expect(saveImpact).toHaveBeenCalledTimes(1);
+        const [, body] = saveImpact.mock.calls[0] as unknown as [string, Record<string, string>];
+        expect(body).toEqual({
+            confirmed: exact,
+            recovered: '5',
+            currency: 'EUR',
+            period: '2026-09',
+            basis: 'rated vs billed CDRs',
+        });
+        expect(c.previewOutstanding()).not.toBe('—');
     });
 
     it('offers no edit on an ARCHIVED Incident — its impact is closed server-side', () => {

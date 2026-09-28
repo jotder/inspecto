@@ -97,6 +97,18 @@ the real ControlApi.
   `FindingsSpec.DISPOSITIONS`. The Case analytics dialog shows *Confirmed (CUR)* / *Outstanding (CUR)* per
   currency from `impact.byCurrency`. Specs: `impact-panel.component.spec.ts`, `resolve.dialog.spec.ts`,
   `case-analytics.dialog.spec.ts`.
+  **Browser pass 2026-09-28** (`ASSURE-IMPACT-LEDGER-RESIDUALS-1` (4), a Personal-flavour server + `inspecto-ops`
+  on the classpath, driven in the Browser pane) found and fixed three defects: 🔴 **a late recovery could never
+  be saved** — the currency-required GROUP validator read `form.value`, which omits disabled controls, and a
+  late recovery disables currency, so it always said "a currency is required"; it and the outstanding preview
+  now read `getRawValue()`. 🔴 **amounts round-tripped through a `double`** — `ObjectImpact` amounts are now the
+  server's exact decimal strings, used verbatim as the edit's starting values (`Number()` only to format).
+  🔴 **the detail page offered no action on any Incident** — its hand-kept table named OPEN/ASSIGNED/IN_PROGRESS;
+  `ObjectDetailComponent` now reads `GET /workflows/{type}` (fallback: the server's built-in lifecycles). And
+  both resolve paths now honour the server's hard I1 gate: an Incident missing part of its resolution pattern
+  is named and left out, never offered "resolve anyway?" (`incidents.md` §4, 2026-09-28). Verified live:
+  record impact (currency refusal inline, then saved with the server's outstanding), resolve with a
+  Disposition from the mail view and from the detail page, and a late recovery on a RESOLVED Incident.
 * **Configurable Findings sections (C3 / BACKLOG D6) — SHIPPED end-to-end 2026-07-26.** The Findings field
   set is deployment-authored: a **`findings-spec` ComponentStore kind** (one per `ObjectType`, id = the
   lowercased type) resolved and served by **`GET /findings/{type}`**, rendered by `<inspecto-schema-form>`.
@@ -179,8 +191,8 @@ the real ControlApi.
     an unreadable state on disk degrades to the built-in with a logged warning rather than 500ing triage.
   * **UI consequences:** `Findings` is now an open `Record<string, string>` (`mail-model.ts`), the panel's
     team + target date moved to a sibling `teamForm` (they are C6, not Findings), the flat
-    `impactAmount`/`recordsAffected` copies the C4 analytics roll-up sums are written **on every Findings
-    save** (by the server since 2026-09-25) — as `''` when the section is not configured, so removing those sections blanks the roll-up for
+    `recordsAffected` copy the C4 analytics roll-up sums is written **on every Findings
+    save** (by the server since 2026-09-25; the `impactAmount` copy retired with WS-10, 2026-09-26) — as `''` when the section is not configured, so removing that section blanks the roll-up for
     each Case as it is next saved (corrected 2026-09-25; this line used to say "only while configured",
     which the code never did) — and the soft no-disposition prompt on resolve **only fires while
     `disposition` is a configured section**. `CASE_DISPOSITIONS` was removed from `mail-model.ts` — the

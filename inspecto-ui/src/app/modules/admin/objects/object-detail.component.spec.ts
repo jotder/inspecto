@@ -31,6 +31,7 @@ function create(overrides: Partial<Record<keyof ObjectsService, unknown>> = {}) 
         graph: () => of({ root: CASE.id, depth: 2, nodes: [], edges: [] }),
         attachments: () => of([]),
         applyRca: vi.fn(() => of([])),
+        workflow: vi.fn(() => throwError(() => new Error('no workflow endpoint'))), // → the built-in fallback
         ...overrides,
     } as unknown as ObjectsService;
     TestBed.configureTestingModule({
@@ -40,7 +41,7 @@ function create(overrides: Partial<Record<keyof ObjectsService, unknown>> = {}) 
             { provide: ObjectsService, useValue: api },
             { provide: EventsService, useValue: { search: () => of([]) } },
             { provide: MatDialog, useValue: {} },
-            { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn() } },
+            { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } },
             // A real router (RouterLink needs createUrlTree); at the root URL listBase falls back to 'incidents'.
             provideRouter([]),
             // ⚠ `paramMap` as an OBSERVABLE, not just the snapshot: the component tracks param changes,
@@ -75,6 +76,25 @@ describe('ObjectDetailComponent', () => {
         expect(c.listLabel).toBe('Incidents');
     });
 
+    /** Browser pass 2026-09-28: the page offered no action at all on an Incident — Resolve included. */
+    it("offers an Incident's actions from its served workflow, and from the built-in one without it", () => {
+        const INCIDENT: OperationalObject = { ...CASE, objectType: 'INCIDENT', status: 'IDENTIFIED' };
+        const served = {
+            type: 'INCIDENT',
+            initial: 'IDENTIFIED',
+            states: ['IDENTIFIED', 'RESOLVED'],
+            terminal: [],
+            transitions: [{ from: 'IDENTIFIED', to: 'RESOLVED', action: 'resolve' }],
+        };
+        const { fixture } = create({ get: () => of(INCIDENT), workflow: vi.fn(() => of(served)) });
+        const c = fixture.componentInstance;
+        expect(c.actions).toEqual(['resolve']); // the served (possibly TOON-overridden) lifecycle wins
+        c.workflowDef.set(null);
+        expect(c.actions).toEqual(['accept', 'resolve', 'archive']); // the server's built-in, as the fallback
+        c.obj.set({ ...INCIDENT, status: 'RESOLVED' });
+        expect(c.actions).toEqual(['archive', 'reopen']);
+    });
+
     it('offers "what happened" only when the object carries a correlation id', () => {
         const { fixture } = create();
         expect(
@@ -93,6 +113,15 @@ describe('ObjectDetailComponent', () => {
         c.transition('escalate');
         expect(api.transition).toHaveBeenCalledWith('obj-9', 'escalate');
         expect(c.obj()?.status).toBe('ESCALATED');
+    });
+
+    it("names an Incident's missing resolution pattern instead of opening a resolve the server refuses", () => {
+        const { fixture, api } = create({ get: () => of({ ...CASE, objectType: 'INCIDENT', status: 'IDENTIFIED' }) });
+        const toastr = TestBed.inject(ToastrService) as unknown as { warning: ReturnType<typeof vi.fn> };
+        fixture.componentInstance.transition('resolve'); // MatDialog is a bare {} here: an open() would throw
+        expect(toastr.warning.mock.calls[0][0]).toContain('timeline');
+        expect(api.addComment).not.toHaveBeenCalled();
+        expect(api.transition).not.toHaveBeenCalled();
     });
 
     it('blocks an empty comment and submits a valid one', () => {

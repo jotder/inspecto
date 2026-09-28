@@ -1,6 +1,6 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, ValidatorFn, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -177,7 +177,9 @@ export class ImpactPanelComponent {
         },
         {
             validators: (g) => {
-                const v = g.value as Record<string, string>;
+                // RAW value: on a late recovery the currency control is disabled, and `value` omits disabled
+                // controls, so every late-recovery save read as "no currency" and could never be submitted.
+                const v = (g as FormGroup).getRawValue() as Record<string, string>;
                 const any = AMOUNTS.some((a) => (v[a] ?? '').trim());
                 return any && !(v['currency'] ?? '').trim() ? { currencyRequired: true } : null;
             },
@@ -189,7 +191,8 @@ export class ImpactPanelComponent {
     readonly readRows = computed(() => {
         const i = this.impact();
         if (!i) return [];
-        const fmt = (n: number | null) => (n == null ? '—' : this.money(n, i.currency));
+        // Display only: the exact string stays the value an edit starts from (startEdit).
+        const fmt = (n: string | null) => (n == null ? '—' : this.money(Number(n), i.currency));
         return [
             ...AMOUNTS.map((a) => ({ label: this.labels[a], value: fmt(i[a]) })),
             { label: 'Outstanding', value: fmt(i.outstanding) },
@@ -206,7 +209,8 @@ export class ImpactPanelComponent {
     });
 
     constructor() {
-        this.form.valueChanges.subscribe((v) => this.formValue.set(v as Record<string, string>));
+        // RAW value, so the preview still sees a disabled (late-recovery) confirmed and currency.
+        this.form.valueChanges.subscribe(() => this.formValue.set(this.form.getRawValue() as Record<string, string>));
         // A different object (or a reload) ends an edit in progress on the old one.
         effect(() => {
             this.object();
@@ -216,12 +220,11 @@ export class ImpactPanelComponent {
 
     startEdit(): void {
         const i = this.impact();
-        const str = (n: number | null | undefined) => (n == null ? '' : String(n));
         this.form.reset({
-            suspected: str(i?.suspected),
-            confirmed: str(i?.confirmed),
-            recovered: str(i?.recovered),
-            prevented: str(i?.prevented),
+            suspected: i?.suspected ?? '',
+            confirmed: i?.confirmed ?? '',
+            recovered: i?.recovered ?? '',
+            prevented: i?.prevented ?? '',
             currency: i?.currency ?? '',
             period: i?.period ?? '',
             basis: i?.basis ?? '',

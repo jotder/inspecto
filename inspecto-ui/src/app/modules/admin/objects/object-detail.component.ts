@@ -32,6 +32,7 @@ import {
     ObjectNote,
     ObjectsService,
     OperationalObject,
+    WorkflowDef,
 } from 'app/inspecto/api';
 import { AiStatusComponent } from 'app/inspecto/ai-assist/ai-status.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -47,6 +48,7 @@ import { ActionRequestsPanelComponent } from './action-requests-panel.component'
 import { ImpactPanelComponent } from './impact-panel.component';
 import { RiskScorePanelComponent } from 'app/inspecto/components/risk-score-panel.component';
 import { ResolveDialog, ResolveDialogData, ResolveResult } from './resolve.dialog';
+import { postmortemGaps } from './mail-model';
 
 type TabKey = 'overview' | 'graph' | 'timeline' | 'events' | 'comments' | 'attachments';
 
@@ -158,13 +160,24 @@ export class ObjectDetailComponent implements OnInit {
 
     readonly fmt = fmtDateTime;
 
-    /** Legal next workflow actions from the current status, per object type (backend re-validates). */
+    /**
+     * The effective lifecycle of the object's type (`GET /workflows/{type}`, possibly TOON-overridden); `null`
+     * until it loads or when it cannot, and then {@link TRANSITIONS} (the built-in defaults) answers.
+     */
+    readonly workflowDef = signal<WorkflowDef | null>(null);
+
+    /**
+     * Fallback legal next actions from the current status, per object type (backend re-validates) — the
+     * servers' built-in lifecycles. ⚠ The INCIDENT row once named states the Incident workflow does not have
+     * (OPEN/ASSIGNED/IN_PROGRESS), so this page offered NO action — Resolve included — on any Incident
+     * (browser pass 2026-09-28); the served workflow is now the source, this only its fallback.
+     */
     private static readonly TRANSITIONS: Record<string, Record<string, string[]>> = {
         INCIDENT: {
-            OPEN: ['assign'],
-            ASSIGNED: ['start'],
-            IN_PROGRESS: ['resolve'],
-            RESOLVED: ['close'],
+            IDENTIFIED: ['accept', 'resolve', 'archive'],
+            DIAGNOSING: ['resolve', 'archive'],
+            RESOLVED: ['archive', 'reopen'],
+            ARCHIVED: ['reopen'],
         },
         CASE: {
             OPEN: ['investigate'],
@@ -177,9 +190,11 @@ export class ObjectDetailComponent implements OnInit {
 
     get actions(): string[] {
         if (!this.obj() || !this.canWork()) return [];
-        return (
-            ObjectDetailComponent.TRANSITIONS[this.obj().objectType]?.[(this.obj().status ?? '').toUpperCase()] ?? []
-        );
+        const status = (this.obj().status ?? '').toUpperCase();
+        const wf = this.workflowDef();
+        if (wf?.type === this.obj().objectType)
+            return [...new Set(wf.transitions.filter((t) => t.from === status).map((t) => t.action))];
+        return ObjectDetailComponent.TRANSITIONS[this.obj().objectType]?.[status] ?? [];
     }
 
     /** The object's attributes as display rows. */
@@ -215,6 +230,11 @@ export class ObjectDetailComponent implements OnInit {
             next: (o) => {
                 this.obj.set(o);
                 this.loading.set(false);
+                if (this.workflowDef()?.type !== o.objectType)
+                    this.api.workflow(o.objectType).subscribe({
+                        next: (wf) => this.workflowDef.set(wf),
+                        error: () => this.workflowDef.set(null), // the built-in fallback answers
+                    });
                 // The active tab may have been opened before the object existed; its loader bailed out
                 // rather than latching an empty result, so drive it now that there is something to read.
                 this.onTabChange();
@@ -344,6 +364,16 @@ export class ObjectDetailComponent implements OnInit {
     transition(action: string): void {
         // WS-10: an Incident resolves only with a Disposition (and, as in the mail view, a resolution comment).
         if (action === 'resolve' && this.obj()?.objectType === 'INCIDENT') {
+            // The resolution pattern is a hard gate on the server: say what is missing up front, rather than
+            // ask for a Disposition and a comment, post the comment, and then fail the resolve.
+            const gaps = postmortemGaps(this.obj()!);
+            if (gaps.length) {
+                this.toastr.warning(
+                    `Complete the resolution pattern first (missing: ${gaps.join(', ')}).`,
+                    'Resolution pattern',
+                );
+                return;
+            }
             const data: ResolveDialogData = { count: 1, label: 'incident', askDisposition: true };
             this.dialog
                 .open(ResolveDialog, { width: '560px', data })

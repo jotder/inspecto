@@ -817,8 +817,10 @@ export class ObjectMailComponent implements OnInit {
 
     /**
      * Resolved requires a resolution comment — appended to each object before the transition.
-     * I1 soft gate: incidents whose mandatory resolution pattern (timeline · cause analysis ·
-     * corrective actions · SLA) is incomplete warn first — never block.
+     * I1: the resolution pattern (timeline · cause analysis · corrective actions · SLA) is a HARD gate on
+     * the server (`ObjectService.commit`), so an incident missing part of it is left out and named — never
+     * offered a "resolve anyway?" the server would refuse (it once was: the dialog then asked for a
+     * Disposition and a comment, posted the comment, and the resolve failed — browser pass 2026-09-28).
      */
     async resolve(targets?: OperationalObject[]): Promise<void> {
         const caseLegal = new Set(
@@ -826,21 +828,21 @@ export class ObjectMailComponent implements OnInit {
                 .transitions.filter((t) => t.action === 'resolve')
                 .map((t) => t.from),
         );
-        const list = (targets ?? this.selected()).filter((o) =>
+        let list = (targets ?? this.selected()).filter((o) =>
             this.isIncident ? ['IDENTIFIED', 'DIAGNOSING'].includes(displayStatus(o)) : caseLegal.has(displayStatus(o)),
         );
         if (!list.length) return;
         if (this.isIncident) {
-            const incomplete = list.map((o) => postmortemGaps(o)).filter((gaps) => gaps.length);
-            if (incomplete.length) {
-                const missing = [...new Set(incomplete.flat())].join(', ');
-                const ok = await this.confirm.confirm(
-                    `${incomplete.length} of ${list.length} selected incident${list.length === 1 ? '' : 's'} ` +
-                        `${incomplete.length === 1 ? 'has' : 'have'} an incomplete resolution pattern ` +
-                        `(missing: ${missing}) — resolve anyway?`,
+            const blocked = list.filter((o) => postmortemGaps(o).length);
+            if (blocked.length) {
+                const missing = [...new Set(blocked.flatMap((o) => postmortemGaps(o)))].join(', ');
+                this.toastr.warning(
+                    `${blocked.length} of ${list.length} selected incident${list.length === 1 ? '' : 's'} ` +
+                        `cannot be resolved until the resolution pattern is complete (missing: ${missing}).`,
                     'Resolution pattern',
                 );
-                if (!ok) return;
+                list = list.filter((o) => !blocked.includes(o));
+                if (!list.length) return;
             }
         }
         // WS-10: an Incident resolves only with a Disposition (the server 422s without one), so it is asked here.

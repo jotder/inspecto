@@ -319,6 +319,11 @@ above the generated commit list.
   unchanged — renaming it is a separate, unmade decision.
 
 **Operator-visible behaviour**
+- **Breaking (2026-09-28, `ASSURE-IMPACT-LEDGER-RESIDUALS-1`):** an object read's `impact` block carries its
+  amounts (`suspected`, `confirmed`, `recovered`, `prevented`, `outstanding`) as **decimal strings**
+  (`"1200.5"`, plain — never exponent form), no longer JSON numbers, so a client can send a read value back
+  unchanged; `PUT /objects/{id}/impact` still accepts a number or a string. `GET /objects/analytics`
+  `impact.byCurrency` totals stay numbers.
 - **Breaking + new route (2026-09-26, WS-10 `ASSURE-IMPACT-LEDGER-1`):** `PUT /objects/{id}/impact
   {impact:{suspected?, confirmed?, recovered?, prevented?, currency?, period?, basis?}}` (`canWorkIncidents`)
   records an Incident's or Case's typed financial impact; every object read gains a top-level `impact` block
@@ -338,7 +343,8 @@ above the generated commit list.
   `PUT /objects/{id}/findings {findings:{key: scalar…}}` saves a Case's Findings values, **open to anyone who
   can see the object** (the SEC-7d/ABAC scope guard still answers 404) and recorded as a `collaboration`
   exemption in `CapabilityManifest.EXEMPTIONS`. It writes only the `attributes.findings` blob plus the flat
-  `impactAmount`/`recordsAffected` copies (now derived **server-side**, `""` when absent), is judged by the
+  `recordsAffected` copy (derived **server-side**, `""` when absent; the `impactAmount` copy retired with WS-10
+  on 2026-09-26), is judged by the
   same findings-spec gate as the PATCH (**422**), refuses any other body key (**422**) and a missing
   `findings` (**400**), and emits an `OBJECT_ACTIVITY` event with `action: findings` and the request's actor.
   `PATCH /objects/{id}` is **unchanged** (still `canAdminister`, still accepts `attributes.findings`). The

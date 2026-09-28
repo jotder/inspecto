@@ -158,15 +158,24 @@ public record Impact(BigDecimal suspected, BigDecimal confirmed, BigDecimal reco
         return JsonAttributes.toPayloadJson(m);
     }
 
-    /** The read view — every field (absent = {@code null}) plus the derived {@code outstanding}. */
+    /**
+     * The read view — every field (absent = {@code null}) plus the derived {@code outstanding}. Amounts are
+     * <b>decimal strings</b> ({@link BigDecimal#toPlainString()}), never JSON numbers: a browser parses a number
+     * into a {@code double}, which holds ~15 significant digits where an amount may carry 21, so a read → edit →
+     * save rewrote the money, and a late recovery on a RESOLVED Incident 409'd on a "changed" confirmed.
+     */
     public Map<String, Object> toMap() {
         Map<String, Object> m = new LinkedHashMap<>();
-        for (String a : AMOUNTS) m.put(a, amount(a));
-        m.put("outstanding", outstanding());
+        for (String a : AMOUNTS) m.put(a, plain(amount(a)));
+        m.put("outstanding", plain(outstanding()));
         m.put("currency", currency);
         m.put("period", period);
         m.put("basis", basis);
         return m;
+    }
+
+    private static String plain(BigDecimal d) {
+        return d == null ? null : d.toPlainString();
     }
 
     private static BigDecimal amount(Map<?, ?> body, String key) {

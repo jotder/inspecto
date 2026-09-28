@@ -174,7 +174,7 @@ class ControlApiImpactTest {
             HttpResponse<String> late = send(c.port, "/objects/" + cs + "/impact",
                     "{\"impact\":{\"confirmed\":\"100\",\"recovered\":\"60\",\"prevented\":\"5\",\"currency\":\"EUR\"}}", "operations");
             assertEquals(200, late.statusCode(), late.body());
-            assertEquals(new BigDecimal("40"), V1Body.of(late.body()).get("impact").get("outstanding").decimalValue());
+            assertEquals("40", V1Body.of(late.body()).get("impact").get("outstanding").asText());
             HttpResponse<String> rewrite = send(c.port, "/objects/" + cs + "/impact",
                     "{\"impact\":{\"confirmed\":\"200\",\"recovered\":\"60\",\"prevented\":\"5\",\"currency\":\"EUR\"}}", "operations");
             assertEquals(409, rewrite.statusCode(), rewrite.body());
@@ -211,6 +211,36 @@ class ControlApiImpactTest {
         }
     }
 
+    /**
+     * An amount reads back as the exact decimal STRING it was stored as, so a client can send it back unchanged.
+     * As a JSON number, a browser parsed 123456789012345.123456 into a double (…345.12): the SPA's late-recovery
+     * save then sent a "changed" confirmed and the server rightly 409'd it (browser pass, 2026-09-28).
+     */
+    @Test
+    void amountsReadBackAsExactStringsSoALateRecoveryCanResendThem(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            var engine = TestOpsEngine.of(c.svc);
+            String inc = engine.open(ObjectType.INCIDENT, "leak", "d", "MAJOR", null, Map.of(
+                    "dueAt", Long.toString(System.currentTimeMillis() + 86_400_000L),
+                    "postmortem", "{\"timeline\":[{\"time\":\"9\",\"text\":\"x\"}],\"causeAnalysis\":[\"y\"],\"actions\":[{\"text\":\"z\"}]}")).id();
+            assertEquals(200, send(c.port, "/objects/" + inc + "/impact",
+                    "{\"impact\":{\"confirmed\":\"123456789012345.123456\",\"recovered\":\"1000\",\"currency\":\"USD\"}}",
+                    "operations").statusCode());
+            engine.transition(inc, "resolve", "t", "CONFIRMED");
+
+            JsonNode impact = V1Body.of(send(c.port, "GET", "/objects/" + inc, "", "operations").body()).get("impact");
+            assertTrue(impact.get("confirmed").isTextual(), "an amount is a string on the wire: " + impact);
+            assertEquals("123456789012345.123456", impact.get("confirmed").asText());
+            assertEquals("1000", impact.get("recovered").asText(), "plain, never 1E+3");
+            assertEquals("123456789011345.123456", impact.get("outstanding").asText());
+            assertTrue(impact.get("suspected").isNull());
+
+            HttpResponse<String> late = send(c.port, "/objects/" + inc + "/impact", "{\"impact\":{\"confirmed\":"
+                    + impact.get("confirmed") + ",\"recovered\":\"2000\",\"currency\":\"USD\"}}", "operations");
+            assertEquals(200, late.statusCode(), "the read value resent is unchanged: " + late.body());
+        }
+    }
+
     @Test
     void anAnalystRecordsImpactOutstandingIsDerivedAndTheChangeIsAudited(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
@@ -228,8 +258,8 @@ class ControlApiImpactTest {
                 c.svc.eventLog().removeSubscriber(sub);
             }
             JsonNode impact = V1Body.of(r.body()).get("impact");
-            assertEquals(new BigDecimal("1200.5"), impact.get("confirmed").decimalValue());
-            assertEquals(new BigDecimal("1000.25"), impact.get("outstanding").decimalValue(), "confirmed - recovered");
+            assertEquals("1200.5", impact.get("confirmed").asText());
+            assertEquals("1000.25", impact.get("outstanding").asText(), "confirmed - recovered");
             assertEquals("EUR", impact.get("currency").asText(), "the currency code is normalised to upper case");
             assertEquals("rated vs billed CDRs", impact.get("basis").asText());
             String stored = V1Body.of(r.body()).get("attributes").get("impact").asText();

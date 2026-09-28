@@ -72,7 +72,7 @@ async function create(opts: CreateOpts = {}) {
             { provide: ObjectsService, useValue: api },
             { provide: MatDialog, useValue: {} },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
-            { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn() } },
+            { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn(), warning: vi.fn() } },
             provideRouter([]),
             {
                 provide: ActivatedRoute,
@@ -289,6 +289,21 @@ describe('ObjectMailComponent', () => {
         c.onSelection([OBJECTS[0]] as unknown as Record<string, unknown>[]);
         c.prioritize('MAJOR');
         expect(api.list).toHaveBeenCalledTimes(2); // initial load + error-path reload
+    });
+
+    /** The server hard-gates the resolution pattern, so the pane must not offer "resolve anyway?" (2026-09-28). */
+    it('leaves an incident with an incomplete resolution pattern out of resolve, and says why', async () => {
+        const { c, api } = await create();
+        const toastr = TestBed.inject(ToastrService) as unknown as { warning: Mock };
+        const open = vi.fn();
+        (TestBed.inject(MatDialog) as unknown as { open: Mock }).open = open;
+        await c.resolve([OBJECTS[0]]); // IDENTIFIED, no postmortem, no SLA
+        expect(toastr.warning).toHaveBeenCalledTimes(1);
+        expect(toastr.warning.mock.calls[0][0]).toContain('cannot be resolved');
+        expect(toastr.warning.mock.calls[0][0]).toContain('timeline');
+        expect(open).not.toHaveBeenCalled(); // no Resolve dialog, no comment posted, no transition
+        expect(api.addComment).not.toHaveBeenCalled();
+        expect(api.transition).not.toHaveBeenCalled();
     });
 
     it('renders the 3-pane shell with no a11y violations', async () => {

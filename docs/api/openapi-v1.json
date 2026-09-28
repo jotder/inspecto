@@ -7068,7 +7068,7 @@
         "tags" : [ "objects" ],
         "summary" : "Save a Case's Findings values (collaboration; open to anyone who can see the object)",
         "operationId" : "putObjectsByObjectIdFindings",
-        "description" : "Stores the canonical attributes.findings blob plus the flat impactAmount/recordsAffected copies, validated against the effective findings-spec (422). The body may carry ONLY 'findings' — any other key is refused 422, so disposition stays on the canAdminister PATCH /objects/{id}. Missing 'findings' → 400; out-of-scope or unknown id → 404. Audited as an OBJECT_ACTIVITY 'findings' event with the request's actor.",
+        "description" : "Stores the canonical attributes.findings blob plus the flat recordsAffected copy (derived server-side; a Case's money is its typed impact, PUT /objects/{id}/impact), validated against the effective findings-spec (422). The body may carry ONLY 'findings' — any other key is refused 422, so disposition stays on the canAdminister PATCH /objects/{id}. Missing 'findings' → 400; out-of-scope or unknown id → 404. Audited as an OBJECT_ACTIVITY 'findings' event with the request's actor.",
         "parameters" : [ {
           "name" : "objectId",
           "in" : "path",
@@ -8788,7 +8788,7 @@
         },
         "responses" : {
           "default" : {
-            "description" : "Envelope-wrapped operational object (see #/components/schemas/Envelope); data.impact carries the four amounts, currency, period, basis and the derived outstanding."
+            "description" : "Envelope-wrapped operational object (see #/components/schemas/Envelope); data.impact carries the four amounts and the derived outstanding as exact decimal strings, plus currency, period and basis."
           }
         },
         "x-optional-module" : true

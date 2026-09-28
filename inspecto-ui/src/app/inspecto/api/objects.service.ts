@@ -24,16 +24,17 @@ export interface OperationalObject {
 }
 
 /**
- * An Incident's or Case's typed financial impact as the server reads it back (WS-10). Amounts are decimals
- * (numbers on the wire); `outstanding` = confirmed − recovered is derived by the server on every read and is
- * never sent back — {@link ImpactInput} has no such field.
+ * An Incident's or Case's typed financial impact as the server reads it back (WS-10). Amounts are exact
+ * decimal STRINGS on the wire — never parse one into a number to send it back (a double holds ~15
+ * significant digits, an amount up to 21); `outstanding` = confirmed − recovered is derived by the server on
+ * every read and is never sent back — {@link ImpactInput} has no such field.
  */
 export interface ObjectImpact {
-    suspected: number | null;
-    confirmed: number | null;
-    recovered: number | null;
-    prevented: number | null;
-    outstanding: number | null;
+    suspected: string | null;
+    confirmed: string | null;
+    recovered: string | null;
+    prevented: string | null;
+    outstanding: string | null;
     currency: string | null;
     period: string | null;
     basis: string | null;
