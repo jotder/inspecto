@@ -70,7 +70,7 @@ class ImportLoaderInventoryTest {
                 "quarantine", "temp", "status", "manifests", "acquire", "artifacts",
                 "job-packs-staging", "jobs_runs.csv", "runlog", "flows", "pipelines", "investigations",
                 "alert-rules", "sets", "pending", "header.json", "log.jsonl", "attachments.jsonl", "mask.key",
-                "pending.jsonl"))
+                "pending.jsonl", "pending.held.jsonl"))
             ALLOWED.put(p, NOT_CONFIG);
         for (String p : List.of("docs", "docs/GLOSSARY.md", "docs/api/openapi-v1.json", "openapi-v1.json",
                 "inspecto-ui", "inspecto-ui/src/app/app.routes.ts", "index.html", "parser.json"))
