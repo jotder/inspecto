@@ -10,6 +10,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
@@ -158,13 +159,19 @@ public final class AuditChain {
      * ts raised to the head's if earlier, payload normalised, any chain attribute the caller supplied replaced.
      * Caller holds this instance's monitor and appends the returned event to {@code store} before releasing it.
      *
-     * @throws IllegalStateException when the head cannot be recovered from the store — linking anyway would
-     *         restart at genesis and fork the chain
+     * @throws IllegalStateException when the head cannot be recovered from the store, or a unit of it could not be
+     *         read — linking anyway would restart at genesis, or reuse stored seqs, and fork the chain
      */
     Event link(Event e, EventStore store) {
         store.claimChainWriter();   // EVERY link: one linker per directory, and the lock must still be ours
         if (recoveredFrom != store) {
             Event head = store.chainHead();
+            // A head read that skipped a file has not seen that file's seqs: the true head may be in it, and linking
+            // onto the head it did see would reuse seqs already stored — a fork. Refuse; the row is stored unlinked.
+            List<String> unread = store.unreadableUnits();
+            if (!unread.isEmpty())
+                throw new IllegalStateException("the audit chain head cannot be recovered: " + unread
+                        + " could not be read and may hold a later seq");
             if (head == null) {
                 headSeq = 0;
                 headHash = GENESIS;

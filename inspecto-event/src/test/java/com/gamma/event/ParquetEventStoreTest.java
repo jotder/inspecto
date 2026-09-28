@@ -367,6 +367,36 @@ class ParquetEventStoreTest {
         }
     }
 
+    /** A file that failed once (bad bytes, then restored in place with the same size and time — identity
+     *  unchanged, as on Windows where there is no file key) is back after the rebuild every verify starts with. */
+    @Test
+    void aFileThatFailedOnceIsRetriedByTheNextRebuild(@TempDir Path dir) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 100_000, 0, 100)) {
+            for (long seq = 1; seq <= 20; seq++) {
+                store.append(chained(1_000 + seq, seq, "s" + seq));
+                if (seq % 10 == 0) store.flush();
+            }
+            Path second;
+            try (var w = java.nio.file.Files.walk(dir)) {
+                second = w.filter(p -> p.toString().endsWith(".parquet")).sorted().toList().get(1);
+            }
+            byte[] good = java.nio.file.Files.readAllBytes(second);
+            long mtime = second.toFile().lastModified();
+            java.nio.file.Files.write(second, new byte[good.length]);
+            assertTrue(second.toFile().setLastModified(mtime));
+            assertEquals(10, store.chainPage(1, 100).size());
+            assertEquals(1, store.unreadableUnits().size());
+
+            java.nio.file.Files.write(second, good);                          // repaired in place, same identity
+            assertTrue(second.toFile().setLastModified(mtime));
+            assertEquals(10, store.chainPage(1, 100).size(), "still excluded: its identity did not change");
+            store.rebuildChainIndex();
+            assertEquals(20, store.chainPage(1, 100).size(), "the rebuild retried it");
+            assertEquals(List.of(), store.unreadableUnits());
+            assertEquals(1, signals(store), "one Signal for the one failure");
+        }
+    }
+
     /** Verify rebuilds the index from the files: a rewrite that restores size and modification time — and so looks
      *  unchanged to the cache — cannot hide a forged row from it. */
     @Test

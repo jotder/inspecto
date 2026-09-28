@@ -238,8 +238,14 @@ class AuditChainTest {
         assertEquals(1, store.unlinkedSince(0), "the hole is countable");
     }
 
+    /**
+     * One corrupt file does not blind the chain — the readable rows still read — but a row cannot be LINKED past
+     * it: its seqs are unknown, so the head may be in it, and linking onto the head that was seen would reuse
+     * stored seqs (a fork). The row is refused onto the chain and stored marked unlinked, loudly. (Reversed
+     * 2026-09-28 by security review of the per-file seq index; the first cut linked on regardless.)
+     */
     @Test
-    void oneCorruptParquetFileNeitherBlindsTheChainNorUnlinksLaterRows(@TempDir Path dir) throws Exception {
+    void oneCorruptParquetFileDoesNotBlindTheChainButRefusesALinkPastIt(@TempDir Path dir) throws Exception {
         try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
             EventLog log = EventLog.create();
             log.installStore(store);
@@ -251,10 +257,43 @@ class AuditChainTest {
             EventLog log = EventLog.create();
             log.installStore(store);
             log.emit(audit(2_000, "after the plant"));
-            List<Event> chain = assertChain(store, 4);
-            assertNull(chain.get(3).attributes().get(AuditAttrs.AUDIT_UNLINKED));
+            assertChain(store, 3);
+            Event refused = store.recent(10).stream().filter(e -> "after the plant".equals(e.message())).findFirst()
+                    .orElseThrow();
+            assertEquals("true", refused.attributes().get(AuditAttrs.AUDIT_UNLINKED));
+            assertNull(refused.attributes().get(AuditAttrs.AUDIT_SEQ), "no seq reused");
             assertEquals(List.of("level=INFO/year=1970/month=01/day=01/planted.parquet"), store.unreadableUnits(),
                     "the bad file is reported, not skipped silently");
+        }
+    }
+
+    /** The file holding the chain head goes unreadable; after a restart the next audit row is refused, not linked
+     *  onto the lower head still visible — which would store a second row at seqs already taken. */
+    @Test
+    void anUnreadableHeadFileRefusesTheNextLinkInsteadOfForking(@TempDir Path dir) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            EventLog log = EventLog.create();
+            log.installStore(store);
+            for (int i = 0; i < 3; i++) log.emit(audit(1_000 + i, "early" + i));
+            store.flush();
+            for (int i = 0; i < 3; i++) log.emit(audit(2_000 + i, "late" + i));   // seq 4..6, in a second file
+        }
+        Path headFile;
+        try (var w = Files.walk(dir)) {
+            headFile = w.filter(p -> p.toString().endsWith(".parquet")).sorted().toList().get(1);
+        }
+        Files.writeString(headFile, "the head file, destroyed");
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            EventLog log = EventLog.create();
+            log.installStore(store);
+            log.emit(audit(3_000, "after the restart"));
+            List<Event> chain = store.chainPage(1, 100);
+            assertEquals(List.of(1L, 2L, 3L), chain.stream().map(AuditChain::seq).toList(),
+                    "seq 4 is not taken a second time");
+            Event refused = store.recent(10).stream().filter(e -> "after the restart".equals(e.message()))
+                    .findFirst().orElseThrow();
+            assertEquals("true", refused.attributes().get(AuditAttrs.AUDIT_UNLINKED));
+            assertEquals(1, store.unreadableUnits().size());
         }
     }
 

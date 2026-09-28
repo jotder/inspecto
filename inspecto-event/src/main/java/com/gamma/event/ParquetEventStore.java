@@ -514,10 +514,15 @@ public final class ParquetEventStore implements EventStore {
     }
 
     /** Verify rebuilds the index from the files' contents, so it never trusts a cached range: size and modification
-     *  time are both settable by whoever can rewrite a file. */
+     *  time are both settable by whoever can rewrite a file. It also forgets which files were unreadable, so every
+     *  verify retries them all: a failure that was transient (a full temp dir, a Windows sharing violation, a file
+     *  repaired in place — on Windows the file key is null, so identity is only size + time) does not exclude a
+     *  file, or refuse every chain link, until a restart. A file still bad fails again and stays listed; its Signal
+     *  is not raised twice for the same identity. */
     @Override
     public synchronized void rebuildChainIndex() {
         seqIndex.clear();
+        unreadable.clear();
     }
 
     /** Test seam: make the cached entry for {@code f} match the file as it is now, without re-reading it — what a

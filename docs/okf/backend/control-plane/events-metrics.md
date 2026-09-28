@@ -186,7 +186,11 @@ timestamp: 2026-07-16T00:00:00Z
       `audit_unlinked=true`, with an ERROR event and `inspecto_audit_unlinked_total`; verify counts every
       chainable row without a seq written since the chain began → `unlinked`. One corrupt `.parquet` used to
       break the glob read, unlink every later row and still verify: chain reads now fall back to one query PER
-      FILE, keep answering, and verify fails with `unreadable-file` naming it. **Ordinary reads too (2026-09-28,
+      FILE, keep answering, and verify fails with `unreadable-file` naming it. ⚠ Reversed 2026-09-28 (security
+      review of the seq index): while any file is unreadable, recovering the head REFUSES to link — the file's
+      seqs are unknown, the head may be in it, and linking onto the lower head that was seen would reuse stored
+      seqs (a fork) — so audit rows are stored marked unlinked until it is readable, removed, or retried by a
+      verify. A held head (already recovered) is unaffected. **Ordinary reads too (2026-09-28,
       `ASSURE-AUDIT-CHAIN-RESIDUALS-1` (4)):** `query` / `page` / `count` (`/events/search`, `/api/v1/events`,
       the audit search and export) used to fail as a whole on one corrupt file and answer from the unflushed
       buffer only, an empty result that looked complete. Every Parquet read now shares one path: the files not
@@ -197,8 +201,9 @@ timestamp: 2026-07-16T00:00:00Z
       per identity. ⚠ Found by security review the same day: letting any successful read clear it let a
       footer-only `COUNT(*)` re-raise the Signal on every poll, and let a file whose payload page is corrupt
       pass the index's few-column aggregate, be re-chosen by a chain read and fail again FOREVER under the store
-      lock (every append waits on `chainHead`). The cost: a transient read failure keeps a file out until it
-      changes or the store reopens. ⚠ Those routes have no diagnostics slot, so the skip is surfaced as
+      lock (every append waits on `chainHead`). A transient failure (a full temp dir, a Windows sharing violation —
+      where the file key is null, so identity is size + time only) is not permanent: `rebuildChainIndex`,
+      which every verify runs first, also forgets the unreadable list, so each verify retries every file. ⚠ Those routes have no diagnostics slot, so the skip is surfaced as
       the Signal and the log, not as a count in the response body.
     - *The anchors are a chain.* Each anchor carries `prevAnchorMac` in its MAC input and must start at the
       previous `lastSeq + 1`; a garbled line (`anchor-unreadable`), a removed or reordered anchor
