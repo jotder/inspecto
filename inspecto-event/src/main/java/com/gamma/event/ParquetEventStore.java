@@ -77,6 +77,10 @@ public final class ParquetEventStore implements EventStore {
     /** The write-ahead journal's file name, in the store root (see class doc). */
     public static final String JOURNAL = "pending.jsonl";
 
+    /** Journalled events a replay HELD BACK because an unreadable Parquet file may already hold them; retried on
+     *  every open (ASSURE-AUDIT-CHAIN-RESIDUALS-1 (9)). Not a {@code .parquet} file, so no read sees it. */
+    public static final String HELD = "pending.held.jsonl";
+
     /** Flush when this many events are buffered. */
     public static final int DEFAULT_FLUSH_THRESHOLD = 1000;
     /** Flush when the oldest buffered event is older than this, even below the size threshold. */
@@ -147,70 +151,127 @@ public final class ParquetEventStore implements EventStore {
             log.warn("Event journal {} could not be opened; buffered events will not survive a crash: {}",
                     root.resolve(JOURNAL), e.getMessage());
         }
+        signalUnreadable();   // a file the replay met unreadable raises its Signal now the journal is open
     }
 
-    /** Replay a journal a crashed predecessor left behind: its events go to Parquet now, then it is removed. */
+    /** Replay a journal a crashed predecessor left behind: its events go to Parquet now, then it is removed.
+     *  Events a previous open had to hold back ({@value #HELD}) are retried with it. */
     private void replayJournal() {
         Path file = root.resolve(JOURNAL);
-        if (!Files.exists(file)) return;
+        Path held = root.resolve(HELD);
+        if (!Files.exists(file) && !Files.exists(held)) return;
         try {
-            List<String> lines = Files.readAllLines(file, StandardCharsets.UTF_8);
-            int torn = 0;
             List<Event> replay = new ArrayList<>();
-            for (String line : lines) {
-                if (line.isBlank()) continue;
-                try {
-                    Map<?, ?> m = JSON.readValue(line, Map.class);
-                    Event e = new Event(str(m.get("eventId")), ((Number) m.get("ts")).longValue(),
-                            EventLevel.parse(str(m.get("level"))), str(m.get("type")), str(m.get("source")),
-                            str(m.get("pipeline")), str(m.get("correlationId")), str(m.get("message")),
-                            JsonAttributes.fromJson(str(m.get("attributes"))),
-                            JsonAttributes.fromPayloadJson(str(m.get("payload"))));
-                    replay.add(e);
-                } catch (Exception bad) {
-                    torn++;   // a kill mid-write tears the last line; everything before it is whole
+            java.util.Set<String> seen = new java.util.HashSet<>();
+            for (Path f : List.of(held, file)) {
+                if (!Files.exists(f)) continue;
+                int torn = 0;
+                for (String line : Files.readAllLines(f, StandardCharsets.UTF_8)) {
+                    if (line.isBlank()) continue;
+                    try {
+                        Event e = fromJournal(line);
+                        if (seen.add(e.eventId())) replay.add(e);
+                    } catch (Exception bad) {
+                        torn++;   // a kill mid-write tears the last line; everything before it is whole
+                    }
                 }
+                if (torn > 0) log.warn("Event journal {}: skipped {} unreadable line(s)", f, torn);
             }
-            if (torn > 0) log.warn("Event journal {}: skipped {} unreadable line(s)", file, torn);
             // A journal whose events DID reach Parquet (a flush landed, then its truncate failed or the kill came
             // between the two) must not write them twice: a duplicated audit row is a forked chain
-            // (ASSURE-AUDIT-CHAIN-1). Skip every event whose id is already on disk.
+            // (ASSURE-AUDIT-CHAIN-1). Skip every event whose id is already on disk. The check reads per file
+            // (ASSURE-AUDIT-CHAIN-RESIDUALS-1 (9)): an unreadable file no longer fails the whole replay, but an
+            // event it COULD hold (same level/day partition) is not proven unflushed, so it is HELD — fail-closed,
+            // never written twice — kept in HELD and retried on every open until the file reads or is removed.
             java.util.Set<String> flushed = flushedIds(replay);
+            List<Event> hold = new ArrayList<>();
             for (Event e : replay) {
                 if (flushed.contains(e.eventId())) continue;
+                if (mayHold(e)) {
+                    hold.add(e);
+                    continue;
+                }
                 tail.append(e);
                 buffer.addLast(e);
             }
             if (!flushed.isEmpty())
                 log.info("Event journal {}: {} event(s) were already flushed; not written again", file, flushed.size());
+            if (!hold.isEmpty()) {
+                // Written (atomically) BEFORE the journal is removed, so a kill in between loses nothing.
+                StringBuilder sb = new StringBuilder();
+                for (Event e : hold) sb.append(toJournal(e)).append('\n');
+                Path tmp = root.resolve(HELD + ".tmp");
+                Files.writeString(tmp, sb, StandardCharsets.UTF_8);
+                Files.move(tmp, held, java.nio.file.StandardCopyOption.REPLACE_EXISTING,
+                        java.nio.file.StandardCopyOption.ATOMIC_MOVE);
+                log.error("Event journal {}: {} event(s) held back, not replayed: an unreadable Parquet file ({}) may"
+                        + " already hold them; retried on every open until it is readable or removed",
+                        file, hold.size(), String.join(", ", unreadableUnits()));
+            }
             if (!buffer.isEmpty()) {
                 log.info("Event journal {}: replaying {} event(s) a previous run did not flush", file, buffer.size());
                 flushLocked();
             }
-            if (buffer.isEmpty()) Files.deleteIfExists(file);   // kept if the replay flush failed: retried next open
-        } catch (IOException e) {
+            if (buffer.isEmpty()) {   // kept if the replay flush failed: retried next open
+                Files.deleteIfExists(file);
+                if (hold.isEmpty()) Files.deleteIfExists(held);
+            }
+        } catch (IOException | RuntimeException e) {
             log.warn("Event journal {} could not be replayed: {}", file, e.getMessage());
         }
     }
 
-    /** The ids among {@code events} already present in the Parquet files. Throws when they cannot be read, so a
-     *  replay is retried on the next open rather than risking a duplicate. */
-    private java.util.Set<String> flushedIds(List<Event> events) throws IOException {
+    /** {@code true} when an unreadable Parquet file could hold {@code e}: one in its own level/day partition, or
+     *  one outside any well-formed partition directory (it could hold anything). */
+    private boolean mayHold(Event e) {
+        if (unreadable.isEmpty()) return false;
+        LocalDate d = Instant.ofEpochMilli(e.ts()).atZone(ZoneOffset.UTC).toLocalDate();
+        Path dir = root.resolve("level=" + e.level().name()).resolve(String.format("year=%04d", d.getYear()))
+                .resolve(String.format("month=%02d", d.getMonthValue()))
+                .resolve(String.format("day=%02d", d.getDayOfMonth()));
+        for (Path f : unreadable.keySet())
+            if (f.getParent().equals(dir) || !isDayPartition(f.getParent())) return true;
+        return false;
+    }
+
+    private static Event fromJournal(String line) throws IOException {
+        Map<?, ?> m = JSON.readValue(line, Map.class);
+        return new Event(str(m.get("eventId")), ((Number) m.get("ts")).longValue(),
+                EventLevel.parse(str(m.get("level"))), str(m.get("type")), str(m.get("source")),
+                str(m.get("pipeline")), str(m.get("correlationId")), str(m.get("message")),
+                JsonAttributes.fromJson(str(m.get("attributes"))),
+                JsonAttributes.fromPayloadJson(str(m.get("payload"))));
+    }
+
+    private static String toJournal(Event e) throws IOException {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        m.put("eventId", e.eventId());
+        m.put("ts", e.ts());
+        m.put("level", e.level().name());
+        m.put("type", e.type());
+        m.put("source", e.source());
+        m.put("pipeline", e.pipeline());
+        m.put("correlationId", e.correlationId());
+        m.put("message", e.message());
+        m.put("attributes", JSON.writeValueAsString(e.attributes()));
+        m.put("payload", JSON.writeValueAsString(e.payload()));
+        return JSON.writeValueAsString(m);
+    }
+
+    /** The ids among {@code events} present in the Parquet files, read per file ({@link #readFiles}): an unreadable
+     *  file is skipped and recorded ({@link #unreadableUnits}); the caller decides what an id it may hold means. */
+    private java.util.Set<String> flushedIds(List<Event> events) {
         java.util.Set<String> found = new java.util.HashSet<>();
-        if (events.isEmpty() || !hasParquet()) return found;
-        String reader = SqlViews.reader("PARQUET", root + "/**/*.parquet", true);
+        if (events.isEmpty()) return found;
+        List<Path> files = parquetFiles();
+        if (files.isEmpty()) return found;
         for (int from = 0; from < events.size(); from += 500) {
             List<Event> chunk = events.subList(from, Math.min(events.size(), from + 500));
-            String sql = "SELECT DISTINCT event_id FROM " + reader + " WHERE event_id IN ("
-                    + String.join(",", java.util.Collections.nCopies(chunk.size(), "?")) + ")";
-            try (PreparedStatement ps = conn.prepareStatement(sql)) {
-                for (int i = 0; i < chunk.size(); i++) ps.setString(i + 1, chunk.get(i).eventId());
-                try (ResultSet rs = ps.executeQuery()) {
-                    while (rs.next()) found.add(rs.getString(1));
-                }
-            } catch (SQLException e) {
-                throw new IOException("could not check the journal against the flushed events: " + e.getMessage(), e);
-            }
+            List<Object> ids = new ArrayList<>();
+            for (Event e : chunk) ids.add(e.eventId());
+            found.addAll(readFiles(files, "SELECT DISTINCT event_id", "WHERE event_id IN ("
+                    + String.join(",", java.util.Collections.nCopies(chunk.size(), "?")) + ")", ids,
+                    rs -> rs.getString(1)));
         }
         return found;
     }
@@ -223,18 +284,7 @@ public final class ParquetEventStore implements EventStore {
     private void journalLocked(Event e) {
         if (journal == null) return;
         try {
-            Map<String, Object> m = new java.util.LinkedHashMap<>();
-            m.put("eventId", e.eventId());
-            m.put("ts", e.ts());
-            m.put("level", e.level().name());
-            m.put("type", e.type());
-            m.put("source", e.source());
-            m.put("pipeline", e.pipeline());
-            m.put("correlationId", e.correlationId());
-            m.put("message", e.message());
-            m.put("attributes", JSON.writeValueAsString(e.attributes()));
-            m.put("payload", JSON.writeValueAsString(e.payload()));
-            journal.write(ByteBuffer.wrap((JSON.writeValueAsString(m) + '\n').getBytes(StandardCharsets.UTF_8)));
+            journal.write(ByteBuffer.wrap((toJournal(e) + '\n').getBytes(StandardCharsets.UTF_8)));
             if (EventType.AUDIT.equals(e.type()) || EventType.ACCESS_DENIED.equals(e.type())) journal.force(false);
         } catch (IOException ex) {
             log.warn("Event journal write failed; this event survives only a clean shutdown: {}", ex.getMessage());
@@ -500,11 +550,13 @@ public final class ParquetEventStore implements EventStore {
         for (Event e : buffer) if (ids.contains(e.eventId())) found.add(e.eventId());
         List<Event> probe = new ArrayList<>();
         for (String id : ids) probe.add(new Event(id, 0, null, null, null, null, null, null, null, null));
-        try {
-            found.addAll(flushedIds(probe));
-        } catch (IOException e) {
-            throw new IllegalStateException(e.getMessage(), e);
-        }
+        found.addAll(flushedIds(probe));
+        signalUnreadable();
+        // Fail-closed (ASSURE-AUDIT-CHAIN-RESIDUALS-1 (9)): an id not found while a file is unreadable may be in
+        // that file, and answering "absent" would let the caller write it twice.
+        if (!unreadable.isEmpty() && !found.containsAll(ids))
+            throw new IllegalStateException("cannot tell whether every event is present: unreadable "
+                    + String.join(", ", unreadableUnits()));
         return found;
     }
 

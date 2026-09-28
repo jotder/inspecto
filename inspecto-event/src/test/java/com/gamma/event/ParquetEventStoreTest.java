@@ -155,6 +155,78 @@ class ParquetEventStoreTest {
             assertEquals(List.of("kept"), reopened.query(EventQuery.recent(100)).stream().map(Event::message).toList());
         }
     }
+    private static List<Path> parquetIn(Path day) throws Exception {
+        try (var s = java.nio.file.Files.list(day)) {
+            return s.filter(p -> p.toString().endsWith(".parquet")).sorted().toList();
+        }
+    }
+
+    /** ASSURE-AUDIT-CHAIN-RESIDUALS-1 (9): one corrupt Parquet file used to fail the journal replay's
+     *  already-flushed check outright, so a crashed run's events never reached Parquet. A file that cannot hold
+     *  the journalled event (another level/day partition) no longer blocks it; the file is reported. */
+    @Test
+    void aCorruptFileElsewhereDoesNotBlockTheJournalReplay(@TempDir Path dir) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            for (int i = 0; i < 2; i++) {
+                store.append(ev(1_000L + i, EventLevel.INFO, EventType.LOG, "P", "old" + i));
+                store.flush();
+            }
+        }
+        java.nio.file.Files.writeString(parquetIn(dir.resolve("level=INFO/year=1970/month=01/day=01")).get(0),
+                "not a parquet file");
+        ParquetEventStore crashed = new ParquetEventStore(dir, 1000, 0, 100);
+        crashed.append(ev(3 * 86_400_000L, EventLevel.WARN, EventType.AUDIT, null, "late"));
+        crashed.simulateCrash();
+
+        try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
+            List<Event> back = reopened.query(EventQuery.recent(100));
+            assertEquals(1, back.stream().filter(e -> "late".equals(e.message())).count(), "the journal replayed");
+            assertEquals(1, reopened.unreadableUnits().size(), "and the corrupt file is named");
+            assertTrue(back.stream().anyMatch(e -> ParquetEventStore.UNREADABLE_SIGNAL.equals(
+                    e.attributes().get("signalType"))), "with its Signal");
+        }
+        assertEquals(0, java.nio.file.Files.size(dir.resolve(ParquetEventStore.JOURNAL)), "journal cleared");
+        assertFalse(java.nio.file.Files.exists(dir.resolve(ParquetEventStore.HELD)), "nothing held");
+        try (ParquetEventStore again = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(1, again.query(EventQuery.recent(100)).stream()
+                    .filter(e -> "late".equals(e.message())).count(), "replayed exactly once");
+        }
+    }
+
+    /** (9) fail-closed: when the unreadable file IS the one the journalled rows were flushed into (a kill between
+     *  the flush and the journal truncate), the replay cannot prove them unflushed, so it holds them back instead of
+     *  writing them twice — and presentIds refuses to answer "absent". Once the file reads again, the held rows are
+     *  found flushed and dropped: exactly one copy. */
+    @Test
+    void journalledRowsAnUnreadableFileMayHoldAreHeldNotWrittenTwice(@TempDir Path dir) throws Exception {
+        ParquetEventStore crashed = new ParquetEventStore(dir, 1000, 0, 100);
+        Event a = ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "A");
+        crashed.append(a);
+        byte[] journal = java.nio.file.Files.readAllBytes(dir.resolve(ParquetEventStore.JOURNAL));
+        crashed.flush();                       // A reaches Parquet ...
+        crashed.simulateCrash();
+        java.nio.file.Files.write(dir.resolve(ParquetEventStore.JOURNAL), journal);   // ... the truncate did not
+        Path f = parquetIn(dir.resolve("level=INFO/year=1970/month=01/day=01")).get(0);
+        byte[] good = java.nio.file.Files.readAllBytes(f);
+        java.nio.file.Files.writeString(f, "not a parquet file");
+
+        try (ParquetEventStore reopened = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(0, reopened.query(EventQuery.recent(100)).stream()
+                    .filter(e -> "A".equals(e.message())).count(), "held back, not written again");
+            assertThrows(IllegalStateException.class, () -> reopened.presentIds(List.of(a.eventId())),
+                    "presentIds does not answer 'absent' for an id the unreadable file may hold");
+        }
+        assertTrue(java.nio.file.Files.exists(dir.resolve(ParquetEventStore.HELD)), "kept for the next open");
+
+        java.nio.file.Files.write(f, good);    // repaired
+        try (ParquetEventStore again = new ParquetEventStore(dir, 1000, 0, 100)) {
+            assertEquals(1, again.query(EventQuery.recent(100)).stream()
+                    .filter(e -> "A".equals(e.message())).count(), "exactly one copy");
+            assertEquals(java.util.Set.of(a.eventId()), again.presentIds(List.of(a.eventId())));
+        }
+        assertFalse(java.nio.file.Files.exists(dir.resolve(ParquetEventStore.HELD)), "hold released");
+    }
+
     /** ASSURE-AUDIT-CHAIN-RESIDUALS-1 (4): one corrupt file in the middle of the store is skipped and REPORTED —
      *  search, keyset page and count still answer from every other file, never an empty "complete" result. */
     @Test

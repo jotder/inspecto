@@ -205,6 +205,17 @@ timestamp: 2026-07-16T00:00:00Z
       where the file key is null, so identity is size + time only) is not permanent: `rebuildChainIndex`,
       which every verify runs first, also forgets the unreadable list, so each verify retries every file. ⚠ Those routes have no diagnostics slot, so the skip is surfaced as
       the Signal and the log, not as a count in the response body.
+    - *The journal replay reads per file too* (`ASSURE-AUDIT-CHAIN-RESIDUALS-1` (9), 2026-09-28). Its
+      already-flushed check (`flushedIds`) and `presentIds` used to read one glob, so one corrupt file failed the
+      replay on every open and kept a crashed run's journalled events out of Parquet. They now go through the same
+      per-file read. **Fail-closed choice:** a journalled event an unreadable file COULD hold — one in the same
+      `level/year/month/day` partition, or any event when the file sits outside a well-formed partition — is not
+      proven unflushed, so it is HELD, never written twice (a duplicate audit row is a forked chain): moved
+      atomically to `pending.held.jsonl` (ERROR log naming the files, plus the file's `events.file_unreadable`
+      Signal), retried on every open, dropped as already-flushed once the file reads again or written once the
+      file is removed. Events in other partitions replay normally. `presentIds` answers from the readable files
+      but THROWS when an id is unresolved while any file is unreadable ("absent" would let `installStore` append
+      a carried row twice). ⚠ A held event is invisible to reads until released.
     - *The anchors are a chain.* Each anchor carries `prevAnchorMac` in its MAC input and must start at the
       previous `lastSeq + 1`; a garbled line (`anchor-unreadable`), a removed or reordered anchor
       (`anchor-chain-broken`) and a finished day (before yesterday) no anchor covers (`anchor-missing`) all
