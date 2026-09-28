@@ -143,23 +143,26 @@ class SecurityTriggersTest {
 
     /** Two services on one shared log (the default Space's EventLog.global()) must not both count the same row. */
     @Test
-    void onlyOneEvaluatorPerLogFiresAndTheNextTakesOverAfterDetach() {
+    void onlyTheNewestEvaluatorPerLogFiresAndAnOlderOneTakesOverAfterDetach() {
         Object log = new Object();
         long tenMin = 600_000L;
         java.util.function.Supplier<SecurityTriggers> make = () -> new SecurityTriggers(log, fired::add, now::get,
                 new SecurityTriggers.Rule(SecurityTriggers.T1, "t1", 3, tenMin),
                 new SecurityTriggers.Rule(SecurityTriggers.T2, "t2", 3, tenMin),
                 new SecurityTriggers.Rule(SecurityTriggers.T3, "t3", 3, 3_600_000L));
-        SecurityTriggers first = make.get(), second = make.get();
+        SecurityTriggers older = make.get(), newer = make.get();
         for (int i = 0; i < 3; i++) {
             Event e = denied(403, "mallory", null, "/jobs");
-            first.accept(e);
-            second.accept(e);
+            older.accept(e);
+            newer.accept(e);
         }
         assertEquals(1, fired.size(), "one evaluator owns the log");
-        first.detach();
-        for (int i = 0; i < 3; i++) second.accept(denied(403, "eve", null, "/jobs"));
-        assertEquals(2, fired.size(), "after the owner detaches the next evaluator takes over");
-        second.detach();
+        // a leaked older evaluator never silences the live one: the newest owned it
+        for (int i = 0; i < 3; i++) older.accept(denied(403, "carol", null, "/jobs"));
+        assertEquals(1, fired.size(), "the older (possibly leaked) evaluator is passive");
+        newer.detach();
+        for (int i = 0; i < 3; i++) older.accept(denied(403, "eve", null, "/jobs"));
+        assertEquals(2, fired.size(), "after the owner detaches the remaining evaluator takes over");
+        older.detach();
     }
 }

@@ -64,7 +64,14 @@ describe('projectMultiResult (LA-08)', () => {
         const g = projectMultiResult({
             nodes: [{ id: 'N/A', label: null, category: null, entityType: msisdn, __provenance_dataset: 'subs' }],
             edges: [
-                { source: 'unknown', target: 'Bob', kind: 'call', count: 1, sourceType: msisdn, __provenance_dataset: 'c' },
+                {
+                    source: 'unknown',
+                    target: 'Bob',
+                    kind: 'call',
+                    count: 1,
+                    sourceType: msisdn,
+                    __provenance_dataset: 'c',
+                },
                 { source: '-', target: 'Bob', kind: 'call', count: 1, sourceType: msisdn, __provenance_dataset: 'c' },
             ],
             mappings: [],

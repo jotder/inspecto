@@ -278,8 +278,10 @@ describe('typed projection ids (LA-17 D-M6)', () => {
         const p = withColumnTypes({ datasetId: 'calls', sourceCol: 'a', targetCol: 'b' }, { a: msisdn });
         const junk = ['N/A', 'unknown', '-'];
         const g = projectTriples(
-            [...junk.map((v) => ({ source: v, target: 'Bob', kind: 'call', count: 1 })),
-                { source: '+44 78', target: 'Bob', kind: 'call', count: 1 }],
+            [
+                ...junk.map((v) => ({ source: v, target: 'Bob', kind: 'call', count: 1 })),
+                { source: '+44 78', target: 'Bob', kind: 'call', count: 1 },
+            ],
             false,
             p,
         );

@@ -71,8 +71,9 @@ public final class SecurityTriggers implements Consumer<Event> {
     /**
      * The evaluator currently evaluating each log. Every CollectorService subscribes one, and the default Space's
      * services all share {@code EventLog.global()} — two live (or one leaked, never closed) services on that log
-     * would each count the same audit row and fire twice. The first evaluator to see an event on a log owns it
-     * until {@link #detach()}.
+     * would each count the same audit row and fire twice. The NEWEST evaluator on a log owns it — a leaked, never-
+     * closed older one must not keep the log and silence the live service's triggers; when the owner {@link #detach()}es,
+     * the next evaluator to see an event takes over.
      */
     private static final Map<Object, SecurityTriggers> ACTIVE =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
@@ -109,6 +110,7 @@ public final class SecurityTriggers implements Consumer<Event> {
 
     SecurityTriggers(Object log, Consumer<Event> emit, LongSupplier clock, Rule t1, Rule t2, Rule t3) {
         this.log = log;
+        if (log != null) ACTIVE.put(log, this);   // the newest service's evaluator owns the log
         this.emit = emit;
         this.clock = clock;
         this.t1 = t1;
