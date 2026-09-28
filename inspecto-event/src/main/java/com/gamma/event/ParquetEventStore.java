@@ -225,6 +225,11 @@ public final class ParquetEventStore implements EventStore {
                 // touches, and are retried from it on the next open.
                 writeHeld(held, pending);
                 Files.deleteIfExists(file);
+                // A give-up dropped the buffer: its chained rows now live ONLY in the held file, invisible to
+                // chainHead, so they block linking like any held row. A retained buffer still shows them.
+                if (buffer.isEmpty())
+                    for (Event e : pending.subList(hold.size(), pending.size()))
+                        if (AuditChain.chained(e)) heldChained++;
             } else {
                 if (hold.isEmpty()) Files.deleteIfExists(held);
                 else writeHeld(held, hold);

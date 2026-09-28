@@ -265,8 +265,10 @@ class ParquetEventStoreTest {
     @Test
     void aReplayFlushThatGivesUpKeepsTheJournal(@TempDir Path dir) throws Exception {
         ParquetEventStore crashed = new ParquetEventStore(dir, 1000, 0, 100);
-        crashed.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "J1"));
-        crashed.append(ev(2_000L, EventLevel.INFO, EventType.AUDIT, null, "J2"));
+        EventLog before = EventLog.create();
+        before.installStore(crashed);
+        before.emit(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "J1"));   // linked: seq 1
+        before.emit(ev(2_000L, EventLevel.INFO, EventType.AUDIT, null, "J2"));   // seq 2
         crashed.simulateCrash();
         Path staging = dir.resolve(".staging");
         if (java.nio.file.Files.exists(staging)) deleteTree(staging);
@@ -274,7 +276,15 @@ class ParquetEventStoreTest {
         int cap = ParquetEventStore.maxRetained;
         ParquetEventStore.maxRetained = 1;                               // the replay flush gives up at once
         try {
-            new ParquetEventStore(dir, 1000, 0, 100).simulateCrash();
+            ParquetEventStore gaveUp = new ParquetEventStore(dir, 1000, 0, 100);
+            // J1/J2 now live only in the held file, invisible to chainHead: a new row must not take seq 1 again.
+            EventLog after = EventLog.create();
+            after.installStore(gaveUp);
+            after.emit(ev(3_000L, EventLevel.INFO, EventType.AUDIT, null, "B"));
+            Event b = gaveUp.query(EventQuery.recent(100)).stream().filter(e -> "B".equals(e.message()))
+                    .findFirst().orElseThrow();
+            assertEquals("true", b.attributes().get(AuditAttrs.AUDIT_UNLINKED), "B is not linked past the held rows");
+            gaveUp.simulateCrash();
         } finally {
             ParquetEventStore.maxRetained = cap;
         }
@@ -282,6 +292,8 @@ class ParquetEventStoreTest {
         try (ParquetEventStore again = new ParquetEventStore(dir, 1000, 0, 100)) {
             List<String> msgs = again.query(EventQuery.recent(100)).stream().map(Event::message).toList();
             assertTrue(msgs.contains("J1") && msgs.contains("J2"), "journal kept, replayed later: " + msgs);
+            List<Long> seqs = again.chainPage(1, 100).stream().map(AuditChain::seq).toList();
+            assertEquals(new java.util.HashSet<>(seqs).size(), seqs.size(), "no seq twice: " + seqs);
         }
     }
 
