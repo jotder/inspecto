@@ -418,7 +418,14 @@ public final class ParquetEventStore implements EventStore {
         for (Event e : buffer)
             if (AuditChain.chained(e) && AuditChain.seq(e) > 0
                     && (best == null || AuditChain.seq(e) > AuditChain.seq(best))) best = e;
-        for (Event d : chainQuery("WHERE " + CHAINED_SQL + " ORDER BY " + SEQ_SQL + " DESC LIMIT 1", List.of()))
+        // Only the file(s) holding the highest indexed seq can hold the head.
+        for (Event d : chainRead(idx -> {
+            long top = Long.MIN_VALUE;
+            for (SeqRange r : idx.values()) if (r.chained() > 0) top = Math.max(top, r.maxSeq());
+            List<Path> at = new ArrayList<>();
+            for (var e : idx.entrySet()) if (e.getValue().chained() > 0 && e.getValue().maxSeq() == top) at.add(e.getKey());
+            return at;
+        }, "WHERE " + CHAINED_SQL + " ORDER BY " + SEQ_SQL + " DESC LIMIT 1", List.of()))
             if (best == null || AuditChain.seq(d) > AuditChain.seq(best)) best = d;
         signalUnreadable();
         return best;
@@ -429,11 +436,42 @@ public final class ParquetEventStore implements EventStore {
         int n = Math.max(0, limit);
         List<Event> merged = new ArrayList<>();
         for (Event e : buffer) if (AuditChain.chained(e) && AuditChain.seq(e) >= fromSeq) merged.add(e);
-        merged.addAll(chainQuery("WHERE " + CHAINED_SQL + " AND " + SEQ_SQL + " >= ? ORDER BY " + SEQ_SQL
-                + ", event_id LIMIT ?", List.of(fromSeq, (long) n)));
+        if (n > 0)
+            merged.addAll(chainRead(idx -> pageFiles(idx, fromSeq, n), "WHERE " + CHAINED_SQL + " AND " + SEQ_SQL
+                    + " >= ? ORDER BY " + SEQ_SQL + ", event_id LIMIT ?", List.of(fromSeq, (long) n)));
         merged.sort(CHAIN_ORDER);
         signalUnreadable();
         return new ArrayList<>(merged.subList(0, Math.min(n, merged.size())));
+    }
+
+    /**
+     * The files that can hold the {@code n} lowest chained rows with {@code seq >= fromSeq}. Files are taken in
+     * ascending {@code minSeq}; a file lying wholly at or above {@code fromSeq} guarantees its {@code chained} rows
+     * are in range, so once the guaranteed rows reach {@code n}, the answer's seqs are all {@code <= bound} (the
+     * highest maxSeq among those files) and every file with {@code minSeq > bound} holds only later rows. Every
+     * other file whose range reaches {@code fromSeq} is read — so two rows claiming one seq, in any two files,
+     * are both read (both ranges contain it) and verify still sees the duplicate.
+     */
+    private static List<Path> pageFiles(Map<Path, SeqRange> idx, long fromSeq, int n) {
+        List<Map.Entry<Path, SeqRange>> reach = new ArrayList<>();
+        for (var e : idx.entrySet()) if (e.getValue().chained() > 0 && e.getValue().maxSeq() >= fromSeq) reach.add(e);
+        reach.sort(Comparator.comparingLong(e -> e.getValue().minSeq()));
+        long counted = 0;
+        long bound = Long.MAX_VALUE;
+        long high = Long.MIN_VALUE;
+        for (var e : reach) {
+            SeqRange r = e.getValue();
+            if (r.minSeq() < fromSeq) continue;   // straddles fromSeq: read, but its in-range count is unknown
+            counted += r.chained();
+            high = Math.max(high, r.maxSeq());
+            if (counted >= n) {
+                bound = high;
+                break;
+            }
+        }
+        List<Path> out = new ArrayList<>();
+        for (var e : reach) if (e.getValue().minSeq() <= bound) out.add(e.getKey());
+        return out;
     }
 
     @Override
@@ -441,9 +479,12 @@ public final class ParquetEventStore implements EventStore {
         long n = 0;
         for (Event e : buffer)
             if (AuditChain.TYPES.contains(e.type()) && e.ts() >= fromTs && AuditChain.unlinked(e)) n++;
-        String where = "WHERE type IN ('" + EventType.AUDIT + "', '" + EventType.ACCESS_DENIED + "') AND ts_ms >= ? AND ("
-                + SEQ_SQL + " IS NULL OR json_extract_string(attributes, '$." + AuditAttrs.AUDIT_UNLINKED + "') = 'true')";
-        n += chainQuery(where, List.of(fromTs)).size();
+        n += chainRead(idx -> {
+            List<Path> with = new ArrayList<>();
+            for (var e : idx.entrySet())
+                if (e.getValue().unlinked() > 0 && e.getValue().maxTs() >= fromTs) with.add(e.getKey());
+            return with;
+        }, "WHERE " + UNLINKED_SQL + " AND ts_ms >= ?", List.of(fromTs)).size();
         signalUnreadable();
         return n;
     }
@@ -472,19 +513,95 @@ public final class ParquetEventStore implements EventStore {
         return out;
     }
 
+    // -- the per-file seq index (ASSURE-AUDIT-CHAIN-RESIDUALS-1 (3)) --
+
+    /** An unlinked audit-type row: no seq, or marked {@link AuditAttrs#AUDIT_UNLINKED}. */
+    private static final String UNLINKED_SQL = "type IN ('" + EventType.AUDIT + "', '" + EventType.ACCESS_DENIED
+            + "') AND (" + SEQ_SQL + " IS NULL OR json_extract_string(attributes, '$." + AuditAttrs.AUDIT_UNLINKED
+            + "') = 'true')";
+
     /**
-     * A chain read over the Parquet files ({@link #readEvents}), which reads the unreadable files' neighbours
-     * anyway — so one corrupt file planted in the directory cannot blind the whole chain (and, through an
-     * unreadable head, unlink every later audit row). The per-file rows are the UNION of each file's answer to
-     * {@code tail}: callers re-sort and re-limit. Throws only when no file at all could be read, never answering
-     * "empty" for "unreadable".
+     * What one Parquet file holds of the chain — its chained-row count and seq range, its unlinked audit rows and
+     * newest timestamp — valid while the file keeps this size and modification time.
      */
-    private List<Event> chainQuery(String tail, List<Object> params) {
+    private record SeqRange(long size, long mtime, long chained, long minSeq, long maxSeq, long unlinked, long maxTs) {}
+
+    /**
+     * The per-file index the chain reads choose their files by. The seq lives in the attributes JSON, so without
+     * it every chain page ({@code /audit/verify} reads a thousand rows per page) scanned every file of the store.
+     * It is computed FROM the files themselves — at the first chain read that meets a file, in one grouped query
+     * over every file not yet indexed, the unreadable ones split off per file — and held in memory only: nothing on
+     * disk can make it lie, a restart rebuilds it with one scan (what the head lookup cost anyway), and a file that
+     * was written before this index existed is indexed exactly like a new one. A file whose size or modification
+     * time changed is indexed again; a file that is gone is dropped.
+     */
+    private final Map<Path, SeqRange> seqIndex = new java.util.HashMap<>();
+
+    /** The index over every readable Parquet file (refreshed first). Throws when files exist but none is readable. */
+    private Map<Path, SeqRange> refreshIndex() {
         List<Path> files = parquetFiles();
-        List<Event> out = readEvents(files, tail, params);
+        seqIndex.keySet().retainAll(new java.util.HashSet<>(files));
+        Map<String, Path> byName = new java.util.LinkedHashMap<>();
+        Map<Path, long[]> stamps = new java.util.HashMap<>();
+        for (Path f : files) {
+            long size;
+            long mtime;
+            try {
+                size = Files.size(f);
+                mtime = Files.getLastModifiedTime(f).toMillis();
+            } catch (IOException gone) {
+                seqIndex.remove(f);
+                continue;   // removed between the listing and now
+            }
+            SeqRange r = seqIndex.get(f);
+            if (r != null && r.size() == size && r.mtime() == mtime) continue;
+            seqIndex.remove(f);
+            byName.put(f.toString().replace('\\', '/'), f);
+            stamps.put(f, new long[]{size, mtime});
+        }
+        if (!byName.isEmpty()) {
+            List<Path> stale = new ArrayList<>(byName.values());
+            List<Object[]> rows = readFiles(stale, "SELECT filename, COUNT(*) FILTER (WHERE " + CHAINED_SQL + "), MIN("
+                    + SEQ_SQL + ") FILTER (WHERE " + CHAINED_SQL + "), MAX(" + SEQ_SQL + ") FILTER (WHERE " + CHAINED_SQL
+                    + "), COUNT(*) FILTER (WHERE " + UNLINKED_SQL + "), MAX(ts_ms)", "GROUP BY filename", List.of(),
+                    rs -> new Object[]{rs.getString(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5),
+                            rs.getLong(6)});
+            for (Path f : stale)   // a readable file with no rows at all has no group: it holds nothing
+                if (!unreadable.contains(f)) seqIndex.put(f, new SeqRange(stamps.get(f)[0], stamps.get(f)[1], 0, 0, 0, 0,
+                        Long.MIN_VALUE));
+            for (Object[] r : rows) {
+                Path f = byName.get(String.valueOf(r[0]).replace('\\', '/'));
+                if (f == null || unreadable.contains(f)) continue;
+                seqIndex.put(f, new SeqRange(stamps.get(f)[0], stamps.get(f)[1], (long) r[1], (long) r[2], (long) r[3],
+                        (long) r[4], (long) r[5]));
+            }
+        }
         if (!files.isEmpty() && unreadable.containsAll(files))
             throw new IllegalStateException("audit chain read failed under " + root + ": no file readable");
-        return out;
+        return seqIndex;
+    }
+
+    /**
+     * A chain read over only the files {@code choose} picks from the index ({@link #readEvents}: an unreadable file
+     * is skipped and reported, so one corrupt file planted in the directory cannot blind the whole chain and,
+     * through an unreadable head, unlink every later audit row). A chosen file that fails to read leaves the index
+     * and the choice is made again over the rest, so a file that went bad after it was indexed never silently
+     * narrows the answer. The rows are the UNION of each file's answer to {@code tail}: callers re-sort and
+     * re-limit. Throws only when no file at all could be read, never answering "empty" for "unreadable".
+     */
+    /** Test seam: how many files the last chain read chose. */
+    int lastChainFiles;
+
+    private List<Event> chainRead(java.util.function.Function<Map<Path, SeqRange>, List<Path>> choose, String tail,
+                                  List<Object> params) {
+        while (true) {
+            List<Path> files = choose.apply(refreshIndex());
+            lastChainFiles = files.size();
+            List<Event> out = readEvents(files, tail, params);
+            boolean lost = false;
+            for (Path f : files) if (unreadable.contains(f) && seqIndex.remove(f) != null) lost = true;
+            if (!lost) return out;
+        }
     }
 
     // -- reads that survive one unreadable file (ASSURE-AUDIT-CHAIN-RESIDUALS-1 (4)) --

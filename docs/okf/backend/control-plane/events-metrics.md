@@ -186,7 +186,15 @@ timestamp: 2026-07-16T00:00:00Z
       `audit_unlinked=true`, with an ERROR event and `inspecto_audit_unlinked_total`; verify counts every
       chainable row without a seq written since the chain began → `unlinked`. One corrupt `.parquet` used to
       break the glob read, unlink every later row and still verify: chain reads now fall back to one query PER
-      FILE, keep answering, and verify fails with `unreadable-file` naming it.
+      FILE, keep answering, and verify fails with `unreadable-file` naming it. **Ordinary reads too (2026-09-28,
+      `ASSURE-AUDIT-CHAIN-RESIDUALS-1` (4)):** `query` / `page` / `count` (`/events/search`, `/api/v1/events`,
+      the audit search and export) used to fail as a whole on one corrupt file and answer from the unflushed
+      buffer only, an empty result that looked complete. Every Parquet read now shares one path: the files not
+      known to be unreadable go in one query, split per file when it fails; an unreadable file is SKIPPED,
+      named in `unreadableUnits()`, logged at ERROR and raised ONCE as a WARN `SIGNAL`
+      (`signalType: events.file_unreadable`, `file: <relative path>`), retried on its own each read and dropped
+      from the list once readable or gone. ⚠ Those routes have no diagnostics slot, so the skip is surfaced as
+      the Signal and the log, not as a count in the response body.
     - *The anchors are a chain.* Each anchor carries `prevAnchorMac` in its MAC input and must start at the
       previous `lastSeq + 1`; a garbled line (`anchor-unreadable`), a removed or reordered anchor
       (`anchor-chain-broken`) and a finished day (before yesterday) no anchor covers (`anchor-missing`) all
@@ -199,8 +207,19 @@ timestamp: 2026-07-16T00:00:00Z
     - *Bounded work.* The roll runs on a control-plane schedule (every 10 min, once per UTC day per Space,
       backing off 5 min → 6 h after a failure) — never on a request; `POST /audit/anchors` is limited to one per
       10 s per Space (429); both walk only from the last anchor. `DbEventStore` keeps the seq in an indexed
-      `audit_seq` column. ⚠ The Parquet store still scans every file per chain page (the seq lives in the
-      attributes JSON) — a large store makes a verify slow, not unbounded in memory.
+      `audit_seq` column. The Parquet store (seq in the attributes JSON) keeps a **per-file seq index**
+      (2026-09-28, `ASSURE-AUDIT-CHAIN-RESIDUALS-1` (3)): per file its chained-row count, min/max seq,
+      unlinked audit-row count and newest `ts_ms`, keyed by size + modification time. It is computed FROM the
+      files — one grouped query (`GROUP BY filename`) over every file not yet indexed, at the first chain read
+      that meets it — and held **in memory only**: no sidecar can make it lie, a restart rebuilds it with one
+      scan (what the head lookup already cost), and a file written before the index existed is indexed like
+      any other (that is the legacy fallback). `chainHead` reads only the file(s) holding the highest seq;
+      `chainPage(from, n)` takes files by ascending min seq until the files lying wholly at or above `from`
+      guarantee `n` rows, then reads every file whose range reaches `from` and starts at or below that bound —
+      so both claims on one seq are always read (duplicates stay detected) and a hole stays a hole;
+      `unlinkedSince` reads only files holding an unlinked row. A chosen file that fails to read leaves the
+      index and the choice is made again. ⚠ A file overwritten in place with the SAME size and modification
+      time keeps its old range until a read of it fails — a deliberate rewriter is the key-holder case (7).
     - *One writer per directory.* The first link takes an OS lock on `<events>/.chain-writer.lock`; a second
       EventLog or process on the same directory is refused and its rows land marked unlinked. A carried row the
       incoming store already holds is not re-linked on a store swap, and verify fails one eventId at two seqs

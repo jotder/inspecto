@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -189,6 +190,100 @@ class ParquetEventStoreTest {
             java.nio.file.Files.delete(files.get(2));
             store.query(EventQuery.recent(10));
             assertEquals(List.of(), store.unreadableUnits(), "a removed file is no longer reported");
+        }
+    }
+
+    private static Event chained(long ts, long seq, String msg) {
+        return Event.builder(EventType.AUDIT).ts(ts).message(msg).attr(AuditAttrs.AUDIT_SEQ, seq).build();
+    }
+
+    /** Every chained row with seq >= from, in chain order, first n — the answer a full scan gives. */
+    private static List<Event> reference(List<Event> all, long from, int n) {
+        return all.stream().filter(e -> AuditChain.seq(e) >= from).sorted(EventStore.CHAIN_ORDER).limit(n).toList();
+    }
+
+    private static List<String> ids(List<Event> es) {
+        return es.stream().map(Event::eventId).toList();
+    }
+
+    /**
+     * ASSURE-AUDIT-CHAIN-RESIDUALS-1 (3): chain pages choose their files from the per-file seq index, and still
+     * answer exactly what a full scan would — across a gap, a seq claimed twice in two far-apart files, a file
+     * written late with a low seq, files with no audit rows, and a fresh store indexing files an earlier one wrote.
+     */
+    @Test
+    void chainPagesReadOnlyTheFilesTheirSeqRangeNeedsAndMatchAFullScan(@TempDir Path dir) throws Exception {
+        List<Event> chain = new ArrayList<>();
+        try (ParquetEventStore store = new ParquetEventStore(dir, 100_000, 0, 100)) {
+            long ts = 1_000;
+            for (long seq = 1; seq <= 200; seq++) {
+                if (seq == 57) continue;                                         // a hole
+                Event e = chained(ts++, seq, "s" + seq);
+                chain.add(e);
+                store.append(e);
+                if (seq % 10 == 0) {
+                    store.append(ev(ts++, EventLevel.INFO, EventType.LOG, "P", "noise"));
+                    store.flush();                                               // ~20 chained files
+                    for (int k = 0; k < 2; k++) {                                // + files with no audit row
+                        store.append(ev(ts++, EventLevel.INFO, EventType.LOG, "P", "noise"));
+                        store.flush();
+                    }
+                }
+            }
+            Event dup = chained(ts++, 12, "second claim on 12");                 // a duplicate, far from its twin
+            Event late = chained(ts++, 3, "second claim on 3");                  // a late file with a low seq
+            chain.add(dup);
+            chain.add(late);
+            store.append(dup);
+            store.append(late);
+            store.flush();
+
+            for (long from : new long[]{1, 3, 12, 13, 50, 57, 58, 190, 200, 201})
+                for (int n : new int[]{1, 2, 7, 10, 25, 1000})
+                    assertEquals(ids(reference(chain, from, n)), ids(store.chainPage(from, n)), "from " + from + ", n " + n);
+            store.chainPage(100, 5);
+            assertTrue(store.lastChainFiles <= 3, "a page reads the files its range needs, not the whole store: "
+                    + store.lastChainFiles);
+            assertEquals(200, AuditChain.seq(store.chainHead()));
+            assertEquals(1, store.lastChainFiles, "the head is read from the file holding the highest seq");
+            assertEquals(2, store.chainPage(12, 2).stream().filter(e -> AuditChain.seq(e) == 12).count(),
+                    "both claims on seq 12 are seen, so verify still reports the duplicate");
+            assertEquals(0, store.unlinkedSince(0));
+            assertEquals(0, store.lastChainFiles, "no file holds an unlinked audit row, so none is read");
+        }
+
+        // A fresh store knows nothing of these files: it indexes them from their contents on the first chain read.
+        try (ParquetEventStore store = new ParquetEventStore(dir, 100_000, 0, 100)) {
+            assertEquals(ids(reference(chain, 1, 1000)), ids(store.chainPage(1, 1000)));
+            store.append(chained(9_000, 500, "written later"));
+            store.flush();
+            assertEquals(500, AuditChain.seq(store.chainHead()), "a file new since the last read is indexed");
+            assertEquals(List.of(), store.unreadableUnits());
+        }
+    }
+
+    /** A file indexed while readable and overwritten afterwards (same size, same time — the index is stale) is
+     *  dropped from the choice and reported, never silently narrowing a page. */
+    @Test
+    void aChainFileCorruptedAfterItWasIndexedIsReportedNotSilentlySkipped(@TempDir Path dir) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 100_000, 0, 100)) {
+            for (long seq = 1; seq <= 30; seq++) {
+                store.append(chained(1_000 + seq, seq, "s" + seq));
+                if (seq % 10 == 0) store.flush();
+            }
+            assertEquals(30, store.chainPage(1, 100).size());
+            Path mid;
+            try (var w = java.nio.file.Files.walk(dir)) {
+                mid = w.filter(p -> p.toString().endsWith(".parquet")).sorted().toList().get(1);
+            }
+            byte[] b = java.nio.file.Files.readAllBytes(mid);
+            java.util.Arrays.fill(b, (byte) 0);
+            long mtime = mid.toFile().lastModified();
+            java.nio.file.Files.write(mid, b);
+            assertTrue(mid.toFile().setLastModified(mtime));
+            assertEquals(20, store.chainPage(1, 100).size(), "its neighbours still answer");
+            assertEquals(1, store.unreadableUnits().size(), "and the corrupt file is named");
+            assertEquals(30, AuditChain.seq(store.chainHead()));
         }
     }
 }
