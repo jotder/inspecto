@@ -417,6 +417,10 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
   overdue Incidents — `slaSweepBreachesTheOldestOverdueIncidentBeyondOneQueryPage`), `active()`,
   `evaluateCaseRule` (+ its open-Case lookup), `applyTagRule` and `backfillTagAssignments`; the list-returning
   ones keep their newest-first order and hold only their filtered hits.
+  One walk yields each id once (a per-walk Set), because a backdated insert mid-walk shifts the page boundary;
+  the sweep also re-reads the stored object before stamping, so a breach fires once and never overwrites a newer
+  status. `ARCHIVED` is skipped by name as well, so it stops the clock even in a workflow where it is not terminal.
+  ⚠ `active()` still reads the scope's terminal history and filters in Java — `OBJECTS-ACTIVE-READ-PUSHDOWN-1` (P3).
 
 ### 3.5 Cases
 

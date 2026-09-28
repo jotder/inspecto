@@ -439,7 +439,10 @@ public final class ObjectService {
      *
      * <p>⚠ Offset paging, not a snapshot: an object deleted mid-walk (only the MNT-14 retention sweep deletes)
      * can shift a later one across a page boundary and be missed, and one created mid-walk may or may not be
-     * seen. Fine for a sampled rollup; not a transactional read.
+     * seen. Fine for a sampled rollup; not a transactional read. An object inserted mid-walk with a
+     * {@code createdAt} behind the cursor (an import keeping timestamps, clock skew) shifts a seen one into the
+     * next page, so each walk remembers the ids it has yielded and never yields one twice (a Set of ids —
+     * the one per-walk cost that grows with the corpus).
      */
     public Iterable<OperationalObject> allMatching(ObjectQuery filter) {
         return () -> new java.util.Iterator<>() {
@@ -447,9 +450,14 @@ public final class ObjectService {
             private int index = 0;
             private int offset = 0;
             private boolean last = false;
+            private final Set<String> seen = new java.util.HashSet<>();
 
             @Override public boolean hasNext() {
-                while (index == page.size()) {
+                while (true) {
+                    while (index < page.size()) {
+                        if (!seen.contains(page.get(index).id())) return true;   // idempotent: next() records it
+                        index++;   // already yielded on an earlier page — skip the shifted duplicate
+                    }
                     if (last) return false;
                     page = store.query(new ObjectQuery(filter.objectType(), filter.status(), filter.severity(),
                             filter.assignee(), filter.owner(), filter.correlationId(), filter.textContains(),
@@ -458,11 +466,11 @@ public final class ObjectService {
                     offset += page.size();
                     last = page.size() < ObjectQuery.MAX_LIMIT;
                 }
-                return true;
             }
 
             @Override public OperationalObject next() {
                 if (!hasNext()) throw new NoSuchElementException();
+                seen.add(page.get(index).id());
                 return page.get(index++);
             }
         };
@@ -1036,11 +1044,17 @@ public final class ObjectService {
             if (o.isClosed()) continue;                                      // closedAt stamped — settled
             if (wf.isTerminal(o.status())) continue;                         // any workflow terminal state
             if ("RESOLVED".equalsIgnoreCase(o.status())) continue;           // fixed — SLA clock stopped
+            if ("ARCHIVED".equalsIgnoreCase(o.status())) continue;           // dismissed, even where not terminal
             if (o.attributes().containsKey(ATTR_SLA_BREACHED_AT)) continue;  // already breached — idempotent
             long dueAt = parseEpoch(o.attributes().get(ATTR_DUE_AT));
             if (dueAt <= 0 || dueAt > now) continue;                         // no SLA set, or not yet due
+            // Write against the CURRENT stored object, not the page's copy: a stale copy would re-emit a breach
+            // already stamped, and its update would overwrite a status change made since the page was read.
+            OperationalObject current = store.get(o.id()).orElse(null);
+            if (current == null || current.isClosed() || current.attributes().containsKey(ATTR_SLA_BREACHED_AT)
+                    || !o.status().equalsIgnoreCase(current.status())) continue;
             OperationalObject marked = store.update(
-                    o.withAttributes(Map.of(ATTR_SLA_BREACHED_AT, Long.toString(now)), now));
+                    current.withAttributes(Map.of(ATTR_SLA_BREACHED_AT, Long.toString(now)), now));
             EventLog.current().emit(Event.builder(EventType.OBJECT_SLA_BREACH)
                     .level(EventLevel.WARN)
                     .source(SOURCE)

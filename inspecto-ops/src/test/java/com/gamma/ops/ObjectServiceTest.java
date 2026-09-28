@@ -352,6 +352,70 @@ class ObjectServiceTest {
         assertTrue(svc.get("oldest").orElseThrow().attributes().containsKey(ObjectService.ATTR_SLA_BREACHED_AT));
     }
 
+    /** ARCHIVED stops the SLA clock even in a workflow where it is NOT terminal (the sweep's documented stop set). */
+    @Test
+    void slaSweepSkipsArchivedEvenWhereTheWorkflowDoesNotMakeItTerminal() {
+        com.gamma.ops.workflow.Workflow custom = new com.gamma.ops.workflow.Workflow(ObjectType.INCIDENT, "IDENTIFIED",
+                java.util.Set.of(new com.gamma.ops.workflow.Workflow.Transition("IDENTIFIED", "ARCHIVED", "archive"),
+                        new com.gamma.ops.workflow.Workflow.Transition("ARCHIVED", "CLOSED", "close")),
+                java.util.Set.of("CLOSED"));
+        assertFalse(custom.isTerminal("ARCHIVED"));
+        InMemoryObjectStore store = new InMemoryObjectStore();
+        ObjectService svc = new ObjectService(store, Map.of(ObjectType.INCIDENT, custom));
+        long now = System.currentTimeMillis();
+        Map<String, String> overdue = Map.of(ObjectService.ATTR_DUE_AT, Long.toString(now - 60_000));
+        store.create(stored("archived", "ARCHIVED", now - 120_000, overdue));
+        store.create(stored("open", "IDENTIFIED", now - 120_000, overdue));
+        assertEquals(1, svc.sweepIncidentSla(now));
+        assertFalse(svc.get("archived").orElseThrow().attributes().containsKey(ObjectService.ATTR_SLA_BREACHED_AT));
+        assertTrue(svc.get("open").orElseThrow().attributes().containsKey(ObjectService.ATTR_SLA_BREACHED_AT));
+    }
+
+    /**
+     * An object inserted mid-walk with a createdAt BEHIND the cursor shifts the page boundary by one, so the
+     * next OFFSET page re-serves the last object already seen. One walk yields each id once, and the sweep
+     * emits exactly one breach for that boundary object.
+     */
+    @Test
+    void aBackdatedInsertMidWalkNeitherDoubleCountsNorDoubleBreaches() {
+        InMemoryEventStore events = new InMemoryEventStore();
+        EventLog.global().installStore(events);
+        long now = System.currentTimeMillis();
+        int n = ObjectQuery.MAX_LIMIT + 3;
+        String boundary = "inc-" + (ObjectQuery.MAX_LIMIT - 1);   // the last object of the first page
+        java.util.concurrent.atomic.AtomicBoolean armed = new java.util.concurrent.atomic.AtomicBoolean();
+        InMemoryObjectStore inner = new InMemoryObjectStore();
+        ObjectStore store = new ObjectStore() {
+            @Override public OperationalObject create(OperationalObject obj) { return inner.create(obj); }
+            @Override public java.util.Optional<OperationalObject> get(String id) { return inner.get(id); }
+            @Override public List<OperationalObject> query(ObjectQuery q) {
+                if (q.offset() > 0 && armed.getAndSet(false))   // between page 1 and page 2: a backdated import
+                    inner.create(stored("backdated-" + System.nanoTime(), "IDENTIFIED", 0L, Map.of()));
+                return inner.query(q);
+            }
+            @Override public List<OperationalObject> findByAttributes(ObjectType t, Map<String, String> a, int l) {
+                return inner.findByAttributes(t, a, l);
+            }
+            @Override public OperationalObject update(OperationalObject obj) { return inner.update(obj); }
+            @Override public void delete(String id) { inner.delete(id); }
+        };
+        for (int i = 0; i < n; i++)
+            inner.create(stored("inc-" + i, "IDENTIFIED", 1_000L + i, boundary.equals("inc-" + i)
+                    ? Map.of(ObjectService.ATTR_DUE_AT, Long.toString(now - 60_000)) : Map.of()));
+        ObjectService svc = new ObjectService(store);
+
+        armed.set(true);
+        List<String> ids = new java.util.ArrayList<>();
+        for (OperationalObject o : svc.allMatching(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build()))
+            ids.add(o.id());
+        assertEquals(n, ids.size(), "the shifted boundary object is not yielded twice");
+        assertEquals(n, new java.util.HashSet<>(ids).size());
+
+        armed.set(true);
+        assertEquals(1, svc.sweepIncidentSla(now));
+        assertEquals(1, activityFor(events, EventType.OBJECT_SLA_BREACH, boundary).size());
+    }
+
     // ── ASSURE-IMPACT-LEDGER-RESIDUALS-1 (1): rollups read every object, not one MAX_LIMIT page ──────────
 
     private static final int BEYOND_ONE_PAGE = ObjectQuery.MAX_LIMIT + 7;
