@@ -22,14 +22,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * relative to the process CWD — outside the Space folder. The row was closed once with every opener routed,
  * and {@code RiskScoreEvaluator} reintroduced a raw open within the day; this test is what keeps it closed.
  *
- * <p>It matches the in-memory URL LITERAL ({@code "jdbc:duckdb:"} or {@code "jdbc:duckdb::memory:"}) that is
- * not immediately concatenated with a path, across every module's {@code src/main/java}. A comment carrying
+ * <p>It matches the in-memory URL LITERAL — {@code "jdbc:duckdb:"} not immediately concatenated with a path, or any
+ * {@code "jdbc:duckdb::memory:…"} — across every module's {@code src/main/java}. A comment carrying
  * the literal trips it too — the loud direction. {@link #ALLOWED} names each exempt file and why.
  */
 class NoRawInMemoryDuckDbOpenContractTest {
 
-    /** The in-memory URL literal, NOT followed by {@code +} (a {@code "jdbc:duckdb:" + path} open is file-backed). */
-    static final Pattern IN_MEMORY_LITERAL = Pattern.compile("\"jdbc:duckdb:(:memory:)?\"(?!\\s*\\+)");
+    /** The in-memory URL literal: {@code "jdbc:duckdb:"} NOT followed by {@code +} (a {@code "jdbc:duckdb:" + path}
+     *  open is file-backed), or any {@code "jdbc:duckdb::memory:…"} — a named in-memory database, even concatenated. */
+    static final Pattern IN_MEMORY_LITERAL =
+            Pattern.compile("\"jdbc:duckdb:\"(?!\\s*\\+)|\"jdbc:duckdb::memory:[^\"]*\"");
 
     /** Files that carry the literal without opening a raw connection with it. */
     private static final Map<String, String> ALLOWED = Map.of(
@@ -60,6 +62,9 @@ class NoRawInMemoryDuckDbOpenContractTest {
         assertTrue(IN_MEMORY_LITERAL.matcher("DriverManager.getConnection(\"jdbc:duckdb:\");").find());
         assertTrue(IN_MEMORY_LITERAL.matcher("String URL = \"jdbc:duckdb:\";").find());
         assertTrue(IN_MEMORY_LITERAL.matcher("getConnection(\"jdbc:duckdb::memory:\")").find());
+        // A NAMED in-memory database is in-memory too, concatenated or not.
+        assertTrue(IN_MEMORY_LITERAL.matcher("getConnection(\"jdbc:duckdb::memory:scratch\")").find());
+        assertTrue(IN_MEMORY_LITERAL.matcher("getConnection(\"jdbc:duckdb::memory:\" + name)").find());
         assertFalse(IN_MEMORY_LITERAL.matcher("return \"jdbc:duckdb:\" + dir.resolve(file);").find());
         assertFalse(IN_MEMORY_LITERAL.matcher("getConnection(\"jdbc:duckdb:\"+path)").find());
     }
