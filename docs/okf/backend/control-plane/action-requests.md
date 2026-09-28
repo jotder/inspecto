@@ -58,15 +58,19 @@ so a value can never break the JSON. The approver reads exactly what will go out
 ### Is anyone left to approve it? — `approverCheck` (2026-09-28)
 
 A pending request's read, list item and create response carry **`approverCheck`**, computed live on every read
-(roles change while it waits) by `ActionRequestRoutes.approverCheck`:
+(roles change while it waits) by `ActionRequestRoutes.approverCheck`, against the request's bound Space root (the
+same root `ControlApi.dispatch` hands the Authenticator as `Roles.configRoot`); a list computes it after the store
+lock, once per distinct maker set:
 
 - **`none-eligible`** — no role in the Space's table grants `canApproveChanges` (deny grants applied, via
   `JobAuthority.capabilitiesNow`; every edition), **or** the Authenticator can enumerate its principals and every
   holder is the author or a co-author. Today only **Demo sign-in** enumerates (`Authenticator.principals`, a default
-  method returning empty; `DemoAuthenticator` answers from `demo-users.toon`).
+  method returning empty; `DemoAuthenticator` lists exactly what it authenticates: the bound Space's
+  `demo-users.toon` plus every hosted Space's via `DemoTokenRelay.known()`).
 - **`unknown`** — roles grant it but who holds them cannot be known: OIDC identities arrive as token claims only and
-  the server keeps no principal directory. Personal (no Authenticator) also reads `unknown`, although no one can
-  decide there at all (deciding needs a Subject).
+  the server keeps no principal directory. Also `unknown` when enumerating fails (a corrupt `demo-users.toon`):
+  logged once, never a 500 — the request is already saved when the check runs.
+- **`none-eligible` on Personal** too: no Authenticator ⇒ no Subject ⇒ deciding is always 403.
 - **`ok`** — an enumerated non-maker holds `canApproveChanges`.
 
 At raise time only (`propose`, so the route and the `invoke-api` consequence alike), a `none-eligible` answer emits

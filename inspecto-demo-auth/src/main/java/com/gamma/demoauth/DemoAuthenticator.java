@@ -64,12 +64,18 @@ public final class DemoAuthenticator implements Authenticator {
                 Map.of("displayName", user.displayName(), "demoUser", true)));
     }
 
-    /** Demo Users are the whole directory: every identity that can sign in to this Space is in its table. */
+    /**
+     * Exactly the identities {@link #authenticate} accepts against {@code configRoot}: that Space's own Demo Users,
+     * then every other one the relay knows ({@link DemoTokenRelay#known()}: every hosted Space's table, or the
+     * legacy write root's), the bound table winning on an id clash as in {@code authenticate}. Their role names
+     * resolve against {@code configRoot}'s role table, as a Subject's do. Throws on an unreadable table.
+     */
     @Override
     public Optional<Map<String, List<String>>> principals(Path configRoot) {
         Map<String, List<String>> out = new java.util.LinkedHashMap<>();
         for (DemoUsers.User u : DemoUsers.load(configRoot != null ? configRoot : legacyRoot()))
             out.put(u.id(), List.copyOf(u.roles()));
+        for (DemoUsers.User u : DemoTokenRelay.known().values()) out.putIfAbsent(u.id(), List.copyOf(u.roles()));
         return Optional.of(out);
     }
 

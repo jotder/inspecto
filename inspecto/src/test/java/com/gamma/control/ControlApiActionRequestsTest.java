@@ -188,6 +188,41 @@ class ControlApiActionRequestsTest {
         return rec.get("id").asText();
     }
 
+    @Test
+    void aDirectoryThatFailsToEnumerateReadsUnknownAndNeverFailsTheRequest(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String inc = incident(c);
+            Authenticator b = base;
+            Authenticators.forTest(new Authenticator() {
+                @Override public Optional<Subject> authenticate(com.sun.net.httpserver.HttpExchange ex) { return b.authenticate(ex); }
+                @Override public Optional<Map<String, List<String>>> principals(Path configRoot) {
+                    throw new IllegalStateException("unreadable demo-users.toon");
+                }
+            });
+            allowLoopback(c);
+            JsonNode rec = data(send(c, "POST", "/action-requests", body(inc), AUTHOR), 200);
+            assertEquals("unknown", rec.get("approverCheck").asText());
+            String id = rec.get("id").asText();
+            assertEquals("unknown", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200).get("approverCheck").asText());
+            JsonNode list = data(send(c, "GET", "/action-requests", null, AUTHOR), 200);
+            assertEquals(1, list.get("total").asInt(), "one saved request, no duplicate");
+            assertEquals("unknown", list.get("items").get(0).get("approverCheck").asText());
+        }
+    }
+
+    @Test
+    void withoutAnAuthenticatorNoOneCanDecideSoItReadsNoneEligible(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String inc = incident(c);
+            allowLoopback(c);
+            Authenticators.forTest(null);
+            JsonNode rec = data(send(c, "POST", "/action-requests", body(inc), null), 200);
+            assertEquals("none-eligible", rec.get("approverCheck").asText());
+            assertEquals(403, send(c, "POST", "/action-requests/" + rec.get("id").asText() + "/approve", "{}", null).statusCode(),
+                    "Personal: deciding always needs a Subject");
+        }
+    }
+
     /** Re-arm with an Authenticator that, like Demo sign-in, can enumerate its principals (id → roles). */
     private void enumerating(Map<String, List<String>> principals) {
         Authenticator b = base;

@@ -76,6 +76,7 @@ final class ActionRequestRoutes implements RouteModule {
         String incident = ApiContext.query(ex, "incidentId");
         String kase = ApiContext.query(ex, "caseId");
         List<Map<String, Object>> items = new ArrayList<>();
+        List<Map<String, Object>> recs = new ArrayList<>();
         int total = 0;
         if (root != null) {
             synchronized (ActionRequests.lock()) {
@@ -84,10 +85,16 @@ final class ActionRequestRoutes implements RouteModule {
                     if (blankOr(status, rec.get("status")) && blankOr(incident, rec.get("incidentId"))
                             && blankOr(kase, rec.get("caseId")) && visible(api, ex, rec)) {
                         total++;
-                        if (items.size() < LIST_CAP) items.add(redacted(ex, withApproverCheck(root, rec, ActionRequests.summary(rec))));
+                        if (items.size() < LIST_CAP) {
+                            recs.add(rec);
+                            items.add(redacted(ex, ActionRequests.summary(rec)));
+                        }
                     }
                 }
             }
+            // outside the store lock, once per distinct maker set - not per item
+            Map<Set<Object>, String> memo = new java.util.HashMap<>();
+            for (int i = 0; i < recs.size(); i++) withApproverCheck(root, recs.get(i), items.get(i), memo);
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("items", items);
@@ -104,13 +111,15 @@ final class ActionRequestRoutes implements RouteModule {
         requireReader(ex);
         Path root = api.writeRoot();
         if (root == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no action request '" + id + "'");
+        Map<String, Object> rec, view;
         synchronized (ActionRequests.lock()) {
-            Map<String, Object> rec = ActionRequests.read(root, id);   // 422 on an unsafe id
+            rec = ActionRequests.read(root, id);   // 422 on an unsafe id
             if (rec == null || !visible(api, ex, rec))
                 throw new ApiException(404, ErrorCodes.NOT_FOUND, "no action request '" + id + "'");
             ActionRequests.expireIfDue(root, rec);
-            return redacted(ex, withApproverCheck(root, rec, withEgress(root, ActionRequests.detail(rec))));
+            view = redacted(ex, withEgress(root, ActionRequests.detail(rec)));
         }
+        return withApproverCheck(root, rec, view, new java.util.HashMap<>());
     }
 
     /**
@@ -188,27 +197,54 @@ final class ActionRequestRoutes implements RouteModule {
      * four-eyes decision — a {@code none-eligible} request stays {@code pending} (fail-closed), this only says so.
      * {@code none-eligible}: no role in the Space's table grants {@code canApproveChanges} (deny grants applied —
      * every edition), or the Authenticator enumerates its principals (Demo) and every holder is a maker.
-     * {@code unknown}: roles grant it but the Authenticator cannot enumerate who holds them (OIDC, Personal).
+     * {@code none-eligible} also with no Authenticator (Personal): no Subject exists, so no one can decide.
+     * {@code unknown}: roles grant it but the Authenticator cannot enumerate who holds them (OIDC), or enumerating failed.
      * {@code ok}: an enumerated non-maker holds it.
      */
     static String approverCheck(Path root, Map<String, Object> rec) {
-        boolean anyRole = Roles.effective(root).keySet().stream()
-                .anyMatch(r -> JobAuthority.capabilitiesNow(List.of(r), root).contains(Roles.CAN_APPROVE_CHANGES));
-        if (!anyRole) return NONE_ELIGIBLE;
-        Map<String, List<String>> who = Authenticators.active().flatMap(a -> a.principals(root)).orElse(null);
-        if (who == null) return UNKNOWN;
+        return approverCheck(root, rec, new java.util.HashMap<>());
+    }
+
+    private static final java.util.concurrent.atomic.AtomicBoolean CHECK_FAILURE_LOGGED =
+            new java.util.concurrent.atomic.AtomicBoolean();
+
+    static String approverCheck(Path root, Map<String, Object> rec, Map<Set<Object>, String> memo) {
         Set<Object> makers = new java.util.HashSet<>();
         makers.add(rec.get("author"));
         if (rec.get("coAuthors") instanceof List<?> co) makers.addAll(co);
+        return memo.computeIfAbsent(makers, m -> {
+            try {
+                return compute(root, m);
+            } catch (RuntimeException e) {   // an unreadable directory (a corrupt demo-users.toon) is "cannot tell"
+                if (CHECK_FAILURE_LOGGED.compareAndSet(false, true))
+                    org.slf4j.LoggerFactory.getLogger(ActionRequestRoutes.class)
+                            .warn("action request approver check failed, reporting 'unknown': {}", e.toString());
+                return UNKNOWN;
+            }
+        });
+    }
+
+    /** {@code root} is the request's bound Space root: the one {@code ControlApi.dispatch} hands the Authenticator
+     *  as {@code Roles.configRoot(ex)}, so the roles read here are the ones the approve gate's Subject was built from. */
+    private static String compute(Path root, Set<Object> makers) {
+        // No Authenticator (Personal) => no Subject is ever attached => deciding is always 403.
+        Authenticator auth = Authenticators.active().orElse(null);
+        if (auth == null) return NONE_ELIGIBLE;
+        boolean anyRole = Roles.effective(root).keySet().stream()
+                .anyMatch(r -> JobAuthority.capabilitiesNow(List.of(r), root).contains(Roles.CAN_APPROVE_CHANGES));
+        if (!anyRole) return NONE_ELIGIBLE;
+        Map<String, List<String>> who = auth.principals(root).orElse(null);
+        if (who == null) return UNKNOWN;
         for (Map.Entry<String, List<String>> p : who.entrySet())
             if (!makers.contains(p.getKey())
                     && JobAuthority.capabilitiesNow(p.getValue(), root).contains(Roles.CAN_APPROVE_CHANGES)) return OK;
         return NONE_ELIGIBLE;
     }
 
-    /** Adds {@code approverCheck} to a pending request's view (computed live — roles change while it waits). */
-    static Map<String, Object> withApproverCheck(Path root, Map<String, Object> rec, Map<String, Object> view) {
-        if (ActionRequests.PENDING.equals(rec.get("status"))) view.put("approverCheck", approverCheck(root, rec));
+    /** Adds {@code approverCheck} to a pending request's view (computed live: roles change while it waits). */
+    static Map<String, Object> withApproverCheck(Path root, Map<String, Object> rec, Map<String, Object> view,
+                                                 Map<Set<Object>, String> memo) {
+        if (ActionRequests.PENDING.equals(rec.get("status"))) view.put("approverCheck", approverCheck(root, rec, memo));
         return view;
     }
 
@@ -221,7 +257,7 @@ final class ActionRequestRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown key '" + k + "' — an action "
                         + "request takes " + new java.util.TreeSet<>(CREATE_KEYS));
         Map<String, Object> rec = propose(api, root, body, ApiContext.actor(ex), ApiContext.actorType(ex), "manual", List.of());
-        return withApproverCheck(root, rec, withEgress(root, ActionRequests.detail(rec)));
+        return withApproverCheck(root, rec, withEgress(root, ActionRequests.detail(rec)), new java.util.HashMap<>());
     }
 
     /**
@@ -290,7 +326,8 @@ final class ActionRequestRoutes implements RouteModule {
         }
         ActionRequests.audit(author, authorType, "action-request.proposed", rec.get("id") + " proposed from " + kind
                 + " " + linked + " → Connection '" + connection + "' (" + method + ")", rec);
-        if (NONE_ELIGIBLE.equals(approverCheck(root, rec)))   // once, at raise — reads never re-emit
+        // once, at raise (reads never re-emit); approverCheck never throws, so a saved request is never 500'd
+        if (NONE_ELIGIBLE.equals(approverCheck(root, rec)))
             ActionRequests.audit(author, authorType, "action-request.no-eligible-approver", rec.get("id")
                     + " has no eligible approver: no one holding canApproveChanges in this Space is outside its "
                     + "makers — it stays pending until it expires unless a role is granted", rec, EventLevel.WARN);
