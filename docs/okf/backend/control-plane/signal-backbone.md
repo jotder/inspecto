@@ -155,6 +155,26 @@ diagnostic context, AG-UI streaming, A2UI inline artifacts — and finally to a 
   `requirement` — these are dialog-based/id-less panes, kept via id-ignoring route factories, no UX
   change). `runnerKey` is still unconsumed — no exec resolver was built speculatively.
 
+## Cross-Space delivery (Exchange `signal` kind, 2026-09-28)
+
+Only a Signal crosses a Space boundary, never a Consequence (D1). `/decision-rules/{name}/apply` answers 422
+when a consequence names `targetSpace`/`space`. Decision Rule Signals now carry `space` and the applying
+`actor`. An owner Space offers a type (`POST /exchange/signal-offers`, `canOfferSignals` in the owner) with a
+payload allowlist that is empty by default. The consumer requests and the owner approves (the existing grant
+routes). `ExchangeSignalForwarder`, an `EventLog.addTap` process-wide tap that only `inspecto-exchange`
+installs, then copies each matching Signal onto the consumer's ledger as `exchange.<origin>.<type>`. The copy has:
+- actor `exchange-grant:<id>`;
+- only the allowlisted keys, plus `chainDepth` + 1;
+- the origin's correlation id, with causation set to the origin signal;
+- the attributes `originSpace`, `originSignalId`, `originActor` and `exchangeGrant`, which only the forwarder writes.
+
+The consumer's MDC is bound during the emit. Otherwise `exchange.signal.undeliverable` (with a reason) goes on
+the origin: the grant is not ACTIVE, the consumer is not hosted in this Pod, the offer is gone, or there are too
+many hops for the correlation id. Nothing is queued. The consumer acts with its own Job, e.g. the
+`incident.open` Job type, which reads `JobContext.signalPayload()`.
+⚠ `exchange.*` types are never re-forwarded or offerable. A Job on `fraud.*` does not match a delivered
+`exchange.opco.fraud.alert`. Design and open gaps: `superpower/cross-space-consequence-design.md` §6.
+
 ## Gotchas
 
 * **The run-claim hand-off seam is load-bearing for every piece above that subscribes to

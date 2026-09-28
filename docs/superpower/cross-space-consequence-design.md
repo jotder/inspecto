@@ -1,8 +1,9 @@
 # Design — cross-Space consequence (Signal / Decision networks, S8)
 
 **Row:** `BACKLOG.md` §3.5 *Signal / Decision networks — cross-Space consequence* (P2, trigger FIRED
-2026-09-15, re-grounded 2026-09-17). **Status:** written 2026-09-24; **all §8 decisions made 2026-09-28 (operator)**. Slice 0 was already
-shipped (`EXCHANGE-OWNING-SPACE-AUTHZ-1`, `67ce12f96`); slices 1–6 are unbuilt and follow. Owners once built: `okf/backend/control-plane/signal-backbone.md`
+2026-09-15, re-grounded 2026-09-17). **Status:** written 2026-09-24; **all §8 decisions made 2026-09-28 (operator)**. Slices 0–4 SHIPPED
+(0 `67ce12f96`; 1–4 on 2026-09-28, D10 acceptance green); slice 5 (connector-direct emission) and the
+plan archive (slice 6) remain — see §6. Owners once built: `okf/backend/control-plane/signal-backbone.md`
 and `okf/backend/control-plane/decision-rules.md`.
 
 **Scope.** The consequence the trigger names: *a Signal in one Space must cause something in another.*
@@ -188,17 +189,24 @@ reuses the Share Grant ledger, audit and revoke; ✅ the apply path is untouched
 | # | Slice | Module(s) | Done when |
 |---|---|---|---|
 | 0 | ✅ **SHIPPED `67ce12f96`** — **Exchange owner/consumer authority fix** — owner-side acts (`offer`, `approve`, `deny`, `revoke`, `expiry`) re-resolve the Subject against the **owner** Space's roles; consumer-side (`request`, `pin`) against the **consumer's**. Reproducing test first. | `inspecto-exchange`, `inspecto` | N1, N2 red before, green after; dataset grants covered too |
-| 1 | Stamp `space` + `actor` on Decision Rule Signals; 422 on a `targetSpace`-carrying consequence | `inspecto` | N7 + a positive test reading `ATTR_SPACE` |
-| 2 | Exchange kind `signal`: offer / request / approve with `payloadKeys`; route + `openapi-v1.json` entry + capability manifest | `inspecto-exchange` | offers listable, grants transition; no delivery yet |
-| 3 | Forwarder (§5.5) with MDC binding and delivered/undeliverable Signals | `inspecto-exchange`, `inspecto-event` | N3–N6, N8, N10, N11 |
-| 4 | B-side consumption — acceptance test for the concrete consequence named in D10 | `inspecto-engine` | N9 + the D10 end-to-end test (a B Job runs in B, not A) |
-| 5 | Connector-direct emission for the emitters D10 needs | `inspecto-acquire` | typed Signal on the Collector's own ledger, offerable |
+| 1 | ✅ **SHIPPED `f9dd5779a`** — Stamp `space` + `actor` on Decision Rule Signals; 422 on a `targetSpace`-carrying consequence | `inspecto` | N7 + a positive test reading `ATTR_SPACE` |
+| 2 | ✅ **SHIPPED `49ac00c14`** — Exchange kind `signal` (route `POST /exchange/signal-offers`; exact types only, `prefix.*` deferred): offer / request / approve with `payloadKeys`; route + `openapi-v1.json` entry + capability manifest | `inspecto-exchange` | offers listable, grants transition; no delivery yet |
+| 3 | ✅ **SHIPPED `0f9c8bf9e`** — Forwarder (§5.5; an `EventLog` process-wide tap; loops cut per correlation id) with MDC binding and delivered/undeliverable Signals | `inspecto-exchange`, `inspecto-event` | N3–N6, N8, N10, N11 |
+| 4 | ✅ **SHIPPED `b305cbc99`** — new `incident.open` Job type — B-side consumption — acceptance test for the concrete consequence named in D10 | `inspecto-engine` | N9 + the D10 end-to-end test (a B Job runs in B, not A) |
+| 5 | ⏳ **NOT BUILT** — Connector-direct emission for the emitters D10 needs | `inspecto-acquire` | typed Signal on the Collector's own ledger, offerable |
 | 6 | Docs: GLOSSARY §Space amendment (D11) and Exchange family kind; OKF `signal-backbone.md` + `decision-rules.md` as-built; EDITIONS cell; archive this plan | docs | vocabulary + link guards green |
 
 ⛔ New mutating routes must clear the route-gating boot check, `CapabilityManifestTest` (literal capability
 strings) and the `openapi-v1.json` contract — see `okf/backend/editions/auth-security.md`.
 
 ---
+
+**As-built gaps (2026-09-28).** (a) The D10 test emits the origin `fraud.alert` straight onto opco's ledger.
+No in-product emitter carries `caseId`/`typology`/`impact` yet: a Decision Rule `emit-signal` carries only
+`{rule}`. That is slice 5's (or an `emit-signal` payload's) job. (b) N8 is enforced by counting cross-Space hops per
+correlation id, not by a framework-stamped depth through Jobs. (c) D12 covers the Space-naming body fields of
+`/exchange/signal-offers` and `/exchange/requests`; a grant-scoped route whose Space was deleted still answers
+404 via the shared resolver. (d) The SPA's access catalog does not list `canOfferSignals` yet.
 
 ## 7. Test plan
 

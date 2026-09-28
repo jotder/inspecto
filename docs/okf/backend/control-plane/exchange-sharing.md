@@ -179,6 +179,13 @@ Tests: `ControlApiExchangeViewTest` (5, real HTTP — full closure, single-mappi
 404, unknown kind 400) · `ExchangeTest` +4 (two-dataset closure, live-only, empty-closure denial, legacy
 scalar key) · `exchange.handler.spec` +2.
 
+## The `signal` kind (cross-Space consequence, 2026-09-28)
+
+`POST /exchange/signal-offers` [`canOfferSignals`, decided in the body `owner`] offers a dotted Signal type
+with `payloadKeys`. `POST /exchange/offers` refuses the kind, and `exchange.*` types are refused (422). A
+signal grant is live-mode only. D12: on this kind, a body Space that is not hosted answers with the gate's own
+403, not 404. Delivery is described in `signal-backbone.md` § *Cross-Space delivery*.
+
 ## What is deliberately out of scope
 
 No Schema sharing (a Dataset's own Result Set is self-describing). No sharing of Dashboards, Pipelines,
