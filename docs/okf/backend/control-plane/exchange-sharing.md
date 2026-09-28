@@ -47,6 +47,11 @@ real HTTP with per-Space role tables before the fix. Now each route declares
 Authenticator on the request's own credential with `Roles.ATTR_CONFIG_ROOT` pointed at the owning Space
 (restoring the bound Space's root and held roles afterwards). It is fail-closed: a different identity, no
 config root or a credential that no longer resolves all give 403.
+⚠ **The bound Space is `default`, else the ALPHABETICALLY first hosted id** (`SpaceManager.current()`),
+not the first created. The pinning test first named its Spaces `hub`/`finance`/`audit`, so the bound
+Space was the consumer and its "holds the capability only in the bound Space" negatives were vacuous
+(a mutant reverting the approve gate stayed green on them). Renamed `hub`/`opco`/`risk` with an assertion
+that `hub` is bound (2026-09-28, cross-Space consequence D3).
 
 | Route | Capability | Decided in |
 |---|---|---|

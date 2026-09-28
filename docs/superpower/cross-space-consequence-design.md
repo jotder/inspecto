@@ -1,8 +1,8 @@
 # Design — cross-Space consequence (Signal / Decision networks, S8)
 
 **Row:** `BACKLOG.md` §3.5 *Signal / Decision networks — cross-Space consequence* (P2, trigger FIRED
-2026-09-15, re-grounded 2026-09-17). **Status:** DESIGN ONLY, written 2026-09-24 — no production code. Every
-slice in §6 waits on the decisions in §8. Owners once built: `okf/backend/control-plane/signal-backbone.md`
+2026-09-15, re-grounded 2026-09-17). **Status:** written 2026-09-24; **all §8 decisions made 2026-09-28 (operator)**. Slice 0 was already
+shipped (`EXCHANGE-OWNING-SPACE-AUTHZ-1`, `67ce12f96`); slices 1–6 are unbuilt and follow. Owners once built: `okf/backend/control-plane/signal-backbone.md`
 and `okf/backend/control-plane/decision-rules.md`.
 
 **Scope.** The consequence the trigger names: *a Signal in one Space must cause something in another.*
@@ -97,7 +97,10 @@ own Job, authored by someone holding `canAuthorWorkbench` in the target — exac
   request → owner approves a Share Grant; each mutation gated and signalled
   (`ExchangeRoutes.java:22-44`, routes `:76-95`). It is excluded from the Personal build
   (`NoExchangeShipsInThePersonalBuildTest`).
-- 🔴 **As read, owner-side authority is not checked against the owner Space.** The routes are un-prefixed,
+- ✅ **FIXED 2026-09-24 (`EXCHANGE-OWNING-SPACE-AUTHZ-1`, `67ce12f96`) — the bullet below describes the
+  code before that fix.** Every Exchange write now re-resolves the caller under the owning (or, for
+  request/pin, consuming) Space's role table (`ApiContext.requireCapabilityIn`); see §8 D3.
+- 🔴 **(Historical) As read, owner-side authority is not checked against the owner Space.** The routes are un-prefixed,
   so the capability is resolved against the *default* Space's roles (`ControlApi.java:854` — `writeRoot()`
   with no MDC); `actOnGrant` then approves by grant id with only the actor string
   (`ExchangeRoutes.java:214-237`, `inspecto-exchange/src/main/java/com/gamma/exchange/Exchange.java:171-183`).
@@ -125,7 +128,7 @@ consented exception to it, and the sentence must be amended in the same change t
 | T7 | **Wrong-ledger write** — delivery runs on A's thread with A's MDC | n/a | delivery binds B's MDC explicitly and restores it; a test asserts the Run lands in B |
 | T8 | **Silent loss** — subscriber fault swallowed (`EventLog.java:170-178`) | n/a | every attempt records `delivered` / `undeliverable` on A's ledger |
 | T9 | **Stale consent** — grant revoked, deliveries continue | n/a | the grant status is read at delivery time, not cached |
-| T10 | **Exchange owner-authority gap** (§2.6) | open, as read | fixed first (slice 0), for datasets as well as signals |
+| T10 | **Exchange owner-authority gap** (§2.6) | ✅ fixed 2026-09-24 (`67ce12f96`) | holds for datasets as well as signals |
 | T11 | **Existence oracle** — 404-vs-403 reveals which Spaces exist | Exchange returns 404 for no such Space | same status for "no such Space" and "not permitted" on the signal kind (D12) |
 
 ---
@@ -184,7 +187,7 @@ reuses the Share Grant ledger, audit and revoke; ✅ the apply path is untouched
 
 | # | Slice | Module(s) | Done when |
 |---|---|---|---|
-| 0 | **Exchange owner/consumer authority fix** — owner-side acts (`offer`, `approve`, `deny`, `revoke`, `expiry`) re-resolve the Subject against the **owner** Space's roles; consumer-side (`request`, `pin`) against the **consumer's**. Reproducing test first. | `inspecto-exchange`, `inspecto` | N1, N2 red before, green after; dataset grants covered too |
+| 0 | ✅ **SHIPPED `67ce12f96`** — **Exchange owner/consumer authority fix** — owner-side acts (`offer`, `approve`, `deny`, `revoke`, `expiry`) re-resolve the Subject against the **owner** Space's roles; consumer-side (`request`, `pin`) against the **consumer's**. Reproducing test first. | `inspecto-exchange`, `inspecto` | N1, N2 red before, green after; dataset grants covered too |
 | 1 | Stamp `space` + `actor` on Decision Rule Signals; 422 on a `targetSpace`-carrying consequence | `inspecto` | N7 + a positive test reading `ATTR_SPACE` |
 | 2 | Exchange kind `signal`: offer / request / approve with `payloadKeys`; route + `openapi-v1.json` entry + capability manifest | `inspecto-exchange` | offers listable, grants transition; no delivery yet |
 | 3 | Forwarder (§5.5) with MDC binding and delivered/undeliverable Signals | `inspecto-exchange`, `inspecto-event` | N3–N6, N8, N10, N11 |
@@ -229,29 +232,35 @@ before a push touching the Exchange/ControlApi seams.
 
 ---
 
-## 8. Decisions owed (operator)
+## 8. Decisions (operator, 2026-09-28 — all recommendations accepted; D2 decided 2026-09-25)
 
-1. **D1 — Only Signals cross; the apply path never gains a target-space parameter.** Recommend **yes** (§5.1).
-2. **D2 — Consent model.** Two-party on the Exchange (Option D) vs admin-only controller (Option B).
-   Recommend **Option D**.
-3. **D3 — Fix the Exchange owner-authority gap (§2.6) first, as its own row, independent of this feature.**
-   Recommend **yes, filed P1** — it affects dataset grants today if the reading is confirmed by slice 0's test.
-4. **D4 — Delivered type namespace** `exchange.<originSpace>.<type>`. Recommend **yes** (fail closed: no
-   existing B Job fires until someone opts in).
-5. **D5 — Payload crossing:** allowlist on the offer vs whole payload. Recommend **allowlist**, empty by default.
-6. **D6 — Delivered Signal identity:** `actor = exchange-grant:<id>`; origin actor as attribute only, never
-   authority. Recommend **yes**.
-7. **D7 — Capability verbs:** a new `canOfferSignals` for the offer, reusing `canRequestShares` /
-   `canApproveShares`; vs reusing `canOfferDatasets` (misnamed for signals). Recommend **new offer verb**.
-8. **D8 — Topology:** v1 in-process, single Pod; a target not hosted here is `undeliverable`, never queued.
-   Cross-Pod delivery deferred to the scale-out plan's durable shared event store. Recommend **yes**.
-9. **D9 — Editions:** ships wherever the Exchange ships (not Personal). Recommend **yes**; confirm the
-   EDITIONS cell.
-10. **D10 — Name the consequence that was actually asked for:** which origin Space, which signal type, which
-    target Space, which Job. Slice 4's acceptance test and slice 5's connector scope depend on it. **Owed —
-    no recommendation possible from code.**
-11. **D11 — GLOSSARY §Space amendment** to *"invisible to another, except through a consented Exchange grant."*
-    Recommend that wording.
-12. **D12 — Existence oracle:** return the same status for "no such Space" and "not permitted" on the
-    signal kind (differs from the Exchange's current 404). Recommend **yes** for the signal kind; dataset
-    kind unchanged unless D3's row takes it.
+1. **D1 — DECIDED 2026-09-28 (operator): only Signals cross.** The apply path never gains a target-space
+   parameter; `/apply` with one → **422** (slice 1).
+2. **D2 — DECIDED 2026-09-25 (operator): two-party consent on the Exchange (Option D).**
+3. **D3 — DECIDED 2026-09-28 (operator): fix the Exchange owner-authority gap first, as its own P1 row.**
+   ✅ **Already shipped** — `EXCHANGE-OWNING-SPACE-AUTHZ-1`, `67ce12f96` (2026-09-24), the same day this
+   doc's §2.6 was written from an older reading; filed and closed as a P1 in one change on 2026-09-28. That
+   change also repaired the pinning test: its negatives were **vacuous**, because `SpaceManager.current()`
+   binds un-prefixed routes to `default` or else the **alphabetically first** Space (the consumer `audit`,
+   not `hub`), so the "holds the capability in the bound Space" caller held nothing there. As-built:
+   `okf/backend/control-plane/exchange-sharing.md` (owning-Space authorization).
+4. **D4 — DECIDED 2026-09-28 (operator):** delivered type `exchange.<originSpace>.<type>`.
+5. **D5 — DECIDED 2026-09-28 (operator):** payload key allowlist on the offer, **empty by default**.
+6. **D6 — DECIDED 2026-09-28 (operator):** delivered Signal `actor = exchange-grant:<id>`; the origin actor
+   is an attribute only, never authority.
+7. **D7 — DECIDED 2026-09-28 (operator):** a new `canOfferSignals` offer verb; request/approve reuse
+   `canRequestShares` / `canApproveShares`.
+8. **D8 — DECIDED 2026-09-28 (operator):** v1 in-process, single Pod; a target not hosted here is
+   `undeliverable`, never queued. Cross-Pod delivery is deferred to the scale-out plan's durable shared
+   event store.
+9. **D9 — DECIDED 2026-09-28 (operator):** ships wherever the Exchange ships, not Personal. EDITIONS cell
+   confirmed: `SEC-10` reads `— | ✅ | ✅` (the `inspecto-exchange` module); the signal kind rides that cell
+   and slice 6 names it there.
+10. **D10 — DECIDED 2026-09-28 (operator); lifts the ON HOLD.** An **OpCo** Space's `fraud.alert` Signal,
+    offered to a **Group hub** Space; the hub's `on_signal` Job opens a **hub Incident** carrying only the
+    allowlisted `{caseId, typology, impact}` — **no MSISDN** (not in the allowlist, so stripped at the
+    boundary per D5). This is slice 4's acceptance test.
+11. **D11 — DECIDED 2026-09-28 (operator), applied:** `GLOSSARY.md` §Space now reads *"invisible to
+    another, except through a consented Exchange grant."*
+12. **D12 — DECIDED 2026-09-28 (operator):** the signal kind returns the same status for "no such Space"
+    and "not permitted". The dataset kind is unchanged (D3's row did not take it).

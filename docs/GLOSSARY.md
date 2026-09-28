@@ -48,7 +48,7 @@
 
 **Space** — A fully isolated project environment in one Inspecto installation. Owns its own Connections,
 Collectors, Schemas, Pipelines, Jobs, Datasets, Widgets, Dashboards, Incidents, Config, and audit trail. Activity
-in one Space is invisible to another.
+in one Space is invisible to another, except through a consented Exchange grant.
 
 **Pod** *(added 2026-09-13, `POD-SCOPE-DIVERGENCE-1`)* — One running Inspecto process in a
 horizontally-scaled Enterprise deployment. Under partitioning each Pod **owns a subset of Spaces**, so

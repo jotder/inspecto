@@ -29,7 +29,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * ({@code EXCHANGE-OWNING-SPACE-AUTHZ-1}, reproduced 2026-09-24).
  *
  * <p>The Exchange routes carry no {@code /spaces/{id}} prefix, so {@code ControlApi.authenticate} hands the
- * {@link Authenticator} the DEFAULT (first-hosted) Space's config root and the {@link Subject} carries THAT
+ * {@link Authenticator} the DEFAULT Space's config root ({@code SpaceManager.current()}:
+ * {@code default}, else the alphabetically FIRST hosted id) and the {@link Subject} carries THAT
  * Space's grants. Until the fix, {@code POST /exchange/grants/{id}/approve} on a grant owned by Space B was
  * decided by Space A's {@code roles.toon}: a steward of A approved B's grants, and B's own approver was
  * refused. Every case here is a pair — a caller whose capability lives only in the wrong Space (403, and the
@@ -67,32 +68,35 @@ class ControlApiExchangeOwningSpaceAuthzTest {
     }
 
     /**
-     * {@code hub} is hosted first, so it is the Space every un-prefixed request binds to. {@code finance} owns
-     * the Datasets, {@code audit} consumes them. {@code steward} holds every Exchange capability in hub
-     * ONLY; {@code financier} holds the owner capabilities in finance ONLY; {@code auditor} holds
-     * canRequestShares in audit ONLY. Returns the id of an open (requested) grant finance→audit.
+     * {@code hub} sorts first, so it is the Space every un-prefixed request binds to (asserted). {@code opco} owns
+     * the Datasets, {@code risk} consumes them. {@code steward} holds every Exchange capability in hub
+     * ONLY; {@code financier} holds the owner capabilities in opco ONLY; {@code auditor} holds
+     * canRequestShares in risk ONLY. Returns the id of an open (requested) grant opco→risk.
      */
     private String arrange(Ctx c) throws Exception {
-        for (String s : List.of("hub", "finance", "audit"))
+        for (String s : List.of("hub", "opco", "risk"))
             assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"" + s + "\"}", null).statusCode());
+        // The negatives are only meaningful if hub IS the bound Space: current() is alphabetical, not
+        // creation order (an earlier naming made the consumer the bound Space and the negatives vacuous).
+        assertEquals("hub", c.spaces().current().id().value(), "hub must be the Space un-prefixed routes bind to");
         for (String ds : List.of("tax_receipts", "payroll", "ledger"))
-            assertEquals(200, send(c.port, "POST", "/spaces/finance/components/dataset",
+            assertEquals(200, send(c.port, "POST", "/spaces/opco/components/dataset",
                     "{\"id\":\"" + ds + "\",\"physicalRef\":\"" + ds + "\"}", null).statusCode());
         for (String ds : List.of("tax_receipts", "payroll"))
             assertEquals(200, send(c.port, "POST", "/exchange/offers",
-                    "{\"kind\":\"dataset\",\"item\":\"" + ds + "\",\"owner\":\"finance\"}", null).statusCode());
+                    "{\"kind\":\"dataset\",\"item\":\"" + ds + "\",\"owner\":\"opco\"}", null).statusCode());
         HttpResponse<String> req = send(c.port, "POST", "/exchange/requests",
-                "{\"kind\":\"dataset\",\"item\":\"tax_receipts\",\"owner\":\"finance\",\"consumer\":\"audit\"}", null);
+                "{\"kind\":\"dataset\",\"item\":\"tax_receipts\",\"owner\":\"opco\",\"consumer\":\"risk\"}", null);
         assertEquals(200, req.statusCode(), req.body());
 
         Roles.write(configOf(c, "hub"), Map.of("steward", new Roles.Def(Set.of(Roles.CAN_APPROVE_SHARES,
                 Roles.CAN_OFFER_DATASETS, Roles.CAN_REQUEST_SHARES), null)), List.of());
-        Roles.write(configOf(c, "finance"), Map.of("financier", new Roles.Def(Set.of(Roles.CAN_APPROVE_SHARES,
+        Roles.write(configOf(c, "opco"), Map.of("financier", new Roles.Def(Set.of(Roles.CAN_APPROVE_SHARES,
                 Roles.CAN_OFFER_DATASETS), null)), List.of());
-        Roles.write(configOf(c, "audit"), Map.of("auditor",
+        Roles.write(configOf(c, "risk"), Map.of("auditor",
                 new Roles.Def(Set.of(Roles.CAN_REQUEST_SHARES), null)), List.of());
         Authenticators.forTest(PER_SPACE_ROLES);
-        return ShareGrant.idFor("dataset", "tax_receipts", "finance", "audit");
+        return ShareGrant.idFor("dataset", "tax_receipts", "opco", "risk");
     }
 
     @Test
@@ -101,12 +105,12 @@ class ControlApiExchangeOwningSpaceAuthzTest {
             String id = arrange(c);
 
             HttpResponse<String> foreign = send(c.port, "POST", "/exchange/grants/" + id + "/approve", "", "steward");
-            assertEquals(403, foreign.statusCode(), "a hub steward must not approve finance's grant: " + foreign.body());
+            assertEquals(403, foreign.statusCode(), "a hub steward must not approve opco's grant: " + foreign.body());
             assertTrue(foreign.body().contains("PERMISSION_DENIED"), foreign.body());
             assertEquals(ShareGrant.REQUESTED, status(c, id), "a refused approve must not have activated the grant");
 
             HttpResponse<String> owner = send(c.port, "POST", "/exchange/grants/" + id + "/approve", "", "financier");
-            assertEquals(200, owner.statusCode(), "finance's own approver must approve: " + owner.body());
+            assertEquals(200, owner.statusCode(), "opco's own approver must approve: " + owner.body());
             assertEquals(ShareGrant.ACTIVE, status(c, id));
 
             assertEquals(403, send(c.port, "POST", "/exchange/grants/" + id + "/expiry",
@@ -137,8 +141,8 @@ class ControlApiExchangeOwningSpaceAuthzTest {
     void requestAndPinAreDecidedByTheConsumerSpacesRoles(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             arrange(c);
-            String body = "{\"kind\":\"dataset\",\"item\":\"payroll\",\"owner\":\"finance\",\"consumer\":\"audit\"}";
-            String id = ShareGrant.idFor("dataset", "payroll", "finance", "audit");
+            String body = "{\"kind\":\"dataset\",\"item\":\"payroll\",\"owner\":\"opco\",\"consumer\":\"risk\"}";
+            String id = ShareGrant.idFor("dataset", "payroll", "opco", "risk");
 
             assertEquals(403, send(c.port, "POST", "/exchange/requests", body, "steward").statusCode());
             assertTrue(grantOpt(c, id).isEmpty(), "a refused request must not have opened a grant");
@@ -157,17 +161,17 @@ class ControlApiExchangeOwningSpaceAuthzTest {
     void offerIsDecidedByTheOwningSpacesRoles(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             arrange(c);
-            String body = "{\"kind\":\"dataset\",\"item\":\"ledger\",\"owner\":\"finance\"}";
+            String body = "{\"kind\":\"dataset\",\"item\":\"ledger\",\"owner\":\"opco\"}";
             Exchange ex = Exchange.under(c.spaces().containerRoot());
 
             assertEquals(403, send(c.port, "POST", "/exchange/offers", body, "steward").statusCode());
-            assertTrue(ex.offer("finance", "dataset", "ledger").isEmpty(), "a refused offer must not be listed");
+            assertTrue(ex.offer("opco", "dataset", "ledger").isEmpty(), "a refused offer must not be listed");
             assertEquals(200, send(c.port, "POST", "/exchange/offers", body, "financier").statusCode());
-            assertTrue(ex.offer("finance", "dataset", "ledger").isPresent());
+            assertTrue(ex.offer("opco", "dataset", "ledger").isPresent());
 
-            // refresh republishes finance's data into the Exchange — the same owner decision. Its positive
+            // refresh republishes opco's data into the Exchange — the same owner decision. Its positive
             // twin needs real Parquet, so here it only has to get PAST the gate (any status but 403).
-            String refresh = "{\"item\":\"tax_receipts\",\"owner\":\"finance\"}";
+            String refresh = "{\"item\":\"tax_receipts\",\"owner\":\"opco\"}";
             assertEquals(403, send(c.port, "POST", "/exchange/refresh", refresh, "steward").statusCode());
             assertNotEquals(403, send(c.port, "POST", "/exchange/refresh", refresh, "financier").statusCode());
         }
