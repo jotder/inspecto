@@ -55,6 +55,7 @@ class ControlApiActionRequestsTest {
     private final HttpClient client = HttpClient.newHttpClient();
 
     private HttpServer target;
+    private Authenticator base;
     private final List<String> keys = new CopyOnWriteArrayList<>();
     private final List<String> bodies = new CopyOnWriteArrayList<>();
     private final AtomicInteger accepted = new AtomicInteger();
@@ -73,7 +74,7 @@ class ControlApiActionRequestsTest {
     /** AUTHOR/ANALYST2 = operations (canWorkIncidents, no canApproveChanges); CHECKER = admin; SELF = the author's id as admin. */
     @BeforeEach
     void arm() throws Exception {
-        Authenticators.forTest(ex -> {
+        Authenticators.forTest(base = ex -> {
             String[] who = switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
                 case AUTHOR -> new String[] {"author-1", "operations"};
                 case ANALYST2 -> new String[] {"analyst-2", "operations"};
@@ -185,6 +186,81 @@ class ControlApiActionRequestsTest {
         JsonNode rec = data(send(c, "POST", "/action-requests", body(incidentId), AUTHOR), 200);
         assertEquals("pending", rec.get("status").asText());
         return rec.get("id").asText();
+    }
+
+    /** Re-arm with an Authenticator that, like Demo sign-in, can enumerate its principals (id → roles). */
+    private void enumerating(Map<String, List<String>> principals) {
+        Authenticator b = base;
+        Authenticators.forTest(new Authenticator() {
+            @Override public Optional<Subject> authenticate(com.sun.net.httpserver.HttpExchange ex) { return b.authenticate(ex); }
+            @Override public Optional<Map<String, List<String>>> principals(Path configRoot) { return Optional.of(principals); }
+        });
+    }
+
+    private static List<com.gamma.event.Event> noApproverEvents(List<com.gamma.event.Event> seen, String id) {
+        return seen.stream().filter(e -> e.attributes().containsValue("action-request.no-eligible-approver")
+                && id.equals(e.attributes().get("actionRequest"))).toList();
+    }
+
+    // ── approver check (RESIDUALS-1 (6)) ────────────────────────────────────────────────────────
+
+    @Test
+    void anIdpThatCannotEnumerateItsPrincipalsReadsUnknownAndStaysQuiet(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        List<com.gamma.event.Event> seen = new CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
+        com.gamma.event.EventLog.global().addSubscriber(sub);
+        try (Ctx c = open(cfg, tmp, true)) {
+            String id = propose(c, incident(c));
+            assertEquals("unknown", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200).get("approverCheck").asText());
+            assertEquals("unknown", data(send(c, "GET", "/action-requests", null, AUTHOR), 200).get("items").get(0)
+                    .get("approverCheck").asText());
+            assertTrue(noApproverEvents(seen, id).isEmpty(), "no warning when it cannot be known");
+        } finally {
+            com.gamma.event.EventLog.global().removeSubscriber(sub);
+        }
+    }
+
+    @Test
+    void anEnumeratedDirectoryWhoseOnlyApproverIsTheMakerReadsNoneEligibleAndWarnsOnce(@TempDir Path cfg, @TempDir Path tmp)
+            throws Exception {
+        List<com.gamma.event.Event> seen = new CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.event.Event> sub = seen::add;
+        com.gamma.event.EventLog.global().addSubscriber(sub);
+        try (Ctx c = open(cfg, tmp, true)) {
+            String inc = incident(c);
+            enumerating(Map.of("author-1", List.of("admin"), "analyst-2", List.of("operations")));
+            String id = propose(c, inc);
+            assertEquals("none-eligible", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200)
+                    .get("approverCheck").asText());
+            data(send(c, "GET", "/action-requests", null, AUTHOR), 200);
+            List<com.gamma.event.Event> warn = noApproverEvents(seen, id);
+            assertEquals(1, warn.size(), "one warning, at raise — reads never re-emit");
+            assertEquals(com.gamma.event.EventLevel.WARN, warn.get(0).level());
+            assertEquals("pending", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200).get("status").asText(),
+                    "never auto-declined");
+
+            enumerating(Map.of("author-1", List.of("admin"), "checker-1", List.of("admin")));
+            assertEquals("ok", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200).get("approverCheck").asText(),
+                    "computed live: a non-maker approver now exists");
+            String ok = propose(c, inc);
+            assertTrue(noApproverEvents(seen, ok).isEmpty());
+        } finally {
+            com.gamma.event.EventLog.global().removeSubscriber(sub);
+        }
+    }
+
+    @Test
+    void aRoleTableThatGrantsNoOneCanApproveChangesReadsNoneEligibleEvenUnderAnIdp(@TempDir Path cfg, @TempDir Path tmp)
+            throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String inc = incident(c);
+            allowLoopback(c);
+            data(send(c, "PUT", "/access/roles", "{\"roles\":[{\"name\":\"admin\",\"capabilities\":"
+                    + "[\"canWorkIncidents\",\"canConfigureAccess\"]},{\"name\":\"super\",\"capabilities\":"
+                    + "[\"canWorkIncidents\",\"canConfigureAccess\"]}]}", CHECKER), 200);
+            JsonNode rec = data(send(c, "POST", "/action-requests", body(inc), AUTHOR), 200);
+            assertEquals("none-eligible", rec.get("approverCheck").asText());
+        }
     }
 
     // ── delivery ────────────────────────────────────────────────────────────────────────────────

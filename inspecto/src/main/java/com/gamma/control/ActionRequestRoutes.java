@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.event.EventLevel;
 import com.gamma.objects.ObjectAccess;
 import com.gamma.pipeline.exec.WebhookSink;
 import com.sun.net.httpserver.HttpExchange;
@@ -83,7 +84,7 @@ final class ActionRequestRoutes implements RouteModule {
                     if (blankOr(status, rec.get("status")) && blankOr(incident, rec.get("incidentId"))
                             && blankOr(kase, rec.get("caseId")) && visible(api, ex, rec)) {
                         total++;
-                        if (items.size() < LIST_CAP) items.add(redacted(ex, ActionRequests.summary(rec)));
+                        if (items.size() < LIST_CAP) items.add(redacted(ex, withApproverCheck(root, rec, ActionRequests.summary(rec))));
                     }
                 }
             }
@@ -108,7 +109,7 @@ final class ActionRequestRoutes implements RouteModule {
             if (rec == null || !visible(api, ex, rec))
                 throw new ApiException(404, ErrorCodes.NOT_FOUND, "no action request '" + id + "'");
             ActionRequests.expireIfDue(root, rec);
-            return redacted(ex, withEgress(root, ActionRequests.detail(rec)));
+            return redacted(ex, withApproverCheck(root, rec, withEgress(root, ActionRequests.detail(rec))));
         }
     }
 
@@ -180,6 +181,37 @@ final class ActionRequestRoutes implements RouteModule {
         return view;
     }
 
+    static final String NONE_ELIGIBLE = "none-eligible", UNKNOWN = "unknown", OK = "ok";
+
+    /**
+     * Whether anyone could approve this request (ASSURE-ACTION-REQUESTS-RESIDUALS-1 (6)). Never changes the
+     * four-eyes decision — a {@code none-eligible} request stays {@code pending} (fail-closed), this only says so.
+     * {@code none-eligible}: no role in the Space's table grants {@code canApproveChanges} (deny grants applied —
+     * every edition), or the Authenticator enumerates its principals (Demo) and every holder is a maker.
+     * {@code unknown}: roles grant it but the Authenticator cannot enumerate who holds them (OIDC, Personal).
+     * {@code ok}: an enumerated non-maker holds it.
+     */
+    static String approverCheck(Path root, Map<String, Object> rec) {
+        boolean anyRole = Roles.effective(root).keySet().stream()
+                .anyMatch(r -> JobAuthority.capabilitiesNow(List.of(r), root).contains(Roles.CAN_APPROVE_CHANGES));
+        if (!anyRole) return NONE_ELIGIBLE;
+        Map<String, List<String>> who = Authenticators.active().flatMap(a -> a.principals(root)).orElse(null);
+        if (who == null) return UNKNOWN;
+        Set<Object> makers = new java.util.HashSet<>();
+        makers.add(rec.get("author"));
+        if (rec.get("coAuthors") instanceof List<?> co) makers.addAll(co);
+        for (Map.Entry<String, List<String>> p : who.entrySet())
+            if (!makers.contains(p.getKey())
+                    && JobAuthority.capabilitiesNow(p.getValue(), root).contains(Roles.CAN_APPROVE_CHANGES)) return OK;
+        return NONE_ELIGIBLE;
+    }
+
+    /** Adds {@code approverCheck} to a pending request's view (computed live — roles change while it waits). */
+    static Map<String, Object> withApproverCheck(Path root, Map<String, Object> rec, Map<String, Object> view) {
+        if (ActionRequests.PENDING.equals(rec.get("status"))) view.put("approverCheck", approverCheck(root, rec));
+        return view;
+    }
+
     // ── create ──────────────────────────────────────────────────────────────────────────────────
 
     private Object create(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
@@ -188,7 +220,8 @@ final class ActionRequestRoutes implements RouteModule {
             if (!CREATE_KEYS.contains(k))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown key '" + k + "' — an action "
                         + "request takes " + new java.util.TreeSet<>(CREATE_KEYS));
-        return withEgress(root, ActionRequests.detail(propose(api, root, body, ApiContext.actor(ex), ApiContext.actorType(ex), "manual", List.of())));
+        Map<String, Object> rec = propose(api, root, body, ApiContext.actor(ex), ApiContext.actorType(ex), "manual", List.of());
+        return withApproverCheck(root, rec, withEgress(root, ActionRequests.detail(rec)));
     }
 
     /**
@@ -257,6 +290,10 @@ final class ActionRequestRoutes implements RouteModule {
         }
         ActionRequests.audit(author, authorType, "action-request.proposed", rec.get("id") + " proposed from " + kind
                 + " " + linked + " → Connection '" + connection + "' (" + method + ")", rec);
+        if (NONE_ELIGIBLE.equals(approverCheck(root, rec)))   // once, at raise — reads never re-emit
+            ActionRequests.audit(author, authorType, "action-request.no-eligible-approver", rec.get("id")
+                    + " has no eligible approver: no one holding canApproveChanges in this Space is outside its "
+                    + "makers — it stays pending until it expires unless a role is granted", rec, EventLevel.WARN);
         return rec;
     }
 

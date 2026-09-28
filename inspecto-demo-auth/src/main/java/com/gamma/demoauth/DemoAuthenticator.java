@@ -64,6 +64,15 @@ public final class DemoAuthenticator implements Authenticator {
                 Map.of("displayName", user.displayName(), "demoUser", true)));
     }
 
+    /** Demo Users are the whole directory: every identity that can sign in to this Space is in its table. */
+    @Override
+    public Optional<Map<String, List<String>>> principals(Path configRoot) {
+        Map<String, List<String>> out = new java.util.LinkedHashMap<>();
+        for (DemoUsers.User u : DemoUsers.load(configRoot != null ? configRoot : legacyRoot()))
+            out.put(u.id(), List.copyOf(u.roles()));
+        return Optional.of(out);
+    }
+
     private static Path legacyRoot() {
         String wr = System.getProperty("assist.write.root");
         return wr == null || wr.isBlank() ? null : Path.of(wr.trim());

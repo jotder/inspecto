@@ -247,6 +247,11 @@ public final class ActionRequests {
 
     /** One AUDIT row. Never the payload, never a token: the id, the Connection, the method and the linkage only. */
     static void audit(String actor, String actorType, String action, String message, Map<String, Object> rec) {
+        audit(actor, actorType, action, message, rec, null);
+    }
+
+    static void audit(String actor, String actorType, String action, String message, Map<String, Object> rec,
+                      com.gamma.event.EventLevel level) {
         try {
             EventLog log = EventLog.current();
             if (log == null) return;
@@ -256,6 +261,7 @@ public final class ActionRequests {
                     .attr("method", rec.get("method")).attr("author", rec.get("author"));
             if (rec.get("incidentId") != null) b.attr("incidentId", rec.get("incidentId"));
             if (rec.get("caseId") != null) b.attr("caseId", rec.get("caseId"));
+            if (level != null) b.level(level);
             log.emit(b);
         } catch (RuntimeException ignored) {
             // best effort, like every audit emit — the record is what matters

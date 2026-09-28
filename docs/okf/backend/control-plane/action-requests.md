@@ -55,6 +55,27 @@ so a value can never break the JSON. The approver reads exactly what will go out
   `PendingChanges.hold` is never reached and no policy kind names it. Holding the proposal as a Pending Change
   as well would make one call need two approvals.
 
+### Is anyone left to approve it? — `approverCheck` (2026-09-28)
+
+A pending request's read, list item and create response carry **`approverCheck`**, computed live on every read
+(roles change while it waits) by `ActionRequestRoutes.approverCheck`:
+
+- **`none-eligible`** — no role in the Space's table grants `canApproveChanges` (deny grants applied, via
+  `JobAuthority.capabilitiesNow`; every edition), **or** the Authenticator can enumerate its principals and every
+  holder is the author or a co-author. Today only **Demo sign-in** enumerates (`Authenticator.principals`, a default
+  method returning empty; `DemoAuthenticator` answers from `demo-users.toon`).
+- **`unknown`** — roles grant it but who holds them cannot be known: OIDC identities arrive as token claims only and
+  the server keeps no principal directory. Personal (no Authenticator) also reads `unknown`, although no one can
+  decide there at all (deciding needs a Subject).
+- **`ok`** — an enumerated non-maker holds `canApproveChanges`.
+
+At raise time only (`propose`, so the route and the `invoke-api` consequence alike), a `none-eligible` answer emits
+**one WARN audit event `action-request.no-eligible-approver`**; reads never re-emit. It is visibility only:
+**nothing auto-declines** — four-eyes stays fail-closed and the request sits `pending` until it expires or a role is
+granted. ⚠ `ok` from the Demo table ignores Access Grants tied to a request (`AccessGrants.deniedCapabilities` is
+applied per role table only). The field is not in `openapi-v1.json`: every `/action-requests*` operation there is
+still a generated skeleton.
+
 ## Who can read one
 
 `GET /action-requests*` needs `canWorkIncidents` **or** `canApproveChanges` (checked literally in the handler — a
@@ -253,6 +274,8 @@ is a valid DNS name) but still never lifts loopback at connect time — the noti
 ## Deferred / known gaps
 
 - No per-request `path` below the Connection's base path: one Connection per endpoint.
+- Under OIDC `approverCheck` is `unknown`: telling whether a specific person holds `canApproveChanges` needs a
+  principal directory the server does not have (a product decision; `ASSURE-ACTION-REQUESTS-RESIDUALS-1`).
 - `inspecto`-module tests drive the dispatcher over a loopback **test** wire (it connects to the pinned address like
   the real one); the real wire's pinning, SNI / certificate verification and redirect refusal are pinned in
   `HttpWebhookSinkTransportTest` and `PinnedHttpTlsTest`.

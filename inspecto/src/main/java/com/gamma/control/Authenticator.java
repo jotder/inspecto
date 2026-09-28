@@ -20,4 +20,11 @@ public interface Authenticator {
     /** Resolve the caller from {@code ex}'s credentials (typically an {@code Authorization: Bearer}
      *  header). Empty ⇒ missing or invalid credentials; the caller gets {@code 401 UNAUTHENTICATED}. */
     Optional<Subject> authenticate(HttpExchange ex);
+
+    /** Every principal this Authenticator can enumerate under a Space's {@code configRoot}, id → role names.
+     *  Empty (the default, and OIDC) ⇒ it cannot say who exists — identities arrive as token claims only.
+     *  Read by the Action Request approver check ({@code ActionRequestRoutes.approverCheck}). */
+    default Optional<java.util.Map<String, java.util.List<String>>> principals(java.nio.file.Path configRoot) {
+        return Optional.empty();
+    }
 }
