@@ -260,6 +260,31 @@ class ParquetEventStoreTest {
         }
     }
 
+    /** (9) second review: a replay flush that fails AT the retention cap clears the buffer (give-up), which used to
+     *  look like success — the journal was deleted and its events, whose only durable copy it was, lost. */
+    @Test
+    void aReplayFlushThatGivesUpKeepsTheJournal(@TempDir Path dir) throws Exception {
+        ParquetEventStore crashed = new ParquetEventStore(dir, 1000, 0, 100);
+        crashed.append(ev(1_000L, EventLevel.INFO, EventType.AUDIT, null, "J1"));
+        crashed.append(ev(2_000L, EventLevel.INFO, EventType.AUDIT, null, "J2"));
+        crashed.simulateCrash();
+        Path staging = dir.resolve(".staging");
+        if (java.nio.file.Files.exists(staging)) deleteTree(staging);
+        java.nio.file.Files.writeString(staging, "a file where the staging directory must go");
+        int cap = ParquetEventStore.maxRetained;
+        ParquetEventStore.maxRetained = 1;                               // the replay flush gives up at once
+        try {
+            new ParquetEventStore(dir, 1000, 0, 100).simulateCrash();
+        } finally {
+            ParquetEventStore.maxRetained = cap;
+        }
+        java.nio.file.Files.delete(staging);
+        try (ParquetEventStore again = new ParquetEventStore(dir, 1000, 0, 100)) {
+            List<String> msgs = again.query(EventQuery.recent(100)).stream().map(Event::message).toList();
+            assertTrue(msgs.contains("J1") && msgs.contains("J2"), "journal kept, replayed later: " + msgs);
+        }
+    }
+
     private static void deleteTree(Path p) throws Exception {
         try (var w = java.nio.file.Files.walk(p)) {
             for (Path x : w.sorted(java.util.Comparator.reverseOrder()).toList()) java.nio.file.Files.delete(x);

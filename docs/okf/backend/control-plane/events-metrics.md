@@ -223,6 +223,10 @@ timestamp: 2026-07-16T00:00:00Z
       The held file keeps every not-yet-flushed event (held AND released) until the replay flush lands, so a
       failed flush plus a crash loses none. `EventLog.installStore` carries per event: a row `presentIds` cannot
       resolve is left out (it may already be there) with an ERROR event naming it, and the rest still carry.
+      `flushLocked` reports whether the batch really landed: a give-up at the retention cap (`maxRetained`,
+      50 000) empties the buffer too, and replay used to read that as success and delete the journal. A replay
+      flush that did not land moves its unflushed events to the held file (which no later flush truncates) and
+      removes the journal; they are retried on the next open.
     - *The anchors are a chain.* Each anchor carries `prevAnchorMac` in its MAC input and must start at the
       previous `lastSeq + 1`; a garbled line (`anchor-unreadable`), a removed or reordered anchor
       (`anchor-chain-broken`) and a finished day (before yesterday) no anchor covers (`anchor-missing`) all

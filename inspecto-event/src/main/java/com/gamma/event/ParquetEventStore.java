@@ -108,7 +108,8 @@ public final class ParquetEventStore implements EventStore {
      * grown without bound — the trade is bounded memory over a complete audit trail, taken only
      * after the flush has failed repeatedly and loudly.
      */
-    private static final int MAX_RETAINED = 50_000;
+    /** Give-up cap on retained unflushed events; not final only as a test hook. */
+    static int maxRetained = 50_000;
     private boolean closed;
     /** The open journal (append); null when it could not be opened — the store then degrades to buffer-only. */
     private FileChannel journal;
@@ -209,11 +210,22 @@ public final class ParquetEventStore implements EventStore {
                 log.error("Event journal {}: {} event(s) held back, not replayed: an unreadable Parquet file ({}) may"
                         + " already hold them; retried on every open until it is readable or removed",
                         file, hold.size(), String.join(", ", unreadableUnits()));
+            boolean landed = true;
+            List<Event> pending = new ArrayList<>(hold);
+            pending.addAll(buffer);
             if (!buffer.isEmpty()) {
                 log.info("Event journal {}: replaying {} event(s) a previous run did not flush", file, buffer.size());
-                flushLocked();
+                landed = flushLocked();
             }
-            if (buffer.isEmpty()) {   // kept if the replay flush failed: retried next open
+            // Only a flush that really landed releases the files: a give-up at the retention cap also empties the
+            // buffer, and the journal / held file are then the only durable copy.
+            if (!landed) {
+                // The journal is about to be reopened for appends, and the next successful flush truncates it —
+                // which would drop these unflushed replay events. They move to the held file, which no flush
+                // touches, and are retried from it on the next open.
+                writeHeld(held, pending);
+                Files.deleteIfExists(file);
+            } else {
                 if (hold.isEmpty()) Files.deleteIfExists(held);
                 else writeHeld(held, hold);
                 Files.deleteIfExists(file);
@@ -337,8 +349,8 @@ public final class ParquetEventStore implements EventStore {
     }
 
     /** Write the buffer to a fresh partitioned Parquet file set, then clear it. Caller holds the lock. */
-    private void flushLocked() {
-        if (buffer.isEmpty()) return;
+    private boolean flushLocked() {
+        if (buffer.isEmpty()) return true;
         try {
             try (PreparedStatement ps = conn.prepareStatement(
                     "INSERT INTO " + BUF_TABLE + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)")) {
@@ -373,21 +385,22 @@ public final class ParquetEventStore implements EventStore {
             // in-memory ring, not a durability guarantee. Retain and retry on the next append/flush,
             // and only give up once the buffer would grow without bound.
             flushFailures++;
-            boolean giveUp = buffer.size() >= MAX_RETAINED;
+            boolean giveUp = buffer.size() >= maxRetained;
             log.warn("Event flush to Parquet failed ({} consecutive), {} {} buffered event(s): {}",
                     flushFailures, giveUp ? "dropping" : "retaining", buffer.size(), e.getMessage());
             clearBufferTable();
-            if (!giveUp) return;   // keep `buffer` for the next attempt
+            if (!giveUp) return false;   // keep `buffer` for the next attempt
             log.error("Event buffer reached {} undrained events; dropping them to bound memory."
                     + " Durable event/audit history for this window is lost.", buffer.size());
             buffer.clear();
             truncateJournal();
             flushFailures = 0;
-            return;
+            return false;   // the buffer is empty, but NOT because it landed
         }
         buffer.clear();
         clearBufferTable();
         truncateJournal();
+        return true;
     }
 
     /**
