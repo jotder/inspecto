@@ -135,16 +135,32 @@ export function parsePostmortem(o: OperationalObject): Postmortem | null {
 
 /**
  * I1 — the mandatory resolution pattern (§2b of `case-management-design.md`): which of the four
- * required sections an incident's resolution still lacks. Empty = complete. Drives the soft
- * resolve-gate (warn, never block — the hard/backend gate is the documented follow-up).
+ * required sections an incident's resolution still lacks. Empty = complete. The SPA's pre-check of the
+ * server's HARD gate (`ObjectService.incidentResolutionGaps`), so it must read the blob as that does
+ * (`mail-model.spec.ts`).
  */
 export function postmortemGaps(o: OperationalObject): string[] {
-    const p = parsePostmortem(o);
+    // The RAW stored blob, read exactly as the server's hard gate (ObjectService.incidentResolutionGaps) reads it:
+    // not parsePostmortem, whose legacy fiveWhys migration is for the editor — the server does not read fiveWhys,
+    // so a gate built on the migrated shape passed an Incident the server then refused.
+    let raw: Record<string, unknown> = {};
+    try {
+        const parsed = JSON.parse(o.attributes?.['postmortem'] ?? '{}') as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) raw = parsed as Record<string, unknown>;
+    } catch {
+        // unreadable: every section is missing
+    }
+    const filled = (v: unknown) => v != null && String(v).trim() !== '';
+    const rows = (key: string) => (Array.isArray(raw[key]) ? (raw[key] as unknown[]) : []);
+    const anyEntry = (key: string, ...fields: string[]) =>
+        rows(key).some(
+            (r) => !!r && typeof r === 'object' && fields.some((f) => filled((r as Record<string, unknown>)[f])),
+        );
     const gaps: string[] = [];
-    if (!p?.timeline.some((t) => t.time.trim() || t.text.trim())) gaps.push('timeline');
-    if (!p?.causeAnalysis.some((w) => w.trim())) gaps.push('cause analysis');
-    if (!p?.actions.some((a) => a.text.trim())) gaps.push('corrective actions');
-    if (!o.attributes?.['dueAt']) gaps.push('SLA');
+    if (!anyEntry('timeline', 'time', 'text')) gaps.push('timeline');
+    if (!rows('causeAnalysis').some(filled)) gaps.push('cause analysis');
+    if (!anyEntry('actions', 'text')) gaps.push('corrective actions');
+    if (!filled(o.attributes?.['dueAt'])) gaps.push('SLA');
     return gaps;
 }
 
