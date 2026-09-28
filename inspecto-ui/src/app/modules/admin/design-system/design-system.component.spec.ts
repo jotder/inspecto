@@ -73,12 +73,31 @@ describe('DesignSystemComponent', () => {
         expect(pane.querySelector('button[aria-label="Full screen"]')).toBeTruthy();
     });
 
-    // ⚠ 30s, not the 15s default: this is the suite's single heaviest assertion — axe over the WHOLE
-    // gallery, every shared pattern mounted at once — and it was sitting close enough to the default
-    // that adding four unrelated specs elsewhere in the suite tipped it over (2026-08-29). A timeout
-    // here says nothing about a11y, so the honest fix is headroom rather than a smaller scan.
-    it('has no a11y violations', async () => {
-        const fixture = await create();
-        await expectNoA11yViolations(fixture.nativeElement);
-    }, 30_000);
+    // ⚠ The gallery mounts every shared pattern at once (~4 100 elements), so one axe pass over the
+    // whole page was the suite's heaviest assertion: ~4.5 s alone, and past even a raised 30 s timeout
+    // under full-suite load (2026-09-28). Profiling showed no single slow rule to drop — the cost is
+    // per node, spread across all rules — so the scan is split instead: every <section> (and the
+    // header) is still checked with the full house rule set, in ONE axe pass per slice (axe's setup
+    // cost is per run), across three tests that each carry about a third of the work. The only axe
+    // rules that look across sections are the duplicate-id family, so whole-page id uniqueness is
+    // asserted separately below. 30 s stays as headroom.
+    const A11Y_SLICES = 3;
+    it.each([0, 1, 2])(
+        'has no a11y violations (section slice %i of 3)',
+        async (slice) => {
+            const el = (await create()).nativeElement as HTMLElement;
+            const sections = Array.from(el.querySelectorAll('section'));
+            expect(sections.length).toBeGreaterThan(A11Y_SLICES);
+            const include = sections.filter((_, i) => i % A11Y_SLICES === slice);
+            if (slice === 0) include.push(el.querySelector('h1')!.parentElement as HTMLElement);
+            await expectNoA11yViolations({ include });
+        },
+        30_000,
+    );
+
+    it('every element id on the gallery page is unique (the whole-page half of axe duplicate-id)', async () => {
+        const el = (await create()).nativeElement as HTMLElement;
+        const ids = Array.from(el.querySelectorAll('[id]')).map((n) => n.id);
+        expect(ids.filter((id, i) => ids.indexOf(id) !== i)).toEqual([]);
+    });
 });

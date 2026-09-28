@@ -22,7 +22,11 @@ const DISABLED_RULES = [
     'bypass',
 ] as const;
 
-export async function expectNoA11yViolations(root: Element): Promise<void> {
+/**
+ * `root` is usually a fixture's element; pass an axe context (e.g. `{ include: [a, b] }`) to scan
+ * several regions of a large page in ONE axe pass — each separate run pays axe's setup cost again.
+ */
+export async function expectNoA11yViolations(root: Element | axe.ElementContext): Promise<void> {
     const results = await axe.run(root, {
         rules: Object.fromEntries(DISABLED_RULES.map((id) => [id, { enabled: false }])),
         resultTypes: ['violations'],
