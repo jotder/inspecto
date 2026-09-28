@@ -844,7 +844,7 @@ public final class ParquetEventStore implements EventStore {
     private List<Path> parquetFiles() {
         if (!Files.isDirectory(root)) return List.of();
         try (Stream<Path> w = Files.walk(root)) {
-            List<Path> files = w.filter(p -> p.getFileName().toString().endsWith(".parquet")).sorted().toList();
+            List<Path> files = w.filter(this::isEventFile).sorted().toList();
             java.util.Set<Path> present = new java.util.HashSet<>(files);
             unreadable.keySet().retainAll(present);
             signalled.keySet().retainAll(present);
@@ -852,6 +852,12 @@ public final class ParquetEventStore implements EventStore {
         } catch (IOException e) {
             throw new IllegalStateException("event store listing failed under " + root + ": " + e.getMessage(), e);
         }
+    }
+
+    /** A revealed event file: a {@code .parquet} outside {@code <root>/.staging/}, where a failed or crashed
+     *  {@code PartitionWriter} write may have left a file that was never revealed. */
+    private boolean isEventFile(Path p) {
+        return p.getFileName().toString().endsWith(".parquet") && !p.startsWith(root.resolve(".staging"));
     }
 
     private String rel(Path f) {
@@ -966,7 +972,7 @@ public final class ParquetEventStore implements EventStore {
     private boolean hasParquet() {
         if (!Files.isDirectory(root)) return false;
         try (Stream<Path> w = Files.walk(root)) {
-            return w.anyMatch(p -> p.getFileName().toString().endsWith(".parquet"));
+            return w.anyMatch(this::isEventFile);
         } catch (Exception e) {
             return false;
         }

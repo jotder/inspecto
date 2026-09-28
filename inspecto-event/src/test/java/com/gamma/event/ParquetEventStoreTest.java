@@ -297,6 +297,34 @@ class ParquetEventStoreTest {
         }
     }
 
+    /** ASSURE-AUDIT-CHAIN-RESIDUALS-1 (10): a reveal that fails removes its staged file, and a staged file a crash
+     *  left behind is never read — the retained buffer's rows appear exactly once. */
+    @Test
+    void aFailedRevealLeavesNoStagedFileAndReadsSkipStaging(@TempDir Path dir) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 1000, 0, 100)) {
+            store.append(ev(1_000L, EventLevel.WARN, EventType.LOG, null, "OK"));
+            store.flush();
+            Path good = parquetIn(dir.resolve("level=WARN/year=1970/month=01/day=01")).get(0);
+            // a crash's leftover: a real Parquet file under .staging/
+            Path crashed = dir.resolve(".staging/deadbeef0000/level=WARN/year=1970/month=01/day=01");
+            java.nio.file.Files.createDirectories(crashed);
+            java.nio.file.Files.copy(good, crashed.resolve("data_0.parquet"));
+
+            java.nio.file.Files.writeString(dir.resolve("level=INFO"), "a file where the partition directory must go");
+            store.append(ev(2_000L, EventLevel.INFO, EventType.LOG, null, "S"));
+            store.flush();                                                  // the reveal fails; S stays buffered
+
+            List<String> msgs = store.query(EventQuery.recent(100)).stream().map(Event::message).toList();
+            assertEquals(1, msgs.stream().filter("S"::equals).count(), "S exactly once: " + msgs);
+            assertEquals(1, msgs.stream().filter("OK"::equals).count(), "the crash leftover is not read: " + msgs);
+            try (var w = java.nio.file.Files.walk(dir.resolve(".staging"))) {
+                List<Path> left = w.filter(p -> p.toString().endsWith(".parquet"))
+                        .filter(p -> !p.startsWith(dir.resolve(".staging/deadbeef0000"))).toList();
+                assertEquals(List.of(), left, "the failed reveal's staged file is deleted");
+            }
+        }
+    }
+
     private static void deleteTree(Path p) throws Exception {
         try (var w = java.nio.file.Files.walk(p)) {
             for (Path x : w.sorted(java.util.Comparator.reverseOrder()).toList()) java.nio.file.Files.delete(x);

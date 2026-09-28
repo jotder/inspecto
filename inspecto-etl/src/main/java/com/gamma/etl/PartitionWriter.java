@@ -215,9 +215,13 @@ public final class PartitionWriter {
             outputs = revealStream
                     .map(src -> reveal(src, stagingRoot, databaseDir, outputFileName))
                     .collect(java.util.stream.Collectors.toCollection(ArrayList::new));
-
+        } finally {
+            // Best effort, on success AND failure: a failed COPY or reveal must not leave its staged
+            // files behind for a reader's file walk to pick up (readers also skip .staging/).
             try (Stream<Path> cleanup = Files.walk(stagingPath)) {
                 cleanup.sorted(Comparator.reverseOrder()).map(Path::toFile).forEach(File::delete);
+            } catch (IOException | UncheckedIOException ignored) {
+                // the next write's own staging dir is distinct; readers skip .staging/ regardless
             }
         }
         return outputs;

@@ -228,6 +228,9 @@ timestamp: 2026-07-16T00:00:00Z
       flush that did not land moves its unflushed events to the held file (which no later flush truncates) and
       removes the journal; they are retried on the next open. After a give-up (buffer dropped) its chained rows
       count as held audit rows, so linking stays blocked until they are released — no seq is reused.
+      *(10) staged files:* `PartitionWriter` deletes its `.staging/<tag>/` tree best-effort in a `finally`, so a
+      failed COPY or reveal leaves nothing behind, and every `ParquetEventStore` file walk (`parquetFiles`,
+      `hasParquet`) skips `<root>/.staging/`, so a crash's unrevealed file is never read as event rows.
     - *The anchors are a chain.* Each anchor carries `prevAnchorMac` in its MAC input and must start at the
       previous `lastSeq + 1`; a garbled line (`anchor-unreadable`), a removed or reordered anchor
       (`anchor-chain-broken`) and a finished day (before yesterday) no anchor covers (`anchor-missing`) all
