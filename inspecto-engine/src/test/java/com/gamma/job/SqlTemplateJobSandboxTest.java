@@ -174,6 +174,44 @@ class SqlTemplateJobSandboxTest {
         }
     }
 
+    /** {@code SQL-TEMPLATE-EGRESS-1} — the connection layer on its own against a live http stub. The guard is
+     *  swapped for one that passes everything, so only the job's connection hardening (autoload off, then
+     *  {@code enable_external_access=false} + locked) stands between the authored SQL and the network. The
+     *  twin runs the same query on a bare {@code jdbc:duckdb:} connection and MUST reach the stub — otherwise
+     *  a zero count would only prove httpfs was unavailable. Assert the stub count, not DuckDB's message
+     *  (the JDBC driver reports a generic pending-query error). */
+    @Test
+    void anHttpReadTheGuardMissesNeverReachesTheNetwork(@TempDir Path dir) throws Exception {
+        AtomicInteger hits = new AtomicInteger();
+        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        server.createContext("/x.csv", ex -> {
+            hits.incrementAndGet();
+            byte[] body = ("k,v" + (char) 10 + "remote,1" + (char) 10).getBytes(StandardCharsets.UTF_8);
+            ex.getResponseHeaders().add("Content-Type", "text/csv");
+            ex.sendResponseHeaders(200, "HEAD".equals(ex.getRequestMethod()) ? -1 : body.length);
+            try (var os = ex.getResponseBody()) { if (!"HEAD".equals(ex.getRequestMethod())) os.write(body); }
+        });
+        server.start();
+        var real = SqlTemplateJob.guard;
+        try {
+            String sql = "SELECT * FROM read_csv('http://127.0.0.1:" + server.getAddress().getPort() + "/x.csv')";
+            DuckDbUtil.loadDriver();
+            try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement();
+                 var rs = st.executeQuery(sql)) {
+                assertTrue(rs.next(), "twin: a bare connection reads the stub");
+            }
+            assertTrue(hits.get() > 0, "twin: the probe must reach the stub on a bare connection");
+            hits.set(0);
+            SqlTemplateJob.guard = s -> List.of();
+            JobRun r = run(dir, sql);
+            assertEquals(0, hits.get(), "the job's connection reached the network: " + r.message());
+            assertNotEquals("SUCCESS", r.status(), r.message());
+        } finally {
+            SqlTemplateJob.guard = real;
+            server.stop(0);
+        }
+    }
+
     private static boolean hasParquet(Path d) throws Exception {
         try (var s = Files.list(d)) {
             return s.anyMatch(p -> p.getFileName().toString().endsWith(".parquet"));

@@ -339,7 +339,8 @@ S1 → S2 are the spine; S3–S6 are independent once S2 lands.
 - **P0-a — positive.** A bare `jdbc:duckdb:` connection (the `SqlTemplateJob` shape) ran
   `SELECT count(*) FROM read_csv('http://127.0.0.1:<port>/x.csv')`, returned the row, and the stub counted
   **2** requests (HEAD + GET): `httpfs` autoloaded from the local extension cache. Filed as its own row,
-  `SQL-TEMPLATE-EGRESS-1` (BACKLOG §3.8).
+  `SQL-TEMPLATE-EGRESS-1` (BACKLOG §3.8) — ✅ closed by S5 below: the probe measured the bare-connection
+  *shape*, not the job, which was already sealed.
 - **P0-b — observed, one setting at a time, fresh in-memory database each:** `autoinstall_known_extensions=false`
   + `autoload_known_extensions=false` → the query fails, **0** requests; `enable_external_access=false` → fails,
   0; `disabled_filesystems='HTTPFileSystem'` → fails, 0; `allowed_directories=[…]` with external access off →
@@ -364,6 +365,22 @@ it and folds its caps (D14: the validator's caps are the ceiling, `capThreads(ba
 Tests: `SafetyPolicyTierTest` — E1–E12, T1–T4 at matcher level, T13 over 2000 random tier pairs
 (mutation-checked: a space-wins overlay for hosts, caps and `install_extensions` turns 5 of 13 red, T13
 included).
+
+**S5 — DuckDB, first half (2026-09-28): `SQL-TEMPLATE-EGRESS-1` closed, no production change.** The row's
+premise did not hold for the job itself: since `SQL-TEMPLATE-SANDBOX-1` (2026-09-24) `SqlTemplateJob` opens
+through `DuckDbUtil.openInMemory`, then `SqlSandbox.disableExtensionAutoload` (autoinstall + autoload off)
+before any view is registered, and `SqlSandbox.sealAllowing` (`allowed_directories` = the data root,
+`enable_external_access=false`, `lock_configuration=true`) before the authored SQL runs — the P0-b settings
+already. P0-a probed a bare `jdbc:duckdb:` connection, the shape the job had *before* that fix. The existing
+`anHttpReadNeverReachesTheNetwork` could not show this: `SqlGuard` refuses `read_csv` first, so it stays green
+with the connection hardening deleted. Pinned now by
+`SqlTemplateJobSandboxTest.anHttpReadTheGuardMissesNeverReachesTheNetwork`: the guard swapped for a
+pass-everything one, a loopback `HttpServer` stub, and a twin on a bare connection that MUST reach the stub
+(count > 0) before the job run must leave it at **0**. Mutation-checked: deleting the two `SqlSandbox` calls
+turns it red with *expected 0 but was 2* and a SUCCESS run (and `aFileLiteralTheGuardMissesIsStoppedByTheConnectionSeal`
+with it). Open for S5: every other `openInMemory` caller is unsealed — filed as `ENGINE-INMEMORY-UNSEALED-1`
+(BACKLOG §3.8), with the harden-by-default remedy and the `DuckDbExtension` / DuckLake host gate; T9, T10
+still owed. `allowed_directories` alone (external access on) is still unmeasured.
 
 ---
 
