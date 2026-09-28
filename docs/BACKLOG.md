@@ -13,8 +13,9 @@ the snapshot by row id when you need the trail. The one before it is
 refusals, grouped the same way. §7 maps duplicate names. **Find a row by its id or name, not by section
 number** — rows moved between sections in this consolidation, and older docs cite the old sections.
 
-> **40<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 24<!--count:backlog-p3--> × P3** —
+> **41<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 25<!--count:backlog-p3--> × P3** —
 > derived by `tools/check-doc-counts.mjs` from the rows between `## 3.` and `## 6.`; never hand-count.
+> ⬆ **40 → 41 on 2026-09-28**: filed P3 `ALERT-HEAL-FLAP-1` (§3.5) — heal-then-relapse has no hysteresis on either Measure-rule heal path (review of the scalar heal).
 > ⬇ **41 → 40 on 2026-09-28**: closed P3 `ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1` — a Measure rule without `by` heals like one key of a `by` rule (all-clear, its Alert resolved, never its Incident; a relapse re-opens an operator-resolved Incident), and `/components/alert-rule` runs the same `AlertRoutes.parse` as `POST /alerts/rules` (as-built `okf/capabilities/incidents/incidents.md` §3.2).
 > ⬇ **42 → 41 on 2026-09-27**: closed P3 `MAINT-TASK-AUTHORITY-1` — Jobs carry a server-stamped author (`createdBy`/`updatedBy`/`updatedByRoles`) and the runner refuses an administrator-only task whose last editor no longer holds `canAdminister` (or that records no author: existing `restore`/`event_prune` schedules pause until an administrator re-saves them); a `cleanup` sweeping or archiving into the config root is administrator-only (as-built `okf/backend/control-plane/jobs.md`).
 > ⬇ **43 → 42 on 2026-09-27**: closed P2 **Security: policy-authoring UX** — its only open clause, the browser pass over the editor, ran on the `fff119d6b` demo build (Preview impact matrix; `would-lock-out` refused in the dialog; `unknown-role` warning under the row; *Why denied?*; delete). As-built stays `okf/backend/editions/auth-security.md`.
@@ -62,8 +63,8 @@ number** — rows moved between sections in this consolidation, and older docs c
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 24<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 40<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 25<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 41<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -234,6 +235,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 #### Alerting & freshness
 
 - **P2** · **Completeness KPI (when the hold lifts)** — K1 (`DbConsignmentOutputStore.dailyVolume()`) and K2 (`FileSequenceGaps`; `SeqScope` already ships) are unwired — `VolumeBaseline`/`FileSequenceGaps` have no production caller; **K4**, a `kpi.completeness` job type (`JobTypeProvider` + descriptor + `ParameterDecl`s, cron'd, one config per pipeline, a Signal plus a deduped Incident on breach, refusing loudly when `-Dconsignment.outputs.backend=none`), is designed but unbuilt (`superpower/completeness-kpi-k4-design.md`); K3, the baseline-window default as a job parameter. K5 shipped. Open inside the design: `kpi.completeness.*` is a **Signal** type and there is no `SignalType` home (the dotted literals are scattered) — whether to create one; `KPI-UNKNOWN-1` — a null-`bounds` sink's daily count is **unknown, not zero**, end to end; and where the sequence template comes from (the Collector's, a job parameter, or the Collector's with an override). Held by the §2 *Completeness KPI hold*. → `okf/capabilities/observability/observability.md` §3.9 · `archived-documents/plans-archive/completeness-kpi-plan.md`
+- **P3** · `ALERT-HEAL-FLAP-1` — **a flapping Measure rule raises a fresh Alert on every relapse.** Both heal paths (a `by` key, and since 2026-09-28 a scalar Measure rule — `okf/capabilities/incidents/incidents.md` §3.2) heal on the first healthy sweep and fire again on the next breach with the cooldown reset, so a value oscillating around its threshold emits an Alert + all-clear pair per sweep (the Incident dedupes, the Alert feed and notifications do not). Needs hysteresis — a minimum healthy duration (or N healthy sweeps) before a heal, and/or a re-arm margin — on both paths alike. Build when someone reports the noise.
 
 #### Signals, decisions & notifications
 

@@ -561,6 +561,18 @@ final class BundleRoutes implements RouteModule {
             // IllegalArgumentException lands as status `failed` for THIS item, before the write and
             // before hot-registration, and the rest of the batch still imports.
             ComponentRoutes.validateKind(api, kind, id, content);
+            // ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1: an alert-rule item meets the same AlertRoutes.parse as
+            // POST /alerts/rules and /components/alert-rule (fromMap, the Investigation refusal, the `by` Schema
+            // check) over the content as stored (name = id); a refusal fails THIS item.
+            if ("alert-rule".equals(kind)) {
+                Map<String, Object> stamped = new LinkedHashMap<>(content);
+                stamped.put("name", id);
+                try {
+                    AlertRoutes.parse(api, stamped);
+                } catch (ApiException refused) {
+                    throw new IllegalArgumentException(refused.getMessage());
+                }
+            }
             return store.write(kind, id, content).content();
         }
     }

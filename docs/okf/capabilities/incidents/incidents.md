@@ -206,7 +206,8 @@ neither key, and the rule takes the scalar path below. How it runs:
   Decision Rule's `create-alert`, and `/components/alert-rule` for a body carrying `by`) reads the Dataset's
   Schema via `DatasetMeasureProbe.columns` — its relation's columns, as `GET /datasets/{id}/rows` serves them —
   and 422s a missing column, or a Schema that cannot be read (unknown Dataset, no data yet). Names match exactly.
-  Since 2026-09-28 `/components/alert-rule` (create, update and version restore) runs the whole of
+  Since 2026-09-28 `/components/alert-rule` (create, update and version restore) and each `alert-rule` item of
+  `POST /bundle/import` (a per-item failure; `BiTemplates` writes no Alert Rules) run the whole of
   `AlertRoutes.parse` — `AlertRule.fromMap`, the Investigation-rule refusal and this check — over the content as
   stored (`name` = id), so it refuses exactly what `POST /alerts/rules` refuses; the Personal-edition refusal
   (`AlertRoutes.editionRefused`) still answers first. ⚠ A body with neither `metric` nor `dataset` used to be an
@@ -228,7 +229,10 @@ clears the cooldown so a relapse fires at once, and resolves the rule's ALERT (l
 Incident is still active (the dedupe on `rule` suppresses a second one) re-opens it if an operator RESOLVED it and
 links the new ALERT `ESCALATED_FROM` it either way (`promoteToIncident`, measure rules only). An empty probe answer
 neither fires nor heals; a never-breached rule is never "cleared". A re-save over another Dataset or Measure retires
-the old ALERT (actor `alert-rule:<name>:rule-changed`), the Incident stays with triage. Ledger-metric and
+the old ALERT (actor `alert-rule:<name>:rule-changed`) and — as a delete does — clears its cooldown, so a
+re-created rule still breaching fires at once; the edge opens only when an Alert actually fired, so a heal never
+clears an Alert that was never raised. The Incident stays with triage. Flapping (heal-then-relapse per sweep) has
+no hysteresis on either path — `ALERT-HEAL-FLAP-1`. Ledger-metric and
 Investigation rules still have no heal. Tests: `MeasureAlertTest` (engine), `ScalarMeasureAlertObjectsTest`
 (`inspecto-ops`, the real workflow).
 

@@ -246,6 +246,9 @@ public final class AlertService {
             // The scalar Measure rule's one "key": its edge state goes and its still-active ALERT resolves, as a
             // `by` rule's per-key ALERTs do below. Its Incident, likewise, stays with triage.
             openMeasures.remove(old.name() + "|" + old.dataset());
+            // …and its cooldown: a re-created rule that is still breaching must raise its Alert at once, not sit in
+            // a dead rule's cooldown with no Alert open (and later "clear" an Alert it never raised).
+            lastFired.remove(old.name() + "|" + old.dataset());
             if (objects == null) return;
             try {
                 String alertId = objects.activeAttributeIndex(ObjectType.ALERT, old.dataset(), "rule").get(old.name());
@@ -397,8 +400,9 @@ public final class AlertService {
             if (value.isEmpty()) continue;                // unknown: neither fires nor heals
             String measureKey = rule.name() + "|" + rule.dataset();
             if (rule.breached(value.getAsDouble())) {
-                openMeasures.put(measureKey, Boolean.TRUE);
-                fire(rule, rule.dataset(), rule.dataset(), value.getAsDouble(), nowMs, out);
+                // Open only once an Alert was actually raised — a heal must never clear an Alert that never fired.
+                if (fire(rule, rule.dataset(), rule.dataset(), value.getAsDouble(), nowMs, out))
+                    openMeasures.put(measureKey, Boolean.TRUE);
             } else if (measureOpen(rule, measureKey)) {
                 openMeasures.put(measureKey, Boolean.FALSE);
                 healMeasure(rule, measureKey, value.getAsDouble(), nowMs);
@@ -847,12 +851,13 @@ public final class AlertService {
         return "alert-rule:" + rule.name();
     }
 
-    /** Fire one breached rule for a scope (a pipeline, or a measure rule's dataset), cooldown-guarded. */
-    private void fire(AlertRule rule, String display, String cooldownScope, double value, long nowMs,
+    /** Fire one breached rule for a scope (a pipeline, or a measure rule's dataset), cooldown-guarded;
+     *  {@code false} when the cooldown held it. */
+    private boolean fire(AlertRule rule, String display, String cooldownScope, double value, long nowMs,
                       List<Alert> out) {
         String key = rule.name() + "|" + cooldownScope;
         Long last = lastFired.get(key);
-        if (last != null && nowMs - last < cooldownMs(rule)) return;   // still in cooldown
+        if (last != null && nowMs - last < cooldownMs(rule)) return false;   // still in cooldown
         lastFired.put(key, nowMs);
         Alert alert = Alert.of(rule, display, textScope(rule, display), value, nowMs);
         fired.addFirst(alert);
@@ -876,6 +881,7 @@ public final class AlertService {
         EventLog.current().emit(firedEvent);
         emitFiredSignal(rule, display, cooldownScope, alert, value, nowMs);
         persistAlertObject(rule, alert, display, value, firedEvent.eventId());
+        return true;
     }
 
     /**

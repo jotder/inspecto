@@ -339,6 +339,46 @@ class ControlApiAlertRuleWriteTest {
             assertEquals("gt", store(root).get("alert-rule", "good").orElseThrow().content().get("comparator"));
             HttpResponse<String> okPut = send(c.port, "PUT", "/components/alert-rule/good", rule("good", "lt", 0.2));
             assertEquals(200, okPut.statusCode(), okPut.body());
+
+            // Version restore: plant an invalid version in the history (bypassing every door), then restore it.
+            store(root).write("alert-rule", "good", new java.util.HashMap<>(java.util.Map.of("metric", "error_rate",
+                    "comparator", "between", "threshold", 0.05, "window", "1h")));
+            assertEquals(200, send(c.port, "PUT", "/components/alert-rule/good", rule("good", "gt", 0.3)).statusCode());
+            int invalidVersion = store(root).versions("alert-rule", "good").stream()
+                    .filter(v -> "between".equals(v.content().get("comparator")))
+                    .mapToInt(ComponentStore.ComponentVersion::version).findFirst().orElseThrow();
+            HttpResponse<String> badRestore = send(c.port, "POST",
+                    "/components/alert-rule/good/versions/" + invalidVersion + "/restore", null);
+            assertEquals(422, badRestore.statusCode(), "a restore of an invalid version is refused: " + badRestore.body());
+            assertEquals("gt", store(root).get("alert-rule", "good").orElseThrow().content().get("comparator"));
+            HttpResponse<String> okRestore = send(c.port, "POST", "/components/alert-rule/good/versions/1/restore", null);
+            assertEquals(200, okRestore.statusCode(), "a valid version restores: " + okRestore.body());
+        }
+    }
+
+    /** ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1: a {@code POST /bundle/import} alert-rule item meets the same parse —
+     *  an invalid item fails on its own, the rest of the batch still imports. */
+    @Test
+    void aBundleImportRefusesEachInvalidAlertRuleItemAndImportsTheRest(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedUsage(root);
+            String bundle = """
+                    {"format":"inspecto-metadata-bundle","version":2,"items":[
+                     {"kind":"alert-rule","id":"no-col","content":{"dataset":"usage","measure":"sum(amount)",
+                      "by":["imsi"],"threshold":500,"severity":"CRITICAL"}},
+                     {"kind":"alert-rule","id":"bad-cmp","content":{"metric":"error_rate","comparator":"between",
+                      "threshold":0.05,"window":"1h"}},
+                     {"kind":"alert-rule","id":"fine","content":{"metric":"error_rate","threshold":0.05,"window":"1h"}}]}""";
+            HttpResponse<String> r = send(c.port, "POST", "/bundle/import", bundle);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode out = V1Body.of(r.body());
+            assertEquals(2, out.get("failed").asInt(), out.toString());
+            assertEquals(1, out.get("imported").asInt(), out.toString());
+            assertTrue(out.toString().contains("[imsi] are not in the Schema of dataset 'usage'"), out.toString());
+            assertTrue(store(root).get("alert-rule", "no-col").isEmpty(), "nothing written for a refused item");
+            assertTrue(store(root).get("alert-rule", "bad-cmp").isEmpty(), "nothing written for a refused item");
+            assertTrue(store(root).get("alert-rule", "fine").isPresent());
         }
     }
 }

@@ -132,6 +132,27 @@ class MeasureAlertTest {
     }
 
     @Test
+    void aDeletedAndRecreatedRuleThatStillBreachesFiresAtOnceAndClearsOnlyWhatItRaised(@TempDir Path dir)
+            throws Exception {
+        List<Event> seen = new CopyOnWriteArrayList<>();
+        EventLog.current().addSubscriber(seen::add);
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        AlertRule rule = measureRule("recreate_ds", "sum(amount)", "lt", 1000);
+        AlertService svc = new AlertService(List.of(rule), configs(cfg), emptyStore());
+        AtomicReference<OptionalDouble> value = new AtomicReference<>(OptionalDouble.of(10.0));
+        svc.measureProbe((d, m) -> value.get());
+
+        assertEquals(1, svc.evaluate(null, 0).size());
+        assertTrue(svc.remove("low-revenue"));
+        svc.upsert(rule);                                               // re-created, still breaching
+        assertEquals(1, svc.evaluate(null, 1000).size(),
+                "the dead rule's cooldown does not hold the new rule's first Alert");
+        value.set(OptionalDouble.of(5000.0));
+        svc.evaluate(null, 2000);
+        assertEquals(1, cleared(seen, "recreate_ds").size(), "one all-clear, for the Alert that was raised");
+    }
+
+    @Test
     void anUnknownValueNeitherFiresNorHealsAndANeverBreachedRuleIsNeverCleared(@TempDir Path dir) throws Exception {
         List<Event> seen = new CopyOnWriteArrayList<>();
         EventLog.current().addSubscriber(seen::add);

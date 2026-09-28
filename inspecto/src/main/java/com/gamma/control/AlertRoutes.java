@@ -188,8 +188,11 @@ final class AlertRoutes implements RouteModule {
                 .orElseThrow(() -> new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "alert engine unavailable"));
     }
 
-    /** Parse + validate an Alert Rule body — 422 on anything the rule refuses. Every save door runs it: create,
-     *  update, a Decision Rule's {@code create-alert}, and {@code /components/alert-rule} ({@code ComponentRoutes}). */
+    /** Parse + validate an Alert Rule body — 422 on anything the rule refuses. Every door that writes an
+     *  {@code alert-rule} runs it: create, update, a Decision Rule's {@code create-alert},
+     *  {@code /components/alert-rule} (create, update, version restore — {@code ComponentRoutes}) and a
+     *  {@code POST /bundle/import} item ({@code BundleRoutes}, a per-item failure). {@code BiTemplates} writes only
+     *  {@code widget} / {@code dashboard}. */
     static AlertRule parse(ApiContext api, Map<String, Object> body) {
         if (!EditionFeatures.present(EditionFeatures.ALERT_DISPATCH))   // the consequence's door (G9)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH));
