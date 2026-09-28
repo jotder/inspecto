@@ -36,6 +36,11 @@ public final class Exchange {
     /** The saved-view kind the Exchange carries (BACKLOG D9) — live-mode only; see {@link #effectiveMode}. */
     public static final String VIEW = "link-analysis-view";
 
+    /** The Signal kind (cross-Space consequence, design {@code superpower/cross-space-consequence-design.md}):
+     *  the item is a dotted Signal type the owner Space announces; an ACTIVE grant lets the consumer Space
+     *  receive it as {@code exchange.<owner>.<type>}. Live-mode only — there is nothing to snapshot. */
+    public static final String SIGNAL = "signal";
+
     /**
      * Kinds that are <em>derived</em> — metadata reading one or more Datasets rather than owning rows of
      * their own. Their grant closure includes a grant for every Dataset they read (§3.5 for widgets,
@@ -243,6 +248,12 @@ public final class Exchange {
             if (!unset && !ShareGrant.LIVE.equals(mode))
                 throw new IllegalArgumentException("a " + VIEW + " grant is live-mode only (mode '" + mode
                         + "' rejected: a saved view has no rows of its own to snapshot)");
+            return ShareGrant.LIVE;
+        }
+        if (SIGNAL.equals(kind)) {
+            if (!unset && !ShareGrant.LIVE.equals(mode))
+                throw new IllegalArgumentException("a " + SIGNAL + " grant is live-mode only (mode '" + mode
+                        + "' rejected: a Signal is delivered as it happens, never snapshotted)");
             return ShareGrant.LIVE;
         }
         return unset ? ShareGrant.SNAPSHOT : mode;

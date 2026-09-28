@@ -78,6 +78,9 @@ public final class Roles {
     public static final String CAN_CONFIGURE_ACCESS    = "canConfigureAccess";
     public static final String CAN_AUTHOR_ALERT_RULES  = "canAuthorAlertRules";
     public static final String CAN_OFFER_DATASETS      = "canOfferDatasets";
+    /** Offer a Signal type to another Space through the Exchange (cross-Space consequence D7). Seeded to
+     *  Admin only, like {@link #CAN_OFFER_DATASETS}: announcing a Signal cross-space is an exposure decision. */
+    public static final String CAN_OFFER_SIGNALS       = "canOfferSignals";
     public static final String CAN_REQUEST_SHARES      = "canRequestShares";
     public static final String CAN_APPROVE_SHARES      = "canApproveShares";
     /**
@@ -204,7 +207,7 @@ public final class Roles {
         // LA-19: revealing a masked entity and approving a sensitive expand are oversight acts, so they sit with
         // Admin (and Super, which holds everything) — NOT with the analyst roles that own Investigations.
         m.put("admin", new Def(Set.of(CAN_ONBOARD_CONNECTIONS, CAN_CONFIGURE_ACCESS, CAN_APPROVE_SHARES,
-                CAN_OFFER_DATASETS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER,
+                CAN_OFFER_DATASETS, CAN_OFFER_SIGNALS, CAN_TRIAGE_REQUIREMENTS, CAN_CURATE_MENUS, CAN_ADMINISTER,
                 CAN_MANAGE_INCIDENTS, CAN_WORK_INCIDENTS, CAN_REVEAL_LINK_ENTITIES, CAN_APPROVE_LINK_EXPANSIONS,
                 CAN_APPROVE_CHANGES), null));
         m.put("power", new Def(Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_OPERATE_RUNS,

@@ -147,6 +147,7 @@ final class CapabilityManifest {
             new Entry("POST", "/events/views/([^/]+)/delete", Roles.CAN_AUTHOR_WORKBENCH),
             // ExchangeRoutes
             new Entry("POST", "/exchange/offers", Roles.CAN_OFFER_DATASETS),
+            new Entry("POST", "/exchange/signal-offers", Roles.CAN_OFFER_SIGNALS),
             new Entry("POST", "/exchange/refresh", Roles.CAN_OFFER_DATASETS),
             new Entry("POST", "/exchange/requests", Roles.CAN_REQUEST_SHARES),
             new Entry("POST", "/exchange/grants/([^/]+)/(approve|deny|revoke)", Roles.CAN_APPROVE_SHARES),

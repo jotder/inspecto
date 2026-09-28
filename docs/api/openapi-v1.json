@@ -6243,6 +6243,21 @@
         "x-optional-module" : true
       }
     },
+    "/exchange/signal-offers" : {
+      "post" : {
+        "tags" : [ "exchange" ],
+        "summary" : "POST /exchange/signal-offers (generated skeleton)",
+        "operationId" : "postExchangeSignalOffers",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
     "/exchange/refresh" : {
       "post" : {
         "tags" : [ "exchange" ],

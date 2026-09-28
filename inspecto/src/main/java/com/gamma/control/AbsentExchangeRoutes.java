@@ -10,12 +10,12 @@ package com.gamma.control;
  * {@code /bootstrap}'s {@code features.exchange} is derived from. A stub that counted as a route would make
  * that flag claim the module is installed; that is exactly the bug cell 3b shipped and fixed.
  *
- * <p>⚠ The eleven pairs mirror {@code ExchangeRoutes}' surface and are kept in step from both sides:
+ * <p>⚠ The twelve pairs mirror {@code ExchangeRoutes}' surface and are kept in step from both sides:
  * {@code NoExchangeShipsInThePersonalBuildTest} proves each 503s without the module, and the module's own
  * four HTTP test classes prove they answer with it. A path added to one and not the other shows up as a 404
  * on Personal — in the core test, by design.
  *
- * <p>⛔ The six capability entries for these paths deliberately REMAIN in {@link CapabilityManifest} on every
+ * <p>⛔ The seven capability entries for these paths deliberately REMAIN in {@link CapabilityManifest} on every
  * edition: the grantable vocabulary is static so a role or policy file authored on Standard still validates
  * on Personal. Naming {@code canOfferDatasets} there grants nothing, because no route is behind it.
  */
@@ -27,6 +27,7 @@ final class AbsentExchangeRoutes implements RouteModule {
     private static final String[][] SURFACE = {
             {"GET",  "/exchange/offers"},
             {"POST", "/exchange/offers"},
+            {"POST", "/exchange/signal-offers"},
             {"POST", "/exchange/refresh"},
             {"POST", "/exchange/requests"},
             {"POST", "/exchange/grants/([^/]+)/(approve|deny|revoke)"},

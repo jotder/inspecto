@@ -29,6 +29,7 @@ import java.util.NoSuchElementException;
  * <pre>
  *   GET  /exchange/offers[?owner=]                 the shareable catalog (metadata only, never rows)
  *   POST /exchange/offers                          owner lists/updates an offer        [canOfferDatasets]
+ *   POST /exchange/signal-offers                   owner offers a Signal type          [canOfferSignals]
  *   POST /exchange/requests                        consumer requests use               [canRequestShares]
  *   POST /exchange/grants/{id}/{approve|deny|revoke}  owner acts on a grant            [canApproveShares]
  *   (every capability is checked in the OWNING Space's role table — owner, or consumer for request/pin)
@@ -83,11 +84,15 @@ public final class ExchangeRoutes implements RouteModule {
         api.post("/exchange/offers", ApiContext.withCapability("canOfferDatasets",
                 (e, m) -> spaceRoles(api, bodySpace(api, e, "owner")),
                 (e, m) -> putOffer(api, e)));
+        // Cross-Space consequence D7: offering a Signal type is its own verb, not canOfferDatasets.
+        api.post("/exchange/signal-offers", ApiContext.withCapability("canOfferSignals",
+                (e, m) -> spaceRoles(api, signalBodySpace(api, e, "owner", "canOfferSignals")),
+                (e, m) -> putSignalOffer(api, e)));
         api.post("/exchange/refresh", ApiContext.withCapability("canOfferDatasets",
                 (e, m) -> spaceRoles(api, bodySpace(api, e, "owner")),
                 (e, m) -> refresh(api, e)));
         api.post("/exchange/requests", ApiContext.withCapability("canRequestShares",
-                (e, m) -> spaceRoles(api, bodySpace(api, e, "consumer")),
+                (e, m) -> spaceRoles(api, signalBodySpace(api, e, "consumer", "canRequestShares")),
                 (e, m) -> requestGrant(api, e)));
         api.post("/exchange/grants/([^/]+)/(approve|deny|revoke)", ApiContext.withCapability("canApproveShares",
                 (e, m) -> spaceRoles(api, grantOf(api, ApiContext.name(m)).owner()),
@@ -159,6 +164,9 @@ public final class ExchangeRoutes implements RouteModule {
         Exchange ex = requireExchange(api);
         Map<String, Object> body = api.body(e);
         String kind  = requireKind(body);
+        if (Exchange.SIGNAL.equals(kind))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST,
+                    "a Signal type is offered through POST /exchange/signal-offers (capability canOfferSignals)");
         String owner = requireSpace(api, ApiContext.str(body, "owner"), "owner");
         String item  = requireItem(body);
         ComponentStore registry = ownerRegistry(api, owner);
@@ -196,13 +204,55 @@ public final class ExchangeRoutes implements RouteModule {
         return offer.toMap();
     }
 
+    /**
+     * {@code POST /exchange/signal-offers} — the owner Space announces a Signal type another Space may ask to
+     * receive. {@code payloadKeys} is the allowlist of payload keys that cross (D5, empty by default: then
+     * only the fact that the Signal happened crosses). Nothing is delivered until a consumer requests and the
+     * owner approves (two-party consent, D2). Exact types only — a {@code prefix.*} offer is deferred.
+     */
+    private Object putSignalOffer(ApiContext api, HttpExchange e) throws java.io.IOException {
+        Exchange ex = requireExchange(api);
+        Map<String, Object> body = api.body(e);
+        String owner = requireSpace(api, ApiContext.str(body, "owner"), "owner");
+        String type = ApiContext.str(body, "item");
+        if (type == null || !type.matches(SIGNAL_TYPE))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST,
+                    "'item' must be a dotted Signal type (e.g. fraud.alert)");
+        if (type.startsWith("exchange."))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "a delivered Signal (exchange.*) cannot be re-offered: a Signal crosses one grant, never relayed");
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        Object raw = body.get("payloadKeys");
+        if (raw != null && !(raw instanceof java.util.List<?>))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'payloadKeys' must be a list of payload keys");
+        if (raw instanceof java.util.List<?> l)
+            for (Object k : l) {
+                String key = k == null ? null : k.toString();
+                if (key == null || !key.matches(PAYLOAD_KEY))
+                    throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid payload key '" + key + "'");
+                if (!keys.contains(key)) keys.add(key);
+            }
+        Offer offer = new Offer(Exchange.SIGNAL, type, owner, ApiContext.str(body, "description"), Map.of(),
+                ApiContext.actor(e), System.currentTimeMillis(), java.util.List.of(), keys);
+        ex.putOffer(offer);
+        signal(e, EventType.EXCHANGE_OFFERED, "offered signal " + owner + "/" + type, owner, null, Exchange.SIGNAL, type);
+        return offer.toMap();
+    }
+
+    /** A dotted Signal type: lower-case segments of the component-id charset. */
+    static final String SIGNAL_TYPE = "[a-z0-9][a-z0-9_-]*(\\.[a-z0-9_-]+)*";
+    /** A payload key an offer may allowlist. */
+    static final String PAYLOAD_KEY = "[A-Za-z_][A-Za-z0-9_-]{0,63}";
+
     // ── grant lifecycle ──────────────────────────────────────────────────────────
 
     private Object requestGrant(ApiContext api, HttpExchange e) throws java.io.IOException {
         Exchange ex = requireExchange(api);
         Map<String, Object> body = api.body(e);
         String kind     = requireKind(body);
-        String owner    = requireSpace(api, ApiContext.str(body, "owner"), "owner");
+        String owner    = Exchange.SIGNAL.equals(kind)
+                ? requireSignalSpace(api, ApiContext.str(body, "owner"), "owner", "canRequestShares")
+                : requireSpace(api, ApiContext.str(body, "owner"), "owner");
         String consumer = requireSpace(api, ApiContext.str(body, "consumer"), "consumer");
         String item     = requireItem(body);
         if (owner.equals(consumer))
@@ -473,6 +523,34 @@ public final class ExchangeRoutes implements RouteModule {
         return requireSpace(api, ApiContext.str(api.body(e), field), field);
     }
 
+    /**
+     * {@link #bodySpace} for a route that may carry the {@code signal} kind: on that kind a Space that is not
+     * hosted answers exactly like the capability gate's refusal (403, same code and message), so the signal
+     * surface is not an oracle for which Spaces exist (D12). Other kinds keep their 404.
+     */
+    private static String signalBodySpace(ApiContext api, HttpExchange e, String field, String capability)
+            throws java.io.IOException {
+        requireExchange(api);
+        Map<String, Object> body = api.body(e);
+        boolean signal = e.getRequestURI().getPath().endsWith("/signal-offers")
+                || Exchange.SIGNAL.equals(ApiContext.str(body, "kind"));
+        return signal ? requireSignalSpace(api, ApiContext.str(body, field), field, capability)
+                : requireSpace(api, ApiContext.str(body, field), field);
+    }
+
+    private static String requireSignalSpace(ApiContext api, String id, String field, String capability) {
+        if (id == null || !SpaceId.isValid(id))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'" + field + "' must be a valid space id");
+        if (api.spaces().space(SpaceId.of(id)).isEmpty()) throw notPermitted(capability);
+        return id;
+    }
+
+    /** The capability gate's own refusal, verbatim ({@code ApiContext.requireCapabilityIn}). */
+    static ApiException notPermitted(String capability) {
+        return new ApiException(403, ErrorCodes.PERMISSION_DENIED,
+                "missing capability '" + capability + "' in the owning space");
+    }
+
     /** The config root holding {@code space}'s role table — what its capability gate is decided by. */
     private static java.nio.file.Path spaceRoles(ApiContext api, String space) {
         SpaceContext ctx = api.spaces().space(SpaceId.of(space))
@@ -492,8 +570,9 @@ public final class ExchangeRoutes implements RouteModule {
 
     private static String requireKind(Map<String, Object> body) {
         String kind = ApiContext.str(body, "kind");
-        if (!"dataset".equals(kind) && !"widget".equals(kind) && !Exchange.VIEW.equals(kind))
-            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'kind' must be 'dataset', 'widget' or '" + Exchange.VIEW + "'");
+        if (!"dataset".equals(kind) && !"widget".equals(kind) && !Exchange.VIEW.equals(kind) && !Exchange.SIGNAL.equals(kind))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'kind' must be 'dataset', 'widget', '"
+                    + Exchange.VIEW + "' or '" + Exchange.SIGNAL + "'");
         return kind;
     }
 

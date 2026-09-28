@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>Six facts, each of which a plausible regression breaks on its own:
  * <ol>
- *   <li>all eleven {@code /exchange} paths answer <b>503 with the edition message</b> — not 404 (the stub
+ *   <li>all twelve {@code /exchange} paths answer <b>503 with the edition message</b> — not 404 (the stub
  *       lost a path), not 200 (the module is back in Personal);</li>
  *   <li>{@code /bootstrap} reports {@code features.exchange == false}, so the SPA's Share affordances stay
  *       hidden. ⚠ This is the flag that was <em>wrong</em> until this cell: it read
@@ -72,7 +72,7 @@ class NoExchangeShipsInThePersonalBuildTest {
         try (Ctx c = open(dir)) {
             // Concrete URLs for the parameterised patterns — a stub is only real if a real request hits it.
             String[][] calls = {
-                    {"GET", "/exchange/offers"}, {"POST", "/exchange/offers"},
+                    {"GET", "/exchange/offers"}, {"POST", "/exchange/offers"}, {"POST", "/exchange/signal-offers"},
                     {"POST", "/exchange/refresh"}, {"POST", "/exchange/requests"},
                     {"POST", "/exchange/grants/g1/approve"}, {"POST", "/exchange/grants/g1/deny"},
                     {"POST", "/exchange/grants/g1/revoke"}, {"POST", "/exchange/grants/g1/pin"},

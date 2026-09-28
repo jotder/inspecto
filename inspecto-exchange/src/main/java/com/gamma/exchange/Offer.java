@@ -22,20 +22,30 @@ import java.util.Map;
  * @param datasets    for a derived offer (a {@code widget}, a saved view), the ids of every Dataset it
  *                    reads — their grants travel with it (§3.5, BACKLOG D9). Empty for a Dataset offer.
  *                    A widget binds exactly one; a view may read several
+ * @param payloadKeys for a {@code signal} offer, the payload keys that may cross to a consumer Space — every
+ *                    other key is stripped at the boundary. Empty by default, so nothing crosses unless the
+ *                    owner names it (cross-Space consequence D5). Empty for every other kind
  */
 public record Offer(String kind, String item, String owner, String description,
                     Map<String, Object> resultSet, String offeredBy, long offeredAt,
-                    List<String> datasets) {
+                    List<String> datasets, List<String> payloadKeys) {
 
     public Offer {
         resultSet = resultSet == null ? Map.of() : Map.copyOf(resultSet);
         datasets = datasets == null ? List.of() : List.copyOf(datasets);
+        payloadKeys = payloadKeys == null ? List.of() : List.copyOf(payloadKeys);
+    }
+
+    /** A Dataset / Widget / saved-View offer (no payload allowlist). */
+    public Offer(String kind, String item, String owner, String description,
+                 Map<String, Object> resultSet, String offeredBy, long offeredAt, List<String> datasets) {
+        this(kind, item, owner, description, resultSet, offeredBy, offeredAt, datasets, List.of());
     }
 
     /** A Dataset offer (no bound-dataset link). */
     public Offer(String kind, String item, String owner, String description,
                  Map<String, Object> resultSet, String offeredBy, long offeredAt) {
-        this(kind, item, owner, description, resultSet, offeredBy, offeredAt, List.of());
+        this(kind, item, owner, description, resultSet, offeredBy, offeredAt, List.of(), List.of());
     }
 
     /** Stable ledger key for an offer — unique per {@code (owner, kind, item)}. */
@@ -54,6 +64,7 @@ public record Offer(String kind, String item, String owner, String description,
         m.put("offeredBy", offeredBy == null ? "" : offeredBy);
         m.put("offeredAt", offeredAt);
         m.put("datasets", datasets);
+        m.put("payloadKeys", payloadKeys);
         return m;
     }
 
@@ -64,7 +75,9 @@ public record Offer(String kind, String item, String owner, String description,
                 Ledger.str(m, "kind"), Ledger.str(m, "item"), Ledger.str(m, "owner"),
                 Ledger.str(m, "description"),
                 rs instanceof Map ? (Map<String, Object>) rs : Map.of(),
-                Ledger.str(m, "offeredBy"), Ledger.asLong(m.get("offeredAt")), datasetsOf(m));
+                Ledger.str(m, "offeredBy"), Ledger.asLong(m.get("offeredAt")), datasetsOf(m),
+                m.get("payloadKeys") instanceof List<?> keys
+                        ? keys.stream().filter(java.util.Objects::nonNull).map(Object::toString).toList() : List.of());
     }
 
     /**
