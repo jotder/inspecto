@@ -358,7 +358,7 @@ final class CapabilityManifest {
             new Exemption("POST", "/auth/refresh", "identity-flow", "rotates the session the caller already holds"),
             new Exemption("POST", "/auth/logout", "identity-flow", "ends the caller's own session"),
             // §2 self-verifying public — authenticated by something other than a Subject.
-            new Exemption("POST", "/public/delivery-status/([^/]+)", "self-verifying-public", "inbound provider callback, verified by provider signature (D8 §4.4)"),
+            new Exemption("POST", "/public/delivery-status/([^/]+)", "self-verifying-public", "inbound provider callback, unauthenticated by nature (the provider holds no Inspecto credential); every write is gated by the adapter's own signature check — SendGrid ECDSA, HMAC, or SES/SNS RSA-SHA256 over an ARN-allowlisted topic whose certificate fetch is egress-checked (D8 §4.4, D8-SES-SNS-1)"),
             new Exemption("POST", "/public/dashboards/([^/]+)/query", "self-verifying-public", "the share token IS the credential; scoped to one published dashboard"),
             // §3 self-service — acts only the caller's own. ⚠ The four /notifications feed/preference writes
             // were listed here as "the caller's own" but wrote ONE shared per-Space state; they were gated
