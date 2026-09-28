@@ -34,6 +34,26 @@ class EventLogAndAppenderTest {
     }
 
     @Test
+    void aLateEmitterNamingAClosedSpaceDoesNotLandInTheDefaultStore() {
+        InMemoryEventStore global = new InMemoryEventStore(100);
+        EventLog.global().installStore(global);
+        EventLog x = EventLog.create();
+        EventLog.register("closed-x", x);
+        EventLog.unregister("closed-x");
+        try {
+            org.slf4j.MDC.put(EventLog.SPACE_MDC_KEY, "closed-x");
+            EventLog.current().emit(Event.builder(EventType.AUDIT).message("late-x"));
+        } finally {
+            org.slf4j.MDC.remove(EventLog.SPACE_MDC_KEY);
+        }
+        EventLog.current().emit(Event.builder(EventType.AUDIT).message("no-space"));   // no MDC: still GLOBAL
+        List<String> held = global.recent(1000).stream().map(Event::message).toList();
+        assertFalse(held.contains("late-x"), "a closed Space's late event must not reach the default store");
+        assertTrue(held.contains("no-space"), "an event with no Space MDC still goes to the global log");
+        assertTrue(x.store().recent(1000).isEmpty(), "nor the closed Space's own log");
+    }
+
+    @Test
     void aReleasedStoreIsNotDrainedIntoTheNextOne() {
         EventLog log = EventLog.create();
         InMemoryEventStore closed = new InMemoryEventStore(100);

@@ -11,6 +11,7 @@ timestamp: 2026-07-16T00:00:00Z
 
 * **`EventLog`** (`inspecto-event/src/main/java/com/gamma/event/EventLog.java`) — the event bus. `global()` +
   per-space instances; `current()` routes by the calling thread's `space` MDC, falling back to global.
+  ⛔ An MDC naming a Space that was **unregistered** (a late emitter outliving `CollectorService.close()`) is NOT routed to global: the event is dropped with one rate-limited stderr line (fail-closed, 2026-09-28) — it must not enter the default Space's store or audit chain.
   **Emission is synchronous on the publishing thread** (`emit()` calls each subscriber inline). This is the
   hand-off seam: the publishing thread holds that pipeline's `PipelineRunGuard` claim, so a subscriber that
   triggered a new ingest of the **same** pipeline inline would block forever on the claim its own thread holds

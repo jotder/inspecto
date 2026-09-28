@@ -42,6 +42,12 @@ public final class EventLog {
 
     private static final EventLog GLOBAL = new EventLog();
 
+    /** Where {@link #current()} sends an emitter whose MDC names a Space that has been {@linkplain #unregister
+     *  unregistered} (a late emitter outliving its Space's close): every emit is DROPPED, announced by one
+     *  rate-limited stderr line — never written into {@link #GLOBAL}'s store or chain, or any other Space's. */
+    private static final EventLog CLOSED_SPACE = new EventLog(true);
+    private static final java.util.concurrent.atomic.AtomicLong lastDropNotice = new java.util.concurrent.atomic.AtomicLong();
+
     /** MDC key carrying the owning space id; lets the capture appender and {@link #current()} route a
      *  log/event to the right per-space log when one server hosts many spaces.
      *  ⛔ Declared BY REFERENCE to {@link CurrentSpace#SPACE_MDC_KEY} — that is the one definition, because
@@ -89,12 +95,18 @@ public final class EventLog {
     /** Register {@code log} as the event log for {@code spaceId}, so {@link #current()} and the capture
      *  appender route to it while a thread carries that space in its {@link #SPACE_MDC_KEY} MDC. */
     public static void register(String spaceId, EventLog log) {
-        if (spaceId != null && log != null) SPACES.put(spaceId, log);
+        if (spaceId != null && log != null) {
+            SPACES.put(spaceId, log);
+            CLOSED.remove(spaceId);
+        }
     }
+
+    /** Space ids that were registered and then {@linkplain #unregister unregistered} (and not re-registered). */
+    private static final java.util.Set<String> CLOSED = ConcurrentHashMap.newKeySet();
 
     /** Remove a previously {@linkplain #register registered} per-space log (on space teardown). */
     public static void unregister(String spaceId) {
-        if (spaceId != null) SPACES.remove(spaceId);
+        if (spaceId != null && SPACES.remove(spaceId) != null && !DEFAULT_SPACE_ID.equals(spaceId)) CLOSED.add(spaceId);
     }
 
     /**
@@ -109,7 +121,8 @@ public final class EventLog {
     public static final ScopedValue<EventLog> CONTAINED = ScopedValue.newInstance();
 
     /** The event log for the calling thread's MDC {@link #SPACE_MDC_KEY}, or {@link #global()} when no space
-     *  is in scope (or its log isn't registered). Used by code that has no injected handle — the capture
+     *  is in scope (or its log was never registered). An MDC naming a Space that has been {@linkplain #unregister
+     *  unregistered} gets a log that DROPS the event (fail-closed) instead of the default Space's. Used by code that has no injected handle — the capture
      *  appender and the deep poll-path emitters. */
     public static EventLog current() {
         if (CONTAINED.isBound()) return CONTAINED.get();
@@ -117,6 +130,7 @@ public final class EventLog {
         if (spaceId != null) {
             EventLog log = SPACES.get(spaceId);
             if (log != null) return log;
+            if (CLOSED.contains(spaceId)) return CLOSED_SPACE;
         }
         return GLOBAL;
     }
@@ -132,7 +146,12 @@ public final class EventLog {
      */
     private final CopyOnWriteArrayList<Consumer<Event>> subscribers = new CopyOnWriteArrayList<>();
 
-    private EventLog() {}
+    /** True only for {@link #CLOSED_SPACE}: {@link #emit} drops. */
+    private final boolean discard;
+
+    private EventLog() { this(false); }
+
+    private EventLog(boolean discard) { this.discard = discard; }
 
     /** Register a live subscriber invoked after each {@link #emit}. Idempotent-safe to pair with {@link #removeSubscriber}. */
     public void addSubscriber(Consumer<Event> subscriber) {
@@ -257,6 +276,13 @@ public final class EventLog {
     /** Append one event and bump the {@code inspecto_events_total{level,type}} counter. Never throws. */
     public void emit(Event event) {
         if (event == null) return;
+        if (discard) {
+            long now = System.currentTimeMillis(), last = lastDropNotice.get();
+            if (now - last >= 60_000 && lastDropNotice.compareAndSet(last, now))
+                System.err.println("ERROR event dropped: its Space MDC names a closed Space (type=" + event.type()
+                        + "); further drops are reported at most once a minute");
+            return;
+        }
         // Single scrub seam: redact any secret in the message/attributes before it is ever persisted
         // or handed to a subscriber. Cheap (same reference) for the clean common case; never throws.
         event = SecretScrubber.scrub(event);
