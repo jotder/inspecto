@@ -61,6 +61,8 @@ public final class ExchangeRoutes implements RouteModule {
         // `shared/<owner>/<item>` ref fails to resolve — fail-closed, with zero wiring. `install` is a
         // public idempotent static, so registering twice is harmless.
         com.gamma.query.SharedRefResolver.install(new ExchangeRefResolver(api.spaces()));
+        // Cross-Space consequence slice 3: deliver consented Signals between this installation's Spaces.
+        ExchangeSignalForwarder.install(api.spaces());
         // The core's delete fence (ComponentRoutes) asks THIS for "is the item still shared?" — it used to
         // reach into com.gamma.exchange by fully-qualified name, which is why an import census missed it and
         // why the core could not drop this package. Absent module ⇒ SharedItemConsumers.NONE ⇒ empty, which

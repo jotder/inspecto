@@ -116,6 +116,15 @@ class NoExchangeShipsInThePersonalBuildTest {
      * exchange module there is no Exchange, so nothing can have been offered and no consumer can be harmed.
      * The fence has nothing to guard — it is not failing to guard something.
      */
+    /** N12 (cross-Space consequence): the Signal forwarder is installed by the Exchange module only. */
+    @Test
+    void noCrossSpaceSignalForwarderIsInstalledOnThePersonalBuild(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            assertEquals(0, com.gamma.event.EventLog.tapCount(),
+                    "no module installed an EventLog tap, so no Signal can leave a Space");
+        }
+    }
+
     @Test
     void theDeleteFenceAsksTheSeamAndGetsNobodyWithNoExchangeInstalled() {
         assertSame(SharedItemConsumers.NONE, SharedItemConsumers.global(),

@@ -163,6 +163,31 @@ public final class EventLog {
         if (subscriber != null) subscribers.remove(subscriber);
     }
 
+    /**
+     * Process-wide taps: invoked after every {@link #emit} on EVERY log, with the log the event landed on. The one
+     * seam an optional module uses to observe all Spaces' ledgers, including Spaces created after it registered
+     * (the Exchange's cross-Space Signal forwarder, {@code superpower/cross-space-consequence-design.md} §5.5).
+     * Guarded like subscribers: a tap fault never breaks the emit. A tap runs on the emitting thread, under the
+     * emitter's MDC, so a tap that writes to ANOTHER log must bind that log's Space itself.
+     */
+    private static final CopyOnWriteArrayList<java.util.function.BiConsumer<EventLog, Event>> TAPS =
+            new CopyOnWriteArrayList<>();
+
+    /** Install a process-wide tap (idempotent for the same instance). */
+    public static void addTap(java.util.function.BiConsumer<EventLog, Event> tap) {
+        if (tap != null) TAPS.addIfAbsent(tap);
+    }
+
+    /** Remove a previously {@linkplain #addTap installed} tap. */
+    public static void removeTap(java.util.function.BiConsumer<EventLog, Event> tap) {
+        if (tap != null) TAPS.remove(tap);
+    }
+
+    /** Number of installed taps (the Personal-build test asserts none is installed without the Exchange). */
+    public static int tapCount() {
+        return TAPS.size();
+    }
+
     /** Number of live subscribers — read by the test-suite leak detector ({@code EventLogLeakDetector}). */
     public int subscriberCount() {
         return subscribers.size();
@@ -310,6 +335,13 @@ public final class EventLog {
                 s.accept(event);
             } catch (Throwable ignore) {
                 // best effort — a listener must never break the thing it observes
+            }
+        }
+        for (java.util.function.BiConsumer<EventLog, Event> tap : TAPS) {
+            try {
+                tap.accept(this, event);
+            } catch (Throwable ignore) {
+                // same guarantee as a subscriber
             }
         }
     }
