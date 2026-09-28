@@ -55,6 +55,8 @@ public final class DecisionRuleGuard {
     static final String TYPE = "decision-rule";
     /** Server-stamped on a version restore: the restored version's makers (see the class doc). */
     static final String RESTORED_MAKERS = "restoredMakers";
+    /** Bounds on {@code restoredMakers}: it is copied forward into later versions, so it must never grow unbounded. */
+    static final int MAX_MAKERS = 64, MAX_MAKER_ID = 256;
     private static final String DIR_PREFIX = "registry/" + ComponentRegistry.dirForType(TYPE).orElse("decision-rules") + "/";
 
     /** Validate and stamp one write of a rule; returns the content to persist. {@code prev}: the stored rule or null. */
@@ -102,11 +104,15 @@ public final class DecisionRuleGuard {
         if (content.get("updatedBy") instanceof String by && !by.isBlank()) out.add(by);
         Object restored = content.get(RESTORED_MAKERS);
         if (restored != null) {
-            if (!(restored instanceof List<?> list) || list.stream().anyMatch(m -> !(m instanceof String s) || s.isBlank()))
+            if (!(restored instanceof List<?> list) || list.stream().anyMatch(m -> !(m instanceof String s) || s.isBlank()
+                    || s.length() > MAX_MAKER_ID))
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "Decision Rule '" + content.get("name")
-                        + "': restoredMakers must be a list of editor ids");
+                        + "': restoredMakers must be a list of editor ids (at most " + MAX_MAKER_ID + " characters each)");
             for (Object m : list) out.add((String) m);
         }
+        if (out.size() > MAX_MAKERS)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "Decision Rule '" + content.get("name")
+                    + "' names more than " + MAX_MAKERS + " makers");
         return List.copyOf(out);
     }
 
@@ -194,6 +200,9 @@ public final class DecisionRuleGuard {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "version " + version + " of Decision Rule '" + name
                         + "' has no recorded editor for its invoke-api consequence (saved before editors were recorded, "
                         + "or history pruned past it), so four-eyes could not exclude its author; save the rule instead");
+            if (m.size() > MAX_MAKERS)   // never truncated — dropping a maker would let them approve
+                throw new ApiException(409, ErrorCodes.CONFLICT, "version " + version + " of Decision Rule '" + name
+                        + "' has more than " + MAX_MAKERS + " makers to carry forward; save the rule instead");
             return m;
         }
         throw new ApiException(404, ErrorCodes.NOT_FOUND, "no version " + version + " of decision-rule component '" + name + "'");
@@ -221,9 +230,9 @@ public final class DecisionRuleGuard {
         out.add(String.valueOf(by));
         Object restored = version.get(RESTORED_MAKERS);
         if (restored == null) return true;
-        if (!(restored instanceof List<?> list)) return false;
+        if (!(restored instanceof List<?> list) || list.size() > MAX_MAKERS) return false;
         for (Object m : list) {
-            if (m == null || String.valueOf(m).isBlank()) return false;
+            if (m == null || String.valueOf(m).isBlank() || String.valueOf(m).length() > MAX_MAKER_ID) return false;
             out.add(String.valueOf(m));
         }
         return true;

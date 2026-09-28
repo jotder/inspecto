@@ -214,7 +214,7 @@ values are discarded. An import carrying an invoke-api rule by someone without `
 anything is written (all-or-nothing). A Space created from a bundle (`POST /spaces/import`) is pinned end to end in
 `ControlApiSpaceBundleActionRequestsTest`: the importer becomes the rule's editor, and — since no version history
 travels with a bundle — the bundled `updatedBy` and a well-formed `restoredMakers` stay makers beside the importer
-(an imported value can only ADD refused approvers; a malformed `restoredMakers` is 422); every other door strips it and
+(an imported value can only ADD refused approvers; a malformed `restoredMakers` is 422, and so is one over 64 ids or an id over 256 characters — a restore that would carry more than 64 forward is 409, never truncated); every other door strips it and
 recomputes. The
 new Space's empty Egress Allowlist denies the target until that Space lifts it. `DecisionRuleWritersTest` enumerates `ConfigWriteFunnelTest`'s writer
 inventory and fails for a new writer that neither calls the guard nor is listed with its reason.

@@ -150,12 +150,16 @@ class ControlApiSpaceBundleActionRequestsTest {
 
     /** A new-Space bundle: an https Connection to the stub target and an invoke-api rule with its recorded makers. */
     private byte[] bundle() throws Exception {
+        return bundle(List.of("author-0"));
+    }
+
+    private byte[] bundle(List<String> restoredMakers) throws Exception {
         Map<String, String> all = new LinkedHashMap<>();
         all.put("bundle.toon", "kind: datasource\n");
         all.put("connections/hook_connection.toon", "connection:\n  id: hook\n  connector: https\n  host: tickets.test\n"
                 + "  port: " + target.getAddress().getPort() + "\n  base_path: api\n");
         all.put("registry/decision-rules/leak.toon", ConfigCodec.toToon(Map.of("name", "leak", "enabled", true,
-                "createdBy", "author-9", "updatedBy", "author-9", "restoredMakers", List.of("author-0"),
+                "createdBy", "author-9", "updatedBy", "author-9", "restoredMakers", restoredMakers,
                 "consequences", List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook"))))));
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (ZipOutputStream z = new ZipOutputStream(bytes)) {
@@ -226,6 +230,23 @@ class ControlApiSpaceBundleActionRequestsTest {
             assertEquals("succeeded", data(beta(c, "POST", "/action-requests/" + id + "/retry", "{}", CHECKER), 200)
                     .get("status").asText());
             assertEquals(List.of(id), keys);
+        }
+    }
+
+    /** restoredMakers is copied forward into every later version, so an imported one is bounded: over the cap is 422. */
+    @Test
+    void aBundledRestoredMakersListOverTheCapIsRefused(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            List<String> tooMany = java.util.stream.IntStream.range(0, DecisionRuleGuard.MAX_MAKERS)
+                    .mapToObj(i -> "maker-" + i).toList();   // + the bundled updatedBy = one over
+            HttpResponse<String> many = importSpace(c, bundle(tooMany), IMPORTER);
+            assertEquals(422, many.statusCode(), many.body());
+            assertTrue(many.body().contains("more than " + DecisionRuleGuard.MAX_MAKERS), many.body());
+            HttpResponse<String> longId = importSpace(c, bundle(List.of("x".repeat(DecisionRuleGuard.MAX_MAKER_ID + 1))),
+                    IMPORTER);
+            assertEquals(422, longId.statusCode(), longId.body());
+            assertTrue(Files.notExists(root.resolve("beta")), "no Space directory is created");
+            data(importSpace(c, bundle(tooMany.subList(1, tooMany.size())), IMPORTER), 200);   // exactly the cap
         }
     }
 }
