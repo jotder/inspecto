@@ -102,6 +102,13 @@ final class UnionModeIngester {
                         for (String t : rawTables.values()) dropTable(conn, t);
                         continue;
                     }
+                    // reject_mode all_or_nothing: the member's raw tables are still private scratch (the union
+                    // below has not run), so dropping them lands nothing of it.
+                    if (cfg.rejectsAllOrNothing() && memberErrors > 0) {
+                        memberAudits.add(ConsignmentIngestStrategy.quarantineAllOrNothing(m, memberErrors, cfg, mStart));
+                        for (String t : rawTables.values()) dropTable(conn, t);
+                        continue;
+                    }
 
                     survivors.add(m);
                     // lineageName: the ENTRY name for an unpack-expanded archive member, the

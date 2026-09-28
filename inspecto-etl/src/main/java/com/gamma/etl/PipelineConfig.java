@@ -438,6 +438,28 @@ public final class PipelineConfig {
     }
 
     /**
+     * What a file with rejected records does ({@code processing.reject_mode}, X4 deferral, 2026-09-28).
+     * {@link #EJECT} (the default, and what an absent key means): the rejected records go to the sidecar and
+     * the file's other records land. {@link #ALL_OR_NOTHING}: a file with ANY rejected record lands nothing —
+     * it is quarantined whole under {@code rejects_all_or_nothing}, its sidecar kept beside it. The unit is
+     * the FILE (the Consignment member), exactly like every other per-member quarantine: its clean
+     * batch-mates still land.
+     */
+    @PublicApi(since = "4.0.0")
+    public enum RejectMode {
+        EJECT, ALL_OR_NOTHING;
+
+        /** The authored spelling ({@code eject} / {@code all_or_nothing}); {@code null}/blank ⇒ {@link #EJECT}. */
+        public static RejectMode parse(Object raw) {
+            if (raw == null || String.valueOf(raw).isBlank()) return EJECT;
+            String v = String.valueOf(raw).trim();
+            for (RejectMode m : values()) if (m.name().equalsIgnoreCase(v)) return m;
+            throw new IllegalArgumentException("processing.reject_mode must be one of eject, all_or_nothing (got '"
+                    + v + "')");
+        }
+    }
+
+    /**
      * Optional per-pipeline bounded-COMMIT-retry override (X1 deferral, 2026-09-25). Parsed from
      * {@code processing.retry}; {@code null} (block absent) means the process-wide {@code -Dingest.retry.*}
      * policy applies whole — today's behaviour. Like {@link Intake}, each field is independently optional and
@@ -1199,6 +1221,7 @@ public final class PipelineConfig {
     private final Chunking       chunking;
     private final Intake         intake;
     private final CommitRetryPolicy commitRetry;
+    private final RejectMode     rejectMode;
     private final Unpack         unpack;
     private final FixedWidth     fixedWidth;
     private final Json           json;
@@ -1368,6 +1391,10 @@ public final class PipelineConfig {
     public Intake         intake()   { return intake; }
     /** Per-pipeline bounded-COMMIT-retry override, or {@code null} = inherit the {@code -Dingest.retry.*} globals. */
     public CommitRetryPolicy commitRetry() { return commitRetry; }
+    /** {@code processing.reject_mode}; never null — absent reads as {@link RejectMode#EJECT}. */
+    public RejectMode     rejectMode() { return rejectMode; }
+    /** True when a file with any rejected record must land nothing ({@code reject_mode: all_or_nothing}). */
+    public boolean        rejectsAllOrNothing() { return rejectMode == RejectMode.ALL_OR_NOTHING; }
     /** Never null — an absent {@code processing.unpack} block reads as {@link Unpack#defaults()}. */
     public Unpack         unpack()   { return unpack == null ? Unpack.defaults() : unpack; }
     /** Fixed-width frontend config, or {@code null} for the default delimited frontend. */
@@ -1486,6 +1513,7 @@ public final class PipelineConfig {
         this.chunking = new Chunking(b.chunkMaxFileBytes, b.chunkTargetBytes);
         this.intake = b.intake;
         this.commitRetry = b.commitRetry;
+        this.rejectMode = b.rejectMode == null ? RejectMode.EJECT : b.rejectMode;
         this.unpack = b.unpack;
         this.fixedWidth = b.fixedWidth;
         this.json = b.json;
@@ -1577,6 +1605,7 @@ public final class PipelineConfig {
         this.chunking = src.chunking;
         this.intake = src.intake;
         this.commitRetry = src.commitRetry;
+        this.rejectMode = src.rejectMode;
         this.unpack = src.unpack;
         this.fixedWidth = src.fixedWidth;
         this.json = src.json;
@@ -2133,6 +2162,7 @@ public final class PipelineConfig {
         long   chunkTargetBytes  = 0;
         Intake intake            = null;   // absent block = inherit the -Dingest.* globals whole
         CommitRetryPolicy commitRetry = null;   // absent block = inherit the -Dingest.retry.* globals whole
+        RejectMode rejectMode    = RejectMode.EJECT;   // absent key = eject-and-continue
         Unpack unpack            = null;   // absent block = Unpack.defaults() (stage on, shipped caps)
         String batchesFilePath;
         String lineageFilePath;

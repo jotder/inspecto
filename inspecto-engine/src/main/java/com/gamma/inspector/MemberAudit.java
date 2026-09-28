@@ -24,6 +24,13 @@ record MemberAudit(int srcId, String filename, MemberStatus status,
                 origin(m), originPath(m));
     }
 
+    /** As {@link #rejected}, but keeping the reject count — a file quarantined BECAUSE of its rejects. */
+    static MemberAudit rejectedWithRejects(Consignment.Member m, MemberStatus status, String error, long errors,
+                                           LocalDateTime start) {
+        return new MemberAudit(m.srcId(), m.file().getName(), status, 0, errors, error, start,
+                origin(m), originPath(m));
+    }
+
     /**
      * The inbox file this member came OUT of — the archive or compressed original the operator
      * actually dropped — or blank when the member IS that file (the ordinary, uncompressed case).

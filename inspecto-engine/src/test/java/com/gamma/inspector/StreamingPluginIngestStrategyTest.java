@@ -67,6 +67,101 @@ class StreamingPluginIngestStrategyTest {
         }
     }
 
+    /** Emits {@code CALL} lines and {@link RecordSink#reject rejects} every {@code BAD} line (segment CALL). */
+    public static class RejectingStreamingIngester implements StreamingFileIngester {
+        @Override
+        public void ingest(File file, RecordSink sink, int srcId, PipelineConfig cfg) throws Exception {
+            for (String line : Files.readAllLines(file.toPath())) {
+                if (line.isBlank()) continue;
+                String[] p = line.split(",", -1);
+                if (p[0].equals("BAD")) sink.reject("CALL");
+                else sink.emit(p[0], p[1], p[0], p[2]);
+            }
+        }
+    }
+
+    // ── processing.reject_mode: all_or_nothing (X4 deferral, 2026-09-28) ─────────
+
+    private static final String AON = "\n  reject_mode: all_or_nothing";
+    private static final String WITH_BAD = "CALL,C001,2020-04-03\nBAD,x,x\nCALL,C002,2020-04-03\n";
+
+    private static List<Path> dataFiles(PipelineConfig cfg) throws IOException {
+        Path db = Path.of(cfg.dirs().database());
+        if (!Files.exists(db)) return List.of();
+        try (Stream<Path> s = Files.walk(db)) { return s.filter(Files::isRegularFile).toList(); }
+    }
+
+    /** Generation mode reveals output per flush — all_or_nothing must not use it, even when the seam forces it. */
+    @Test
+    void allOrNothingGenerationModeLandsNothingOfAFileWithARejectAndQuarantinesItWhole(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = setup(dir, RejectingStreamingIngester.class.getName(), AON);
+        assertTrue(cfg.rejectsAllOrNothing());
+        File input = writeInput(cfg, "events_20200403.bin", WITH_BAD);
+
+        IngestOutcome out = new StreamingPluginIngestStrategy(1).ingest(buildBatch(cfg, input), cfg);
+
+        assertEquals("EMPTY", out.status(), out.error());
+        assertTrue(out.outputs().isEmpty(), "no outputs");
+        assertEquals(List.of(), dataFiles(cfg), "nothing of the file is visible in the database dir");
+        MemberAudit a = out.memberAudits().get(0);
+        assertEquals(MemberStatus.QUARANTINED_MISMATCH, a.status());
+        assertEquals(1, a.errorRows(), "the reject count is kept on the audit row");
+        assertEquals(0, a.parsedRows());
+        assertTrue(a.error().startsWith("rejects_all_or_nothing: 1 record(s) rejected"), a.error());
+        assertTrue(Files.exists(Path.of(cfg.dirs().quarantine(), "rejects_all_or_nothing", "events_20200403.bin")));
+        assertFalse(input.exists(), "the file left the inbox");
+    }
+
+    @Test
+    void allOrNothingUnionModeLandsTheCleanBatchMateAndNothingOfTheRejectingOne(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = setup(dir, RejectingStreamingIngester.class.getName(), AON);
+        File bad = writeInput(cfg, "bad_20200403.bin", WITH_BAD);
+        File good = writeInput(cfg, "good_20200403.bin", "CALL,G001,2020-04-03\nCALL,G002,2020-04-03\n");
+        SchemaSelector.Selection sel = new SchemaSelector.Selection(Map.of(), null);
+        Consignment batch = new Consignment(cfg.identity().runTimestamp() + "_events_0001", "events", null,
+                List.of(new Consignment.Member(bad, 0, bad.length(), sel),
+                        new Consignment.Member(good, 1, good.length(), sel)));
+
+        IngestOutcome out = new StreamingPluginIngestStrategy().ingest(batch, cfg);
+
+        assertEquals("SUCCESS", out.status(), out.error());
+        assertEquals(2, out.totalInputRows(), "only the clean member's rows");
+        assertEquals(List.of("good_20200403.bin"), out.survivors().stream().map(m -> m.file().getName()).toList());
+        String landed = String.join("\n", dataFiles(cfg).stream().map(p -> {
+            try { return Files.readString(p); } catch (IOException e) { throw new RuntimeException(e); }
+        }).toList());
+        assertFalse(landed.contains("C001"), "not one row of the rejecting file landed: " + landed);
+        assertTrue(landed.contains("G001"));
+    }
+
+    @Test
+    void ejectIsUnchangedTheGoodRecordsOfARejectingFileLand(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = setup(dir, RejectingStreamingIngester.class.getName());
+        assertFalse(cfg.rejectsAllOrNothing(), "absent reject_mode = eject");
+        File input = writeInput(cfg, "events_20200403.bin", WITH_BAD);
+
+        IngestOutcome out = new StreamingPluginIngestStrategy(1).ingest(buildBatch(cfg, input), cfg);
+
+        assertEquals("SUCCESS", out.status(), out.error());
+        assertEquals(2, out.totalInputRows());
+        assertEquals(1, out.memberAudits().get(0).errorRows());
+    }
+
+    /** A "crash" after the reject count is known but before the quarantine completes publishes nothing. */
+    @Test
+    void allOrNothingAFailureBeforeTheDecisionCompletesLeavesNothingVisible(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = setup(dir, RejectingStreamingIngester.class.getName(), AON);
+        File input = writeInput(cfg, "events_20200403.bin", WITH_BAD);
+        Files.createDirectories(Path.of(cfg.dirs().quarantine()));
+        Files.writeString(Path.of(cfg.dirs().quarantine(), "rejects_all_or_nothing"), "blocks the reason dir");
+
+        IngestOutcome out = new StreamingPluginIngestStrategy(1).ingest(buildBatch(cfg, input), cfg);
+
+        assertEquals("FAILED", out.status());
+        assertEquals(List.of(), dataFiles(cfg), "no output of the file is visible");
+        assertTrue(input.exists(), "the file stays in the inbox for the retry");
+    }
+
     // ── tests ─────────────────────────────────────────────────────────────────
 
     @Test

@@ -183,11 +183,41 @@ sidecar row). What was missing was only the replay, now `POST /runs/{name}/repla
 - **Refused (422):** a non-delimited frontend or plugin decoder, a sidecar row with no `raw_line`, and a
   sidecar whose row count reaches `rejects_limit` (it may be truncated).
 
-⛔ **Not built — the per-pipeline `all_or_nothing` switch.** It is not a small key: the decision must be taken
-per member **before** the write, and the single-member native path streams `read_csv → transform → COPY`
-in one pass, so its reject count is known only after the rows have landed; the Java loop, the three native
-streaming paths and the plugin lane would each need it. The nearest existing knob is
-`csv_settings.ignore_errors: false` (native engine only), which FAILS the batch on the first bad row — a
+✅ **`processing.reject_mode: all_or_nothing` (built 2026-09-28, operator ask).** Absent or `eject` is the
+behaviour above, byte for byte (the default path gains one boolean test per member, no extra pass).
+`all_or_nothing`: a file with **any** rejected record lands **nothing** — it is quarantined whole under
+`<quarantine>/…/rejects_all_or_nothing/` with its reject sidecar moved beside it, and its audit row reads
+`QUARANTINED_MISMATCH` (the member vocabulary is unchanged) with the reason
+`rejects_all_or_nothing: N record(s) rejected, nothing landed (reject_mode all_or_nothing)` and `error_rows = N`.
+**The unit is the FILE** (the Consignment member), like every other per-member quarantine: its clean
+batch-mates still land, and a Consignment whose only member was refused ends `EMPTY`. Per ingest path —
+the decision is always taken after the reject count is final and **before any of the file's rows are
+written**, so there is no staging/rename step and a crash before the decision leaves no output at all:
+
+| Path | Where the reject count is known | Mechanism |
+|---|---|---|
+| Java parse loop (`CsvIngestStrategy`) | after `CsvIngester.ingest` into the per-file `raw_f<id>` temp table | drop the temp table before it joins `raw_input` |
+| Native single member (`NativeCsvStreamingEngine.streamingIngest`) | `streamUnit`: after `read_csv → transformed` (a table in the SCRATCH DB), before `writeAndTrace` | drop `transformed`, write nothing; `finishSingle` quarantines. 🔴 The BACKLOG's "streams to output before it knows its reject count" was wrong for this path: `DataTransformer.materialize` is a CTAS in the scratch DB, and `drainRejects` already ran before the write |
+| Native multi-member UNION (`unionStreamingIngest`) | the per-member `COUNT(*)` probe | the member's view never joins the union |
+| Native CHUNKED (`chunkedIngest`) | only after the LAST chunk — and each chunk reveals its output as it goes | **not used**: under `all_or_nothing` a chunking-sized file streams as one unit through the single-member path (the fan-out trade: it materialises in scratch) |
+| Plugin lane (`StreamingPluginIngestStrategy`) | union mode: after the member's `sink.finish()`; generation mode: only after output was revealed per flush | union mode drops the member's raw tables; **generation mode is not used** under `all_or_nothing` (wins over the forced test seam too) |
+
+Gates: `ConfigSpecs.pipeline()` declares `processing.reject_mode` (ENUM `eject`/`all_or_nothing`, no spec
+default — absent means eject), `ConfigSafetyValidator` refuses any other value (**422** on `/config/write`),
+and the parser refuses it at load naming the key (`PipelineConfig.RejectMode.parse`). The SPA config pane is
+spec-driven, so the field appears there with no UI change; there is no editor node attribute for it.
+**X4 replay:** a sidecar found in a `rejects_all_or_nothing` quarantine directory is refused (**422**) — none
+of the file's good records landed, so replaying only the rejects would land the wrong half; the recovery is
+the whole file (fix, move it back to the inbox). A replay input run under `all_or_nothing` is itself all or
+nothing. Pinned by `RejectAllOrNothingTest` (Java single + multi, native single / union / chunked: clean
+lands, one bad record lands nothing + quarantine + sidecar, eject unchanged, a failed quarantine — the stand-in
+for a crash between the count and the publish — leaves nothing visible and the file in the inbox, replay
+refused, unknown mode refused) and `StreamingPluginIngestStrategyTest.allOrNothing*`. ⚠ Residuals: under
+`all_or_nothing` a huge single file (or a huge plugin input) materialises whole in scratch instead of
+chunking/generating; a crash AFTER the decision, inside the ordinary write, is the same window `eject` has;
+the chunked `eject` path names its sidecar per CHUNK (`<stem>_chunk_NNNNN_errors.csv`), so X4 replay by the
+original file name does not find it (pre-existing, not changed). The nearest older knob,
+`csv_settings.ignore_errors: false` (native engine only), still FAILS the batch on the first bad row — a
 retry-then-`retry_exhausted` end, not a whole-file quarantine. **Audit:** the replay is recorded by the
 single `AuditTrail` seam every mutating route goes through (actor, capability `canOperateRuns`, IP), under
 its own action `pipeline.rejects_replayed` since 2026-09-25 — before that it fell to the POST default and

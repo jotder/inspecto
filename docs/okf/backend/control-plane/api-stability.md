@@ -364,6 +364,11 @@ above the generated commit list.
   The `sink.persistent` node advertises `retry__max_attempts` / `retry__initial_backoff` /
   `retry__max_backoff` in `node-attributes.contract.json`.
   [execution-lanes](../pipeline-graph/execution-lanes.md)
+- **New config key (additive, 2026-09-28, X4 deferral):** `processing.reject_mode: eject | all_or_nothing`
+  (absent = `eject`, today's behaviour). Any other value is a **422** at `/config/write`. Under
+  `all_or_nothing` a file with a rejected record is quarantined whole under the new reason
+  `rejects_all_or_nothing`, and `POST /runs/{name}/replay-rejects` for it is a **422**.
+  [execution-lanes](../pipeline-graph/execution-lanes.md)
 - **Behaviour change — the reject sidecar's `raw_line` is now byte-exact** (2026-09-25): both CSV ingesters
   escape an embedded `"` RFC-4180-style (`""`) in `<errors>/<file>_errors.csv` instead of rewriting it to
   `'`, so `GET /runs/{name}/errors?file=` now shows the line's real quotes. A reader that split the column

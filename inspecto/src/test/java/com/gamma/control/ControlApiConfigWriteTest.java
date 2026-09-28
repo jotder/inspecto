@@ -183,6 +183,26 @@ class ControlApiConfigWriteTest {
         }
     }
 
+    /** X4 deferral (2026-09-28): {@code processing.reject_mode} accepts its two modes and 422s anything else. */
+    @Test
+    void rejectModeIsAcceptedWhenKnownAnd422WhenNot(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> accepted = post(c.port, "/config/write", """
+                    {"type":"pipeline","config":{
+                       "name":"aon_ok","dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1,"reject_mode":"all_or_nothing"}}}""");
+            assertEquals(200, accepted.statusCode(), "a declared key is not refused as unknown: " + accepted.body());
+
+            HttpResponse<String> r = post(c.port, "/config/write", """
+                    {"type":"pipeline","config":{
+                       "name":"aon_bad","dirs":{"poll":"in","database":"out"},
+                       "processing":{"threads":1,"reject_mode":"sometimes"}}}""");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("processing.reject_mode"), r.body());
+            assertFalse(Files.exists(root.resolve("aon_bad_pipeline.toon")), "nothing written on a rejected config");
+        }
+    }
+
     /**
      * G4: {@code active: true} with no schema source loads nowhere, so accepting the write means the
      * pipeline is dropped from the index and skipped by the scheduler forever, silently.

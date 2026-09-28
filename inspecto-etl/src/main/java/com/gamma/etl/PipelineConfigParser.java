@@ -308,6 +308,9 @@ final class PipelineConfigParser {
                     millisOrNull(retry.get("max_backoff"), "processing.retry.max_backoff"));
         }
 
+        // ── processing.reject_mode (X4 deferral, 2026-09-28): eject (default) | all_or_nothing ──
+        b.rejectMode = PipelineConfig.RejectMode.parse(proc.get("reject_mode"));
+
         // ── unpack stage (Collector-level decompression, additive, optional) ──
         // Unlike `intake` above, an absent KEY here takes the shipped default rather than a global:
         // these are safety caps, so every one always has a concrete value (Unpack.defaults()).

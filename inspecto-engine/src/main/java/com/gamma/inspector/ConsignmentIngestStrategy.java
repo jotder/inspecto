@@ -4,6 +4,8 @@ import com.gamma.consignment.ConsignmentOutputs;
 import com.gamma.consignment.EventTimeBounds;
 import com.gamma.etl.Consignment;
 import com.gamma.etl.CsvIngester;
+import com.gamma.etl.MemberStatus;
+import com.gamma.etl.QuarantineManager;
 import com.gamma.query.DecisionRuleApplier;
 import com.gamma.etl.LineageCollector;
 import com.gamma.etl.LineageRow;
@@ -75,6 +77,23 @@ interface ConsignmentIngestStrategy {
     /** A non-null message for an exception, falling back to its simple class name. */
     static String msg(Exception e) {
         return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+    }
+
+    /**
+     * {@code processing.reject_mode: all_or_nothing} (X4 deferral, 2026-09-28): the decision every ingest path
+     * takes per member AFTER its reject count is known and BEFORE any of its rows are written. The file is
+     * quarantined whole under {@link QuarantineManager#REASON_REJECTS_ALL_OR_NOTHING} with its reject sidecar
+     * beside it; the audit row carries the reject count and lands 0 rows. Status stays
+     * {@code QUARANTINED_MISMATCH} (the wire vocabulary is unchanged); the reason says which rule fired.
+     */
+    static MemberAudit quarantineAllOrNothing(Consignment.Member m, long rejects, PipelineConfig cfg,
+                                              java.time.LocalDateTime mStart) throws java.io.IOException {
+        QuarantineManager.quarantine(m.file(), QuarantineManager.REASON_REJECTS_ALL_OR_NOTHING, true, cfg);
+        log.warn("[INGEST] [{}] reject_mode all_or_nothing: {} record(s) rejected — nothing landed, file quarantined",
+                m.file().getName(), rejects);
+        return MemberAudit.rejectedWithRejects(m, MemberStatus.QUARANTINED_MISMATCH,
+                QuarantineManager.REASON_REJECTS_ALL_OR_NOTHING + ": " + rejects
+                        + " record(s) rejected, nothing landed (reject_mode all_or_nothing)", rejects, mStart);
     }
 
     // ── shared ingest-tail helpers (used by both strategies) ─────────────────────

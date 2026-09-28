@@ -465,6 +465,21 @@ class ConfigSafetyValidatorTest {
                 "processing.retry.max_attempts"));
     }
 
+    /** X4 deferral (2026-09-28): {@code processing.reject_mode} is a closed set — an unknown mode is refused. */
+    @Test
+    void rejectModeIsAClosedSet(@TempDir Path root) {
+        for (String mode : List.of("eject", "all_or_nothing", "ALL_OR_NOTHING")) {
+            Map<String, Object> ok = pipeline(safeDirs(root));
+            ok.put("processing", Map.of("reject_mode", mode));
+            assertFalse(hasError(ConfigSafetyValidator.check("pipeline", ok, SafetyPolicy.withRoots(root)),
+                    "processing.reject_mode"), mode);
+        }
+        Map<String, Object> bad = pipeline(safeDirs(root));
+        bad.put("processing", Map.of("reject_mode", "sometimes"));
+        assertTrue(hasError(ConfigSafetyValidator.check("pipeline", bad, SafetyPolicy.withRoots(root)),
+                "processing.reject_mode"));
+    }
+
     /** DUCKLE-C10-ADMISSION-POOLS-1: a Pipeline CHOOSES a pool, so only its shape is gated — a
      *  well-formed name the server does not define is accepted (it is admitted in `default`). */
     @Test

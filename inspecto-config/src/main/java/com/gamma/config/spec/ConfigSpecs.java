@@ -352,6 +352,13 @@ public final class ConfigSpecs {
                         "Cap on any one retry delay: a bare number of seconds or N s|m|h|d. Unset = inherit "
                                 + "-Dingest.retry.backoff.maxMs (default 1h).",
                         FieldType.STRING, false, null, List.of(), DURATION, null, null),
+                // X4 deferral (2026-09-28). No spec default, like processing.retry: absent = eject, and a
+                // seeded value would only restate it. An unknown value is refused by ConfigSafetyValidator.
+                new FieldSpec("processing.reject_mode", "Rejected-record handling",
+                        "eject (unset): a rejected record goes to <errors>/<file>_errors.csv and the file's other "
+                                + "records land. all_or_nothing: a file with ANY rejected record lands nothing and is "
+                                + "quarantined whole under rejects_all_or_nothing, its reject sidecar beside it.",
+                        FieldType.ENUM, false, null, List.of("eject", "all_or_nothing"), null, "select", null),
                 FieldSpec.withDefault("processing.streaming.large_file_bytes", "Streaming generation-mode threshold (bytes)",
                         FieldType.LONG, 268_435_456L,
                         "Plugin-ingester batches whose largest member is >= this run in bounded generation mode (huge files); smaller batches use union mode (many small files packed → one transform/write). 0 = always union."),

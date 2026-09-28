@@ -97,7 +97,11 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
                     boolean fanOut = cfg.sinks().size() > 1;
                     if (batch.members().size() == 1 && !fanOut) {
                         Consignment.Member only = batch.members().get(0);
-                        return cfg.chunking().appliesTo(only.file().length())
+                        // reject_mode all_or_nothing never chunks: each chunk reveals its output as it goes, so a
+                        // reject in a later chunk would be found after earlier chunks were visible. The whole file
+                        // streams as ONE unit instead (the fan-out trade above: it materialises in scratch), and
+                        // streamUnit decides on the reject count before the write.
+                        return cfg.chunking().appliesTo(only.file().length()) && !cfg.rejectsAllOrNothing()
                                 ? NativeCsvStreamingEngine.chunkedIngest(batch, only, cfg, conn, batchStart)
                                 : NativeCsvStreamingEngine.streamingIngest(batch, only, cfg, conn, batchStart);
                     }
@@ -142,6 +146,14 @@ final class CsvIngestStrategy implements ConsignmentIngestStrategy {
                         QuarantineManager.quarantine(m.file(), QuarantineManager.REASON_EMPTY, false, cfg);
                         memberAudits.add(MemberAudit.rejected(m, MemberStatus.QUARANTINED_EMPTY,
                                 "0 valid rows (empty/header-only file)", mStart));
+                        dropTable(conn, tempTable);
+                        continue;
+                    }
+
+                    // reject_mode all_or_nothing: the member's reject count is final here and none of its
+                    // rows has reached raw_input yet, so dropping its temp table lands nothing of it.
+                    if (cfg.rejectsAllOrNothing() && ing.errorRows() > 0) {
+                        memberAudits.add(ConsignmentIngestStrategy.quarantineAllOrNothing(m, ing.errorRows(), cfg, mStart));
                         dropTable(conn, tempTable);
                         continue;
                     }

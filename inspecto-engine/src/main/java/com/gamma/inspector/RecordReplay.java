@@ -5,6 +5,7 @@ import com.gamma.etl.ConsignmentManifest;
 import com.gamma.etl.MemberStatus;
 import com.gamma.etl.CsvIngester;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.QuarantineManager;
 import com.gamma.etl.SchemaSelector;
 import com.google.gson.GsonBuilder;
 import org.slf4j.Logger;
@@ -88,6 +89,14 @@ public final class RecordReplay {
 
         Path sidecar = locateSidecar(cfg, CsvIngester.stripExtensions(file) + "_errors.csv");
         if (sidecar == null) throw new NoSuchFileException("no reject sidecar recorded for '" + file + "'");
+        // reject_mode all_or_nothing quarantined the file WHOLE — none of its good records landed, so replaying
+        // only its rejects would land the part that was wrong and none of the part that was right. The recovery
+        // is the whole file: fix, then move it from the quarantine tree back into the inbox.
+        Path home = sidecar.getParent() == null ? null : sidecar.getParent().getFileName();
+        if (home != null && home.toString().equals(QuarantineManager.REASON_REJECTS_ALL_OR_NOTHING))
+            throw new IllegalArgumentException("'" + file + "' was quarantined whole under reject_mode all_or_nothing"
+                    + " (nothing of it landed), so replaying only its rejected records does not apply — fix the"
+                    + " cause and re-ingest the whole file from " + sidecar.getParent());
 
         List<Map<String, String>> rows = new ArrayList<>();
         com.gamma.util.Csv.readInto(sidecar, rows);

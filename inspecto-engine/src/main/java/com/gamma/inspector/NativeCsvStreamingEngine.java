@@ -114,6 +114,13 @@ final class NativeCsvStreamingEngine {
                 dropView(conn, view);
                 continue;
             }
+            // reject_mode all_or_nothing: the COUNT(*) probe drove this member's read in full, so its reject
+            // count is final and it has not joined the union yet — dropping its view lands nothing of it.
+            if (cfg.rejectsAllOrNothing() && rejects > 0) {
+                memberAudits.add(ConsignmentIngestStrategy.quarantineAllOrNothing(m, rejects, cfg, mStart));
+                dropView(conn, view);
+                continue;
+            }
 
             // lineageName: the ENTRY name for an unpack-expanded archive member, the plain
             // filename otherwise — the temp name is workspace bookkeeping, never DATA.
@@ -343,6 +350,13 @@ final class NativeCsvStreamingEngine {
             dropTable(conn, "transformed");
             return new Streamed(0, rejects, List.of(), List.of(), Map.of(), castFailures);
         }
+        // reject_mode all_or_nothing: `transformed` lives in the scratch DB, and the reject count is final now
+        // that read_csv has run to the end — so this is the last moment before anything is written. Nothing is:
+        // finishSingle sees rejects > 0 with no outputs and quarantines the file whole.
+        if (cfg.rejectsAllOrNothing() && rejects > 0) {
+            dropTable(conn, "transformed");
+            return new Streamed(parsed, rejects, List.of(), List.of(), Map.of(), castFailures);
+        }
         // One write per CHUNK, so each carries its own scope — the base name is unique per chunk and
         // is what keeps the batch's branch ledger from reading the second chunk as already committed.
         // 🔴 The input has been READ by now, so a failure below is the sink's, never the file's: it is
@@ -368,6 +382,10 @@ final class NativeCsvStreamingEngine {
                                               Map<String, EventTimeBounds> bounds,
                                               long castFailures)
             throws Exception {
+        if (parsed > 0 && rejects > 0 && cfg.rejectsAllOrNothing()) {
+            // streamUnit wrote nothing: outputs is empty by construction (and chunking is off under this mode).
+            return empty(batch, batchStart, ConsignmentIngestStrategy.quarantineAllOrNothing(m, rejects, cfg, mStart));
+        }
         if (parsed == 0 && rejects > 0) {
             QuarantineManager.quarantine(m.file(), "field_mismatch", true, cfg);
             String reason = String.format("0 valid rows; %d row(s) rejected (field mismatch)", rejects);

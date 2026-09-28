@@ -47,6 +47,10 @@ final class StreamingPluginIngestStrategy implements ConsignmentIngestStrategy {
         // so the fan-out reaches every destination. (A very large plugin input thus materialises rather than
         // streaming; a chunking-sized input combined with multiple destinations is rare.)
         if (cfg.sinks().size() > 1) generationMode = false;
+        // reject_mode all_or_nothing: generation mode reveals output every flush_records rows, before the
+        // member's reject count is final — union mode holds every row in scratch until the decision is taken.
+        // It wins over the forced test seam too: correctness over bounded scratch.
+        if (cfg.rejectsAllOrNothing()) generationMode = false;
 
         // Slice P3: resolve through the owning pack's loader and keep that pack pinned for the whole batch.
         try (PluginIngesters.Leased leased = PluginIngesters.open(cfg)) {

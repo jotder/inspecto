@@ -35,6 +35,10 @@ public final class QuarantineManager {
      *  isn't rediscovered and reprocessed every poll cycle (an EMPTY batch never backs up/marks). */
     public static final String REASON_EMPTY = "empty";
 
+    /** {@code processing.reject_mode: all_or_nothing}: the file had rejected records, so NONE of it landed.
+     *  Its reject sidecar is moved beside it; record replay refuses it (re-ingest the whole file instead). */
+    public static final String REASON_REJECTS_ALL_OR_NOTHING = "rejects_all_or_nothing";
+
     // ── acquisition-stage reasons (Data Acquisition roadmap Phase F dead-letter) ──
     /** A fetched file failed its post-download integrity check (size/checksum mismatch). */
     public static final String REASON_CORRUPT_DOWNLOAD = "corrupt_download";

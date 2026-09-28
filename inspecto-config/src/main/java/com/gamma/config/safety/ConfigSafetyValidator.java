@@ -260,6 +260,12 @@ public final class ConfigSafetyValidator {
                 out.add(Finding.error(f, f + " must be a non-negative duration — a bare number of seconds or "
                         + "N s|m|h|d (got '" + d + "')"));
         }
+        // X4 deferral: reject_mode is a closed set — an unknown mode must not silently read as eject.
+        String rejectMode = RawConfig.str(raw, "processing.reject_mode");
+        if (rejectMode != null && !rejectMode.isBlank()
+                && !List.of("eject", "all_or_nothing").contains(rejectMode.trim().toLowerCase(java.util.Locale.ROOT)))
+            out.add(Finding.error("processing.reject_mode", "reject_mode must be one of eject, all_or_nothing (got '"
+                    + rejectMode + "')"));
         // A pool is CHOSEN here, never defined: only the shape is checked. A well-formed name the server
         // does not define is admitted in `default` — not a refusal (scale-out plan §4.1 rule 2).
         String pool = RawConfig.str(raw, "processing.pool");
