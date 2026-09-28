@@ -446,6 +446,7 @@ class JobPackManagerTest {
         java.util.concurrent.ExecutorService pool = java.util.concurrent.Executors.newSingleThreadExecutor();
         java.util.concurrent.CountDownLatch inRun = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.CountDownLatch proceed = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicInteger sinkRows = new java.util.concurrent.atomic.AtomicInteger(-1);
         java.io.File db = com.gamma.util.DuckDbUtil.tempDbFile("lease_");
         trustEveryJarIn(packsDir);
         try (JobPackManager mgr = new JobPackManager(packsDir.toString(), new JobTypeRegistry(),
@@ -470,6 +471,12 @@ class JobPackManagerTest {
                         "parsed", "b1", coordinator, (sinkNode, table) -> {
                             inRun.countDown();
                             assertTrue(proceed.await(20, java.util.concurrent.TimeUnit.SECONDS), "test released the run");
+                            // the walk resumes AFTER the unload: the pack's rows must still be intact
+                            try (java.sql.Statement q = conn.createStatement();
+                                 java.sql.ResultSet rs = q.executeQuery("SELECT count(*) FROM \"" + table + "\"")) {
+                                rs.next();
+                                sinkRows.set(rs.getInt(1));
+                            }
                         }, () -> {}));
                 assertTrue(inRun.await(20, java.util.concurrent.TimeUnit.SECONDS), "the run reached its sink write");
 
@@ -481,6 +488,7 @@ class JobPackManagerTest {
                 proceed.countDown();
                 run.get(20, java.util.concurrent.TimeUnit.SECONDS);
                 assertFalse(mgr.isDraining("lease-1.jar"), "the close finishes once the run completes");
+                assertEquals(3, sinkRows.get(), "the walk completed correctly: the pack executor's 3 rows reached the sink");
             } finally {
                 proceed.countDown();
                 pool.shutdownNow();

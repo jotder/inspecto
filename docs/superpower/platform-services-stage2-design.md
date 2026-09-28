@@ -2,7 +2,7 @@
 
 **Row:** `BACKLOG.md` §3.2 *Platform Services Stage 2 / 3* (P2).
 **Owner concept:** [`okf/backend/control-plane/platform-services.md`](../okf/backend/control-plane/platform-services.md).
-**Status:** DESIGN ONLY, written 2026-09-24. Nothing built. Decisions owed in §7.
+**Status:** written 2026-09-24. **All 10 decisions in §7 decided 2026-09-28 (operator: every recommendation accepted; D-10 deferred).** S2-0 ✅ shipped (`6edebc398`, 2026-09-24); S2-1…S2-5 and Stage 3 are still in flight — this doc stays the plan for them.
 **Scope fence:** new Step Processors are ⛔ **ON HOLD** (operator, 2026-09-23). This document designs the
 *registry and SPI* a Step kind is contributed through. It adds no processor to the catalog; the only Step
 it builds is a test-scope no-op for the S2-2 spike.
@@ -182,8 +182,8 @@ Each slice is independently green; unit tests per change (`-pl inspecto-engine -
 
 | # | Slice | Verify (test first where it reproduces a defect) |
 |---|---|---|
-| **S2-0a** | `PipelineNodeExecutors.register` refuses a built-in type **from a pack** (classpath layer unchanged) | `JobPackManagerTest`: a real pack jar contributing an executor for `transform.filter` is rejected whole, `transform.filter` still runs the built-in; a mutant that removes the check goes red on that assertion |
-| **S2-0b** | A walk pins the owning pack of every contributed node it will execute | new test: load a pack node, start a walk that blocks inside it, rescan with the jar removed — the classloader close is deferred until the walk ends; without the pin the step fails with a linkage error (the reproduction) |
+| **S2-0a** ✅ `6edebc398` | `PipelineNodeExecutors.register` refuses a built-in type **from a pack** (classpath layer unchanged) | `JobPackManagerTest`: a real pack jar contributing an executor for `transform.filter` is rejected whole, `transform.filter` still runs the built-in; a mutant that removes the check goes red on that assertion |
+| **S2-0b** ✅ `6edebc398` | A walk pins the owning pack of every contributed node it will execute | new test: load a pack node, start a walk that blocks inside it, rescan with the jar removed — the classloader close is deferred until the walk ends; without the pin the step fails with a linkage error (the reproduction) |
 | **S2-1** | `mode()` on `PipelineNodeType`; built-ins `LOWERED`; a pack `LOWERED` rejected; a mode-less contributed type refused at arming | every committed pipeline arms identically (existing suites); regenerate the node-attributes contract if `mode` is served; `NodeAttributesContractTest` green |
 | **S2-2** | **Bridge spike** — measurement only, test scope, behind a system property, excluded from the default suite | see §5.1; the deliverable is a published number, not a pass/fail |
 | **S2-3** | `StepExecutor` + `StepContext` + `requires:` + dry-run + failure mapping + watchdog; pack raw-`Connection` executors rejected; `scaffold.mjs new step` unlocked | a pack Step runs armed and in a dry run (and knows which); a throwing Step leaves no node tables and fails the batch; a `reject:` emit is tagged as a reject stream by `ConservationCheck`; a sleeping Step is killed at its deadline with `STEP_TIMEOUT`; an undeclared service is invisible; `ScaffoldTemplatesTest` compiles and loads the new template |
@@ -218,32 +218,44 @@ New Step Processors (on hold) · fan-in for contributed Steps (`RowShaper.merge`
 a Job-side watchdog (R1, recorded gap) · filtered `services()` on `ProcessorContext` (D4) and a devkit jar
 (D5), both only on demand · user-instantiated configured resources (still the Connection component's).
 
-## 7. Decisions owed (operator)
+## 7. Decisions (operator — all decided 2026-09-28)
+
+The operator accepted every recommendation below on 2026-09-28. Each entry keeps its original framing; the **Decided** line is the call.
 
 1. **D-1 — Option B over A.** Evolve the live `PipelineNodeType` + `PipelineNodeExecutor` seam into the
    Stage 2 contract rather than add a parallel `StepTypeProvider` registry. *Recommended: B.*
+   **✅ Decided 2026-09-28 (operator): Option B.**
 2. **D-2 — Close third-party raw-`Connection` execution.** A pack carrying a `PipelineNodeExecutor` is
    rejected (the classpath layer keeps it). This reads the existing seam as a breach of ⛔ R2's intent.
    *Recommended: yes, in S2-3; breaking, and free by policy.*
+   **✅ Decided 2026-09-28 (operator): yes — S2-3 rejects any pack carrying a raw-`Connection` `PipelineNodeExecutor`.**
 3. **D-3 — The bridge ratio that makes `EXECUTED` acceptable** as a default authoring choice, from S2-2's
    V2 ÷ V0. *No recommendation until measured; proposal: publish, then decide.*
+   **✅ Decided 2026-09-28 (operator): no ratio threshold — measure and publish.**
 4. **D-4 — Arrow bridge in S2-3 scope?** Only if V3 materially beats V2. *Recommended: decide on the
    number.*
+   **✅ Decided 2026-09-28 (operator): the Arrow bridge is in scope only if V3 clearly beats V2.**
 5. **D-5 — Recipe spelling for a contributed kind:** a generic `- step: {kind: acme.score, …}` verb, or
    the kind id as its own verb. *Recommended: the generic verb — the verb set stays closed and
    compiler-total, and a pack cannot shadow a built-in verb.*
+   **✅ Decided 2026-09-28 (operator): the generic `- step: {kind: …}` verb.**
 6. **D-6 — Do contributed kinds appear in `ProcessorCatalog`?** *Recommended: no — the catalog is a
    committed contract of built-ins; contributed kinds reach the palette through
    `PipelineNodeTypes.catalog()` as they do today.*
+   **✅ Decided 2026-09-28 (operator): no — contributed kinds stay out of `ProcessorCatalog`.** (The Step Processor hold — no NEW catalog processors — stands and is unaffected.)
 7. **D-7 — Watchdog defaults:** the per-kind default, the system ceiling, and whether an abandoned
    (uninterruptible) thread also disables the kind until the pack is replaced. *Proposal: 5 min default,
    30 min ceiling, disable-on-abandon.*
+   **✅ Decided 2026-09-28 (operator): 5 min default, 30 min ceiling, an abandoned thread disables the kind.**
 8. **D-8 — S2-0 ships now, ahead of the rest?** Both halves are defects in shipped code (a pack can
    redefine a core verb's execution; a pack can unload under a running walk). *Recommended: yes, as its
    own change.*
+   **✅ Decided 2026-09-28 (operator): yes, as its own change** — already shipped as `6edebc398` (2026-09-24); the pipeline-run lease test was tightened 2026-09-28 to also assert the walk's output rows.
 9. **D-9 — Cross-pack service dependencies (Stage 3).** A Job in pack B requiring a service from pack A
    is rejected today if B loads first (`rescan` loads in directory order). Options: a second pass over
    rejected packs after each load round, or declared pack dependencies. *Recommended: the retry pass —
    no new manifest vocabulary.*
+   **✅ Decided 2026-09-28 (operator): the retry pass.**
 10. **D-10 — Is the `DatasetAccess` gate met?** `ConsignmentSelector` exists; confirm its pruning and
     generation pinning are the ones `DatasetAccess` should inherit before S3-3 is sized.
+    **⏸ Deferred 2026-09-28 (operator):** gates S3-3 only; nothing else waits on it.

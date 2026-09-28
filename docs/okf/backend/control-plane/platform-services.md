@@ -163,9 +163,11 @@ not write Datasets or send outbound mail).
 
 ## 7. S2-0 — pack isolation for pipeline node types (as built, 2026-09-24)
 
-S2-0 of the Stage 2 design is two defects that design pass found. The design lives on another branch;
-`docs/superpower/platform-services-stage2-design.md` does not exist on this one at the time of writing. Both reproduced red first;
-the tests are in `JobPackManagerTest` and `PipelineNodeTypesPackOverlayTest`.
+S2-0 of the Stage 2 design ([`platform-services-stage2-design.md`](../../../superpower/platform-services-stage2-design.md),
+whose §7 calls the operator decided 2026-09-28) is two defects that design pass found. Both reproduced red first;
+the tests are in `JobPackManagerTest` and `PipelineNodeTypesPackOverlayTest`. The lease test blocks the walk
+inside its sink write (after the pack executor ran), unloads the pack, and asserts the close is deferred AND,
+since 2026-09-28, that the resumed walk still delivers the pack executor's 3 rows to the sink.
 
 1. **A pack executor may run only its own pack's node type.** `PipelineNodeTypes.register` already
    refused a pack node type that reuses a built-in name, but `PipelineNodeExecutors.register` did not.
