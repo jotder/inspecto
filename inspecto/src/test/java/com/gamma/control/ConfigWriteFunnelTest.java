@@ -251,8 +251,10 @@ class ConfigWriteFunnelTest {
             Map.entry("MaterializeTask#run", MACHINE + " (the Materialize Job restates its job-owned provenance keys "
                     + "on its target Dataset)"),
             Map.entry("EntityListRoutes#list", ENTITY_FACTS), Map.entry("EntityListRoutes#one", ENTITY_FACTS),
-            Map.entry("EntityListRoutes#create", ENTITY_FACTS), Map.entry("EntityListRoutes#members", ENTITY_FACTS),
-            Map.entry("EntityListRoutes#retire", ENTITY_FACTS),
+            Map.entry("EntityListRoutes#create", ENTITY_FACTS),
+            Map.entry("EntityListRoutes#match", ENTITY_FACTS + " (a read: match persists nothing)"),
+            Map.entry("RiskWatchListFeed#check", ENTITY_FACTS + " (a read)"),
+            Map.entry("RiskWatchListFeed#feed", MACHINE + " (the risk.score watch-list feed; expiring entries only, D-P5)"),
             Map.entry("EntityIdentityRoutes#assertIdentity", ENTITY_FACTS),
             Map.entry("EntityIdentityRoutes#retract", ENTITY_FACTS),
             Map.entry("EntityIdentityRoutes#groups", ENTITY_FACTS), Map.entry("EntityIdentityRoutes#group", ENTITY_FACTS),

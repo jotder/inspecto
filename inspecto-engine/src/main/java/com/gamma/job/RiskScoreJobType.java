@@ -83,6 +83,9 @@ final class RiskScoreJobType implements JobTypeProvider {
             RiskScoreEvaluator.write(data, model, version, ctx.runId(), now, run.scored());
 
             long high = run.scored().stream().filter(RiskScorer.Scored::high).count();
+            int fed = feedWatchList(writeRoot, data, model, ctx.runId(), now, run.scored());
+            if (model.watchList() != null)
+                ctx.log().info("fed watch list", "model", modelId, "list", model.watchList().list(), "written", fed);
             ctx.artifacts().dataset("scores", model.scoresDataset(), META, run.scored().size(), now);
             ctx.signals().emit("risk.score.produced", Severity.INFO, Map.of("model", modelId,
                     "dataset", model.scoresDataset(), "entities", run.scored().size(), "high", high));
@@ -91,6 +94,25 @@ final class RiskScoreJobType implements JobTypeProvider {
             return JobResult.ok("risk.score: " + run.scored().size() + " entit(ies) scored, " + high
                     + " high → dataset '" + model.scoresDataset() + "'", (System.nanoTime() - t0) / 1_000_000L);
         }
+    }
+
+    /**
+     * ASSURE-ENTITY-LISTS-1: add every {@code high} entity to the model's {@code watch} Entity List, expiring
+     * {@code ttlHours} after {@code now}. No {@code watchList} is a no-op; one with no installed provider (Personal)
+     * fails the run. The scores are already written, and the failure says the feed did not happen.
+     */
+    static int feedWatchList(Path writeRoot, Path dataDir, RiskScoreModel model, String runId, Instant now,
+                             List<RiskScorer.Scored> scored) throws java.io.IOException {
+        RiskScoreModel.WatchList w = model.watchList();
+        if (w == null) return 0;
+        com.gamma.risk.WatchListFeed feed = com.gamma.risk.WatchListFeed.installed().orElseThrow(() ->
+                new IllegalStateException("risk-score '" + model.id() + "' feeds watch list '" + w.list()
+                        + "', but Entity Lists are not installed in this edition"));
+        List<String> keys = scored.stream().filter(RiskScorer.Scored::high).map(RiskScorer.Scored::entityKey).toList();
+        if (keys.isEmpty()) return 0;
+        return feed.feed(writeRoot, dataDir, w.list(), keys, now.plus(java.time.Duration.ofHours(w.ttlHours())),
+                "job:risk.score:" + model.id(), "risk.score " + model.id() + " run " + runId + ": score >= "
+                        + model.highThreshold());
     }
 
     /** The scores Dataset's fixed shape. */

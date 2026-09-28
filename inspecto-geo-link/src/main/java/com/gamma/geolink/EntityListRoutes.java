@@ -5,6 +5,7 @@ import com.gamma.control.ApiException;
 import com.gamma.control.EntityTypes;
 import com.gamma.control.ErrorCodes;
 import com.gamma.control.LinkAnalysisSettings;
+import com.gamma.control.PendingChanges;
 import com.gamma.control.RouteModule;
 import com.gamma.control.WriteGates;
 import com.gamma.event.Event;
@@ -15,6 +16,7 @@ import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,7 +38,17 @@ import java.util.regex.Pattern;
  *   <li>{@code POST /inv/entity-lists} {@code {id?, title, purpose, entityType, reason}} → 201 + the list.</li>
  *   <li>{@code POST /inv/entity-lists/{id}/members} {@code {add?, remove?, reason}} → 200 + the list + {@code changed}.</li>
  *   <li>{@code POST /inv/entity-lists/{id}/retire} {@code {reason}} → 200 + the list.</li>
+ *   <li>{@code POST /inv/entity-lists/{id}/match} {@code {values[]}} → {@code {matches: [{value, matched, entry?, match?}]}}
+ *       (ASSURE-ENTITY-LISTS-1; read-shaped: a POST so keys never ride in a URL).</li>
  * </ul>
+ *
+ * <p><b>ASSURE-ENTITY-LISTS-1 (WS-12)</b> adds the assurance entries. {@code members} also takes
+ * {@code addRanges} / {@code removeRanges} ({@link EntityListEntries}: prefix, same-length range, CIDR) and
+ * {@code expiresAt} (an ISO instant in the future, applied to every entry the call adds; an expired entry stays in
+ * the as-of fold but stops matching). An expiring add never shortens a PERMANENT entry. Each write rewrites the
+ * list's Parquet sidecar ({@link EntityListSidecar}). Under an approval policy for kind {@code entity-list},
+ * {@code members} and {@code retire} are held as Pending Changes (four-eyes). The exception is an add-only change
+ * whose every entry expires within 24 h: it applies at once and answers {@code reviewAfter: true} (D-P5).
  *
  * <p><b>Gates.</b> Writes: {@code canManageIncidents} (the wrapper) → no write root 503 → body 422 → unknown list 404
  * → retired / id ever used 409 → normalised value empty or in both {@code add} and {@code remove} 422 → append under
@@ -72,6 +84,7 @@ public final class EntityListRoutes implements RouteModule {
                 (e, m) -> members(api, e, m.group(1), api.body(e))));
         api.post("/inv/entity-lists/([^/]+)/retire", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> retire(api, e, m.group(1), api.body(e))));
+        api.post("/inv/entity-lists/([^/]+)/match", (e, m) -> match(api, m.group(1), api.body(e)));
     }
 
     // ── reads ──────────────────────────────────────────────────────────────────────────────────────────
@@ -111,6 +124,39 @@ public final class EntityListRoutes implements RouteModule {
         return render(root, log, facts, l, atSeq);
     }
 
+    private Object match(ApiContext api, String id, Map<String, Object> body) throws IOException {
+        Path root = WriteGates.requireWriteRoot(api, "entity lists");
+        List<String> values = values(body, "values");
+        if (values.isEmpty() || values.size() > MAX_VALUES)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'values' must list 1.." + MAX_VALUES + " strings");
+        EntityFactLog log = new EntityFactLog(root);
+        EntityFactLog.Log facts = read(log);
+        EntityRegistry.EntityList l = current(facts, id);
+        if (l == null) throw notFound(id, "");
+        boolean masked = masked(root, l);
+        byte[] key = masked ? EntityMasking.key(log.directory()) : null;
+        Instant now = Instant.now();
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (String v : values) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("value", v);
+            String entry = l.retired() ? null : l.match(v, now);   // a retired list matches nothing
+            m.put("matched", entry != null);
+            if (entry != null) {
+                boolean exact = entry.equals(EntityTypes.normalise(l.normaliser(), v)) && l.members().contains(entry);
+                m.put("match", exact ? "key" : EntityListEntries.parse(entry).match());
+                m.put("entry", masked ? EntityMasking.token(key, entry) : entry);
+            }
+            out.add(m);
+        }
+        Map<String, Object> res = new LinkedHashMap<>();
+        res.put("listId", id);
+        res.put("purpose", l.purpose());
+        res.put("atSeq", facts.headSeq());
+        res.put("matches", out);
+        return res;
+    }
+
     // ── writes ─────────────────────────────────────────────────────────────────────────────────────────
 
     private Object create(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
@@ -148,6 +194,7 @@ public final class EntityListRoutes implements RouteModule {
             head = append(log, head, ex, reason, "list.created", id, payload);
             emit(ex, id, "list.created", 0, 0, head.headSeq());
             created = render(root, log, head, current(head, id), head.headSeq());
+            created.put("sidecar", EntityListSidecar.write(api.dataRoot(), current(head, id), head.facts()));
         }
         return ApiContext.respondJson(ex, 201, created);   // outside the lock: a slow client must not stall writers
     }
@@ -157,9 +204,14 @@ public final class EntityListRoutes implements RouteModule {
         String reason = reason(body);
         List<String> add = values(body, "add");
         List<String> remove = values(body, "remove");
-        if (add.size() + remove.size() > MAX_VALUES)
+        List<Object> addRanges = rangeSpecs(body, "addRanges");
+        List<Object> removeRanges = rangeSpecs(body, "removeRanges");
+        if (add.size() + remove.size() + addRanges.size() + removeRanges.size() > MAX_VALUES)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "at most " + MAX_VALUES
-                    + " values per call (add + remove), got " + (add.size() + remove.size()));
+                    + " values per call (add + remove + addRanges + removeRanges), got "
+                    + (add.size() + remove.size() + addRanges.size() + removeRanges.size()));
+        Instant now = Instant.now();
+        String expiresAt = expiresAt(body, now);
 
         EntityFactLog log = new EntityFactLog(root);
         synchronized (log.lock()) {
@@ -171,23 +223,64 @@ public final class EntityListRoutes implements RouteModule {
                     "entity list '" + id + "' is of Entity Type '" + l.entityType() + "', which is no longer in force"));
             Set<String> toAdd = normalise(l, add, "add");
             Set<String> toRemove = normalise(l, remove, "remove");
+            Set<String> rangesAdd = canonical(l, addRanges, "addRanges");
+            Set<String> rangesRemove = canonical(l, removeRanges, "removeRanges");
             for (String k : toAdd)
                 if (toRemove.contains(k))
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a value normalises to a key named in both "
                             + "'add' and 'remove'");
-            toAdd.removeAll(l.members());
+            for (String k : rangesAdd)
+                if (rangesRemove.contains(k))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "a range is named in both 'addRanges' "
+                            + "and 'removeRanges'");
+            // An add is a no-op when it would not change the entry: already there with the same expiry, or already
+            // PERMANENT (an expiring add never shortens a permanent entry).
+            toAdd.removeIf(k -> l.members().contains(k) && unchanged(l.expiresAt().get(k), expiresAt));
+            rangesAdd.removeIf(k -> l.ranges().contains(k) && unchanged(l.rangeExpiresAt().get(k), expiresAt));
             toRemove.retainAll(l.members());
+            rangesRemove.retainAll(l.ranges());
+            int changed = toAdd.size() + toRemove.size() + rangesAdd.size() + rangesRemove.size();
 
+            boolean reviewAfter = false;
+            if (changed > 0) {
+                // D-P5: an add-only change whose every entry expires within 24 h applies at once and is reviewed after.
+                boolean shortLived = toRemove.isEmpty() && rangesRemove.isEmpty() && expiresAt != null
+                        && !Instant.parse(expiresAt).isAfter(now.plus(SHORT_LIVED));
+                if (shortLived) {
+                    reviewAfter = PendingChanges.governs(root, KIND);
+                } else {
+                    Map<String, Object> proposed = new LinkedHashMap<>();
+                    proposed.put("add", maskedList(root, log, l, toAdd));
+                    proposed.put("remove", maskedList(root, log, l, toRemove));
+                    proposed.put("addRanges", maskedList(root, log, l, rangesAdd));
+                    proposed.put("removeRanges", maskedList(root, log, l, rangesRemove));
+                    proposed.put("expiresAt", expiresAt);
+                    PendingChanges.hold(api, ex, KIND, id, proposed, heldBase(l));
+                }
+            }
+
+            Map<String, Object> approved = approvedBy(ex);
             if (!toAdd.isEmpty()) {
-                head = append(log, head, ex, reason, "list.member.added", id, Map.of("keys", List.copyOf(toAdd)));
+                head = append(log, head, ex, reason, "list.member.added", id, payload("keys", toAdd, expiresAt, approved));
                 emit(ex, id, "list.member.added", toAdd.size(), 0, head.headSeq());
             }
             if (!toRemove.isEmpty()) {
-                head = append(log, head, ex, reason, "list.member.removed", id, Map.of("keys", List.copyOf(toRemove)));
+                head = append(log, head, ex, reason, "list.member.removed", id, payload("keys", toRemove, null, approved));
                 emit(ex, id, "list.member.removed", 0, toRemove.size(), head.headSeq());
             }
-            Map<String, Object> out = render(root, log, head, current(head, id), head.headSeq());
-            out.put("changed", toAdd.size() + toRemove.size());
+            if (!rangesAdd.isEmpty()) {
+                head = append(log, head, ex, reason, "list.range.added", id, payload("ranges", rangesAdd, expiresAt, approved));
+                emit(ex, id, "list.range.added", rangesAdd.size(), 0, head.headSeq());
+            }
+            if (!rangesRemove.isEmpty()) {
+                head = append(log, head, ex, reason, "list.range.removed", id, payload("ranges", rangesRemove, null, approved));
+                emit(ex, id, "list.range.removed", 0, rangesRemove.size(), head.headSeq());
+            }
+            EntityRegistry.EntityList after = current(head, id);
+            Map<String, Object> out = render(root, log, head, after, head.headSeq());
+            out.put("changed", changed);
+            if (reviewAfter) out.put("reviewAfter", true);
+            out.put("sidecar", changed == 0 ? "unchanged" : EntityListSidecar.write(api.dataRoot(), after, head.facts()));
             return out;
         }
     }
@@ -201,10 +294,109 @@ public final class EntityListRoutes implements RouteModule {
             EntityRegistry.EntityList l = EntityRegistry.fold(head.facts(), head.headSeq()).get(id);
             if (l == null) throw notFound(id, "");
             if (l.retired()) throw new ApiException(409, ErrorCodes.CONFLICT, "entity list '" + id + "' is already retired");
-            head = append(log, head, ex, reason, "list.retired", id, Map.of());
+            PendingChanges.hold(api, ex, KIND, id, null, heldBase(l));   // retiring a block list loosens control
+            Map<String, Object> approved = approvedBy(ex);
+            head = append(log, head, ex, reason, "list.retired", id,
+                    approved == null ? Map.of() : Map.of("approvedChange", approved));
             emit(ex, id, "list.retired", 0, 0, head.headSeq());
-            return render(root, log, head, current(head, id), head.headSeq());
+            Map<String, Object> out = render(root, log, head, current(head, id), head.headSeq());
+            out.put("sidecar", EntityListSidecar.write(api.dataRoot(), current(head, id), head.facts()));
+            return out;
         }
+    }
+
+    // ── ASSURE-ENTITY-LISTS-1 helpers ──────────────────────────────────────────────────────────────────────
+
+    /** The approval-policy kind of an Entity List change. */
+    static final String KIND = "entity-list";
+    private static final java.time.Duration SHORT_LIVED = java.time.Duration.ofHours(24);
+
+    /**
+     * What a held change replaces: the list at its last fact. Any later change to the list moves {@code lastSeq},
+     * so approving a stale proposal is refused (409) by the hold's base check.
+     */
+    private static Map<String, Object> heldBase(EntityRegistry.EntityList l) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("listId", l.id());
+        m.put("purpose", l.purpose());
+        m.put("lastSeq", l.lastSeq());
+        return m;
+    }
+
+    /** The Pending Change that approved this replay, as the fact records it ({@code null} when not a replay). */
+    private static Map<String, Object> approvedBy(HttpExchange ex) {
+        if (!(ApiContext.attr(ex, ApiContext.ATTR_APPROVED_CHANGE) instanceof Map<?, ?> pc)) return null;
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", pc.get("id"));
+        m.put("author", pc.get("author"));
+        return m;
+    }
+
+    private static Map<String, Object> payload(String field, Set<String> entries, String expiresAt,
+                                               Map<String, Object> approved) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put(field, List.copyOf(entries));
+        if (expiresAt != null) m.put("expiresAt", expiresAt);
+        if (approved != null) m.put("approvedChange", approved);
+        return m;
+    }
+
+    private static boolean unchanged(String currentExpiry, String requested) {
+        if (currentExpiry == null) return true;   // permanent: a re-add keeps it and an expiring add never shortens it
+        return currentExpiry.equals(requested);
+    }
+
+    /** {@code expiresAt}: absent = permanent; else an ISO-8601 instant after now (a past one would add nothing live). */
+    private static String expiresAt(Map<String, Object> body, Instant now) {
+        Object raw = body.get("expiresAt");
+        if (raw == null) return null;
+        Instant at;
+        try {
+            at = Instant.parse(String.valueOf(raw));
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'expiresAt' must be an ISO-8601 instant "
+                    + "(e.g. 2026-10-01T00:00:00Z)");
+        }
+        if (!at.isAfter(now))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'expiresAt' must be in the future");
+        return at.toString();
+    }
+
+    private static List<Object> rangeSpecs(Map<String, Object> body, String key) {
+        Object raw = body.get(key);
+        if (raw == null) return List.of();
+        if (!(raw instanceof List<?> l))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "' must be a list of range entries");
+        return new ArrayList<>(l);
+    }
+
+    /** Range specs ({@code {prefix} | {from, to} | {cidr}}) or canonical strings, canonicalised under the sealed normaliser. */
+    private static Set<String> canonical(EntityRegistry.EntityList l, List<Object> specs, String key) {
+        Set<String> out = new TreeSet<>();
+        for (int i = 0; i < specs.size(); i++) {
+            Object o = specs.get(i);
+            try {
+                if (o instanceof Map<?, ?> m) out.add(EntityListEntries.canonical(m, l.normaliser()));
+                else if (o instanceof String str && str.length() <= MAX_VALUE_LENGTH) out.add(EntityListEntries.parse(str).canonical());
+                else throw new IllegalArgumentException("must be a range object or a canonical range string");
+            } catch (IllegalArgumentException | IndexOutOfBoundsException e) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + key + "[" + i + "]': "
+                        + (e instanceof IllegalArgumentException ? e.getMessage() : "malformed range"));
+            }
+        }
+        return out;
+    }
+
+    /** Entries as the Pending Change shows them to the approver: masked exactly as the list renders. */
+    private static List<String> maskedList(Path root, EntityFactLog log, EntityRegistry.EntityList l, Set<String> entries)
+            throws IOException {
+        List<String> out = new ArrayList<>(entries);
+        if (!out.isEmpty() && masked(root, l)) {
+            byte[] key = EntityMasking.key(log.directory());
+            out.replaceAll(k -> EntityMasking.token(key, k));
+            out.sort(null);
+        }
+        return out;
     }
 
     // ── helpers ────────────────────────────────────────────────────────────────────────────────────────
@@ -288,6 +480,7 @@ public final class EntityListRoutes implements RouteModule {
         m.put("entityType", l.entityType());
         m.put("normaliser", l.normaliser());
         m.put("size", l.members().size());
+        m.put("rangeCount", l.ranges().size());
         m.put("retired", l.retired());
         m.put("createdAt", l.createdAt());
         m.put("createdBy", l.createdBy());
@@ -306,12 +499,34 @@ public final class EntityListRoutes implements RouteModule {
             members.sort(null);
         }
         out.put("members", members);
+        // ASSURE-ENTITY-LISTS-1: the range entries and every expiring entry, masked like the members.
+        boolean masked = masked(root, l);
+        byte[] key = masked && (!l.ranges().isEmpty() || !l.expiresAt().isEmpty()) ? EntityMasking.key(log.directory()) : null;
+        List<String> ranges = new ArrayList<>(l.ranges());
+        if (masked) ranges.replaceAll(k -> EntityMasking.token(key, k));
+        ranges.sort(null);
+        out.put("ranges", ranges);
+        Instant now = Instant.now();
+        List<Map<String, Object>> expiring = new ArrayList<>();
+        l.expiresAt().forEach((k, at) -> expiring.add(expiring(masked ? EntityMasking.token(key, k) : k, "key", at, now)));
+        l.rangeExpiresAt().forEach((k, at) -> expiring.add(expiring(masked ? EntityMasking.token(key, k) : k, "range", at, now)));
+        expiring.sort(java.util.Comparator.comparing(m -> String.valueOf(m.get("entry"))));
+        out.put("expiring", expiring);
         out.put("atSeq", atSeq);
         out.put("headHash", atSeq == 0 ? "" : facts.facts().get((int) atSeq - 1).hash());
         return out;
     }
 
-    private static boolean masked(Path root, EntityRegistry.EntityList l) {
+    private static Map<String, Object> expiring(String entry, String kind, String at, Instant now) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("entry", entry);
+        m.put("kind", kind);
+        m.put("expiresAt", at);
+        m.put("expired", !Instant.parse(at).isAfter(now));
+        return m;
+    }
+
+    static boolean masked(Path root, EntityRegistry.EntityList l) {
         return switch (LinkAnalysisSettings.forRoot(root).effectiveMaskingMode()) {
             case "none" -> false;
             case "all" -> true;
@@ -321,10 +536,14 @@ public final class EntityListRoutes implements RouteModule {
 
     /** Best-effort audit (LA-04 pattern), emitted only AFTER the fact is sealed. Counts, never keys. */
     private static void emit(HttpExchange ex, String listId, String kind, int added, int removed, long seq) {
+        emit(ApiContext.actor(ex), ApiContext.actorType(ex), listId, kind, added, removed, seq);
+    }
+
+    static void emit(String actor, String actorType, String listId, String kind, int added, int removed, long seq) {
         try {
             Event.Builder b = Event.builder(EventType.ENTITY_LIST_CHANGED).source("inv")
                     .message("entity.list.changed — " + listId + " " + kind)
-                    .actor(ApiContext.actor(ex)).actorType(ApiContext.actorType(ex))
+                    .actor(actor).actorType(actorType)
                     .action("entity.list.changed").actionCategory("analysis")
                     .attr("listId", listId).attr("kind", kind).attr("added", added).attr("removed", removed)
                     .attr("seq", seq);

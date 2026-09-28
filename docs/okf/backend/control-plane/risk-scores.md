@@ -30,6 +30,7 @@ is injective (`a-b` and `a_b` cannot share an output).
 | `entityType` | `subscriber` · `account` · `device` · `sim` · `dealer` · `channel` · `partner`, or any plain token |
 | `highThreshold` | a score at or above this is `high` (in (0, 100]) |
 | `dataScope` | optional; a data-scoped caller must hold it to read a score |
+| `watchList` | optional `{list, ttlHours}`: feed every high entity to a `watch` Entity List for 1..24 h ([Entity Lists](entity-lists.md)) |
 | `factors[]` | `id`, `label?`, `dataset`, `key`, `measure`, `filters?`, `weight`, `cap?`, `evidence?` |
 
 A factor's **indicator** is a Measure (`count` or `agg(field)`, with the Measure grammar's `filters`) over
@@ -205,8 +206,9 @@ renders it as a required autocomplete over the saved models (`riskScoreModelOpti
 
 ## Residuals
 
-- **The watch Entity List is not fed.** "Above a threshold → watch Entity List" waits on
-  `ASSURE-ENTITY-LISTS-1`, which is on hold.
+- ✅ **The watch Entity List is fed (2026-09-28).** An optional `watchList: {list, ttlHours}` (1..24) adds every
+  high entity to a `watch` Entity List after each run, expiring `ttlHours` later. It fails closed at save and at
+  run. See [Entity Lists — assurance entries](entity-lists.md#the-risk-score-watch-list-feed).
 - **Entity-key masking is D-P8** (deferred). The key is raw on every surface.
 - There is no authoring pane: models are written through `/components/risk-score`.
 - An indicator is a Measure. There is no free-form arithmetic expression, and no reference to a saved

@@ -22,6 +22,11 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  *       carries every EFFECTIVE key of one call (normalised, sorted), not one fact per key, so a 5 000-key call is
  *       one file, not 5 000;</li>
  *   <li>{@code list.retired} — flagged; its members are kept (a retired list still reads as it was).</li>
+ *   <li>ASSURE-ENTITY-LISTS-1 (WS-12): {@code list.member.added} may carry {@code expiresAt} (an ISO instant) for
+ *       every key it names; a later add without it makes them permanent, a remove forgets the expiry.
+ *       {@code list.range.added {ranges[], expiresAt?}} / {@code list.range.removed {ranges[]}} keep the range entries
+ *       ({@link EntityListEntries}: prefix, same-length range, CIDR) the same way. An expired entry stays in the
+ *       fold (as-of reads show it) but no longer MATCHES ({@link EntityList#live}).</li>
  * </ul>
  * The writer ({@link EntityListRoutes}) guarantees the invariants — a created id is new, a changed list exists and
  * is not retired — so the fold does not re-judge them; a fact naming a list it has not seen is ignored.
@@ -33,9 +38,49 @@ final class EntityRegistry {
 
     private EntityRegistry() {}
 
-    /** One Entity List as of a log position. {@code members} are normalised keys, sorted. */
+    /**
+     * One Entity List as of a log position. {@code members} are normalised keys, sorted; {@code ranges} the canonical
+     * range entries; {@code expiresAt} / {@code rangeExpiresAt} the expiry of each expiring member / range (absent =
+     * permanent). Two maps, because a member key of a {@code default} list may spell like a range entry.
+     */
     record EntityList(String id, String title, String purpose, String entityType, String normaliser, String createdAt,
-                      String createdBy, boolean retired, long lastSeq, SortedSet<String> members) {}
+                      String createdBy, boolean retired, long lastSeq, SortedSet<String> members,
+                      SortedSet<String> ranges, java.util.SortedMap<String, String> expiresAt,
+                      java.util.SortedMap<String, String> rangeExpiresAt) {
+
+        /** Whether member {@code key} still matches at {@code now}: it has no expiry, or one after now. */
+        boolean live(String key, java.time.Instant now) {
+            return notExpired(expiresAt.get(key), now);
+        }
+
+        /** Whether range entry {@code range} still matches at {@code now}. */
+        boolean liveRange(String range, java.time.Instant now) {
+            return notExpired(rangeExpiresAt.get(range), now);
+        }
+
+        private static boolean notExpired(String at, java.time.Instant now) {
+            return at == null || java.time.Instant.parse(at).isAfter(now);
+        }
+
+        /** The members that still match at {@code now}. */
+        SortedSet<String> liveMembers(java.time.Instant now) {
+            SortedSet<String> out = new TreeSet<>();
+            for (String k : members) if (live(k, now)) out.add(k);
+            return Collections.unmodifiableSortedSet(out);
+        }
+
+        /**
+         * The entry that admits {@code raw} at {@code now}: its key when an exact member, else the first live range
+         * entry that contains it; {@code null} when none does. An expired entry never matches.
+         */
+        String match(String raw, java.time.Instant now) {
+            String key = com.gamma.control.EntityTypes.normalise(normaliser, raw);
+            if (!key.isEmpty() && members.contains(key) && live(key, now)) return key;
+            for (String r : ranges)
+                if (liveRange(r, now) && EntityListEntries.matches(EntityListEntries.parse(r), key, raw)) return r;
+            return null;
+        }
+    }
 
     /** Every list that existed at {@code atSeq}, in creation order. */
     static Map<String, EntityList> fold(List<EntityFactLog.Fact> facts, long atSeq) {
@@ -52,8 +97,10 @@ final class EntityRegistry {
             Acc l = lists.get(id);
             if (l == null) continue;
             switch (f.kind()) {
-                case "list.member.added" -> l.members.addAll(strings(b.get("keys")));
-                case "list.member.removed" -> l.members.removeAll(strings(b.get("keys")));
+                case "list.member.added" -> expiring(strings(b.get("keys")), b.get("expiresAt"), l.members, l.expires);
+                case "list.member.removed" -> forget(strings(b.get("keys")), l.members, l.expires);
+                case "list.range.added" -> expiring(strings(b.get("ranges")), b.get("expiresAt"), l.ranges, l.rangeExpires);
+                case "list.range.removed" -> forget(strings(b.get("ranges")), l.ranges, l.rangeExpires);
                 case "list.retired" -> l.retired = true;
                 default -> { continue; }
             }
@@ -61,8 +108,22 @@ final class EntityRegistry {
         }
         Map<String, EntityList> out = new LinkedHashMap<>();
         lists.forEach((id, l) -> out.put(id, new EntityList(l.id, l.title, l.purpose, l.entityType, l.normaliser, l.createdAt,
-                l.createdBy, l.retired, l.lastSeq, Collections.unmodifiableSortedSet(l.members))));
+                l.createdBy, l.retired, l.lastSeq, Collections.unmodifiableSortedSet(l.members),
+                Collections.unmodifiableSortedSet(l.ranges), Collections.unmodifiableSortedMap(l.expires),
+                Collections.unmodifiableSortedMap(l.rangeExpires))));
         return out;
+    }
+
+    private static void expiring(List<String> entries, Object expiresAt, SortedSet<String> into,
+                                 java.util.SortedMap<String, String> expiries) {
+        into.addAll(entries);
+        for (String e : entries)
+            if (expiresAt == null) expiries.remove(e); else expiries.put(e, String.valueOf(expiresAt));
+    }
+
+    private static void forget(List<String> entries, SortedSet<String> from, java.util.SortedMap<String, String> expiries) {
+        from.removeAll(entries);
+        entries.forEach(expiries::remove);
     }
 
     // ── identity resolution (slice 2, design §8.1) ─────────────────────────────────────────────────────
@@ -141,6 +202,9 @@ final class EntityRegistry {
     private static final class Acc {
         final String id, title, purpose, entityType, normaliser, createdAt, createdBy;
         final SortedSet<String> members = new TreeSet<>();
+        final SortedSet<String> ranges = new TreeSet<>();
+        final java.util.SortedMap<String, String> expires = new java.util.TreeMap<>();
+        final java.util.SortedMap<String, String> rangeExpires = new java.util.TreeMap<>();
         boolean retired;
         long lastSeq;
 

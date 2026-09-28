@@ -146,4 +146,22 @@ class RiskScoreJobTest {
             assertTrue(run.message().contains("unknown risk-score model 'nope'"), run.message());
         }
     }
+
+    /** ASSURE-ENTITY-LISTS-1: without Entity Lists installed (this module's classpath) a watch-list feed FAILS, never skips. */
+    @Test
+    void aWatchListFeedWithNoEntityListsInstalledFailsInsteadOfSkipping(@TempDir Path dir) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("entityType", "subscriber");
+        m.put("highThreshold", 50);
+        m.put("factors", List.of(Map.of("id", "n", "dataset", "d", "key", "k", "measure", "count", "weight", 60)));
+        m.put("watchList", Map.of("list", "mule-watch", "ttlHours", 12));
+        com.gamma.risk.RiskScoreModel model = com.gamma.risk.RiskScoreModel.fromMap("subs", m);
+        List<RiskScorer.Scored> scored = List.of(RiskScorer.score(model, "m1", Map.of("n", 1.0), Map.of()));
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> RiskScoreJobType.feedWatchList(
+                dir, dir, model, "r1", java.time.Instant.now(), scored));
+        assertTrue(e.getMessage().contains("not installed"), e.getMessage());
+        assertDoesNotThrow(() -> RiskScoreJobType.feedWatchList(dir, dir, com.gamma.risk.RiskScoreModel.fromMap("subs",
+                new LinkedHashMap<>(Map.of("entityType", "subscriber", "highThreshold", 50, "factors", m.get("factors")))),
+                "r1", java.time.Instant.now(), scored), "no watchList: nothing to feed");
+    }
 }

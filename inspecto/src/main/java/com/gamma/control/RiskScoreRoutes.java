@@ -125,6 +125,17 @@ final class RiskScoreRoutes implements RouteModule {
     /** {@link #requireStorable(ApiContext, RiskScoreModel)} against explicit roots. */
     static void requireStorable(Path writeRoot, java.util.function.Supplier<Path> dataRoots, RiskScoreModel model) {
         if (writeRoot == null) throw new IllegalArgumentException("risk-score write needs a write root");
+        if (model.watchList() != null) {
+            // ASSURE-ENTITY-LISTS-1: fail closed at save — the list must exist, be a live watch list, and the edition
+            // must carry Entity Lists at all.
+            com.gamma.risk.WatchListFeed feed = com.gamma.risk.WatchListFeed.installed().orElseThrow(() ->
+                    new IllegalArgumentException("risk-score.watchList needs Entity Lists, which this edition does not carry"));
+            try {
+                feed.check(writeRoot, model.watchList().list());
+            } catch (java.io.IOException e) {
+                throw new IllegalArgumentException("risk-score.watchList cannot be checked: the Entity List log is unreadable", e);
+            }
+        }
         DatasetMeasureProbe probe = new DatasetMeasureProbe(() -> writeRoot, dataRoots);
         for (Map.Entry<String, Set<String>> e : model.referencedColumns().entrySet()) {
             List<String> columns;

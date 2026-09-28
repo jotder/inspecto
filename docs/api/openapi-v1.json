@@ -8917,6 +8917,29 @@
         "x-optional-module" : true
       }
     },
+    "/inv/entity-lists/{entitylistId}/match" : {
+      "post" : {
+        "tags" : [ "inv" ],
+        "summary" : "POST /inv/entity-lists/{entitylistId}/match (generated skeleton)",
+        "operationId" : "postInvEntityListsByEntitylistIdMatch",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "parameters" : [ {
+          "name" : "entitylistId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true,
+        "x-optional-module" : true
+      }
+    },
     "/inv/entity-identities" : {
       "get" : {
         "tags" : [ "inv" ],

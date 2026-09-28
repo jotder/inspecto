@@ -68,6 +68,8 @@ class DecisionRuleWritersTest {
             Map.entry("EntityListRoutes#list", NOT_CONFIG), Map.entry("EntityListRoutes#one", NOT_CONFIG),
             Map.entry("EntityListRoutes#create", NOT_CONFIG), Map.entry("EntityListRoutes#members", NOT_CONFIG),
             Map.entry("EntityListRoutes#retire", NOT_CONFIG), Map.entry("InvestigationRoutes#sealList", NOT_CONFIG),
+            Map.entry("EntityListRoutes#match", NOT_CONFIG), Map.entry("RiskWatchListFeed#check", NOT_CONFIG),
+            Map.entry("RiskWatchListFeed#feed", NOT_CONFIG),
             Map.entry("EntityIdentityRoutes#assertIdentity", NOT_CONFIG), Map.entry("EntityIdentityRoutes#retract", NOT_CONFIG),
             Map.entry("EntityIdentityRoutes#groups", NOT_CONFIG), Map.entry("EntityIdentityRoutes#group", NOT_CONFIG),
             Map.entry("ActionRequestRoutes#propose", NOT_CONFIG),

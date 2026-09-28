@@ -71,6 +71,7 @@ final class AbsentGeoLinkRoutes implements RouteModule {
             {"POST", "/inv/entity-lists"},
             {"POST", "/inv/entity-lists/([^/]+)/members"},
             {"POST", "/inv/entity-lists/([^/]+)/retire"},
+            {"POST", "/inv/entity-lists/([^/]+)/match"},
             {"GET",  "/inv/entity-identities"},
             {"GET",  "/inv/entity-identities/group"},
             {"POST", "/inv/entity-identities"},

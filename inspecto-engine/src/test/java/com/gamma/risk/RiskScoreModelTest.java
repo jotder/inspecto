@@ -36,6 +36,25 @@ class RiskScoreModelTest {
         return assertThrows(IllegalArgumentException.class, () -> RiskScoreModel.fromMap("subs", m)).getMessage();
     }
 
+    /** ASSURE-ENTITY-LISTS-1: the watch-list feed is optional, and only an expiring (1..24 h) feed is accepted (D-P5). */
+    @Test
+    void aWatchListFeedIsAListIdAndAWholeTtlOfAtMost24Hours() {
+        assertNull(RiskScoreModel.fromMap("subs", model(factor())).watchList(), "absent = no feed");
+        Map<String, Object> m = model(factor());
+        m.put("watchList", Map.of("list", "mule-watch", "ttlHours", 24));
+        assertEquals(new RiskScoreModel.WatchList("mule-watch", 24), RiskScoreModel.fromMap("subs", m).watchList());
+        for (Object ttl : List.of(0, 25, 1.5, -1, "x")) {
+            m.put("watchList", Map.of("list", "mule-watch", "ttlHours", ttl));
+            assertTrue(refused(m).contains("ttlHours"), "ttlHours " + ttl);
+        }
+        m.put("watchList", Map.of("list", "Mule Watch", "ttlHours", 1));
+        assertTrue(refused(m).contains("watchList.list"));
+        m.put("watchList", Map.of("list", "w", "ttlHours", 1, "purpose", "block"));
+        assertTrue(refused(m).contains("unknown key 'purpose'"));
+        m.put("watchList", "w");
+        assertTrue(refused(m).contains("must be an object"));
+    }
+
     @Test
     void aValidModelParsesWithDefaults() {
         RiskScoreModel m = RiskScoreModel.fromMap("subs", model(factor()));

@@ -38,7 +38,7 @@ import java.util.regex.Pattern;
  * registry and runs at the route ({@link #referencedColumns}).
  */
 public record RiskScoreModel(String id, String entityType, double highThreshold, String scoresDataset,
-                             String dataScope, String description, List<Factor> factors) {
+                             String dataScope, String description, List<Factor> factors, WatchList watchList) {
 
     /** The named entity types (D-P1). Anything else that is a plain token is accepted as free-form. */
     public static final List<String> ENTITY_TYPES =
@@ -56,7 +56,7 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
     /** The component envelope the store/route adds (name = id, owner, shares) — accepted, never scored. */
     public static final Set<String> ENVELOPE_KEYS = Set.of("name", "owner", "shares");
     private static final Set<String> MODEL_KEYS = Set.of("name", "owner", "shares", "id", "entityType",
-            "highThreshold", "dataScope", "description", "factors");
+            "highThreshold", "dataScope", "description", "factors", "watchList");
     private static final Set<String> FACTOR_KEYS = Set.of("id", "label", "dataset", "key", "measure",
             "filters", "weight", "cap", "evidence");
 
@@ -106,6 +106,16 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
             return body;
         }
     }
+
+    /** The longest a fed watch entry may live: D-P5 lets only an expiring (at most 24 h) entry skip four-eyes. */
+    public static final int MAX_WATCH_TTL_HOURS = 24;
+    private static final Pattern LIST_ID = Pattern.compile("[a-z0-9][a-z0-9_-]{0,63}");
+
+    /**
+     * The optional watch-list feed (ASSURE-ENTITY-LISTS-1): after each run every {@code high} entity is added to the
+     * {@code watch} Entity List {@code list}, expiring {@code ttlHours} (1..24) later. See {@link WatchListFeed}.
+     */
+    public record WatchList(String list, int ttlHours) {}
 
     public RiskScoreModel {
         factors = List.copyOf(factors);
@@ -166,7 +176,25 @@ public record RiskScoreModel(String id, String entityType, double highThreshold,
                 throw new IllegalArgumentException("risk-score.factors: duplicate factor id '" + f.id() + "'");
             factors.add(f);
         }
-        return new RiskScoreModel(id, entityType, high, scores, scope, Values.trimToNull(m.get("description")), factors);
+        return new RiskScoreModel(id, entityType, high, scores, scope, Values.trimToNull(m.get("description")), factors,
+                watchList(m.get("watchList")));
+    }
+
+    private static WatchList watchList(Object raw) {
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?> w))
+            throw new IllegalArgumentException("risk-score.watchList must be an object {list, ttlHours}");
+        for (Object k : w.keySet())
+            if (!Set.of("list", "ttlHours").contains(String.valueOf(k)))
+                throw new IllegalArgumentException("risk-score.watchList: unknown key '" + k + "' (expected [list, ttlHours])");
+        String list = Values.trimToNull(w.get("list"));
+        if (list == null || !LIST_ID.matcher(list).matches())
+            throw new IllegalArgumentException("risk-score.watchList.list must be an Entity List id, got '" + list + "'");
+        double ttl = number(w.get("ttlHours"), "risk-score.watchList.ttlHours");
+        if (ttl != Math.rint(ttl) || ttl < 1 || ttl > MAX_WATCH_TTL_HOURS)
+            throw new IllegalArgumentException("risk-score.watchList.ttlHours must be a whole number in 1.."
+                    + MAX_WATCH_TTL_HOURS + " (a longer-lived entry needs four-eyes, D-P5), got " + w.get("ttlHours"));
+        return new WatchList(list, (int) ttl);
     }
 
     private static Factor factor(int i, Map<?, ?> fm) {

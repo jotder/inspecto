@@ -826,7 +826,9 @@ public final class InvestigationRoutes implements RouteModule {
         sealed.put("normaliser", l.normaliser());   // D-M9: the list's sealed rule — its members were stored under it
         sealed.put("purpose", l.purpose());
         sealed.put("masked", type.masked());   // the type's masking flag AS SEALED — EntityMasking reads only the log
-        sealed.put("members", new ArrayList<>(l.members()));
+        // ASSURE-ENTITY-LISTS-1: an expired entry no longer matches, so it is not sealed. Range entries are not
+        // sealed by excludeBy / seedBy yet (they match exact keys only).
+        sealed.put("members", new ArrayList<>(l.liveMembers(java.time.Instant.now())));
         return sealed;
     }
 

@@ -186,9 +186,10 @@ system: the evidence cannot say something the code does not.
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:67` |
 | POST | `/inv/entity-identities` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityIdentityRoutes.java:69` |
 | POST | `/inv/entity-identities/([^/]+)/retract` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityIdentityRoutes.java:71` |
-| POST | `/inv/entity-lists` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:69` |
-| POST | `/inv/entity-lists/([^/]+)/members` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:71` |
-| POST | `/inv/entity-lists/([^/]+)/retire` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:73` |
+| POST | `/inv/entity-lists` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:81` |
+| POST | `/inv/entity-lists/([^/]+)/match` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:87` |
+| POST | `/inv/entity-lists/([^/]+)/members` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:83` |
+| POST | `/inv/entity-lists/([^/]+)/retire` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/EntityListRoutes.java:85` |
 | POST | `/inv/investigation-templates/([^/]+)/instantiate` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationTemplateRoutes.java:87` |
 | POST | `/inv/investigations` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:136` |
 | POST | `/inv/investigations/([^/]+)/alert-rules` | gated | `canAuthorAlertRules` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationMeasureRoutes.java:58` |
