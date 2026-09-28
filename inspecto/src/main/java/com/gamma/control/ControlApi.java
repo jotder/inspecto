@@ -739,30 +739,34 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 log.debug("{} {} aborted by the client: {}", ex.getRequestMethod(), path(ex), e.getMessage());
                 return;
             }
-            fail500(ex, e, String.valueOf(e.getMessage()));
+            fail500(ex, e);
         } catch (StackOverflowError soe) {
-            fail500(ex, soe, String.valueOf(soe));   // unwound to here, so the stack is usable again
+            fail500(ex, soe);   // unwound to here, so the stack is usable again
         } catch (VirtualMachineError vme) {
             try {
-                fail500(ex, vme, String.valueOf(vme));
+                fail500(ex, vme);
             } catch (Throwable t) {
                 vme.addSuppressed(t);                // the answer is best-effort; the original must survive
             }
             throw vme;
         } catch (Error e) {
-            fail500(ex, e, String.valueOf(e));
+            fail500(ex, e);
         }
     }
 
     /** Log a server fault at ERROR, with the correlation id and the stack, and answer it with a 500 v1 error
      *  envelope. If the handler already committed the response (an SSE stream, or a route that responded and
      *  then failed, e.g. in its audit call), there is nothing left to answer: a second send would only throw
-     *  "headers already sent" and bury the real failure. */
-    private void fail500(HttpExchange ex, Throwable t, String message) throws IOException {
-        log.error("{} {} failed (Correlation-ID {})", ex.getRequestMethod(), path(ex),
-                ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID), t);
+     *  "headers already sent" and bury the real failure.
+     *
+     *  <p>ERR-500-GENERIC (operator, 2026-09-28): the client gets only a generic message naming the
+     *  correlation id; the exception text (class names, SQL fragments, paths) and the stack stay in the
+     *  ERROR log line under that id. {@link ApiException} bodies are authored by their route and unchanged. */
+    private void fail500(HttpExchange ex, Throwable t) throws IOException {
+        Object cid = ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID);
+        log.error("{} {} failed (Correlation-ID {})", ex.getRequestMethod(), path(ex), cid, t);
         if (ex.getResponseCode() > 0) return;
-        respond(ex, 500, Map.of("error", message));
+        respond(ex, 500, Map.of("error", "Internal error — correlation id " + cid));
     }
 
     /** The 5xx {@link #errorBoundary} answers a non-{@link ApiException} failure with, or 0 when it answers none

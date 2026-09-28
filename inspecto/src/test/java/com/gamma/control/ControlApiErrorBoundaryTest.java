@@ -88,7 +88,10 @@ class ControlApiErrorBoundaryTest {
         assertEquals(ErrorCodes.INTERNAL, err.get("errorCode").asText(), r.body());
         assertEquals(cid, err.get("correlationId").asText(), r.body());
         assertFalse(err.get("recoverable").asBoolean(), r.body());
-        assertTrue(err.get("message").asText().contains(messageFragment), r.body());
+        // ERR-500-GENERIC (operator, 2026-09-28): generic text + the id; the exception text stays in the log only.
+        assertEquals("Internal error — correlation id " + cid, err.get("message").asText(), r.body());
+        assertFalse(r.body().contains(messageFragment), r.body());
+        assertFalse(r.body().contains(kind.getName()), r.body());
 
         List<ILoggingEvent> lines = c.logs.list.stream()
                 .filter(e -> e.getLevel() == Level.ERROR && e.getFormattedMessage().contains(path)).toList();
@@ -97,6 +100,8 @@ class ControlApiErrorBoundaryTest {
         assertTrue(line.getFormattedMessage().contains(cid), line.getFormattedMessage());
         assertNotNull(line.getThrowableProxy(), "the stack is logged");
         assertEquals(kind.getName(), line.getThrowableProxy().getClassName());
+        assertTrue((line.getThrowableProxy().getClassName() + ": " + line.getThrowableProxy().getMessage()).contains(messageFragment),
+                "the exception text is kept in the log");
     }
 
     @Test
