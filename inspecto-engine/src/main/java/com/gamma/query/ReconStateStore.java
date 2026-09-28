@@ -20,7 +20,7 @@ import java.util.Map;
  * <pre>
  *   { "reconciliation": "&lt;id&gt;", "lastRunAt": "&lt;ISO instant&gt;" | null, "runs": n,
  *     "breaks": [ { pair, key, keyValues?, type, column?, leftValue?, rightValue?, diff?, status, note?, firstSeenAt?,
- *                   lastSeenAt?, occurrences, recurrences, assignee? } ] }
+ *                   lastSeenAt?, occurrences, recurrences, assignee?, absentRuns? } ] }
  * </pre>
  * {@code status} is {@code open | assigned | resolved | auto_closed}. A document written before
  * {@code ASSURE-BREAK-LIFECYCLE-1} (no counters, no assignee) reads with defaults — see

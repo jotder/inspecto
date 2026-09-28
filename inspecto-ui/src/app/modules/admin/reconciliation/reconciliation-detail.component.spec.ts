@@ -175,6 +175,10 @@ describe('ReconciliationDetailComponent (Breaks page)', () => {
         });
         expect(c.seenText(mea)).toBe('4 runs · recurred 1×');
         expect(c.seenText(c.missingB()[0])).toBe('—');
+        // ASSURE-BREAK-RECURRENCE-REACH-1: the header states the server's window (ReconBreaks.RECURRENCE_WINDOW_RUNS)
+        expect(c.missingColumns().find((col) => col.colId === 'seen')?.headerTooltip).toContain(
+            'within 3 runs of auto-closing',
+        );
         expect(c.missingColumns().map((col) => col.colId ?? col.field)).toEqual(
             expect.arrayContaining(['age', 'seen', 'assignee']),
         );

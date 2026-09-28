@@ -64,12 +64,12 @@ class ReconBreaksTest {
     }
 
     @Test
-    void aBreakThatIsGoneAutoClosesAndAnAutoClosedOneThatStaysGoneIsDropped() {
+    void aBreakThatIsGoneAutoClosesAndAnAutoClosedOneGonePastTheWindowIsDropped() {
         ReconBreaks.Break wasOpen = open("missing_right", "MEA · voice", null).withFirstSeenAt(RUN1);
         ReconBreaks.Break wasResolved = open("value_break", "EU · data", "amount").withStatus("resolved", "ok").withFirstSeenAt(RUN1);
-        ReconBreaks.Break wasClosed = open("missing_left", "APAC · sms", null).withStatus("auto_closed", null);
+        ReconBreaks.Break wasClosed = absentFor(List.of(open("missing_left", "APAC · sms", null)), ReconBreaks.RECURRENCE_WINDOW_RUNS).get(0);
         List<ReconBreaks.Break> merged = ReconBreaks.merge(List.of(wasOpen, wasResolved, wasClosed), List.of(), RUN2);
-        assertEquals(2, merged.size(), "the already auto-closed one is dropped (bounded history)");
+        assertEquals(2, merged.size(), "an auto-closed one gone past the window is dropped (bounded history)");
         assertEquals(List.of("auto_closed", "auto_closed"), merged.stream().map(ReconBreaks.Break::status).toList());
         assertEquals("ok", merged.get(1).note(), "an auto-closed Break keeps its note");
     }
@@ -178,6 +178,103 @@ class ReconBreaksTest {
 
         legacy.remove("firstSeenAt");
         assertEquals(0, ReconBreaks.Break.fromMap(legacy).occurrences(), "an identity-only one no run has seen");
+    }
+
+    // ── recurrence reach: the retention window (ASSURE-BREAK-RECURRENCE-REACH-1) ─────
+
+    /** {@code n} recorded runs on which none of {@code state}'s Breaks is present. */
+    private static List<ReconBreaks.Break> absentFor(List<ReconBreaks.Break> state, int n) {
+        for (int i = 0; i < n; i++) state = ReconBreaks.merge(state, List.of(), "2026-09-0" + (i + 2) + "T00:00:00Z");
+        return state;
+    }
+
+    /** 🔴 The gap the row named: absent for two (and three) runs used to come back as a NEW Break. */
+    @Test
+    void aBreakThatReturnsAfterTwoOrThreeAbsentRunsIsARecurrence() {
+        List<ReconBreaks.Break> fresh = List.of(open("missing_right", "MEA · voice", null));
+        for (int absent = 2; absent <= 3; absent++) {   // literal, not the constant: shrinking the window must go red
+            List<ReconBreaks.Break> gone = absentFor(ReconBreaks.merge(List.of(), fresh, RUN1), absent);
+            assertEquals(1, gone.size(), "retained through " + absent + " absent runs");
+            assertEquals("auto_closed", gone.get(0).status());
+            assertEquals(absent, gone.get(0).absentRuns(), "counts the consecutive absent runs");
+            assertEquals(RUN1, gone.get(0).lastSeenAt(), "an absent run is not a sighting");
+
+            ReconBreaks.Break back = ReconBreaks.merge(gone, fresh, "2026-10-01T00:00:00Z").get(0);
+            assertEquals("open", back.status(), "after " + absent + " absent runs");
+            assertEquals(1, back.recurrences(), "after " + absent + " absent runs it is a recurrence, not new");
+            assertEquals(2, back.occurrences());
+            assertEquals(RUN1, back.firstSeenAt(), "ageing still runs from the first sighting");
+            assertEquals(0, back.absentRuns(), "present again: the absence count resets");
+        }
+    }
+
+    @Test
+    void aBreakThatReturnsBeyondTheWindowIsNew() {
+        List<ReconBreaks.Break> fresh = List.of(open("missing_right", "MEA · voice", null));
+        List<ReconBreaks.Break> gone = absentFor(ReconBreaks.merge(List.of(), fresh, RUN1), ReconBreaks.RECURRENCE_WINDOW_RUNS + 1);
+        assertEquals(List.of(), gone, "dropped on the first absent run past the window");
+        ReconBreaks.Break back = ReconBreaks.merge(gone, fresh, RUN3).get(0);
+        assertEquals(0, back.recurrences(), "beyond the window it is a new Break");
+        assertEquals(1, back.occurrences());
+        assertEquals(RUN3, back.firstSeenAt());
+    }
+
+    /** The window carries an assignee across the absence, as one absent run always did. */
+    @Test
+    void aRecurrenceWithinTheWindowReturnsToItsAssignee() {
+        List<ReconBreaks.Break> fresh = List.of(open("value_break", "EU · data", "amount"));
+        ReconBreaks.Break assigned = ReconBreaks.merge(List.of(), fresh, RUN1).get(0).withStatus("assigned", null).withAssignee("dana");
+        List<ReconBreaks.Break> gone = absentFor(List.of(assigned), ReconBreaks.RECURRENCE_WINDOW_RUNS);
+        ReconBreaks.Break back = ReconBreaks.merge(gone, fresh, RUN3).get(0);
+        assertEquals("assigned", back.status());
+        assertEquals("dana", back.assignee());
+    }
+
+    /**
+     * 🔴 Retention is bounded twice: by the window (a rotating key is forgotten after it) and by a cap on the
+     * auto-closed records kept, which drops the LONGEST-absent first — never a present Break.
+     */
+    @Test
+    void theRetainedAutoClosedSetIsBoundedAndTheLongestAbsentGoFirst() {
+        ReconBreaks.Break k1 = absentFor(List.of(open("missing_right", "k1", null).withFirstSeenAt(RUN1)), 1).get(0);
+        List<ReconBreaks.Break> state = ReconBreaks.merge(List.of(k1, open("missing_right", "k2", null).withFirstSeenAt(RUN1)),
+                List.of(), RUN2);   // k1 absent 2 runs, k2 absent 1
+        List<ReconBreaks.Break> prev = new java.util.ArrayList<>(state);
+        prev.add(open("missing_right", "k3", null).withFirstSeenAt(RUN1));
+        List<ReconBreaks.Break> merged = ReconBreaks.merge(prev, List.of(open("missing_right", "k4", null)), RUN3,
+                ReconBreaks.RECURRENCE_WINDOW_RUNS, 2);
+        assertEquals(List.of("k4", "k2", "k3"), merged.stream().map(ReconBreaks.Break::key).toList(),
+                "two auto-closed kept, the longest-absent (k1, 3 runs) dropped, the present one untouched");
+        assertEquals(List.of(2, 1), merged.subList(1, 3).stream().map(ReconBreaks.Break::absentRuns).toList());
+        assertEquals(4, ReconBreaks.merge(prev, List.of(open("missing_right", "k4", null)), RUN3).size(),
+                "the default cap (MAX_BREAKS) keeps all three");
+    }
+
+    /** The per-pair identity holds across the window: the A↔C record's presence is not the A↔B one's. */
+    @Test
+    void anAbAndAnAcBreakCountTheirAbsencesIndependently() {
+        ReconBreaks.Break ab = open("value_break", "m2", "active_flag");
+        ReconBreaks.Break ac = ab.withPair("AC");
+        List<ReconBreaks.Break> state = ReconBreaks.merge(List.of(), List.of(ab, ac), RUN1);
+        for (int i = 0; i < 2; i++) state = ReconBreaks.merge(state, List.of(ac), RUN2);   // A↔B absent twice
+        List<ReconBreaks.Break> back = ReconBreaks.merge(state, List.of(ab, ac), RUN3);
+        ReconBreaks.Break abBack = back.stream().filter(b -> b.pair().equals("AB")).findFirst().orElseThrow();
+        ReconBreaks.Break acBack = back.stream().filter(b -> b.pair().equals("AC")).findFirst().orElseThrow();
+        assertEquals(1, abBack.recurrences(), "the A↔B Break came back within the window");
+        assertEquals(0, acBack.recurrences(), "the A↔C one never left");
+        assertEquals(4, acBack.occurrences());
+        assertEquals(2, abBack.occurrences());
+    }
+
+    /** absentRuns is persisted on an auto-closed record only; a legacy auto-closed one reads as absent one run. */
+    @Test
+    void absentRunsRoundTripsAndALegacyAutoClosedRecordReadsAsOneAbsentRun() {
+        ReconBreaks.Break gone = absentFor(ReconBreaks.merge(List.of(), List.of(open("missing_left", "k", null)), RUN1), 2).get(0);
+        assertEquals(2, ReconBreaks.Break.fromMap(gone.toMap()).absentRuns());
+        assertFalse(open("missing_left", "k", null).toMap().containsKey("absentRuns"), "omitted while present");
+        Map<String, Object> legacy = new LinkedHashMap<>(Map.of("pair", "AB", "key", "k", "type", "missing_left",
+                "status", "auto_closed", "firstSeenAt", RUN1));
+        assertEquals(1, ReconBreaks.Break.fromMap(legacy).absentRuns());
     }
 
     // ── identity (one contract with the SPA's breakId and the promote dedupe) ───────

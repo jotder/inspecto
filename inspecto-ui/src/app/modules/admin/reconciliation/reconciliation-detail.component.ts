@@ -314,7 +314,8 @@ export class ReconciliationDetailComponent implements OnInit {
             colId: 'seen',
             headerName: 'Seen',
             minWidth: 170,
-            headerTooltip: 'Recorded runs this break was present in; recurred = came back after auto-closing',
+            headerTooltip:
+                'Recorded runs this break was present in; recurred = came back within 3 runs of auto-closing (gone longer, it returns as a new break)',
             valueGetter: (p) => p.data?.occurrences ?? null,
             valueFormatter: (p) => (p.data ? this.seenText(p.data) : '—'),
         },

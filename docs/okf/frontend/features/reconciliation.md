@@ -103,11 +103,33 @@ resolving a Break was a config write that 403'd too. As built:
     neither a run nor an occurrence;
   * 🔴 **an auto-closed Break that reappears is RE-OPENED, not new.** The lifecycle id is deterministic and
     the state holds one record per id, so the same id again can only be the same Break: it keeps its
-    `firstSeenAt` (age runs from the FIRST sighting) and counts `recurrences + 1`. ⚠ Recurrence is countable
-    only while the auto-closed record survives — the bounded-history rule still drops one that stays gone a
-    further run, so a Break that returns after **two or more** absent runs is a new Break (`recurrences 0`).
-    Widening that window is an open call (it trades recurrence reach against state size; a Reconciliation
-    with rotating keys would otherwise accumulate every key it ever saw);
+    `firstSeenAt` (age runs from the FIRST sighting) and counts `recurrences + 1`. Recurrence is countable
+    while the auto-closed record survives — see the recurrence window below;
+  * **the recurrence window** (`ASSURE-BREAK-RECURRENCE-REACH-1`, session decision 2026-09-28). An
+    auto-closed record carries `absentRuns` — the consecutive recorded runs it has been gone (1 on the run it
+    auto-closes, persisted only while > 0, reset by its return). It survives
+    `ReconBreaks.RECURRENCE_WINDOW_RUNS` = **3** absent runs; on the 4th it is dropped. So a Break back after
+    1–3 absent runs is a **recurrence** (re-opened, `firstSeenAt` kept, back to its assignee), and one gone
+    longer is a **new** Break (`recurrences 0`, `occurrences 1`, stamped by that run). Before this the window
+    was one run. Decided:
+    * **runs, not days** — recurrence means "came back on a later run", and cadence varies per
+      Reconciliation: a day window would keep an hourly one's rotating keys for hundreds of runs yet forget a
+      monthly one's after a single run;
+    * **3** — covers a key that skips a short outage or a late feed across a couple of runs, while a
+      Reconciliation with rotating keys forgets each one after three runs instead of accumulating every key
+      it ever saw;
+    * **bounded twice** — by the window, and by a cap on the retained `auto_closed` records at
+      `ReconStateStore.MAX_BREAKS` (50,000), dropping the longest-absent first (ties keep their recorded
+      order). Present Breaks are never dropped: the >50,000 refusal of `ReconBreaks.compute` is unchanged, so a
+      state holds at most one run's Breaks plus that many auto-closed records;
+    * **per pair** — `absentRuns` lives on the lifecycle record, so an A↔B Break can auto-close and recur
+      while the same-key A↔C one stays present (`ControlApiReconStateTest.anAbBreakRecursWhileTheSameKeyAcBreakStaysPresent`);
+    * **legacy state** — an `auto_closed` record written before the window reads `absentRuns` 1 (it had been
+      gone exactly one run).
+    Tested in `ReconBreaksTest` and over real HTTP in `ControlApiReconStateTest` (back after 2 and 3 absent
+    runs = recurrence; after 4 = dropped then new). Mutation-checked: window 1 (the old rule), no drop, and an
+    unsorted cap each turn them red. The SPA's *Seen* header tooltip names the 3-run window (pinned in
+    `reconciliation-detail.component.spec.ts` — a literal mirror of the Java constant; change both together);
   * `assigned` = an unresolved Break with an `assignee`. It stays assigned while present, **auto-closes like
     any other when it disappears, keeping the assignee on record**, and a Break with an assignee that
     reappears comes back `assigned` to that assignee (a recurrence returns to its owner). Resolve keeps the

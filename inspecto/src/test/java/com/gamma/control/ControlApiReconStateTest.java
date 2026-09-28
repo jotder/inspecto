@@ -163,7 +163,7 @@ class ControlApiReconStateTest {
                     rec("value_break", "EU · data", "amount", "resolved", "known FX gap"),
                     rec("missing_right", "MEA · voice", null, "open", null),
                     rec("missing_left", "LATAM · voice", null, "open", null),
-                    rec("missing_left", "OLD · sms", null, "auto_closed", null)));
+                    goneForTheWindow(rec("missing_left", "OLD · sms", null, "auto_closed", null))));
 
             JsonNode s = V1Body.of(send(c, "POST", "/spaces/s1/recon/orders_recon/record", null).body());
             String runAt = s.get("lastRunAt").asText();
@@ -179,7 +179,7 @@ class ControlApiReconStateTest {
             assertEquals(OLD, find(s, "MEA · voice").get("firstSeenAt").asText(), "⛔ never re-stamped");
             assertEquals(runAt, find(s, "APAC · sms").get("firstSeenAt").asText(), "first seen on this run");
             assertEquals("auto_closed", find(s, "LATAM · voice").get("status").asText(), "gone ⇒ auto-closed");
-            assertNull(find(s, "OLD · sms"), "an auto-closed Break still gone is dropped");
+            assertNull(find(s, "OLD · sms"), "an auto-closed Break still gone past the window is dropped");
         }
     }
 
@@ -347,6 +347,91 @@ class ControlApiReconStateTest {
             assertEquals(200, ok.statusCode(), ok.body());
             JsonNode s = V1Body.of(send(c, "GET", "/spaces/s1/recon/orders_recon/state", null, "Authorization", "Bearer ops").body());
             assertEquals("dana", find(s, "APAC · sms").get("assignee").asText());
+        }
+    }
+
+    // ── recurrence reach: the retention window (ASSURE-BREAK-RECURRENCE-REACH-1) ─────
+
+    private static final String ORDERS_A = "SELECT * FROM (VALUES ('EU','voice',100.0),('EU','voice',100.0),"
+            + "('EU','data',118.0),('US','voice',50.0),('MEA','voice',10.0)) t(region, product, amount)";
+    /** {@link #ORDERS_A} without MEA/voice — its missing-right Break is absent from the run. */
+    private static final String ORDERS_A_NO_MEA = "SELECT * FROM (VALUES ('EU','voice',100.0),('EU','voice',100.0),"
+            + "('EU','data',118.0),('US','voice',50.0)) t(region, product, amount)";
+
+    private JsonNode record(Ctx c, String id, int times) throws Exception {
+        JsonNode s = null;
+        for (int i = 0; i < times; i++) {
+            HttpResponse<String> r = send(c, "POST", "/spaces/s1/recon/" + id + "/record", null);
+            assertEquals(200, r.statusCode(), r.body());
+            s = V1Body.of(r.body());
+        }
+        return s;
+    }
+
+    /** 🔴 The gap: a Break absent for two, then three, runs used to come back as a new Break. */
+    @Test
+    void aBreakBackAfterTwoOrThreeAbsentRunsIsARecurrence(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            Path data = c.config.getParent().resolve("data");
+            String first = find(record(c, "orders_recon", 1), "MEA · voice").get("firstSeenAt").asText();
+            int recurrences = 0;
+            for (int absent = 2; absent <= 3; absent++) {
+                seed(data, "orders_a", ORDERS_A_NO_MEA);
+                JsonNode gone = find(record(c, "orders_recon", absent), "MEA · voice");
+                assertEquals("auto_closed", gone.get("status").asText(), "retained through " + absent + " absent runs");
+                assertEquals(absent, gone.get("absentRuns").asInt());
+
+                seed(data, "orders_a", ORDERS_A);
+                JsonNode back = find(record(c, "orders_recon", 1), "MEA · voice");
+                assertEquals("open", back.get("status").asText());
+                assertEquals(++recurrences, back.get("recurrences").asInt(), "back after " + absent + " absent runs = a recurrence");
+                assertEquals(first, back.get("firstSeenAt").asText(), "ageing runs from the first sighting");
+                assertNull(back.get("absentRuns"), "present again: no absence on record");
+            }
+            JsonNode read = V1Body.of(send(c, "GET", "/spaces/s1/recon/orders_recon/state", null).body());
+            assertEquals(3, find(read, "MEA · voice").get("occurrences").asInt());
+        }
+    }
+
+    /** Beyond the window the record is dropped — the state does not keep a key forever — and a return is new. */
+    @Test
+    void aBreakBackBeyondTheWindowIsNewAndTheRecordIsNotKept(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            Path data = c.config.getParent().resolve("data");
+            record(c, "orders_recon", 1);
+            seed(data, "orders_a", ORDERS_A_NO_MEA);
+            assertNotNull(find(record(c, "orders_recon", 3), "MEA · voice"), "kept for the whole window");
+            JsonNode past = record(c, "orders_recon", 1);
+            assertNull(find(past, "MEA · voice"), "one absent run past the window: dropped (bounded)");
+            assertNull(find(V1Body.of(send(c, "GET", "/spaces/s1/recon/orders_recon/state", null).body()), "MEA · voice"));
+
+            seed(data, "orders_a", ORDERS_A);
+            JsonNode s = record(c, "orders_recon", 1);
+            JsonNode back = find(s, "MEA · voice");
+            assertEquals(0, back.get("recurrences").asInt(), "back beyond the window = a new Break");
+            assertEquals(1, back.get("occurrences").asInt());
+            assertEquals(s.get("lastRunAt").asText(), back.get("firstSeenAt").asText());
+        }
+    }
+
+    /** The per-pair identity holds across the window: m2's A↔B Break leaves and returns, its A↔C one never leaves. */
+    @Test
+    void anAbBreakRecursWhileTheSameKeyAcBreakStaysPresent(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            Path data = c.config.getParent().resolve("data");
+            record(c, "sim_recon", 1);
+            seed(data, "crm", "SELECT * FROM (VALUES ('m1',1),('m2',1)) t(msisdn, active_flag)");   // CRM agrees on m2
+            JsonNode gone = record(c, "sim_recon", 2);
+            assertEquals("auto_closed", find(gone, "AB", "m2").get("status").asText());
+            assertEquals(2, find(gone, "AB", "m2").get("absentRuns").asInt());
+            assertEquals("open", find(gone, "AC", "m2").get("status").asText(), "the A↔C Break is untouched");
+
+            seed(data, "crm", "SELECT * FROM (VALUES ('m1',1),('m2',0)) t(msisdn, active_flag)");
+            JsonNode s = record(c, "sim_recon", 1);
+            assertEquals(1, find(s, "AB", "m2").get("recurrences").asInt(), "A↔B came back within the window");
+            assertEquals(2, find(s, "AB", "m2").get("occurrences").asInt());
+            assertEquals(0, find(s, "AC", "m2").get("recurrences").asInt(), "A↔C never left");
+            assertEquals(4, find(s, "AC", "m2").get("occurrences").asInt());
         }
     }
 
@@ -588,6 +673,12 @@ class ControlApiReconStateTest {
         b.put("status", status);
         if (note != null) b.put("note", note);
         b.put("firstSeenAt", OLD);
+        return b;
+    }
+
+    /** An auto-closed record that has been absent for the whole recurrence window. */
+    private static Map<String, Object> goneForTheWindow(Map<String, Object> b) {
+        b.put("absentRuns", com.gamma.query.ReconBreaks.RECURRENCE_WINDOW_RUNS);
         return b;
     }
 

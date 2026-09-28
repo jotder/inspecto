@@ -90,6 +90,8 @@ export interface ReconBreak {
      * The recorded lifecycle's counters (`ASSURE-BREAK-LIFECYCLE-1`, server-side in `ReconBreaks.merge`) — all
      * absent on a live Break no run has recorded. `occurrences` = recorded runs the Break was present in;
      * `recurrences` = times it reappeared after auto-closing (it is then RE-OPENED, keeping `firstSeenAt`).
+     * Only a return within `ReconBreaks.RECURRENCE_WINDOW_RUNS` (3) absent runs counts; one gone longer is a new
+     * Break (`ASSURE-BREAK-RECURRENCE-REACH-1`). `absentRuns` (server-only, on an `auto_closed` record) is not read here.
      */
     lastSeenAt?: string;
     occurrences?: number;

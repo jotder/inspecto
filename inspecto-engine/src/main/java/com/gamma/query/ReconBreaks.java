@@ -31,8 +31,9 @@ import java.util.Set;
  *   <li>a Break not seen last run is {@code open} and stamped {@code firstSeenAt = runAt};</li>
  *   <li>a Break still present keeps its {@code firstSeenAt} (⛔ never re-stamped — that would reset every age
  *       to zero on every run), and a {@code resolved} one stays resolved with its note;</li>
- *   <li>an {@code open}/{@code assigned}/{@code resolved} Break no longer present becomes {@code auto_closed}; one that was
- *       already {@code auto_closed} and is still gone is dropped (bounded history).</li>
+ *   <li>an {@code open}/{@code assigned}/{@code resolved} Break no longer present becomes {@code auto_closed} with
+ *       {@code absentRuns = 1}; one already {@code auto_closed} and still gone counts one more absent run, and is
+ *       dropped once it has been gone {@link #RECURRENCE_WINDOW_RUNS} runs (bounded history).</li>
  * </ul>
  * ⚠ One deliberate widening over the TS: a still-present {@code open} Break keeps its note too (the operator's
  * R2-03 statement "still present → keep status/note/firstSeenAt"). The TS dropped it, which made a re-open
@@ -44,9 +45,14 @@ import java.util.Set;
  *   <li>🔴 <b>a Break that auto-closed and reappears is RE-OPENED, not new.</b> Its lifecycle id
  *       ({@link #lifecycleId}) is deterministic — {@code (pair, type, key, column)} — and the state holds one
  *       record per id, so "the same id again" can only be the same Break. It keeps its {@code firstSeenAt}
- *       (ageing runs from the FIRST sighting) and counts one {@code recurrence}. ⚠ Recurrence is only
- *       countable while the auto-closed record survives: one that stays gone for a further run is dropped
- *       (the bounded history above), so a Break that returns after two or more absent runs is a NEW Break;</li>
+ *       (ageing runs from the FIRST sighting) and counts one {@code recurrence}. Recurrence is countable
+ *       while the auto-closed record survives — up to {@link #RECURRENCE_WINDOW_RUNS} consecutive absent runs
+ *       ({@code ASSURE-BREAK-RECURRENCE-REACH-1}); a Break gone longer returns as a NEW Break. 🔴 The window is
+ *       in runs, not days: recurrence means "came back on a later run", and a day window would keep an hourly
+ *       Reconciliation's rotating keys for hundreds of runs yet forget a monthly one's after one. The retained
+ *       {@code auto_closed} set is also capped at {@link ReconStateStore#MAX_BREAKS} (longest-absent dropped
+ *       first), so a state holds at most one run's Breaks plus that many auto-closed records — the bound it had
+ *       before the window;</li>
  *   <li>{@code assigned} is an unresolved Break with an {@code assignee}. It stays assigned while present,
  *       auto-closes like any other when it disappears (the assignee stays on record), and a Break with an
  *       assignee that reappears comes back {@code assigned} to that assignee — a recurrence returns to its
@@ -66,6 +72,14 @@ public final class ReconBreaks {
     public static final String ASSIGNED = "assigned";
 
     /** The four Break types, in the order {@link #fromSets} emits them. */
+    /**
+     * The recurrence window: how many consecutive recorded runs an {@code auto_closed} Break survives absent
+     * ({@code ASSURE-BREAK-RECURRENCE-REACH-1}, 2026-09-28). A Break that returns within it is a recurrence; one
+     * gone longer is dropped on the next absent run and returns as a new Break. Counted in RUNS, not days — see
+     * the class note.
+     */
+    public static final int RECURRENCE_WINDOW_RUNS = 3;
+
     public static final List<String> TYPES = List.of("missing_right", "missing_left", "cardinality_break", "value_break");
 
     /** The A↔B pair — side 1 against the anchor; what a Break recorded before pairs existed belongs to. */
@@ -85,17 +99,19 @@ public final class ReconBreaks {
      * {@code leftValue}, {@code rightValue}, {@code diff}, {@code note}, {@code firstSeenAt}, {@code lastSeenAt} and
      * {@code assignee} are optional ({@code null} = absent, and omitted from {@link #toMap}). {@code occurrences}
      * counts the recorded runs the Break was present in; {@code recurrences} the times it reappeared after
-     * auto-closing (see the class note).
+     * auto-closing; {@code absentRuns} the consecutive recorded runs an {@code auto_closed} one has been gone (0 while
+     * present; omitted from {@link #toMap} when 0) — see the class note.
      */
     public record Break(String pair, String key, Map<String, Object> keyValues, String type, String column,
                         Object leftValue, Object rightValue, Double diff, String status, String note,
-                        String firstSeenAt, String lastSeenAt, int occurrences, int recurrences, String assignee) {
+                        String firstSeenAt, String lastSeenAt, int occurrences, int recurrences, String assignee,
+                        int absentRuns) {
 
         /** A fresh, {@code open} Break carrying no note and no stamp. */
         static Break fresh(String key, Map<String, Object> keyValues, String type, String column,
                            Object leftValue, Object rightValue, Double diff) {
             return new Break(PAIR_AB, key, keyValues, type, column, leftValue, rightValue, diff, OPEN, null, null,
-                    null, 0, 0, null);
+                    null, 0, 0, null, 0);
         }
 
         /**
@@ -104,7 +120,7 @@ public final class ReconBreaks {
          */
         public static Break identityOnly(String pair, String type, String key, String column, String status, String note,
                                          String assignee) {
-            return new Break(pair, key, null, type, column, null, null, null, status, note, null, null, 0, 0, assignee);
+            return new Break(pair, key, null, type, column, null, null, null, status, note, null, null, 0, 0, assignee, 0);
         }
 
         /** {@link ReconBreaks#lifecycleId} of this Break — pair included. */
@@ -115,29 +131,35 @@ public final class ReconBreaks {
         /** This Break on {@code newPair}. */
         public Break withPair(String newPair) {
             return new Break(newPair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, firstSeenAt,
-                    lastSeenAt, occurrences, recurrences, assignee);
+                    lastSeenAt, occurrences, recurrences, assignee, absentRuns);
         }
 
         /** This Break with a new status and note; the assignee is kept (see {@link #withAssignee}). */
         public Break withStatus(String newStatus, String newNote) {
             return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, newStatus, newNote, firstSeenAt,
-                    lastSeenAt, occurrences, recurrences, assignee);
+                    lastSeenAt, occurrences, recurrences, assignee, absentRuns);
         }
 
         public Break withAssignee(String newAssignee) {
             return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, firstSeenAt,
-                    lastSeenAt, occurrences, recurrences, newAssignee);
+                    lastSeenAt, occurrences, recurrences, newAssignee, absentRuns);
         }
 
         Break withFirstSeenAt(String stamp) {
             return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, stamp,
-                    lastSeenAt, occurrences, recurrences, assignee);
+                    lastSeenAt, occurrences, recurrences, assignee, absentRuns);
         }
 
-        /** This Break as seen on the run at {@code runAt}: first/last sighting and the two counters. */
+        /** This Break as seen on the run at {@code runAt}: first/last sighting and the two counters; present, so never absent. */
         Break sighted(String first, String runAt, int occurrenceCount, int recurrenceCount) {
             return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, status, note, first,
-                    runAt, occurrenceCount, recurrenceCount, assignee);
+                    runAt, occurrenceCount, recurrenceCount, assignee, 0);
+        }
+
+        /** This Break {@code auto_closed} after {@code runs} consecutive recorded runs without it. */
+        Break absentFor(int runs) {
+            return new Break(pair, key, keyValues, type, column, leftValue, rightValue, diff, AUTO_CLOSED, note, firstSeenAt,
+                    lastSeenAt, occurrences, recurrences, assignee, runs);
         }
 
         /**
@@ -173,6 +195,7 @@ public final class ReconBreaks {
             m.put("occurrences", occurrences);
             m.put("recurrences", recurrences);
             if (assignee != null) m.put("assignee", assignee);
+            if (absentRuns > 0) m.put("absentRuns", absentRuns);
             return m;
         }
 
@@ -208,10 +231,12 @@ public final class ReconBreaks {
             String last = m.get("lastSeenAt") == null ? first : str(m.get("lastSeenAt"));
             int occurrences = m.get("occurrences") instanceof Number n ? n.intValue() : first == null ? 0 : 1;
             int recurrences = m.get("recurrences") instanceof Number n ? n.intValue() : 0;
+            // An auto-closed record written before the window existed had been absent exactly one run.
+            int absentRuns = m.get("absentRuns") instanceof Number n ? n.intValue() : AUTO_CLOSED.equals(status) ? 1 : 0;
             return new Break(pair, key, kv instanceof Map<?, ?> km ? new LinkedHashMap<>((Map<String, Object>) km) : null,
                     type, str(m.get("column")), m.get("leftValue"), m.get("rightValue"),
                     diff instanceof Number n ? n.doubleValue() : null, status, str(m.get("note")),
-                    first, last, occurrences, recurrences, str(m.get("assignee")));
+                    first, last, occurrences, recurrences, str(m.get("assignee")), absentRuns);
         }
 
         private static String str(Object v) {
@@ -384,6 +409,16 @@ public final class ReconBreaks {
      * this run carries exactly the run's own timestamp.
      */
     public static List<Break> merge(List<Break> previous, List<Break> fresh, String runAt) {
+        return merge(previous, fresh, runAt, RECURRENCE_WINDOW_RUNS, ReconStateStore.MAX_BREAKS);
+    }
+
+    /**
+     * {@link #merge(List, List, String)} with an explicit recurrence window ({@code windowRuns} consecutive
+     * absent runs an {@code auto_closed} record survives) and {@code retainCap}, the most {@code auto_closed}
+     * records kept: past it the longest-absent are dropped first (ties keep their recorded order). Present Breaks
+     * are never dropped — their count is {@link #compute}'s cap to refuse.
+     */
+    static List<Break> merge(List<Break> previous, List<Break> fresh, String runAt, int windowRuns, int retainCap) {
         Map<String, Break> prevById = new LinkedHashMap<>();
         for (Break p : previous) prevById.put(p.id(), p);
         Set<String> freshIds = new HashSet<>();
@@ -411,10 +446,23 @@ public final class ReconBreaks {
             }
             out.add(carried);
         }
-        for (Break p : previous)
-            if ((OPEN.equals(p.status()) || RESOLVED.equals(p.status()) || ASSIGNED.equals(p.status()))
-                    && !freshIds.contains(p.id()))
-                out.add(p.withStatus(AUTO_CLOSED, p.note()));   // the assignee stays on record
+        List<Break> gone = new ArrayList<>();
+        for (Break p : previous) {
+            if (freshIds.contains(p.id())) continue;
+            if (OPEN.equals(p.status()) || RESOLVED.equals(p.status()) || ASSIGNED.equals(p.status()))
+                gone.add(p.absentFor(1));   // note and assignee stay on record
+            else if (AUTO_CLOSED.equals(p.status()) && p.absentRuns() < windowRuns)
+                gone.add(p.absentFor(p.absentRuns() + 1));
+            // else: auto-closed and gone past the window — dropped (bounded history)
+        }
+        if (gone.size() > retainCap) {
+            List<Break> byAbsence = new ArrayList<>(gone);
+            byAbsence.sort(java.util.Comparator.comparingInt(Break::absentRuns));   // stable: ties keep order
+            Set<Break> kept = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+            kept.addAll(byAbsence.subList(0, retainCap));
+            gone.removeIf(b -> !kept.contains(b));
+        }
+        out.addAll(gone);
         return out;
     }
 
