@@ -698,7 +698,25 @@ public final class ControlApi implements AutoCloseable, ApiContext {
 
     /** Error boundary: map a thrown {@link ApiException} to its status (carrying its error code for the v1
      *  envelope) and anything else to a 500. Inside correlation + CORS, so error bodies still carry the
-     *  Correlation-ID and CORS headers. */
+     *  Correlation-ID and CORS headers.
+     *
+     *  <p>ERR-BOUNDARY-ERROR-1 (2026-09-28): a server-side {@link Error} is answered too, never left to escape.
+     *  An escaping Throwable reaches the JDK HttpServer, which drops the connection with no log line; the client
+     *  sees "header parser received no bytes". That happened twice with a {@code NoClassDefFoundError}, from a
+     *  jdk.* module missing from the jlinked bundle runtime, and cost hours each time. The policy:
+     *  <ul>
+     *    <li>{@link StackOverflowError} and every non-{@link VirtualMachineError} {@code Error}
+     *        ({@link LinkageError}, {@link AssertionError}, {@code ServiceConfigurationError}, …) are
+     *        answered with a logged 500. The stack has unwound by the time it gets here, and the JVM is
+     *        sound.</li>
+     *    <li>Any other {@link VirtualMachineError} ({@link OutOfMemoryError}, {@link InternalError}) is logged,
+     *        answered with a best-effort 500, then RETHROWN. It is not ours to swallow, because the JVM may be
+     *        unsound. ⚠ The JDK HttpServer ({@code ServerImpl.Exchange.run}, JDK 27) catches the rethrow and logs it
+     *        at TRACE only, so it ends the exchange but reaches no uncaught-exception handler. That is why the
+     *        ERROR line is logged here first. {@code -XX:+ExitOnOutOfMemoryError} fires at allocation, so it
+     *        works either way.</li>
+     *  </ul>
+     *  Recorded in docs/okf/capabilities/control-api/control-api.md. */
     private void errorBoundary(HttpExchange ex, Chain next) throws IOException {
         try {
             next.proceed(ex);
@@ -721,16 +739,30 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 log.debug("{} {} aborted by the client: {}", ex.getRequestMethod(), path(ex), e.getMessage());
                 return;
             }
-            log.error("{} {} failed", ex.getRequestMethod(), path(ex), e);
-            respond(ex, 500, Map.of("error", String.valueOf(e.getMessage())));
+            fail500(ex, e, String.valueOf(e.getMessage()));
+        } catch (StackOverflowError soe) {
+            fail500(ex, soe, String.valueOf(soe));   // unwound to here, so the stack is usable again
         } catch (VirtualMachineError vme) {
-            throw vme;   // OOM / StackOverflow: the JVM is not in a state to answer reliably
+            try {
+                fail500(ex, vme, String.valueOf(vme));
+            } catch (Throwable t) {
+                vme.addSuppressed(t);                // the answer is best-effort; the original must survive
+            }
+            throw vme;
         } catch (Error e) {
-            // A LinkageError (NoClassDefFoundError — e.g. a jdk.* module missing from the jlinked bundle
-            // runtime) used to escape as a silently dropped connection with nothing in the log.
-            log.error("{} {} failed", ex.getRequestMethod(), path(ex), e);
-            respond(ex, 500, Map.of("error", String.valueOf(e)));
+            fail500(ex, e, String.valueOf(e));
         }
+    }
+
+    /** Log a server fault at ERROR, with the correlation id and the stack, and answer it with a 500 v1 error
+     *  envelope. If the handler already committed the response (an SSE stream, or a route that responded and
+     *  then failed, e.g. in its audit call), there is nothing left to answer: a second send would only throw
+     *  "headers already sent" and bury the real failure. */
+    private void fail500(HttpExchange ex, Throwable t, String message) throws IOException {
+        log.error("{} {} failed (Correlation-ID {})", ex.getRequestMethod(), path(ex),
+                ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID), t);
+        if (ex.getResponseCode() > 0) return;
+        respond(ex, 500, Map.of("error", message));
     }
 
     /** True when an exception is the socket giving way because the peer went first, not a server fault. */
