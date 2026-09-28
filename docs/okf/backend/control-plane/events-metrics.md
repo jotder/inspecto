@@ -477,7 +477,8 @@ flavour territory (core ships the SPI; the adapters live in `inspecto-connectors
   paste into the provider console.
 * **The unauthenticated edge is bounded twice, before the handler buffers anything** (SEC review F1,
   2026-09-24). The body is read through `ApiContext.rawBody(ex, maxBytes)` with
-  `DeliveryStatusRoutes.MAX_CALLBACK_BYTES` = 256 KiB — over it is **413 `PAYLOAD_TOO_LARGE`**, refused on
+  `DeliveryStatusRoutes.MAX_CALLBACK_BYTES` = 512 KiB (raised from 256 KiB 2026-09-28: a 256 KiB SNS message
+  outgrows it inside its envelope) — over it is **413 `PAYLOAD_TOO_LARGE`**, refused on
   the declared `Content-Length` before reading, or after at most cap+1 bytes of a chunked body, and never
   handed to `verify`. And the path is in `ControlApi.isRateLimited` on its own per-caller-IP bucket
   (`RateLimiter.callback()`: burst 60, 5/s) → **429 `RATE_LIMITED`**. ⚠ Until then the route read the
@@ -493,9 +494,60 @@ assertion), `DeliveryReceiptStoreTest`, `NotificationServiceTest` (receipt per d
 in-app / one per digest), `Hmac…`/`SendGridDeliveryStatusAdapterTest`, `SmtpEmailChannelTest`.
 
 **Deliberately not built** (residuals → BACKLOG §6): auto-disable / suppression on hard bounce +
-complaint, soft-bounce retry scheduling, an SES/SNS adapter (needs subscription confirmation and an
-outbound cert fetch from a callback path — its own review), a UI, and the `deliverWithReceipt` SPI escape
-hatch.
+complaint, soft-bounce retry scheduling, a UI, and the `deliverWithReceipt` SPI escape hatch. (The SES/SNS
+adapter was later built — next section.)
+
+### SES via SNS (`D8-SES-SNS-1`, built 2026-09-28 on recorded fixtures)
+
+Adapter id `ses` (`SesSnsDeliveryStatusAdapter`, `inspecto-connectors`), so the SNS HTTPS subscription URL is
+`/api/v1/public/delivery-status/ses`. Operator decisions D1–D11 of
+[`ses-sns-adapter-design.md`](../../../superpower/ses-sns-adapter-design.md) §9 accepted 2026-09-28; the design's
+§3 is the security review. ⚠ **No SES account was available**: the fixtures (`src/test/resources/sns/`) are
+built from AWS's documented shapes and re-signed at test time with a keytool-minted test CA — the live checks
+owed are listed below.
+
+* **SPI:** `DeliveryStatusAdapter.control(raw)` (a `default`, D10) runs after `verify`: a verified message with no
+  delivery events answers **200 `{"control": kind}`**, a replayed `MessageId` `{"control":"duplicate",
+  "duplicate":true}` — never 422, which SNS would retry.
+* **`verify` order:** flat-envelope parse (streamed, strings only, depth 1, duplicate keys refused) →
+  `SignatureVersion` exactly `2` (v1 refused and logged once per topic, D4) → `TopicArn` on
+  `notify.deliverystatus.sns.topicArns` **before any lookup** → `Timestamp` within 3600 s past / 300 s future (D6)
+  → certificate → SHA256withRSA.
+* 🔒 **The fetch** (`SnsSigningCerts`, `SnsHttpsFetcher`; its own commit and adversarial review): the host is
+  derived from the allowlisted ARN's partition and region, never a pattern (`sns.s3.amazonaws.com` is an S3
+  bucket); the URL's raw authority must equal it exactly; path `/SimpleNotificationService-<32 hex>.pem`.
+  `EgressPolicy` classes, resolved once and dialled at the checked address; private ranges only with
+  `…sns.allowPrivateAddresses=true` (D3) and `fd00:ec2::254` refused even then (it sits in the liftable ULA
+  range). TLS SNI + endpoint identification, no redirects, 200 only, 16 KiB, 3 s connect, a **5 s watchdog on
+  the whole exchange** (per-read timeouts do not stop a byte-a-second server). Cache 8, negative cache 10 min
+  (1 min for a transport error), single-flight, **12 fetches/hour** for never-seen URLs; a URL that once passed
+  trust is re-fetched outside the budget. Pinned PEM (`…sns.signingCert`, D1) never fetches. Proxy only with
+  `…sns.useProxy=true` (D9). The adapter refuses to arm if `jdk.internal.httpclient.disableHostnameVerification`
+  is set.
+* **Trust** (`SnsCertTrust`): PKIX to the JVM trust store (revocation off), validity, SAN `dNSName`
+  `sns.amazonaws.com` or the regional host (CN only when there is no DNS SAN), RSA ≥ 2048. Intermediates from
+  the PEM or the TLS session are path material, never anchors.
+* **Confirmation** (`SnsSubscriptionConfirmer`): `SubscribeURL` must be exactly `https://<host>/?Action=
+  ConfirmSubscription&TopicArn=<ours>&Token=<ours>`; one background thread, queue 4 (D7), its own budget.
+  `autoConfirm=false` fetches nothing and writes an AUDIT row with the Token (D8). An `UnsubscribeConfirmation`
+  is audited and never re-subscribes.
+* **Mapping** (`SesEventMapper`, design §4.3): Transient and Undetermined bounces → `BOUNCED_SOFT` (the existing
+  soft-bounce retry), `DeliveryDelay` → `UNKNOWN` (D11), Reject / Rendering Failure → `BOUNCED_HARD`. Correlation
+  reads our `Message-ID` from `mail.commonHeaders.messageId`, then `mail.headers` (D5, provisional). A verified
+  event that is not ours is an `UNKNOWN` under a `ses:` id → 202.
+
+**Deploy note.** Set the topic attribute `SignatureVersion=2`, set `-Dnotify.deliverystatus.sns.topicArns`, and
+subscribe `https://<public host>/api/v1/public/delivery-status/ses`. For restricted egress use a pinned
+`…sns.signingCert` plus `autoConfirm=false` (zero outbound) and confirm from the audit row with
+`aws sns confirm-subscription`. When AWS rotates its certificate, pinned mode fails closed (403s, trigger T3).
+
+**Owed to a live account:** whether SES echoes OUR `Message-ID` (D5 — otherwise an `X-SES-MESSAGE-TAGS` tag and a
+`SmtpEmailChannel` change); the real certificate path grammar (32 hex) and subject name; whether the served PEM
+chains to the JVM trust store (it may be leaf-only, in which case verification fails closed and the TLS-session
+intermediates are what carry it); `Subject` absent vs JSON null; the SNS retry horizon behind the 3600 s window.
+
+Tests: `SnsFixturesTest`, `SnsVerificationTest` (S1), `SesSnsAdapterEventsTest` (S2), `SnsFetchSecurityTest` (S3,
+a real loopback `HttpsServer`, never amazonaws.com), `ControlApiDeliveryStatusTest` (the control path).
 
 **Receipt retention (shipped 2026-07-26).** The `receipt_prune` maintenance task forgets receipts sent
 before `retention_days` (required, like every other prune — deliberate forgetting), with a
