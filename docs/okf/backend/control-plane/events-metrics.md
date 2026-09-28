@@ -192,8 +192,13 @@ timestamp: 2026-07-16T00:00:00Z
       buffer only, an empty result that looked complete. Every Parquet read now shares one path: the files not
       known to be unreadable go in one query, split per file when it fails; an unreadable file is SKIPPED,
       named in `unreadableUnits()`, logged at ERROR and raised ONCE as a WARN `SIGNAL`
-      (`signalType: events.file_unreadable`, `file: <relative path>`), retried on its own each read and dropped
-      from the list once readable or gone. ⚠ Those routes have no diagnostics slot, so the skip is surfaced as
+      (`signalType: events.file_unreadable`, `file: <relative path>`). It stays out — skipped, never retried —
+      until it is gone or its identity (size, modification time, file key) changes, and it raises one Signal
+      per identity. ⚠ Found by security review the same day: letting any successful read clear it let a
+      footer-only `COUNT(*)` re-raise the Signal on every poll, and let a file whose payload page is corrupt
+      pass the index's few-column aggregate, be re-chosen by a chain read and fail again FOREVER under the store
+      lock (every append waits on `chainHead`). The cost: a transient read failure keeps a file out until it
+      changes or the store reopens. ⚠ Those routes have no diagnostics slot, so the skip is surfaced as
       the Signal and the log, not as a count in the response body.
     - *The anchors are a chain.* Each anchor carries `prevAnchorMac` in its MAC input and must start at the
       previous `lastSeq + 1`; a garbled line (`anchor-unreadable`), a removed or reordered anchor
@@ -218,8 +223,10 @@ timestamp: 2026-07-16T00:00:00Z
       guarantee `n` rows, then reads every file whose range reaches `from` and starts at or below that bound —
       so both claims on one seq are always read (duplicates stay detected) and a hole stays a hole;
       `unlinkedSince` reads only files holding an unlinked row. A chosen file that fails to read leaves the
-      index and the choice is made again. ⚠ A file overwritten in place with the SAME size and modification
-      time keeps its old range until a read of it fails — a deliberate rewriter is the key-holder case (7).
+      index and the choice is made again (bounded). **`/audit/verify` rebuilds the whole index first**
+      (`EventStore.rebuildChainIndex`, one grouped scan — the old per-verify cost): size and modification time
+      are both settable by whoever rewrites a file, so a same-size, same-time rewrite adding a forged row would
+      otherwise be skipped by a page. Only the append path's `chainHead` and anchor paging trust the cache.
     - *One writer per directory.* The first link takes an OS lock on `<events>/.chain-writer.lock`; a second
       EventLog or process on the same directory is refused and its rows land marked unlinked. A carried row the
       incoming store already holds is not re-linked on a store swap, and verify fails one eventId at two seqs

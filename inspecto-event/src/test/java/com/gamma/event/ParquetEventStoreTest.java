@@ -286,4 +286,120 @@ class ParquetEventStoreTest {
             assertEquals(30, AuditChain.seq(store.chainHead()));
         }
     }
+    /** Overwrite the middle of {@code column}'s data in {@code f}, leaving the footer (and every other column) valid. */
+    private static void corruptColumn(Path f, String column) throws Exception {
+        long offset;
+        long length;
+        com.gamma.util.DuckDbUtil.loadDriver();
+        try (java.sql.Connection c = com.gamma.util.DuckDbUtil.openInMemory(null);
+             java.sql.PreparedStatement ps = c.prepareStatement("SELECT data_page_offset, total_compressed_size FROM "
+                     + "parquet_metadata(?) WHERE path_in_schema = ?")) {
+            ps.setString(1, f.toString().replace('\\', '/'));
+            ps.setString(2, column);
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                assertTrue(rs.next(), "the file has a " + column + " column chunk");
+                offset = rs.getLong(1);
+                length = rs.getLong(2);
+            }
+        }
+        try (java.nio.channels.FileChannel ch = java.nio.channels.FileChannel.open(f,
+                java.nio.file.StandardOpenOption.WRITE)) {
+            long from = offset + length / 4;
+            byte[] junk = new byte[(int) Math.max(8, length / 2)];
+            java.util.Arrays.fill(junk, (byte) 0x5A);
+            ch.write(java.nio.ByteBuffer.wrap(junk), from);
+        }
+    }
+
+    private static Event withPayload(Event e, int i) {
+        StringBuilder big = new StringBuilder();
+        java.util.Random r = new java.util.Random(i);
+        for (int k = 0; k < 4000; k++) big.append((char) ('a' + r.nextInt(26)));
+        return new Event(e.eventId(), e.ts(), e.level(), e.type(), e.source(), e.pipeline(), e.correlationId(),
+                e.message(), e.attributes(), java.util.Map.of("blob", big.toString()));
+    }
+
+    private static long signals(ParquetEventStore store) {
+        return store.query(EventQuery.builder().type(EventType.SIGNAL).limit(100).build()).size();
+    }
+
+    /**
+     * A file whose footer and indexed columns read but whose payload page is corrupt passes the index's aggregate
+     * and fails the full-row chain read. It must be read at most once and then stay out — not re-indexed and
+     * re-chosen forever under the store lock (every append waits on chainHead) — and raise ONE Signal however
+     * often a count or page polls it.
+     */
+    @Test
+    void aFileCorruptOnlyInAColumnTheIndexDoesNotReadCannotSpinTheChainOrSpamSignals(@TempDir Path dir)
+            throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 100_000, 0, 100)) {
+            for (long seq = 1; seq <= 30; seq++) {
+                store.append(withPayload(chained(1_000 + seq, seq, "s" + seq), (int) seq));
+                if (seq % 10 == 0) store.flush();
+            }
+        }
+        Path last;
+        try (var w = java.nio.file.Files.walk(dir)) {
+            last = w.filter(p -> p.toString().endsWith(".parquet")).sorted().toList().get(2);   // holds seq 21..30
+        }
+        corruptColumn(last, "payload");
+        try (java.sql.Connection c = com.gamma.util.DuckDbUtil.openInMemory(null);
+             java.sql.Statement st = c.createStatement()) {
+            String f = "read_parquet('" + last.toString().replace(java.io.File.separatorChar, '/') + "')";
+            st.executeQuery("SELECT COUNT(*), MAX(ts_ms), MAX(json_extract_string(attributes, '$.audit_seq')), "
+                    + "MAX(type) FROM " + f).close();                 // the index's columns still read
+            assertThrows(java.sql.SQLException.class, () -> st.executeQuery("SELECT payload FROM " + f).close(),
+                    "the payload column does not");
+        }
+        try (ParquetEventStore store = new ParquetEventStore(dir, 100_000, 0, 100)) {
+            Event head = assertTimeoutPreemptively(java.time.Duration.ofSeconds(30), store::chainHead,
+                    "a chain read over a file that indexes but does not read must finish");
+            assertEquals(20, AuditChain.seq(head), "the head comes from the files that do read");
+            assertEquals(1, store.unreadableUnits().size());
+            assertEquals(20, store.chainPage(1, 100).size());
+            for (int poll = 0; poll < 5; poll++) {
+                store.count();                                   // COUNT(*) reads the footer only: it would succeed
+                store.page(10, null, null);
+                store.chainHead();
+            }
+            assertEquals(1, store.unreadableUnits().size(), "a footer-only success does not clear the file");
+            assertEquals(1, signals(store), "one Signal per file version, not one per poll");
+        }
+    }
+
+    /** Verify rebuilds the index from the files: a rewrite that restores size and modification time — and so looks
+     *  unchanged to the cache — cannot hide a forged row from it. */
+    @Test
+    void rebuildingTheIndexSeesAForgedRewriteTheCacheWouldTrust(@TempDir Path dir) throws Exception {
+        try (ParquetEventStore store = new ParquetEventStore(dir, 100_000, 0, 100)) {
+            for (long seq = 1; seq <= 20; seq++) {
+                store.append(chained(1_000 + seq, seq, "s" + seq));
+                if (seq % 10 == 0) store.flush();
+            }
+            store.append(ev(5_000, EventLevel.INFO, EventType.LOG, "P", "noise"));
+            store.flush();
+            assertEquals(20, store.chainPage(1, 100).size());    // every file indexed; the noise file as chained=0
+            Path noise;
+            try (var w = java.nio.file.Files.walk(dir)) {
+                noise = w.filter(p -> p.toString().endsWith(".parquet")).sorted().toList().get(2);
+            }
+            // Forge: the noise file now carries a second claim on seq 5; the cache is made to see it as unchanged.
+            Path forgedDir = java.nio.file.Files.createTempDirectory("forge");
+            try (ParquetEventStore forger = new ParquetEventStore(forgedDir, 100_000, 0, 100)) {
+                forger.append(chained(5_000, 5, "forged"));
+                forger.flush();
+            }
+            Path forged;
+            try (var w = java.nio.file.Files.walk(forgedDir)) {
+                forged = w.filter(p -> p.toString().endsWith(".parquet")).findFirst().orElseThrow();
+            }
+            java.nio.file.Files.copy(forged, noise, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            store.restampForTest(noise);
+            assertEquals(1, store.chainPage(5, 2).stream().filter(e -> AuditChain.seq(e) == 5).count(),
+                    "the cached range hides the forged row — the reason verify must not trust it");
+            store.rebuildChainIndex();
+            assertEquals(2, store.chainPage(5, 2).stream().filter(e -> AuditChain.seq(e) == 5).count(),
+                    "after a rebuild both claims on seq 5 are read, so verify reports the duplicate");
+        }
+    }
 }

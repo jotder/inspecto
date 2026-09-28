@@ -140,6 +140,7 @@ final class AuditVerifier {
         LocalDate today = policy.today();
         boolean requireAnchors = policy.requireAnchors();
         List<AuditAnchors.Anchor> anchors = anchorFile.anchors();
+        store.rebuildChainIndex();   // one full scan: verify never trusts cached per-file seq ranges
         Event head = store.chainHead();
         long headSeq = head == null ? 0 : AuditChain.seq(head);
         long anchoredTo = anchors.stream().mapToLong(AuditAnchors.Anchor::lastSeq).max().orElse(0);

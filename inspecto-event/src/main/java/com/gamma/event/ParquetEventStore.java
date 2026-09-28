@@ -503,14 +503,29 @@ public final class ParquetEventStore implements EventStore {
         return found;
     }
 
-    /** The Parquet files this store can currently not read, relative to its root — every read (search, page,
-     *  count, chain) keeps it current: a file joins when a read of it fails and leaves when one succeeds or it
-     *  is gone. A verify must not pass over them silently. */
+    /** The Parquet files this store can currently not read, relative to its root. A file joins when any read of it
+     *  fails and leaves only when it is gone or its identity (size, modification time, file key) changes — never
+     *  because a narrower read of the same bytes succeeded. A verify must not pass over them silently. */
     @Override
     public synchronized List<String> unreadableUnits() {
         List<String> out = new ArrayList<>();
-        for (Path f : unreadable) out.add(rel(f));
+        for (Path f : unreadable.keySet()) out.add(rel(f));
         return out;
+    }
+
+    /** Verify rebuilds the index from the files' contents, so it never trusts a cached range: size and modification
+     *  time are both settable by whoever can rewrite a file. */
+    @Override
+    public synchronized void rebuildChainIndex() {
+        seqIndex.clear();
+    }
+
+    /** Test seam: make the cached entry for {@code f} match the file as it is now, without re-reading it — what a
+     *  rewrite that restores the size and modification time looks like to the index. */
+    synchronized void restampForTest(Path f) throws IOException {
+        SeqRange r = seqIndex.get(f);
+        Stamp st = stamp(f);
+        seqIndex.put(f, new SeqRange(st, r.chained(), r.minSeq(), r.maxSeq(), r.unlinked(), r.maxTs()));
     }
 
     // -- the per-file seq index (ASSURE-AUDIT-CHAIN-RESIDUALS-1 (3)) --
@@ -524,7 +539,31 @@ public final class ParquetEventStore implements EventStore {
      * What one Parquet file holds of the chain — its chained-row count and seq range, its unlinked audit rows and
      * newest timestamp — valid while the file keeps this size and modification time.
      */
-    private record SeqRange(long size, long mtime, long chained, long minSeq, long maxSeq, long unlinked, long maxTs) {}
+    private record SeqRange(Stamp stamp, long chained, long minSeq, long maxSeq, long unlinked, long maxTs) {}
+
+    /** A file's identity as the index and the unreadable list see it. */
+    private record Stamp(long size, long mtime, Object fileKey) {}
+
+    private static Stamp stamp(Path f) throws IOException {
+        var a = Files.readAttributes(f, java.nio.file.attribute.BasicFileAttributes.class);
+        return new Stamp(a.size(), a.lastModifiedTime().toMillis(), a.fileKey());
+    }
+
+    /** {@code true} while {@code f} is on the unreadable list with its identity unchanged; a changed file is taken
+     *  off the list so the next read tries it afresh. */
+    private boolean knownUnreadable(Path f) {
+        Stamp was = unreadable.get(f);
+        if (was == null) return false;
+        Stamp now;
+        try {
+            now = stamp(f);
+        } catch (IOException gone) {
+            return true;
+        }
+        if (now.equals(was)) return true;
+        unreadable.remove(f);
+        return false;
+    }
 
     /**
      * The per-file index the chain reads choose their files by. The seq lives in the attributes JSON, so without
@@ -542,22 +581,21 @@ public final class ParquetEventStore implements EventStore {
         List<Path> files = parquetFiles();
         seqIndex.keySet().retainAll(new java.util.HashSet<>(files));
         Map<String, Path> byName = new java.util.LinkedHashMap<>();
-        Map<Path, long[]> stamps = new java.util.HashMap<>();
+        Map<Path, Stamp> stamps = new java.util.HashMap<>();
         for (Path f : files) {
-            long size;
-            long mtime;
+            Stamp st;
             try {
-                size = Files.size(f);
-                mtime = Files.getLastModifiedTime(f).toMillis();
+                st = stamp(f);
             } catch (IOException gone) {
                 seqIndex.remove(f);
                 continue;   // removed between the listing and now
             }
             SeqRange r = seqIndex.get(f);
-            if (r != null && r.size() == size && r.mtime() == mtime) continue;
+            if (r != null && r.stamp().equals(st)) continue;
             seqIndex.remove(f);
+            if (knownUnreadable(f)) continue;   // stays out until it changes: never re-indexed only to fail again
             byName.put(f.toString().replace('\\', '/'), f);
-            stamps.put(f, new long[]{size, mtime});
+            stamps.put(f, st);
         }
         if (!byName.isEmpty()) {
             List<Path> stale = new ArrayList<>(byName.values());
@@ -567,16 +605,15 @@ public final class ParquetEventStore implements EventStore {
                     rs -> new Object[]{rs.getString(1), rs.getLong(2), rs.getLong(3), rs.getLong(4), rs.getLong(5),
                             rs.getLong(6)});
             for (Path f : stale)   // a readable file with no rows at all has no group: it holds nothing
-                if (!unreadable.contains(f)) seqIndex.put(f, new SeqRange(stamps.get(f)[0], stamps.get(f)[1], 0, 0, 0, 0,
-                        Long.MIN_VALUE));
+                if (!unreadable.containsKey(f)) seqIndex.put(f, new SeqRange(stamps.get(f), 0, 0, 0, 0, Long.MIN_VALUE));
             for (Object[] r : rows) {
                 Path f = byName.get(String.valueOf(r[0]).replace('\\', '/'));
-                if (f == null || unreadable.contains(f)) continue;
-                seqIndex.put(f, new SeqRange(stamps.get(f)[0], stamps.get(f)[1], (long) r[1], (long) r[2], (long) r[3],
-                        (long) r[4], (long) r[5]));
+                if (f == null || unreadable.containsKey(f)) continue;
+                seqIndex.put(f, new SeqRange(stamps.get(f), (long) r[1], (long) r[2], (long) r[3], (long) r[4],
+                        (long) r[5]));
             }
         }
-        if (!files.isEmpty() && unreadable.containsAll(files))
+        if (!files.isEmpty() && unreadable.keySet().containsAll(files))
             throw new IllegalStateException("audit chain read failed under " + root + ": no file readable");
         return seqIndex;
     }
@@ -594,14 +631,17 @@ public final class ParquetEventStore implements EventStore {
 
     private List<Event> chainRead(java.util.function.Function<Map<Path, SeqRange>, List<Path>> choose, String tail,
                                   List<Object> params) {
-        while (true) {
+        // Each retry follows a chosen file failing, and a failed file stays unreadable until it changes, so the
+        // choice shrinks every round; the bound only guards that argument.
+        for (int round = 0; round <= seqIndex.size() + 1; round++) {
             List<Path> files = choose.apply(refreshIndex());
             lastChainFiles = files.size();
             List<Event> out = readEvents(files, tail, params);
             boolean lost = false;
-            for (Path f : files) if (unreadable.contains(f) && seqIndex.remove(f) != null) lost = true;
+            for (Path f : files) if (unreadable.containsKey(f) && seqIndex.remove(f) != null) lost = true;
             if (!lost) return out;
         }
+        throw new IllegalStateException("audit chain read under " + root + " kept losing files; giving up");
     }
 
     // -- reads that survive one unreadable file (ASSURE-AUDIT-CHAIN-RESIDUALS-1 (4)) --
@@ -610,7 +650,9 @@ public final class ParquetEventStore implements EventStore {
     public static final String UNREADABLE_SIGNAL = "events.file_unreadable";
 
     /** Files a read failed on, in path order; see {@link #unreadableUnits}. */
-    private final java.util.TreeSet<Path> unreadable = new java.util.TreeSet<>();
+    private final java.util.TreeMap<Path, Stamp> unreadable = new java.util.TreeMap<>();
+    /** The identity each unreadable file last raised its Signal for — one Signal per file version, not per read. */
+    private final Map<Path, Stamp> signalled = new java.util.HashMap<>();
     /** Files that joined {@link #unreadable} during the current read — each raises one warning Signal. */
     private final List<Path> newlyUnreadable = new ArrayList<>();
 
@@ -633,9 +675,12 @@ public final class ParquetEventStore implements EventStore {
 
     /**
      * {@code select FROM <files> tail} over the given files. The files not known to be unreadable go in ONE query;
-     * when that fails, each is read on its own. A known-unreadable file is retried on its own every time (it may
-     * have been repaired). A file that fails is recorded ({@link #unreadableUnits}, an ERROR log, one warning
-     * Signal) and SKIPPED — the rest still answer, where one corrupt file used to fail the whole search into an
+     * when that fails, each is read on its own. A known-unreadable file is SKIPPED, not retried, until its identity
+     * changes: a narrower read (a COUNT from the footer, the index's few columns) can succeed on a file whose other
+     * columns are corrupt, and letting it clear the file would re-raise the warning on every poll and let a chain
+     * read re-choose the file forever. So a transient failure keeps a file out until it changes or the store is
+     * reopened. A file that fails is recorded ({@link #unreadableUnits}, an ERROR log, one warning Signal per file
+     * identity) and SKIPPED — the rest still answer, where one corrupt file used to fail the whole search into an
      * empty result that looked complete. With a per-file split, the rows are the UNION of each file's answer:
      * callers re-sort and re-limit (every caller does).
      */
@@ -643,7 +688,7 @@ public final class ParquetEventStore implements EventStore {
         List<T> out = new ArrayList<>();
         List<Path> good = new ArrayList<>();
         List<Path> retry = new ArrayList<>();
-        for (Path f : files) (unreadable.contains(f) ? retry : good).add(f);
+        for (Path f : files) if (!knownUnreadable(f)) good.add(f);
         if (!good.isEmpty()) {
             try {
                 readInto(out, reader(good), select, tail, params, row);
@@ -656,12 +701,18 @@ public final class ParquetEventStore implements EventStore {
             List<T> one = new ArrayList<>();
             try {
                 readInto(one, reader(List.of(f)), select, tail, params, row);
-                unreadable.remove(f);
                 out.addAll(one);
             } catch (SQLException bad) {
-                if (unreadable.add(f)) {
+                Stamp st;
+                try {
+                    st = stamp(f);
+                } catch (IOException gone) {
+                    continue;   // removed mid-read: nothing left to report
+                }
+                unreadable.put(f, st);
+                if (!st.equals(signalled.put(f, st))) {
                     newlyUnreadable.add(f);
-                    log.error("Event store file {} could not be read; reads skip it until it is readable again: {}",
+                    log.error("Event store file {} could not be read; reads skip it until it changes: {}",
                             f, bad.getMessage());
                 }
             }
@@ -695,7 +746,9 @@ public final class ParquetEventStore implements EventStore {
         if (!Files.isDirectory(root)) return List.of();
         try (Stream<Path> w = Files.walk(root)) {
             List<Path> files = w.filter(p -> p.getFileName().toString().endsWith(".parquet")).sorted().toList();
-            unreadable.retainAll(new java.util.HashSet<>(files));
+            java.util.Set<Path> present = new java.util.HashSet<>(files);
+            unreadable.keySet().retainAll(present);
+            signalled.keySet().retainAll(present);
             return files;
         } catch (IOException e) {
             throw new IllegalStateException("event store listing failed under " + root + ": " + e.getMessage(), e);

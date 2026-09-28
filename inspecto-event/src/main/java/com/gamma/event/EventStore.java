@@ -194,6 +194,11 @@ public interface EventStore extends AutoCloseable {
         return List.of();
     }
 
+    /** Drop any cached knowledge of where chained rows live, so the next chain reads recompute it from storage —
+     *  what {@code /audit/verify} does first, never trusting a cache an attacker could steer. Default: nothing
+     *  cached. @since 5.x */
+    default void rebuildChainIndex() {}
+
     /** Claim the right to LINK onto this store's audit chain; throws when another writer holds it (see
      *  {@code ParquetEventStore}). Default: nothing to claim. @since 5.x */
     default void claimChainWriter() {}
