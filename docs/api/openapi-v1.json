@@ -8944,27 +8944,112 @@
     "/settings/approval" : {
       "get" : {
         "tags" : [ "settings" ],
-        "summary" : "GET /settings/approval (generated skeleton)",
+        "summary" : "Read the Space's approval policy",
         "operationId" : "getSettingsApproval",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "description" : "The per-kind maker-checker policy persisted as `approval.toon` in the Space's config tree, plus the read-only facts a policy editor needs: `governable` (the kinds a policy may name), `defaultApproverCapability` and `failedClosed`. Open to any caller (reads are not capability-gated). Default OFF: no file (or no write root) reads as an empty `approval` map with `expiresAfterHours` 168. A file that is present but unreadable or invalid is NOT read as off — it holds every governable kind with the defaults and reports `failedClosed: true`.",
         "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          "200" : {
+            "description" : "The effective approval policy.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/ApprovalPolicy"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
           }
-        },
-        "x-generated" : true
+        }
       },
       "put" : {
         "tags" : [ "settings" ],
-        "summary" : "PUT /settings/approval (generated skeleton)",
+        "summary" : "Replace the Space's approval policy",
         "operationId" : "putSettingsApproval",
-        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
-        "responses" : {
-          "default" : {
-            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+        "description" : "Replaces `approval.toon` wholesale and returns the policy as GET reads it. Requires canAdminister (not canAuthorWorkbench: turning maker-checker off is the one change an author must not be able to make), and is itself never held for approval. Validated fail-closed: an unknown key, a kind outside `governable`, an `approverCapability` no route demands, `expiresAfterHours` outside 1..8784, a non-boolean flag, or a policy requiring approval on a build with no Authenticator is refused. Emits one `approval-policy.changed` audit event carrying the policy before and after.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "additionalProperties" : false,
+                "properties" : {
+                  "approval" : {
+                    "type" : "object",
+                    "description" : "Kind (one of `governable`) → rule. Omitted or empty = OFF.",
+                    "additionalProperties" : {
+                      "$ref" : "#/components/schemas/ApprovalRule"
+                    }
+                  },
+                  "expiresAfterHours" : {
+                    "type" : "integer",
+                    "minimum" : 1,
+                    "maximum" : 8784,
+                    "default" : 168,
+                    "description" : "How long a Pending Change waits before it is recorded `expired`."
+                  }
+                }
+              }
+            }
           }
         },
-        "x-generated" : true
+        "responses" : {
+          "200" : {
+            "description" : "The policy was written; the effective policy as GET reads it.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "$ref" : "#/components/schemas/ApprovalPolicy"
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "403" : {
+            "description" : "The caller lacks canAdminister (PERMISSION_DENIED).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422" : {
+            "description" : "The policy is refused by validation (CONFIG_VALIDATION_FAILED); `error.message` names the offending key.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "No write root is configured (CONTROL_PLANE_READ_ONLY) — set -Dassist.write.root to enable.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/pending-changes" : {
@@ -11281,6 +11366,60 @@
             }
           }
         } ]
+      },
+      "ApprovalRule" : {
+        "type" : "object",
+        "additionalProperties" : false,
+        "properties" : {
+          "required" : {
+            "type" : "boolean",
+            "default" : false,
+            "description" : "Whether a change to this kind is held as a Pending Change until approved."
+          },
+          "approverCapability" : {
+            "type" : "string",
+            "default" : "canApproveChanges",
+            "description" : "The capability an approver must hold; must be one some route demands."
+          },
+          "fourEyes" : {
+            "type" : "boolean",
+            "default" : true,
+            "description" : "Whether the approver must be someone other than the author."
+          }
+        }
+      },
+      "ApprovalPolicy" : {
+        "type" : "object",
+        "required" : [ "approval", "expiresAfterHours", "failedClosed", "governable", "defaultApproverCapability" ],
+        "properties" : {
+          "approval" : {
+            "type" : "object",
+            "description" : "Kind → rule; empty = OFF.",
+            "additionalProperties" : {
+              "$ref" : "#/components/schemas/ApprovalRule"
+            }
+          },
+          "expiresAfterHours" : {
+            "type" : "integer",
+            "minimum" : 1,
+            "maximum" : 8784
+          },
+          "failedClosed" : {
+            "type" : "boolean",
+            "description" : "True when `approval.toon` exists but could not be read — every governable kind is then held with the defaults."
+          },
+          "governable" : {
+            "type" : "array",
+            "description" : "The kinds a policy may name (read-only).",
+            "items" : {
+              "type" : "string"
+            }
+          },
+          "defaultApproverCapability" : {
+            "type" : "string",
+            "description" : "The approverCapability a rule gets when it names none (read-only)."
+          }
+        }
       },
       "PendingChangeList" : {
         "type" : "object",
