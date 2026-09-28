@@ -77,6 +77,9 @@ lock, once per distinct maker set:
   linked Incident / Case passes the approver's data scope and row policy), which cannot be evaluated without their
   request — so a non-maker holder who is scoped, or any Access Policy, reads **`unknown`**, never `ok`.
 - A pending record whose MAC fails reads `unknown` (its makers cannot be trusted).
+- ⚠ The built-in `space-isolation` policy (`inspecto-policy`) is not considered. It engages only when an IdP
+  `space` claim is mapped, and the only Authenticator that enumerates principals, and so the only one that can yield
+  `ok`, is Demo sign-in, which carries no claims. Under OIDC the answer is already `unknown`.
 
 At raise time only (`propose`, so the route and the `invoke-api` consequence alike), a `none-eligible` answer emits
 **one WARN audit event `action-request.no-eligible-approver`**; reads never re-emit. It is visibility only:
