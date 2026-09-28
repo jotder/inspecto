@@ -98,12 +98,12 @@ class CrossSpaceFraudIncidentAcceptanceTest {
 
     /**
      * One opco Run emitting 20 cases (one shared correlation id): the forwarder delivers all 20 to hub, none
-     * undeliverable. ⚠ The hub Job's TriggerCoalescer (JobService §8.4) folds a burst of matching Signals into
-     * one follow-up Run, so a burst opens FEWER Incidents than cases. That is the Job framework's storm guard,
-     * not a delivery loss; per-Signal firing for incident.open is an open decision (design §6 as-built gaps).
+     * undeliverable, and the hub opens EXACTLY one Incident per case, none carrying the MSISDN. incident.open
+     * defaults to {@code coalesce: false} (operator 2026-09-28, design §8), so the per-Job TriggerCoalescer's
+     * storm guard does not fold real cases together. Mutation-checked: forcing coalescing on turns this red.
      */
     @Test
-    void twentyFraudAlertsFromOneOpcoRunAreAllDeliveredToHub(@TempDir Path root) throws Exception {
+    void twentyFraudAlertsFromOneOpcoRunOpenTwentyHubIncidents(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             consent(c);
             assertEquals(200, post(c, "/spaces/hub/jobs", HUB_JOB, "builder").statusCode());
@@ -112,7 +112,19 @@ class CrossSpaceFraudIncidentAcceptanceTest {
                     .stream().filter(e -> "exchange.opco.fraud.alert".equals(e.attributes().get(Signal.ATTR_TYPE))).count();
             assertEquals(20, delivered, "no real case is dropped for sharing a Run's correlation id");
             assertFalse(recorded(c, ExchangeSignalForwarder.UNDELIVERABLE));
-            assertFalse(awaitIncidents(c, 1).isEmpty(), "the hub Job fired");
+            awaitIncidents(c, 20);
+            Thread.sleep(500);
+            List<JsonNode> got = incidents(c, "hub");
+            assertEquals(20, got.size(), "one hub Incident per case");
+            Set<String> cases = new java.util.TreeSet<>();
+            for (JsonNode inc : got) {
+                cases.add(inc.path("attributes").path("caseId").asText());
+                assertTrue(inc.path("attributes").path("msisdn").isMissingNode(), inc.toString());
+                assertFalse(inc.toString().contains("+15550100"), "no MSISDN leak: " + inc);
+            }
+            Set<String> want = new java.util.TreeSet<>();
+            for (int i = 0; i < 20; i++) want.add("C-" + i);
+            assertEquals(want, cases, "each Incident carries its own Signal's case");
         }
     }
 

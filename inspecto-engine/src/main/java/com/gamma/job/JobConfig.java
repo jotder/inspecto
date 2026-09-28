@@ -120,6 +120,21 @@ public record JobConfig(String name, String type, String cron, String onPipeline
     public boolean hasWhen()   { return when != null && !when.isBlank(); }
     public boolean hasBind()   { return !bind.isEmpty(); }
 
+    /** The {@code coalesce:} key (operator, 2026-09-28; cross-Space consequence design §8). */
+    public static final String COALESCE = "coalesce";
+
+    /**
+     * Whether a burst of matching Signals folds into one follow-up Run ({@code true}) or each Signal gets its
+     * own Run carrying that Signal ({@code false}). Authored as {@code coalesce: false}; absent, it defaults to
+     * {@code true} (the storm guard) for every type except {@code incident.open}, where one Incident per
+     * Signal is the point. Carried in {@link #params()}, so it round-trips through {@link #toMap()}.
+     */
+    public boolean coalesce() {
+        String v = params.get(COALESCE);
+        if (v == null || v.isBlank()) return !IncidentOpenJob.TYPE_ID.equals(type);
+        return !"false".equalsIgnoreCase(v.trim());
+    }
+
     /** A required param, or an {@link IllegalArgumentException} naming the job. */
     public String require(String key) {
         String v = params.get(key);

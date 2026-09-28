@@ -719,6 +719,74 @@ class JobServiceTest {
         }
     }
 
+    /**
+     * Operator 2026-09-28: {@code coalesce: false} gives one Run per matching Signal (queued, never SKIPPED by the
+     * non-overlap lock), while a default Job keeps folding the same burst. The coalescing twin is the control:
+     * it proves the burst really overlapped, so the 20 Runs are the opt-out and not a slow probe.
+     */
+    @Test
+    void aNonCoalescingJobRunsOncePerSignalWhileTheDefaultFolds(@TempDir Path dir) throws Exception {
+        Map<String, String> hb = new java.util.HashMap<>(Map.of("task", "heartbeat"));
+        Map<String, String> each = new java.util.HashMap<>(hb);
+        each.put(JobConfig.COALESCE, "false");
+        List<JobConfig> cfgs = List.of(
+                new JobConfig("each", "maintenance", null, null, true, false, each, "probe.burst", null),
+                new JobConfig("folded", "maintenance", null, null, true, false, hb, "probe.burst", null));
+        assertFalse(cfgs.get(0).coalesce());
+        assertTrue(cfgs.get(1).coalesce(), "every other Job keeps coalescing by default");
+        assertFalse(new JobConfig("i", "incident.open", null, null, true, false, Map.of(), "x", null).coalesce(),
+                "incident.open defaults to one Run per Signal");
+        assertEquals("false", JobConfig.fromMap(Map.of("job", Map.of("name", "n", "type", "maintenance",
+                "coalesce", "false"))).toMap().get(JobConfig.COALESCE).toString(), "the key round-trips");
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(cfgs, new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
+            com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
+            js.eventLog(log);
+            js.start();
+            for (int i = 0; i < 20; i++) log.emit(probe(i));
+            long until = System.currentTimeMillis() + 15_000;
+            while (successes(js, "each") < 20 && System.currentTimeMillis() < until) Thread.sleep(50);
+            Thread.sleep(300);
+            assertEquals(20, successes(js, "each"), js.runsFor("each").toString());
+            assertTrue(js.runsFor("each").stream().noneMatch(r -> "SKIPPED".equals(r.status())));
+            assertTrue(successes(js, "folded") < 20, "the default Job folded the burst: " + js.runsFor("folded"));
+        }
+    }
+
+    /** The burst bound: past it a Signal is REFUSED — a SKIPPED Run and a {@code job.signal.refused} Signal. */
+    @Test
+    void aNonCoalescingJobRefusesSignalsPastItsBurstBound(@TempDir Path dir) throws Exception {
+        Map<String, String> each = Map.of("task", "heartbeat", JobConfig.COALESCE, "false");
+        try (Scheduler s = new Scheduler();
+             JobService js = new JobService(List.of(new JobConfig("each", "maintenance", null, null, true, false,
+                     each, "probe.burst", null)), new ConsignmentEventBus(), s, null, dir.resolve("audit").toString())) {
+            com.gamma.event.EventLog log = com.gamma.event.EventLog.create();
+            js.eventLog(log);
+            js.start();
+            js.setMaxPendingSignalRuns(0);
+            log.emit(probe(1));
+            JobRun run = await(() -> js.lastRunOf("each").orElse(null));
+            assertEquals("SKIPPED", run.status(), run.toString());
+            assertTrue(log.store().recent(100).stream().anyMatch(e ->
+                    "job.signal.refused".equals(e.attributes().get(com.gamma.signal.Signal.ATTR_TYPE))));
+            js.setMaxPendingSignalRuns(JobService.DEFAULT_MAX_PENDING_SIGNAL_RUNS);   // positive twin
+            log.emit(probe(2));
+            JobRun ok = await(() -> js.runsFor("each").stream().filter(r -> "SUCCESS".equals(r.status()))
+                    .findFirst().orElse(null));
+            assertEquals("SUCCESS", ok.status());
+        }
+    }
+
+    private static com.gamma.event.Event probe(int i) {
+        return new com.gamma.signal.Signal(null, "probe.burst", java.time.Instant.now(), com.gamma.signal.Severity.INFO,
+                com.gamma.signal.Ref.of("test", "probe"), null, null, null, null, null, "probe",
+                Map.of("i", i), 1).toEvent();
+    }
+
+    private static long successes(JobService js, String name) {
+        return js.runsFor(name).stream().filter(r -> "SUCCESS".equals(r.status())).count();
+    }
+
     @Test
     void togglingEnabledKeepsExactlyOneBuiltJobAndArmsOnlyWhenEnabled(@TempDir Path dir) throws Exception {
         JobConfig on = maintenance("tog", "* * * * * *", null, Map.of("task", "heartbeat"));

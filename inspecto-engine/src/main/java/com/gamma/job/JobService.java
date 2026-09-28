@@ -281,6 +281,24 @@ public final class JobService implements AutoCloseable {
     /** One coalescer per on-signal Job, so a burst of matching signals folds into one follow-up Run (§8.4). */
     private final Map<String, TriggerCoalescer> signalCoalescers = new ConcurrentHashMap<>();
 
+    /**
+     * Per-Signal firing for a {@code coalesce: false} Job (operator, 2026-09-28): each matching Signal gets its
+     * own Run, serialised through the Job's fair one-permit lane (so Runs queue in order instead of being
+     * SKIPPED by the non-overlap lock), and the lane holds at most {@link #maxPendingSignalRuns} admitted-but-
+     * unfinished Runs. A Signal beyond that bound is REFUSED — a {@code SKIPPED} Run plus a
+     * {@code job.signal.refused} WARN Signal naming it — never silently dropped or folded.
+     */
+    private record SignalLane(java.util.concurrent.Semaphore serial, java.util.concurrent.atomic.AtomicInteger pending) {
+        SignalLane() { this(new java.util.concurrent.Semaphore(1, true), new java.util.concurrent.atomic.AtomicInteger()); }
+    }
+    private final Map<String, SignalLane> signalLanes = new ConcurrentHashMap<>();
+    /** Session decision 2026-09-28: 1000 queued Runs per Job — a whole-Run burst of real cases fits, a storm does not. */
+    static final int DEFAULT_MAX_PENDING_SIGNAL_RUNS = 1000;
+    private volatile int maxPendingSignalRuns = DEFAULT_MAX_PENDING_SIGNAL_RUNS;
+
+    /** Test seam: shrink the per-Job pending bound for a non-coalescing Job. */
+    void setMaxPendingSignalRuns(int max) { this.maxPendingSignalRuns = max; }
+
     /** Per-job upstream commits seen since the job's last {@code on_pipeline_gate=all} firing. */
     private final Map<String, Set<String>> pendingUpstreams = new ConcurrentHashMap<>();
     /** Loop cut: a signal-triggered Run beyond this chain depth does not fire (§8.4) — {@code -Djobs.signal.maxChainDepth}. */
@@ -744,6 +762,7 @@ public final class JobService implements AutoCloseable {
         jobs.remove(name);
         crons.remove(name);
         signalCoalescers.remove(name);
+        signalLanes.remove(name);
         jobPackOwner.remove(name);
         unavailableJobs.remove(name);
         Scheduler.CronHandle handle = cronHandles.remove(name);
@@ -922,6 +941,17 @@ public final class JobService implements AutoCloseable {
             // payload — put there by PipelineConsignmentSignal.emit (pipeline.batch.*) and by
             // commitPayload (the pipeline.commit mirror) — and be read back out here.
             Firing firing = new Firing(Map.of(), sig.payload(), signalDryRun(sig.payload()));
+            if (!c.coalesce()) {                                           // one Run per Signal, bounded
+                SignalLane lane = signalLanes.computeIfAbsent(c.name(), k -> new SignalLane());
+                if (lane.pending().incrementAndGet() > maxPendingSignalRuns) {
+                    lane.pending().decrementAndGet();
+                    refuseSignal(c.name(), sig);
+                    continue;
+                }
+                submitRun(newRunId(c.name()), c.name(), "signal:" + sig.type(), cid, sig.signalId(), newDepth,
+                        firing, lane);
+                continue;
+            }
             signalCoalescers.computeIfAbsent(c.name(), k -> new TriggerCoalescer())
                     .signal(() -> submitRun(newRunId(c.name()), c.name(), "signal:" + sig.type(), cid,
                             // 🔴 THE causation link: every signal this Run emits nests under the signal
@@ -967,6 +997,13 @@ public final class JobService implements AutoCloseable {
     }
 
     /** A→B→A loop protection: the chain is too deep — don't fire; emit a {@code job.chain.cut} WARN (§8.4). */
+    private void refuseSignal(String name, Signal sig) {
+        recordSkipped(name, "signal:" + sig.type(), "burst bound: " + maxPendingSignalRuns + " Runs already queued");
+        emitSignal("job.signal.refused", Severity.WARN, sig.correlationId(), sig.signalId(), Ref.of("job", name),
+                Map.of("job", name, "refusedSignalId", String.valueOf(sig.signalId()),
+                        "refusedType", String.valueOf(sig.type()), "maxPending", maxPendingSignalRuns));
+    }
+
     private void cutChain(String name, Signal sig, int depth) {
         log.warn("[JOB] signal chain cut at depth {} (max {}) — not firing '{}' on '{}'",
                 depth, maxChainDepth, name, sig.type());
@@ -1226,8 +1263,14 @@ public final class JobService implements AutoCloseable {
      */
     private void submitRun(String runId, String name, String trigger, String correlationId,
                            String causationId, int chainDepth, Firing firing) {
+        submitRun(runId, name, trigger, correlationId, causationId, chainDepth, firing, null);
+    }
+
+    /** As above; a non-null {@code lane} serialises this Run behind the Job's earlier per-Signal Runs. */
+    private void submitRun(String runId, String name, String trigger, String correlationId,
+                           String causationId, int chainDepth, Firing firing, SignalLane lane) {
         Job job = jobs.get(name);
-        if (job == null) return;
+        if (job == null) { if (lane != null) lane.pending().decrementAndGet(); return; }
         String start = LocalDateTime.now().format(TS);
         liveRuns.put(runId, new JobRun(runId, name, job.type(), trigger, start, null, "RUNNING", 0L, null));
         // The default space runs with no MDC (it is the fallback namespace everywhere); a named space sets it so
@@ -1236,11 +1279,16 @@ public final class JobService implements AutoCloseable {
         workers.submit(() -> {
             if (scoped) MDC.put(EventLog.SPACE_MDC_KEY, spaceId);
             try {
-                if (!acquireRunPermit()) return;
+                if (lane != null) lane.serial().acquireUninterruptibly();   // lane first, then a pool slot
                 try {
-                    runJob(runId, name, trigger, start, correlationId, causationId, chainDepth, firing);
+                    if (!acquireRunPermit()) return;
+                    try {
+                        runJob(runId, name, trigger, start, correlationId, causationId, chainDepth, firing);
+                    } finally {
+                        releaseRunPermit();
+                    }
                 } finally {
-                    releaseRunPermit();
+                    if (lane != null) { lane.serial().release(); lane.pending().decrementAndGet(); }
                 }
             } finally {
                 if (scoped) MDC.remove(EventLog.SPACE_MDC_KEY);

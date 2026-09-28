@@ -208,10 +208,11 @@ count. That count (the first cut) dropped real cases: a verifier found one Run's
 `undeliverable` (fixed 2026-09-28). The delivered Signal carries origin `chainDepth` + 1. A Run always stamps
 its own system depth on what it emits (`RunContext`, `put` not `putIfAbsent`), so a payload cannot reset the
 depth. Jobs and Decision Rules cannot emit `exchange.*`, and a correlation id is not Job-chosen (a Run
-inherits its trigger's), so a loop cannot be restarted. (e) 🔴 **Open decision:** `JobService`'s per-Job
-`TriggerCoalescer` folds a burst of matching Signals into one follow-up Run. 20 cases from one opco Run
-are all DELIVERED, but the hub opens fewer Incidents than cases. Per-Signal firing for `incident.open` needs a
-Job-framework call. (c) D12 covers the Space-naming body fields of
+inherits its trigger's), so a loop cannot be restarted. (e) ✅ **DECIDED (operator, 2026-09-28) — §8 D13.**
+`JobService`'s per-Job `TriggerCoalescer` folded a burst of matching Signals into one follow-up Run, so 20
+delivered cases opened fewer hub Incidents than cases. A Job may now declare `coalesce: false`: one Run per
+matching Signal, each carrying its Signal; `incident.open` defaults to it. The D10 test asserts 20 cases → 20
+Incidents, no MSISDN (red when coalescing is forced on). (c) D12 covers the Space-naming body fields of
 `/exchange/signal-offers` and `/exchange/requests`; a grant-scoped route whose Space was deleted still answers
 404 via the shared resolver. (d) The SPA access catalog lists `canOfferSignals` (2026-09-28).
 
@@ -279,3 +280,10 @@ before a push touching the Exchange/ControlApi seams.
     another, except through a consented Exchange grant."*
 12. **D12 — DECIDED 2026-09-28 (operator):** the signal kind returns the same status for "no such Space"
     and "not permitted". The dataset kind is unchanged (D3's row did not take it).
+13. **D13 — DECIDED 2026-09-28 (operator): a per-Job coalescing opt-out.** A Job's `coalesce: false` gives one
+    Run per matching Signal (queued behind the Job's earlier Runs on a fair one-permit lane, never `SKIPPED` by
+    the non-overlap lock). `incident.open` defaults to `false`; every other Job keeps coalescing, its Signal-storm
+    guard. **Session decision (bound):** at most **1000** queued Runs per non-coalescing Job; a Signal past that
+    is refused — a `SKIPPED` Run plus a `job.signal.refused` WARN Signal naming it (`refusedSignalId`). A queue
+    bound, not a time window: it caps memory and a real Run's burst of cases fits in it. Pinned by
+    `JobServiceTest.aNonCoalescingJobRunsOncePerSignalWhileTheDefaultFolds` / `…RefusesSignalsPastItsBurstBound`.

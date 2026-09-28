@@ -23,6 +23,8 @@ import java.util.function.Supplier;
  */
 final class IncidentOpenJob implements Job {
 
+    static final String TYPE_ID = "incident.open";
+
     private final JobConfig cfg;
     private final Supplier<ObjectAccess> objects;
 
@@ -32,7 +34,7 @@ final class IncidentOpenJob implements Job {
     }
 
     @Override public String name() { return cfg.name(); }
-    @Override public String type() { return "incident.open"; }
+    @Override public String type() { return TYPE_ID; }
 
     @Override public JobResult run() {
         throw new UnsupportedOperationException("incident.open requires a JobContext");
