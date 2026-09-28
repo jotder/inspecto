@@ -38,17 +38,33 @@ import java.util.Set;
  * and each archived one back to the change. They are all co-authors of every Action Request the rule raises and
  * none may approve one. When the history cannot say (an unstamped version on the chain, or a chain that runs past
  * the retained history), the answer is unknown and the rule raises nothing — fail closed.
+ *
+ * <p><b>A version restore keeps the restored content's makers</b> ({@code ASSURE-ACTION-REQUESTS-RESIDUALS-1}
+ * item 1): a restore writes an old version back with the RESTORER as {@code updatedBy}, so on its own the history
+ * walk would stop at the version the restore replaced and forget who wrote the restored consequence. The restore
+ * therefore stamps {@code restoredMakers} — the restored version's own makers, computed from the history AT that
+ * version ({@link #restoredMakers}) — and {@link #makers} adds every chained version's {@code restoredMakers}. The
+ * field is server-only: {@link #prepare} discards any body value. A restore of a version whose makers the history
+ * cannot say is refused (409) — fail closed.
  */
 public final class DecisionRuleGuard {
 
     private DecisionRuleGuard() {}
 
     static final String TYPE = "decision-rule";
+    /** Server-stamped on a version restore: the restored version's makers (see the class doc). */
+    static final String RESTORED_MAKERS = "restoredMakers";
     private static final String DIR_PREFIX = "registry/" + ComponentRegistry.dirForType(TYPE).orElse("decision-rules") + "/";
 
     /** Validate and stamp one write of a rule; returns the content to persist. {@code prev}: the stored rule or null. */
     static Map<String, Object> prepare(HttpExchange ex, Map<String, Object> content, Map<String, Object> prev) {
-        return prepare(ex, content, prev, Map.of(), true);
+        return prepare(ex, content, prev, Map.of(), true, null);
+    }
+
+    /** {@link #prepare} for a version restore: {@code restoredMakers} from {@link #restoredMakers}, or null. */
+    static Map<String, Object> prepare(HttpExchange ex, Map<String, Object> content, Map<String, Object> prev,
+                                       List<String> restoredMakers) {
+        return prepare(ex, content, prev, Map.of(), true, restoredMakers);
     }
 
     /**
@@ -57,12 +73,19 @@ public final class DecisionRuleGuard {
      */
     static Map<String, Object> prepare(HttpExchange ex, Map<String, Object> content, Map<String, Object> prev,
                                        Map<String, String> carried, boolean live) {
+        return prepare(ex, content, prev, carried, live, null);
+    }
+
+    private static Map<String, Object> prepare(HttpExchange ex, Map<String, Object> content, Map<String, Object> prev,
+                                               Map<String, String> carried, boolean live, List<String> restoredMakers) {
         checkInvokeApi(ex, content, carried, live);
         Map<String, Object> out = new LinkedHashMap<>(content);
         String actor = ApiContext.actor(ex);
         Object created = prev == null ? null : prev.get("createdBy");
         out.put("createdBy", created == null ? actor : created);
         out.put("updatedBy", actor);
+        out.remove(RESTORED_MAKERS);   // server-only, like the stamps above
+        if (restoredMakers != null && !restoredMakers.isEmpty()) out.put(RESTORED_MAKERS, List.copyOf(restoredMakers));
         return out;
     }
 
@@ -131,20 +154,58 @@ public final class DecisionRuleGuard {
      * the rule has no invoke-api consequence.
      */
     static List<String> makers(ComponentStore store, String name, Map<String, Object> current) {
-        String sig = signature(current);
+        List<ComponentStore.ComponentVersion> history = store.versions(TYPE, name);
+        return makersFrom(current, history, history.size() < ComponentStore.historyKeep());
+    }
+
+    /**
+     * The makers of archived {@code version} — what {@link #makers} answered while it was current — for a restore to
+     * stamp as {@code restoredMakers}. Empty when that version has no invoke-api consequence; 409 when the history
+     * cannot say (fail closed: four-eyes could not exclude the restored content's author).
+     */
+    static List<String> restoredMakers(ComponentStore store, String name, int version) {
+        List<ComponentStore.ComponentVersion> history = store.versions(TYPE, name);
+        for (int i = 0; i < history.size(); i++) {
+            if (history.get(i).version() != version) continue;
+            List<String> m = makersFrom(history.get(i).content(), history.subList(i + 1, history.size()),
+                    history.size() < ComponentStore.historyKeep());
+            if (m == null)
+                throw new ApiException(409, ErrorCodes.CONFLICT, "version " + version + " of Decision Rule '" + name
+                        + "' has no recorded editor for its invoke-api consequence (saved before editors were recorded, "
+                        + "or history pruned past it), so four-eyes could not exclude its author; save the rule instead");
+            return m;
+        }
+        throw new ApiException(404, ErrorCodes.NOT_FOUND, "no version " + version + " of decision-rule component '" + name + "'");
+    }
+
+    /** {@code head}'s makers, walking {@code older} (newest first); {@code complete}: nothing was pruned. */
+    private static List<String> makersFrom(Map<String, Object> head, List<ComponentStore.ComponentVersion> older,
+                                           boolean complete) {
+        String sig = signature(head);
         if (sig == null) return List.of();
         Set<String> out = new LinkedHashSet<>();
-        if (current.get("updatedBy") == null) return null;
-        out.add(String.valueOf(current.get("updatedBy")));
-        List<ComponentStore.ComponentVersion> history = store.versions(TYPE, name);
-        for (ComponentStore.ComponentVersion v : history) {
+        if (!addMakers(out, head)) return null;
+        for (ComponentStore.ComponentVersion v : older) {
             if (!sig.equals(signature(v.content()))) return List.copyOf(out);   // the next-newer version made the change
-            Object by = v.content().get("updatedBy");
-            if (by == null) return null;   // an unstamped version on the chain: provenance unknown
-            out.add(String.valueOf(by));
+            if (!addMakers(out, v.content())) return null;   // an unstamped version on the chain: provenance unknown
         }
         // No differing version retained: complete only if the history cannot have been pruned.
-        return history.size() < ComponentStore.historyKeep() ? List.copyOf(out) : null;
+        return complete ? List.copyOf(out) : null;
+    }
+
+    /** One version's makers — its {@code updatedBy} plus any {@code restoredMakers}; false when unknown or malformed. */
+    private static boolean addMakers(Set<String> out, Map<String, Object> version) {
+        Object by = version.get("updatedBy");
+        if (by == null) return false;
+        out.add(String.valueOf(by));
+        Object restored = version.get(RESTORED_MAKERS);
+        if (restored == null) return true;
+        if (!(restored instanceof List<?> list)) return false;
+        for (Object m : list) {
+            if (m == null || String.valueOf(m).isBlank()) return false;
+            out.add(String.valueOf(m));
+        }
+        return true;
     }
 
     /** The canonical JSON of the rule's invoke-api consequences (connection, method, payload); null for none. */

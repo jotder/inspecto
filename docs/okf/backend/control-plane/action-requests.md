@@ -4,7 +4,7 @@ title: Action Requests — approved outbound API calls
 description: An outbound call raised from an Incident or Case (or a Decision Rule's invoke-api), held for a four-eyes approval, then sent once to an https Connection with bounded retries under one idempotency key.
 resource: inspecto/src/main/java/com/gamma/control/ActionRequestRoutes.java
 tags: [control-plane, action-request, maker-checker, four-eyes, webhook, egress, decision-rule, incident]
-timestamp: 2026-09-27T00:00:00Z
+timestamp: 2026-09-28T00:00:00Z
 ---
 
 # Action Requests
@@ -44,7 +44,12 @@ so a value can never break the JSON. The approver reads exactly what will go out
 - **Four-eyes is always on**: the author approving or declining their own request is **403** — and so is any
   **co-author**: a request raised by a Decision Rule's `invoke-api` carries the rule's **makers** as `coAuthors`
   — every editor, read from the component version history, since the invoke-api consequence (connection, method,
-  payload) last changed — so no maker of what the rule sends can approve or decline what it raised. It is not a policy option. Retry and
+  payload) last changed — so no maker of what the rule sends can approve or decline what it raised. A **version
+  restore** (`POST /components/decision-rule/{id}/versions/{v}/restore`) makes the restorer the editor, so it also
+  stamps the server-only `restoredMakers` — the restored version's own makers, read from the history at that
+  version — and every chained version's `restoredMakers` join the set: the restored consequence's author can no
+  more approve than the restorer. A body `restoredMakers` is discarded; a version whose makers the history cannot
+  say is not restored (**409**, fail closed — save the rule instead). It is not a policy option. Retry and
   mark-failed are not four-eyes: they send nothing new.
 - 🔴 **Not under the Approval Policy.** An Action Request is not config and carries its own mandatory approval;
   `PendingChanges.hold` is never reached and no policy kind names it. Holding the proposal as a Pending Change
@@ -206,7 +211,9 @@ in `DecisionRuleGuard` from EVERY door that writes one: `/decision-rules`, `/com
 restore, which lands there), `/import`, `/bundle/import`, a new Space's bundle; a pipeline rename may move
 `target` only; the agent's fix drafts refuse the kind. `createdBy` / `updatedBy` are **server-stamped** — body
 values are discarded. An import carrying an invoke-api rule by someone without `canWorkIncidents` is 403 before
-anything is written (all-or-nothing). `DecisionRuleWritersTest` enumerates `ConfigWriteFunnelTest`'s writer
+anything is written (all-or-nothing). A Space created from a bundle (`POST /spaces/import`) is pinned end to end in
+`ControlApiSpaceBundleActionRequestsTest`: the importer becomes the rule's maker (and a refused co-author), and the
+new Space's empty Egress Allowlist denies the target until that Space lifts it. `DecisionRuleWritersTest` enumerates `ConfigWriteFunnelTest`'s writer
 inventory and fails for a new writer that neither calls the guard nor is listed with its reason.
 
 ## Routes

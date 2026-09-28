@@ -695,6 +695,58 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    /**
+     * ASSURE-ACTION-REQUESTS-RESIDUALS-1 (1): restoring an old invoke-api version makes the RESTORER its editor, but
+     * the restored consequence's author is still a maker — neither may approve what it raises, and a later save that
+     * keeps the consequence (even one forging {@code restoredMakers}) does not forget them.
+     */
+    @Test
+    void aRestoredInvokeApiVersionKeepsItsAuthorAsACoAuthor(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            allowLoopback(c);
+            data(send(c, "POST", "/decision-rules", INVOKE_RULE, EDITOR), 200);   // v1: editor-1's target
+            data(send(c, "PUT", "/decision-rules/leak", INVOKE_RULE.replace("\"params\":{\"connection\":\"hook\"}",
+                    "\"params\":{\"connection\":\"hook\",\"payload\":{\"n\":\"2\"}}"), POWER), 200);   // changed
+            data(send(c, "POST", "/components/decision-rule/leak/versions/1/restore", "{}", POWER), 200);
+            String first = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200)
+                    .at("/executed/0/actionRequestId").asText();
+            JsonNode rec = data(send(c, "GET", "/action-requests/" + first, null, CHECKER), 200);
+            assertEquals(List.of("power-1", "editor-1"), JSON.convertValue(rec.get("coAuthors"), List.class), rec.toString());
+            HttpResponse<String> author = send(c, "POST", "/action-requests/" + first + "/approve", "{}", EDITOR);
+            assertEquals(403, author.statusCode(), "the restored version's author: " + author.body());
+            assertEquals(403, send(c, "POST", "/action-requests/" + first + "/approve", "{}", POWER).statusCode(),
+                    "the restorer");
+            data(send(c, "POST", "/action-requests/" + first + "/decline", "{}", CHECKER), 200);
+
+            data(send(c, "PUT", "/decision-rules/leak", INVOKE_RULE.replace("\"name\":\"leak\",",
+                    "\"name\":\"leak\",\"description\":\"reworded\",\"restoredMakers\":[\"forged\"],"), POWER), 200);
+            String second = data(send(c, "POST", "/decision-rules/leak/apply", "{}", AUTHOR), 200)
+                    .at("/executed/0/actionRequestId").asText();
+            assertEquals(List.of("power-1", "editor-1"), JSON.convertValue(data(send(c, "GET",
+                    "/action-requests/" + second, null, CHECKER), 200).get("coAuthors"), List.class),
+                    "the restored stamp is carried down the chain; a body value is discarded");
+            assertEquals(403, send(c, "POST", "/action-requests/" + second + "/approve", "{}", EDITOR).statusCode());
+            assertTrue(keys.isEmpty());
+        }
+    }
+
+    /** Fail closed: a version whose invoke-api author the history cannot say is not restored at all. */
+    @Test
+    void restoringAVersionWithNoRecordedEditorIsRefused(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            new com.gamma.pipeline.ComponentStore(c.root.resolve("registry")).write("decision-rule", "leak",
+                    Map.of("name", "leak", "consequences",
+                            List.of(Map.of("action", "invoke-api", "params", Map.of("connection", "hook")))));
+            data(send(c, "PUT", "/decision-rules/leak", "{\"name\":\"leak\",\"consequences\":[{\"action\":"
+                    + "\"emit-signal\"}]}", POWER), 200);
+            HttpResponse<String> r = send(c, "POST", "/components/decision-rule/leak/versions/1/restore", "{}", POWER);
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(r.body().contains("no recorded editor"), r.body());
+            assertEquals("emit-signal", data(send(c, "GET", "/components/decision-rule/leak", null, POWER), 200)
+                    .at("/content/consequences/0/action").asText(), "nothing was written");
+        }
+    }
+
     private HttpResponse<String> sendBytes(Ctx c, String path, byte[] body, String auth) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path))
                 .header("Authorization", auth).POST(BodyPublishers.ofByteArray(body)).build(), BodyHandlers.ofString());

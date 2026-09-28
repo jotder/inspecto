@@ -469,7 +469,15 @@ final class ComponentRoutes implements RouteModule {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
         }
         // R3: a restore is an update — edit access, envelope carried forward, owner-only envelope changes.
-        return writeComponent(api, store, ex, type, id, ComponentAccess.onUpdate(ex, type, id, current.content(), content));
+        Map<String, Object> restored = ComponentAccess.onUpdate(ex, type, id, current.content(), content);
+        // ASSURE-ACTION-REQUESTS-RESIDUALS-1 (1): the restored content's makers stay co-authors, not only the restorer.
+        // The invoke-api gate first, so a caller who may not write the rule learns nothing about its history.
+        List<String> restoredMakers = null;
+        if (DecisionRuleGuard.TYPE.equals(type)) {
+            DecisionRuleGuard.checkInvokeApi(ex, restored, Map.of(), true);
+            restoredMakers = DecisionRuleGuard.restoredMakers(store, id, version);
+        }
+        return writeComponent(api, store, ex, type, id, restored, restoredMakers);
     }
 
     /** The JSON shape for one archived version: identity + version metadata + the archived content. */
@@ -623,6 +631,12 @@ final class ComponentRoutes implements RouteModule {
     /** Write a component: the body is the content (the routing-only {@code id} key is stripped); 422 on bad input.
      *  The written resource's new {@code ETag} rides the response so a client can chain a conditional update. */
     private Object writeComponent(ApiContext api, ComponentStore store, com.sun.net.httpserver.HttpExchange ex, String type, String id, Map<String, Object> body) throws IOException {
+        return writeComponent(api, store, ex, type, id, body, null);
+    }
+
+    /** {@code restoredMakers}: a Decision Rule version restore's restored-content makers, else null. */
+    private Object writeComponent(ApiContext api, ComponentStore store, com.sun.net.httpserver.HttpExchange ex, String type, String id, Map<String, Object> body,
+                                  List<String> restoredMakers) throws IOException {
         if ("alert-rule".equals(type) && AlertRoutes.editionRefused(ex)) return ApiContext.HANDLED;   // G9
         Map<String, Object> content = new LinkedHashMap<>(body);
         content.remove("id");   // routing key, not content (the store stamps name=id)
@@ -632,7 +646,7 @@ final class ComponentRoutes implements RouteModule {
             // and server-stamped makers as /decision-rules, before the hold (version restore lands here as well).
             if (DecisionRuleGuard.TYPE.equals(type)) {
                 ComponentRegistry.Component prior = existing(store, type, id);
-                content = DecisionRuleGuard.prepare(ex, content, prior == null ? null : prior.content());
+                content = DecisionRuleGuard.prepare(ex, content, prior == null ? null : prior.content(), restoredMakers);
             }
             // ASSURE-PER-ENTITY-ALERTS-RESIDUALS-1 (3): this door refuses exactly what POST /alerts/rules refuses —
             // the same AlertRoutes.parse (AlertRule.fromMap, the Investigation-rule refusal, the `by` Schema check),
