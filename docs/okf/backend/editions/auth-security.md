@@ -657,9 +657,14 @@ an overwritten satellite (the old cleanup deleted every satellite, pre-existing 
 lock, so another request can save a file between an import's write and its rollback. `ImportJournal` also keeps
 a SHA-256 of what the import last wrote to each file and restores (or deletes) a file only while it still holds
 exactly those bytes; a file changed or deleted since is left as the other writer made it, logged, and named in
-the refusal — a `notRolledBack` list on `/import`'s 422 body and on a `/pipelines/import` / `/bundle/import`
-pipeline item's SaveGate refusal, `; changed concurrently, not rolled back: [...]` appended to any other
-refusal's message. Chosen over serialising imports behind a lock because none exists to reuse (`ComponentStore`
+the refusal — a `notRolledBack` list on `/import`'s 422 body and on a `/pipelines/import` SaveGate refusal,
+`; changed concurrently, not rolled back: [...]` appended to any other refusal's message (a `/bundle/import`
+pipeline item's `failed` row, and the 500 of a write failure — `ImportRollback`). The list lives on
+`ImportJournal.notRolledBack()`, so it survives a rollback that throws and one run inside
+`BundleImporter.writeConfig`. **A rollback that itself fails never replaces the refusal**: the 4xx (or the original
+failure) stays the answer, with `rollbackIncomplete` / `; rollback incomplete: …` and the failure attached as
+suppressed and logged. `SpaceManager.createFromBundle` does not report the list — it seeds a brand-new Space no
+other request can write yet. Chosen over serialising imports behind a lock because none exists to reuse (`ComponentStore`
 and `/config/write` write through `AtomicFiles` unlocked) and a new one would have to be taken by every config
 writer to help. ⚠ The compare and the restore are two steps, not an atomic swap: a write landing in that
 sub-millisecond gap is still overwritten. Tests: `ImportJournalTest` (interleaved writes),

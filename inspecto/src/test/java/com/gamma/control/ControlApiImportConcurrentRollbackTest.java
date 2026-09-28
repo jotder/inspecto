@@ -86,6 +86,30 @@ class ControlApiImportConcurrentRollbackTest {
         }
     }
 
+    /**
+     * A rollback that itself fails does not replace the refusal: the 422 stays the answer and says the rollback was
+     * incomplete. The file is turned into a non-empty directory between the write and the rollback.
+     */
+    @Test
+    void aRollbackThatFailsKeepsTheRefusalAndSaysSo(@TempDir Path root) throws Exception {
+        Path landed = root.resolve("beta").resolve("config").resolve("etl_pipeline.toon");
+        ImportJournal.beforeRollback = written -> {
+            try {
+                Files.delete(landed);
+                Files.createDirectories(landed.resolve("inner"));
+            } catch (java.io.IOException io) {
+                throw new java.io.UncheckedIOException(io);
+            }
+        };
+        try (Ctx c = open(root)) {
+            HttpResponse<String> imp = post(c.port, "/spaces/beta/import", bundleWithMissingSchema(root));
+            assertEquals(422, imp.statusCode(), "the refusal, not a 500 from the rollback: " + imp.body());
+            assertTrue(imp.body().contains("rollbackIncomplete"), imp.body());
+        } finally {
+            ImportJournal.beforeRollback = null;
+        }
+    }
+
     /** A one-pipeline bundle whose schema reference the target Space does not have — the import's 422. */
     private static byte[] bundleWithMissingSchema(Path root) throws Exception {
         Path config = root.resolve("scratch").resolve("config");
@@ -94,7 +118,7 @@ class ControlApiImportConcurrentRollbackTest {
         if (!Files.exists(pipeline)) {
             Files.move(TestConfigs.csv(config, PipelineConfigBatchTest.miniSchema()).write(), pipeline);
             Files.writeString(pipeline, Files.readString(pipeline)
-                    .replaceAll("(?m)^(\s*schema_file:).*$", "$1 no_such_schema.toon"));
+                    .replaceAll("(?m)^(\\s*schema_file:).*$", "$1 no_such_schema.toon"));
         }
         return BundleExporter.exportDataSource(
                 new DataSourceBundle("test_etl", pipeline, null, List.of(), List.of(), List.of(), List.of(),

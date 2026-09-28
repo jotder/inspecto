@@ -624,7 +624,11 @@ final class BundleRoutes implements RouteModule {
             }
             if (!r.written())
                 throw new IllegalArgumentException("pipeline '" + id + "' has ERROR-level findings, not written: "
-                        + r.body().get("findings"));
+                        + r.body().get("findings")
+                        + (r.body().containsKey("notRolledBack")
+                                ? "; changed concurrently, not rolled back: " + r.body().get("notRolledBack") : "")
+                        + (r.body().containsKey("rollbackIncomplete")
+                                ? "; rollback incomplete: " + r.body().get("rollbackIncomplete") : ""));
             return r.body();
         }
         public Map<String, Object> normalized(String id, Map<String, Object> content) {

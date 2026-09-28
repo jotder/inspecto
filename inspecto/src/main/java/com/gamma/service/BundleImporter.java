@@ -234,7 +234,13 @@ public final class BundleImporter {
                 written.add(root.relativize(target).toString().replace('\\', '/'));
             }
         } catch (IOException | RuntimeException failed) {
-            journal.rollback();
+            // the write failure is the answer; a rollback failure rides along rather than replacing it. What the
+            // rollback left alone stays on journal.notRolledBack() for the caller to report.
+            try {
+                journal.rollback();
+            } catch (IOException rollbackFailed) {
+                failed.addSuppressed(rollbackFailed);
+            }
             throw failed;
         }
         return new Unpacked(written);

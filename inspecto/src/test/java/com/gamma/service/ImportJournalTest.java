@@ -87,4 +87,23 @@ class ImportJournalTest {
         assertEquals(List.of(shared.toAbsolutePath().normalize()), j.rollback());
         assertFalse(Files.exists(shared), "the other request's delete is not undone");
     }
+
+    /** A rollback that throws still reports every file it had found changed concurrently (`notRolledBack()`). */
+    @Test
+    void aRollbackThatThrowsKeepsWhatItFoundChangedConcurrently(@TempDir Path root) throws Exception {
+        Path shared = root.resolve("a_pipeline.toon");
+        Files.writeString(shared, "before");
+        Path blocked = root.resolve("b_pipeline.toon");
+
+        ImportJournal j = new ImportJournal();
+        j.write(shared, b("imported"), ".t-");
+        j.write(blocked, b("imported"), ".t-");
+        Files.writeString(shared, "a legitimate concurrent save");
+        Files.delete(blocked);   // the path becomes a non-empty directory: the rollback cannot read or remove it
+        Files.createDirectories(blocked.resolve("inner"));
+
+        assertThrows(java.io.IOException.class, j::rollback);
+        assertEquals(List.of(shared.toAbsolutePath().normalize()), j.notRolledBack(), "kept across the throw");
+        assertEquals("a legitimate concurrent save", Files.readString(shared));
+    }
 }

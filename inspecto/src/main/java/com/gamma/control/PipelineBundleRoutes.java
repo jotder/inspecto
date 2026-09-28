@@ -404,13 +404,13 @@ final class PipelineBundleRoutes implements RouteModule {
             // THIS space now, instead of discovering them at the first poll. WARNING-level — see the helper.
             List<Map<String, Object>> requirements = classifyRequirements(api, manifest, retargeted, findings);
             if (SaveGate.refuses(findings)) {
-                List<String> notRolledBack = DataSourceRoutes.relative(writeRoot, journal.rollback());
                 done = true;
+                ImportRollback.Outcome undone = ImportRollback.run(journal, writeRoot, journal::rollback);
                 Map<String, Object> refusal = new LinkedHashMap<>();
                 refusal.put("written", false);
                 refusal.put("error", "config has ERROR-level findings; not written");
                 refusal.put("findings", findings);
-                if (!notRolledBack.isEmpty()) refusal.put("notRolledBack", notRolledBack);
+                undone.into(refusal);
                 return new Imported(false, refusal);
             }
 
@@ -463,10 +463,12 @@ final class PipelineBundleRoutes implements RouteModule {
             return new Imported(true, r);
         } catch (ApiException refused) {
             done = true;
-            if (registeredHere) api.service().unregisterPipeline(target);
-            List<String> notRolledBack = DataSourceRoutes.relative(writeRoot, journal.rollback());
-            api.service().refreshConfigs();
-            throw DataSourceRoutes.withNotRolledBack(refused, notRolledBack);
+            throw ImportRollback.refusal(refused, undo(api, journal, writeRoot, target, registeredHere));
+        } catch (IOException | RuntimeException failed) {
+            done = true;
+            ImportRollback.Outcome undone = undo(api, journal, writeRoot, target, registeredHere);
+            if (undone.clean()) throw failed;
+            throw ImportRollback.failure(failed, undone);   // the 500 body names what was not rolled back
         } finally {
             if (!done) {
                 if (registeredHere) api.service().unregisterPipeline(target);
@@ -474,6 +476,16 @@ final class PipelineBundleRoutes implements RouteModule {
                 api.service().refreshConfigs();
             }
         }
+    }
+
+    /** Undo a refused closure import: unregister what it registered, roll the tree back, re-read the configs. */
+    private static ImportRollback.Outcome undo(ApiContext api, com.gamma.service.ImportJournal journal, Path writeRoot,
+                                               Path target, boolean registeredHere) {
+        return ImportRollback.run(journal, writeRoot, () -> {
+            if (registeredHere) api.service().unregisterPipeline(target);
+            journal.rollback();
+            api.service().refreshConfigs();
+        });
     }
 
     private static String rel(Path writeRoot, Path p) {

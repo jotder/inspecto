@@ -313,12 +313,13 @@ final class DataSourceRoutes implements RouteModule {
             Map<String, List<Finding>> broken = referentialFindings(config, written);
             if (!broken.isEmpty()) {
                 // before the response: the tree is whole (bar a file another request changed meanwhile)
-                List<String> notRolledBack = undo(api, journal, registeredHere, connectionsBefore, config);
                 done = true;
+                ImportRollback.Outcome undone = ImportRollback.run(journal, config,
+                        () -> undo(api, journal, registeredHere, connectionsBefore));
                 Map<String, Object> refusal = new LinkedHashMap<>();
                 refusal.put("error", "bundle references things this space does not have; nothing was registered");
                 refusal.put("findings", broken);
-                if (!notRolledBack.isEmpty()) refusal.put("notRolledBack", notRolledBack);
+                undone.into(refusal);
                 return ApiContext.respondJson(e, 422, refusal);
             }
 
@@ -350,48 +351,35 @@ final class DataSourceRoutes implements RouteModule {
             done = true;
             return importedBody(bundle, written, pipelines, referencesKept, overwrite && !conflicts.isEmpty(), missing);
         } catch (ApiException refusal) {
-            List<String> notRolledBack = undo(api, journal, registeredHere, connectionsBefore, config);
+            done = true;   // first: a rollback that throws must not run the undo twice, nor replace the 4xx
+            throw ImportRollback.refusal(refusal, ImportRollback.run(journal, config,
+                    () -> undo(api, journal, registeredHere, connectionsBefore)));
+        } catch (IOException | RuntimeException failed) {
             done = true;
-            throw withNotRolledBack(refusal, notRolledBack);
+            ImportRollback.Outcome undone = ImportRollback.run(journal, config,
+                    () -> undo(api, journal, registeredHere, connectionsBefore));
+            if (undone.clean()) throw failed;
+            throw ImportRollback.failure(failed, undone);   // the 500 body names what was not rolled back
         } finally {
-            if (!done) undo(api, journal, registeredHere, connectionsBefore, config);
+            if (!done) undo(api, journal, registeredHere, connectionsBefore);   // an Error: best effort
         }
-    }
-
-    /**
-     * A refusal whose rollback left some files alone (`IMPORT-RESIDUALS-1` (3)) says so: the same status and code,
-     * the message naming each file that changed concurrently and was not rolled back.
-     */
-    static ApiException withNotRolledBack(ApiException refused, List<String> notRolledBack) {
-        if (notRolledBack.isEmpty()) return refused;
-        ApiException noted = new ApiException(refused.status, refused.errorCode, refused.getMessage()
-                + "; changed concurrently, not rolled back: " + notRolledBack);
-        noted.initCause(refused);
-        return noted;
-    }
-
-    /** The files a rollback left alone, relative to {@code root} with forward slashes. */
-    static List<String> relative(Path root, List<Path> files) {
-        Path r = root.toAbsolutePath().normalize();
-        return files.stream().map(p -> r.relativize(p).toString().replace('\\', '/')).toList();
     }
 
     /**
      * Undo a refused import: unregister the pipelines it registered, put back the connections it replaced, restore
      * every file it wrote ({@link ImportJournal#rollback}) and re-read the registered configs from the restored tree.
-     * Returns the files (relative to {@code config}) left alone because another request changed them meanwhile.
+     * What the rollback left alone (a file another request changed meanwhile) is on
+     * {@link ImportJournal#notRolledBack()}.
      */
-    private static List<String> undo(ApiContext api, ImportJournal journal, List<Path> registeredHere,
-                                     Map<String, java.util.Optional<ConnectionProfile>> connectionsBefore,
-                                     Path config) throws IOException {
+    private static void undo(ApiContext api, ImportJournal journal, List<Path> registeredHere,
+                             Map<String, java.util.Optional<ConnectionProfile>> connectionsBefore) throws IOException {
         for (Path p : registeredHere) api.service().unregisterPipeline(p);
         connectionsBefore.forEach((id, before) -> {
             if (before.isPresent()) api.service().registerConnection(before.get());
             else api.service().unregisterConnection(id);
         });
-        List<Path> left = journal.rollback();
+        journal.rollback();
         api.service().refreshConfigs();
-        return relative(config, left);
     }
 
     private static Map<String, Object> importedBody(BundleImporter.Bundle bundle, List<String> written,

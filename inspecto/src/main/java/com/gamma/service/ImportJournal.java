@@ -45,6 +45,7 @@ public final class ImportJournal {
     private final Map<Path, byte[]> prior = new LinkedHashMap<>();   // null value ⇒ the file did not exist
     private final Map<Path, byte[]> wrote = new LinkedHashMap<>();   // SHA-256 of what this import last wrote
     private final List<Path> createdDirs = new ArrayList<>();
+    private final List<Path> notRolledBack = new ArrayList<>();   // every rollback's, kept even when one throws
 
     /** Write {@code bytes} to {@code target} atomically, recording what was there first. */
     public void write(Path target, byte[] bytes, String tempPrefix) throws IOException {
@@ -67,7 +68,8 @@ public final class ImportJournal {
      * is someone else's newer write and is left alone. Best effort per file — one failure does not stop the
      * others — and the first failure is rethrown at the end so the caller can say the rollback was incomplete.
      *
-     * @return the files left alone because they changed concurrently (absolute paths; empty when all rolled back)
+     * @return the files THIS call left alone because they changed concurrently (absolute paths; empty when all
+     *         rolled back). They are also added to {@link #notRolledBack()}, which survives a throw.
      */
     public List<Path> rollback() throws IOException {
         Consumer<List<Path>> hook = beforeRollback;
@@ -82,6 +84,7 @@ public final class ImportJournal {
                 if (ours == null) continue;   // the write itself failed: nothing of ours is on disk
                 if (!Files.exists(e.getKey()) || !Arrays.equals(ours, sha256(Files.readAllBytes(e.getKey())))) {
                     changedConcurrently.add(e.getKey());
+                    notRolledBack.add(e.getKey());
                     log.warn("[IMPORT] {} changed after this import wrote it; left as is, not rolled back", e.getKey());
                     continue;
                 }
@@ -107,6 +110,15 @@ public final class ImportJournal {
         createdDirs.clear();
         if (first != null) throw first;
         return changedConcurrently;
+    }
+
+    /**
+     * Every file any {@link #rollback} of this journal left alone because it changed concurrently — including one
+     * that went on to throw, and one run inside a helper (a {@code BundleImporter.writeConfig} write failure) whose
+     * caller never saw its return value.
+     */
+    public List<Path> notRolledBack() {
+        return List.copyOf(notRolledBack);
     }
 
     private static byte[] sha256(byte[] bytes) {
