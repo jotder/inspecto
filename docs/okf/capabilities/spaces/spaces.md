@@ -202,7 +202,23 @@ recovery create) Dataset access is fail-open; a template Dataset shared away fro
 "shared away", not as absent (template content is the server's own, so there is nothing to hide). A KPI tile in the template binds by `options.kpi.kpiId` (no new mechanism). ⚠ The gate
 reads the Dataset's Schema, so a KPI over a Dataset that the template's own pipeline has not filled yet (a
 `physicalRef` store with no Parquet — every fresh `orders-starter` store) is REFUSED at apply; that is why
-`orders-starter` ships no KPI pack. Seed-gated kind: `kpi` only — the rest of the tree is still copied as-is.
+`orders-starter` ships no KPI pack.
+
+**Every registry kind a template seeds is gated, not only `kpi`** (`ASSURE-KPI-DEFINITIONS-RESIDUALS-1` (1) ⚠,
+2026-09-28). The seed gate is `TemplateSeedGate.require`, one table-driven pass over the staged tree before boot:
+(1) **capability** — `ImportCapabilityGuard.checkFiles(…, newSpace=true)` over the staged `config/`, the same
+kind→capability table `/spaces/import` and `/components/{kind}` use (`connection` → `canOnboardConnections`,
+`alert-rule` → `canAuthorAlertRules`, `findings-spec` → `canManageIncidents`, an `event_prune`/`restore` Job →
+`canAdminister`; a `registry/` file whose kind cannot be told is refused); skipped on the zero-Space recovery
+create, like the KPI capability; (2) **save validation** — every `ComponentStore.WRITABLE_TYPES` component meets
+what `ComponentRoutes.writeComponent` runs before its write: `validateKind(api, …)`, `AlertRoutes.parse` for an
+`alert-rule` (edition feature, Investigation refusal, `by` Schema check), `DecisionRuleGuard.prepare` (the
+invoke-api gate, result discarded — no stamps are seeded) for a `decision-rule` — judged through a staged
+`ApiContext` whose `writeRoot`/`dataRoot` are the NEW Space's `config/` / `data/`; an unreadable registry `.toon` is
+refused; (3) `kpi` as above. First refusal → 403 / 422 naming the kind, no Space. `ControlApiSpaceTemplateSeedGateTest`
+applies EVERY shipped template and pins both refusals. ⚠ Not gated: the CONTENT of a template's non-registry configs
+(Pipelines, Connections, Jobs — the `SaveGate` `/config/write` runs); only their capability. A template
+`decision-rule` with an `invoke-api` consequence finds no Connection (none are counted as carried), so it is refused.
 
 ### 3.6 Metadata Bundle v2 (SPC-4) — configuration moves, data never does
 
