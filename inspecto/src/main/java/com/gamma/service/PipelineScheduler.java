@@ -262,10 +262,11 @@ final class PipelineScheduler {
      * {@link #triggerWorkers}. A pipeline still running when the next tick fires is simply not selected
      * again, because its claim is still held.
      */
-    void dispatchCycle() {
+    List<Future<Integer>> dispatchCycle() {
         // Periodic driver: ingest only. A remote collector's files are fetched by the separate acquisition
         // driver ({@link #dispatchAcquireCycle()}) on its own timer, so the poll tick must not re-fetch (B3b).
-        dispatch(selectDue(System.currentTimeMillis()), false);
+        // The returned futures are ignored by the timer; tests await them instead of sleeping.
+        return dispatch(selectDue(System.currentTimeMillis()), false);
     }
 
     /**
@@ -644,8 +645,8 @@ final class PipelineScheduler {
      * are skipped. Cadence is the acquisition timer's own interval, not a pipeline's {@code trigger:} — a
      * cron-gated pipeline still wants its files staged and ready before the cron fires.
      */
-    void dispatchAcquireCycle() {
-        dispatchAcquire(selectDueForAcquire());
+    List<Future<?>> dispatchAcquireCycle() {
+        return dispatchAcquire(selectDueForAcquire());   // futures ignored by the timer; tests await them
     }
 
     /**
@@ -686,17 +687,19 @@ final class PipelineScheduler {
 
     /** Hand each selected pipeline's fetch to {@link #triggerWorkers}, releasing the claim on a rejected
      *  submit (service stopping) so it cannot leak — mirrors {@link #dispatch}. */
-    private void dispatchAcquire(List<Due> due) {
-        if (due.isEmpty()) return;
+    private List<Future<?>> dispatchAcquire(List<Due> due) {
+        if (due.isEmpty()) return List.of();
         Map<String, String> mdc = MDC.getCopyOfContextMap();
+        List<Future<?>> runs = new ArrayList<>(due.size());
         for (Due d : due) {
             try {
-                triggerWorkers.submit(() -> acquireOne(d, mdc));
+                runs.add(triggerWorkers.submit(() -> acquireOne(d, mdc)));
             } catch (RejectedExecutionException e) {
                 d.claim().close();
                 log.debug("Acquire cycle: '{}' not dispatched (service stopping)", d.id());
             }
         }
+        return runs;
     }
 
     /** Fetch-and-land one pipeline under its {@link #acquireGuard} claim and the {@link #acquirePermits}

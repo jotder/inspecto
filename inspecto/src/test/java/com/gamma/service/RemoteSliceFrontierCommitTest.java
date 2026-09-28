@@ -12,6 +12,8 @@ import java.lang.reflect.Method;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,12 +39,17 @@ class RemoteSliceFrontierCommitTest {
         return (PipelineScheduler) f.get(svc);
     }
 
-    private interface Condition { boolean holds() throws Exception; }
-
-    private static boolean awaitTrue(Condition cond) throws Exception {
-        for (int i = 0; i < 200; i++) { if (cond.holds()) return true; Thread.sleep(50); }
-        return false;
+    /**
+     * Both dispatch entry points are fire-and-forget; wait for the tasks they started to FINISH. A fixed
+     * sleep here was the flake: on a slow CI box the acquisition had not landed when the ingest cycle ran,
+     * so the ingest found nothing, the inbox/marker check held trivially, and the frontier stayed behind.
+     */
+    private static void awaitAll(List<? extends Future<?>> runs) throws Exception {
+        for (Future<?> f : runs) f.get(30, TimeUnit.SECONDS);
     }
+
+    private static void acquire(CollectorService svc) throws Exception { awaitAll(scheduler(svc).dispatchAcquireCycle()); }
+    private static void ingest(CollectorService svc) throws Exception { awaitAll(scheduler(svc).dispatchCycle()); }
 
     private static List<String> files(Path root, String suffix) throws Exception {
         if (!Files.exists(root)) return List.of();
@@ -52,16 +59,13 @@ class RemoteSliceFrontierCommitTest {
         }
     }
 
-    /** One acquire cycle then one ingest cycle; waits until the inbox holds no un-marked slice. */
+    /** One acquire cycle then one ingest cycle, each awaited to completion; then no slice may be un-marked. */
     private static void cycle(CollectorService svc, Path dir) throws Exception {
-        scheduler(svc).dispatchAcquireCycle();
-        Thread.sleep(500);                                  // let the async acquisition land (or find nothing)
-        scheduler(svc).dispatchCycle();
-        assertTrue(awaitTrue(() -> files(dir.resolve("inbox"), ".csv").size()
-                        <= files(dir.resolve("markers"), ".processed").size()),
+        acquire(svc);
+        ingest(svc);
+        assertTrue(files(dir.resolve("inbox"), ".csv").size() <= files(dir.resolve("markers"), ".processed").size(),
                 "ingest cycle did not mark the landed slice(s): inbox=" + files(dir.resolve("inbox"), ".csv")
                         + " markers=" + files(dir.resolve("markers"), ".processed"));
-        Thread.sleep(300);
     }
 
     private static Path pipeline(Path dir) throws Exception {
@@ -184,10 +188,9 @@ class RemoteSliceFrontierCommitTest {
         m.invoke(null);
     }
 
-    private static void awaitLanded(Path dir, int n) throws Exception {
-        assertTrue(awaitTrue(() -> files(dir.resolve("inbox"), ".csv").size() >= n),
+    private static void assertLanded(Path dir, int n) throws Exception {
+        assertTrue(files(dir.resolve("inbox"), ".csv").size() >= n,
                 "acquisition did not land " + n + " slice(s): inbox=" + files(dir.resolve("inbox"), ".csv"));
-        Thread.sleep(300);                                  // let the land's bookkeeping finish
     }
 
     /**
@@ -201,13 +204,12 @@ class RemoteSliceFrontierCommitTest {
         FakeOffsetTailConnectorFactory.END.set(3);
         CollectorService svc = new CollectorService(List.of(pipeline(dir)), 3600, 1);
         try {
-            scheduler(svc).dispatchAcquireCycle();
-            awaitLanded(dir, 1);
+            acquire(svc);
+            assertLanded(dir, 1);
             forgetInMemoryFrontiers();                      // the restart: landed, not yet committed
 
-            scheduler(svc).dispatchCycle();
-            assertTrue(awaitTrue(() -> files(dir.resolve("markers"), ".processed").size() == 1), "slice committed");
-            Thread.sleep(300);
+            ingest(svc);
+            assertEquals(1, files(dir.resolve("markers"), ".processed").size(), "slice committed");
             String frontier = ledger.dbWatermark(FakeOffsetTailConnectorFactory.WATERMARK_KEY).orElse("<none>");
 
             FakeOffsetTailConnectorFactory.END.set(4);      // one new message
@@ -234,15 +236,13 @@ class RemoteSliceFrontierCommitTest {
         FakeOffsetTailConnectorFactory.END.set(3);
         CollectorService svc = new CollectorService(List.of(pipeline(dir)), 3600, 1);
         try {
-            scheduler(svc).dispatchAcquireCycle();
-            awaitLanded(dir, 1);
+            acquire(svc);
+            assertLanded(dir, 1);
 
             FakeOffsetTailConnectorFactory.END.set(4);      // backlog grows before the commit
-            scheduler(svc).dispatchAcquireCycle();          // same process: fenced
-            Thread.sleep(500);
+            acquire(svc);                                   // same process: fenced
             forgetInMemoryFrontiers();                      // restart: the fence must survive it too
-            scheduler(svc).dispatchAcquireCycle();
-            Thread.sleep(500);
+            acquire(svc);
             List<String> fetchedBeforeCommit = List.copyOf(FakeOffsetTailConnectorFactory.FETCHED);
 
             cycle(svc, dir);                                // commits [0,3), then the next acquire drains [3,4)
