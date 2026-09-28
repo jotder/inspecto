@@ -37,6 +37,13 @@ import java.util.Set;
  */
 final class JobRoutes implements RouteModule {
 
+    /**
+     * The approval-policy kind of a Job definition. Every human write of one through {@code /jobs} — create,
+     * update, delete, enable / disable, reschedule — reaches {@link PendingChanges#hold} after its gates and
+     * before any byte (operator, 2026-09-28). A Job's RUN-time writes are not held, by decision.
+     */
+    static final String KIND = "job";
+
     @Override
     public void register(ApiContext api) {
         // The job *list* is a collection read: a space with no registered jobs returns an empty list
@@ -56,7 +63,7 @@ final class JobRoutes implements RouteModule {
         api.put("/jobs/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> updateJob(api, e, ApiContext.name(m), api.body(e))));
         api.delete("/jobs/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> deleteJob(api, ApiContext.name(m))));
+                (e, m) -> deleteJob(api, e, ApiContext.name(m))));
         // Job Type registry (R3, job-framework P2a): list + per-type descriptor (params/emits/artifacts)
         // that drives authoring forms. Fixed sub-paths under /jobs/, registered before the /jobs/{name}
         // regex routes (two segments; "types" never collides with a job name's /runs route).
@@ -108,11 +115,11 @@ final class JobRoutes implements RouteModule {
         // the same write-root gate as CRUD; enable/disable is an operational verb (canOperateRuns, the
         // lens heuristic), reschedule authors the schedule (canAuthorWorkbench).
         api.post("/jobs/([^/]+)/enable", ApiContext.withCapability("canOperateRuns",
-                (e, m) -> setEnabled(api, ApiContext.name(m), true)));
+                (e, m) -> setEnabled(api, e, ApiContext.name(m), true)));
         api.post("/jobs/([^/]+)/disable", ApiContext.withCapability("canOperateRuns",
-                (e, m) -> setEnabled(api, ApiContext.name(m), false)));
+                (e, m) -> setEnabled(api, e, ApiContext.name(m), false)));
         api.post("/jobs/([^/]+)/reschedule", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> reschedule(api, ApiContext.name(m), api.body(e))));
+                (e, m) -> reschedule(api, e, ApiContext.name(m), api.body(e))));
         // Run Artifacts (R7, job-framework P1d, §10/§14): one run's recorded outputs, and the latest
         // successful run's outputs. Both end in fixed segments (/artifacts[/latest]) so they never
         // collide with the /runs history or /trigger routes under full-match routing.
@@ -247,25 +254,29 @@ final class JobRoutes implements RouteModule {
     }
 
     /** {@code POST /jobs/{name}/enable|disable} — flip the persisted {@code enabled} flag; 404 if unknown. */
-    private Object setEnabled(ApiContext api, String name, boolean enabled) throws IOException {
+    private Object setEnabled(ApiContext api, HttpExchange ex, String name, boolean enabled) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
         refuseSystemJob(api, name);
-        Map<String, Object> m = new LinkedHashMap<>(existingJob(api, name).toMap());
+        JobConfig existing = existingJob(api, name);
+        Map<String, Object> m = new LinkedHashMap<>(existing.toMap());
         m.put("enabled", enabled);
         JobConfig c = parseJob(m);
+        PendingChanges.hold(api, ex, KIND, name, c.toMap(), existing.toMap());   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
         return c.toMap();
     }
 
     /** {@code POST /jobs/{name}/reschedule} — replace the persisted {@code cron}; 422 without one, 404 if unknown. */
-    private Object reschedule(ApiContext api, String name, Map<String, Object> body) throws IOException {
+    private Object reschedule(ApiContext api, HttpExchange ex, String name, Map<String, Object> body) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
         refuseSystemJob(api, name);
         String cron = ApiContext.str(body, "cron");
         if (cron == null || cron.isBlank()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'cron' is required");
-        Map<String, Object> m = new LinkedHashMap<>(existingJob(api, name).toMap());
+        JobConfig existing = existingJob(api, name);
+        Map<String, Object> m = new LinkedHashMap<>(existing.toMap());
         m.put("cron", cron);
         JobConfig c = parseJob(m);
+        PendingChanges.hold(api, ex, KIND, name, c.toMap(), existing.toMap());   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
         return c.toMap();
     }
@@ -352,6 +363,7 @@ final class JobRoutes implements RouteModule {
         WriteGates.conflictIf(api.service().jobServiceOrCreate().jobs().stream()
                         .anyMatch(v -> v.name().equals(c.name())),
                 "job '" + c.name() + "' already exists (use PUT to update)");
+        PendingChanges.hold(api, ex, KIND, c.name(), c.toMap(), null);   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
         return c.toMap();
     }
@@ -372,18 +384,21 @@ final class JobRoutes implements RouteModule {
         requireAdministerForEventPrune(ex, existing);   // turning an event_prune INTO something else, too
         requireAdministerForEventPrune(ex, c);
         if (!name.equals(c.name())) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body 'name' must match the path id");
+        PendingChanges.hold(api, ex, KIND, name, c.toMap(), existing.toMap());   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
         ETags.set(ex, ETags.of(ContentHash.of(c.toMap())));
         return c.toMap();
     }
 
     /** {@code DELETE /jobs/{name}} — remove a job's config + file; 404 if unknown. */
-    private Object deleteJob(ApiContext api, String name) throws IOException {
+    private Object deleteJob(ApiContext api, HttpExchange ex, String name) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
         JobService svc = jobs(api);
         refuseSystemJob(api, name);
         if (svc.jobs().stream().noneMatch(v -> v.name().equals(name)))
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no job named '" + name + "'");
+        PendingChanges.hold(api, ex, KIND, name, null,
+                svc.jobConfig(name).map(JobConfig::toMap).orElse(null));   // maker-checker (operator, 2026-09-28)
         boolean removed = Files.deleteIfExists(jobFile(api, name));
         svc.removeJob(name);
         return Map.of("name", name, "deleted", true, "fileRemoved", removed);

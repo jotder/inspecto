@@ -780,10 +780,20 @@ gets papered over.
 `ApprovalPolicy.GOVERNABLE`, a capability no route demands, an unknown key or a bad value is 422. A file that
 is present but unreadable is **not** read as off: every governable kind is held until it is fixed
 (`failedClosed: true` on the GET).
+**The route is refused** (operator, 2026-09-28): an empty or absent body is 422 — turning four-eyes off must be
+explicit, `{"approval": {}}`; and with no Authenticator configured `PUT /settings/approval` is 403 before any
+other gate, because the `canAdminister` wrap is a no-op without a Subject and the policy must never be switched
+off unauthenticated. **Personal edition therefore cannot change the approval policy through the API.**
 
 **Governable** — `pipeline`, `schema`, `enrichment`, `meta` (the `/config/write` + `/config/patch` types) and
-every `ComponentStore` kind except `requirement`, `channel` and `notification-rule`. ⛔ Not governable: `job`
-(the `/jobs` writers are not held), Connections, Tags and Case Rules, the Space settings documents — the
+every `ComponentStore` kind except `requirement`, `channel` and `notification-rule`, and `job` (operator,
+2026-09-28): the six `/jobs` writers — create, update, delete, enable, disable, reschedule — hold after their
+gates (the Job spec + `checkJob`, the `event_prune`/`restore` `canAdminister` check, `If-Match`), keyed by the
+Job name; the replay applies as the author, so `JobAuthority.stamp` writes the AUTHOR as `updatedBy`, never the
+approver, and the run-time `canAdminister` re-check (MAINT-TASK-AUTHORITY-1) judges the author. A Pipeline rename
+refuses to rewrite a governed Job's `on_pipeline`. ⛔ A Job's RUN-time writes (`MaterializeTask` restating its
+target Dataset, engine writes) are NOT held, by decision (operator, 2026-09-28): holding them would stall
+scheduled runs. ⛔ Not governable: Connections, Tags and Case Rules, the Space settings documents — the
 approval policy above all, which could otherwise never be lifted.
 
 **The hold** — `PendingChanges.hold(api, ex, kind, name, proposed, current)`, called by each authoring route
@@ -852,7 +862,7 @@ route that reaches neither `hold` nor `holdRefusing` unless it is on `NO_HOLD` w
 real HTTP, with an armed Authenticator, by `ControlApiPendingChangesTest`.
 
 ⚠ Known limits: the guard's closure stops at the file boundary (a write in another class is invisible);
-`channel` / `notification-rule` / `job` are not governable yet. (Four-eyes still forbids self-decline, as in
+`channel` / `notification-rule` are not governable yet. (Four-eyes still forbids self-decline, as in
 Link Analysis; since 2026-09-28 the author instead WITHDRAWS their own change — `POST /pending-changes/{id}/withdraw`,
 status `withdrawn`, author-only, see [auth-security](../editions/auth-security.md).)
 

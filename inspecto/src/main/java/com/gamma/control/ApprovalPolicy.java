@@ -53,8 +53,8 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
      * below. Bulk writers (bundle imports, BI template apply) and the Investigation Alert Rule bind refuse under
      * a policy instead ({@code PendingChanges.holdRefusing}).
      *
-     * <p>⛔ Deliberately NOT governable: {@code job} (the five {@code /jobs} writers are not held),
-     * {@code requirement} (a business request's triage lifecycle, not config the engine runs), {@code channel}
+     * <p>{@code job} is governable since 2026-09-28 (operator): the six {@code /jobs} writers hold; a Job's
+     * RUN-time writes do not, by decision. ⛔ Deliberately NOT governable: {@code requirement} (a business request's triage lifecycle, not config the engine runs), {@code channel}
      * and {@code notification-rule} (their {@code NotificationRoutes} writers are not held yet), Connections
      * (secret-aware CRUD of their own), and the Space settings documents — {@code approval.toon} above all,
      * since a policy that could hold its own change could never be turned off.
@@ -64,7 +64,7 @@ record ApprovalPolicy(Map<String, Rule> rules, int expiresAfterHours, boolean fa
     private static Set<String> governable() {
         Set<String> s = new TreeSet<>(ComponentStore.WRITABLE_TYPES);
         s.removeAll(Set.of("requirement", "channel", "notification-rule"));
-        s.addAll(Set.of("pipeline", "schema", "enrichment", "meta"));
+        s.addAll(Set.of("pipeline", "schema", "enrichment", "meta", JobRoutes.KIND));
         return java.util.Collections.unmodifiableSet(s);
     }
 

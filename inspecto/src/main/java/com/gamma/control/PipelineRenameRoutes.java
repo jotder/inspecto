@@ -511,7 +511,7 @@ final class PipelineRenameRoutes implements RouteModule {
      */
     private int rewriteDependents(Path writeRoot, String oldId, String newId) {
         int count = rewriteEnrichTriggers(writeRoot, oldId, newId, null);
-        count += rewriteJobTriggers(writeRoot, oldId, newId);
+        count += rewriteJobTriggers(writeRoot, oldId, newId, null);
         count += rewriteComponentTargets(writeRoot, "expectation", oldId, newId, null);
         count += rewriteComponentTargets(writeRoot, "decision-rule", oldId, newId, null);
         count += rewriteDatasetRefs(writeRoot, oldId, newId, null);
@@ -524,13 +524,14 @@ final class PipelineRenameRoutes implements RouteModule {
      * (`ASSURE-MAKER-CHECKER-1` verification finding 2): the rename's own hold is on {@code pipeline}, so
      * without this an Expectation, Decision Rule, Dataset, Alert Rule or Enrichment under a policy would be
      * rewritten with no Pending Change of its own. The same matchers as the rewrite, run without writing.
-     * ({@code job} is not governable, so its triggers are not asked about.)
+     * A Job's {@code on_pipeline} trigger too, since {@code job} became governable (operator, 2026-09-28).
      */
     private List<String> governedDependents(Path writeRoot, String oldId, String newId) {
         ApprovalPolicy policy = ApprovalPolicy.forRoot(writeRoot);
         if (!policy.holdsAnything()) return List.of();
         List<String> planned = new ArrayList<>();
         if (policy.ruleFor("enrichment") != null) rewriteEnrichTriggers(writeRoot, oldId, newId, planned);
+        if (policy.ruleFor("job") != null) rewriteJobTriggers(writeRoot, oldId, newId, planned);
         for (String type : List.of("expectation", "decision-rule"))
             if (policy.ruleFor(type) != null) rewriteComponentTargets(writeRoot, type, oldId, newId, planned);
         if (policy.ruleFor("dataset") != null) rewriteDatasetRefs(writeRoot, oldId, newId, planned);
@@ -579,7 +580,7 @@ final class PipelineRenameRoutes implements RouteModule {
     }
 
     /** Top-level {@code on_pipeline} in every {@code jobs/*_job.toon} under the write root. */
-    private int rewriteJobTriggers(Path writeRoot, String oldId, String newId) {
+    private int rewriteJobTriggers(Path writeRoot, String oldId, String newId, List<String> planned) {
         Path jobsDir = writeRoot.resolve("jobs");
         if (!Files.isDirectory(jobsDir)) return 0;
         int count = 0;
@@ -590,6 +591,10 @@ final class PipelineRenameRoutes implements RouteModule {
                     if (!oldId.equalsIgnoreCase(String.valueOf(raw.get("on_pipeline")))) continue;
                     Map<String, Object> out = new LinkedHashMap<>(raw);
                     out.put("on_pipeline", newId);
+                    if (planned != null) {
+                        planned.add("job '" + p.getFileName() + "'");
+                        continue;
+                    }
                     AtomicFiles.write(p, ConfigCodec.toToon(out).getBytes(StandardCharsets.UTF_8), ".job-");
                     count++;
                 } catch (Exception ex) {

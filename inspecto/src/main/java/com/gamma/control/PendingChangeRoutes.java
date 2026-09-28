@@ -79,6 +79,16 @@ final class PendingChangeRoutes implements RouteModule {
     }
 
     private Object writePolicy(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
+        // Operator, 2026-09-28: with no Authenticator the canAdminister wrap is a no-op, so anyone could switch
+        // four-eyes off - refuse the route outright. Personal edition cannot change the policy through the API.
+        if (Authenticators.active().isEmpty())
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "the approval policy cannot be changed "
+                    + "on a server with no Authenticator configured");
+        // Operator, 2026-09-28: an empty body used to parse as {} and write the OFF policy - turning four-eyes
+        // off must be explicit ({"approval": {}}).
+        if (body == null || body.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an empty body is refused - send "
+                    + "{\"approval\": {}} to turn every hold off explicitly");
         Path root = WriteGates.requireWriteRoot(api, "approval policy write");
         ApprovalPolicy before = ApprovalPolicy.forRoot(root);
         Map<String, Object> doc = new LinkedHashMap<>(body);

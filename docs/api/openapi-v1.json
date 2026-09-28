@@ -9011,9 +9011,9 @@
         "tags" : [ "settings" ],
         "summary" : "Replace the Space's approval policy",
         "operationId" : "putSettingsApproval",
-        "description" : "Replaces `approval.toon` wholesale and returns the policy as GET reads it. Requires canAdminister (not canAuthorWorkbench: turning maker-checker off is the one change an author must not be able to make), and is itself never held for approval. Validated fail-closed: an unknown key, a kind outside `governable`, an `approverCapability` no route demands, `expiresAfterHours` outside 1..8784, a non-boolean flag, or a policy requiring approval on a build with no Authenticator is refused. Lenient scalars: `expiresAfterHours` also accepts its string form (`\"168\"`), the boolean flags accept `\"true\"`/`\"false\"`, and a missing or blank `approverCapability` falls back to `canApproveChanges`. An empty body is read as `{}` and writes the OFF policy. Emits one `approval-policy.changed` audit event carrying the policy before and after.",
+        "description" : "Replaces `approval.toon` wholesale and returns the policy as GET reads it. Requires canAdminister (not canAuthorWorkbench: turning maker-checker off is the one change an author must not be able to make), and is itself never held for approval. Validated fail-closed: an unknown key, a kind outside `governable`, an `approverCapability` no route demands, `expiresAfterHours` outside 1..8784, a non-boolean flag, or a policy requiring approval on a build with no Authenticator is refused. Lenient scalars: `expiresAfterHours` also accepts its string form (`\"168\"`), the boolean flags accept `\"true\"`/`\"false\"`, and a missing or blank `approverCapability` falls back to `canApproveChanges`. An empty or absent body is refused (422): turning four-eyes off must be explicit, `{\"approval\": {}}`. With no Authenticator configured the route is refused outright (403), so the policy can never be switched off unauthenticated — Personal edition cannot change it through the API (operator, 2026-09-28). Emits one `approval-policy.changed` audit event carrying the policy before and after.",
         "requestBody" : {
-          "description" : "An empty body is read as `{}` and writes the OFF policy.",
+          "description" : "Required: an empty or absent body is 422. Send `{\"approval\": {}}` to turn every hold off.",
           "content" : {
             "application/json" : {
               "schema" : {
@@ -9059,7 +9059,7 @@
             }
           },
           "403" : {
-            "description" : "The caller lacks canAdminister (PERMISSION_DENIED). Only when an Authenticator / Subject is present — with none attached the capability gate is a no-op.",
+            "description" : "The caller lacks canAdminister, or no Authenticator is configured at all (PERMISSION_DENIED) — the route is never served unauthenticated.",
             "content" : {
               "application/json" : {
                 "schema" : {
@@ -9079,7 +9079,7 @@
             }
           },
           "422" : {
-            "description" : "The policy is refused by validation (CONFIG_VALIDATION_FAILED); `error.message` names the offending key.",
+            "description" : "The body is empty or absent, or the policy is refused by validation (CONFIG_VALIDATION_FAILED); `error.message` names the offending key.",
             "content" : {
               "application/json" : {
                 "schema" : {

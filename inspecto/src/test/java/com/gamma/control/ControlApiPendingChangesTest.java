@@ -65,6 +65,7 @@ class ControlApiPendingChangesTest {
                 case SELF -> new String[] {"author-1", "admin"};
                 case ADMIN -> new String[] {"admin-1", "admin"};
                 case PLAIN -> new String[] {"plain-1", "admin"};
+                case "Bearer ops" -> new String[] {"ops-1", "operations"};
                 default -> null;
             };
             if (who == null) return Optional.empty();
@@ -144,7 +145,7 @@ class ControlApiPendingChangesTest {
             assertEquals(403, send(c, "PUT", "/settings/approval", PACK_POLICY, AUTHOR).statusCode(),
                     "an author cannot lift (or set) the policy");
             assertEquals(422, send(c, "PUT", "/settings/approval",
-                    "{\"approval\":{\"job\":{\"required\":true}}}", ADMIN).statusCode(), "job is not governable");
+                    "{\"approval\":{\"channel\":{\"required\":true}}}", ADMIN).statusCode(), "channel is not governable");
             assertEquals(422, send(c, "PUT", "/settings/approval",
                     "{\"approval\":{\"no-such-kind\":{\"required\":true}}}", ADMIN).statusCode());
             assertEquals(422, send(c, "PUT", "/settings/approval",
@@ -163,15 +164,37 @@ class ControlApiPendingChangesTest {
     }
 
     @Test
-    void aPolicyThatCouldNeverApproveIsRefusedOnABuildWithNoAuthenticator(@TempDir Path cfg, @TempDir Path tmp)
+    void thePolicyRouteIsRefusedOutrightOnABuildWithNoAuthenticator(@TempDir Path cfg, @TempDir Path tmp)
             throws Exception {
-        // the write root is a SUBDIR: its key lives in the sibling <root>.secrets/, still inside the TempDir
+        // Operator, 2026-09-28: with no Authenticator the canAdminister wrap is a no-op, so the route itself
+        // refuses — turning four-eyes on OR off. Personal edition cannot change the policy through the API.
         Path root = Files.createDirectories(tmp.resolve("config"));
         Authenticators.forTest(null);
         try (Ctx c = open(cfg, root)) {
-            HttpResponse<String> r = send(c, "PUT", "/settings/approval", PACK_POLICY, null);
-            assertEquals(422, r.statusCode(), r.body());
-            assertTrue(r.body().contains("signed-in"), r.body());
+            for (String body : List.of(PACK_POLICY, "{\"approval\":{}}", "")) {
+                HttpResponse<String> r = send(c, "PUT", "/settings/approval", body, null);
+                assertEquals(403, r.statusCode(), r.body());
+                assertTrue(r.body().contains("no Authenticator"), r.body());
+            }
+            assertFalse(Files.exists(root.resolve(ApprovalPolicy.FILE)), "a refusal writes nothing");
+        }
+    }
+
+    @Test
+    void anEmptyPolicyBodyIsRefusedAndTurningFourEyesOffMustBeExplicit(@TempDir Path cfg, @TempDir Path tmp)
+            throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            policy(c, PACK_POLICY);
+            for (String body : List.of("", "{}")) {
+                HttpResponse<String> r = send(c, "PUT", "/settings/approval", body, ADMIN);
+                assertEquals(422, r.statusCode(), "body '" + body + "': " + r.body());
+            }
+            assertTrue(data(send(c, "GET", "/settings/approval", null, ADMIN), 200)
+                    .at("/approval/pattern-pack/required").asBoolean(), "the refused PUT left the policy on");
+            policy(c, "{\"approval\":{}}");
+            assertEquals(0, data(send(c, "GET", "/settings/approval", null, ADMIN), 200).get("approval").size(),
+                    "an explicit empty approval map turns it off");
         }
     }
 
@@ -674,6 +697,109 @@ class ControlApiPendingChangesTest {
             assertEquals(403, r.statusCode(), r.body());
             assertTrue(r.body().contains("roles are unknown"), r.body());
             assertFalse(store(c).exists("pattern-pack", "p9"));
+        }
+    }
+
+    // ── the job kind (operator, 2026-09-28): /jobs writers hold; a Job's RUN-time writes do not ──────────
+
+    private static final String JOB_POLICY = "{\"approval\":{\"job\":{\"required\":true},\"dataset\":{\"required\":true}}}";
+    private static final String BEAT = "{\"name\":\"beat\",\"type\":\"maintenance\",\"task\":\"heartbeat\",\"cron\":\"0 3 * * *\"}";
+
+    private static Path jobToon(Path root) {
+        return root.resolve("jobs").resolve("beat_job.toon");
+    }
+
+    @Test
+    void aJobCreateAndUpdateAreHeldAndAppliedOnlyByASecondPerson(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        try (Ctx c = open(cfg, root)) {
+            policy(c, JOB_POLICY);
+            JsonNode held = data(send(c, "POST", "/jobs", BEAT, AUTHOR), 202);
+            String create = held.at("/pendingChange/id").asText();
+            assertEquals("job", held.at("/pendingChange/kind").asText(), held.toString());
+            assertFalse(Files.exists(jobToon(root)), "a held Job create writes nothing");
+            assertEquals(404, send(c, "GET", "/jobs/beat", null, AUTHOR).statusCode(), "and registers nothing");
+
+            HttpResponse<String> own = send(c, "POST", "/pending-changes/" + create + "/approve", "{}", SELF);
+            assertEquals(403, own.statusCode(), "four-eyes: the author may never approve their own Job");
+            assertFalse(Files.exists(jobToon(root)));
+
+            JsonNode ok = data(send(c, "POST", "/pending-changes/" + create + "/approve", "{}", CHECKER), 200);
+            assertTrue(ok.get("applied").asBoolean(), ok.toString());
+            JsonNode job = data(send(c, "GET", "/jobs/beat", null, AUTHOR), 200);
+            assertEquals("0 3 * * *", job.get("cron").asText());
+            assertTrue(Files.readString(jobToon(root)).contains("author-1"),
+                    "MAINT-TASK-AUTHORITY-1: the applied Job carries its AUTHOR, server-stamped, not the approver");
+            assertFalse(Files.readString(jobToon(root)).contains("checker-1"));
+
+            String update = data(send(c, "PUT", "/jobs/beat", BEAT.replace("0 3 * * *", "0 4 * * *"), AUTHOR), 202)
+                    .at("/pendingChange/id").asText();
+            assertEquals("0 3 * * *", data(send(c, "GET", "/jobs/beat", null, AUTHOR), 200).get("cron").asText(),
+                    "a held update leaves the live Job as it was");
+            assertEquals(403, send(c, "POST", "/pending-changes/" + update + "/approve", "{}", SELF).statusCode());
+            assertTrue(data(send(c, "POST", "/pending-changes/" + update + "/approve", "{}", CHECKER), 200)
+                    .get("applied").asBoolean());
+            assertEquals("0 4 * * *", data(send(c, "GET", "/jobs/beat", null, AUTHOR), 200).get("cron").asText());
+
+            // the other /jobs writers reach the hold too — reschedule and delete
+            data(send(c, "POST", "/jobs/beat/reschedule", "{\"cron\":\"0 5 * * *\"}", AUTHOR), 202);
+            assertEquals("0 4 * * *", data(send(c, "GET", "/jobs/beat", null, AUTHOR), 200).get("cron").asText());
+        } finally {
+            System.clearProperty("jobs.audit.dir");
+        }
+    }
+
+    @Test
+    void aJobDeleteIsHeld(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        try (Ctx c = open(cfg, root)) {
+            data(send(c, "POST", "/jobs", BEAT, AUTHOR), 200);   // policy off: written at once
+            policy(c, JOB_POLICY);
+            String id = data(send(c, "DELETE", "/jobs/beat", null, AUTHOR), 202).at("/pendingChange/id").asText();
+            assertTrue(Files.exists(jobToon(root)), "a held delete deletes nothing");
+            assertTrue(data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER), 200)
+                    .get("applied").asBoolean());
+            assertFalse(Files.exists(jobToon(root)));
+        } finally {
+            System.clearProperty("jobs.audit.dir");
+        }
+    }
+
+    @Test
+    void aRunTimeMaterializeIsNotHeld(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        new com.gamma.pipeline.ViewStore(root.resolve("views")).write(new com.gamma.pipeline.ViewDefinition("orders_view",
+                "flow-x", List.of(), "SELECT * FROM (VALUES ('EU',10.0),('US',5.0)) AS t(region,amount)",
+                "2026-09-28T00:00:00Z"));
+        new ComponentStore(root.resolve("registry")).write("dataset", "orders", Map.of("view", "orders_view"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        System.setProperty("data.dir", tmp.resolve("data").toString());   // else the Parquet lands in the CWD
+        try (Ctx c = open(cfg, root)) {
+            // MaterializeTask resolves the default Space's registry through this property AT RUN TIME
+            System.setProperty("assist.write.root", root.toString());
+            policy(c, JOB_POLICY);   // job AND dataset governed
+            HttpResponse<String> r = send(c, "POST", "/datasets/orders/materialize", "{\"target\":\"orders_daily\"}", "Bearer ops");
+            assertEquals(202, r.statusCode(), r.body());
+            assertTrue(r.body().contains("runId") && !r.body().contains("pendingChange"),
+                    "a Job run is started, not a Pending Change: " + r.body());
+            String run = JSON.readTree(r.body()).at("/data/runId").asText();
+            for (int i = 0; i < 100; i++) {   // let the run finish, then look for anything it held
+                String status = data(send(c, "GET", "/jobs/runs/" + run, null, ADMIN), 200).get("status").asText();
+                if (!"running".equalsIgnoreCase(status) && !"queued".equalsIgnoreCase(status)) break;
+                Thread.sleep(50);
+            }
+            JsonNode done = data(send(c, "GET", "/jobs/runs/" + run, null, ADMIN), 200);
+            assertEquals("success", done.get("status").asText().toLowerCase(java.util.Locale.ROOT), done.toString());
+            assertTrue(store(c).exists("dataset", "orders_daily"),
+                    "the run wrote its governed target Dataset straight away");
+            assertEquals(0, data(send(c, "GET", "/pending-changes", null, ADMIN), 200).get("total").asInt(),
+                    "a Job's run-time writes are not held, by decision");
+        } finally {
+            System.clearProperty("assist.write.root");
+            System.clearProperty("jobs.audit.dir");
+            System.clearProperty("data.dir");
         }
     }
 }

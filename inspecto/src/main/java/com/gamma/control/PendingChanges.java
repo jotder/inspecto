@@ -446,7 +446,9 @@ public final class PendingChanges {
             "POST /decision-rules", "PUT /decision-rules/([^/]+)", "DELETE /decision-rules/([^/]+)",
             "POST /expectations", "PUT /expectations/([^/]+)", "DELETE /expectations/([^/]+)",
             "PUT /access/catalog", "PUT /access/profiles/([^/]+)", "DELETE /access/profiles/([^/]+)",
-            "POST /requirements/([^/]+)/kpi");
+            "POST /requirements/([^/]+)/kpi",
+            "POST /jobs", "PUT /jobs/([^/]+)", "DELETE /jobs/([^/]+)", "POST /jobs/([^/]+)/enable",
+            "POST /jobs/([^/]+)/disable", "POST /jobs/([^/]+)/reschedule");
 
     /** Whether {@code method path} (route-table path, query allowed) is on {@link #REPLAYABLE}. */
     static boolean replayable(String method, String path) {
