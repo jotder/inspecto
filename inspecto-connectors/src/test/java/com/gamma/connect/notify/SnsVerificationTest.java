@@ -32,7 +32,7 @@ class SnsVerificationTest {
             lookups.incrementAndGet();
             trust.check(cert, List.of(), HOST, System.currentTimeMillis());
             return cert;
-        }, 3600, 300);
+        }, env -> {}, 3600, 300);
     }
 
     private static byte[] signed(String fixture, Consumer<JsonObject> tweak) throws Exception {
@@ -122,7 +122,7 @@ class SnsVerificationTest {
 
     @Test
     void anUnconfiguredAdapterVerifiesNothing() throws Exception {
-        var a = new SesSnsDeliveryStatusAdapter(Set.of(), env -> { throw new AssertionError("never"); }, 3600, 300);
+        var a = new SesSnsDeliveryStatusAdapter(Set.of(), env -> { throw new AssertionError("never"); }, env -> {}, 3600, 300);
         assertFalse(a.configured());
         assertFalse(a.verify(signed("notification", e -> {}), Map.of()));
     }

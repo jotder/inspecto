@@ -4,6 +4,7 @@ import com.gamma.api.PublicApi;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * SPI for an <em>inbound</em> provider callback that reports what happened to a message we sent
@@ -51,6 +52,17 @@ public interface DeliveryStatusAdapter {
 
     /** The normalised events in this payload (providers batch several per callback). */
     List<DeliveryEvent> parse(byte[] raw);
+
+    /**
+     * A VERIFIED message that carries no delivery events — a subscription handshake, or a replay the adapter
+     * has already handled (D8-SES-SNS-1, decision D10). Runs after {@link #verify} and before {@link #parse};
+     * when it returns a kind, the route answers {@code 200 {"control": kind}} and {@code parse} is skipped. The
+     * adapter schedules any side effect itself and must not block the request on it. The default returns
+     * empty, so adapters without control messages are unchanged.
+     *
+     * @since 4.0.0
+     */
+    default Optional<String> control(byte[] raw) { return Optional.empty(); }
 
     /**
      * Whether this adapter has the configuration it needs (a public key, a shared secret). An

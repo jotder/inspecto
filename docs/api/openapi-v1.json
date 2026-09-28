@@ -5250,8 +5250,11 @@
           }
         } ],
         "responses" : {
+          "200" : {
+            "description" : "Verified. Either the stamped events, or {\"control\": kind} for a verified message that carries no delivery events (an SNS SubscriptionConfirmation / UnsubscribeConfirmation), with duplicate:true for a replayed MessageId; no receipt is written for a control message."
+          },
           "413" : {
-            "description" : "Body over the 256 KiB callback cap (errorCode PAYLOAD_TOO_LARGE); never reaches signature verification."
+            "description" : "Body over the 512 KiB callback cap (errorCode PAYLOAD_TOO_LARGE); never reaches signature verification."
           },
           "429" : {
             "description" : "Per-caller-IP callback budget exhausted (errorCode RATE_LIMITED); providers retry."

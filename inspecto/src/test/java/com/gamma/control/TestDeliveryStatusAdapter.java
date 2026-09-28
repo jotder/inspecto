@@ -51,6 +51,18 @@ public final class TestDeliveryStatusAdapter implements DeliveryStatusAdapter {
         return GOOD_SIGNATURE.equals(headers.get("x-test-signature"));
     }
 
+    /** A body {@code {"control": kind}} is a control message (D10); anything else is not. */
+    @Override
+    public java.util.Optional<String> control(byte[] raw) {
+        try {
+            JsonNode root = JSON.readTree(new String(raw, StandardCharsets.UTF_8));
+            return root.isObject() && root.hasNonNull("control")
+                    ? java.util.Optional.of(root.get("control").asText()) : java.util.Optional.empty();
+        } catch (Exception ex) {
+            return java.util.Optional.empty();
+        }
+    }
+
     @Override
     public List<DeliveryEvent> parse(byte[] raw) {
         List<DeliveryEvent> events = new ArrayList<>();

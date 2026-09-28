@@ -1,5 +1,8 @@
 package com.gamma.connect.notify;
 
+import com.gamma.event.Event;
+import com.gamma.event.EventLog;
+import com.gamma.event.EventType;
 import com.gamma.notify.DeliveryEvent;
 import com.gamma.notify.DeliveryStatusAdapter;
 import org.slf4j.Logger;
@@ -14,6 +17,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -56,8 +60,14 @@ public final class SesSnsDeliveryStatusAdapter implements DeliveryStatusAdapter 
         X509Certificate certificateFor(SnsEnvelope envelope) throws Exception;
     }
 
+    /** What happens to a verified, first-seen {@code SubscriptionConfirmation}. Must return without blocking. */
+    interface Confirmer {
+        void subscriptionConfirmation(SnsEnvelope envelope);
+    }
+
     private final Set<String> topicArns;
     private final CertSource certs;
+    private final Confirmer confirmer;
     private final long freshnessSeconds;
     private final long futureSkewSeconds;
     private final Set<String> warnedV1 = ConcurrentHashMap.newKeySet();
@@ -67,10 +77,11 @@ public final class SesSnsDeliveryStatusAdapter implements DeliveryStatusAdapter 
         }
     });
 
-    SesSnsDeliveryStatusAdapter(Set<String> topicArns, CertSource certs, long freshnessSeconds,
+    SesSnsDeliveryStatusAdapter(Set<String> topicArns, CertSource certs, Confirmer confirmer, long freshnessSeconds,
                                 long futureSkewSeconds) {
         this.topicArns = topicArns == null ? Set.of() : Set.copyOf(topicArns);
         this.certs = certs;
+        this.confirmer = confirmer;
         this.freshnessSeconds = freshnessSeconds > 0 ? freshnessSeconds : DEFAULT_FRESHNESS_SECONDS;
         this.futureSkewSeconds = futureSkewSeconds >= 0 ? futureSkewSeconds : DEFAULT_FUTURE_SKEW_SECONDS;
     }
@@ -83,7 +94,7 @@ public final class SesSnsDeliveryStatusAdapter implements DeliveryStatusAdapter 
     /** Inert without a TopicArn allowlist and a certificate source — its callback URL then answers 404. */
     @Override
     public boolean configured() {
-        return !topicArns.isEmpty() && certs != null;
+        return !topicArns.isEmpty() && certs != null && confirmer != null;
     }
 
     @Override
@@ -126,8 +137,55 @@ public final class SesSnsDeliveryStatusAdapter implements DeliveryStatusAdapter 
         return now - then <= freshnessSeconds && then - now <= futureSkewSeconds;
     }
 
+    /**
+     * After {@link #verify}: a replayed {@code MessageId} is {@code "duplicate"} and does no work (design §3.4 — it
+     * spares the RSA work and, above all, a second confirmation GET; receipt integrity does not depend on it,
+     * because the first observation of a status wins). A {@code SubscriptionConfirmation} is handed to the
+     * {@link Confirmer}, which must not block; an {@code UnsubscribeConfirmation} is audited and NEVER
+     * re-subscribes. A {@code Notification} is not a control message.
+     */
+    @Override
+    public Optional<String> control(byte[] raw) {
+        SnsEnvelope env = SnsEnvelope.parse(raw);
+        if (env == null) return Optional.empty();
+        if (duplicate(env.messageId())) return Optional.of("duplicate");
+        switch (env.type()) {
+            case SnsEnvelope.SUBSCRIPTION_CONFIRMATION -> {
+                confirmer.subscriptionConfirmation(env);
+                return Optional.of(SnsEnvelope.SUBSCRIPTION_CONFIRMATION);
+            }
+            case SnsEnvelope.UNSUBSCRIBE_CONFIRMATION -> {
+                audit("sns.unsubscribe-confirmation", "SNS confirmed that our subscription to " + env.topicArn()
+                        + " was removed; it is not re-subscribed automatically", env.topicArn(), null);
+                return Optional.of(SnsEnvelope.UNSUBSCRIBE_CONFIRMATION);
+            }
+            default -> {
+                return Optional.empty();
+            }
+        }
+    }
+
+    /** The SES event in a verified {@code Notification}'s {@code Message} (design §4.3, {@link SesEventMapper}). */
     @Override
     public List<DeliveryEvent> parse(byte[] raw) {
-        return List.of();
+        SnsEnvelope env = SnsEnvelope.parse(raw);
+        if (env == null || !SnsEnvelope.NOTIFICATION.equals(env.type())) return List.of();
+        return SesEventMapper.map(env.message());
+    }
+
+    /** Best-effort AUDIT row, like every audit emit in the product. {@code token} is recorded only when given (D8). */
+    static void audit(String action, String message, String topicArn, String token) {
+        try {
+            EventLog events = EventLog.current();
+            if (events == null) return;
+            Event.Builder b = Event.builder(EventType.AUDIT).source("audit").message(message)
+                    .actor("sns").actorType("system").action(action).actionCategory("operation")
+                    .attr("adapter", ID).attr("topicArn", topicArn);
+            if (token != null) b.attr("token", token);
+            events.emit(b);
+        } catch (RuntimeException ignored) {
+            // the audit trail is best effort; the log line is the fallback
+        }
+        log.info("{}: {}", action, message);
     }
 }

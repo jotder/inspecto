@@ -33,6 +33,8 @@ import java.util.ServiceLoader;
  *   <li>Signature absent, invalid, or stale → <b>403</b>, nothing written, an audit record made. An
  *       unverified callback must never be able to mark a destination dead — that would be a cheap
  *       denial-of-notification vector, which is the whole reason verification precedes the write.</li>
+ *   <li>A verified CONTROL message ({@link DeliveryStatusAdapter#control}) → <b>200</b>
+ *       {@code {"control": kind}}; the event path is skipped.</li>
  *   <li>Payload that yields no usable events → <b>422</b>.</li>
  *   <li>Every {@code deliveryId} unknown → <b>202 accepted</b>, not an error. Receipts are prunable, and
  *       providers retry forever on a non-2xx: rejecting a callback for a receipt we already forgot would
@@ -44,8 +46,9 @@ final class DeliveryStatusRoutes implements RouteModule {
 
     /** Hard cap on an inbound callback body (SEC review F1): the route is unauthenticated, so the body is
      *  bounded BEFORE it is buffered — a larger one is {@code 413 PAYLOAD_TOO_LARGE} and never reaches the
-     *  adapter. 256 KiB comfortably holds a provider's batched event array (SendGrid batches ~1 KB events). */
-    static final int MAX_CALLBACK_BYTES = 256 * 1024;
+     *  adapter. 512 KiB (D8-SES-SNS-1 design §3.2 step 1): an SNS message may itself be 256 KiB, and the
+     *  envelope JSON-escapes it and adds a base64 signature, so a 256 KiB cap would refuse genuine SNS posts. */
+    static final int MAX_CALLBACK_BYTES = 512 * 1024;
 
     /** Adapters are configured from system properties, so discovery once per API instance is correct. */
     private final List<DeliveryStatusAdapter> adapters = discoverAdapters();
@@ -140,6 +143,15 @@ final class DeliveryStatusRoutes implements RouteModule {
             // status, so a rejected callback lands in the trail as a 403 on this path. Nothing is written
             // to any receipt before this point.
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "delivery-status callback signature rejected");
+        }
+
+        // A verified message with no delivery events — an SNS subscription handshake, or a replay the adapter
+        // already handled (D10). 200, never 422: a non-2xx makes the provider retry.
+        var control = adapter.control(raw);
+        if (control.isPresent()) {
+            return "duplicate".equals(control.get())
+                    ? Map.of("control", control.get(), "duplicate", true)
+                    : Map.of("control", control.get());
         }
 
         List<DeliveryEvent> events = adapter.parse(raw);

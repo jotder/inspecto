@@ -155,6 +155,29 @@ class ControlApiDeliveryStatusTest {
         }
     }
 
+    // ---- gate 2b: a verified control message (D8-SES-SNS-1, D10) --------------------------------
+
+    @Test
+    void aVerifiedControlMessageIs200ControlAndSkipsTheEventPath(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            seed(c.svc, "d1", "n1");
+            HttpResponse<String> r = callback(c.port, "test",
+                    "{\"control\":\"SubscriptionConfirmation\",\"deliveryId\":\"d1\"}", "good");
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals("SubscriptionConfirmation", json(r).at("/control").asText(), r.body());
+            assertTrue(json(r).at("/duplicate").isMissingNode(), r.body());
+
+            HttpResponse<String> dup = callback(c.port, "test", "{\"control\":\"duplicate\"}", "good");
+            assertEquals(200, dup.statusCode(), "a replay is 2xx, or the provider retries it forever");
+            assertTrue(json(dup).at("/duplicate").asBoolean(), dup.body());
+
+            assertEquals(403, callback(c.port, "test", "{\"control\":\"SubscriptionConfirmation\"}", "wrong")
+                    .statusCode(), "control runs only after verify");
+            assertTrue(c.svc.deliveryReceipts().get("d1").orElseThrow().statusAt().isEmpty(),
+                    "a control message writes no receipt");
+        }
+    }
+
     // ---- gate 3: nothing usable in the payload ----------------------------------------------------
 
     @Test
