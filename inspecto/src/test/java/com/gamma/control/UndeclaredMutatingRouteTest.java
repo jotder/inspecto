@@ -23,14 +23,16 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class UndeclaredMutatingRouteTest {
 
-    private ControlApi open(Path dir) throws Exception {
+    /** The caller closes it: ControlApi.close() does not close its service, whose subscribers sit on the
+     *  process-wide EventLog.global(). */
+    private CollectorService service(Path dir) throws Exception {
         Path toon = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
-        return new ControlApi(new CollectorService(List.of(toon), 3600, 1), 0);
+        return new CollectorService(List.of(toon), 3600, 1);
     }
 
     @Test
     void anUndeclaredMutatingRouteIsRefusedAtRegistration(@TempDir Path dir) throws Exception {
-        try (ControlApi api = open(dir)) {
+        try (CollectorService svc = service(dir); ControlApi api = new ControlApi(svc, 0)) {
             IllegalStateException e = assertThrows(IllegalStateException.class,
                     () -> api.post("/undeclared-route", (ex, m) -> null));
 
@@ -45,7 +47,7 @@ class UndeclaredMutatingRouteTest {
     /** Every mutating method is covered — a gap in one is a gap in the control. */
     @Test
     void everyMutatingMethodIsCovered(@TempDir Path dir) throws Exception {
-        try (ControlApi api = open(dir)) {
+        try (CollectorService svc = service(dir); ControlApi api = new ControlApi(svc, 0)) {
             assertThrows(IllegalStateException.class, () -> api.post("/x1", (e, m) -> null));
             assertThrows(IllegalStateException.class, () -> api.put("/x2", (e, m) -> null));
             assertThrows(IllegalStateException.class, () -> api.patch("/x3", (e, m) -> null));
@@ -61,7 +63,7 @@ class UndeclaredMutatingRouteTest {
      */
     @Test
     void aReadNeedsNoDeclaration(@TempDir Path dir) throws Exception {
-        try (ControlApi api = open(dir)) {
+        try (CollectorService svc = service(dir); ControlApi api = new ControlApi(svc, 0)) {
             assertDoesNotThrow(() -> api.get("/a-plain-read", (e, m) -> null));
         }
     }
@@ -69,7 +71,7 @@ class UndeclaredMutatingRouteTest {
     /** A declared capability is accepted — the positive case, so the test above cannot pass vacuously. */
     @Test
     void aGatedMutatingRouteRegistersFine(@TempDir Path dir) throws Exception {
-        try (ControlApi api = open(dir)) {
+        try (CollectorService svc = service(dir); ControlApi api = new ControlApi(svc, 0)) {
             assertDoesNotThrow(() -> api.post("/gated-route",
                     ApiContext.withCapability("canAdminister", (e, m) -> null)));
         }
@@ -78,7 +80,7 @@ class UndeclaredMutatingRouteTest {
     /** And so is a recorded exemption — checked through a real one, so the lookup is exercised as shipped. */
     @Test
     void arecordedExemptionRegistersFine(@TempDir Path dir) throws Exception {
-        try (ControlApi api = open(dir)) {
+        try (CollectorService svc = service(dir); ControlApi api = new ControlApi(svc, 0)) {
             assertTrue(CapabilityManifest.isExempt("POST", "/queries/([^/]+)/run"),
                     "fixture check: this exemption must exist for the assertion below to mean anything");
         }

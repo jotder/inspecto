@@ -37,6 +37,21 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ToolSchemaAdopterContractTest {
 
+    /** Every CollectorService this class builds, closed after each test: the default Space's services share the
+     *  process-wide {@code EventLog.global()}, so an unclosed one leaves its subscribers live for the whole fork. */
+    private final java.util.List<CollectorService> services = new java.util.ArrayList<>();
+
+    private CollectorService track(CollectorService svc) {
+        services.add(svc);
+        return svc;
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void closeServices() {
+        services.forEach(CollectorService::close);
+        services.clear();
+    }
+
     /** One adopter's payload: the arg keys it sends, mapped to the JSON type of the value. */
     private record Payload(String tool, String adopter, Map<String, String> argTypes) {}
 
@@ -92,9 +107,9 @@ class ToolSchemaAdopterContractTest {
     // The schemas are hand-written literals in InspectoTools, so a full JSON parser buys nothing; a
     // property's declaration is always a single balanced brace group after its key.
 
-    private static Map<String, String> schemasByName() {
+    private Map<String, String> schemasByName() {
         Map<String, String> out = new LinkedHashMap<>();
-        for (Tool t : new InspectoPack(new CollectorService(List.of(), 3600, 1)).toolProvider().tools()) {
+        for (Tool t : new InspectoPack(track(new CollectorService(List.of(), 3600, 1))).toolProvider().tools()) {
             out.put(t.spec().name(), t.spec().jsonSchema());
         }
         return out;

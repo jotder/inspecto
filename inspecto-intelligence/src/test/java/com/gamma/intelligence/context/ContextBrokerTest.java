@@ -21,11 +21,26 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ContextBrokerTest {
 
+    /** Every CollectorService this class builds, closed after each test: the default Space's services share the
+     *  process-wide {@code EventLog.global()}, so an unclosed one leaves its subscribers live for the whole fork. */
+    private final java.util.List<CollectorService> services = new java.util.ArrayList<>();
+
+    private CollectorService track(CollectorService svc) {
+        services.add(svc);
+        return svc;
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void closeServices() {
+        services.forEach(CollectorService::close);
+        services.clear();
+    }
+
     /** Future-dated so these signals dominate the newest-first overlay over any ambient ledger noise. */
     private final Instant base = Instant.now().plusSeconds(3600);
 
-    private static CollectorService seeded(Signal... signals) {
-        CollectorService svc = new CollectorService(List.of(), 3600, 1);
+    private CollectorService seeded(Signal... signals) {
+        CollectorService svc = track(new CollectorService(List.of(), 3600, 1));
         for (Signal s : signals) svc.events().append(s.toEvent());
         return svc;
     }

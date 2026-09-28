@@ -490,6 +490,11 @@
                     <version>3.2.5</version>
                     <configuration>
                         <argLine>@{argLine} --enable-native-access=ALL-UNNAMED</argLine>
+                        <!-- Registers the ServiceLoader-listed JUnit extensions, e.g. the inspecto-etl test-jar's
+                             EventLogLeakDetector (a test class that leaves an EventLog.global() subscriber attached). -->
+                        <properties>
+                            <configurationParameters>junit.jupiter.extensions.autodetection.enabled=true</configurationParameters>
+                        </properties>
                         <systemPropertyVariables>
                             <!-- The ELT parity-gate switch — see the `ingest.lane` property above. -->
                             <ingest.lane>${ingest.lane}</ingest.lane>

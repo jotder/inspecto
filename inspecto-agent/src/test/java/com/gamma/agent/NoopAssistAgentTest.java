@@ -17,9 +17,24 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class NoopAssistAgentTest {
 
+    /** Every CollectorService this class builds, closed after each test: the default Space's services share the
+     *  process-wide {@code EventLog.global()}, so an unclosed one leaves its subscribers live for the whole fork. */
+    private final java.util.List<CollectorService> services = new java.util.ArrayList<>();
+
+    private CollectorService track(CollectorService svc) {
+        services.add(svc);
+        return svc;
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void closeServices() {
+        services.forEach(CollectorService::close);
+        services.clear();
+    }
+
     @Test
     void wiresIntoCollectorServiceViaTheSpi() {
-        CollectorService svc = new CollectorService(List.of(), 60, 1);
+        CollectorService svc = track(new CollectorService(List.of(), 60, 1));
         assertFalse(svc.assistAgent().isPresent(), "no agent before registration");
 
         NoopAssistAgent agent = new NoopAssistAgent();
@@ -32,7 +47,7 @@ class NoopAssistAgentTest {
 
     @Test
     void secondRegistrationIsIgnored() {
-        CollectorService svc = new CollectorService(List.of(), 60, 1);
+        CollectorService svc = track(new CollectorService(List.of(), 60, 1));
         NoopAssistAgent first = new NoopAssistAgent();
         NoopAssistAgent second = new NoopAssistAgent();
 

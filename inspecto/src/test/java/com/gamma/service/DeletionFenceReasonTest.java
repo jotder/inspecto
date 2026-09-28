@@ -9,6 +9,8 @@ import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineStores;
 
+import com.gamma.event.EventLog;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -45,6 +47,22 @@ class DeletionFenceReasonTest {
      *  trigger populates while a pipeline is in flight (see {@code CollectorService#runPipeline}).
      *  Simulating it directly is far cheaper than racing a real run, and exercises exactly what
      *  {@code checkDeletion} reads. */
+    private EventLog subscribedLog;
+    private java.util.function.Consumer<Event> subscriber;
+
+    /** Capture the service's events; de-registered in {@link #unsubscribe} — the default Space's log is the
+     *  process-wide {@code EventLog.global()}, so a leftover listener would outlive this class. */
+    private void subscribe(CollectorService svc, List<Event> captured) {
+        subscribedLog = svc.eventLog();
+        subscriber = captured::add;
+        subscribedLog.addSubscriber(subscriber);
+    }
+
+    @AfterEach
+    void unsubscribe() {
+        if (subscribedLog != null) subscribedLog.removeSubscriber(subscriber);
+    }
+
     @SuppressWarnings("unchecked")
     private Set<String> runningSet(CollectorService svc) throws Exception {
         Field f = CollectorService.class.getDeclaredField("running");
@@ -57,7 +75,7 @@ class DeletionFenceReasonTest {
         Registered r = seed(dir);
         try (CollectorService svc = new CollectorService(List.of(r.toon()), 3600, 1)) {
             List<Event> captured = new CopyOnWriteArrayList<>();
-            svc.eventLog().addSubscriber(captured::add);
+            subscribe(svc, captured);
 
             runningSet(svc).add(r.pipelineName());   // simulate an in-flight run of the store's producer
 
@@ -77,7 +95,7 @@ class DeletionFenceReasonTest {
         Registered r = seed(dir);
         try (CollectorService svc = new CollectorService(List.of(r.toon()), 3600, 1)) {
             List<Event> captured = new CopyOnWriteArrayList<>();
-            svc.eventLog().addSubscriber(captured::add);
+            subscribe(svc, captured);
 
             // No pipeline produces or consumes this name — the typo class, and the row's original complaint:
             // "no error, no warning and no event" before this change.

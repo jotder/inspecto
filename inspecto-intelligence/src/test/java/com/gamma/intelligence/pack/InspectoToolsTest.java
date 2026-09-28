@@ -43,11 +43,26 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class InspectoToolsTest {
 
+    /** Every CollectorService this class builds, closed after each test: the default Space's services share the
+     *  process-wide {@code EventLog.global()}, so an unclosed one leaves its subscribers live for the whole fork. */
+    private final java.util.List<CollectorService> services = new java.util.ArrayList<>();
+
+    private CollectorService track(CollectorService svc) {
+        services.add(svc);
+        return svc;
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void closeServices() {
+        services.forEach(CollectorService::close);
+        services.clear();
+    }
+
     private static final Instant T0 = Instant.parse("2026-07-19T10:00:00Z");
     private static final int WIDE_WINDOW = 1_000_000; // minutes — sidesteps the default 60-min/24-h floors
 
-    private static CollectorService seeded(Signal... signals) {
-        CollectorService svc = new CollectorService(List.of(), 3600, 1);
+    private CollectorService seeded(Signal... signals) {
+        CollectorService svc = track(new CollectorService(List.of(), 3600, 1));
         for (Signal s : signals) svc.events().append(s.toEvent());
         return svc;
     }
@@ -71,7 +86,7 @@ class InspectoToolsTest {
 
     @Test
     void actToolsAreRegisteredMutatingAndCapabilityGated() {
-        CollectorService svc = new CollectorService(List.of(), 3600, 1);
+        CollectorService svc = track(new CollectorService(List.of(), 3600, 1));
         for (String name : List.of("component_apply", "component_rollback")) {
             Tool t = tool(svc, name);
             assertTrue(t.spec().mutating(), name + " must be mutating (P3 act tool)");
@@ -231,7 +246,7 @@ class InspectoToolsTest {
     @Test
     @SuppressWarnings("unchecked")
     void diffBatchesComparesTwoLedgerEntriesAndComputesTheDelta(@TempDir Path dir) throws Exception {
-        CollectorService svc = new CollectorService(List.of(writeMiniPipeline(dir)), 3600, 1);
+        CollectorService svc = track(new CollectorService(List.of(writeMiniPipeline(dir)), 3600, 1));
         // Pipeline ids register lowercased (in-file 'MINI_ETL' -> 'mini_etl'); the tool takes the id
         // exactly as status_get/signals hand it to the agent, so query with the registered form.
         PipelineConfig cfg = svc.configFor("mini_etl").orElseThrow();
@@ -356,7 +371,7 @@ class InspectoToolsTest {
 
     // ── AGT-6a plan D9: config_schema (the projected structural contract) ────────
 
-    private static Tool schemaTool() {
+    private Tool schemaTool() {
         return tool(InspectoTools.tools(seeded()), "config_schema");
     }
 
@@ -466,7 +481,7 @@ class InspectoToolsTest {
 
     // ── AGT-5 P2 slice 1: component_draft (the validator repair loop) ────────────
 
-    private static Tool draftTool() {
+    private Tool draftTool() {
         return tool(InspectoTools.tools(seeded()), "component_draft");
     }
 
@@ -614,7 +629,7 @@ class InspectoToolsTest {
 
     // ── AGT-5 P2 slice 2: pipeline_author (parse + simulate) ─────────────────────
 
-    private static Tool authorTool() {
+    private Tool authorTool() {
         return tool(InspectoTools.tools(seeded()), "pipeline_author");
     }
 

@@ -37,8 +37,19 @@ class ControlApiSignalsStreamTest {
 
     private final HttpClient client = HttpClient.newHttpClient();
 
-    private record Ctx(CollectorService svc, ControlApi api, int port) implements AutoCloseable {
-        public void close() { api.close(); svc.close(); }
+    private record Ctx(CollectorService svc, ControlApi api, int port, int baseline) implements AutoCloseable {
+        /** An SSE handler only notices its client left on its next write (a heartbeat is 15 s away), so its
+         *  EventLog listener — on the process-wide global log — would outlive this class. Nudge it with a frame
+         *  that passes every test's filter until the handler has de-registered, then close. */
+        public void close() throws InterruptedException {
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+            while (svc.eventLog().subscriberCount() > baseline && System.nanoTime() < deadline) {
+                svc.eventLog().emit(sig("job.run.failed", Severity.CRITICAL, "drain").toEvent());
+                Thread.sleep(50);
+            }
+            api.close();
+            svc.close();
+        }
     }
 
     private Ctx open(Path dir) throws Exception {
@@ -46,7 +57,7 @@ class ControlApiSignalsStreamTest {
         CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
         ControlApi api = new ControlApi(svc, 0);
         api.start();
-        return new Ctx(svc, api, api.port());
+        return new Ctx(svc, api, api.port(), svc.eventLog().subscriberCount());
     }
 
     private static Signal sig(String type, Severity sev, String correlationId) {

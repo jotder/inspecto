@@ -144,6 +144,11 @@ public final class EventLog {
         if (subscriber != null) subscribers.remove(subscriber);
     }
 
+    /** Number of live subscribers — read by the test-suite leak detector ({@code EventLogLeakDetector}). */
+    public int subscriberCount() {
+        return subscribers.size();
+    }
+
     /** The current backing store (for the read API / tests). */
     public EventStore store() {
         return store.get();

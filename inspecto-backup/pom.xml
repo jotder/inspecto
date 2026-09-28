@@ -35,6 +35,13 @@
     </description>
 
     <dependencies>
+        <!-- test-jar carries the EventLogLeakDetector (auto-registered JUnit extension). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
         <!-- The core: MaintenanceTaskProvider, MaintenanceTaskContext, JobConfig/JobContext/JobResult,
              Checksums, PathJail, ComponentStore, Severity. Compile scope, as inspecto-policy does — a thin
              jar dropped beside inspecto.jar resolves all of it from there at run time. -->

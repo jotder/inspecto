@@ -81,9 +81,14 @@ class ControlApiHttpsTest {
         }
         try {
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
-            ControlApi api = new ControlApi(svc, 0);
-            api.start();
-            return new Ctx(svc, api, api.port());
+            try {
+                ControlApi api = new ControlApi(svc, 0);
+                api.start();
+                return new Ctx(svc, api, api.port());
+            } catch (Exception | Error e) {
+                svc.close();   // a fail-closed boot must not leave the service's EventLog subscribers attached
+                throw e;
+            }
         } finally {
             System.clearProperty("https.keystore");
             System.clearProperty("https.keystore.password");

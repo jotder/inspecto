@@ -30,6 +30,13 @@
          optional agent modules — they were previously kept in lockstep by hand. -->
 
     <dependencies>
+        <!-- test-jar carries the EventLogLeakDetector (auto-registered JUnit extension). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-processor</artifactId>

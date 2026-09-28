@@ -558,7 +558,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 events instanceof com.gamma.event.InMemoryEventStore ? null
                         : java.nio.file.Path.of(System.getProperty("jobs.audit.dir", root.auditDir()))
                                 .resolve(com.gamma.query.DatasetFreshnessProbe.FLOOR_FILE));
-        this.eventLog.addSubscriber(freshness.subscriber());
+        this.freshnessSubscriber = freshness.subscriber();
+        this.eventLog.addSubscriber(freshnessSubscriber);
         alerting.freshnessProbe(freshness);
         bus.subscribe(this::onConsignmentEvent);
         // Notification engine (Phase B2): render operational events into the appUser's in-app feed.
@@ -781,6 +782,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     /** Set by {@link #start()}: a rule change before it must not start the job scheduler early. */
     private volatile boolean freshnessSweepLive;
+    /** The DUCKLE-C1 freshness probe's and the S3b dataset-write trigger's EventLog subscribers — held so
+     *  {@link #close()} can de-register them (the default Space's log is the process-wide global one). */
+    private java.util.function.Consumer<com.gamma.event.Event> freshnessSubscriber;
+    private volatile java.util.function.Consumer<com.gamma.event.Event> datasetWriteSubscriber;
 
     /**
      * DUCKLE-C1 residual (1): arm the minute-cadence freshness sweep while any Alert Rule with
@@ -1097,7 +1102,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // S3b — drive dataset-triggered flows: a dataset.write Signal on this space's ledger signals
         // every {type: event, on: dataset, from: datasets/<id>} pipeline's coalescer. The subscriber runs
         // on the emitting thread; onDatasetWrite hands the run to triggerWorkers, same as the bus path.
-        eventLog.addSubscriber(e -> {
+        datasetWriteSubscriber = e -> {
             java.util.Map<String, String> attrs = e.attributes();
             if (attrs == null
                     || !com.gamma.signal.DatasetWriteSignal.TYPE.equals(attrs.get(com.gamma.signal.Signal.ATTR_TYPE)))
@@ -1111,7 +1116,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     : e.payload().get(com.gamma.signal.DatasetWriteSignal.PAYLOAD_PIPELINE);
             if (dataset != null) underSpace(() -> pipelineScheduler.onDatasetWrite(
                     dataset.toString(), owner == null ? null : owner.toString()));
-        });
+        };
+        eventLog.addSubscriber(datasetWriteSubscriber);
         // Dispatch-and-return: the tick selects due pipelines and hands each to triggerWorkers, so a slow
         // pipeline cannot delay the next tick for the others. runAllOnce (POST /trigger, tests) keeps the
         // blocking path — same runs, awaited. See PipelineScheduler's "Two cycle entry points, one body".
@@ -2043,6 +2049,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.removeSubscriber(eventObjectBridge);   // de-register the D2 gap→ALERT bridge
         this.eventLog.removeSubscriber(notificationSubscriber);   // de-register the B2 event→feed engine
         this.eventLog.removeSubscriber(securityTriggers);   // de-register the security trigger evaluator
+        this.eventLog.removeSubscriber(freshnessSubscriber);   // de-register the DUCKLE-C1 freshness probe
+        this.eventLog.removeSubscriber(datasetWriteSubscriber);   // de-register the S3b dataset-write trigger
         securityTriggers.detach();   // …and release the log, so a later service's evaluator takes over
         try { notificationService.close(); } catch (Exception e) { log.warn("Error closing notification service: {}", e.getMessage()); }
         try { notifications.close(); } catch (Exception e) { log.warn("Error closing notification store: {}", e.getMessage()); }

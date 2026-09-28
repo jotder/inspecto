@@ -29,6 +29,21 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ComponentDraftRepairLoopTest {
 
+    /** Every CollectorService this class builds, closed after each test: the default Space's services share the
+     *  process-wide {@code EventLog.global()}, so an unclosed one leaves its subscribers live for the whole fork. */
+    private final java.util.List<CollectorService> services = new java.util.ArrayList<>();
+
+    private CollectorService track(CollectorService svc) {
+        services.add(svc);
+        return svc;
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void closeServices() {
+        services.forEach(CollectorService::close);
+        services.clear();
+    }
+
     private static final ModelInfo MODEL = new ModelInfo("stub", "scripted", true);
 
     /** A gateway that answers each successive {@code chat} with the next scripted config. */
@@ -66,7 +81,7 @@ class ComponentDraftRepairLoopTest {
 
     private InspectoIntelligenceAgent open(LlmGateway gateway) {
         InspectoIntelligenceAgent agent = new InspectoIntelligenceAgent(gateway);
-        agent.init(new CollectorService(List.of(), 3600, 1));
+        agent.init(track(new CollectorService(List.of(), 3600, 1)));
         agent.start();
         return agent;
     }

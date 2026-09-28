@@ -26,6 +26,21 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class InvestigatorTest {
 
+    /** Every CollectorService this class builds, closed after each test: the default Space's services share the
+     *  process-wide {@code EventLog.global()}, so an unclosed one leaves its subscribers live for the whole fork. */
+    private final java.util.List<CollectorService> services = new java.util.ArrayList<>();
+
+    private CollectorService track(CollectorService svc) {
+        services.add(svc);
+        return svc;
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void closeServices() {
+        services.forEach(CollectorService::close);
+        services.clear();
+    }
+
     private static final int WIDE_WINDOW = 1_000_000; // minutes — sidesteps the tools' time floors
 
     // A scripted, well-formed RCA synthesis: two ranked hypotheses + a concrete fix draft.
@@ -59,7 +74,7 @@ class InvestigatorTest {
         components.write("expectation", "amt-nonneg", Map.of("expr", "AMT >= -100", "severity", "warn"));
 
         // Broken batch: a FAILED signal on the JVM-wide ledger → timeline_build surfaces it.
-        CollectorService svc = new CollectorService(List.of(), 3600, 1);
+        CollectorService svc = track(new CollectorService(List.of(), 3600, 1));
         svc.events().append(failedBatch(Instant.now()).toEvent());
 
         StubLlmGateway gateway = StubLlmGateway.builder().defaultReplyText(RCA_JSON).build();
@@ -92,7 +107,7 @@ class InvestigatorTest {
 
     @Test
     void unparseableSynthesisFilesAnInconclusiveTriageRunRatherThanThrowing(@TempDir Path dir) {
-        CollectorService svc = new CollectorService(List.of(), 3600, 1);
+        CollectorService svc = track(new CollectorService(List.of(), 3600, 1));
         StubLlmGateway gateway = StubLlmGateway.builder().defaultReplyText("sorry, I can't tell").build();
         Investigator investigator = new Investigator(svc, null, List::of, gateway);
 
@@ -109,7 +124,7 @@ class InvestigatorTest {
         ComponentStore components = new ComponentStore(dir.resolve("registry"));
         components.write("expectation", "amt-nonneg-fix", Map.of("expr", "AMT >= 5", "severity", "warn"));
         java.nio.file.Files.writeString(dir.resolve("approval.toon"), "approval:\n  expectation:\n    required: true\n");
-        CollectorService svc = new CollectorService(List.of(), 3600, 1);
+        CollectorService svc = track(new CollectorService(List.of(), 3600, 1));
         StubLlmGateway gateway = StubLlmGateway.builder().defaultReplyText(RCA_JSON).build();
         TriageRun c = new Investigator(svc, components, List::of, gateway).investigate(new Incident("incident:2",
                 Map.of("type", "pipeline.batch.failed"), Map.of("sinceMinutes", WIDE_WINDOW)));
@@ -119,7 +134,7 @@ class InvestigatorTest {
 
     @Test
     void fixDraftIsNotPersistedWhenNoComponentWriteRootIsConfigured(@TempDir Path dir) {
-        CollectorService svc = new CollectorService(List.of(), 3600, 1);
+        CollectorService svc = track(new CollectorService(List.of(), 3600, 1));
         StubLlmGateway gateway = StubLlmGateway.builder().defaultReplyText(RCA_JSON).build();
         Investigator investigator = new Investigator(svc, null, List::of, gateway); // no ComponentStore
 
