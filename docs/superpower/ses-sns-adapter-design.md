@@ -402,6 +402,12 @@ body-reading route), so S0 also runs the `inspecto` module suite.
 
 ## 6. GeoIP
 
+> ✅ **D12 answered (operator, 2026-09-28) and BUILT the same day, except the reader**: operator-supplied,
+> country only. `geo_country` + `geo_db_build` on the audit row through the `GeoCountryResolver` SPI; no
+> `geo_city`. ⚠ `com.maxmind.db:maxmind-db` is not in the offline Maven cache, so no resolver ships and
+> `-Dgeoip.db` is inert until that binding lands (`D8-SES-SNS-1`). As built:
+> [`events-metrics.md`](../okf/backend/control-plane/events-metrics.md) § *GeoIP on the audit trail*.
+
 **What exists.** `AuditAttrs` records only `ip` and leaves location out on purpose: "editions resolve
 it" (`inspecto-event/src/main/java/com/gamma/event/AuditAttrs.java:12-13`). The Pipeline enricher
 `enrichment.geoip` is `PLANNED` (`inspecto-engine/src/main/java/com/gamma/pipeline/ProcessorCatalog.java:148`,
@@ -483,7 +489,7 @@ A body that tries to set an email address is ignored.
 
 ## 8. Security triggers
 
-> ✅ **T1–T4 BUILT 2026-09-28** (T5 waits on GeoIP, i.e. operator decision D12). As built:
+> ✅ **T1–T5 BUILT 2026-09-28** (T5 after D12 was answered; it stays silent until a GeoIP reader ships). T5 as built: a subject's first observed country is a baseline, not a firing. As built:
 > [`events-metrics.md`](../okf/backend/control-plane/events-metrics.md) § *Security triggers*. Two
 > corrections to the text below: T4 keys on the AUDIT row of a successful `PUT /access/roles` (the only
 > route that writes `roles.toon` — no `config.written` action exists for it, and `/config/write` and bundle
@@ -544,7 +550,7 @@ T2 keyed by a spoofed XFF from an unlisted peer counts against the **socket** pe
 | **D9** | Honour a configured egress proxy for the certificate and confirmation fetches. | **Honour `ProxySelector.getDefault()` only when `-Dnotify.deliverystatus.sns.useProxy=true`.** Unlike `WebhookSink`, refusing a proxy here would make the adapter unusable behind a corporate egress proxy. TLS hostname verification still covers the endpoint. |
 | **D10** | SPI shape for control messages (§4.1). | **(A): a `default control(raw)` method.** It is additive, and SendGrid and HMAC are unchanged. |
 | **D11** | `DeliveryDelay` maps to `BOUNCED_SOFT` or to `UNKNOWN`. | **`UNKNOWN`.** SES is still retrying on its own, and a soft bounce would make our retry task resend alongside it. |
-| **D12** | GeoIP: which database the documentation recommends, and whether `geo_city` is recorded or only `geo_country`. | **Recommend nothing we bundle. Document GeoLite2 (the operator downloads it) and DB-IP Lite. Record country only by default.** City is more personal data for little security value. |
+| **D12** | GeoIP: which database the documentation recommends, and whether `geo_city` is recorded or only `geo_country`. | **Recommend nothing we bundle. Document GeoLite2 (the operator downloads it) and DB-IP Lite. Record country only by default.** City is more personal data for little security value. ✅ **ANSWERED (operator, 2026-09-28): operator-supplied, country only** — no database bundled or downloaded; `geo_country` + `geo_db_build`, never the city. |
 | **D13** | The false-premise `self-service` exemptions on `read-all`, `/{id}/read` and `DELETE /{id}` (F2). | **File a separate row and correct the exemption rationale text now.** Per-user read state is a larger change to `NotificationStore` than preferences are. |
 | **D14** | Rename the "Security & passwords" category, given that password events happen at the IdP. | **Rename it to "Security"** (a UI-only change; the category id `security` stays).  ✅ **DONE 2026-09-25** (operator). |
 

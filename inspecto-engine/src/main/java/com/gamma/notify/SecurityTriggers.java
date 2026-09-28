@@ -29,7 +29,15 @@ import java.util.regex.Pattern;
  *   <tr><td>{@code t2}</td><td>{@code ACCESS_DENIED} 401</td><td>IP</td><td>50 in 10 min</td></tr>
  *   <tr><td>{@code t3}</td><td>{@code ACCESS_DENIED} 403 on {@code /public/delivery-status/{adapter}}</td><td>adapter</td><td>10 in 60 min</td></tr>
  *   <tr><td>{@code t4}</td><td>{@code AUDIT} of a successful {@code PUT /access/roles} (the {@code roles.toon} write)</td><td>actor</td><td>every change</td></tr>
+ *   <tr><td>{@code t5}</td><td>{@code AUDIT} {@code auth.exchange} 200 carrying {@code geo_country}</td><td>subject</td><td>a country not seen before for a subject already seen</td></tr>
  * </table>
+ *
+ * <p><b>T5 (sign-in from a new country).</b> Needs an operator-supplied GeoIP database ({@code -Dgeoip.db}, D12);
+ * without one no row carries {@code geo_country} and T5 is silent. A subject's FIRST observed sign-in sets its
+ * baseline and does not fire — otherwise every user's first sign-in after a restart would page every
+ * administrator. Countries seen are in-memory (at most {@link #MAX_COUNTRIES_PER_SUBJECT} per subject, subjects
+ * in the same LRU bound), so a restart re-baselines. The row's actor is the Subject the minted token verified to,
+ * or {@code unknown}, which T5 skips.
  *
  * <p>Thresholds are system properties, the idiom the delivery-status adapters use:
  * {@code notify.security.<id>.threshold} and {@code notify.security.<id>.windowMinutes} for {@code t1}–{@code t3}
@@ -55,6 +63,10 @@ public final class SecurityTriggers implements Consumer<Event> {
     public static final String T2 = "t2";
     public static final String T3 = "t3";
     public static final String T4 = "t4";
+    public static final String T5 = "t5";
+
+    /** Most countries remembered per subject for T5 — beyond it the oldest is forgotten. */
+    public static final int MAX_COUNTRIES_PER_SUBJECT = 16;
 
     private static final Pattern DELIVERY_STATUS = Pattern.compile("/public/delivery-status/([^/?]+)");
     private static final String ROLES_ROUTE = "/access/roles";
@@ -78,10 +90,12 @@ public final class SecurityTriggers implements Consumer<Event> {
     private static final Map<Object, SecurityTriggers> ACTIVE =
             java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
 
-    /** Per (trigger, key): the recent matching timestamps (≤ threshold), and when it last fired. */
+    /** Per (trigger, key): the recent matching timestamps (≤ threshold), and when it last fired; for T5, the
+     *  countries the subject has signed in from (insertion order, ≤ {@link #MAX_COUNTRIES_PER_SUBJECT}). */
     private static final class Window {
         final ArrayDeque<Long> hits = new ArrayDeque<>();
         long firedAt = Long.MIN_VALUE;
+        final java.util.LinkedHashSet<String> countries = new java.util.LinkedHashSet<>();
     }
 
     private final LinkedHashMap<String, Window> windows = new LinkedHashMap<>(256, 0.75f, true) {
@@ -164,12 +178,45 @@ public final class SecurityTriggers implements Consumer<Event> {
     private void onAudit(Event e) {
         String path = attr(e, AuditAttrs.HTTP_PATH);
         int status = status(e);
+        if ("auth.exchange".equals(attr(e, AuditAttrs.ACTION))) {
+            if (status == 200) onSignIn(e);
+            return;
+        }
         // 202 is a write HELD as a Pending Change — nothing was written yet; its approval replays the PUT and
         // audits a 200 then, which is the change.
         if (path == null || !path.endsWith(ROLES_ROUTE) || status < 200 || status >= 300 || status == 202) return;
         if (!"PUT".equals(attr(e, AuditAttrs.HTTP_METHOD))) return;
         String actor = attr(e, AuditAttrs.ACTOR);
         fire(T4, "Role or capability configuration changed", actor == null ? "unknown" : actor, 1, 0, e);
+    }
+
+    private void onSignIn(Event e) {
+        String subject = attr(e, AuditAttrs.ACTOR);
+        String country = attr(e, AuditAttrs.GEO_COUNTRY);
+        if (subject == null || subject.isBlank() || "unknown".equals(subject) || country == null || country.isBlank())
+            return;
+        boolean fire;
+        String previous;
+        synchronized (windows) {
+            Window w = windows.computeIfAbsent(T5 + "|" + subject, k -> new Window());
+            previous = w.countries.isEmpty() ? null : String.join(",", w.countries);
+            fire = previous != null && !w.countries.contains(country);
+            w.countries.remove(country);   // re-insert: most recent last, so the cap forgets the oldest
+            w.countries.add(country);
+            if (w.countries.size() > MAX_COUNTRIES_PER_SUBJECT) w.countries.remove(w.countries.iterator().next());
+        }
+        if (fire) emit.accept(Event.builder(EventType.SECURITY_TRIGGERED)
+                .level(EventLevel.WARN)
+                .source("security")
+                .correlationId(e.correlationId())
+                .message(subject + " signed in from " + country + " (previously " + previous + ")")
+                .attr("trigger", T5)
+                .attr("title", "Sign-in from a new country")
+                .attr("key", subject)
+                .attr("count", 1)
+                .attr("windowMinutes", 0L)
+                .attr("cause", e.eventId())
+                .build());
     }
 
     private void count(Rule rule, String key, Event e) {

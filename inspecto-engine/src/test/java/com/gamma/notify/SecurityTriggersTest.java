@@ -165,4 +165,45 @@ class SecurityTriggersTest {
         assertEquals(2, fired.size(), "after the owner detaches the remaining evaluator takes over");
         older.detach();
     }
+
+    // ── T5: sign-in from a new country (design §8, D12) ──
+
+    private static Event signIn(String subject, String country, int status) {
+        Event.Builder b = Event.builder(status == 200 ? EventType.AUDIT : EventType.ACCESS_DENIED)
+                .actor(subject).action("auth.exchange").ip("203.0.113.9")
+                .attr(AuditAttrs.HTTP_PATH, "/auth/exchange").attr(AuditAttrs.HTTP_STATUS, status);
+        if (country != null) b.attr(AuditAttrs.GEO_COUNTRY, country).attr(AuditAttrs.GEO_DB_BUILD, 1_760_000_000L);
+        return b.build();
+    }
+
+    @Test
+    void t5FiresOnceOnANewCountryForASubjectAndNotOnARepeat() {
+        SecurityTriggers t = triggers(20);
+        t.accept(signIn("alice", "DE", 200));
+        assertTrue(fired.isEmpty(), "the first observed sign-in is the baseline");
+        t.accept(signIn("alice", "DE", 200));
+        assertTrue(fired.isEmpty(), "a repeat country does not fire");
+        t.accept(signIn("alice", "BR", 200));
+        assertEquals(1, fired.size());
+        Event e = fired.get(0);
+        assertEquals(SecurityTriggers.T5, e.attributes().get("trigger"));
+        assertEquals("alice", e.attributes().get("key"));
+        assertTrue(e.message().contains("BR") && e.message().contains("DE"), e.message());
+        t.accept(signIn("alice", "BR", 200));
+        t.accept(signIn("alice", "DE", 200));
+        assertEquals(1, fired.size(), "both countries are now known");
+        t.accept(signIn("bob", "BR", 200));
+        assertEquals(1, fired.size(), "another subject has its own baseline");
+    }
+
+    @Test
+    void t5IgnoresRowsWithoutACountryARefusedExchangeAndAnUnverifiedActor() {
+        SecurityTriggers t = triggers(20);
+        t.accept(signIn("alice", "DE", 200));
+        t.accept(signIn("alice", null, 200));
+        t.accept(signIn("alice", "BR", 401));
+        t.accept(signIn("unknown", "DE", 200));
+        t.accept(signIn("unknown", "BR", 200));
+        assertTrue(fired.isEmpty(), "no geo, a refusal, or an unverified subject never fires T5");
+    }
 }

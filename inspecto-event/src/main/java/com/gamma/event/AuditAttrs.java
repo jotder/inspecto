@@ -10,8 +10,8 @@ package com.gamma.event;
  * already-extensible attribute map (see {@link Event} and {@link Event.Builder}).
  *
  * <p>The shape mirrors the standard audit anatomy — <b>actor</b> (who), <b>action</b> (what),
- * <b>target</b> (on what), and <b>contextual environment</b> (from where). GeoIP {@code location} is
- * intentionally omitted in the auth-free core (only {@link #IP} is captured); editions resolve it.
+ * <b>target</b> (on what), and <b>contextual environment</b> (from where). Location is {@link #GEO_COUNTRY} only,
+ * written when an operator-supplied GeoIP database resolves the {@link #IP} (decision D12) — never a city.
  *
  * @since 4.0.0
  */
@@ -42,6 +42,12 @@ public final class AuditAttrs {
     // ── contextual environment (from where) ───────────────────────────────────────
     /** Client IP (IPv4/IPv6) of the request. */
     public static final String IP = "ip";
+    /** ISO 3166-1 alpha-2 country of {@link #IP}, present only when {@code -Dgeoip.db} resolved it (D12). There
+     *  is deliberately no city key: location is personal data, and a country is all the security triggers use. */
+    public static final String GEO_COUNTRY = "geo_country";
+    /** Build epoch (seconds) of the GeoIP database that produced {@link #GEO_COUNTRY} — a stale database is
+     *  otherwise a confident wrong answer. Present iff {@link #GEO_COUNTRY} is. */
+    public static final String GEO_DB_BUILD = "geo_db_build";
     /** Request {@code User-Agent}. */
     public static final String USER_AGENT = "user_agent";
     /** HTTP method of the audited request. */
@@ -85,6 +91,6 @@ public final class AuditAttrs {
      */
     public static final java.util.List<String> ALL = java.util.List.of(
             ACTOR, ACTOR_TYPE, ACTION, ACTION_CATEGORY, TARGET_TYPE, TARGET_ID,
-            IP, USER_AGENT, HTTP_METHOD, HTTP_PATH, HTTP_STATUS, ABAC_ACTION, POLICY, CAPABILITY,
+            IP, GEO_COUNTRY, GEO_DB_BUILD, USER_AGENT, HTTP_METHOD, HTTP_PATH, HTTP_STATUS, ABAC_ACTION, POLICY, CAPABILITY,
             AUDIT_SEQ, AUDIT_PREV_HASH, AUDIT_HASH, AUDIT_UNLINKED);
 }

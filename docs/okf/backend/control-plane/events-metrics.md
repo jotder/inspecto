@@ -362,7 +362,7 @@ timestamp: 2026-07-16T00:00:00Z
   In-app feed copies stay per-event — only the external destination delivery batches. Package-private
   `flushDigest(id)` is the test seam. Tests: `NotificationServiceTest` (buffer+combined flush,
   empty-flush no-op), `ControlApiNotificationChannelsTest` (default/round-trip/negative-422).
-* **Security triggers T1–T4** (2026-09-28, ses-sns-adapter-design §8) — `SecurityTriggers` (engine,
+* **Security triggers T1–T5** (2026-09-28, ses-sns-adapter-design §8) — `SecurityTriggers` (engine,
   `com.gamma.notify`) is a second `EventLog` subscriber beside `NotificationService`, wired per
   `CollectorService`; it reads the audit rows and emits `EventType.SECURITY_TRIGGERED` back into the same log,
   which the built-in rule `builtin-security-triggered` maps to category `security` (now `available = true`).
@@ -372,6 +372,7 @@ timestamp: 2026-07-16T00:00:00Z
   | t2 | `ACCESS_DENIED` 401 | audit IP | 50 in 10 min |
   | t3 | `ACCESS_DENIED` 403 on `/public/delivery-status/{adapter}` | adapter | 10 in 60 min |
   | t4 | `AUDIT` of a 2xx (not 202-held) `PUT /access/roles` — the only authoring door to `roles.toon` (import refuses reserved files) | actor | every change |
+  | t5 | `AUDIT` `auth.exchange` 200 carrying `geo_country` | subject | a country new for a subject already seen |
   * **Once per key per window**: a sliding window of at most `threshold` timestamps per (trigger, key); on firing
     the key is quiet until the window elapses. Keys live in ONE access-ordered LRU of `MAX_KEYS` = 10,000, so
     rotating keys can evict a count but never grow the heap.
@@ -395,7 +396,30 @@ timestamp: 2026-07-16T00:00:00Z
   * Tests: `SecurityTriggersTest` (threshold−1, once per window, sliding window, T2/T3 keys, 10,000-key LRU,
     T4, cannot be opted out + admin-only digest), `ControlApiSecurityTriggersTest` (real HTTP: 12 403s → one
     notification, admin-only feed; spoofed XFF counts against 127.0.0.1; a roles write fires T4).
-* Deferred to editions/follow-ons: time-based retention sweep, GeoIP and trigger T5 (operator decision D12).
+  * **T5 — sign-in from a new country** (2026-09-28, D12). Keys on the `auth.exchange` row's actor, which
+    `AuthRoutes.sessionSubject` sets to the Subject the edition's `Authenticator` verifies the MINTED access token
+    to (else `unknown`, which T5 skips). A subject's FIRST observed country is its baseline and does not fire
+    (otherwise every first sign-in after a restart would page every admin); a later, unseen country fires once.
+    Countries live in the same LRU, at most `MAX_COUNTRIES_PER_SUBJECT` = 16 per subject, in memory — a restart
+    re-baselines. Silent without GeoIP.
+* **GeoIP on the audit trail (D12, operator 2026-09-28): operator-supplied, country only.** Inspecto bundles NO
+  GeoIP database and never downloads one. The operator obtains one — MaxMind GeoLite2 (free account and licence
+  key, GeoLite2 EULA, attribution, and a duty to apply each update within 30 days) or DB-IP Lite (CC BY 4.0,
+  attribution) — and sets `-Dgeoip.db=<path to .mmdb>`; unset means off. `AuditTrail.located` stamps
+  `AuditAttrs.GEO_COUNTRY` (`geo_country`, ISO 3166-1 alpha-2, upper-cased) and `GEO_DB_BUILD` (`geo_db_build`,
+  the database build epoch, so a stale database is visible) on every audit and access-denied row whose
+  `ApiContext.ip` resolves — the F3 trusted-proxy IP, so a spoofed `X-Forwarded-For` cannot choose a country.
+  There is **no city key**, and `GeoCountryResolver.Geo` has no city field, so no implementation can supply one.
+  The seam is the `@PublicApi` SPI `GeoCountryResolver` (ServiceLoader, via `GeoCountryResolvers.active()`); a
+  resolver that throws costs only the geo attributes, never the row. ⚠ **No resolver ships yet:** the
+  `com.maxmind.db:maxmind-db` reader (Apache 2.0, Standard/Enterprise) is not in the offline Maven cache, so
+  today `-Dgeoip.db` is **inert** (one WARN, no attributes) — the binding is `D8-SES-SNS-1`'s remaining clause.
+  Location is personal data; it rides on the audit row under the audit trail's retention.
+  Tests: `SecurityTriggersTest` (T5 fires once on a new country; repeat and baseline silent; no-geo, refused and
+  `unknown` rows skipped), `ControlApiGeoIpTest` (real HTTP with a fake resolver: country + db build on the
+  sign-in row and no city key; an untrusted peer's XFF is located as the socket peer; `-Dgeoip.db` set without a
+  reader, and unset, write no geo and no error; T5 fires once over HTTP and cannot be steered by a spoofed XFF).
+* Deferred to editions/follow-ons: time-based retention sweep; the `maxmind-db` `GeoCountryResolver` binding.
 
 ### Inbound delivery-status webhooks (BACKLOG D8, shipped 2026-07-26)
 

@@ -426,6 +426,12 @@ resolves once per request against `-Dcontrol.trustedProxies` (`TrustedProxies`: 
 XFF; with a list, only from a listed peer, right-most untrusted hop). Operator detail in
 [operations reference](../build-run/operations-reference.md).
 
+**The sign-in row names the verified Subject and, with GeoIP, its country** (D12, 2026-09-28). A successful
+`POST /auth/exchange` audits `auth.exchange` with the actor the edition's `Authenticator` resolves from the
+MINTED access token (`unknown` if it cannot), and — only when an operator-supplied `-Dgeoip.db` resolves the
+F3 client IP — `geo_country` plus `geo_db_build`, never a city. Trigger T5 alerts on a new country per subject.
+As built: [events & metrics](../control-plane/events-metrics.md) § *Security triggers*.
+
 **Evidence** is `compliance/evidence/route-gating.md`, whose inventory table is **generated** by
 `tools/route-gating-report.mjs` and CI-enforced in `--check` mode — the document cannot say something the
 code does not. Plan of record: `archived-documents/plans-archive/route-gating-compliance-plan.md`.

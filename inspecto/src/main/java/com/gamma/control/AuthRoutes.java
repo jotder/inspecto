@@ -52,7 +52,7 @@ final class AuthRoutes implements RouteModule {
             AuditTrail.authentication(ex, "auth.exchange", false, 401);
             return new ApiException(401, ErrorCodes.UNAUTHENTICATED, "code exchange failed");
         });
-        AuditTrail.authentication(ex, "auth.exchange", true, 200);
+        AuditTrail.authentication(ex, "auth.exchange", true, 200, sessionSubject(ex, t));
         return respondWithSession(ex, t);
     }
 
@@ -79,6 +79,24 @@ final class AuthRoutes implements RouteModule {
         AuditTrail.authentication(ex, "auth.logout", true, 200);
         return Map.of("loggedOut", true);
 
+    }
+
+    /**
+     * Who the session just minted belongs to: the edition's {@link Authenticator} verifying the new access token,
+     * exactly as it would on the next request. {@code unknown} when there is no authenticator or it refuses the
+     * token — never the caller-written {@code X-Actor} header, since this route is public and trigger T5 (new
+     * country for a subject) keys on this row's actor.
+     */
+    private static String sessionSubject(HttpExchange ex, TokenRelay.Tokens t) {
+        try {
+            Authenticator a = Authenticators.active().orElse(null);
+            if (a == null || t.accessToken() == null) return "unknown";
+            var probe = new ReplayExchange(ex, "GET", ex.getRequestURI().getPath(), null,
+                    Map.of("Authorization", "Bearer " + t.accessToken()));
+            return a.authenticate(probe).map(Subject::id).filter(id -> !id.isBlank()).orElse("unknown");
+        } catch (RuntimeException e) {
+            return "unknown";
+        }
     }
 
     /** Rotate the cookie to the (possibly new) refresh token and return only the access-token body —

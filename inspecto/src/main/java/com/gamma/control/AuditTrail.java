@@ -65,13 +65,13 @@ final class AuditTrail {
             // its presence is what lets "every privileged write, by actor, by capability, in the window"
             // be one /audit/search query instead of a hand-built join (compliance plan step 4b).
             Object capability = ApiContext.attr(ex, ApiContext.ATTR_CAPABILITY);
-            var event = Event.builder(EventType.AUDIT)
+            var event = located(ex, Event.builder(EventType.AUDIT))
                     .source("audit")
                     .message(actor + " " + action.name() + (targetId == null ? "" : " " + targetId) + outcome)
                     .actor(actor).actorType(ApiContext.actorType(ex))
                     .action(action.name()).actionCategory(action.category())
                     .target(targetType, targetId)
-                    .ip(ApiContext.ip(ex)).userAgent(ApiContext.userAgent(ex))
+                    .userAgent(ApiContext.userAgent(ex))
                     // The request's Correlation-ID, so a failed request's row joins its ERROR log line.
                     .correlationId(ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID) instanceof String c ? c : null)
                     .attr(AuditAttrs.HTTP_METHOD, method)
@@ -104,21 +104,48 @@ final class AuditTrail {
      * @param status  the HTTP status the caller received
      */
     static void authentication(HttpExchange ex, String action, boolean ok, int status) {
+        authentication(ex, action, ok, status, ApiContext.actor(ex));
+    }
+
+    /** As above, naming the {@code actor} explicitly — {@code /auth/exchange} passes the Subject the minted token
+     *  resolves to (or {@code unknown}), because on that public route {@link ApiContext#actor} would be the
+     *  caller-written {@code X-Actor} header, and trigger T5 keys on this row's actor. */
+    static void authentication(HttpExchange ex, String action, boolean ok, int status, String actor) {
         try {
-            String actor = ApiContext.actor(ex);
             String path = ex.getRequestURI().getPath();
-            EventLog.current().emit(Event.builder(ok ? EventType.AUDIT : EventType.ACCESS_DENIED)
+            EventLog.current().emit(located(ex, Event.builder(ok ? EventType.AUDIT : EventType.ACCESS_DENIED))
                     .source("audit")
                     .message(actor + " " + action + (ok ? "" : " (refused, HTTP " + status + ")"))
                     .actor(actor).actorType(ApiContext.actorType(ex))
                     .action(action).actionCategory("authentication")
-                    .ip(ApiContext.ip(ex)).userAgent(ApiContext.userAgent(ex))
+                    .userAgent(ApiContext.userAgent(ex))
                     .attr(AuditAttrs.HTTP_METHOD, "POST")
                     .attr(AuditAttrs.HTTP_PATH, path)
                     .attr(AuditAttrs.HTTP_STATUS, status));
         } catch (RuntimeException ignore) {
             // best effort — the audit trail must never break the request
         }
+    }
+
+    /**
+     * Stamp the contextual environment's "from where": the client {@link AuditAttrs#IP} (trusted-proxy resolved,
+     * F3) and — when an operator-supplied GeoIP database is configured (D12) — its {@link AuditAttrs#GEO_COUNTRY}
+     * plus {@link AuditAttrs#GEO_DB_BUILD}. Never a city. A resolver that throws costs the geo attributes only.
+     */
+    static Event.Builder located(HttpExchange ex, Event.Builder b) {
+        String ip = ApiContext.ip(ex);
+        b.ip(ip);
+        if (ip == null) return b;
+        try {
+            GeoCountryResolvers.active().flatMap(r -> r.resolve(ip)).ifPresent(g -> {
+                if (g.country() == null || g.country().isBlank()) return;
+                b.attr(AuditAttrs.GEO_COUNTRY, g.country().trim().toUpperCase(java.util.Locale.ROOT));
+                b.attr(AuditAttrs.GEO_DB_BUILD, g.dbBuild());
+            });
+        } catch (RuntimeException ignore) {
+            // best effort — location must never cost the row
+        }
+        return b;
     }
 
     /** Record a refused attempt. Two callers, with deliberately different scopes: an unknown or
@@ -137,13 +164,13 @@ final class AuditTrail {
             // name reached only the exception message and never the audit row — so the one question an
             // investigator asks of a refusal, "denied WHAT?", had no answer in the log (plan step 4a).
             Object capability = ApiContext.attr(ex, ApiContext.ATTR_CAPABILITY);
-            var event = Event.builder(EventType.ACCESS_DENIED)
+            var event = located(ex, Event.builder(EventType.ACCESS_DENIED))
                     .source("audit")
                     .message(actor + " access.denied " + method + " " + path + " (" + status + ")"
                             + (capability == null ? "" : " missing " + capability))
                     .actor(actor).actorType(ApiContext.actorType(ex))
                     .action("access.denied").actionCategory("authorization")
-                    .ip(ApiContext.ip(ex)).userAgent(ApiContext.userAgent(ex))
+                    .userAgent(ApiContext.userAgent(ex))
                     .attr(AuditAttrs.HTTP_METHOD, method)
                     .attr(AuditAttrs.HTTP_PATH, path)
                     .attr(AuditAttrs.HTTP_STATUS, status);
@@ -172,14 +199,14 @@ final class AuditTrail {
         try {
             String actor = ApiContext.actor(ex);
             String verb = granted ? "access.granted" : "access.denied";
-            EventLog.current().emit(Event.builder(granted ? EventType.AUDIT : EventType.ACCESS_DENIED)
+            EventLog.current().emit(located(ex, Event.builder(granted ? EventType.AUDIT : EventType.ACCESS_DENIED))
                     .source("audit")
                     .message(actor + " " + verb + " " + abacAction + " " + route
                             + (policy == null ? "" : " (policy " + policy + ")"))
                     .actor(actor).actorType(ApiContext.actorType(ex))
                     .action(verb).actionCategory("authorization")
                     .target(resourceType, resourceId)
-                    .ip(ApiContext.ip(ex)).userAgent(ApiContext.userAgent(ex))
+                    .userAgent(ApiContext.userAgent(ex))
                     .attr(AuditAttrs.HTTP_PATH, route)
                     .attr(AuditAttrs.ABAC_ACTION, abacAction)
                     .attr(AuditAttrs.POLICY, policy));
