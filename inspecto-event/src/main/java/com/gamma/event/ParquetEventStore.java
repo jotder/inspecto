@@ -125,6 +125,11 @@ public final class ParquetEventStore implements EventStore {
             DuckDbUtil.loadDriver();
             this.conn = DuckDbUtil.openInMemory(null);   // in-memory scratch + reader; no Space context: capped, spills under java.io.tmpdir
             try (Statement st = conn.createStatement()) {
+                // DuckDB caches file contents keyed by path + modification time. This store must re-read a file that
+                // was rewritten in place with its size and mtime restored (a repaired or forged Parquet file), so a
+                // cached copy would answer for bytes no longer on disk — seen on Linux CI, where a repaired file
+                // stayed "unreadable" after rebuildChainIndex().
+                st.execute("SET enable_external_file_cache = false");
                 st.execute("CREATE TABLE " + BUF_TABLE + " ("
                         + "event_id VARCHAR, ts_ms BIGINT, type VARCHAR, source VARCHAR, "
                         + "pipeline VARCHAR, correlation_id VARCHAR, message VARCHAR, attributes VARCHAR, "
