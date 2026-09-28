@@ -69,9 +69,14 @@ lock, once per distinct maker set:
   `demo-users.toon` plus every hosted Space's via `DemoTokenRelay.known()`).
 - **`unknown`** — roles grant it but who holds them cannot be known: OIDC identities arrive as token claims only and
   the server keeps no principal directory. Also `unknown` when enumerating fails (a corrupt `demo-users.toon`):
-  logged once, never a 500 — the request is already saved when the check runs.
-- **`none-eligible` on Personal** too: no Authenticator ⇒ no Subject ⇒ deciding is always 403.
-- **`ok`** — an enumerated non-maker holds `canApproveChanges`.
+  logged at most once per root per 10 minutes, never a 500 — the request is already saved when the check runs.
+- **`none-eligible` on Personal** too: no Authenticator ⇒ no Subject ⇒ deciding is always 403. Its raise-time
+  audit event is **INFO**, not WARN: it holds for every request by construction, so a warning would be noise.
+- **`ok`** — an enumerated non-maker holds `canApproveChanges` **unscoped**: none of their roles carries a data
+  scope (or is a `case:` role) and the Space has no authored Access Policy. Deciding also needs `visible()` (the
+  linked Incident / Case passes the approver's data scope and row policy), which cannot be evaluated without their
+  request — so a non-maker holder who is scoped, or any Access Policy, reads **`unknown`**, never `ok`.
+- A pending record whose MAC fails reads `unknown` (its makers cannot be trusted).
 
 At raise time only (`propose`, so the route and the `invoke-api` consequence alike), a `none-eligible` answer emits
 **one WARN audit event `action-request.no-eligible-approver`**; reads never re-emit. It is visibility only:

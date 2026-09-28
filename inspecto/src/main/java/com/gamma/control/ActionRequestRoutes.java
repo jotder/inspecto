@@ -205,10 +205,13 @@ final class ActionRequestRoutes implements RouteModule {
         return approverCheck(root, rec, new java.util.HashMap<>());
     }
 
-    private static final java.util.concurrent.atomic.AtomicBoolean CHECK_FAILURE_LOGGED =
-            new java.util.concurrent.atomic.AtomicBoolean();
+    /** Last "approver check failed" log per root: at most one line per root per {@link #FAILURE_LOG_EVERY_MS}. */
+    private static final java.util.concurrent.ConcurrentHashMap<Path, Long> CHECK_FAILURE_LOGGED =
+            new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long FAILURE_LOG_EVERY_MS = 10 * 60_000L;
 
     static String approverCheck(Path root, Map<String, Object> rec, Map<Set<Object>, String> memo) {
+        if (ActionRequests.invalid(rec)) return UNKNOWN;   // its makers cannot be trusted
         Set<Object> makers = new java.util.HashSet<>();
         makers.add(rec.get("author"));
         if (rec.get("coAuthors") instanceof List<?> co) makers.addAll(co);
@@ -216,7 +219,11 @@ final class ActionRequestRoutes implements RouteModule {
             try {
                 return compute(root, m);
             } catch (RuntimeException e) {   // an unreadable directory (a corrupt demo-users.toon) is "cannot tell"
-                if (CHECK_FAILURE_LOGGED.compareAndSet(false, true))
+                long now = System.currentTimeMillis();
+                Long last = CHECK_FAILURE_LOGGED.get(root);
+                if ((last == null || now - last >= FAILURE_LOG_EVERY_MS)
+                        && (last == null ? CHECK_FAILURE_LOGGED.putIfAbsent(root, now) == null
+                                         : CHECK_FAILURE_LOGGED.replace(root, last, now)))
                     org.slf4j.LoggerFactory.getLogger(ActionRequestRoutes.class)
                             .warn("action request approver check failed, reporting 'unknown': {}", e.toString());
                 return UNKNOWN;
@@ -235,10 +242,20 @@ final class ActionRequestRoutes implements RouteModule {
         if (!anyRole) return NONE_ELIGIBLE;
         Map<String, List<String>> who = auth.principals(root).orElse(null);
         if (who == null) return UNKNOWN;
-        for (Map.Entry<String, List<String>> p : who.entrySet())
-            if (!makers.contains(p.getKey())
-                    && JobAuthority.capabilitiesNow(p.getValue(), root).contains(Roles.CAN_APPROVE_CHANGES)) return OK;
-        return NONE_ELIGIBLE;
+        // decide also needs visible(): the linked object must pass the approver's data scope and row policy, which
+        // is not evaluable here without their request. So a scoped holder, or any authored Access Policy, reads unknown.
+        boolean rowPolicies = !AccessPolicies.load(root).policies().isEmpty() || AccessPolicies.load(root).unreadable();
+        Map<String, Roles.Def> defs = Roles.effective(root);
+        boolean scopedHolder = false;
+        for (Map.Entry<String, List<String>> p : who.entrySet()) {
+            if (makers.contains(p.getKey())
+                    || !JobAuthority.capabilitiesNow(p.getValue(), root).contains(Roles.CAN_APPROVE_CHANGES)) continue;
+            boolean scoped = rowPolicies || p.getValue().stream().anyMatch(r -> r.startsWith("case:")
+                    || (defs.get(r) != null && defs.get(r).dataScopes() != null));
+            if (!scoped) return OK;
+            scopedHolder = true;
+        }
+        return scopedHolder ? UNKNOWN : NONE_ELIGIBLE;
     }
 
     /** Adds {@code approverCheck} to a pending request's view (computed live: roles change while it waits). */
@@ -330,7 +347,10 @@ final class ActionRequestRoutes implements RouteModule {
         if (NONE_ELIGIBLE.equals(approverCheck(root, rec)))
             ActionRequests.audit(author, authorType, "action-request.no-eligible-approver", rec.get("id")
                     + " has no eligible approver: no one holding canApproveChanges in this Space is outside its "
-                    + "makers — it stays pending until it expires unless a role is granted", rec, EventLevel.WARN);
+                    + "makers — it stays pending until it expires unless a role is granted", rec,
+                    // Personal (no Authenticator) is none-eligible by construction — no one can ever decide there —
+                    // so it is informational, not a warning on every raise
+                    Authenticators.active().isPresent() ? EventLevel.WARN : EventLevel.INFO);
         return rec;
     }
 

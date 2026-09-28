@@ -223,6 +223,19 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    @Test
+    void aNonMakerApproverWhoseRoleIsDataScopedReadsUnknownNotOk(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String inc = incident(c);
+            data(send(c, "PUT", "/access/roles", "{\"roles\":[{\"name\":\"scoped-approver\",\"capabilities\":"
+                    + "[\"canApproveChanges\"],\"dataScopes\":[\"billing\"]}]}", CHECKER), 200);
+            enumerating(Map.of("author-1", List.of("operations"), "checker-2", List.of("scoped-approver")));
+            String id = propose(c, inc);
+            assertEquals("unknown", data(send(c, "GET", "/action-requests/" + id, null, AUTHOR), 200)
+                    .get("approverCheck").asText(), "the scope may hide the Incident from them: decide needs visible()");
+        }
+    }
+
     /** Re-arm with an Authenticator that, like Demo sign-in, can enumerate its principals (id → roles). */
     private void enumerating(Map<String, List<String>> principals) {
         Authenticator b = base;
@@ -423,7 +436,10 @@ class ControlApiActionRequestsTest {
             Path f = c.root.resolve(ActionRequests.DIR).resolve(id + ".json");
             Files.writeString(f, Files.readString(f).replace("\"ticket\" : \"" + inc + "\"", "\"ticket\" : \"forged\""));
             assertTrue(Files.readString(f).contains("forged"), "the tamper landed");
-            assertEquals("invalid", data(send(c, "GET", "/action-requests/" + id, null, CHECKER), 200).get("status").asText());
+            JsonNode bad = data(send(c, "GET", "/action-requests/" + id, null, CHECKER), 200);
+            assertEquals("invalid", bad.get("status").asText());
+            assertTrue(!bad.has("approverCheck") || "unknown".equals(bad.get("approverCheck").asText()),
+                    "a record failing its MAC never reads ok or none-eligible");
             HttpResponse<String> approve = send(c, "POST", "/action-requests/" + id + "/approve", "{}", CHECKER);
             assertEquals(409, approve.statusCode(), approve.body());
             assertTrue(approve.body().contains("integrity"), approve.body());
