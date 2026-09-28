@@ -171,13 +171,48 @@ class ControlApiExchangeSignalDeliveryTest {
     }
 
     @Test
-    void crossSpaceHopsPerCorrelationAreCutAtTheMaxChainDepth(@TempDir Path root) throws Exception {
+    void manySignalsSharingOneCorrelationIdAreAllDelivered(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            consent(c, "hub");
+            for (int i = 0; i < 20; i++)
+                emit(c, "opco", "fraud.alert", Map.of("caseId", "C-" + i), "one-run");
+            assertEquals(20, signals(c, "hub", DELIVERED_TYPE).size(), "one Run's 20 Signals are 20 deliveries");
+            assertTrue(signals(c, "opco", ExchangeSignalForwarder.UNDELIVERABLE).isEmpty());
+        }
+    }
+
+    @Test
+    void oneSignalFansOutToEveryConsentedGrant(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            offer(c);
+            List<String> consumers = new java.util.ArrayList<>();
+            for (int i = 0; i < 10; i++) {
+                String space = "x" + i;
+                Authenticators.forTest(null);   // Space creation is not what is under test
+                assertEquals(200, post(c, "/spaces", "{\"id\":\"" + space + "\"}", null).statusCode());
+                Authenticators.forTest(PER_SPACE_ROLES);
+                Roles.write(configOf(c, space), Map.of("analyst", new Roles.Def(Set.of(Roles.CAN_REQUEST_SHARES), null)), List.of());
+                assertEquals(200, post(c, "/exchange/requests", request(space), "analyst").statusCode());
+                assertEquals(200, post(c, "/exchange/grants/" + ShareGrant.idFor(Exchange.SIGNAL, "fraud.alert", "opco", space)
+                        + "/approve", "", "opsadmin").statusCode());
+                consumers.add(space);
+            }
+            emit(c, "opco", "fraud.alert", Map.of("caseId", "C-1"), "fan-1");
+            for (String space : consumers) assertEquals(1, signals(c, space, DELIVERED_TYPE).size(), space);
+            assertEquals(10, signals(c, "opco", ExchangeSignalForwarder.DELIVERED).size());
+        }
+    }
+
+    @Test
+    void aChainAtTheMaxDepthIsUndeliverable(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             consent(c, "hub");
             int max = Integer.getInteger("jobs.signal.maxChainDepth", 8);
-            for (int i = 0; i <= max; i++)
-                emit(c, "opco", "fraud.alert", Map.of("caseId", "C-1", "chainDepth", 0), "loop-1");
-            assertEquals(max, signals(c, "hub", DELIVERED_TYPE).size(), "a payload chainDepth of 0 does not reset the count");
+            emit(c, "opco", "fraud.alert", Map.of("caseId", "C-1", "chainDepth", max - 1), "deep");
+            assertEquals(max, ((Number) Signal.fromEvent(signals(c, "hub", DELIVERED_TYPE).getFirst())
+                    .payload().get("chainDepth")).intValue(), "one cross-Space hop deeper");
+            emit(c, "opco", "fraud.alert", Map.of("caseId", "C-2", "chainDepth", max), "deeper");
+            assertEquals(1, signals(c, "hub", DELIVERED_TYPE).size(), "the hop past the cap is not delivered");
             assertEquals("chain depth " + max + " reached", reasonOf(c));
         }
     }

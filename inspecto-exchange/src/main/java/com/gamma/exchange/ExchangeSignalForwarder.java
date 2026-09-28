@@ -39,10 +39,12 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * </ul>
  * No grant for the type: nothing happens and nothing is recorded (N3).
  *
- * <p>Loops (T4): a delivered type is {@code exchange.*}, which is never forwarded again and never offerable. A
- * loop through Jobs on both sides keeps the correlation id (the forwarder preserves it; a Run inherits its
- * trigger's), so the number of cross-Space hops per correlation id is counted here and cut at
- * {@code jobs.signal.maxChainDepth} — a payload cannot reset it.
+ * <p>Loops (T4): a delivered type is {@code exchange.*}, which is never forwarded again, never offerable, and
+ * never emittable by a Job or Decision Rule. A loop through Jobs on both sides is cut on the CHAIN's depth: the
+ * delivered Signal carries the origin's {@code chainDepth} + 1, a Run triggered by it runs one deeper, and a
+ * Run's emitted Signals always carry the Run's system depth (a payload value is overwritten), so a depth
+ * beyond {@code jobs.signal.maxChainDepth} is undeliverable. Independent Signals that merely share a correlation
+ * id (one Run emitting many, one Signal fanned out to many grants) are independent deliveries.
  */
 public final class ExchangeSignalForwarder implements java.util.function.BiConsumer<EventLog, Event> {
 
@@ -58,14 +60,6 @@ public final class ExchangeSignalForwarder implements java.util.function.BiConsu
 
     /** The live SpaceManagers served (weak, so a closed test server does not pin its manager). */
     private final CopyOnWriteArrayList<WeakReference<SpaceManager>> managers = new CopyOnWriteArrayList<>();
-
-    /** Cross-Space hops seen per correlation id (bounded LRU). */
-    private final Map<String, Integer> hops = new LinkedHashMap<>(256, 0.75f, true) {
-        @Override
-        protected boolean removeEldestEntry(Map.Entry<String, Integer> e) {
-            return size() > 10_000;
-        }
-    };
 
     private ExchangeSignalForwarder() {}
 
@@ -124,16 +118,13 @@ public final class ExchangeSignalForwarder implements java.util.function.BiConsu
         if (target.isEmpty()) return "consumer not hosted here";
         String cid = sig.correlationId() == null || sig.correlationId().isBlank() ? sig.signalId() : sig.correlationId();
         int max = Integer.getInteger("jobs.signal.maxChainDepth", 8);
-        synchronized (hops) {
-            int seen = hops.getOrDefault(cid, 0);
-            if (seen >= max) return "chain depth " + max + " reached";
-            hops.put(cid, seen + 1);
-        }
+        int depth = intOf(sig.payload().get("chainDepth")) + 1;
+        if (depth > max) return "chain depth " + max + " reached";
 
         Map<String, Object> payload = new LinkedHashMap<>();
         for (String k : offer.get().payloadKeys())
             if (sig.payload().containsKey(k)) payload.put(k, sig.payload().get(k));
-        payload.put("chainDepth", intOf(sig.payload().get("chainDepth")) + 1);
+        payload.put("chainDepth", depth);
 
         String type = "exchange." + origin.id().value() + "." + sig.type();
         Signal delivered = new Signal(null, type, Instant.now(), sig.severity(), Ref.of("exchange-grant", g.id()), null,

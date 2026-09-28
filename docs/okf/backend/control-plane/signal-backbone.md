@@ -170,7 +170,11 @@ installs, then copies each matching Signal onto the consumer's ledger as `exchan
 
 The consumer's MDC is bound during the emit. Otherwise `exchange.signal.undeliverable` (with a reason) goes on
 the origin: the grant is not ACTIVE, the consumer is not hosted in this Pod, the offer is gone, or there are too
-many hops for the correlation id. Nothing is queued. The consumer acts with its own Job, e.g. the
+the delivered depth would exceed `jobs.signal.maxChainDepth`. Nothing is queued. The depth is the chain's:
+a Run always stamps its system `chainDepth` (payload values are overwritten), and Jobs and Decision Rules
+cannot emit `exchange.*`. Many Signals that share a correlation id are independent deliveries.
+⚠ A burst still reaches a hub Job as FEWER Runs: that is the per-Job `TriggerCoalescer` (open decision in the
+design's §6 as-built gaps). The consumer acts with its own Job, e.g. the
 `incident.open` Job type, which reads `JobContext.signalPayload()`.
 ⚠ `exchange.*` types are never re-forwarded or offerable. A Job on `fraud.*` does not match a delivered
 `exchange.opco.fraud.alert`. Design and open gaps: `superpower/cross-space-consequence-design.md` §6.

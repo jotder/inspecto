@@ -142,6 +142,7 @@ final class DecisionRoutes implements RouteModule {
     private Object apply(ApiContext api, String name, String actor) throws IOException {
         Map<String, Object> rule = RouteErrors.existing(store(api), TYPE, "decision rule", name);
         refuseTargetSpace(rule);
+        refuseExchangeNamespace(rule);
         return applyConsequences(api, name, rule, false, actor);
     }
 
@@ -431,6 +432,19 @@ final class DecisionRoutes implements RouteModule {
     /** The consequence params that would name ANOTHER Space. D1 (operator 2026-09-28): only Signals cross
      *  Spaces (through a consented Exchange grant), so the apply path never gains a target-space parameter. */
     static final java.util.Set<String> TARGET_SPACE_PARAMS = java.util.Set.of("targetSpace", "space");
+
+    /** 422 before any consequence runs when an {@code emit-signal} names an {@code exchange.*} type: only the
+     *  Exchange writes that namespace, so a rule cannot forge another Space's delivered Signal. */
+    @SuppressWarnings("unchecked")
+    private static void refuseExchangeNamespace(Map<String, Object> rule) {
+        if (!(rule.get("consequences") instanceof List<?> l)) return;
+        for (Object o : l)
+            if (o instanceof Map<?, ?> c && "emit-signal".equals(String.valueOf(c.get("action")))
+                    && paramStr((Map<String, Object>) c, "type", "").startsWith("exchange."))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                        "a Decision Rule cannot emit an exchange.* Signal: that namespace is written only by the"
+                                + " Exchange when it delivers another Space's Signal");
+    }
 
     /** 422 before ANY consequence runs when one names a target Space — fail closed, so an author never
      *  believes a cross-Space effect happened (cross-Space consequence D1, test N7). */

@@ -203,10 +203,17 @@ strings) and the `openapi-v1.json` contract — see `okf/backend/editions/auth-s
 
 **As-built gaps (2026-09-28).** (a) The D10 test emits the origin `fraud.alert` straight onto opco's ledger.
 No in-product emitter carries `caseId`/`typology`/`impact` yet: a Decision Rule `emit-signal` carries only
-`{rule}`. That is slice 5's (or an `emit-signal` payload's) job. (b) N8 is enforced by counting cross-Space hops per
-correlation id, not by a framework-stamped depth through Jobs. (c) D12 covers the Space-naming body fields of
+`{rule}`. That is slice 5's (or an `emit-signal` payload's) job. (b) N8 is cut on the CHAIN's depth, not a per-correlation
+count. That count (the first cut) dropped real cases: a verifier found one Run's 21st Signal
+`undeliverable` (fixed 2026-09-28). The delivered Signal carries origin `chainDepth` + 1. A Run always stamps
+its own system depth on what it emits (`RunContext`, `put` not `putIfAbsent`), so a payload cannot reset the
+depth. Jobs and Decision Rules cannot emit `exchange.*`, and a correlation id is not Job-chosen (a Run
+inherits its trigger's), so a loop cannot be restarted. (e) 🔴 **Open decision:** `JobService`'s per-Job
+`TriggerCoalescer` folds a burst of matching Signals into one follow-up Run. 20 cases from one opco Run
+are all DELIVERED, but the hub opens fewer Incidents than cases. Per-Signal firing for `incident.open` needs a
+Job-framework call. (c) D12 covers the Space-naming body fields of
 `/exchange/signal-offers` and `/exchange/requests`; a grant-scoped route whose Space was deleted still answers
-404 via the shared resolver. (d) The SPA's access catalog does not list `canOfferSignals` yet.
+404 via the shared resolver. (d) The SPA access catalog lists `canOfferSignals` (2026-09-28).
 
 ## 7. Test plan
 

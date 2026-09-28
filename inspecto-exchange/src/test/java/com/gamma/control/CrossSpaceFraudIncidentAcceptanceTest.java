@@ -96,6 +96,36 @@ class CrossSpaceFraudIncidentAcceptanceTest {
         }
     }
 
+    /**
+     * One opco Run emitting 20 cases (one shared correlation id): the forwarder delivers all 20 to hub, none
+     * undeliverable. ⚠ The hub Job's TriggerCoalescer (JobService §8.4) folds a burst of matching Signals into
+     * one follow-up Run, so a burst opens FEWER Incidents than cases. That is the Job framework's storm guard,
+     * not a delivery loss; per-Signal firing for incident.open is an open decision (design §6 as-built gaps).
+     */
+    @Test
+    void twentyFraudAlertsFromOneOpcoRunAreAllDeliveredToHub(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            consent(c);
+            assertEquals(200, post(c, "/spaces/hub/jobs", HUB_JOB, "builder").statusCode());
+            for (int i = 0; i < 20; i++) emitFraudAlert(c, "C-" + i, "opco-run-1");
+            long delivered = c.spaces().space(SpaceId.of("hub")).orElseThrow().service().eventLog().store().recent(1000)
+                    .stream().filter(e -> "exchange.opco.fraud.alert".equals(e.attributes().get(Signal.ATTR_TYPE))).count();
+            assertEquals(20, delivered, "no real case is dropped for sharing a Run's correlation id");
+            assertFalse(recorded(c, ExchangeSignalForwarder.UNDELIVERABLE));
+            assertFalse(awaitIncidents(c, 1).isEmpty(), "the hub Job fired");
+        }
+    }
+
+    private List<JsonNode> awaitIncidents(Ctx c, int atLeast) throws Exception {
+        long until = System.currentTimeMillis() + 15_000;
+        List<JsonNode> got = incidents(c, "hub");
+        while (got.size() < atLeast && System.currentTimeMillis() < until) {
+            Thread.sleep(100);
+            got = incidents(c, "hub");
+        }
+        return got;
+    }
+
     @Test
     void aHubJobOnTheBareOriginTypeDoesNotFire(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
@@ -142,9 +172,13 @@ class CrossSpaceFraudIncidentAcceptanceTest {
     }
 
     private static void emitFraudAlert(Ctx c, String caseId) {
+        emitFraudAlert(c, caseId, null);
+    }
+
+    private static void emitFraudAlert(Ctx c, String caseId, String correlationId) {
         EventLog opco = c.spaces().space(SpaceId.of("opco")).orElseThrow().service().eventLog();
         opco.emit(new Signal(null, "fraud.alert", Instant.now(), Severity.WARN, Ref.of("decision-rule", "fraud_rule"),
-                null, null, null, "opco", Ref.of("user", "analyst-7"), "fraud.alert",
+                null, correlationId, null, "opco", Ref.of("user", "analyst-7"), "fraud.alert",
                 Map.of("caseId", caseId, "typology", "sim-box", "impact", 4200, "msisdn", "+15550100"), 1).toEvent());
     }
 

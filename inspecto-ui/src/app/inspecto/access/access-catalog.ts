@@ -90,6 +90,12 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             label: 'Offer Datasets and Widgets for sharing',
         },
         {
+            id: 'exchange.offer-signals',
+            kind: 'action',
+            capability: 'canOfferSignals',
+            label: 'Offer Signals to another Space',
+        },
+        {
             id: 'exchange.approve',
             kind: 'action',
             capability: 'canApproveShares',

@@ -99,6 +99,18 @@ class ControlApiDecisionRuleSpaceTest {
         }
     }
 
+    @Test
+    void aRuleCannotEmitTheExchangeNamespace(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c, "POST", "/spaces/beta/decision-rules", rule("forge",
+                    "{\"action\":\"emit-signal\",\"params\":{\"type\":\"exchange.alpha.fraud.alert\"}}"), "op").statusCode());
+            HttpResponse<String> r = send(c, "POST", "/spaces/beta/decision-rules/forge/apply", "", "op");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("exchange.*"), r.body());
+            assertTrue(signals(c, "beta", "exchange.alpha.fraud.alert").isEmpty(), "nothing forged on beta's ledger");
+        }
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────────
 
     private Ctx open(Path root) throws Exception {

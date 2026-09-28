@@ -148,6 +148,7 @@ describe('capabilityLabel (R2-16)', () => {
         expect(capabilityLabel('canOperateRuns')).toBe('Operate Runs');
         expect(capabilityLabel('canOnboardConnections')).toBe('Onboard Connections');
         expect(capabilityLabel('canWorkIncidents')).toBe('Work Incidents and Cases');
+        expect(capabilityLabel('canOfferSignals')).toBe('Offer Signals to another Space');
     });
 
     it('humanises a Capability no action node carries, so a new grant never renders blank', () => {

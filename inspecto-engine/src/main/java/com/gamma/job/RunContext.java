@@ -137,8 +137,14 @@ final class RunContext implements JobContext {
         }
 
         @Override public void emit(String type, Severity severity, Map<String, Object> payload) {
+            // Only the Exchange forwarder writes the delivered namespace: a Job forging exchange.<space>.<type>
+            // would fire this Space's on_signal Jobs as if another Space had announced it.
+            if (type != null && type.startsWith("exchange."))
+                throw new IllegalArgumentException("a Job cannot emit '" + type + "': the exchange.* Signal namespace"
+                        + " is written only by the Exchange when it delivers another Space's Signal");
             Map<String, Object> p = new LinkedHashMap<>(payload == null ? Map.of() : payload);
-            p.putIfAbsent("chainDepth", chainDepth);   // the next run in the chain is chainDepth + 1 (§8.4)
+            // The system depth always wins: a payload chainDepth would let a Job restart the loop count (§8.4).
+            p.put("chainDepth", chainDepth);   // the next run in the chain is chainDepth + 1
             Signal s = new Signal(null, type, Instant.now(), severity == null ? Severity.INFO : severity,
                     source, null, correlationId, causationId, null, null, type, p, 1);
             EventLog.current().emit(s.toEvent());   // MDC (set by the Run) routes to the space store
