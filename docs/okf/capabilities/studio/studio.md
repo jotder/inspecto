@@ -436,9 +436,9 @@ Parameters:
 - `include_sensitive`: `dataset.column`, or `dataset.*` for a whole view or virtual Dataset.
 - `timeout_seconds` (300) and `retries` (2).
 
-⚠ `connection`, `datasets`, `include_sensitive`, `schema` and `columns` are read from the **saved** Job only. A
-trigger arg, a Signal binding or a run-time override of any of them refuses the run, because those are the values
-four-eyes approved (below).
+⚠ **Every** parameter is read from the **saved** Job only. A trigger arg, a Signal binding or a run-time override
+of any of them (`mode`, `partition_column`, `timeout_seconds` and `retries` included) refuses the run, because those
+are the values four-eyes approved (below).
 
 **Writing**
 - **Full refresh** fills `<table>__inspecto_stage`, drops the old table and renames the stage. Every Dataset of
@@ -506,10 +506,9 @@ four-eyes approved (below).
     URL parameter outside `sslmode`, `sslrootcert` and `ApplicationName` refuses the run. Only one host is
     accepted, and a tunnel or proxy on the Connection refuses the run.
 - `sslmode` **defaults to `verify-full`**. `disable`, `allow`, `prefer`, `require` and `verify-ca` are refused
-  unless the Connection sets `insecure_tls: true` **and** the Job's author holds `canAdminister` at run time. Such
-  a run is audited (`publish.postgres.insecure-tls`).
-  - ⚠ The Connection routes do not themselves gate `insecure_tls`; it has no effect for a non-administrator
-    author.
+  unless the Connection sets `insecure_tls: true`, and that Connection content was part of an approval (below).
+  Approving a publication whose Connection sets `insecure_tls` needs `canAdminister`, so the flag never takes
+  effect on anyone else's say-so. Every such run is audited (`publish.postgres.insecure-tls`).
 - `sslrootcert` must be a secret reference (`${KEYSTORE:…}`, `${ENV:…}`, …), resolved in-process into a trust
   store. A file path is refused, and the JDK roots are used when it is unset.
 - Verified against a TLS-enabled local Postgres with a CA-signed certificate: the authored host passes
@@ -521,16 +520,34 @@ four-eyes approved (below).
   - Our own `sslfactory` means `LibPQFactory` never reads `~/.postgresql/root.crt` or a client key.
   - `gssEncMode=disable` and `jaasLogin=false`.
 
-**Approval**
-- **Four-eyes is mandatory (operator 2026-09-29).** `PendingChanges.hold` always holds creating a
-  `publish.postgres` Job, or changing its `connection`, `datasets` or `include_sensitive`: a `canApproveChanges`
-  holder other than the author must approve, whatever `approval.toon` says.
-- A schedule change or a delete is not held by this rule.
-- No import (bundle, zip, Space import, Space Template) may carry a `publish.postgres` Job, because a bulk import
-  cannot be approved (`ImportCapabilityGuard`, 409).
+**Approval: a content fingerprint (decision 2026-09-29)**
+- Four-eyes approval pins a SHA-256 **content fingerprint** (`PublicationApproval`), not names. It covers:
+  - `job`: every key of the Job except its schedule (`cron`, `on_pipeline`, `on_signal`, `when`, `catch_up`,
+    `enabled`) and the server-stamped author keys;
+  - `connection`: the resolved Connection's connector, host, port, database, user, base path, every option
+    (`jdbc_url`, so `sslmode` and `sslrootcert`, and `insecure_tls`), tunnel/proxy, and the password's IDENTITY
+    (the `${…}` reference itself, or a SHA-256 of a literal; never the secret);
+  - `dataset:<id>`: each Dataset's relation keys (`physicalRef`, `view`, `sql`, `sourceName`, `calculated`), its
+    columns with their classification, its sharing envelope, and a view's stored definition.
+- **Hold.** `PendingChanges.hold` holds every write of a `publish.postgres` Job whose proposed fingerprint differs
+  from the approved one, whatever `approval.toon` says. That covers a create, any parameter change through
+  `/jobs`, `/config/write` or `/config/patch`, and re-saving an unchanged Job whose Connection or Dataset changed
+  since its approval, which is how a publication is re-approved. The approver needs `canApproveChanges`, or
+  `canAdminister` when the Connection sets `insecure_tls`. A schedule change or a delete is not held.
+- **Approve.** The Pending Change carries the fingerprint it was proposed with. Approval refuses (409) if the
+  Connection or a Dataset moved since then, and otherwise records it in `publication-approvals/<job>.json`. No Job
+  writer touches that directory, and every import is refused it.
+- **Run.** Every run recomputes the fingerprint and refuses on any difference with *"the approved publication
+  changed (connection | dataset X | job params); re-approve"*, or *"never approved"*. The refusal writes an AUDIT
+  row (`publish.postgres.run`, outcome `refused`) and raises a `publish.postgres.refused` Signal.
+- **Imports.** No import (bundle, zip, Space import, Space Template) may carry a `publish.postgres` Job, because a
+  bulk import cannot be approved (`ImportCapabilityGuard`, 409).
 - ⚠ On a server with no Authenticator every caller is the same anonymous actor, so four-eyes can never be met and
   such a Job cannot be created through the API.
-- ⚠ The zero-Space recovery create (`TemplateSeedGate` with `checkCapability` false) skips the import gate.
+- ⚠ The zero-Space recovery create (`TemplateSeedGate` with `checkCapability` false) skips the import gate. A Job it
+  seeds still has no approval, so it cannot run. That is P3 `TEMPLATE-RECOVERY-IMPORT-GATE-1`.
+- ⚠ Deleting a Job leaves its approval record. A Job re-created with the same name and identical content (only
+  possible by writing the file directly, since every API create is held) would run on it.
 
 **Run behaviour and editions**
 - **Timeouts / retries / failure**:
