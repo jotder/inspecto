@@ -135,11 +135,14 @@ final class GraphDossierBuilder {
         dossier.put("renderings", renderings);
 
         List<Map<String, Object>> entities = castList(ws.get("entities"));
-        dossier.put("workingSet", Map.of(
-                "entities", entities.subList(0, Math.min(ENTITY_LIST_CAP, entities.size())),
-                "entitiesTotal", entities.size(),
-                "entitiesTruncated", entities.size() > ENTITY_LIST_CAP,
-                "hash", state.hash()));
+        Map<String, Object> workingSet = new LinkedHashMap<>();
+        workingSet.put("entities", entities.subList(0, Math.min(ENTITY_LIST_CAP, entities.size())));
+        workingSet.put("entitiesTotal", entities.size());
+        workingSet.put("entitiesTruncated", entities.size() > ENTITY_LIST_CAP);
+        workingSet.put("hash", state.hash());
+        // LA-17 slice 2: every merged node — all member keys and the assertions that joined them (masked per member).
+        if (ws.get("resolution") != null) workingSet.put("resolution", ws.get("resolution"));
+        dossier.put("workingSet", workingSet);
         return dossier;
     }
 
@@ -167,6 +170,9 @@ final class GraphDossierBuilder {
         content.put("links", sha256(canonical(ws.get("links"))));
         content.put("excluded", sha256(canonical(ws.get("excluded"))));
         content.put("scores", sha256(canonical(scores)));
+        // LA-17 slice 2: the merged nodes the dossier exposes — only when a resolve is in force, so a manifest of an
+        // unresolved Investigation is byte-identical to one issued before resolution existed.
+        if (ws.get("resolution") != null) content.put("resolution", sha256(canonical(ws.get("resolution"))));
 
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("algorithm", "SHA-256");
@@ -454,6 +460,8 @@ final class GraphDossierBuilder {
                 list.put("size", strings(l.get("members")).size());
                 out.put("list", list);
             }
+            // LA-17 slice 2: the pin and counts — the log.jsonl artefact hashes the sealed groups themselves.
+            if (e.get("resolution") instanceof Map<?, ?> r) out.put("resolution", InvestigationRoutes.resolutionSummary(r));
             entries.add(out);
         }
         Map<String, Object> bindings = new LinkedHashMap<>();
@@ -609,6 +617,7 @@ final class GraphDossierBuilder {
                         + InvestigationRoutes.listClause(e) + " (reason: " + p.get("reason") + ")"
                         + (gone.isEmpty() ? "." : ": " + String.join(", ", gone) + ".");
             }
+            case "resolve" -> InvestigationRoutes.resolveLine(e);
             case "seedBy" -> {
                 Map<String, Object> r = castMap((Map<?, ?>) e.get("read"));
                 List<String> seeded = strings(r.get("ids"));

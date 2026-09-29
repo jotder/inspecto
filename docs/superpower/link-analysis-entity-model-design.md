@@ -380,3 +380,45 @@ append time and replay never re-reads the list:
   - Tests: `ControlApiEntityIdentityImportTest` (7, real HTTP; idempotency and the view gate mutation-checked).
 - **Owed**: applying resolution in Investigations (pinned `atSeq`, merged nodes showing members + joining assertions,
   §8.1 last bullet) waits on the parallel SPA lane; D-M11's `typedEntityKey` projection step; SPA client methods.
+- ~~**Owed**: applying resolution in Investigations; D-M11's `typedEntityKey` projection step; SPA client methods.~~
+  D-M11's projection step shipped in the SPA (`0d5843768`); resolution in Investigations is below; the SPA client and
+  panel stay owed.
+
+### 8.3 As built — resolution in Investigations (2026-09-30)
+- **Op `resolve {atSeq?}`** on `POST /inv/investigations/{id}/ops` — no new route, so no new capability, manifest,
+  `SURFACE`, openapi path or route-gating row (the `/ops` route is already `canManageIncidents`). `atSeq` is an
+  identity fact seq (integer ≥ 0), the head when absent. 422: `ids` given; `atSeq` not an integer ≥ 0; past the head;
+  more than 5 000 member keys in all (bounded like a list op).
+- **The seal** (`InvestigationRoutes.sealResolution`, stored as the entry's `resolution`): `{atSeq, atHash (the chain
+  hash of the fact AT atSeq), headSeq, headHash, groups[{id, members[], assertions[{seq, a, b, via, actor, at,
+  reason}]}], types{id → {normaliser, masked}}, columnTypes{source, target}}`. Everything the evaluator needs is inside
+  it, so replay, `?at`, a fork and the Dossier never re-read the fact log or the settings.
+- **Evaluator**: a `resolve` puts the seal in force from its step; a later one replaces it; undo reverts it
+  byte-identically. ⚠ Reading of §8.1: **a VIEW, not a rewrite** — traversal, exclusion and counts stay over raw
+  identifiers (an expand does not fan out from every member; excluding one member does not exclude the others). The view
+  is recomputed at every later position, so an entity admitted AFTER the resolve resolves too. An entity's typed keys:
+  its own `type` (seed `entityType` / `seedBy` list) when it names a sealed type; else the sealed type of each bound
+  column it stands in within a Working Set link; else the shared type when both columns have the same one. An emptied
+  value has no key. `toMap` gains `resolution {step, atSeq, atHash, groups[{id, members, assertions, entities[]}]}` and
+  per-entity `resolvedTo` — only when a resolve is in force, so every older hash is unchanged.
+- **Readers**: `/ops` answers `resolution` (the merged nodes) on every step while one is in force; `/log` shows
+  `resolutionSummary` (pin + counts, never keys) and the line "Applied identity resolution as of fact N (g groups, m
+  member keys) …"; the Working Set relation's `entities` gain an `identity` column (the group id, else the entity id)
+  and the answer carries `groups` beside the relation (not a relation of its own, so `AlertRule.INVESTIGATION_RELATIONS`
+  and the Widget binding are unchanged); the cache key needs nothing — the seal is in the log bytes; the measures gain
+  `identities` = `countDistinct(identity)` (a merged node counts once), usable by an Alert Rule; the Dossier's
+  `workingSet.resolution`, a `manifest.content.resolution` hash (only when present), the json rendering's summary and
+  the ledger line. Coverage (LA-19) reads only the window — unaffected.
+- **Fork** keeps the seal verbatim (a fork re-orders the method). **Template (D-E8)**: carried as `{op}` only — the pin
+  and groups are this case's evidence; instantiation re-seals at the head AT THAT MOMENT over the new binding.
+- **Masking per member key** (`EntityMasking.collectResolution`): a key masks when its type was sealed masked, is masked
+  today or no longer in force, or is not in the seal (fail closed); a masked key also masks every raw id whose key under
+  that type's normaliser is its value. An unmasked-type member stays readable in a group with a masked one. `all`
+  masks every key; the group id / `resolvedTo` / assertion `a`,`b` render as the member they are; `reveal` returns keys.
+- **Pinned by** `ControlApiInvestigationResolveTest` (8), mutation-checked: dropping the resolution from the hash, a fork
+  that re-seals, a template that carries the pin, no per-member masking, group-level masking and ignoring `atSeq` each
+  turn a test red on the expected value.
+- ⛔ **Awaiting operator approval**: `ConfigWriteFunnelTest` and `DecisionRuleWritersTest` flag
+  `InvestigationRoutes#sealResolution` — their signal is `new EntityFactLog(`, which here READS the log, exactly as the
+  already-listed `InvestigationRoutes#sealList`. No inventory entry was added (the entry needs operator approval); both
+  tests stay red until one is.

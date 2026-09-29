@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -25,7 +26,7 @@ import java.util.TreeSet;
  * carries its SEALED read (the materialised rows, decision D-E3), so evaluating a log is a function of the log
  * alone and replays identically on any day, against any data.
  *
- * <p>The op semantics (plan §2.3), for the nine ops shipped so far:
+ * <p>The op semantics (plan §2.3), for the ten ops shipped so far:
  * <ul>
  *   <li>{@code seed {ids, entityType?}} — admits each id at hop 0 as its own seed. An already-admitted id keeps
  *       its original provenance; an EXCLUDED id is re-admitted, because a later explicit analyst op wins.</li>
@@ -54,6 +55,13 @@ import java.util.TreeSet;
  *       an explicit later {@code seed}/{@code seedBy} or a {@code keep} can have put it there.</li>
  *   <li>{@code seedBy {listId}} (LA-17) — seeds the SEALED {@code read.ids} (the raw values the route found
  *       normalising to a member) exactly as {@code seed} does, with {@code entityType} = the list's type.</li>
+ *   <li>{@code resolve {atSeq?}} (LA-17 slice 2, design §8.1) — puts the identity resolution SEALED into the entry
+ *       ({@code resolution: {atSeq, atHash, groups[], types, columnTypes, …}}; replay never re-reads the fact log) in
+ *       force from this step on; a later {@code resolve} replaces it. It changes NOTHING about traversal, exclusion or
+ *       counts — an entity stays its raw identifier. What it adds is a VIEW, computed from the state at every later
+ *       position: each admitted entity's typed keys ({@link State#keysOf}), and every sealed group one of them is in,
+ *       shown as a merged node with ALL its member keys, the assertions that joined it, and the raw entity ids it
+ *       covers. So an entity admitted AFTER the resolve is resolved too, under the rule as sealed.</li>
  * </ul>
  * An {@code undo} log entry is NOT a vocabulary op — it is a log edit, recorded append-only, naming the step it
  * reverts. Undo always targets the latest effective op, so skipping undone steps is exactly equivalent to
@@ -96,6 +104,98 @@ final class InvestigationEvaluator {
         Map<String, Object> window;
         /** Entity List keys an {@code excludeBy} excluded (LA-17): normaliser → key → the step that excluded it. */
         final TreeMap<String, TreeMap<String, Integer>> excludedKeys = new TreeMap<>();
+        /** The identity resolution the latest {@code resolve} sealed (LA-17 slice 2), and its step; null = none. */
+        Map<String, Object> resolution;
+        int resolvedBy;
+
+        /**
+         * Every typed key {@code <type>:<normalised value>} entity {@code e} carries under the sealed resolution,
+         * sorted. Its type is, in order: its own {@code type} (a {@code seed}'s {@code entityType} or a {@code seedBy}
+         * list's) when that names a SEALED Entity Type (case-insensitive); else the sealed type of each bound column it
+         * stands in within a link of the Working Set ({@code sides}); else — when both bound columns are the SAME type —
+         * that type (an id does not record its column, but then it does not matter). A value the type's normaliser
+         * empties carries no key. Empty when no resolution is in force.
+         */
+        @SuppressWarnings("unchecked")
+        SortedSet<String> keysOf(Entity e, Map<String, SortedSet<String>> sides) {
+            SortedSet<String> out = new TreeSet<>();
+            if (resolution == null) return out;
+            Map<String, Object> types = (Map<String, Object>) resolution.get("types");
+            Map<String, Object> cols = (Map<String, Object>) resolution.get("columnTypes");
+            List<String> typeIds = new ArrayList<>();
+            String own = e.type() == null ? null : typeId(types, e.type());
+            if (own != null) typeIds.add(own);
+            else {
+                for (String side : sides.getOrDefault(e.id(), new TreeSet<>()))
+                    if (cols.get(side) != null) typeIds.add(String.valueOf(cols.get(side)));
+                if (typeIds.isEmpty() && cols.get("source") != null && cols.get("source").equals(cols.get("target")))
+                    typeIds.add(String.valueOf(cols.get("source")));
+            }
+            for (String t : typeIds) {
+                if (!(types.get(t) instanceof Map<?, ?> def)) continue;
+                String v = EntityTypes.normalise(String.valueOf(def.get("normaliser")), e.id());
+                if (!v.isEmpty()) out.add(t + ":" + v);
+            }
+            return out;
+        }
+
+        private static String typeId(Map<String, Object> types, String named) {
+            for (String t : types.keySet()) if (t.equalsIgnoreCase(named.trim())) return t;
+            return null;
+        }
+
+        /** Which bound column(s) each entity stands in within the Working Set's links: id → {source, target}. */
+        Map<String, SortedSet<String>> sides() {
+            Map<String, SortedSet<String>> out = new TreeMap<>();
+            for (Link l : links.values()) {
+                out.computeIfAbsent(l.source(), k -> new TreeSet<>()).add("source");
+                out.computeIfAbsent(l.target(), k -> new TreeSet<>()).add("target");
+            }
+            return out;
+        }
+
+        /**
+         * The resolution view (see the class note): {@code groups} — every sealed group holding a key of an admitted
+         * entity, as {@code {id, members[], assertions[], entities[]}} — and, into {@code resolvedToOut}, entity id →
+         * the group it resolves to (the smallest group id when its keys hit more than one). Null when none is in force.
+         */
+        @SuppressWarnings("unchecked")
+        Map<String, Object> resolutionView(Map<String, String> resolvedToOut) {
+            if (resolution == null) return null;
+            Map<String, SortedSet<String>> sides = sides();
+            Map<String, String> groupOfKey = new TreeMap<>();
+            Map<String, Map<String, Object>> sealed = new TreeMap<>();
+            for (Object o : (List<Object>) resolution.get("groups")) {
+                Map<String, Object> g = (Map<String, Object>) o;
+                String gid = String.valueOf(g.get("id"));
+                sealed.put(gid, g);
+                for (String m : strings(g.get("members"))) groupOfKey.put(m, gid);
+            }
+            TreeMap<String, TreeSet<String>> entitiesOf = new TreeMap<>();
+            for (Entity e : entities.values()) {
+                TreeSet<String> hit = new TreeSet<>();
+                for (String k : keysOf(e, sides)) if (groupOfKey.containsKey(k)) hit.add(groupOfKey.get(k));
+                if (hit.isEmpty()) continue;
+                resolvedToOut.put(e.id(), hit.first());
+                for (String gid : hit) entitiesOf.computeIfAbsent(gid, k -> new TreeSet<>()).add(e.id());
+            }
+            List<Map<String, Object>> groups = new ArrayList<>();
+            for (var g : entitiesOf.entrySet()) {
+                Map<String, Object> s = sealed.get(g.getKey());
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", g.getKey());
+                m.put("members", s.get("members"));
+                m.put("assertions", s.get("assertions"));
+                m.put("entities", new ArrayList<>(g.getValue()));
+                groups.add(m);
+            }
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("step", resolvedBy);
+            out.put("atSeq", resolution.get("atSeq"));
+            out.put("atHash", resolution.get("atHash"));
+            out.put("groups", groups);
+            return out;
+        }
 
         /** Whether {@code id} is NOT in the Working Set and normalises to a key an {@code excludeBy} excluded. */
         boolean blockedByKey(String id) {
@@ -107,6 +207,8 @@ final class InvestigationEvaluator {
 
         /** The canonical, response-shaped view of this state. */
         Map<String, Object> toMap() {
+            Map<String, String> resolvedTo = new TreeMap<>();
+            Map<String, Object> view = resolutionView(resolvedTo);
             List<Map<String, Object>> es = new ArrayList<>();
             for (Entity e : entities.values()) {
                 Map<String, Object> m = new LinkedHashMap<>();
@@ -117,6 +219,8 @@ final class InvestigationEvaluator {
                 m.put("admittedBy", e.admittedBy());
                 m.put("hidden", hidden.contains(e.id()));
                 m.put("kept", kept.contains(e.id()));
+                // Only when resolved (LA-17 slice 2): an unresolved state hashes exactly as it did before.
+                if (resolvedTo.containsKey(e.id())) m.put("resolvedTo", resolvedTo.get(e.id()));
                 es.add(m);
             }
             List<Map<String, Object>> ls = new ArrayList<>();
@@ -171,6 +275,8 @@ final class InvestigationEvaluator {
                     }
                 out.put("excludedKeys", ks);
             }
+            // Only when a resolve is in force (LA-17 slice 2), for the same reason.
+            if (view != null) out.put("resolution", view);
             return out;
         }
 
@@ -305,6 +411,10 @@ final class InvestigationEvaluator {
                 for (String id : ids) if (s.entities.containsKey(id)) s.kept.add(id);
             }
             case "window" -> s.window = p.get("window") instanceof Map<?, ?> w ? (Map<String, Object>) w : null;
+            case "resolve" -> {   // LA-17 slice 2: the sealed resolution, in force from here (see the class note)
+                s.resolution = (Map<String, Object>) entry.get("resolution");
+                s.resolvedBy = step;
+            }
             case "annotate" -> {
                 String note = String.valueOf(p.get("note"));
                 String confidence = p.get("confidence") == null ? null : String.valueOf(p.get("confidence"));

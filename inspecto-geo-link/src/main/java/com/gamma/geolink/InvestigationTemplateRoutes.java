@@ -57,6 +57,9 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  *       method (D-E8), its membership at authoring time is not. Neither the sealed members nor a seedBy's matched ids
  *       nor the exclusion's reason text travel; instantiating re-resolves the list at the fact log's head AT THAT
  *       MOMENT (design §4.4.1), and an excludeBy's reason is then stated as the template and list it came from.</li>
+ *   <li>{@code resolve} (LA-17 slice 2) → carried as {@code {op}} ONLY: applying the Space's identity resolution is
+ *       method, the pinned {@code atSeq} and the groups it sealed are this case's evidence. Instantiating re-seals the
+ *       resolution at the fact log's head AT THAT MOMENT, over the new binding's column types.</li>
  *   <li>Any other op is carried verbatim.</li>
  * </ul>
  *
@@ -137,6 +140,9 @@ public final class InvestigationTemplateRoutes implements RouteModule {
                 t.put("windowParam", name);
             } else if (InvestigationRoutes.LIST_OPS.contains(op)) {
                 t.put("listId", p.get("listId"));   // the list by name — never its sealed members (see the class note)
+            } else if (op.equals("resolve")) {
+                // LA-17 slice 2 (D-E8): "resolve identities here" is method; the pinned atSeq and its groups are this
+                // case's evidence. Carried as {op} only — instantiation re-seals at the fact log's head at THAT moment.
             } else if (CASE_OPS.contains(op)) {
                 dropped.add(ordered("step", step, "op", op, "count", strings(p.get("ids")).size()));
                 t = null;

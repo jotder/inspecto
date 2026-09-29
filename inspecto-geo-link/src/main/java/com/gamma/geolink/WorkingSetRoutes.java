@@ -79,7 +79,7 @@ public final class WorkingSetRoutes implements RouteModule {
     private static final int CACHE_ENTRIES = 32;
 
     static final Map<String, List<String>> COLUMNS = Map.of(
-            "entities", List.of("entityId", "type", "hop", "seedId", "opSeq", "hidden", "kept"),
+            "entities", List.of("entityId", "type", "hop", "seedId", "opSeq", "hidden", "kept", "identity"),
             "links", List.of("source", "target", "kind", "count", "opSeq"),
             "excluded", List.of("entityId", "opSeq", "reason"));
 
@@ -138,6 +138,9 @@ public final class WorkingSetRoutes implements RouteModule {
         out.put("head", head);
         out.put("key", rel.key());
         out.put("cached", cached[0]);
+        // LA-17 slice 2: the merged nodes of a resolve in force at this head, beside any relation — not a relation of
+        // their own (an Alert Rule / Widget measures entities, links, excluded; `identity` counts merged nodes once).
+        if (!rel.tables().get("groups").isEmpty()) out.put("groups", rel.tables().get("groups"));
         // D-U6: masked on the way out, AFTER the cache — the cached relation holds raw ids, the answer never does.
         EntityMasking mask = EntityMasking.of(inv, List.of());
         @SuppressWarnings("unchecked") Map<String, Object> masked = (Map<String, Object>) mask.apply(out);
@@ -191,7 +194,11 @@ public final class WorkingSetRoutes implements RouteModule {
         return rel;
     }
 
+    @SuppressWarnings("unchecked")
     private static Map<String, List<Map<String, Object>>> tables(InvestigationEvaluator.State s) {
+        // LA-17 slice 2: an entity's identity is the group it resolves to under a resolve in force, else itself.
+        Map<String, String> resolvedTo = new LinkedHashMap<>();
+        Map<String, Object> view = s.resolutionView(resolvedTo);
         List<Map<String, Object>> entities = new ArrayList<>();
         for (InvestigationEvaluator.Entity e : s.entities.values()) {
             Map<String, Object> r = new LinkedHashMap<>();
@@ -202,6 +209,7 @@ public final class WorkingSetRoutes implements RouteModule {
             r.put("opSeq", e.admittedBy());
             r.put("hidden", s.hidden.contains(e.id()));
             r.put("kept", s.kept.contains(e.id()));
+            r.put("identity", resolvedTo.getOrDefault(e.id(), e.id()));
             entities.add(r);
         }
         List<Map<String, Object>> links = new ArrayList<>();
@@ -222,7 +230,20 @@ public final class WorkingSetRoutes implements RouteModule {
             r.put("reason", x.getValue().reason());
             excluded.add(r);
         }
-        return Map.of("entities", List.copyOf(entities), "links", List.copyOf(links), "excluded", List.copyOf(excluded));
+        List<Map<String, Object>> groups = new ArrayList<>();
+        if (view != null)
+            for (Object o : (List<Object>) view.get("groups")) {
+                Map<String, Object> g = (Map<String, Object>) o;
+                Map<String, Object> r = new LinkedHashMap<>();
+                r.put("groupId", g.get("id"));
+                r.put("members", g.get("members"));
+                r.put("assertions", g.get("assertions"));
+                r.put("entities", g.get("entities"));
+                r.put("opSeq", view.get("step"));
+                groups.add(r);
+            }
+        return Map.of("entities", List.copyOf(entities), "links", List.copyOf(links), "excluded", List.copyOf(excluded),
+                "groups", List.copyOf(groups));
     }
 
     private static int intParam(HttpExchange ex, String name, int dflt) {

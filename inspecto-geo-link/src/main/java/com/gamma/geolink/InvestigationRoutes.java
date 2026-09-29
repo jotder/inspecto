@@ -53,10 +53,11 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
  *   <li>{@code POST /inv/investigations} — create, bound to {@code {dataset, sourceCol, targetCol, linkKindCol?,
  *       timeCol?, timeColZone?}}.</li>
  *   <li>{@code POST /inv/investigations/{id}/ops} — append one op ({@code seed · expand · exclude · hide · keep ·
- *       window · annotate · excludeBy · seedBy}); answers the Working Set DELTA and {@code truncated}. An
+ *       window · annotate · excludeBy · seedBy · resolve}); answers the Working Set DELTA and {@code truncated}. An
  *       {@code expand} is one hop-ladder rung (LA-13, plan §2.4) — see {@link #expandParams}. The two Entity List
  *       ops (LA-17) SEAL the list as it stands at the fact log's head — see {@link #sealList} and
- *       {@link #seedRead}.</li>
+ *       {@link #seedRead}. A {@code resolve} (LA-17 slice 2) SEALS the Space's identity resolution at a pinned
+ *       fact seq — see {@link #sealResolution}.</li>
  *   <li>{@code POST /inv/investigations/{id}/undo} — real undo: a log edit that reverts the latest op.</li>
  *   <li>{@code POST /inv/investigations/{id}/reorder} — re-ordering FORKS (D-E4): a new Investigation with explicit
  *       parent lineage; the original log, its Working Sets and any Artifact anchored to them are untouched.</li>
@@ -102,9 +103,9 @@ import static com.gamma.geolink.InvestigationEvaluator.strings;
 public final class InvestigationRoutes implements RouteModule {
 
     private static final Pattern SAFE_IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
-    /** The nine ops evaluated so far (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's two). */
+    /** The ten ops evaluated so far (LA-10's five + LA-13's {@code window} + LA-19's {@code annotate} + LA-17's three). */
     private static final Set<String> SHIPPED = Set.of("seed", "expand", "exclude", "hide", "keep", "window", "annotate",
-            "excludeBy", "seedBy");
+            "excludeBy", "seedBy", "resolve");
     /** The ops over a named Entity List (LA-17, design §4.4.1): they carry {@code listId}, never ids. */
     static final Set<String> LIST_OPS = Set.of("excludeBy", "seedBy");
     /** The rest of the closed vocabulary (plan §2.2): named so they refuse as "not yet", never as "unknown". */
@@ -224,7 +225,7 @@ public final class InvestigationRoutes implements RouteModule {
         if (op == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'op'");
         if (DEFERRED.contains(op))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is in the closed vocabulary but not implemented yet (LA-10 "
-                    + "LA-13, LA-19 and LA-17 ship seed, expand, exclude, hide, keep, window, annotate, excludeBy, seedBy)");
+                    + "LA-13, LA-19 and LA-17 ship seed, expand, exclude, hide, keep, window, annotate, excludeBy, seedBy, resolve)");
         if (!SHIPPED.contains(op))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "op '" + op + "' is not in the closed op vocabulary");
         Map<String, Object> params = params(op, resolvePseudonyms(inv, body));
@@ -248,6 +249,7 @@ public final class InvestigationRoutes implements RouteModule {
                 entry.put("list", list);
                 if (op.equals("seedBy")) entry.put("read", seedRead(api, ex, inv, list));
             }
+            if (op.equals("resolve")) entry.put("resolution", sealResolution(inv.writeRoot(), inv.header(), params.get("atSeq"), ""));
             if (op.equals("expand")) {
                 List<String> frontier = ids.isEmpty() ? new ArrayList<>(before.entities.keySet()) : sorted(ids);
                 if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "nothing to expand — the Working Set is empty");
@@ -336,6 +338,9 @@ public final class InvestigationRoutes implements RouteModule {
             // seedBy's read — a DISTINCT over the whole Dataset — does not depend on the order, so it travels too.
             if (orig.get("list") != null) e.put("list", orig.get("list"));
             if ("seedBy".equals(orig.get("op"))) e.put("read", orig.get("read"));
+            // LA-17 slice 2: a resolve keeps the resolution it sealed, for the same reason — a fork re-orders the
+            // method, it does not re-read the identity facts.
+            if (orig.get("resolution") != null) e.put("resolution", orig.get("resolution"));
             if ("expand".equals(orig.get("op"))) {
                 @SuppressWarnings("unchecked") Map<String, Object> p = (Map<String, Object>) orig.get("params");
                 List<String> named = strings(p.get("ids"));
@@ -430,6 +435,9 @@ public final class InvestigationRoutes implements RouteModule {
                 e.put("list", list);
                 if (op.equals("seedBy")) e.put("read", seedRead(api, ex, inv, list));
             }
+            // LA-17 slice 2 (D-E8): a resolve travels as the method "resolve identities here" — re-sealed at THIS
+            // moment's head over the NEW binding, never the authored atSeq or groups.
+            if (op.equals("resolve")) e.put("resolution", sealResolution(writeRoot, h, params.get("atSeq"), "template step " + step + ": "));
             if (op.equals("expand")) {
                 List<String> frontier = new ArrayList<>(state.entities.keySet());
                 if (frontier.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "template step " + step + " expands an empty Working Set");
@@ -558,6 +566,7 @@ public final class InvestigationRoutes implements RouteModule {
                 out.put("read", summary);
             }
             if (e.get("list") instanceof Map<?, ?> l) out.put("list", listSummary(l));   // ...and so do the sealed members
+            if (e.get("resolution") instanceof Map<?, ?> r) out.put("resolution", resolutionSummary(r));   // ...and groups
             Integer removed = "excludeBy".equals(e.get("op"))
                     ? (step == 1 ? 0 : counts.get(step - 2)) - counts.get(step - 1) : null;
             out.put("undoneBy", undoneBy.get(step));
@@ -601,6 +610,9 @@ public final class InvestigationRoutes implements RouteModule {
                             .attr("truncated", truncated).attr("fingerprint", read.get("fingerprint"));
                     // LA-17: which list, at which fact — never its members (as ENTITY_LIST_CHANGED carries counts).
                     if (e.get("list") instanceof Map<?, ?> l) b.attr("listId", l.get("listId")).attr("atSeq", l.get("atSeq"));
+                    // LA-17 slice 2: which fact seq was pinned and how many groups it sealed — never a key.
+                    if (e.get("resolution") instanceof Map<?, ?> r)
+                        b.attr("atSeq", r.get("atSeq")).attr("groups", strings(r.get("groups")).size());
                     return b;
                 });
 
@@ -626,6 +638,8 @@ public final class InvestigationRoutes implements RouteModule {
             out.put("read", r);
         }
         if (after.window != null || "window".equals(op)) out.put("window", after.window);
+        // LA-17 slice 2: while a resolve is in force every step answers the merged nodes, so the canvas can redraw them.
+        if (after.resolution != null) out.put("resolution", after.toMap().get("resolution"));
         out.put("workingSet", summary(after));
         return out;
     }
@@ -833,6 +847,93 @@ public final class InvestigationRoutes implements RouteModule {
     }
 
     /**
+     * LA-17 slice 2 (design §8.1) — the Space's identity resolution at identity fact seq {@code atSeq} (the head when
+     * null), SEALED so replay, {@code ?at}, a fork and the Dossier never re-read the fact log:
+     * {@code {atSeq, atHash, headSeq, headHash, groups[{id, members[], assertions[{seq, a, b, via, actor, at, reason}]}],
+     * types{id → {normaliser, masked}}, columnTypes{source, target}}}. {@code types} are the Entity Types in force NOW
+     * (an entity's typed key is minted with the sealed normaliser, and {@link EntityMasking} reads the sealed flag, fail
+     * closed); {@code columnTypes} are the bound columns' types by registry classification, as the projection routes
+     * report them ({@code InvRoutes.columnTypes}). {@code atHash} is the chain hash of the fact AT {@code atSeq} (null at
+     * 0), so the pinned prefix is itself verifiable. Refusals: {@code atSeq} past the head 422 · more than
+     * {@link #MAX_LIST_MEMBERS} member keys in all 422 (bounded like a list op). A broken fact chain is a 500.
+     */
+    static Map<String, Object> sealResolution(Path writeRoot, Map<String, Object> header, Object atSeq, String where)
+            throws IOException {
+        EntityFactLog.Log head = EntityListRoutes.read(new EntityFactLog(writeRoot));
+        long at = atSeq instanceof Number n ? n.longValue() : head.headSeq();
+        if (at > head.headSeq())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "'atSeq' " + at
+                    + " is beyond the identity fact log head " + head.headSeq());
+        Map<Long, EntityRegistry.Assertion> assertions = EntityRegistry.assertions(head.facts(), at);
+        List<Map<String, Object>> groups = new ArrayList<>();
+        int keys = 0;
+        for (EntityRegistry.Group g : EntityRegistry.resolve(head.facts(), at).values()) {
+            keys += g.members().size();
+            List<Map<String, Object>> joined = new ArrayList<>();
+            for (long seq : g.assertions()) {
+                EntityRegistry.Assertion x = assertions.get(seq);
+                Map<String, Object> a = new LinkedHashMap<>();
+                a.put("seq", x.seq());
+                a.put("a", x.a());
+                a.put("b", x.b());
+                a.put("via", x.via());
+                a.put("actor", x.actor());
+                a.put("at", x.at());
+                a.put("reason", x.reason());
+                joined.add(a);
+            }
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", g.id());
+            m.put("members", new ArrayList<>(g.members()));
+            m.put("assertions", joined);
+            groups.add(m);
+        }
+        if (keys > MAX_LIST_MEMBERS)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + "the identity resolution at seq " + at + " has "
+                    + keys + " member keys; a resolve seals at most " + MAX_LIST_MEMBERS);
+        String atHash = null;
+        for (EntityFactLog.Fact f : head.facts()) if (f.seq() == at) atHash = f.hash();
+        Map<String, Object> types = new java.util.TreeMap<>();
+        for (EntityTypes.EntityType t : LinkAnalysisSettings.forRoot(writeRoot).effectiveEntityTypes())
+            types.put(t.id(), Map.of("normaliser", t.normaliser(), "masked", t.masked()));
+        String src = String.valueOf(header.get("sourceCol")), tgt = String.valueOf(header.get("targetCol"));
+        Map<String, Map<String, Object>> cols = InvRoutes.columnTypes(writeRoot, String.valueOf(header.get("dataset")), List.of(src, tgt));
+        Map<String, Object> columnTypes = new LinkedHashMap<>();
+        columnTypes.put("source", cols.containsKey(src) ? cols.get(src).get("id") : null);
+        columnTypes.put("target", cols.containsKey(tgt) ? cols.get(tgt).get("id") : null);
+        Map<String, Object> sealed = new LinkedHashMap<>();
+        sealed.put("atSeq", at);
+        sealed.put("atHash", atHash);
+        sealed.put("headSeq", head.headSeq());
+        sealed.put("headHash", head.headHash());
+        sealed.put("groups", groups);
+        sealed.put("types", types);
+        sealed.put("columnTypes", columnTypes);
+        return sealed;
+    }
+
+    /** A sealed resolution as the log view shows it: the pin and counts, not the groups (the log line hashes them). */
+    static Map<String, Object> resolutionSummary(Map<?, ?> r) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (String k : List.of("atSeq", "atHash", "headSeq", "headHash", "columnTypes")) out.put(k, r.get(k));
+        int members = 0;
+        List<?> groups = r.get("groups") instanceof List<?> g ? g : List.of();
+        for (Object g : groups) if (g instanceof Map<?, ?> m) members += strings(m.get("members")).size();
+        out.put("groups", groups.size());
+        out.put("members", members);
+        return out;
+    }
+
+    /** {@code "Applied identity resolution as of fact 12 (3 groups, 7 member keys)."} — no key is named. */
+    static String resolveLine(Map<String, Object> e) {
+        Map<String, Object> s = resolutionSummary((Map<?, ?>) e.get("resolution"));
+        int g = (Integer) s.get("groups"), m = (Integer) s.get("members");
+        return "Applied identity resolution as of fact " + s.get("atSeq") + " (" + g + " group" + (g == 1 ? "" : "s") + ", "
+                + m + " member key" + (m == 1 ? "" : "s") + "): an entity whose typed key is a member shows as its merged "
+                + "node; traversal and counts are unchanged.";
+    }
+
+    /**
      * The sealed read behind a {@code seedBy} (design §4.4.1): the DISTINCT values of the bound {@code sourceCol} and
      * {@code targetCol} over the Investigation's Dataset (R3 gate on the read, as {@link #read}), normalised in Java
      * with the sealed list's normaliser, keeping the RAW values whose key is a member. Shaped like an expand's read —
@@ -959,6 +1060,16 @@ public final class InvestigationRoutes implements RouteModule {
                         + EntityListRoutes.LIST_ID.pattern());
             p.put("listId", listId);
             if (op.equals("excludeBy")) p.put("reason", exclusionReason(body, op));
+            return p;
+        }
+        if (op.equals("resolve")) {   // LA-17 slice 2: no ids — the pinned identity fact seq, or the head when absent
+            if (body.containsKey("ids"))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'resolve' applies the Space's identity resolution, not ids — "
+                        + "send 'atSeq' (optional)");
+            Object at = body.get("atSeq");
+            if (at != null && (!(at instanceof Number n) || n.doubleValue() != Math.rint(n.doubleValue()) || n.longValue() < 0))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'atSeq' must be an identity fact seq (an integer >= 0), got " + at);
+            if (at != null) p.put("atSeq", ((Number) at).longValue());
             return p;
         }
         if (op.equals("window")) {   // no ids: an intensional op over time, not over entities
@@ -1123,6 +1234,7 @@ public final class InvestigationRoutes implements RouteModule {
             case "annotate" -> "Annotated " + list(ids) + gradeClause(p) + ": \"" + p.get("note") + "\"";
             case "excludeBy" -> "Excluded " + removed + " entit" + (removed != null && removed == 1 ? "y" : "ies")
                     + " on " + listClause(e) + " (reason: " + p.get("reason") + ").";
+            case "resolve" -> resolveLine(e);
             case "seedBy" -> {
                 Map<String, Object> r = (Map<String, Object>) e.get("read");
                 int n = strings(r.get("ids")).size();

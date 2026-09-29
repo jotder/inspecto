@@ -122,7 +122,7 @@ class ControlApiInvestigationWorkingSetTest {
 
             JsonNode ents = ws(c, "case-a", "");
             assertEquals("entities", ents.get("relation").asText());
-            assertEquals("[\"entityId\",\"type\",\"hop\",\"seedId\",\"opSeq\",\"hidden\",\"kept\"]", ents.get("columns").toString());
+            assertEquals("[\"entityId\",\"type\",\"hop\",\"seedId\",\"opSeq\",\"hidden\",\"kept\",\"identity\"]", ents.get("columns").toString());
             assertEquals(Set.of("alice", "carol", "dave", "erin", "frank"), ids(ents));
             assertEquals(5, ents.get("total").asInt());
             assertFalse(ents.get("truncated").asBoolean());

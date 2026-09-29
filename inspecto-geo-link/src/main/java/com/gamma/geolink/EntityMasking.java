@@ -175,6 +175,7 @@ final class EntityMasking {
                 typedKeys.computeIfAbsent(String.valueOf(l.get("normaliser")), k -> new TreeSet<>()).addAll(members);
             }
         }
+        if (e.get("resolution") instanceof Map<?, ?> res) collectResolution(res, types, universe, typedSeeds, typedKeys);
         if (e.get("params") instanceof Map<?, ?> p) {
             List<String> ids = strings(p.get("ids"));
             universe.addAll(ids);
@@ -197,6 +198,37 @@ final class EntityMasking {
                         if (row.get("source") != null) universe.add(String.valueOf(row.get("source")));
                         if (row.get("target") != null) universe.add(String.valueOf(row.get("target")));
                     }
+        }
+    }
+
+    /**
+     * LA-17 slice 2 — a {@code resolve}'s sealed groups, masked PER MEMBER KEY by that key's own Entity Type (the
+     * {@code <type>} before the first {@code :}): masked when the type was sealed masked, when it is masked TODAY or
+     * no longer in force, or when the seal carries no such type (fail closed each way), as a list's flag is read. A
+     * masked key also masks every id the log knows whose key under that type's normaliser is its value — the same identifier in raw form, as a list member
+     * masks its raw matches. A member of an UNMASKED type stays readable even when its group holds a masked one.
+     */
+    private static void collectResolution(Map<?, ?> res, List<EntityTypes.EntityType> types, Set<String> universe,
+                                          Set<String> typedSeeds, Map<String, Set<String>> typedKeys) {
+        Map<?, ?> sealedTypes = res.get("types") instanceof Map<?, ?> t ? t : Map.of();
+        if (!(res.get("groups") instanceof List<?> groups)) return;
+        for (Object o : groups) {
+            if (!(o instanceof Map<?, ?> g)) continue;
+            for (String key : strings(g.get("members"))) {
+                universe.add(key);
+                int colon = key.indexOf(':');
+                String type = colon < 0 ? key : key.substring(0, colon);
+                Map<?, ?> sealed = sealedTypes.get(type) instanceof Map<?, ?> d ? d : null;
+                var now = types.stream().filter(x -> x.id().equalsIgnoreCase(type)).findFirst();
+                boolean masked = sealed == null || !Boolean.FALSE.equals(sealed.get("masked"))
+                        || now.map(EntityTypes.EntityType::masked).orElse(true);
+                if (!masked) continue;
+                typedSeeds.add(key);
+                String normaliser = sealed != null ? String.valueOf(sealed.get("normaliser"))
+                        : now.map(EntityTypes.EntityType::normaliser).orElse(null);
+                if (normaliser != null && colon >= 0)
+                    typedKeys.computeIfAbsent(normaliser, k -> new TreeSet<>()).add(key.substring(colon + 1));
+            }
         }
     }
 

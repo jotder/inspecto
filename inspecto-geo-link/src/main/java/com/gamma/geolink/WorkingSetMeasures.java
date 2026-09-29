@@ -49,7 +49,9 @@ public final class WorkingSetMeasures implements InvestigationMeasureProbe {
             List.of("links", "links", "count"),
             List.of("events", "links", "sum(count)"),
             List.of("excluded", "excluded", "count"),
-            List.of("maxHop", "entities", "max(hop)"));
+            List.of("maxHop", "entities", "max(hop)"),
+            // LA-17 slice 2: distinct identities — a merged node counts once; equals `entities` with no resolve in force.
+            List.of("identities", "entities", "countDistinct(identity)"));
 
     /**
      * One Measure over one relation's rows. Throws {@link IllegalArgumentException} for a measure outside the
