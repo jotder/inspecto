@@ -1198,21 +1198,24 @@ Write-CrlfScript -Path "$bundleDir\serve.bat" -Content $serveBatContent
 # ── step 6b-2: Dockerfile wrapping serve.sh (PKG-3, backend-hardening plan item 6) ──────
 # Containerized deployment over EXISTING seams only: serve.sh already reads PORT/SPACES_ROOT/
 # CORS_ORIGIN/... from the environment, so the Dockerfile adds no configuration surface of its
-# own. The base image provides java; .dockerignore excludes the embedded runtime/ so serve.sh's
-# `[ -x runtime/bin/java ]` preference misses and it falls back to the image JVM (an embedded
-# per-platform runtime inside a container would be dead weight, and the Windows one can't run).
+# own. The JVM is the bundle's OWN jlinked runtime/ (serve.sh prefers runtime/bin/java): at
+# release=27 no vendor JRE image exists (Adoptium published no eclipse-temurin:27-*), and the old
+# eclipse-temurin:24-jre base could not run the JAR at all. debian:stable-slim supplies only glibc +
+# bash. ⚠ So the Dockerfile is valid ONLY in the linux_amd64 bundle; the build-time
+# `runtime/bin/java -version` makes a Windows bundle fail at `docker build`, not at container start.
+# chmod first: a zip packed on Windows does not carry the executable bit.
 # HEALTHCHECK hits /health tokenless — correct, it is in ControlApi's PUBLIC_PATHS. It probes via
-# bash /dev/tcp, NOT curl: eclipse-temurin:24-jre ships no curl/wget (verified 2026-08-28 — the
-# plan's curl one-liner would have reported unhealthy forever), and bash is in the Ubuntu base.
+# bash /dev/tcp, NOT curl: the slim base ships no curl/wget.
 $dockerfileContent = @'
 # Build from an unzipped inspecto-deploy bundle:  docker build -t inspecto .
 # Run:  docker run -p 8080:8080 inspecto
 # All serve.sh env vars pass straight through (-e PORT / SPACES_ROOT /
 # CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS ...). Persist data by mounting the spaces
 # root:  -v /srv/inspecto/spaces:/app/spaces
-FROM eclipse-temurin:24-jre
+FROM debian:stable-slim
 WORKDIR /app
 COPY . /app
+RUN chmod +x serve.sh runtime/bin/* && runtime/bin/java -version
 ENV PORT=8080
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s CMD ["bash", "-c", \
@@ -1221,9 +1224,8 @@ ENTRYPOINT ["./serve.sh"]
 '@
 Write-LfScript -Path "$bundleDir\Dockerfile" -Content $dockerfileContent
 $dockerignoreContent = @'
-# Keep the image lean: the base image supplies the JVM (serve.sh falls back to `java` when
-# runtime/ is absent), and Windows-only launchers are dead weight in a Linux container.
-runtime/
+# runtime/ is NOT excluded: the bundle's jlinked runtime is the image's only JVM.
+# Windows-only launchers are dead weight in a Linux container.
 *.bat
 inspecto-deploy*.zip*
 '@

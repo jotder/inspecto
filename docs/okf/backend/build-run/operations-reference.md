@@ -1096,6 +1096,9 @@ As-built decisions:
   image to point at, so the bundle carries its own. ⚠ The Dockerfile is therefore valid **only in the
   `linux_amd64` bundle**; it asserts this with a `runtime/bin/java -version` at build time rather than
   failing at container start.
+  🔴 **This bullet was ahead of the code until 2026-09-29:** `package.ps1` still emitted
+  `eclipse-temurin:24-jre` and excluded `runtime/`; fixed then (`ASSURE-OPERABILITY-1`). The fixed Dockerfile
+  has not yet been built — the 2026-08-28 verification below is of the old temurin image.
 - **HEALTHCHECK probes `/health` via a bash `/dev/tcp` HTTP GET, not curl** — the temurin JRE image
   ships **no curl or wget** (verified 2026-08-28; the original plan's curl one-liner would have
   reported unhealthy forever). `/health` is tokenless via `PUBLIC_PATHS`, correct for a healthcheck.

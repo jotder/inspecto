@@ -79,8 +79,9 @@ and `values.yaml` parse and carry the expected keys; the templates were checked 
 and never installed on a cluster. Run `helm lint deploy/helm/inspecto && helm template t deploy/helm/inspecto`
 on a host that has it before first use.
 
-🔴 **Image blocker found while grounding this:** [operations-reference.md](operations-reference.md) says the
-bundle Dockerfile moved to `debian:stable-slim` + the bundle's own jlinked runtime on 2026-09-17, but
-`inspecto/package.ps1` (step 6b-2) still writes `FROM eclipse-temurin:24-jre` with `runtime/` excluded by
-`.dockerignore` — a Java 24 JRE cannot run the `release=27` JAR. Until that is fixed, the image this chart
-deploys will not start.
+✅ **Image blocker fixed in code 2026-09-29, NOT yet built:** `inspecto/package.ps1` step 6b-2 had still
+written `FROM eclipse-temurin:24-jre` with `runtime/` excluded, although
+[operations-reference.md](operations-reference.md) recorded the move to `debian:stable-slim` + the bundle's
+own jlinked runtime. It now emits that, keeps `runtime/` in the build context, and runs
+`chmod +x serve.sh runtime/bin/* && runtime/bin/java -version` at build time. ⚠ No image has been built from
+it: `debian:stable-slim` is not present on the build host and was not pulled.
