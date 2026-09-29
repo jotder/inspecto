@@ -23,7 +23,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Amazon SES delivery events arriving through an Amazon SNS HTTPS subscription (D8-SES-SNS-1). Design and
- * security review: {@code docs/superpower/ses-sns-adapter-design.md}; operator decisions D1–D11 accepted
+ * security review: {@code docs/archived-documents/plans-archive/ses-sns-adapter-design.md}; operator decisions D1–D11 accepted
  * 2026-09-28.
  *
  * <h3>{@link #verify} — every step fails closed, in this order</h3>

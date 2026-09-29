@@ -517,7 +517,7 @@ echoes our `Message-ID` (D5) and the real signing-certificate path grammar and c
 
 Adapter id `ses` (`SesSnsDeliveryStatusAdapter`, `inspecto-connectors`), so the SNS HTTPS subscription URL is
 `/api/v1/public/delivery-status/ses`. Operator decisions D1–D11 of
-[`ses-sns-adapter-design.md`](../../../superpower/ses-sns-adapter-design.md) §9 accepted 2026-09-28; the design's
+[`ses-sns-adapter-design.md`](../../../archived-documents/plans-archive/ses-sns-adapter-design.md) §9 accepted 2026-09-28; the design's
 §3 is the security review. ⚠ **No SES account was available**: the fixtures (`src/test/resources/sns/`) are
 built from AWS's documented shapes and re-signed at test time with a keytool-minted test CA — the live checks
 owed are listed below.
@@ -561,6 +561,14 @@ subscribe `https://<public host>/api/v1/public/delivery-status/ses`. For restric
 `SmtpEmailChannel` change); the real certificate path grammar (32 hex) and subject name; whether the served PEM
 chains to the JVM trust store (it may be leaf-only, in which case verification fails closed and the TLS-session
 intermediates are what carry it); `Subject` absent vs JSON null; the SNS retry horizon behind the 3600 s window.
+
+**Residual risk, accepted by the design review.** (1) Trust rests on the JVM CA store: anyone who can get a
+certificate for `sns.amazonaws.com` from a trusted CA can forge messages; pinned mode narrows that to one
+certificate. (2) Revocation is not checked, because checking it is another outbound fetch; exposure is bounded
+by the certificate's validity. (3) A VPC-endpoint deployment that opts into private addresses (D3) loses the
+private-range block; the ARN-derived host and TLS verification remain its whole defence. (4) The envelope is
+parsed before the signature is checked, so the JSON parser is attack surface, bounded by the size cap, depth 1
+and a tree parse with no type binding.
 
 Tests: `SnsFixturesTest`, `SnsVerificationTest` (S1), `SesSnsAdapterEventsTest` (S2), `SnsFetchSecurityTest` (S3,
 a real loopback `HttpsServer`, never amazonaws.com), `ControlApiDeliveryStatusTest` (the control path).
