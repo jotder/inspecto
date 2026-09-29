@@ -412,16 +412,23 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
   - **Workflow** (`Workflow.fromComponent` / `problems()`, moved to `inspecto-engine` `com.gamma.objects` so core can
     validate at save): exactly one initial state, ≥ 1 terminal state, every state reachable, every non-terminal
     state has a way out, no two transitions leave a state by one action; for an Incident a `RESOLVED` state,
-    `ARCHIVED` (if present) terminal, and **no transition into a terminal state other than `ARCHIVED` except from
+    `ARCHIVED` (if present) terminal, every non-terminal state able to FINISH (a path to `RESOLVED` or `ARCHIVED`
+    for an Incident, to a terminal state otherwise — a self-loop or a closed cycle is refused), and **no transition into a terminal state other than `ARCHIVED` except from
     `RESOLVED`**. That is defence in depth: the runtime gate (`decidesIncident`) already gates every custom terminal
     state, so a workflow cannot describe a path around the Disposition / postmortem gate AND could not use one. The
     same validation now runs on `*_workflow.toon` at boot. Precedence: authored component > `*_workflow.toon` >
-    built-in. **Hot reload:** `GovernanceRegistry` (`inspecto-ops`) checksums the three registry dirs on every
-    read and re-parses on change — whichever door wrote the file (route, approval replay, restore, hand edit); a
-    file that fails validation at load is skipped and the lower layer serves. ⚠ The legacy single-tenant root has
+    built-in. **Hot reload:** `GovernanceRegistry` (`inspecto-ops`) lists the three registry dirs on every read
+    and re-parses only a file whose mtime or size moved — whichever door wrote it (route, approval replay,
+    restore, hand edit). A file that fails validation at load keeps its **last valid version** in force; one
+    that was never valid contributes nothing (the lower layer serves). ⚠ The legacy single-tenant root has
     no config dir, so `ControlApi` points its engine at `<assist.write.root>/registry`.
-    ⚠ Not done: a Workflow that drops a state live objects occupy is accepted; those objects then have no legal
-    move until the state returns.
+    A PUT / restore / DELETE that drops a state live objects of that type occupy is refused **409**, naming each
+    state and its count (`ObjectAccess.countByStatus`; a delete is judged against the built-in, since core cannot
+    see `*_workflow.toon`) — `ControlApiWorkflowStrandTest`.
+    ⚠ **Hand edits are operator scope.** A file written straight into `registry/workflows|sla-policies|escalation-rules/`
+    takes effect on the next read like a routed save, but it bypasses the `canAdminister` gate, the maker-checker
+    hold, the 409 strand check and the audit trail — only the save-time validation is re-run at load. Filesystem
+    access to the config tree is an operator's, and that is where the control lives.
   - **SLA policy** (`SlaPolicy`): per object type, targets per priority (`responseMinutes`, `resolutionMinutes`,
     `*` = fallback) in a business calendar — working days, a same-day `start`–`end` window (no overnight
     windows), ISO-date holidays, and an **IANA zone id, required** (`ZoneId.getAvailableZoneIds()`; an offset or
