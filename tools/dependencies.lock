@@ -13,7 +13,7 @@
 #   and both lines are kept so the split stays visible instead of being silently collapsed.
 # ⚠ SNAPSHOT entries are weakly pinned by construction: content can move under a fixed version.
 #
-# 97 third-party artifacts across 33 reactor modules.
+# 95 third-party artifacts across 33 reactor modules.
 ai.djl.huggingface:tokenizers:jar:0.36.0:compile
 ai.djl:api:jar:0.36.0:compile
 at.yawk.lz4:lz4-java:jar:1.10.1:runtime
@@ -48,7 +48,6 @@ com.maxmind.db:maxmind-db:jar:4.2.0:compile
 com.microsoft.onnxruntime:onnxruntime:jar:1.20.0:compile
 com.nimbusds:nimbus-jose-jwt:jar:10.9.1:compile
 com.opencsv:opencsv:jar:5.9:compile
-com.pgvector:pgvector:jar:0.1.6:compile
 com.squareup.okhttp3:okhttp-sse:jar:4.12.0:compile
 com.squareup.okhttp3:okhttp:jar:4.12.0:compile
 com.squareup.okio:okio-jvm:jar:3.6.0:compile
@@ -74,7 +73,6 @@ dev.langchain4j:langchain4j-http-client:jar:1.16.3:compile
 dev.langchain4j:langchain4j-mcp:jar:1.16.3-beta26:compile
 dev.langchain4j:langchain4j-ollama:jar:1.16.3:compile
 dev.langchain4j:langchain4j-open-ai:jar:1.16.3:compile
-dev.langchain4j:langchain4j-pgvector:jar:1.16.3-beta26:compile
 dev.langchain4j:langchain4j:jar:1.16.3:compile
 dev.toonformat:jtoon:jar:1.0.9:compile
 javax.activation:activation:jar:1.1:compile

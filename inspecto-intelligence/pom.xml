@@ -66,6 +66,16 @@
         <dependency>
             <groupId>com.eoiagent</groupId>
             <artifactId>eoiagent-platform</artifactId>
+            <!-- ASSURE-INTELLIGENCE-BUNDLE-1: eoiagent-knowledge's pgvector store (and the postgresql
+                 driver copy it drags in) is unused here; the bundle has its own postgresql.jar. The ONNX
+                 embedding stack is NOT excludable - OnnxEmbeddingAdapter loads all-MiniLM on the session
+                 path (proven 2026-09-29: 23 of 214 tests die with NoClassDefFoundError without it). -->
+            <exclusions>
+                <exclusion>
+                    <groupId>dev.langchain4j</groupId>
+                    <artifactId>langchain4j-pgvector</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>com.eoiagent</groupId>
@@ -114,13 +124,6 @@
                                 <!-- MERGE the ServiceLoader registrations, or the IntelligenceAgent entry is lost. -->
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                             </transformers>
-                            <artifactSet>
-                                <excludes>
-                                    <!-- The bundle already stages postgresql.jar (PG-1) at its own version;
-                                         a second, different driver copy on one classpath is a conflict. -->
-                                    <exclude>org.postgresql:postgresql</exclude>
-                                </excludes>
-                            </artifactSet>
                             <filters>
                                 <filter>
                                     <artifact>*:*</artifact>
