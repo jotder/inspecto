@@ -21,8 +21,10 @@ public final class TestMmdb {
 
     private TestMmdb() {}
 
-    /** Writes a Country database mapping each IPv4 /prefix (e.g. {@code "198.51.100.0/24"}) to an ISO code. */
+    /** Writes a Country database mapping each /prefix (e.g. {@code "198.51.100.0/24"}) to an ISO code. With any IPv6
+     *  prefix it is an IPv6 database, holding the IPv4 prefixes at {@code ::a.b.c.d} as MaxMind's own files do. */
     public static Path write(Path file, Map<String, String> prefixToIso) throws IOException {
+        final boolean v6 = prefixToIso.keySet().stream().anyMatch(k -> k.contains(":"));
         final int empty = Integer.MIN_VALUE;
         List<int[]> nodes = new ArrayList<>();
         nodes.add(new int[]{empty, empty});
@@ -31,6 +33,12 @@ public final class TestMmdb {
             String[] p = e.getKey().split("/");
             byte[] a = java.net.InetAddress.ofLiteral(p[0]).getAddress();
             int bits = Integer.parseInt(p[1]);
+            if (v6 && a.length == 4) {
+                byte[] w = new byte[16];
+                System.arraycopy(a, 0, w, 12, 4);
+                a = w;
+                bits += 96;
+            }
             int offset = data.size();
             // {"country": {"iso_code": "<iso>"}, "city": {"names": {"en": "Nowhere"}}} — the city is there so a
             // test proves the resolver never reads it.
@@ -58,7 +66,7 @@ public final class TestMmdb {
         out.write(0xE9);
         str(out, "node_count"); out.write(0xC4); be(out, n, 4);
         str(out, "record_size"); out.write(0xA1); out.write(24);
-        str(out, "ip_version"); out.write(0xA1); out.write(4);
+        str(out, "ip_version"); out.write(0xA1); out.write(v6 ? 6 : 4);
         str(out, "database_type"); str(out, "Test-Country");
         str(out, "languages"); out.write(0x01); out.write(0x04); str(out, "en");
         str(out, "binary_format_major_version"); out.write(0xA1); out.write(2);

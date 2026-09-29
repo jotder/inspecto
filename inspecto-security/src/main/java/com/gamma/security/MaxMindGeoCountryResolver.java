@@ -1,12 +1,15 @@
 package com.gamma.security;
 
 import com.gamma.control.GeoCountryResolver;
+import com.gamma.pipeline.exec.EgressPolicy;
 import com.maxmind.db.Reader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.net.InetAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.Optional;
 
@@ -20,11 +23,21 @@ import java.util.Optional;
  * and never blocks a request. The database is read into memory once, lazily, on first lookup (the file is not held open, so
  * an operator can replace it; a restart picks the new build up); {@link Reader} is safe for
  * concurrent lookups. Only IP literals are parsed ({@link InetAddress#ofLiteral}), so a lookup can never become
- * a DNS query; private, loopback and link-local addresses answer empty without touching the database.
+ * a DNS query. Every address {@link EgressPolicy#deniedClass} classifies as non-public answers empty without touching
+ * the database: unspecified ({@code 0.0.0.0/8}, {@code ::}), loopback, link-local, multicast, broadcast, private
+ * (RFC 1918, IPv6 ULA {@code fc00::/7}, site-local {@code fec0::/10}), CGNAT {@code 100.64.0.0/10}, IPv6 forms that
+ * embed any of those, and this host's own addresses. The classifier is reused, not mirrored, so the two lists
+ * cannot drift.
+ *
+ * <p>A file over {@code -Dgeoip.db.maxBytes} (default 256 MB; a Country DB is ~10 MB) is refused before it is read,
+ * like a corrupt one: one WARN, off for the run. An {@link OutOfMemoryError} while reading it is caught the same way;
+ * every other {@link VirtualMachineError} propagates.
  */
 public final class MaxMindGeoCountryResolver implements GeoCountryResolver {
 
     static final String PROPERTY = "geoip.db";
+    static final String MAX_BYTES_PROPERTY = "geoip.db.maxBytes";
+    static final long DEFAULT_MAX_BYTES = 256L * 1024 * 1024;
     private static final Logger log = LoggerFactory.getLogger(MaxMindGeoCountryResolver.class);
 
     private final String path;
@@ -46,10 +59,14 @@ public final class MaxMindGeoCountryResolver implements GeoCountryResolver {
                 if (!opened) {
                     try {
                         if (path == null || path.isBlank()) throw new IllegalStateException("-Dgeoip.db is not set");
+                        long max = Long.getLong(MAX_BYTES_PROPERTY, DEFAULT_MAX_BYTES);
+                        long size = Files.size(Path.of(path));
+                        if (size > max) throw new IllegalStateException(
+                                size + " bytes exceeds -D" + MAX_BYTES_PROPERTY + "=" + max);
                         // MEMORY, not the default MEMORY_MAPPED: a mapped file stays locked on Windows, so the
                         // operator could not replace the .mmdb while the engine runs. A Country DB is ~10 MB.
                         reader = new Reader(new File(path), Reader.FileMode.MEMORY);
-                    } catch (Exception | LinkageError e) {
+                    } catch (Exception | LinkageError | OutOfMemoryError e) {
                         log.warn("GeoIP database {} could not be opened ({}); audit rows carry no geo_country",
                                 path, e.toString());
                     }
@@ -65,8 +82,7 @@ public final class MaxMindGeoCountryResolver implements GeoCountryResolver {
         try {
             if (ip == null || ip.isBlank()) return Optional.empty();
             InetAddress a = InetAddress.ofLiteral(ip.trim());
-            if (a.isLoopbackAddress() || a.isSiteLocalAddress() || a.isLinkLocalAddress()
-                    || a.isAnyLocalAddress() || a.isMulticastAddress()) return Optional.empty();
+            if (EgressPolicy.deniedClass(a) != null) return Optional.empty();
             Reader r = reader();
             if (r == null) return Optional.empty();
             Map<?, ?> rec = r.get(a, Map.class);

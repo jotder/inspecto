@@ -38,14 +38,34 @@ class MaxMindGeoCountryResolverTest {
     }
 
     @Test
-    void privateLoopbackAndLinkLocalAddressesResolveToNothing(@TempDir Path dir) throws Exception {
-        // A database that maps private space to a country, so an empty answer proves the guard, not a miss.
-        var r = new MaxMindGeoCountryResolver(TestMmdb.write(dir.resolve("p.mmdb"),
-                Map.of("10.0.0.0/8", "DE", "127.0.0.0/8", "DE", "192.168.0.0/16", "DE", "169.254.0.0/16", "DE"))
-                .toString());
-        for (String ip : List.of("10.1.2.3", "127.0.0.1", "192.168.1.1", "169.254.1.1", "::1", "fe80::1")) {
+    void everyNonPublicRangeResolvesToNothing(@TempDir Path dir) throws Exception {
+        // A database that maps every such range to a country, so an empty answer proves the filter, not a miss
+        // (::1 falls inside 0.0.0.0/8 as the IPv6 tree stores it, at ::0.0.0.0/104).
+        Map<String, String> m = new java.util.LinkedHashMap<>();
+        for (String p : List.of("0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16",
+                "172.16.0.0/12", "192.168.0.0/16", "224.0.0.0/4", "255.255.255.255/32",
+                "fc00::/7", "fe80::/10", "ff00::/8", "2001:db8::/32")) m.put(p, "DE");
+        var r = new MaxMindGeoCountryResolver(TestMmdb.write(dir.resolve("p.mmdb"), m).toString());
+        assertEquals("DE", r.resolve("2001:db8::7").orElseThrow().country(), "control: the IPv6 tree answers");
+        for (String ip : List.of("0.1.2.3", "10.1.2.3", "100.64.0.1", "100.127.255.254", "127.0.0.1",
+                "169.254.1.1", "172.16.5.5", "192.168.1.1", "224.0.0.1", "255.255.255.255",
+                "fc00::1", "fd12:3456::1", "fe80::1", "ff02::1", "::1")) {
             assertEquals(Optional.empty(), r.resolve(ip), ip);
         }
+    }
+
+    @Test
+    void aDatabaseOverTheSizeCapIsRefusedSoft(@TempDir Path dir) throws Exception {
+        var r = over(dir);
+        System.setProperty(MaxMindGeoCountryResolver.MAX_BYTES_PROPERTY, "64");
+        try {
+            assertEquals(Optional.empty(), r.resolve("198.51.100.4"));
+        } finally {
+            System.clearProperty(MaxMindGeoCountryResolver.MAX_BYTES_PROPERTY);
+        }
+        assertEquals(Optional.empty(), r.resolve("198.51.100.4"), "latched off for the run");
+        assertEquals("DE", over(dir).resolve("198.51.100.4")
+                .orElseThrow().country(), "control: the same file under the default cap resolves");
     }
 
     @Test

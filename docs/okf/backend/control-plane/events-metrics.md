@@ -418,9 +418,12 @@ timestamp: 2026-07-16T00:00:00Z
   sidecar. It reads `-Dgeoip.db` once, lazily, into memory (`FileMode.MEMORY`: the default memory-mapped mode
   keeps the file locked on Windows, so the operator could not replace it); takes `country.iso_code` only and
   never reads a city; `geo_db_build` is the file's `build_epoch`. It parses only IP literals
-  (`InetAddress.ofLiteral`, so no DNS), answers empty for private, loopback, link-local, multicast and
-  not-in-database addresses, and fails soft: a missing or unreadable database logs one WARN and resolves
-  nothing for the rest of the run (a restart picks up a repaired file).
+  (`InetAddress.ofLiteral`, so no DNS), answers empty for every address `EgressPolicy.deniedClass` calls
+  non-public (reused, not mirrored: `0.0.0.0/8`, loopback, link-local, multicast, broadcast, RFC 1918, CGNAT
+  `100.64/10`, ULA `fc00::/7`, embedded-IPv4 forms, this host) and for not-in-database addresses, and fails soft:
+  a missing, unreadable or over-cap database (`-Dgeoip.db.maxBytes`, default 256 MB, checked before reading)
+  or an `OutOfMemoryError` while loading it logs one WARN and resolves nothing for the rest of the run (a
+  restart picks up a repaired file); other `VirtualMachineError`s propagate.
   Location is personal data; it rides on the audit row under the audit trail's retention.
   Tests: `SecurityTriggersTest` (T5 fires once on a new country; repeat and baseline silent; no-geo, refused and
   `unknown` rows skipped), `ControlApiGeoIpTest` (real HTTP with a fake resolver: country + db build on the
