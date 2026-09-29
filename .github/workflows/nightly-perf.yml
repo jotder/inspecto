@@ -1,0 +1,52 @@
+# Nightly throughput floor (ASSURE-OPERABILITY-1, 2026-09-29).
+#
+# Runs ONE existing benchmark — PluginIngestBenchmark, streaming plugin ingest → PARQUET, 1,000,000 rows,
+# 30 day-partitions — at a FIXED size and fails the job when union-mode throughput drops below the floor.
+#
+# The floor is set from a MEASURED local baseline, not a guess (okf/backend/build-run/performance.md,
+# "Nightly throughput floor"): three runs on 2026-09-29, 12-core Windows dev host, JDK 27, union mode =
+# 192,881 / 148,906 / 138,636 rows/s. Floor = 50,000 rows/s, ~2.8x headroom under the slowest run, because
+# a shared 4-vCPU hosted runner is slower and noisier than the dev host. Tighten it only from measured
+# RUNNER numbers (they are printed in the log: "floor check: union N rows/s").
+#
+# Offline-safe: the benchmark generates its own input, uses no network and no DuckDB extension beyond the
+# built-in parquet writer. Only the Maven dependency resolution touches the network, as in ci.yml.
+# ⚠ The size is fixed on purpose: at 200K rows the fixed per-batch cost dominates (measured 74K rows/s),
+# so changing bench.rows without re-measuring invalidates the floor.
+name: Nightly perf floor
+
+on:
+  schedule:
+    - cron: '17 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  throughput-floor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 27
+        uses: actions/setup-java@v4
+        with:
+          distribution: oracle
+          java-version: '27'
+          cache: maven
+
+      - name: PluginIngestBenchmark at 1M rows, floor 50,000 rows/s
+        run: >-
+          mvn --batch-mode --no-transfer-progress -pl inspecto-engine -am test
+          -Dtest=PluginIngestBenchmark -Dsurefire.failIfNoSpecifiedTests=false
+          -Dbench.run=true -Dbench.rows=1000000 -Dbench.days=30 -Dbench.format=PARQUET
+          -Dbench.floorRowsPerSec=50000
+
+      - name: Upload benchmark output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-perf
+          path: inspecto-engine/target/surefire-reports/*PluginIngestBenchmark*

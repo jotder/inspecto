@@ -322,3 +322,52 @@ Mode comparison (`PluginIngestBenchmark`, 500K rows, PARQUET, 30 day-partitions)
 generation trades output fragmentation and a little throughput for bounded memory. See
 [plugins.md → execution modes](../engine/plugins.md#execution-modes--the-framework-picks-by-file-size) and
 [design-notes D9/D10](../../../archived-documents/design-notes.md).
+
+## Nightly throughput floor (ASSURE-OPERABILITY-1, 2026-09-29)
+
+`.github/workflows/nightly-perf.yml` runs `PluginIngestBenchmark` nightly (and on `workflow_dispatch`) at a
+**fixed** size — 1,000,000 rows, 30 day-partitions, PARQUET — with `-Dbench.floorRowsPerSec=50000`. The
+benchmark asserts union-mode throughput against that property (unset = no floor, so manual runs are
+unchanged).
+
+Measured baseline the floor came from — three runs on 2026-09-29, 12-core Windows dev host, JDK 27,
+`mvn -o -pl inspecto-engine -am test -Dtest=PluginIngestBenchmark ... -Dbench.rows=1000000`:
+
+| run | union rows/s | generation (4 gens) rows/s |
+|---|---|---|
+| 1 | 192,881 | 204,681 |
+| 2 | 148,906 | 132,695 |
+| 3 | 138,636 | 152,337 |
+
+Floor = **50,000 rows/s**, ~2.8× headroom under the slowest run, because a shared 4-vCPU hosted runner is
+slower and noisier than the dev host. The negative was checked: a floor of 100,000,000 fails the test with
+`union throughput … is below the floor`. ⚠ The size is part of the floor: at 200K rows the fixed per-batch
+cost dominates (measured 74K rows/s), so re-measure before changing `bench.rows`. ⚠ No runner number exists
+yet — the first nightly run is the first; tighten the floor only from runner numbers (logged as
+`floor check: union N rows/s`).
+
+## Mixed load: ingest while dashboards query (2026-09-29)
+
+`MixedLoadBenchmark` (`inspecto/src/test/java/com/gamma/inspector/`, gated on `-Dbench.run=true`) runs
+the same streaming plugin ingest (1M rows → PARQUET) while N threads loop `POST /api/v1/bi/query` against a
+real `ControlApi` over HTTP. The readers' Dataset is a view aggregating `range(2,000,000)` by a 30-value key —
+a CPU-bound dashboard query on the same host and DuckDB library; it does **not** read the files being
+written. Phases: readers alone (5 s), ingest alone, then both.
+
+```
+mvn -o -pl inspecto -am test -Dtest=MixedLoadBenchmark -Dsurefire.failIfNoSpecifiedTests=false \
+    -Dbench.run=true -Dbench.rows=1000000 -Dbench.readers=4
+```
+
+Measured 2026-09-29, same 12-core dev host, one run each:
+
+| readers | ingest alone | ingest + readers | reader p50 / p95 alone | reader p50 / p95 during ingest | errors |
+|---|---|---|---|---|---|
+| 4 | 200,778 rows/s | 159,692 rows/s (80%) | 548 / 743 ms, 7.0 q/s | 628 / 824 ms, 6.0 q/s | 0 |
+| 8 | 118,363 rows/s | 88,924 rows/s (75%) | 1,255 / 2,035 ms, 5.5 q/s | 1,434 / 2,479 ms, 5.1 q/s | 0 |
+
+Reading: concurrent dashboards cost ingest ~20–25% of its throughput and add ~15% to reader latency; no
+query failed. Reader throughput saturates near 5–7 q/s for this query shape regardless of reader count, so
+beyond ~4 readers the extra threads only queue (p50 doubles from 4 to 8). ⚠ The two "ingest alone" numbers
+differ 1.7× between runs on the same host — the dev host is shared, so compare phases *within* a run, not
+across runs. These are single runs on a developer box, not customer sizing (which stays parked).

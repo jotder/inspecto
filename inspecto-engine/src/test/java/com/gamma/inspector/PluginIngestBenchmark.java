@@ -94,6 +94,17 @@ class PluginIngestBenchmark {
         // Correctness: both modes conserve the input row count.
         assertEquals(rows, union.lineageRows, "union mode must conserve rows");
         assertEquals(rows, gen.lineageRows, "generation mode must conserve rows");
+
+        // Throughput floor (ASSURE-OPERABILITY-1): the nightly workflow passes -Dbench.floorRowsPerSec so a
+        // regression fails the job instead of only moving a printed number. Unset = no floor (manual runs).
+        long floor = Long.getLong("bench.floorRowsPerSec", 0L);
+        if (floor > 0) {
+            double unionRate = rows / union.sec;
+            System.out.printf("floor check: union %,.0f rows/s vs floor %,d rows/s%n", unionRate, floor);
+            if (unionRate < floor)
+                throw new AssertionError(String.format(
+                        "union throughput %,.0f rows/s is below the floor %,d rows/s", unionRate, floor));
+        }
     }
 
     // ── harness ────────────────────────────────────────────────────────────────
