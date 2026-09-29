@@ -86,3 +86,38 @@ test('Maven version ordering', () => {
     assert.equal(compareMaven('1.0', '1.0.0'), 0);
     assert.ok(compareMaven('1.0.1', '1.0') > 0);
 });
+
+const semverRec = (id, events) => ({
+    id, database_specific: { severity: 'HIGH' },
+    affected: [{ package: { ecosystem: 'Maven', name: 'com.example:lib' }, ranges: [{ type: 'SEMVER', events }] }],
+});
+
+test('a SEMVER range is evaluated: in range fails, fixed passes', () => {
+    const hit = fixture({ records: [semverRec('GHSA-sv', [{ introduced: '1.0.0' }, { fixed: '1.2.1' }])] });
+    const miss = fixture({ records: [semverRec('GHSA-sv', [{ introduced: '1.0.0' }, { fixed: '1.2.0' }])] });
+    try {
+        const r = run(hit.args); assert.equal(r.status, 1, r.output); assert.match(r.output, /GHSA-sv/);
+        assert.equal(run(miss.args).status, 0);
+    } finally { rmSync(hit.dir, { recursive: true, force: true }); rmSync(miss.dir, { recursive: true, force: true }); }
+});
+
+test('an unknown range type on a matching package exits 2, never a silent pass', () => {
+    const f = fixture({ records: [{ id: 'X-1', database_specific: { severity: 'LOW' },
+        affected: [{ package: { ecosystem: 'Maven', name: 'com.example:lib' }, ranges: [{ type: 'WEIRD', events: [{ introduced: '0' }] }] }] }] });
+    try { const r = run(f.args); assert.equal(r.status, 2, r.output); assert.match(r.output, /range type/); }
+    finally { rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+test('a future-dated snapshot exits 2', () => {
+    const f = fixture({ taken: '2026-10-15', records: [osv('a', 'LOW', [{ introduced: '0' }])] });
+    try { const r = run(f.args); assert.equal(r.status, 2, r.output); assert.match(r.output, /future/); }
+    finally { rmSync(f.dir, { recursive: true, force: true }); }
+});
+
+test('unparseable record files are counted, warned, and exit 2', () => {
+    const f = fixture({ records: [osv('a', 'LOW', [{ introduced: '0' }])] });
+    try {
+        writeFileSync(join(f.args[1], 'maven', 'broken.json'), '{not json');
+        const r = run(f.args); assert.equal(r.status, 2, r.output); assert.match(r.output, /1 unparseable/);
+    } finally { rmSync(f.dir, { recursive: true, force: true }); }
+});

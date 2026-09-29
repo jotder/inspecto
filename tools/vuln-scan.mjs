@@ -13,8 +13,9 @@
 //
 // Verdict: exit 1 on any UNWAIVED finding of severity HIGH or CRITICAL — and on UNKNOWN severity, which
 // fails closed (a record with no usable severity is not evidence of safety). Exit 0 otherwise. Exit 2 when
-// the scan could not run: no snapshot, no snapshot.json, zero records, an empty component list, or a
-// snapshot older than --max-age-days (default 30). ⛔ Exit 2 is NEVER a pass.
+// the scan could not run: no snapshot, no snapshot.json, zero records, an unparseable record file, a range
+// type it cannot evaluate, an empty component list, or a snapshot dated in the future or older than
+// --max-age-days (default 30). ⛔ Exit 2 is NEVER a pass.
 //
 // Waivers (compliance/vuln-waivers.json): [{"id":"GHSA-…|CVE-…","package":"group:artifact","reason":"…",
 // "expires":"YYYY-MM-DD"}]. A waiver needs all four fields; an expired or malformed one waives nothing.
@@ -80,20 +81,50 @@ export function compareMaven(a, b) {
 }
 
 // ── OSV matching ───────────────────────────────────────────────────────────────────────────────
-function inRange(version, events) {
+// SemVer 2.0 precedence: numeric major.minor.patch, then a pre-release sorts BEFORE its release; build
+// metadata is ignored. A leading 'v' is tolerated.
+export function compareSemver(a, b) {
+    const parse = v => {
+        const [core, pre] = String(v).replace(/^v/, '').split('+')[0].split(/-(.*)/s);
+        return { nums: core.split('.').map(n => Number(n) || 0), pre: pre ? pre.split('.') : [] };
+    };
+    const x = parse(a), y = parse(b);
+    for (let i = 0; i < 3; i++) if ((x.nums[i] ?? 0) !== (y.nums[i] ?? 0)) return (x.nums[i] ?? 0) - (y.nums[i] ?? 0);
+    if (!x.pre.length || !y.pre.length) return y.pre.length - x.pre.length;
+    for (let i = 0; i < Math.max(x.pre.length, y.pre.length); i++) {
+        const p = x.pre[i], q = y.pre[i];
+        if (p === undefined) return -1;
+        if (q === undefined) return 1;
+        const pn = /^\d+$/.test(p), qn = /^\d+$/.test(q);
+        if (pn && qn && Number(p) !== Number(q)) return Number(p) - Number(q);
+        if (pn !== qn) return pn ? -1 : 1;
+        if (p !== q) return p < q ? -1 : 1;
+    }
+    return 0;
+}
+function inRange(version, events, cmp) {
     let affected = false;
     for (const e of events) {
-        if (e.introduced !== undefined && (e.introduced === '0' || compareMaven(version, e.introduced) >= 0)) affected = true;
-        if (e.fixed !== undefined && compareMaven(version, e.fixed) >= 0) affected = false;
-        if (e.last_affected !== undefined && compareMaven(version, e.last_affected) > 0) affected = false;
+        if (e.introduced !== undefined && (e.introduced === '0' || cmp(version, e.introduced) >= 0)) affected = true;
+        if (e.fixed !== undefined && cmp(version, e.fixed) >= 0) affected = false;
+        if (e.last_affected !== undefined && cmp(version, e.last_affected) > 0) affected = false;
     }
     return affected;
 }
+// ECOSYSTEM ranges use Maven ordering, SEMVER ranges SemVer ordering. GIT ranges are commit hashes and
+// cannot be matched against a version: skipped (OSV Maven records carry them beside a version range).
+// ANY other range type throws: an unevaluated range must never read as "not affected".
+export class UnknownRangeType extends Error {}
 export function affects(record, pkg, version) {
     return (record.affected || []).some(a => {
         if (a.package?.ecosystem !== 'Maven' || a.package?.name !== pkg) return false;
         if ((a.versions || []).includes(version)) return true;
-        return (a.ranges || []).some(r => r.type === 'ECOSYSTEM' && inRange(version, r.events || []));
+        return (a.ranges || []).some(r => {
+            if (r.type === 'ECOSYSTEM') return inRange(version, r.events || [], compareMaven);
+            if (r.type === 'SEMVER') return inRange(version, r.events || [], compareSemver);
+            if (r.type === 'GIT') return false;
+            throw new UnknownRangeType(`${record.id}: range type '${r.type}' cannot be evaluated`);
+        });
     });
 }
 export function severityOf(record) {
@@ -127,6 +158,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
     if (!/^\d{4}-\d{2}-\d{2}$/.test(meta.taken || '')) cannotRun('snapshot.json has no "taken": "YYYY-MM-DD"');
     const ageDays = (Date.parse(today) - Date.parse(meta.taken)) / 86_400_000;
+    if (ageDays < 0) cannotRun(`snapshot "taken" ${meta.taken} is in the future (today ${today}) - the date is wrong`);
     if (ageDays > maxAgeDays) cannotRun(`snapshot taken ${meta.taken} is ${ageDays} days old (> ${maxAgeDays}) — refresh it`);
 
     const comps = components();
@@ -135,24 +167,32 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     for (const c of comps) (byPkg.get(c.pkg) ?? byPkg.set(c.pkg, new Set()).get(c.pkg)).add(c.version);
 
     const waivers = loadWaivers();
-    let records = 0;
+    let records = 0, unparseable = 0;
     const findings = [];
     for (const f of walk(dbDir)) {
         let rec;
-        try { rec = JSON.parse(readFileSync(f, 'utf8')); } catch { continue; }
+        try { rec = JSON.parse(readFileSync(f, 'utf8')); } catch {
+            unparseable++;
+            console.error(`⚠ unparseable OSV record: ${f}`);
+            continue;
+        }
         if (!rec.id) continue;
         records++;
         for (const a of rec.affected || []) {
             const versions = byPkg.get(a.package?.name);
             if (!versions) continue;
             for (const v of versions) {
-                if (!affects({ affected: [a] }, a.package.name, v)) continue;
+                let hit;
+                try { hit = affects({ id: rec.id, affected: [a] }, a.package.name, v); }
+                catch (e) { if (e instanceof UnknownRangeType) cannotRun(e.message); throw e; }
+                if (!hit) continue;
                 const ids = [rec.id, ...(rec.aliases || [])];
                 const waived = waivers.some(w => ids.includes(w.id) && w.package === a.package.name);
                 findings.push({ id: rec.id, pkg: a.package.name, version: v, severity: severityOf(rec), waived });
             }
         }
     }
+    if (unparseable) cannotRun(`${unparseable} unparseable record file(s) in ${dbDir} - a corrupt snapshot is not a clean one`);
     if (records === 0) cannotRun(`snapshot ${dbDir} holds zero OSV records`);
 
     const seen = new Set();

@@ -41,8 +41,11 @@ reads `tools/dependencies.lock` (default) or a bundle SBOM (`--sbom <bundle>/sbo
 and matches every Maven coordinate against an **OSV-format snapshot** at `$VULN_DB_DIR` (or `--db`).
 
 - **Verdict:** exit 1 on any unwaived HIGH, CRITICAL or UNKNOWN-severity finding (unknown fails closed);
-  exit 0 otherwise; exit **2 = could not run** (no snapshot, no `snapshot.json`, zero records, empty component
-  list, snapshot older than `--max-age-days`, default 30). ⛔ Exit 2 is never a pass.
+  exit 0 otherwise; exit **2 = could not run** (no snapshot, no `snapshot.json`, zero records, any
+  unparseable record file, a range type it cannot evaluate on a matching package, empty component list, a
+  snapshot dated in the future or older than `--max-age-days`, default 30). ⛔ Exit 2 is never a pass.
+- **Ranges:** `ECOSYSTEM` uses Maven version ordering, `SEMVER` uses SemVer 2.0 precedence, commit-hash
+  ranges (type `GIT`) are skipped because they cannot be matched against a version; any other type exits 2.
 - **Severity** comes from each record's `database_specific.severity` (the GitHub advisory field;
   `MODERATE` = MEDIUM). Records with none are UNKNOWN.
 - **Waivers:** `compliance/vuln-waivers.json`, an array of `{id, package, reason, expires}`. `id` may be the
