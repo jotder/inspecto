@@ -115,6 +115,18 @@ class GovernanceSweepTest {
     }
 
     @Test
+    void aBrokenEditKeepsTheLastValidAuthoredWorkflowInForce() throws Exception {
+        components.write("workflow", "incident", incidentWorkflow(List.of(
+                t("NEW", "RESOLVED", "resolve"), t("RESOLVED", "ARCHIVED", "archive"), t("NEW", "ARCHIVED", "archive")),
+                List.of("ARCHIVED")));
+        assertEquals("NEW", svc.workflow(ObjectType.INCIDENT).initialState());
+        // a hand edit that fails validation (no terminal state, a dead end) — not served, and NOT a fallback either
+        components.write("workflow", "incident", incidentWorkflow(List.of(t("NEW", "STUCK", "go")), List.of()));
+        assertEquals("NEW", svc.workflow(ObjectType.INCIDENT).initialState(), "the last valid version stays in force");
+        assertTrue(svc.workflow(ObjectType.INCIDENT).states().contains("RESOLVED"));
+    }
+
+    @Test
     void aCustomTerminalStateReachedThroughResolvedStillNeedsTheDispositionAndPostmortem() throws Exception {
         components.write("workflow", "incident", incidentWorkflow(List.of(
                 t("NEW", "RESOLVED", "resolve"), t("RESOLVED", "CLOSED", "close"), t("NEW", "ARCHIVED", "archive"),
