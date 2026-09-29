@@ -640,7 +640,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     static final String[] REQUEST_SCOPED_ATTRS = {
             ApiContext.ATTR_CORRELATION_ID, ApiContext.ATTR_START_NANOS, ApiContext.ATTR_SELF_PATH,
             ApiContext.ATTR_ERROR_CODE, ApiContext.ATTR_IDEMPOTENCY_KEY,
-            ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_CLIENT_IP, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_CAPABILITY,
+            ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_CLIENT_IP, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_SUBJECT_ISSUER, ApiContext.ATTR_CAPABILITY,
             ApiContext.ATTR_RESOURCE_PERMISSIONS,
             ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ApiContext.ATTR_APPROVED_CHANGE, ATTR_EFFECTIVE_PATH,
             Roles.ATTR_CONFIG_ROOT, AccessDecider.ATTR_MATCHED_POLICY };
@@ -839,8 +839,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         }
         String principal = Idempotency.principal(ex);
         String space = MDC.get(EventLog.SPACE_MDC_KEY);
-        String key = Idempotency.keyFor(method, ex.getRequestURI().getPath(),
-                space == null ? EventLog.DEFAULT_SPACE_ID : space, principal, header);
+        String key = Idempotency.keyFor(method, path, space == null ? EventLog.DEFAULT_SPACE_ID : space, principal, header);
         Idempotency.Entry hit = idempotency.get(key);
         if (hit != null) {
             if (!hit.bodyHash().equals(bodyHash)) {

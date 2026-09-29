@@ -75,6 +75,8 @@ public interface ApiContext {
      *  {@link Authenticator} validates the request; absent on Personal edition (no Authenticator present)
      *  and on the public bootstrap/health surface. */
     String ATTR_SUBJECT           = "inspecto.subject";
+    /** The issuer ({@code iss}) of the token the {@link Subject} was verified from, stamped by the Authenticator. */
+    String ATTR_SUBJECT_ISSUER    = "inspecto.subject.issuer";
     /** The capability {@link #requireCapability} CHECKED on this exchange — set only when a Subject was
      *  attached, i.e. only when a check actually ran. Read by {@code AuditTrail}: on a 403 it is the
      *  capability that was missing, on a permitted write the one the write was privileged by. Absent on

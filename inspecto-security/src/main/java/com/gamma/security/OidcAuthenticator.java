@@ -158,6 +158,7 @@ public final class OidcAuthenticator implements Authenticator {
             // RBAC R3: expose the recognised role names server-internally so component sharing can
             // match `subjectType: role` shares — the Subject itself stays capabilities-only.
             ComponentAccess.heldRoles(ex, Set.copyOf(held));
+            Subject.stampIssuer(ex, claims.getIssuer());   // bearer vs gateway issuer: separate idempotency namespaces
             return Optional.of(new Subject(subjectId, Set.copyOf(capabilities),
                     RoleMapper.dataScopesFor(claims, rolesClaim, defs),
                     attributes(claims, Roles.attributeClaims(ex)), verifiedEmail(claims), displayName(claims)));

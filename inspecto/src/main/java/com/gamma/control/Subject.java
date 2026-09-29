@@ -67,4 +67,11 @@ public record Subject(String id, Set<String> capabilities, Set<String> dataScope
     public boolean scoped() {
         return dataScopes != null;
     }
+
+    /** Record which issuer minted the token this request's Subject came from - the namespace its {@link #id()}
+     *  lives in. Two IdPs may mint the same {@code sub}; anything keyed per caller (the Idempotency-Key cache)
+     *  must not let them share an entry. */
+    public static void stampIssuer(com.sun.net.httpserver.HttpExchange ex, String issuer) {
+        if (issuer != null && !issuer.isBlank()) ApiContext.attr(ex, ApiContext.ATTR_SUBJECT_ISSUER, issuer);
+    }
 }

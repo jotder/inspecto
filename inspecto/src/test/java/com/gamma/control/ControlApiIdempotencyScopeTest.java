@@ -41,6 +41,8 @@ class ControlApiIdempotencyScopeTest {
     private static final Authenticator FAKE_AUTH = ex -> {
         String auth = ex.getRequestHeaders().getFirst("Authorization");
         if (auth == null || !auth.startsWith("Bearer ")) return Optional.empty();
+        String iss = ex.getRequestHeaders().getFirst("X-Test-Issuer");   // stands in for the token's iss claim
+        if (iss != null) Subject.stampIssuer(ex, iss);
         String token = auth.substring(7);   // "<id>:ro" is the same person holding no capabilities
         if (token.endsWith(":ro")) return Optional.of(new Subject(token.substring(0, token.length() - 3), Set.of()));
         return Optional.of(new Subject(token, Set.of(Roles.CAN_AUTHOR_WORKBENCH)));
@@ -91,6 +93,13 @@ class ControlApiIdempotencyScopeTest {
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
+    private HttpResponse<String> send(int port, String who, String path, String body, String key, String issuer) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1/spaces/s1" + path))
+                .header("Content-Type", "application/json").header("Authorization", "Bearer " + who)
+                .header("Idempotency-Key", key).header("X-Test-Issuer", issuer).POST(BodyPublishers.ofString(body));
+        return client.send(b.build(), BodyHandlers.ofString());
+    }
+
     private static boolean replayed(HttpResponse<String> r) {
         return "true".equals(r.headers().firstValue("Idempotency-Replayed").orElse(null));
     }
@@ -115,6 +124,36 @@ class ControlApiIdempotencyScopeTest {
             assertFalse(replayed(bw));
             assertEquals(409, bw.statusCode(), bw.body());
         }
+    }
+
+    @Test
+    void twoIssuersMintingTheSameSubDoNotShareEntries(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "alice", "/components/widget", WIDGET, "W", "https://idp-a").statusCode());
+            assertTrue(replayed(send(c.port, "alice", "/components/widget", WIDGET, "W", "https://idp-a")), "same issuer replays");
+            HttpResponse<String> other = send(c.port, "alice", "/components/widget", WIDGET, "W", "https://idp-b");
+            assertFalse(replayed(other), "another IdP's 'alice' is another principal");
+            assertEquals(409, other.statusCode(), other.body());
+        }
+    }
+
+    @Test
+    void twoSpellingsOfOneRouteShareAnEntry(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, post(c.port, "alice", "/components/widget", WIDGET, "W").statusCode());
+            HttpResponse<String> encoded = post(c.port, "alice", "/components/%77idget", WIDGET, "W");
+            assertTrue(replayed(encoded), "a percent-encoded spelling of the same route replays: " + encoded.body());
+            assertEquals(200, encoded.statusCode());
+            HttpResponse<String> query = post(c.port, "alice", "/components/widget?x=1", WIDGET, "W");
+            assertEquals(422, query.statusCode(), "a different query string is a different request");
+        }
+    }
+
+    @Test
+    void canonicalPathCollapsesSlashesAndKeepsCase() {
+        assertEquals("/components/widget", Idempotency.canonical("//components///widget/"));
+        assertEquals("/", Idempotency.canonical("/"));
+        assertNotEquals(Idempotency.canonical("/Components/widget"), Idempotency.canonical("/components/widget"));
     }
 
     @Test

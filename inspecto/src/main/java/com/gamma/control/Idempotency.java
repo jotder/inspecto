@@ -122,16 +122,28 @@ final class Idempotency {
         return (k == null || k.isBlank()) ? null : k.trim();
     }
 
-    /** Who the cache entry belongs to: the authenticated Subject, else a per-client anonymous principal. */
+    /** Who the cache entry belongs to: the authenticated Subject namespaced by its token's issuer (or, when the
+     *  Authenticator stamps none, by the Authenticator itself), else a per-client anonymous principal. Two IdPs
+     *  that mint the same {@code sub} therefore never share entries. */
     static String principal(HttpExchange ex) {
-        return ApiContext.subject(ex).map(s -> "sub:" + s.id()).orElseGet(() -> "anon@" + ApiContext.ip(ex));
+        return ApiContext.subject(ex).map(s -> {
+            String iss = ApiContext.attr(ex, ApiContext.ATTR_SUBJECT_ISSUER) instanceof String i ? i
+                    : Authenticators.active().map(a -> a.getClass().getName()).orElse("-");
+            return "sub:" + iss.length() + ":" + iss + ":" + s.id();   // length-prefixed: no issuer/id ambiguity
+        }).orElseGet(() -> "anon@" + ApiContext.ip(ex));
     }
 
-    /** The caller-scoped cache key. {@code rawPath} is the request URI path, which still carries {@code /api/v1}
-     *  and any {@code /spaces/{id}} prefix; {@code space} is the bound Space, added so an unprefixed request is
-     *  scoped too. */
-    static String keyFor(String method, String rawPath, String space, String principal, String key) {
-        return method + " " + rawPath + " space=" + space + " " + principal + " " + key;
+    /** The caller-scoped cache key. {@code routePath} is the path the router MATCHED - already percent-decoded,
+     *  with {@code /api/v1} and {@code /spaces/{id}} stripped (the Space rides separately) - then canonicalised:
+     *  duplicate slashes collapsed, a trailing slash dropped. Case is kept exact: routes match case-sensitively.
+     *  So every spelling the router sends to one route shares one entry. */
+    static String keyFor(String method, String routePath, String space, String principal, String key) {
+        return method + " " + canonical(routePath) + " space=" + space + " " + principal + " " + key;
+    }
+
+    static String canonical(String path) {
+        String p = path.replaceAll("/{2,}", "/");
+        return p.length() > 1 && p.endsWith("/") ? p.substring(0, p.length() - 1) : p;
     }
 
     /**
@@ -140,7 +152,9 @@ final class Idempotency {
      * the rest of the stream so the handler still sees every byte.
      */
     static String bodyHash(HttpExchange ex) throws IOException {
-        if (ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY) instanceof byte[] cached) return sha256(cached);
+        String q = ex.getRequestURI().getRawQuery();   // the query is part of the request: a different one is a mismatch
+        String query = q == null ? "" : q;
+        if (ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY) instanceof byte[] cached) return sha256(query, cached);
         InputStream in = ex.getRequestBody();
         byte[] head = in.readNBytes(MAX_REQUEST_BYTES + 1);
         if (head.length > MAX_REQUEST_BYTES) {
@@ -149,12 +163,15 @@ final class Idempotency {
         }
         ex.setStreams(new ByteArrayInputStream(head), null);   // a handler reading the stream directly still sees it
         ApiContext.attr(ex, ApiContext.ATTR_RAW_BODY, head);
-        return sha256(head);
+        return sha256(query, head);
     }
 
-    private static String sha256(byte[] b) {
+    private static String sha256(String query, byte[] b) {
         try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b));
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            md.update(query.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            md.update((byte) 0);
+            return HexFormat.of().formatHex(md.digest(b));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
