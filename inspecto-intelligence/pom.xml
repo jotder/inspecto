@@ -41,6 +41,10 @@
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-processor</artifactId>
             <version>${project.version}</version>
+            <!-- `provided` (ASSURE-INTELLIGENCE-BUNDLE-1), as inspecto-agent scopes it: the core is always
+                 on a bundle's classpath as inspecto.jar, so shading it into the sidecar would ship a second
+                 copy of the product. Still on the compile and test classpath. -->
+            <scope>provided</scope>
         </dependency>
         <!-- S9: no longer depends on inspecto-agent. The pack's ModelProfile + LlmGateway are built
              from the core-owned read-side model settings (com.gamma.model.ModelSettings/ModelSettingsStore),
@@ -90,6 +94,67 @@
         </dependency>
     </dependencies>
 
-    <!-- Build config (compiler + surefire native-access flag) is inherited from the parent
-         POM's <pluginManagement>. No module-specific plugins here. -->
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-shade-plugin</artifactId>
+                <!-- ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): Enterprise stages this SHADED `sidecar` artifact as
+                     inspecto-intelligence.jar. A thin jar would be present but unable to link (eoiagent,
+                     LangChain4j, onnxruntime missing) - the same trap PKG-5 closed for inspecto-agent. -->
+                <executions>
+                    <execution>
+                        <phase>package</phase>
+                        <goals><goal>shade</goal></goals>
+                        <configuration>
+                            <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <shadedArtifactAttached>true</shadedArtifactAttached>
+                            <shadedClassifierName>sidecar</shadedClassifierName>
+                            <transformers>
+                                <!-- MERGE the ServiceLoader registrations, or the IntelligenceAgent entry is lost. -->
+                                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                            </transformers>
+                            <artifactSet>
+                                <excludes>
+                                    <!-- The bundle already stages postgresql.jar (PG-1) at its own version;
+                                         a second, different driver copy on one classpath is a conflict. -->
+                                    <exclude>org.postgresql:postgresql</exclude>
+                                </excludes>
+                            </artifactSet>
+                            <filters>
+                                <filter>
+                                    <artifact>*:*</artifact>
+                                    <excludes>
+                                        <!-- Same excludes as the inspecto-agent sidecar - see its pom. -->
+                                        <exclude>META-INF/*.SF</exclude>
+                                        <exclude>META-INF/*.DSA</exclude>
+                                        <exclude>META-INF/*.RSA</exclude>
+                                        <exclude>logback.xml</exclude>
+                                        <exclude>module-info.class</exclude>
+                                        <exclude>META-INF/services/org.slf4j.spi.SLF4JServiceProvider</exclude>
+                                        <exclude>org/slf4j/impl/**</exclude>
+                                        <exclude>ch/qos/logback/**</exclude>
+                                        <exclude>META-INF/services/java.sql.Driver</exclude>
+                                        <exclude>META-INF/services/jakarta.servlet.ServletContainerInitializer</exclude>
+                                    </excludes>
+                                </filter>
+                                <filter>
+                                    <!-- onnxruntime 1.20.0 ships DEBUG SYMBOLS beside its native libraries: a
+                                         305 MB win-x64 onnxruntime.pdb plus macOS .dSYM bundles. The runtime
+                                         never loads them; the libraries themselves stay. -->
+                                    <artifact>com.microsoft.onnxruntime:onnxruntime</artifact>
+                                    <excludes>
+                                        <exclude>**/*.pdb</exclude>
+                                        <exclude>**/*.dSYM/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <!-- Compiler + surefire native-access flag are inherited from the parent POM's <pluginManagement>. -->
 </project>

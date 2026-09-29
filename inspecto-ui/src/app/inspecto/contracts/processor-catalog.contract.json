@@ -855,7 +855,7 @@
     "emoji" : "🤖",
     "icon" : "heroicons_outline:cpu-chip",
     "status" : "planned",
-    "note" : "the optional `inspecto-intelligence` module carries onnxruntime; never bundled",
+    "note" : "onnxruntime ships in the Enterprise bundle inside `inspecto-intelligence` (its embeddings, ASSURE-INTELLIGENCE-BUNDLE-1); this Step Processor is not built",
     "addable" : false
   }, {
     "id" : "ml.llm.classify",

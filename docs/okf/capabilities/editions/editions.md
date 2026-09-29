@@ -54,7 +54,7 @@ The organising rule is one sentence, and it is the most load-bearing sentence in
 
 * **The three editions** — Personal, Professional, Enterprise — as build flavours of one commit, and the five
   mechanisms that assemble them.
-* **The 10**<!--count:optional-modules--> **optional modules**, the 12<!--count:enterprise-first-party-jars--> first-party jars an Enterprise bundle stages (plus the `postgresql.jar` sidecar), and the shape assertions that prove each staged
+* **The 11**<!--count:optional-modules--> **optional modules**, the 13<!--count:enterprise-first-party-jars--> first-party jars an Enterprise bundle stages (plus the `postgresql.jar` sidecar), and the shape assertions that prove each staged
   jar can do its job.
 * **The absence contract** — the provider seams, the five stub route groups, and the requirement that a
   missing module answers with an explanation rather than a not-found.
@@ -149,24 +149,24 @@ Both pages also cite the parent build file at two line numbers for the profile i
 comments, and the identifiers moved when the gating modules were inserted. **Cite the identifier, not the
 line** — the same lesson the compliance area recorded about its own citations.
 
-### 3.3 Optional modules and staged jars — 10<!--count:optional-modules--> modules, 12<!--count:enterprise-first-party-jars--> first-party jars (+ the postgresql sidecar)
+### 3.3 Optional modules and staged jars — 11<!--count:optional-modules--> modules, 13<!--count:enterprise-first-party-jars--> first-party jars (+ the postgresql sidecar)
 
 | Edition | Optional modules compiled | Jars staged into the bundle |
 |---|---|---|
 | Personal | none (default reactor) | 2 — the fat JAR and the connector sidecar |
-| Professional | 8 | 11 — those two, the eight, and the database driver |
-| Enterprise | 9 | 12 — the eleven plus the policy engine |
+| Professional | 9 (the assist agent is a default-reactor module) | 12 — those two, the nine, and the database driver |
+| Enterprise | 11 (the intelligence agent is a default-reactor module) | 14 — the twelve plus the policy engine and the intelligence agent (`ASSURE-INTELLIGENCE-BUNDLE-1`, 2026-09-29) |
 
 🔴 **Staged is not the same as first-party, and the difference is exactly one jar.** The database driver
-is `postgresql.jar`, which is **third-party**: Professional stages **11** jars of which **10** are first-party,
-and Enterprise stages **12** of which **11** are. Conflating the two counts is what made the
+is `postgresql.jar`, which is **third-party**: Professional stages **12** jars of which **11** are first-party,
+and Enterprise stages **14** of which **13** are. Conflating the two counts is what made the
 bill-of-materials correction hard to state (§2 `PKG-2`) — quote the staged count or the first-party count,
 never one as the other. Until 2026-09-09 this file described the jar only as "the database driver", so the
 name a reader would grep for lived solely in `REQUIREMENTS.md`.
 
 The eight Professional modules are the authentication module plus the seven produced by the edition-gating
 work: notification channels, backup tasks, geographic and link analysis, exchange and sharing, the metrics
-exposition, the events feed, and operational objects. Enterprise adds the policy engine, and the profile
+exposition, the events feed, and operational objects. Enterprise adds the policy engine and the intelligence agent (a shaded jar carrying onnxruntime natives, ~148 MB), and the profile
 lists all nine **literally** — Maven profiles do not inherit, so there is no superset relation in the build
 file even though there is one in the module set.
 

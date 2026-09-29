@@ -955,7 +955,7 @@ file to `archive/archive/…`).
 | Dynamic microservice REST enricher | `enrichment.rest` | — |
 | Parameterized stored-procedure caller | `transform.db.procedure` | — |
 | Master entity resolution & record linkage | `enrichment.entity.link` | — |
-| ONNX Runtime embedded inference | `ml.inference.onnx` | the optional `inspecto-intelligence` module carries onnxruntime; never bundled |
+| ONNX Runtime embedded inference | `ml.inference.onnx` | onnxruntime ships in the Enterprise bundle inside `inspecto-intelligence` (its embeddings, ASSURE-INTELLIGENCE-BUNDLE-1); this Step Processor is not built |
 | LLM zero-shot classifier & tagging | `ml.llm.classify` | assist/intelligence agents are never bundled (CP-14) |
 | Text embeddings & vector generator | `ml.embedding.vector` | — |
 
