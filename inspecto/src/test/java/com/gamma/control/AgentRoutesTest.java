@@ -69,6 +69,34 @@ class AgentRoutesTest {
         assertEquals("user", AgentRoutes.roleFor(java.util.Set.of()), "no grants → least privileged, whatever the body claims");
     }
 
+    /**
+     * INTELLIGENCE-AGENT-NEVER-STARTED-1 (2026-09-29): CollectorService.start() must START the intelligence agent.
+     * It only init()ed it, so a real bundle's /agent/sessions hit a null pack (500). The module's own tests call
+     * start() themselves and could never see that. This is the test that fails if the call goes away.
+     */
+    @Test
+    void theServiceStartsTheIntelligenceAgent(@TempDir Path dir) throws Exception {
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent();
+        try (Ctx ctx = open(dir, agent)) {
+            assertFalse(agent.started, "registering only init()s");
+            ctx.svc().start();
+            assertTrue(agent.started, "CollectorService.start() must start the registered intelligence agent");
+        }
+    }
+
+    /** A start that fails withdraws the agent: its routes answer 503 (absent), never 500, and boot continues. */
+    @Test
+    void aFailedStartWithdrawsTheAgentSoItsRoutesAnswer503(@TempDir Path dir) throws Exception {
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent();
+        agent.failStart = true;
+        try (Ctx ctx = open(dir, agent)) {
+            ctx.svc().start();   // must not throw
+            assertTrue(ctx.svc().intelligenceAgent().isEmpty(), "a failed start unpublishes the agent");
+            assertTrue(agent.closed, "a withdrawn agent is closed");
+            assertEquals(503, send(ctx.port(), "POST", "/agent/sessions", "{}").statusCode());
+        }
+    }
+
     @Test
     void agentRoutesReturn503WhenNoIntelligenceModuleIsPresent(@TempDir Path dir) throws Exception {
 
@@ -686,6 +714,19 @@ class AgentRoutesTest {
 
         @Override public String name() { return "fake-intelligence"; }
         @Override public void init(ReadModel service) {}
+
+        // INTELLIGENCE-AGENT-NEVER-STARTED-1: records the lifecycle CollectorService.start() drives.
+        volatile boolean started;
+        volatile boolean closed;
+        volatile boolean failStart;
+
+        @Override
+        public void start() {
+            if (failStart) throw new IllegalStateException("simulated start failure");
+            started = true;
+        }
+
+        @Override public void close() { closed = true; }
 
         // AGT-6a A1: a stand-in belt for POST /agent/tools/{name}. "component_draft" mirrors the real
         // tool's result shape (ok=true even when findings exist); "component_apply" stands in for the

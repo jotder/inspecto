@@ -1062,6 +1062,23 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             catch (Exception e) { log.warn("{} agent '{}' start failed: {}", kind, nameOf.apply(a), e.getMessage()); }
         }
 
+        /**
+         * {@link #start}, but a start that fails WITHDRAWS the agent: it is closed and unpublished, so its
+         * routes answer 503 (absent) instead of 500 (present but half-built). {@link LinkageError} is caught
+         * too — the OptionalSpi contract: a module that cannot link on this host must never fail the boot.
+         */
+        void startOrWithdraw(java.util.function.Consumer<T> starter) {
+            T a = agent;
+            if (a == null) return;
+            try {
+                starter.accept(a);
+            } catch (Exception | LinkageError e) {
+                log.warn("{} agent '{}' start failed, withdrawn (its routes answer 503): {}", kind, nameOf.apply(a), e.toString());
+                agent = null;
+                try { a.close(); } catch (Exception closeFailure) { log.warn("Error closing {} agent '{}': {}", kind, nameOf.apply(a), closeFailure.getMessage()); }
+            }
+        }
+
         /** Close the agent if present, logging (never rethrowing) a close failure. */
         void close() {
             T a = agent;
@@ -1105,7 +1122,14 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         if (jobs != null) jobs.start();
         freshnessSweepLive = true;
         syncFreshnessSweep();   // DUCKLE-C1 (1): boot re-derives the sweep from the rules loaded above
-        assistSlot.start(AssistAgent::start);   // intelligence agent is intentionally not start()ed here
+        assistSlot.start(AssistAgent::start);
+        // INTELLIGENCE-AGENT-NEVER-STARTED-1 (2026-09-29): the SPI has promised "start() — called after the
+        // service has started" since AGT-5 P0 (2b3435ece), but nothing called it; 802834c39 carried the gap
+        // forward as "intentionally not start()ed" with no reason recorded anywhere. start() builds the pack,
+        // platform and tool belt that /agent/sessions and /agent/tools need. Every background behaviour it can
+        // arm stays OFF unless its own -D flag is set (intelligence.opsmonitor.enabled, intelligence.triage.enabled,
+        // intelligence.act.enabled), and autonomous classes default OFF under /agent/policy's kill switch.
+        intelligenceSlot.startOrWithdraw(IntelligenceAgent::start);
         // T13 / §3.8 — drive event-triggered flows: an upstream batch-commit signals the downstream
         // pipeline's coalescer (off the publishing thread, see triggerWorkers). Subscribed before the first
         // poll cycle so no commit is missed; flows with no event trigger ignore every event.
