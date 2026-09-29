@@ -358,6 +358,7 @@ final class ComponentRoutes implements RouteModule {
         // R3: edit access against the current envelope, carry owner/shares forward, owner-only envelope changes.
         Map<String, Object> merged = ComponentAccess.onUpdate(ex, type, id, current.content(), body);
         ETags.requireMatch(ex, ETags.of(ContentHash.of(current.content())));
+        requireNoStrandedObjects(api, type, current.content(), merged);
         Object incompatible = schemaCompatibilityGate(ex, type, current.content(), merged);
         if (incompatible != null) return incompatible;
         return writeComponent(api, store, ex, type, id, merged);
@@ -406,6 +407,37 @@ final class ComponentRoutes implements RouteModule {
                 "findings", breaking));
     }
 
+    /**
+     * ASSURE-WORKFLOW-SLA-1: a Workflow replace / restore / delete may not drop a state live objects of its type still
+     * occupy — those objects would have no legal move while their SLA keeps breaching. 409 naming each such state
+     * and how many objects sit in it. A delete falls back to the built-in workflow ({@code *_workflow.toon} files
+     * are not visible here), so it is judged against that. A no-op without the ops module (no objects exist).
+     */
+    private static void requireNoStrandedObjects(ApiContext api, String type, Map<String, Object> before,
+                                                 Map<String, Object> after) {
+        if (!WORKFLOW.equals(type)) return;
+        com.gamma.objects.Workflow old;
+        try {
+            old = com.gamma.objects.Workflow.fromMap(before);
+        } catch (IllegalArgumentException unreadable) {
+            return;   // a stored file that no longer parses is not being served (GovernanceRegistry skips it)
+        }
+        com.gamma.objects.Workflow next = after == null ? com.gamma.objects.Workflow.defaultFor(old.objectType())
+                : com.gamma.objects.Workflow.fromMap(after);
+        com.gamma.objects.ObjectAccess objects = api.service().objects().orElse(null);
+        if (objects == null) return;
+        List<String> stranded = new java.util.ArrayList<>();
+        for (String state : old.states()) {
+            if (next.states().contains(state)) continue;
+            long n = objects.countByStatus(old.objectType(), state);
+            if (n > 0) stranded.add(state + " (" + n + ")");
+        }
+        if (!stranded.isEmpty())
+            throw new ApiException(409, ErrorCodes.CONFLICT, "the " + old.objectType() + " workflow change drops state(s) "
+                    + "live objects still occupy: " + String.join(", ", stranded)
+                    + " — move them out first; nothing was written");
+    }
+
     /** The current component or {@code null}; maps a bad type to the standard 400. */
     private static ComponentRegistry.Component existing(ComponentStore store, String type, String id) {
         try {
@@ -431,6 +463,7 @@ final class ComponentRoutes implements RouteModule {
         if (!consumers.isEmpty())
             throw new ApiException(409, ErrorCodes.CONFLICT, type + " component '" + id + "' is shared with space(s): "
                     + String.join(", ", consumers) + " — revoke the grant(s) first");
+        requireNoStrandedObjects(api, type, current.content(), null);
         PendingChanges.hold(api, ex, type, id, null, current.content());   // maker-checker: a delete is a change
         boolean removed;
         try {
@@ -498,6 +531,7 @@ final class ComponentRoutes implements RouteModule {
             DecisionRuleGuard.checkInvokeApi(ex, restored, Map.of(), true);
             restoredMakers = DecisionRuleGuard.restoredMakers(store, id, version);
         }
+        requireNoStrandedObjects(api, type, current.content(), restored);
         return writeComponent(api, store, ex, type, id, restored, restoredMakers);
     }
 

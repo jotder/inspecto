@@ -147,6 +147,13 @@ public final class ObjectServiceAccess implements ObjectAccess {
     }
 
     @Override
+    public long countByStatus(ObjectType kind, String status) {
+        long n = 0;
+        for (OperationalObject ignored : service.allMatching(ObjectQuery.builder().objectType(kind).status(status).build())) n++;
+        return n;
+    }
+
+    @Override
     public List<Map<String, Object>> findByStatus(ObjectType kind, String status) {
         return service.query(ObjectQuery.builder().objectType(kind).status(status).build())
                 .stream().map(ObjectServiceAccess::flatten).toList();

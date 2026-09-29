@@ -137,6 +137,15 @@ public interface ObjectAccess {
     List<Map<String, Object>> findByStatus(ObjectType kind, String status);
 
     /**
+     * How many objects of {@code kind} sit in {@code status} — every one, not a page (ASSURE-WORKFLOW-SLA-1: a
+     * Workflow edit that drops an occupied state is refused naming this count). The default counts one page of
+     * {@link #findByStatus}; the module counts them all.
+     */
+    default long countByStatus(ObjectType kind, String status) {
+        return findByStatus(kind, status).size();
+    }
+
+    /**
      * The module's {@code EventLog} subscriber, which promotes qualifying events (a sequence gap, a
      * conservation imbalance) into managed ALERT objects — or empty when it has none to contribute.
      *
