@@ -215,7 +215,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/inv/investigations/([^/]+)/reveal` | gated | `canRevealLinkEntities` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:146` |
 | POST | `/inv/investigations/([^/]+)/template` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationTemplateRoutes.java:84` |
 | POST | `/inv/investigations/([^/]+)/undo` | gated | `canManageIncidents` | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvestigationRoutes.java:140` |
-| POST | `/inv/pattern/branching` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/PatternRoutes.java:59` |
+| POST | `/inv/pattern/branching` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/PatternRoutes.java:60` |
 | POST | `/inv/projection` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java:100` |
 | POST | `/inv/projection/multi` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java:102` |
 | POST | `/inv/projection/neighbors` | exempt | read-shaped | `inspecto-geo-link/src/main/java/com/gamma/geolink/InvRoutes.java:101` |
