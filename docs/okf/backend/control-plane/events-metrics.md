@@ -611,7 +611,10 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
   with "attachments are off in this Space" until a domain is named. `MailAccess.overChannels()` checks it on
   EVERY send that carries an attachment, over every To AND Cc: the domain must equal an entry or be a subdomain
   of one (`notexample.com` does not match `example.com`), compared lower-case on the punycode (IDN) form. One
-  address outside refuses the whole send. A missing or invalid file reads as empty (fail closed). Tests:
+  address outside refuses the whole send. A missing or invalid file reads as empty (fail closed).
+  🔴 Each To/Cc entry must be exactly ONE plain mailbox (`x@d` or `Name <x@d>`): RFC 822 group syntax
+  (`grp: a@evil.test;b@example.com`, which JavaMail delivers to both), a comma-joined second address, quoted or
+  commented local parts, source routes, and `%` / `!` routing in the local part are all refused, not parsed. Tests:
   `MailAttachDomainsTest`, `ControlApiActionRequestsTest.theMailAttachmentDomainAllowlistIsEmptyByDefaultAdminOnlyAndValidated`.
 * 🔴 **Turning `attach: true` on is APPROVAL-REQUIRED — four-eyes, with or without a policy** (operator 2026-09-29).
   `JobRoutes.attachApproval`: a `POST /jobs` of a report Job with `attach: true`, or a `PUT /jobs/{name}` that

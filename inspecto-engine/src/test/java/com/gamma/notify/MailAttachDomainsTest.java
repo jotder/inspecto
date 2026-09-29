@@ -35,6 +35,27 @@ class MailAttachDomainsTest {
         assertFalse(MailAttachDomains.permits("no-at-sign", allow));
     }
 
+    /** Re-verification finding 1: anything JavaMail would parse as MORE than one plain mailbox is refused. */
+    @Test
+    void groupSyntaxRoutingAndMultiAddressEntriesAreRefused() {
+        List<String> allow = List.of("example.com");
+        for (String sneaky : List.of("grp: a@evil.test;b@example.com", "grp:a@evil.test;", "a@evil.test, b@example.com",
+                "a%evil.test@example.com", "evil.test!a@example.com", "\"a@evil.test\"@example.com",
+                "a(c@evil.test)@example.com", "@evil.test:a@example.com", "Evil <a@evil.test>, <b@example.com>",
+                "a@evil.test <b@example.com>", "b@example.com;", "a@b@example.com", "<a@example.com> x@evil.test"))
+            assertFalse(MailAttachDomains.permits(sneaky, allow), sneaky);
+        assertTrue(MailAttachDomains.permits("Ops Team <ops@example.com>", allow));
+        assertTrue(MailAttachDomains.permits("first.last+tag@example.com", allow));
+    }
+
+    @Test
+    void aGroupInToRefusesTheWholeSendThroughMailAccess(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve(MailAttachDomains.FILE), "allow[1]: example.com\n");
+        System.setProperty("assist.write.root", root.toString());
+        assertThrows(IllegalArgumentException.class, () -> MailAccess.overChannels()
+                .send(List.of("grp: a@evil.test;b@example.com"), List.of(), "s", "b", ONE));
+    }
+
     @Test
     void badEntriesAreRefused() {
         for (String bad : List.of("a@b.example", "*.example.com", "localhost", "", "x/y.example"))

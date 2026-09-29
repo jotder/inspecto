@@ -68,14 +68,25 @@ public final class MailAttachDomains {
         }
     }
 
-    /** Whether {@code address}'s domain equals, or is a subdomain of, an allowed entry. */
+    /**
+     * One recipient entry is exactly ONE plain mailbox: {@code local@domain}, optionally as
+     * {@code Display Name <local@domain>} with a display name of letters, digits, spaces and {@code . _ ' -}.
+     * 🔴 Everything else is refused rather than parsed, because JavaMail parses more than this check would:
+     * RFC 822 group syntax ({@code grp: a@evil.test;b@example.com} delivers to BOTH), a second address after a
+     * comma, quoted or commented local parts, source routes ({@code @hop:x@y}), and {@code %} / {@code !}
+     * routing in the local part ({@code a%evil.test@example.com}, which some relays forward to evil.test).
+     */
+    private static final java.util.regex.Pattern MAILBOX = java.util.regex.Pattern.compile(
+            "(?:[A-Za-z0-9 ._'-]*<([A-Za-z0-9._+'-]+@[^<>@\\s,;:\"()\\[\\]\\\\%!]+)>|([A-Za-z0-9._+'-]+@[^<>@\\s,;:\"()\\[\\]\\\\%!]+))");
+
+    /** Whether {@code address} is one plain mailbox ({@link #MAILBOX}) whose domain equals, or is a subdomain of,
+     *  an allowed entry. */
     public static boolean permits(String address, List<String> allowed) {
         if (address == null) return false;
-        String a = address.trim();
-        int lt = a.lastIndexOf('<');
-        if (lt >= 0 && a.endsWith(">")) a = a.substring(lt + 1, a.length() - 1);   // "Name <x@y>"
-        int at = a.lastIndexOf('@');
-        if (at < 0 || at == a.length() - 1) return false;
+        java.util.regex.Matcher m = MAILBOX.matcher(address.trim());
+        if (!m.matches()) return false;
+        String a = m.group(1) != null ? m.group(1) : m.group(2);
+        int at = a.indexOf('@');
         String domain;
         try {
             domain = normalise(a.substring(at + 1));
