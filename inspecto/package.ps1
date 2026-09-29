@@ -835,6 +835,15 @@ CP="inspecto.jar"
 [ -f inspecto-agent.jar ] && CP="${CP}:inspecto-agent.jar"
 # ASSURE-INTELLIGENCE-BUNDLE-1: the /agent/* intelligence agent, Enterprise only; OptionalSpi-skipped likewise.
 [ -f inspecto-intelligence.jar ] && CP="${CP}:inspecto-intelligence.jar"
+# Its native loaders (onnxruntime, JNA, DJL tokenizers) extract libraries at first use. Keep them OFFLINE and
+# out of the shared %TEMP% / ~/.djl.ai: everything lands in ./runtime-natives, created owner-only (0700).
+# onnxruntime ALWAYS extracts into java.io.tmpdir (onnxruntime.native.path only names a PRE-extracted dir),
+# so java.io.tmpdir itself is pinned. ASSURE-INTELLIGENCE-BUNDLE-1.
+if [ -f inspecto-intelligence.jar ]; then
+    NATIVES="$(pwd)/runtime-natives"
+    ( umask 077; mkdir -p "${NATIVES}/tmp" "${NATIVES}/djl" ) && chmod 700 "${NATIVES}"
+    JAVA_OPTS+=("-Dai.djl.offline=true" "-Djava.io.tmpdir=${NATIVES}/tmp" "-Djna.tmpdir=${NATIVES}/tmp" "-DDJL_CACHE_DIR=${NATIVES}/djl" "-DENGINE_CACHE_DIR=${NATIVES}/djl")
+fi
 [ -f inspecto-security.jar ]   && CP="${CP}:inspecto-security.jar"
 [ -f postgresql.jar ]          && CP="${CP}:postgresql.jar"
 exec "$JAVA" "${JAVA_OPTS[@]}" \
@@ -924,6 +933,12 @@ if exist inspecto-events.jar set "CP=%CP%;inspecto-events.jar"
 if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
 if exist inspecto-agent.jar set "CP=%CP%;inspecto-agent.jar"
 if exist inspecto-intelligence.jar set "CP=%CP%;inspecto-intelligence.jar"
+rem ASSURE-INTELLIGENCE-BUNDLE-1: native loaders stay OFFLINE and out of %TEMP% / ~/.djl.ai - everything lands in
+rem runtime-natives\, whose inherited ACL is replaced by one owner-only grant at first start.
+if exist inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
+if exist inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
+if exist inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
+if exist inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
 if exist inspecto-security.jar set "CP=%CP%;inspecto-security.jar"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 "%JAVA%" %OPTS% ^
@@ -1087,6 +1102,15 @@ fi
 [ -f inspecto-agent.jar ] && CP="${CP}:inspecto-agent.jar"
 # ASSURE-INTELLIGENCE-BUNDLE-1: the /agent/* intelligence agent, Enterprise only; OptionalSpi-skipped likewise.
 [ -f inspecto-intelligence.jar ] && CP="${CP}:inspecto-intelligence.jar"
+# Its native loaders (onnxruntime, JNA, DJL tokenizers) extract libraries at first use. Keep them OFFLINE and
+# out of the shared %TEMP% / ~/.djl.ai: everything lands in ./runtime-natives, created owner-only (0700).
+# onnxruntime ALWAYS extracts into java.io.tmpdir (onnxruntime.native.path only names a PRE-extracted dir),
+# so java.io.tmpdir itself is pinned. ASSURE-INTELLIGENCE-BUNDLE-1.
+if [ -f inspecto-intelligence.jar ]; then
+    NATIVES="$(pwd)/runtime-natives"
+    ( umask 077; mkdir -p "${NATIVES}/tmp" "${NATIVES}/djl" ) && chmod 700 "${NATIVES}"
+    JAVA_OPTS+=("-Dai.djl.offline=true" "-Djava.io.tmpdir=${NATIVES}/tmp" "-Djna.tmpdir=${NATIVES}/tmp" "-DDJL_CACHE_DIR=${NATIVES}/djl" "-DENGINE_CACHE_DIR=${NATIVES}/djl")
+fi
 [ -f postgresql.jar ] && CP="${CP}:postgresql.jar"
 # Operational stores on PostgreSQL (2026-08-31). The three ledgers (status/batches/lineage) are now
 # SERVED from a database by default; Personal stays on the bundled DuckDB with zero configuration,
@@ -1198,6 +1222,12 @@ if exist inspecto-events.jar set "CP=%CP%;inspecto-events.jar"
 if exist inspecto-ops.jar set "CP=%CP%;inspecto-ops.jar"
 if exist inspecto-agent.jar set "CP=%CP%;inspecto-agent.jar"
 if exist inspecto-intelligence.jar set "CP=%CP%;inspecto-intelligence.jar"
+rem ASSURE-INTELLIGENCE-BUNDLE-1: native loaders stay OFFLINE and out of %TEMP% / ~/.djl.ai - everything lands in
+rem runtime-natives\, whose inherited ACL is replaced by one owner-only grant at first start.
+if exist inspecto-intelligence.jar if not exist runtime-natives\tmp mkdir runtime-natives\tmp
+if exist inspecto-intelligence.jar if not exist runtime-natives\djl mkdir runtime-natives\djl
+if exist inspecto-intelligence.jar for /f "delims=" %%U in ('whoami') do icacls runtime-natives /inheritance:r /grant:r "%%U:(OI)(CI)F" >nul
+if exist inspecto-intelligence.jar set "OPTS=%OPTS% -Dai.djl.offline=true -Djava.io.tmpdir=%CD%\runtime-natives\tmp -Djna.tmpdir=%CD%\runtime-natives\tmp -DDJL_CACHE_DIR=%CD%\runtime-natives\djl -DENGINE_CACHE_DIR=%CD%\runtime-natives\djl"
 if exist postgresql.jar set "CP=%CP%;postgresql.jar"
 rem Operational stores on PostgreSQL (2026-08-31) - the edition seam; see serve.sh for the reasoning.
 rem The URL is the signal, never the driver's presence: postgres without a URL fails the boot.
