@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.etl.TestConfigs;
+import com.gamma.job.PublicationApproval;
 import com.gamma.job.PublicationDestinations;
 import com.gamma.service.CollectorService;
 import com.gamma.service.ReservedConfigPaths;
@@ -31,10 +32,10 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * ASSURE-BI-PUBLICATION-1 (operator 2026-09-29): the per-Space publication destination allowlist
- * ({@code /settings/publication-destinations}, canAdminister, empty by default, reserved from imports) and the
- * MANDATORY four-eyes hold on a {@code publish.postgres} Job — on create, and on a change to its connection,
- * datasets or include_sensitive — whatever the Space's approval policy says. Real HTTP, armed Subjects.
+ * ASSURE-BI-PUBLICATION-1 (operator 2026-09-29): the per-Space publication destination allowlist, and the
+ * MANDATORY four-eyes hold on a {@code publish.postgres} Job that pins its CONTENT — any Job parameter, through
+ * {@code /jobs}, {@code /config/write} or {@code /config/patch}, is held; approval records the content fingerprint
+ * the run re-checks; a Connection with {@code insecure_tls} needs an administrator to approve. Real HTTP.
  */
 class ControlApiPublicationTest {
 
@@ -60,12 +61,24 @@ class ControlApiPublicationTest {
         public void close() { api.close(); svc.close(); }
     }
 
+    /** author = super (authors Jobs), checker = admin (approves, administers), approver = canApproveChanges only. */
     @BeforeEach
     void arm() {
-        Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
-            case "Bearer author" -> Optional.of(new Subject("author-1", Set.of("canAuthorWorkbench")));
-            case "Bearer admin" -> Optional.of(new Subject("admin-1", Set.of("canAuthorWorkbench", "canAdminister")));
-            default -> Optional.empty();
+        Authenticators.forTest(ex -> {
+            String auth = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
+            String[] who = switch (auth) {
+                case "Bearer author" -> new String[] {"author-1", "super"};
+                case "Bearer checker" -> new String[] {"checker-1", "admin"};
+                default -> null;
+            };
+            if ("Bearer approver".equals(auth))
+                return Optional.of(new Subject("approver-1", Set.of("canApproveChanges")));
+            if ("Bearer builder".equals(auth))
+                return Optional.of(new Subject("builder-1", Set.of("canAuthorWorkbench")));
+            if (who == null) return Optional.empty();
+            Roles.Def def = Roles.effective(ex).get(who[1]);
+            ComponentAccess.heldRoles(ex, Set.of(who[1]));
+            return Optional.of(new Subject(who[0], def.capabilities(), def.dataScopes()));
         });
     }
 
@@ -93,57 +106,94 @@ class ControlApiPublicationTest {
         return client.send(b.build(), BodyHandlers.ofString());
     }
 
+    private static JsonNode data(HttpResponse<String> r, int status) throws Exception {
+        assertEquals(status, r.statusCode(), r.body());
+        return JSON.readTree(r.body()).get("data");
+    }
+
+    /** Assert {@code r} was held for four-eyes and return the Pending Change id. */
+    private static String held(HttpResponse<String> r) throws Exception {
+        JsonNode pc = data(r, 202).get("pendingChange");
+        assertEquals("job", pc.get("kind").asText(), r.body());
+        assertTrue(pc.get("fourEyes").asBoolean());
+        return pc.get("id").asText();
+    }
+
     private static final String PUBLISH = "{\"name\":\"to-bi\",\"type\":\"publish.postgres\",\"connection\":\"BI\","
             + "\"datasets\":\"subs\",\"schema\":\"bi\"}";
+
+    private void approvedPublication(Ctx c) throws Exception {
+        String id = held(send(c, "POST", "/jobs", PUBLISH, "Bearer author"));
+        assertEquals(403, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", "Bearer author").statusCode(),
+                "four-eyes: not the author");
+        JsonNode ok = data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", "Bearer checker"), 200);
+        assertTrue(ok.get("applied").asBoolean(), ok.toString());
+        assertTrue(PublicationApproval.approved(c.root(), "to-bi").isPresent(), "the approval pinned the content");
+    }
 
     @Test
     void theDestinationAllowlistIsEmptyByDefaultAdministratorOnlyAndValidated(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            HttpResponse<String> empty = send(c, "GET", "/settings/publication-destinations", "", "Bearer author");
-            assertEquals(200, empty.statusCode(), empty.body());
-            assertEquals(0, JSON.readTree(empty.body()).get("data").get("hosts").size(), "empty by default");
+            assertEquals(0, data(send(c, "GET", "/settings/publication-destinations", "", "Bearer builder"), 200)
+                    .get("hosts").size(), "empty by default");
             assertEquals(403, send(c, "PUT", "/settings/publication-destinations", "{\"hosts\":[\"bi.example.com\"]}",
-                    "Bearer author").statusCode(), "canAdminister only");
+                    "Bearer builder").statusCode(), "canAdminister only");
             assertEquals(422, send(c, "PUT", "/settings/publication-destinations", "{\"hosts\":[\"a@b.example.com\"]}",
-                    "Bearer admin").statusCode());
-            assertEquals(422, send(c, "PUT", "/settings/publication-destinations", "{\"allow\":[]}", "Bearer admin").statusCode());
-            HttpResponse<String> ok = send(c, "PUT", "/settings/publication-destinations", "{\"hosts\":[\"BI.Example.com\"]}", "Bearer admin");
-            assertEquals(200, ok.statusCode(), ok.body());
+                    "Bearer checker").statusCode());
+            assertEquals(422, send(c, "PUT", "/settings/publication-destinations", "{\"allow\":[]}", "Bearer checker").statusCode());
+            data(send(c, "PUT", "/settings/publication-destinations", "{\"hosts\":[\"BI.Example.com\"]}", "Bearer checker"), 200);
             assertEquals(List.of("bi.example.com"), PublicationDestinations.hosts(c.root()));
             assertTrue(ReservedConfigPaths.reserved(PublicationDestinations.FILE), "no import may write it");
+            assertTrue(ReservedConfigPaths.reserved(PublicationApproval.DIR + "to-bi.json"), "nor an approval");
         }
     }
 
     @Test
-    void creatingAPublishJobIsAlwaysHeldForFourEyesEvenWithNoApprovalPolicy(@TempDir Path dir) throws Exception {
+    void aCreateIsHeldApprovalPinsTheContentAndOtherJobsAreNotHeld(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             assertFalse(Files.exists(c.root().resolve("approval.toon")), "no approval policy in this Space");
-            HttpResponse<String> held = send(c, "POST", "/jobs", PUBLISH, "Bearer admin");
-            assertEquals(202, held.statusCode(), held.body());
-            JsonNode pc = JSON.readTree(held.body()).get("data").get("pendingChange");
-            assertEquals("job", pc.get("kind").asText(), held.body());
-            assertTrue(pc.get("fourEyes").asBoolean());
-            assertTrue(c.svc().jobService().flatMap(s -> s.jobConfig("to-bi")).isEmpty(), "nothing was written");
-
+            approvedPublication(c);
+            assertTrue(c.svc().jobService().flatMap(s -> s.jobConfig("to-bi")).isPresent(), "applied on approval");
             HttpResponse<String> plain = send(c, "POST", "/jobs",
-                    "{\"name\":\"tidy\",\"type\":\"maintenance\",\"task\":\"cleanup\"}", "Bearer admin");
+                    "{\"name\":\"tidy\",\"type\":\"maintenance\",\"task\":\"cleanup\"}", "Bearer author");
             assertTrue(plain.statusCode() / 100 == 2 && plain.statusCode() != 202, "other Jobs are not held: " + plain.body());
         }
     }
 
     @Test
-    void theHoldCoversAChangeToConnectionDatasetsOrIncludeSensitiveOnly() {
-        Map<String, Object> saved = Map.of("name", "to-bi", "type", "publish.postgres", "connection", "BI",
-                "datasets", "subs", "schema", "bi");
-        assertNotNull(PendingChanges.mandatoryRule("job", saved, null), "create");
-        assertNull(PendingChanges.mandatoryRule("job", Map.of("job", withKey(saved, "cron", "0 0 * * * ?")), Map.of("job", saved)),
-                "a schedule change is not held by this rule");
-        for (String k : List.of("connection", "datasets", "include_sensitive"))
-            assertNotNull(PendingChanges.mandatoryRule("job", withKey(saved, k, "other"), saved), k);
-        assertNull(PendingChanges.mandatoryRule("job", null, saved), "a delete is not held");
-        assertNull(PendingChanges.mandatoryRule("job", Map.of("name", "x", "type", "maintenance"), null));
-        assertNotNull(PendingChanges.mandatoryRule("job", saved, Map.of("name", "to-bi", "type", "maintenance")),
-                "turning another Job into a publication is a create");
+    void aConfigPatchOfSchemaColumnsOrModeIsEachHeld(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            approvedPublication(c);
+            for (String patch : List.of("{\"schema\":\"anywhere\"}", "{\"columns\":\"plan\"}", "{\"mode\":\"partition-incremental\"}")) {
+                String id = held(send(c, "POST", "/config/patch",
+                        "{\"type\":\"job\",\"name\":\"to-bi_job\",\"subdir\":\"jobs\",\"patch\":{\"job\":" + patch + "}}", "Bearer author"));
+                data(send(c, "POST", "/pending-changes/" + id + "/decline", "{\"reason\":\"no\"}", "Bearer checker"), 200);
+            }
+            assertEquals("bi", c.svc().jobService().flatMap(s -> s.jobConfig("to-bi")).orElseThrow().params().get("schema"),
+                    "nothing was written");
+        }
+    }
+
+    @Test
+    void aConfigWriteOfAPublicationIsHeld(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            held(send(c, "POST", "/config/write", "{\"type\":\"job\",\"config\":{\"job\":" + PUBLISH + "}}", "Bearer author"));
+            assertTrue(c.svc().jobService().flatMap(s -> s.jobConfig("to-bi")).isEmpty(), "nothing was written");
+        }
+    }
+
+    @Test
+    void aConnectionWithInsecureTlsNeedsAnAdministratorToApprove(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            data(send(c, "POST", "/connections", "{\"id\":\"BI\",\"connector\":\"db\",\"options\":{\"jdbc_url\":"
+                    + "\"jdbc:postgresql://bi.example.com:5432/bi?sslmode=require\",\"insecure_tls\":\"true\"}}", "Bearer checker"), 200);
+            String id = held(send(c, "POST", "/jobs", PUBLISH, "Bearer author"));
+            assertEquals(403, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", "Bearer approver").statusCode(),
+                    "canApproveChanges alone cannot approve an insecure_tls publication");
+            assertTrue(PublicationApproval.approved(c.root(), "to-bi").isEmpty());
+            assertTrue(data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", "Bearer checker"), 200)
+                    .get("applied").asBoolean());
+        }
     }
 
     @Test
@@ -155,11 +205,5 @@ class ControlApiPublicationTest {
         assertEquals(409, refused.status);
         assertThrows(ApiException.class, () -> ImportCapabilityGuard.checkItems(null,
                 List.of(Map.of("kind", "job", "id", "to-bi", "content", Map.of("name", "to-bi", "type", "publish.postgres")))));
-    }
-
-    private static Map<String, Object> withKey(Map<String, Object> m, String k, Object v) {
-        Map<String, Object> out = new java.util.LinkedHashMap<>(m);
-        out.put(k, v);
-        return out;
     }
 }

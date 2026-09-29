@@ -91,6 +91,14 @@ class PostgresPublishJobTest {
         new ComponentStore(cfg.resolve("registry")).write("dataset", id, ds);
     }
 
+    /** Whether {@link #run} records a four-eyes approval of the Job as it is now (what the approve route does). */
+    boolean approve = true;
+
+    void approve(JobConfig job) throws Exception {
+        PublicationApproval.record(cfg, job.name(), PublicationApproval.fingerprints(job.toMap(), cfg, ConnectionRegistry::find),
+                "checker-1", Set.of("canApproveChanges"));
+    }
+
     JobRun run(Map<String, String> params) throws Exception {
         return run(params, null);
     }
@@ -99,6 +107,7 @@ class PostgresPublishJobTest {
         Map<String, String> p = new HashMap<>(Map.of("connection", "BI", "datasets", "subs", "schema", "bi", "retries", "0"));
         p.putAll(params);
         JobConfig job = new JobConfig("pub", "publish.postgres", null, null, true, false, p, null, null);
+        if (approve) approve(job);
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(job), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, data.toString())) {
@@ -292,9 +301,8 @@ class PostgresPublishJobTest {
     }
 
     @Test
-    void aWeakerSslmodeNeedsInsecureTlsOnTheConnectionAndACanAdministerAuthor() throws Exception {
+    void aWeakerSslmodeNeedsInsecureTlsOnTheApprovedConnection() throws Exception {
         register("BI", "jdbc:postgresql://bi.example.test:5432/bi?sslmode=require");
-        PostgresPublishJobType.installAuthority(c -> author("root", "canAdminister"));
         JobRun r = run(Map.of());
         assertEquals("FAILED", r.status());
         assertTrue(r.message().contains("needs verify-full"), r.message());
@@ -302,14 +310,59 @@ class PostgresPublishJobTest {
 
         ConnectionRegistry.register(ConnectionProfile.fromMap(Map.of("id", "BI", "connector", "db", "username", "bi",
                 "options", Map.of("jdbc_url", "jdbc:postgresql://bi.example.test:5432/bi?sslmode=require", "insecure_tls", "true"))));
-        PostgresPublishJobType.installAuthority(c -> author("bob"));
-        JobRun notAdmin = run(Map.of());
-        assertEquals("FAILED", notAdmin.status());
-        assertTrue(notAdmin.message().contains("canAdminister"), notAdmin.message());
-
-        PostgresPublishJobType.installAuthority(c -> author("root", "canAdminister"));
-        assertEquals("SUCCESS", run(Map.of()).status());
+        assertEquals("SUCCESS", run(Map.of()).status(), "approved WITH insecure_tls (the approver needed canAdminister)");
         assertEquals("require", dialedProps.get().getProperty("sslmode"));
+    }
+
+    @Test
+    void insecureTlsSetAfterTheApprovalNeverTakesEffect() throws Exception {
+        assertEquals("SUCCESS", run(Map.of()).status());   // approved on a verify-full Connection
+        ConnectionRegistry.register(ConnectionProfile.fromMap(Map.of("id", "BI", "connector", "db", "username", "bi",
+                "options", Map.of("jdbc_url", "jdbc:postgresql://bi.example.test:5432/bi?sslmode=disable", "insecure_tls", "true"))));
+        dialed.set(null);
+        approve = false;
+        JobRun r = run(Map.of());
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("the approved publication changed (connection)"), r.message());
+        assertNull(dialed.get(), "nothing was dialled");
+    }
+
+    @Test
+    void aConnectionEditAfterApprovalRefusesTheRun() throws Exception {
+        assertEquals("SUCCESS", run(Map.of()).status());
+        approve = false;
+        ConnectionRegistry.register(ConnectionProfile.fromMap(Map.of("id", "BI", "connector", "db", "username", "someone-else",
+                "options", Map.of("jdbc_url", "jdbc:postgresql://bi.example.test:5432/bi"))));
+        JobRun r = run(Map.of());
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("the approved publication changed (connection); re-approve"), r.message());
+        register("BI", "jdbc:postgresql://bi.example.test:5432/other_db");
+        assertTrue(run(Map.of()).message().contains("(connection)"), "a different database is a different publication");
+    }
+
+    @Test
+    void aDatasetDefinitionEditAfterApprovalRefusesTheRun() throws Exception {
+        assertEquals("SUCCESS", run(Map.of()).status());
+        approve = false;
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "subs", Map.of("physicalRef", "subs",
+                "columns", List.of(Map.of("name", "msisdn"))));   // the classification dropped
+        JobRun r = run(Map.of());
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("the approved publication changed (dataset subs)"), r.message());
+    }
+
+    @Test
+    void aJobThatWasNeverApprovedOrWhoseParamsChangedIsRefused() throws Exception {
+        approve = false;
+        JobRun never = run(Map.of());
+        assertEquals("FAILED", never.status());
+        assertTrue(never.message().contains("never approved"), never.message());
+        approve = true;
+        assertEquals("SUCCESS", run(Map.of()).status());
+        approve = false;
+        JobRun edited = run(Map.of("mode", "partition-incremental", "partition_column", "day"));
+        assertEquals("FAILED", edited.status());
+        assertTrue(edited.message().contains("(job params)"), edited.message());
     }
 
     @Test
@@ -337,13 +390,14 @@ class PostgresPublishJobTest {
 
     @Test
     void aTriggerMayNotOverrideTheApprovedConnectionDatasetsOrSensitiveColumns() throws Exception {
-        for (String k : List.of("connection", "datasets", "include_sensitive", "schema", "columns")) {
-            JobRun r = run(Map.of(), Map.of(k, "evil"));
+        for (String k : List.of("connection", "datasets", "include_sensitive", "schema", "columns", "mode",
+                "partition_column", "timeout_seconds", "retries")) {
+            JobRun r = run(Map.of(), Map.of(k, k.equals("mode") ? "partition-incremental" : "9"));
             assertEquals("FAILED", r.status(), k);
-            assertTrue(r.message().contains("saved (approved) Job only"), r.message());
+            assertTrue(r.message().contains("comes from the approved Job only"), r.message());
         }
         assertNull(dialed.get());
-        assertEquals("SUCCESS", run(Map.of(), Map.of("retries", "0")).status(), "an unlocked parameter may still be given");
+        assertEquals("SUCCESS", run(Map.of(), Map.of("retries", "0")).status(), "the approved value itself may be given");
     }
 
     @Test

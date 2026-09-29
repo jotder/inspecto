@@ -47,7 +47,7 @@ public final class ReservedConfigPaths {
 
     /** Reserved directories (a prefix of the config-relative path). */
     static final List<String> DIRS = List.of(
-            "pending-changes/", "action-requests/", "recon-state/", ".history/", "audit/", "agent/", "expectation-baselines/",
+            "pending-changes/", "action-requests/", "publication-approvals/", "recon-state/", ".history/", "audit/", "agent/", "expectation-baselines/",
             "registry/access-catalog/", "registry/access-profiles/");
 
     /** Component kinds no bundle may carry — the access config, gated {@code canConfigureAccess} on its own routes. */

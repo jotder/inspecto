@@ -106,7 +106,11 @@ public final class PendingChanges {
         Path root = api.writeRoot();
         ApprovalPolicy policy = ApprovalPolicy.forRoot(root);
         ApprovalPolicy.Rule rule = policy.ruleFor(kind);
-        if (rule == null) rule = mandatoryRule(kind, proposed, current);
+        Map<String, String> publication = null;
+        if (rule == null && isPublicationWrite(kind, proposed)) {
+            publication = publicationFingerprints(api, proposed);
+            rule = mandatoryRule(root, publicationName(proposed), current, publication, insecureTls(api, proposed));
+        }
         if (rule == null) return;
 
         String reason = ex.getRequestHeaders().getFirst(HEADER_REASON);
@@ -137,6 +141,7 @@ public final class PendingChanges {
         rec.put("proposedVersion", version(proposed));
         rec.put("current", current);
         rec.put("proposed", proposed);
+        if (publication != null) rec.put("publicationFingerprints", publication);   // what the approver approves
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("method", ex.getRequestMethod());
         String query = ex.getRequestURI().getRawQuery();
@@ -237,20 +242,46 @@ public final class PendingChanges {
     }
 
     /**
-     * A hold NO approval policy can turn off (ASSURE-BI-PUBLICATION-1, operator 2026-09-29): creating a
-     * {@code publish.postgres} Job, or changing its {@code connection}, {@code datasets} or {@code include_sensitive},
-     * always needs four-eyes approval by a {@code canApproveChanges} holder — it decides which data leaves the
-     * platform and where. A delete, and any other change, is not held by this rule.
+     * A hold NO approval policy can turn off (ASSURE-BI-PUBLICATION-1, decision 2026-09-29). A write of a
+     * {@code publish.postgres} Job is held for four-eyes unless the Job's CONTENT fingerprint — every Job key but its
+     * schedule, the resolved Connection, each Dataset's definition ({@link com.gamma.job.PublicationApproval}) — is
+     * exactly what was last approved. So a create is held, any parameter change is held, and re-saving a Job whose
+     * Connection or Dataset changed since its approval is held too (that is how a publication is re-approved). The
+     * approver needs {@code canApproveChanges}, or {@code canAdminister} when the Connection sets {@code insecure_tls}.
+     * A delete is not held.
      */
-    static ApprovalPolicy.Rule mandatoryRule(String kind, Map<String, Object> proposed, Map<String, Object> current) {
-        if (!JobRoutes.KIND.equals(kind) || proposed == null) return null;
-        Map<?, ?> p = jobSection(proposed), c = current == null ? null : jobSection(current);
-        if (!isPublication(p)) return null;
-        ApprovalPolicy.Rule always = new ApprovalPolicy.Rule(true, ApprovalPolicy.DEFAULT_APPROVER, true);
-        if (c == null || !isPublication(c)) return always;
-        for (String k : com.gamma.job.PostgresPublishJobType.FOUR_EYES)
-            if (!java.util.Objects.equals(trimmed(p.get(k)), trimmed(c.get(k)))) return always;
+    static ApprovalPolicy.Rule mandatoryRule(Path root, String name, Map<String, Object> current,
+                                             Map<String, String> proposedFingerprints, boolean insecureTls) {
+        ApprovalPolicy.Rule always = new ApprovalPolicy.Rule(true,
+                insecureTls ? Roles.CAN_ADMINISTER : ApprovalPolicy.DEFAULT_APPROVER, true);
+        if (current == null || !isPublication(jobSection(current))) return always;
+        java.util.Optional<Map<String, String>> approved = com.gamma.job.PublicationApproval.approved(root, name);
+        if (approved.isEmpty() || !com.gamma.job.PublicationApproval.changed(approved.get(), proposedFingerprints).isEmpty())
+            return always;
         return null;
+    }
+
+    /** The Job's own name (what a run looks its approval up by), whatever file a config write names. */
+    static String publicationName(Map<?, ?> proposed) {
+        return String.valueOf(jobSection(proposed).get("name")).trim();
+    }
+
+    /** Whether this is a write (not a delete) of a {@code publish.postgres} Job. */
+    static boolean isPublicationWrite(String kind, Map<String, Object> proposed) {
+        return JobRoutes.KIND.equals(kind) && proposed != null && isPublication(jobSection(proposed));
+    }
+
+    /** The content fingerprints of a proposed publication Job, against this Space's Connections and Datasets now. */
+    static Map<String, String> publicationFingerprints(ApiContext api, Map<?, ?> proposed) {
+        return com.gamma.job.PublicationApproval.fingerprints(proposed, api.writeRoot(), api.service()::connection);
+    }
+
+    /** Whether the proposed publication's Connection sets {@code insecure_tls: true}. */
+    static boolean insecureTls(ApiContext api, Map<?, ?> proposed) {
+        Object conn = jobSection(proposed).get("connection");
+        return conn != null && api.service().connection(String.valueOf(conn).trim())
+                .map(p -> p.options() != null && "true".equalsIgnoreCase(String.valueOf(p.options().get("insecure_tls")).trim()))
+                .orElse(false);
     }
 
     /** Whether a decoded Job section is a {@code publish.postgres} Job. */

@@ -74,10 +74,6 @@ public final class PostgresPublishJobType implements JobTypeProvider {
             P_PARTITION = "partition_column", P_COLUMNS = "columns", P_SENSITIVE = "include_sensitive",
             P_TIMEOUT = "timeout_seconds", P_RETRIES = "retries";
     static final String FULL = "full-refresh", INCREMENTAL = "partition-incremental";
-    /** The parameters a run takes from the saved Job only — the four-eyes-approved destination and data. */
-    public static final List<String> LOCKED = List.of(P_CONNECTION, P_DATASETS, P_SENSITIVE, P_SCHEMA, P_COLUMNS);
-    /** The parameters whose change (or a create) holds a {@code publish.postgres} Job for four-eyes approval. */
-    public static final List<String> FOUR_EYES = List.of(P_CONNECTION, P_DATASETS, P_SENSITIVE);
     static final int BATCH = 1000;
 
     /** Who a run acts as. {@code open} = no authenticator (Personal / an open dev server): sharing envelopes are
@@ -159,16 +155,24 @@ public final class PostgresPublishJobType implements JobTypeProvider {
         @Override
         public JobResult run(JobContext ctx) {
             long t0 = System.nanoTime();
-            Map<String, String> p = new LinkedHashMap<>(ctx.params().isEmpty() ? ctx.config() : ctx.params());
-            // The approved destination and data (four-eyes) come from the SAVED Job only: a trigger's args, a
-            // Signal binding or a run-time override may not change them.
-            for (String k : LOCKED) {
-                String saved = cfg.params().get(k), given = p.get(k);
-                if (given != null && !given.isBlank() && !given.equals(saved))
-                    return JobResult.failed(TYPE_ID + " refused: '" + k + "' comes from the saved (approved) Job only, "
-                            + "a run may not override it", ms(t0));
-                if (saved == null) p.remove(k); else p.put(k, saved);
-            }
+            // EVERY parameter comes from the saved (four-eyes-approved) Job: a trigger arg, a Signal binding or a
+            // run-time override of any of them refuses the run.
+            Map<String, String> given = ctx.params().isEmpty() ? ctx.config() : ctx.params();
+            Map<String, String> p = savedParams();
+            for (Map.Entry<String, String> e : given.entrySet())
+                if (!JobConfig.AUTHOR_KEYS.contains(e.getKey()) && !java.util.Objects.equals(blankToNull(e.getValue()), blankToNull(p.get(e.getKey()))))
+                    return refuse(ctx, "'" + e.getKey() + "' comes from the approved Job only; a run may not override it", t0);
+            // The approval pins CONTENT: the Job, its Connection and each Dataset's definition, as fingerprinted
+            // when the Pending Change was approved. Any difference refuses the run.
+            Path approvalRoot = SpaceConfigRoot.current();
+            if (approvalRoot == null) return refuse(ctx, "no Space config root to read the approval from", t0);
+            Map<String, String> now = PublicationApproval.fingerprints(cfg.toMap(), approvalRoot, ConnectionRegistry::find);
+            java.util.Optional<Map<String, String>> approved = PublicationApproval.approved(approvalRoot, cfg.name());
+            if (approved.isEmpty())
+                return refuse(ctx, "this publication was never approved (four-eyes) — re-approve", t0);
+            List<String> changed = PublicationApproval.changed(approved.get(), now);
+            if (!changed.isEmpty())
+                return refuse(ctx, "the approved publication changed (" + String.join(" | ", changed) + "); re-approve", t0);
             Map<String, Long> rows = new LinkedHashMap<>();
             String schema = p.get(P_SCHEMA);
             try {
@@ -186,6 +190,21 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                         + "is as it was before this run", e, "job", cfg.name());
                 return JobResult.failed(TYPE_ID + " failed, nothing published (rolled back): " + why, ms(t0));
             }
+        }
+
+        /** The saved Job's parameters over the declared defaults — what four-eyes approved. */
+        private Map<String, String> savedParams() {
+            Map<String, String> out = new LinkedHashMap<>();
+            for (ParameterDecl d : new PostgresPublishJobType(null).descriptor().parameters()) if (d.defaultValue() != null) out.put(d.name(), d.defaultValue());
+            cfg.params().forEach((k, v) -> { if (!JobConfig.AUTHOR_KEYS.contains(k)) out.put(k, v); });
+            return out;
+        }
+
+        private JobResult refuse(JobContext ctx, String why, long t0) {
+            audit("refused", cfg.params().get(P_SCHEMA), Map.of(), why);
+            ctx.signals().emit("publish.postgres.refused", Severity.WARN, Map.of("job", cfg.name(), "reason", why));
+            ctx.log().error("publish.postgres refused: " + why, null, "job", cfg.name());
+            return JobResult.failed(TYPE_ID + " refused: " + why, ms(t0));
         }
 
         private String publish(JobContext ctx, Map<String, String> p, Map<String, Long> rows) throws Exception {
@@ -478,9 +497,6 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                 throw new SecurityException("Connection '" + connectionId + "' asks for sslmode=" + sslmode + ", which does "
                         + "not verify the server's certificate and host name — publish.postgres needs verify-full, or an "
                         + "explicit " + INSECURE_TLS + ": true on the Connection — refused");
-            if (!author.capabilities().contains(CAN_ADMINISTER))
-                throw new SecurityException("Connection '" + connectionId + "' sets " + INSECURE_TLS + ", which takes "
-                        + "effect only for a Job author holding canAdminister — refused");
         }
         String rootCert = params.get("sslrootcert");
         if (rootCert != null && !SecretResolver.isReference(rootCert))
@@ -705,6 +721,8 @@ public final class PostgresPublishJobType implements JobTypeProvider {
         if (n < min || n > max) throw new IllegalArgumentException(key + " must be " + min + ".." + max + ", got " + n);
         return n;
     }
+
+    private static String blankToNull(String s) { return s == null || s.isBlank() ? null : s.trim(); }
 
     private static long ms(long t0) { return (System.nanoTime() - t0) / 1_000_000L; }
 }

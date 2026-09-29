@@ -151,6 +151,9 @@ class PostgresPublishPgTest {
     }
 
     private static JobRun run(Path dir, Path data, JobConfig job) throws Exception {
+        Path cfgRoot = Path.of(System.getProperty("assist.write.root"));   // the four-eyes approval the route records
+        PublicationApproval.record(cfgRoot, job.name(), PublicationApproval.fingerprints(job.toMap(), cfgRoot,
+                ConnectionRegistry::find), "checker-1", java.util.Set.of("canApproveChanges"));
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(job), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, data.toString())) {

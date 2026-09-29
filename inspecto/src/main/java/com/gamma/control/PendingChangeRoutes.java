@@ -78,6 +78,12 @@ final class PendingChangeRoutes implements RouteModule {
         return out;
     }
 
+    private static Map<String, String> stringMap(Map<?, ?> m) {
+        Map<String, String> out = new java.util.TreeMap<>();
+        m.forEach((k, v) -> out.put(String.valueOf(k), String.valueOf(v)));
+        return out;
+    }
+
     private Object writePolicy(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         // Operator, 2026-09-28: with no Authenticator the canAdminister wrap is a no-op, so anyone could switch
         // four-eyes off - refuse the route outright. Personal edition cannot change the policy through the API.
@@ -239,6 +245,21 @@ final class PendingChangeRoutes implements RouteModule {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "pending change '" + id + "' names a request ("
                         + (request == null ? "none" : request.get("method") + " " + request.get("path"))
                         + ") that is not a maker-checker route — nothing was dispatched");
+            // ASSURE-BI-PUBLICATION-1: a publication is approved for its CONTENT. The Connection and Datasets must be
+            // what they were when it was proposed, and a Connection with insecure_tls needs an administrator.
+            Map<String, String> publication = null;
+            if (rec.get("proposed") instanceof Map<?, ?> proposedJob
+                    && PendingChanges.isPublicationWrite(String.valueOf(rec.get("kind")), (Map<String, Object>) proposedJob)) {
+                publication = PendingChanges.publicationFingerprints(api, proposedJob);
+                if (!(rec.get("publicationFingerprints") instanceof Map<?, ?> then)
+                        || !com.gamma.job.PublicationApproval.changed(stringMap(then), publication).isEmpty())
+                    throw new ApiException(409, ErrorCodes.CONFLICT, "the publication changed since it was proposed ("
+                            + (rec.get("publicationFingerprints") instanceof Map<?, ?> t
+                                    ? String.join(" | ", com.gamma.job.PublicationApproval.changed(stringMap(t), publication))
+                                    : "no fingerprint recorded")
+                            + ") — nothing was applied; propose it again");
+                if (PendingChanges.insecureTls(api, proposedJob)) ApiContext.requireCapability(ex, Roles.CAN_ADMINISTER);
+            }
             Map<String, Object> marker = new LinkedHashMap<>(rec);
             marker.put("approvedBy", by);   // AuditTrail stamps it on the replayed write beside the author (actor)
             Map<String, String> headers = new LinkedHashMap<>();
@@ -258,6 +279,11 @@ final class PendingChangeRoutes implements RouteModule {
             Map<String, Object> result = new LinkedHashMap<>();
             result.put("status", r.status());
             result.put("body", parse(r.body()));
+            if (applied && publication != null) {
+                java.util.Set<String> caps = ApiContext.subject(ex).map(Subject::capabilities).orElse(java.util.Set.of());
+                com.gamma.job.PublicationApproval.record(root, PendingChanges.publicationName((Map<?, ?>) rec.get("proposed")),
+                        publication, by, caps);
+            }
             if (applied) {
                 rec.put("status", "approved");
                 rec.put("decidedBy", by);
