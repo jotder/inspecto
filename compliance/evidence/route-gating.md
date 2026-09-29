@@ -311,6 +311,7 @@ system: the evidence cannot say something the code does not.
 | PUT | `/settings/geo` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:56` |
 | PUT | `/settings/link-analysis` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:59` |
 | PUT | `/settings/pipeline-history` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:62` |
+| PUT | `/settings/publication-destinations` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/PublicationDestinationRoutes.java:34` |
 | PUT | `/settings/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:77` |
 | PUT | `/settings/timezone` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:68` |
 | POST | `/space-comparisons` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceComparisonRoutes.java:42` |
@@ -318,7 +319,7 @@ system: the evidence cannot say something the code does not.
 | DELETE | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:79` |
 | PUT | `/spaces/([^/]+)` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:76` |
 | POST | `/spaces/import` | exempt | recovery-route | `inspecto/src/main/java/com/gamma/control/SpaceRoutes.java:74` |
-| POST | `/streams/([^/]+)/records` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/StreamPushRoutes.java:83` |
+| POST | `/streams/([^/]+)/records` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/StreamPushRoutes.java:84` |
 | POST | `/system/operational-db/test` | gated | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/SystemRoutes.java:40` |
 | PUT | `/system/scheduler` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/SchedulerRoutes.java:74` |
 | POST | `/tags` | gated | `canAuthorWorkbench` | `inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:51` |
