@@ -157,11 +157,11 @@
                     <legend class="mb-1 text-sm font-medium">
                         {{ f.type === 'select' ? 'Choices' : 'Suggested values' }}
                     </legend>
-                    @for (c of choiceControls.controls; track $index; let i = $index; let cf = $first; let cl = $last) {
+                    @for (c of choiceControls.controls; track c; let i = $index; let cf = $first; let cl = $last) {
                     <div class="flex items-center gap-1">
                         <mat-form-field class="flex-auto" subscriptSizing="dynamic">
                             <mat-label>Choice {{ i + 1 }}</mat-label>
-                            <input matInput [formControlName]="i" />
+                            <input #choiceInput matInput [formControl]="c" />
                         </mat-form-field>
                         @if (canEdit()) {
                         <button

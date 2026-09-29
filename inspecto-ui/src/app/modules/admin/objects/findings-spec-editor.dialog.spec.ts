@@ -279,6 +279,44 @@ describe('FindingsSpecEditorDialog', () => {
         expect(ref.close).toHaveBeenCalledTimes(1); // declined — still open
     });
 
+    /**
+     * FINDINGS-EDITOR-CHOICE-BINDING-1 + FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1, driven through the DOM like the proxy
+     * lead: text typed into a choice box that was already on screen before a later *Add choice* must be kept.
+     */
+    it('keeps what is typed into an earlier choice box after a later Add choice, and focuses each new box', async () => {
+        const { c, el, render, saveButton } = await create();
+        c.addField();
+        c.fieldForm.controls.label.setValue('Recovery route');
+        c.fieldForm.controls.type.setValue('select');
+        await render();
+        const addChoice = (): HTMLButtonElement =>
+            Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.trim() === 'Add choice')!;
+        const boxes = (): HTMLInputElement[] =>
+            Array.from(el.querySelectorAll('fieldset input')) as HTMLInputElement[];
+        const type = async (box: HTMLInputElement, text: string): Promise<void> => {
+            box.value = text;
+            box.dispatchEvent(new Event('input'));
+            await render();
+        };
+
+        addChoice().click();
+        await render();
+        expect(el.ownerDocument.activeElement).toBe(boxes()[0]);
+        await type(boxes()[0], 'bar');
+
+        addChoice().click();
+        await render();
+        expect(el.ownerDocument.activeElement).toBe(boxes()[1]);
+        await type(boxes()[1], 'refund');
+
+        await type(boxes()[0], 'bar sim');
+
+        expect(c.selected()!.choices.map((x) => x.label)).toEqual(['bar sim', 'refund']);
+        expect(c.problems()).toEqual([]);
+        expect(saveButton()!.disabled).toBe(false);
+        await expectNoA11yViolations(el);
+    });
+
     it('keeps what the preview holds across a draft edit', async () => {
         const { c, fixture, render } = await create();
         await render();

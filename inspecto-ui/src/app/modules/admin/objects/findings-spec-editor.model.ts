@@ -3,7 +3,7 @@ import { AttributeTier, AttributeType } from 'app/inspecto/component-model';
 
 /**
  * The Findings-field editor's model (findings-spec authoring UI, slice S1 —
- * `docs/superpower/findings-spec-authoring-ui-design.md`). Framework-free: the dialog holds a list of
+ * `docs/archived-documents/plans-archive/findings-spec-authoring-ui-design.md`). Framework-free: the dialog holds a list of
  * {@link FieldDraft}s and every rule lives here.
  *
  * The analyst never types a key, a choice value, a tier or a `dependsOn` object (design §3):

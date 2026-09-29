@@ -1,4 +1,16 @@
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal, viewChild } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    ElementRef,
+    Injector,
+    afterNextRender,
+    computed,
+    inject,
+    signal,
+    viewChild,
+    viewChildren,
+} from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { HttpErrorResponse } from '@angular/common/http';
 import { FormArray, FormBuilder, FormControl, ReactiveFormsModule } from '@angular/forms';
@@ -54,7 +66,7 @@ const KIND = 'findings-spec' as const;
 
 /**
  * **Findings fields** editor (findings-spec authoring UI S2–S5, design
- * `docs/superpower/findings-spec-authoring-ui-design.md`, Option C). Lets a Case-desk lead see, add, edit,
+ * `docs/archived-documents/plans-archive/findings-spec-authoring-ui-design.md`, Option C). Lets a Case-desk lead see, add, edit,
  * reorder and remove the questions the Case Findings panel asks — with a live preview that is the real
  * `<inspecto-schema-form>` — without ever seeing a key, a tier, a regex or TOON.
  *
@@ -96,6 +108,7 @@ export class FindingsSpecEditorDialog {
     private dialog = inject(MatDialog);
     private fb = inject(FormBuilder);
     private destroyRef = inject(DestroyRef);
+    private injector = inject(Injector);
 
     /** D1: writing needs `canManageIncidents`. Everyone else gets the same screen, read-only (T1). */
     readonly canEdit = inject(LensService).canManageIncidents;
@@ -127,6 +140,7 @@ export class FindingsSpecEditorDialog {
     /** What the preview holds, carried across every draft edit (a spec swap rebuilds its controls). */
     readonly previewSeed = signal<Record<string, unknown>>({});
     private readonly preview = viewChild<InspectoSchemaFormComponent>('preview');
+    private readonly choiceInputs = viewChildren<ElementRef<HTMLInputElement>>('choiceInput');
 
     readonly controlLabel = controlLabel;
     readonly usesChoices = usesChoices;
@@ -326,29 +340,36 @@ export class FindingsSpecEditorDialog {
 
     // ── choices ──────────────────────────────────────────────────────────────────
 
+    // The choice rows are tracked by their control, so every edit below changes `choiceControls` IN PLACE.
+    // Rebuilding it (as `select()` does) under a still-rendered row left that input bound to a removed control,
+    // and what the lead typed there was silently lost (FINDINGS-EDITOR-CHOICE-BINDING-1).
+
     addChoice(): void {
         const uid = this.selectedUid();
         if (!uid) return;
         this.mutate((fields) =>
             fields.map((f) => (f.uid === uid ? { ...f, choices: [...f.choices, newChoice('')] } : f)),
         );
-        this.select(uid);
+        this.choiceControls.push(this.fb.nonNullable.control(''), { emitEvent: false });
+        // Put the cursor in the new box, not the field's Name (FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1).
+        afterNextRender(() => this.choiceInputs().at(-1)?.nativeElement.focus(), { injector: this.injector });
     }
 
     moveChoice(index: number, delta: -1 | 1): void {
         const uid = this.selectedUid();
-        if (!uid) return;
+        const j = index + delta;
+        if (!uid || j < 0 || j >= this.choiceControls.length) return;
         this.mutate((fields) =>
             fields.map((f) => {
                 if (f.uid !== uid) return f;
-                const j = index + delta;
-                if (j < 0 || j >= f.choices.length) return f;
                 const choices = [...f.choices];
                 [choices[index], choices[j]] = [choices[j], choices[index]];
                 return { ...f, choices };
             }),
         );
-        this.select(uid);
+        const control = this.choiceControls.at(index);
+        this.choiceControls.removeAt(index, { emitEvent: false });
+        this.choiceControls.insert(j, control, { emitEvent: false });
     }
 
     async removeChoice(index: number): Promise<void> {
@@ -366,7 +387,7 @@ export class FindingsSpecEditorDialog {
         this.mutate((fields) =>
             fields.map((x) => (x.uid === f.uid ? { ...x, choices: x.choices.filter((_, i) => i !== index) } : x)),
         );
-        this.select(f.uid);
+        this.choiceControls.removeAt(index, { emitEvent: false });
     }
 
     // ── pickers ──────────────────────────────────────────────────────────────────
