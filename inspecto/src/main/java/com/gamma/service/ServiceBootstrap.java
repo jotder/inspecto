@@ -59,8 +59,9 @@ public final class ServiceBootstrap {
         // Job templates (PIP-6) resolve at load: jobs referencing `template:` are expanded here, so the
         // scheduler only ever sees plain JobConfigs. (The *_job_template.toon suffix does not match the
         // *_job.toon scan — a template file is never loaded as a job itself.)
+        // THE shared discovery (JobTemplate.discover) — the same one an attachment approval hashes against.
         Map<String, com.gamma.job.JobTemplate> templates =
-                loadJobTemplates(resolveBySuffix(paths, "_job_template.toon"));
+                com.gamma.job.JobTemplate.discover(java.util.Arrays.stream(paths).map(Path::of).toList());
         List<JobConfig> jobConfigs = loadJobs(resolveBySuffix(paths, "_job.toon"), templates);
         List<SemanticModel> semantics = loadSemantics(resolveBySuffix(paths, "_meta.toon"));
         List<com.gamma.alert.AlertRule> alertRules = loadAlerts(root);
@@ -232,22 +233,6 @@ public final class ServiceBootstrap {
                         c.id(), c.connector(), c.isRemote() ? c.testEndpoint() : "local", p);
             } catch (Exception e) {
                 log.warn("Could not load connection profile {}: {}", p, e.getMessage());
-            }
-        }
-        return out;
-    }
-
-    /** Load each {@code *_job_template.toon} (PIP-6) by name; a bad one is warned and skipped. */
-    private static Map<String, com.gamma.job.JobTemplate> loadJobTemplates(List<Path> paths) {
-        Map<String, com.gamma.job.JobTemplate> out = new java.util.LinkedHashMap<>();
-        for (Path p : paths) {
-            try {
-                com.gamma.job.JobTemplate t = com.gamma.job.JobTemplate.load(p.toString());
-                if (out.putIfAbsent(t.name(), t) != null)
-                    log.warn("Duplicate job template '{}' at {} — keeping the first", t.name(), p);
-                else log.info("Loaded job template '{}' ({} param(s)) from {}", t.name(), t.paramDefaults().size(), p);
-            } catch (Exception e) {
-                log.warn("Could not load job template {}: {}", p, e.getMessage());
             }
         }
         return out;

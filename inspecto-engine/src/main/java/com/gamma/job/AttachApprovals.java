@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
-import java.util.stream.Stream;
 
 /**
  * The approval of a report Job's ATTACHMENTS, pinned to CONTENT (ASSURE-XLSX-ATTACHMENTS-1 rounds 3–4; the same
@@ -89,23 +88,9 @@ public final class AttachApprovals {
         }
     }
 
-    /** Every {@code *_job_template.toon} under {@code root} (depth 4), by name. */
+    /** The templates a Job in the Space whose config root is {@code root} expands against — {@link JobTemplate#discover}. */
     public static Map<String, JobTemplate> templates(Path root) {
-        Map<String, JobTemplate> out = new LinkedHashMap<>();
-        if (root == null || !Files.isDirectory(root)) return out;
-        try (Stream<Path> files = Files.walk(root, 4)) {
-            for (Path p : files.filter(f -> f.getFileName().toString().endsWith("_job_template.toon")).toList()) {
-                try {
-                    JobTemplate t = JobTemplate.load(p.toString());
-                    out.putIfAbsent(t.name(), t);
-                } catch (Exception bad) {
-                    // the loader skips a bad template too
-                }
-            }
-        } catch (IOException unreadable) {
-            // no templates readable ⇒ none expand
-        }
-        return out;
+        return JobTemplate.discover(root == null ? List.of() : List.of(root));
     }
 
     /**

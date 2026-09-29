@@ -56,6 +56,43 @@ public record JobTemplate(String name, Map<String, String> paramDefaults, Map<St
         jobBlock = jobBlock == null ? Map.of() : Map.copyOf(jobBlock);
     }
 
+    /**
+     * THE template discovery (ASSURE-XLSX-ATTACHMENTS-1 round 5): every {@code *_job_template.toon} under each of
+     * {@code roots} (a directory is walked in full, sorted; a file is taken as is), loaded by name, the FIRST of a
+     * duplicated name kept, a bad file skipped. The loader ({@code ServiceBootstrap}), the approval hold and the
+     * approve check all call this, so the template a Job expands against at load is the one its approval hashed.
+     */
+    public static java.util.Map<String, JobTemplate> discover(java.util.List<java.nio.file.Path> roots) {
+        java.util.Map<String, JobTemplate> out = new java.util.LinkedHashMap<>();
+        for (java.nio.file.Path root : roots) {
+            if (root == null) continue;
+            java.util.List<java.nio.file.Path> files = new java.util.ArrayList<>();
+            if (java.nio.file.Files.isDirectory(root)) {
+                try (java.util.stream.Stream<java.nio.file.Path> w = java.nio.file.Files.walk(root)) {
+                    w.filter(java.nio.file.Files::isRegularFile)
+                     .filter(f -> f.getFileName().toString().endsWith("_job_template.toon"))
+                     .sorted().forEach(files::add);
+                } catch (IOException unreadable) {
+                    LOG.warn("Could not scan {} for job templates: {}", root, unreadable.getMessage());
+                }
+            } else if (java.nio.file.Files.isRegularFile(root) && root.getFileName().toString().endsWith("_job_template.toon")) {
+                files.add(root);
+            }
+            for (java.nio.file.Path p : files) {
+                try {
+                    JobTemplate t = load(p.toString());
+                    if (out.putIfAbsent(t.name(), t) != null)
+                        LOG.warn("Duplicate job template '{}' at {} — keeping the first", t.name(), p);
+                } catch (Exception bad) {
+                    LOG.warn("Could not load job template {}: {}", p, bad.getMessage());
+                }
+            }
+        }
+        return out;
+    }
+
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(JobTemplate.class);
+
     /** Load one {@code *_job_template.toon} (a {@code job_template { name, params?, job }} block). */
     public static JobTemplate load(String path) throws IOException {
         Map<String, Object> root = ToonHelper.load(path);

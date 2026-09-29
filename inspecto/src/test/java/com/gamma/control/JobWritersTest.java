@@ -84,6 +84,18 @@ class JobWritersTest {
         assertTrue(stale.isEmpty(), () -> "NOT_A_JOB_WRITER rows naming no writer route: " + stale);
     }
 
+    /** Round 5 item 3: the loader and the approval side call the ONE template discovery — they cannot disagree. */
+    @Test
+    void theLoaderAndTheApprovalShareOneTemplateDiscovery() throws IOException {
+        String loader = Files.readString(Path.of("src/main/java/com/gamma/service/ServiceBootstrap.java"));
+        String approvals = Files.readString(Path.of("../inspecto-engine/src/main/java/com/gamma/job/AttachApprovals.java"));
+        String guard = Files.readString(Path.of("src/main/java/com/gamma/control/JobWriteGuard.java"));
+        assertTrue(loader.contains("JobTemplate.discover("), "ServiceBootstrap loads templates through JobTemplate.discover");
+        assertTrue(!loader.contains("\"_job_template.toon\""), "the loader keeps no second discovery of its own");
+        assertTrue(approvals.contains("JobTemplate.discover("), "AttachApprovals.templates is JobTemplate.discover");
+        assertTrue(guard.contains("AttachApprovals.templates("), "the hold and approve expand through AttachApprovals.templates");
+    }
+
     /** Round 4 finding 3: a plain report template plus {@code attach: "true"} in the job file is judged EXPANDED. */
     @Test
     void aTemplatePlusAttachOverrideImportIsRefused() {
