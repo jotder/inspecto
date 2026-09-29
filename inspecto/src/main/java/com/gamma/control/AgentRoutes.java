@@ -4,6 +4,7 @@ import com.gamma.intelligence.AgentAnswerSink;
 import com.gamma.intelligence.AgentAskRequest;
 import com.gamma.intelligence.AgentAskResult;
 import com.gamma.intelligence.AgentSessionRequest;
+import com.gamma.intelligence.AgentSessionResult;
 import com.gamma.intelligence.spi.IntelligenceAgent;
 import com.sun.net.httpserver.HttpExchange;
 
@@ -27,6 +28,15 @@ import java.util.Map;
  */
 final class AgentRoutes implements RouteModule {
 
+    /**
+     * Session id -> the Subject id that opened it (2026-09-29, round-2 verification). Every per-session route
+     * answers 404 to any other caller, exactly as it answers an unknown session, so a session id someone else
+     * learned is useless. Only sessions opened with a Subject are recorded; Personal has no Subject and checks
+     * nothing. The issuer is implicit: the installed Authenticator accepts exactly one issuer, so a Subject id
+     * is unique within an installation. In memory, like the sessions themselves.
+     */
+    private final Map<String, String> sessionOwners = new java.util.concurrent.ConcurrentHashMap<>();
+
     @Override
     public void register(ApiContext api) {
         api.post("/agent/sessions", (e, m) -> {
@@ -38,7 +48,10 @@ final class AgentRoutes implements RouteModule {
                 // The caller's capabilities ride with the session, so a tool the model calls meets the same gate as
                 // POST /agent/tools/{name}. null (no Subject, Personal) checks nothing, like every gate.
                 java.util.Set<String> capabilities = ApiContext.subject(e).map(Subject::capabilities).orElse(null);
-                return agentOr503(api).openSession(new AgentSessionRequest(role, mapField(page), goalKind, capabilities));
+                AgentSessionResult opened = agentOr503(api).openSession(
+                        new AgentSessionRequest(role, mapField(page), goalKind, capabilities));
+                ApiContext.subject(e).ifPresent(s -> sessionOwners.put(opened.sessionId(), s.id()));
+                return opened;
             } catch (IllegalArgumentException ex) {   // unknown goalKind → reject at the edge
                 throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, ex.getMessage());
             }
@@ -48,6 +61,7 @@ final class AgentRoutes implements RouteModule {
             String question = ApiContext.str(body, "question");
             if (question == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "question is required");
             Object page = body.get("page");
+            requireSessionOwner(e, ApiContext.name(m));
             try {
                 return agentOr503(api).ask(ApiContext.name(m), new AgentAskRequest(question, mapField(page)));
             } catch (IllegalArgumentException ex) {
@@ -59,6 +73,7 @@ final class AgentRoutes implements RouteModule {
             String question = ApiContext.str(body, "question");
             if (question == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "question is required");
             Object page = body.get("page");
+            requireSessionOwner(e, ApiContext.name(m));
             streamAsk(agentOr503(api), ApiContext.name(m), new AgentAskRequest(question, mapField(page)), e);
             return ApiContext.HANDLED;
         });
@@ -335,6 +350,14 @@ final class AgentRoutes implements RouteModule {
      */
     private static void requireToolCapability(IntelligenceAgent agent, String tool, HttpExchange e) {
         agent.toolCapability(tool).ifPresent(capability -> ApiContext.requireCapability(e, capability));
+    }
+
+    /** 404 unless the caller opened {@code sessionId} (a no-op without a Subject, i.e. Personal). */
+    private void requireSessionOwner(HttpExchange e, String sessionId) {
+        ApiContext.subject(e).ifPresent(caller -> {
+            if (!caller.id().equals(sessionOwners.get(sessionId)))
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown intelligence session: '" + sessionId + "'");
+        });
     }
 
     /** The in-process intelligence agent, or 503 when the optional module is absent. */

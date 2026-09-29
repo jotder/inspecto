@@ -106,6 +106,32 @@ class AgentRoutesTest {
         }
     }
 
+    /** Round-2 verification 2026-09-29: a session belongs to the Subject that opened it; anyone else gets 404. */
+    @Test
+    void aSessionAnswersOnlyItsOwnerAndIs404ToEveryoneElse(@TempDir Path dir) throws Exception {
+        Authenticator fake = ex -> {
+            String auth = ex.getRequestHeaders().getFirst("Authorization");
+            if ("Bearer alice".equals(auth)) return java.util.Optional.of(new Subject("alice", java.util.Set.of()));
+            if ("Bearer bob".equals(auth)) return java.util.Optional.of(new Subject("bob", java.util.Set.of()));
+            return java.util.Optional.empty();
+        };
+        Authenticators.forTest(fake);
+        try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
+            HttpResponse<String> opened = sendAs(ctx.port(), "alice", "/agent/sessions", "{}");
+            assertEquals(200, opened.statusCode());
+            String sid = V1Body.of(opened.body()).get("sessionId").asText();
+            String ask = "{\"question\":\"hello\"}";
+            assertEquals(404, sendAs(ctx.port(), "bob", "/agent/sessions/" + sid + "/ask", ask).statusCode(),
+                    "another Subject must not reach alice's session");
+            assertEquals(404, sendAs(ctx.port(), "bob", "/agent/sessions/" + sid + "/ask/stream", ask).statusCode(),
+                    "nor its stream");
+            assertEquals(200, sendAs(ctx.port(), "alice", "/agent/sessions/" + sid + "/ask", ask).statusCode(),
+                    "the owner still can");
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
     @Test
     void openSessionThenAskRoundTrips(@TempDir Path dir) throws Exception {
         try (Ctx ctx = open(dir, new FakeIntelligenceAgent())) {
