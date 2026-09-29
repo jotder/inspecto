@@ -113,6 +113,48 @@ class StreamLaneTest {
     }
 
     @Test
+    void anErrorInTheProbeKillsTheLaneAndCountsIt() {
+        StreamLane l = new StreamLane("dies-probe", 1, 5_000, 50, () -> { throw new OutOfMemoryError("probe"); },
+                drained::incrementAndGet, now::get);
+        double before = deaths("dies-probe");
+        assertFalse(l.step());
+        assertTrue(l.dead());
+        assertEquals(before + 1, deaths("dies-probe"));
+        probe.pending = 5;
+        assertFalse(l.step(), "a dead lane never steps again");
+        assertEquals(0, drained.get());
+    }
+
+    @Test
+    void aThrowingDrainKillsTheLane() {
+        StreamLane l = new StreamLane("dies-drain", 1, 5_000, 50, () -> probe,
+                () -> { throw new IllegalStateException("drain blew up"); }, now::get);
+        probe.pending = 1;
+        assertTrue(l.step(), "it did try to drain");
+        assertTrue(l.dead());
+        assertEquals(1, probe.closes.get(), "the dead lane released its connector");
+        assertFalse(l.step());
+    }
+
+    @Test
+    void anOrdinaryProbeFailureDoesNotKillTheLane() {
+        StreamLane l = lane(1, 5_000);
+        probe.fail = true;
+        l.step();
+        assertFalse(l.dead());
+    }
+
+    @SuppressWarnings("unchecked")
+    private static double deaths(String pipeline) {
+        var snap = com.gamma.metrics.MetricRegistry.global().snapshot("inspecto_stream_lane_deaths_total"::equals);
+        var entry = (java.util.Map<String, Object>) snap.get("inspecto_stream_lane_deaths_total");
+        if (entry == null) return 0;
+        for (var row : (List<java.util.Map<String, Object>>) entry.get("series"))
+            if (String.valueOf(row.get("labels")).contains(pipeline)) return ((Number) row.get("value")).doubleValue();
+        return 0;
+    }
+
+    @Test
     void theStartedLaneDrainsOnItsOwnThreadAndStopsOnClose() throws Exception {
         StreamLane l = new StreamLane("p", 10, 60_000, 10, () -> probe, drained::incrementAndGet, System::currentTimeMillis);
         probe.pending = 10;

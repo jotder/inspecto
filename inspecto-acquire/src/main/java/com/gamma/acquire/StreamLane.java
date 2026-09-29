@@ -39,6 +39,9 @@ public final class StreamLane implements AutoCloseable {
     private long waitingSince = -1;
     private long drains;
     private volatile boolean stopped;
+    /** Set when a probe or drain threw something that is not an ordinary failure (an Error, an unexpected
+     *  exception out of the drain): the lane stops and {@link #dead()} tells its owner to replace it. */
+    private volatile boolean dead;
     private Thread thread;
 
     public StreamLane(String name, long records, long maxWaitMs, long probeMs,
@@ -57,14 +60,18 @@ public final class StreamLane implements AutoCloseable {
      * A probe failure closes the connector (the next step reopens it) and drains nothing.
      */
     public synchronized boolean step() {
+        if (dead) return false;
         long pending;
         try {
             if (connector == null) connector = open.get();
             pending = connector.pendingRecords();
-        } catch (Exception e) {
+        } catch (AcquisitionException e) {
+            // An ordinary source failure (broker down): keep the lane, reopen on the next probe.
             log.warn("Stream lane '{}': backlog probe failed, reopening next probe: {}", name, e.getMessage());
             closeConnector();
             return false;
+        } catch (Throwable t) {
+            return die("backlog probe", t);
         }
         if (pending == 0) {
             waitingSince = -1;
@@ -79,10 +86,25 @@ public final class StreamLane implements AutoCloseable {
         drains++;
         try {
             drain.run();
-        } catch (RuntimeException e) {
-            log.error("Stream lane '{}': drain failed", name, e);
+        } catch (Throwable t) {
+            die("drain", t);
         }
         return true;
+    }
+
+    /** Mark the lane dead: ERROR log + {@code inspecto_stream_lane_deaths_total}, connector closed, loop stops. */
+    private boolean die(String where, Throwable t) {
+        dead = true;
+        log.error("Stream lane '{}' died in its {} — its owner restarts it on the next reconcile", name, where, t);
+        com.gamma.metrics.MetricRegistry.global().inc("inspecto_stream_lane_deaths_total",
+                "Continuous stream lanes that died and were marked for restart", Map.of("pipeline", name));
+        closeConnector();
+        return false;
+    }
+
+    /** Whether the lane died (see {@link #die}); a dead lane never steps again and must be replaced. */
+    public boolean dead() {
+        return dead;
     }
 
     /** Drains fired so far. */
@@ -96,7 +118,7 @@ public final class StreamLane implements AutoCloseable {
         thread = Thread.ofVirtual().name("stream-lane-" + name).start(() -> {
             if (mdc != null) MDC.setContextMap(mdc);
             try {
-                while (!stopped) {
+                while (!stopped && !dead) {
                     step();
                     try {
                         Thread.sleep(probeMs);

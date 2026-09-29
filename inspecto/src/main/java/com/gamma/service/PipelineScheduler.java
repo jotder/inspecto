@@ -770,8 +770,10 @@ final class PipelineScheduler {
         } finally {
             registryLock.unlock();
         }
+        // A lane no longer wanted is closed; a DEAD lane is closed too, so computeIfAbsent below replaces it
+        // rather than keeping a corpse that would never drain again.
         streamLanes.entrySet().removeIf(e -> {
-            if (want.containsKey(e.getKey())) return false;
+            if (want.containsKey(e.getKey()) && !e.getValue().dead()) return false;
             e.getValue().close();
             return true;
         });
@@ -789,7 +791,7 @@ final class PipelineScheduler {
     /** The lane's drain: fetch-and-land under the acquire claim, then ingest via the ordinary trigger path. */
     private void drainNow(String id) {
         PipelineConfig cfg = configRegistry.get(id).orElse(null);
-        if (cfg == null) return;
+        if (cfg == null || paused.contains(id) || !cfg.active()) return;   // paused since the last reconcile
         RunLease.Claim claim = acquireGuard.tryAcquire(id);
         if (claim != null) {
             try (claim) {
@@ -799,6 +801,7 @@ final class PipelineScheduler {
                 return;
             }
         }
+        if (paused.contains(id)) return;   // paused while fetching: land, but do not ingest
         runPipeline.accept(id);
     }
 
@@ -806,6 +809,11 @@ final class PipelineScheduler {
     void closeStreamLanes() {
         streamLanes.values().forEach(StreamLane::close);
         streamLanes.clear();
+    }
+
+    /** Test view: the live lane object of a Pipeline, or {@code null}. */
+    StreamLane streamLane(String id) {
+        return streamLanes.get(id);
     }
 
     /** Test view: the Pipelines that currently have a lane. */

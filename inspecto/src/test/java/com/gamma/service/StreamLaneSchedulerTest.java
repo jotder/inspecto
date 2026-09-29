@@ -98,6 +98,29 @@ class StreamLaneSchedulerTest {
     }
 
     @Test
+    void aDeadLaneIsReplacedOnTheNextReconcile(@TempDir Path dir) throws Exception {
+        FakeRemoteConnectorFactory.reset(Files.createDirectories(dir.resolve("remote")));
+        Path cfg = pipeline(dir, "trigger:\n  type: stream\n  records: 1000\n  max_wait: 60s");
+        CollectorService svc = new CollectorService(List.of(cfg), 3600, 1);
+        try {
+            PipelineScheduler s = scheduler(svc);
+            s.reconcileStreamLanes();
+            String id = s.streamLaneIds().iterator().next();
+            com.gamma.acquire.StreamLane first = s.streamLane(id);
+            FakeRemoteConnectorFactory.FAIL_CREATE.set("boom");   // the lane's open throws -> not an AcquisitionException
+            long deadline = System.currentTimeMillis() + 5_000;
+            while (!first.dead() && System.currentTimeMillis() < deadline) Thread.sleep(20);
+            assertTrue(first.dead(), "an unexpected throw marks the lane dead");
+            FakeRemoteConnectorFactory.FAIL_CREATE.set(null);
+            s.reconcileStreamLanes();
+            assertNotSame(first, s.streamLane(id), "reconcile replaced the dead lane");
+            assertFalse(s.streamLane(id).dead());
+        } finally {
+            svc.close();
+        }
+    }
+
+    @Test
     void aDefaultPollPipelineGetsNoLane(@TempDir Path dir) throws Exception {
         FakeRemoteConnectorFactory.reset(Files.createDirectories(dir.resolve("remote")));
         CollectorService svc = new CollectorService(List.of(pipeline(dir, "")), 3600, 1);
