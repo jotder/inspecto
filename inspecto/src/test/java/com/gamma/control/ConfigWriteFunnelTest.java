@@ -268,6 +268,7 @@ class ConfigWriteFunnelTest {
             Map.entry("RiskWatchListFeed#feed", MACHINE + " (the risk.score watch-list feed; expiring entries only, D-P5)"),
             Map.entry("EntityIdentityRoutes#assertIdentity", ENTITY_FACTS),
             Map.entry("EntityIdentityRoutes#retract", ENTITY_FACTS),
+            Map.entry("EntityIdentityRoutes#importDataset", ENTITY_FACTS),   // operator-approved 2026-09-30
             Map.entry("EntityIdentityRoutes#groups", ENTITY_FACTS), Map.entry("EntityIdentityRoutes#group", ENTITY_FACTS),
             Map.entry("InvestigationRoutes#sealList", "READS the Identity Fact log to seal a list into an "
                     + "Investigation op (LA-17) — the signal matches opening the log, which is not a write; "

@@ -71,6 +71,7 @@ class DecisionRuleWritersTest {
             Map.entry("EntityListRoutes#match", NOT_CONFIG), Map.entry("RiskWatchListFeed#check", NOT_CONFIG),
             Map.entry("RiskWatchListFeed#feed", NOT_CONFIG),
             Map.entry("EntityIdentityRoutes#assertIdentity", NOT_CONFIG), Map.entry("EntityIdentityRoutes#retract", NOT_CONFIG),
+            Map.entry("EntityIdentityRoutes#importDataset", NOT_CONFIG),   // operator-approved 2026-09-30
             Map.entry("EntityIdentityRoutes#groups", NOT_CONFIG), Map.entry("EntityIdentityRoutes#group", NOT_CONFIG),
             Map.entry("ActionRequestRoutes#propose", NOT_CONFIG),
             Map.entry("ActionRequestRoutes#decide", NOT_CONFIG), Map.entry("ActionRequestRoutes#retry", NOT_CONFIG),
