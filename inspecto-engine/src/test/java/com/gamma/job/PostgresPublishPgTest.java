@@ -103,8 +103,18 @@ class PostgresPublishPgTest {
     void verifyFullAgainstARealTlsPostgresChecksTheAuthoredHost(@TempDir Path dir) throws Exception {
         String setup = System.getenv("INSPECTO_TEST_PG_TLS_URL"), caFile = System.getenv("INSPECTO_TEST_PG_TLS_CA"),
                 certHost = System.getenv("INSPECTO_TEST_PG_TLS_HOST"), pw = System.getenv("INSPECTO_TEST_PG_TLS_PASSWORD");
-        Assumptions.assumeTrue(setup != null && caFile != null && certHost != null && pw != null,
-                "SKIPPED: no TLS Postgres — set INSPECTO_TEST_PG_TLS_URL, _CA, _HOST and _PASSWORD");
+        if (setup != null && caFile != null && certHost != null && pw != null) {
+            verifyFull(dir, setup, caFile, certHost, pw);
+            return;
+        }
+        // No inputs: provision our own — a keytool CA + server cert and a throwaway container of the LOCAL
+        // postgres image (never pulled). Skips, saying why, only when docker or the image is absent.
+        try (SelfProvisionedTlsPostgres pg = SelfProvisionedTlsPostgres.start(dir.resolve("tls"))) {
+            verifyFull(dir, pg.setupUrl(), pg.caFile().toString(), SelfProvisionedTlsPostgres.HOST, SelfProvisionedTlsPostgres.PASSWORD);
+        }
+    }
+
+    private void verifyFull(Path dir, String setup, String caFile, String certHost, String pw) throws Exception {
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("jdbc:postgresql://[^:/]+:(\\d+)/.*").matcher(setup);
         assertTrue(m.matches(), "setup URL needs an explicit port");
         String port = m.group(1);

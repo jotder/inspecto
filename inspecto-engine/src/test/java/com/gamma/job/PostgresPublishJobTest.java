@@ -354,6 +354,20 @@ class PostgresPublishJobTest {
     }
 
     @Test
+    void strippingAClassificationFromASiblingDatasetRefusesTheRun() throws Exception {
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "subs2", Map.of("physicalRef", "subs"));
+        JobRun ok = run(Map.of("datasets", "subs2"));
+        assertEquals("SUCCESS", ok.status(), ok.message());
+        assertEquals(List.of("plan", "amount", "day"), columnsOf("subs2"), "msisdn stays out through subs's catalog");
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "subs", Map.of("physicalRef", "subs",
+                "columns", List.of(Map.of("name", "msisdn"))));   // the sibling's classification stripped
+        approve = false;
+        JobRun r = run(Map.of("datasets", "subs2"));
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("the approved publication changed (dataset subs2)"), r.message());
+    }
+
+    @Test
     void anApprovalNotBoundToAnApprovedPendingChangeIsRefused() throws Exception {
         PostgresPublishJobType.installApprovalVerifier(null);
         JobRun none = run(Map.of());

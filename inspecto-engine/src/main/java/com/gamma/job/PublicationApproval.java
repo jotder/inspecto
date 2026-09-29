@@ -70,6 +70,10 @@ public final class PublicationApproval {
             Map<String, Object> def = new TreeMap<>();
             if (ds != null) {
                 for (String k : DATASET_KEYS) if (ds.containsKey(k)) def.put(k, canonical(ds.get(k)));
+                // the classification a run INHERITS from sibling Datasets over the same store is part of what was
+                // approved: stripping it from a sibling must change this fingerprint
+                def.put("inheritedClassification",
+                        canonical(PostgresPublishJobType.lineageClassification(id, ds, store, views)));
                 if (ds.get("view") != null)
                     views.get(String.valueOf(ds.get("view"))).ifPresent(v -> def.put("viewDefinition", canonical(v.toMap())));
             } else {

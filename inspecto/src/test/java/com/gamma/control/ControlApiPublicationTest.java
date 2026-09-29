@@ -207,6 +207,13 @@ class ControlApiPublicationTest {
             rec.put("nonce", PublicationApproval.recordOf(c.root(), "to-bi").orElseThrow().get("nonce"));
             rec.put("job", "someone-else");
             assertFalse(PendingChangeRoutes.verifyPublicationApproval(c.root(), rec), "bound to that Job");
+            rec.put("job", "to-bi");
+            assertTrue(PendingChangeRoutes.verifyPublicationApproval(c.root(), rec));
+            Map<String, Object> fps = new java.util.TreeMap<>((Map<String, Object>) rec.get("fingerprints"));
+            fps.put("connection", "0".repeat(64));
+            rec.put("fingerprints", fps);
+            assertFalse(PendingChangeRoutes.verifyPublicationApproval(c.root(), rec),
+                    "fingerprints edited on the host differ from the MAC'd Pending Change's");
         }
     }
 

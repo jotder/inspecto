@@ -97,7 +97,12 @@ final class PendingChangeRoutes implements RouteModule {
             return pc != null && !PendingChanges.invalid(pc) && "approved".equals(pc.get("status"))
                     && String.valueOf(nonce).equals(String.valueOf(pc.get("publicationNonce")))
                     && pc.get("proposed") instanceof Map<?, ?> proposed
-                    && String.valueOf(job).equals(PendingChanges.publicationName(proposed));
+                    && String.valueOf(job).equals(PendingChanges.publicationName(proposed))
+                    // the record's fingerprints must be the ones the MAC'd Pending Change was approved with — an
+                    // approval file edited on the host fails here
+                    && record.get("fingerprints") instanceof Map<?, ?> recorded
+                    && pc.get("publicationFingerprints") instanceof Map<?, ?> approved
+                    && stringMap(recorded).equals(stringMap(approved));
         } catch (RuntimeException | java.io.IOException unreadable) {
             return false;
         }
