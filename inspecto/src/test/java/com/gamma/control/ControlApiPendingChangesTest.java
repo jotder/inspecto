@@ -709,6 +709,47 @@ class ControlApiPendingChangesTest {
         return root.resolve("jobs").resolve("beat_job.toon");
     }
 
+    private static final String REPORT = "{\"name\":\"mailer\",\"type\":\"report\",\"cron\":\"0 3 * * *\","
+            + "\"recipients\":\"ops@example.com\",\"attach\":\"false\"}";
+
+    /**
+     * ASSURE-XLSX-ATTACHMENTS-1 (operator 2026-09-29): turning {@code attach: true} on is APPROVAL-REQUIRED — held as
+     * a Pending Change with NO approval policy configured, four-eyes, applied only by a second person.
+     */
+    @Test
+    void turningAttachOnIsHeldForFourEyesEvenWithNoPolicy(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        try (Ctx c = open(cfg, root)) {
+            HttpResponse<String> plain = send(c, "POST", "/jobs", REPORT, AUTHOR);
+            assertTrue(plain.statusCode() < 300 && plain.statusCode() != 202, "no policy, no attach: applied at once — " + plain.body());
+
+            JsonNode held = data(send(c, "PUT", "/jobs/mailer", REPORT.replace("\"false\"", "\"true\""), AUTHOR), 202);
+            String id = held.at("/pendingChange/id").asText();
+            assertEquals("job", held.at("/pendingChange/kind").asText(), held.toString());
+            assertEquals("false", data(send(c, "GET", "/jobs/mailer", null, AUTHOR), 200).at("/attach").asText(),
+                    "a held flip writes nothing");
+
+            assertEquals(403, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", SELF).statusCode(),
+                    "four-eyes: the author may never approve their own attach");
+            assertEquals(403, send(c, "POST", "/pending-changes/" + id + "/approve", "{}", AUTHOR).statusCode());
+            JsonNode ok = data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER), 200);
+            assertTrue(ok.get("applied").asBoolean(), ok.toString());
+            assertEquals("true", data(send(c, "GET", "/jobs/mailer", null, AUTHOR), 200).at("/attach").asText());
+
+            // an already-approved attach Job edits under the normal (here: no) policy
+            HttpResponse<String> edit = send(c, "PUT", "/jobs/mailer",
+                    REPORT.replace("\"false\"", "\"true\"").replace("0 3", "0 4"), AUTHOR);
+            assertTrue(edit.statusCode() < 300 && edit.statusCode() != 202, edit.body());
+
+            // a NEW report Job created with attach: true is held too
+            data(send(c, "POST", "/jobs", REPORT.replace("mailer", "mailer2").replace("\"false\"", "\"true\""), AUTHOR), 202);
+            assertEquals(404, send(c, "GET", "/jobs/mailer2", null, AUTHOR).statusCode());
+        } finally {
+            System.clearProperty("jobs.audit.dir");
+        }
+    }
+
     @Test
     void aJobCreateAndUpdateAreHeldAndAppliedOnlyByASecondPerson(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         Path root = Files.createDirectories(tmp.resolve("config"));

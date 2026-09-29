@@ -613,6 +613,15 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
   of one (`notexample.com` does not match `example.com`), compared lower-case on the punycode (IDN) form. One
   address outside refuses the whole send. A missing or invalid file reads as empty (fail closed). Tests:
   `MailAttachDomainsTest`, `ControlApiActionRequestsTest.theMailAttachmentDomainAllowlistIsEmptyByDefaultAdminOnlyAndValidated`.
+* 🔴 **Turning `attach: true` on is APPROVAL-REQUIRED — four-eyes, with or without a policy** (operator 2026-09-29).
+  `JobRoutes.attachApproval`: a `POST /jobs` of a report Job with `attach: true`, or a `PUT /jobs/{name}` that
+  flips an existing report Job to it, reaches `PendingChanges.hold(…, mandatory)` with a
+  `canApproveChanges` four-eyes rule even when `approval.toon` names no `job` rule (a policy is opt-in; this
+  risk is not). With a job policy too, the policy's approver applies and four-eyes is forced on. Editing an
+  already-approved attach Job falls back to the normal policy. This fits the Pending Change design unchanged: the
+  approve path reads the approver and four-eyes flag from the RECORD, never from the live policy. Test:
+  `ControlApiPendingChangesTest.turningAttachOnIsHeldForFourEyesEvenWithNoPolicy` (author proposes, self-approve
+  403, a second admin applies; mutation to "no mandatory rule" turns it red).
 * Tests: `MailAttachmentsTest` (jail, `config.secrets`, allowlist, both caps, filename), `SmtpEmailChannelAttachmentTest`
   (MIME structure after serialise-and-reparse, header injection, the channel's own cap check), `ReportJobDeliveryTest`
   (the Job attaches its own artifact; an over-cap file fails the Run with the reason). ⚠ No live-SMTP round trip: the
