@@ -737,10 +737,22 @@ class ControlApiPendingChangesTest {
             assertTrue(ok.get("applied").asBoolean(), ok.toString());
             assertEquals("true", data(send(c, "GET", "/jobs/mailer", null, AUTHOR), 200).at("/attach").asText());
 
-            // an already-approved attach Job edits under the normal (here: no) policy
+            // an already-approved attach Job: a schedule edit goes under the normal (here: no) policy...
             HttpResponse<String> edit = send(c, "PUT", "/jobs/mailer",
                     REPORT.replace("\"false\"", "\"true\"").replace("0 3", "0 4"), AUTHOR);
             assertTrue(edit.statusCode() < 300 && edit.statusCode() != 202, edit.body());
+            // ...but changing WHO gets it or WHAT is attached re-opens the four-eyes hold (finding 4)
+            String approved = REPORT.replace("\"false\"", "\"true\"").replace("0 3", "0 4");
+            for (String change : List.of(
+                    approved.replace("ops@example.com", "ops@example.com,leak@example.com"),
+                    approved.replace("}", ",\"dataset\":\"other_ds\"}"),
+                    approved.replace("}", ",\"format\":\"xlsx\"}"),
+                    approved.replace("}", ",\"scope\":\"dataset\"}"),
+                    approved.replace("}", ",\"measures\":\"count\"}"),
+                    approved.replace("}", ",\"group_by\":\"msisdn\"}"))) {
+                JsonNode reheld = data(send(c, "PUT", "/jobs/mailer", change, AUTHOR), 202);
+                data(send(c, "POST", "/pending-changes/" + reheld.at("/pendingChange/id").asText() + "/withdraw", "{}", AUTHOR), 200);
+            }
 
             // a NEW report Job created with attach: true is held too
             data(send(c, "POST", "/jobs", REPORT.replace("mailer", "mailer2").replace("\"false\"", "\"true\""), AUTHOR), 202);
