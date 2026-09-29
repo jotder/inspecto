@@ -10,7 +10,7 @@ import java.util.Map;
  *   <li>{@link #mandatory} — called by {@link PendingChanges#hold} itself for {@code kind = job}, so every route
  *       that holds a job write ({@code /jobs} POST/PUT/enable/disable/reschedule, {@code /config/write},
  *       {@code /config/patch}) gets the mandatory four-eyes rule with no call site to forget.</li>
- *   <li>{@code refuseImport} — called by {@code ImportCapabilityGuard} for every job an import carries (the
+ *   <li>{@link #refuseImport} — called by {@code ImportCapabilityGuard} for every job an import carries (the
  *       {@code /bundle/import} job items, a pipeline closure's and the {@code /import} zip's {@code *_job.toon},
  *       a new Space's bundle): N items cannot be one Pending Change, so an attaching report Job is refused (403)
  *       before anything is written, whatever the policy.</li>
@@ -33,6 +33,13 @@ final class JobWriteGuard {
         Map<?, ?> prev = section(current);
         if (attaches(prev)) return null;
         return new ApprovalPolicy.Rule(true, ApprovalPolicy.DEFAULT_APPROVER, true);
+    }
+
+    /** An import carrying an attaching report Job: refused outright (403) — it must be proposed through {@code /jobs}. */
+    static void refuseImport(Map<?, ?> job) {
+        if (attaches(section(job)))
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
+                    "a report job that attaches data needs approval; create it through /jobs");
     }
 
     static boolean attaches(Map<?, ?> job) {

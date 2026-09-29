@@ -188,6 +188,29 @@ class ControlApiBundleNewKindsTest {
         }
     }
 
+    /** ASSURE-XLSX-ATTACHMENTS-1 re-verification finding 3: an attaching report Job never arrives by bundle. */
+    @Test
+    void aBundleCarryingAnAttachingReportJobIsRefusedBeforeAnyWrite(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            String attach = "{\"name\":\"mailer\",\"type\":\"report\",\"cron\":\"0 3 * * *\","
+                    + "\"recipients\":\"ops@example.com\",\"attach\":\"true\"}";
+            String good = "{\"name\":\"wellbehaved\",\"type\":\"maintenance\",\"task\":\"cleanup\",\"cron\":\"0 4 * * *\"}";
+            String bundle = "{\"format\":\"inspecto-metadata-bundle\",\"version\":2,"
+                    + "\"exportedAt\":\"2026-09-16T00:00:00Z\",\"sourceSpace\":null,\"items\":["
+                    + "{\"kind\":\"job\",\"id\":\"wellbehaved\",\"content\":" + good + "},"
+                    + "{\"kind\":\"job\",\"id\":\"mailer\",\"content\":" + attach + "}]}";
+            HttpResponse<String> r = send(c.port, "POST", "/bundle/import", bundle);
+            assertEquals(403, r.statusCode(), r.body());
+            assertTrue(r.body().contains("attaches data needs approval"), r.body());
+            assertEquals(404, send(c.port, "GET", "/jobs/mailer", null).statusCode());
+            assertEquals(404, send(c.port, "GET", "/jobs/wellbehaved", null).statusCode(), "refused whole, before any item");
+
+            // with attach false the same Job imports
+            JsonNode ok = json(send(c.port, "POST", "/bundle/import", bundle.replace("\"attach\":\"true\"", "\"attach\":\"false\"")));
+            assertEquals(2, ok.get("imported").asInt(), ok.toString());
+        }
+    }
+
     // ── enrichment (pipeline spec gap 6b) ────────────────────────────────────────
 
     /**

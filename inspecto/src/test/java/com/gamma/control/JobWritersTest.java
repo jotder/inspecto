@@ -58,6 +58,12 @@ class JobWritersTest {
         assertTrue(hold != null && hold.contains("JobWriteGuard.mandatory("),
                 "PendingChanges.hold must run JobWriteGuard.mandatory — every holding route relies on it");
 
+        String imports = ConfigWriteFunnelTest.methodBodies(ConfigWriteFunnelTest.withoutComments(Files.readString(
+                Path.of("src/main/java/com/gamma/control/ImportCapabilityGuard.java")))).get("requireIfAdministerOnly");
+        assertTrue(imports != null && imports.contains("JobWriteGuard.refuseImport("),
+                "every import of a job (items and files) funnels through requireIfAdministerOnly, which must refuse "
+                        + "an attaching report Job");
+
         Set<String> writers = new LinkedHashSet<>();
         Set<String> open = new LinkedHashSet<>();
         for (ConfigWriteFunnelTest.Verdict v : ConfigWriteFunnelTest.scan()) {

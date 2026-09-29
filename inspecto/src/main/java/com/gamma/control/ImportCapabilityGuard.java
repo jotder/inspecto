@@ -182,6 +182,9 @@ final class ImportCapabilityGuard {
         if (PendingChanges.isPublication(job))
             throw new ApiException(409, ErrorCodes.CONFLICT, "an import carrying a publish.postgres Job is refused — "
                     + "create it with POST /jobs so it can be approved (four-eyes); nothing was written");
+        // ASSURE-XLSX-ATTACHMENTS-1: an attaching report Job needs four-eyes approval, which N imported items cannot
+        // get — refused outright (403), whatever the policy, before anything is written.
+        JobWriteGuard.refuseImport(job);
         Map<String, Object> j = new LinkedHashMap<>((Map<String, Object>) job);
         j.putIfAbsent("name", "import");
         try {
