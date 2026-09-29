@@ -136,7 +136,10 @@ final class ConfigReadRoutes implements RouteModule {
         // Read BEFORE the delete: the id the config history is filed under is in the file itself.
         Map<String, Object> deletedRaw = "pipeline".equals(type)
                 ? ConfigLoader.filesystem().decode(target.toString()) : Map.of();
+        Map<String, Object> deletedJob = "job".equals(type) ? ConfigFileSupport.storedContent(target, type) : null;
         Files.delete(target);
+        if (deletedJob != null)   // ASSURE-BI-PUBLICATION-1: a deleted publication's approval goes with it
+            com.gamma.job.PublicationApproval.forget(writeRoot, PendingChanges.publicationName(deletedJob));
         // Split storage (schema): the sibling _structure.csv / _mapping.csv are part of the component — discard them too.
         if ("schema".equals(type)) {
             Files.deleteIfExists(StructureCsv.siblingFor(target));

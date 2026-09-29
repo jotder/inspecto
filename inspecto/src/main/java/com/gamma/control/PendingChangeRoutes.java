@@ -78,6 +78,31 @@ final class PendingChangeRoutes implements RouteModule {
         return out;
     }
 
+    private static byte[] randomBytes() {
+        byte[] b = new byte[16];
+        new java.security.SecureRandom().nextBytes(b);
+        return b;
+    }
+
+    /**
+     * The {@link com.gamma.job.PostgresPublishJobType.ApprovalVerifier} the control plane installs: an approval record
+     * is honoured only if the Pending Change it names exists under this config root, passes its MAC check, is
+     * {@code approved}, is for that Job, and carries the same nonce.
+     */
+    static boolean verifyPublicationApproval(Path root, Map<String, Object> record) {
+        Object id = record.get("pendingChange"), nonce = record.get("nonce"), job = record.get("job");
+        if (id == null || nonce == null || job == null) return false;
+        try {
+            Map<String, Object> pc = PendingChanges.read(root, String.valueOf(id));
+            return pc != null && !PendingChanges.invalid(pc) && "approved".equals(pc.get("status"))
+                    && String.valueOf(nonce).equals(String.valueOf(pc.get("publicationNonce")))
+                    && pc.get("proposed") instanceof Map<?, ?> proposed
+                    && String.valueOf(job).equals(PendingChanges.publicationName(proposed));
+        } catch (RuntimeException | java.io.IOException unreadable) {
+            return false;
+        }
+    }
+
     private static Map<String, String> stringMap(Map<?, ?> m) {
         Map<String, String> out = new java.util.TreeMap<>();
         m.forEach((k, v) -> out.put(String.valueOf(k), String.valueOf(v)));
@@ -281,8 +306,10 @@ final class PendingChangeRoutes implements RouteModule {
             result.put("body", parse(r.body()));
             if (applied && publication != null) {
                 java.util.Set<String> caps = ApiContext.subject(ex).map(Subject::capabilities).orElse(java.util.Set.of());
+                String nonce = java.util.HexFormat.of().formatHex(randomBytes());
+                rec.put("publicationNonce", nonce);   // saved with the approved record below (MAC'd)
                 com.gamma.job.PublicationApproval.record(root, PendingChanges.publicationName((Map<?, ?>) rec.get("proposed")),
-                        publication, by, caps);
+                        publication, by, caps, nonce, String.valueOf(rec.get("id")));
             }
             if (applied) {
                 rec.put("status", "approved");

@@ -100,9 +100,11 @@ public final class PublicationApproval {
 
     /** Record the approval of {@code job}'s fingerprints ({@code approvedBy} is the approving Subject). */
     public static void record(Path configRoot, String job, Map<String, String> fingerprints, String approvedBy,
-                              Set<String> approverCapabilities) throws IOException {
+                              Set<String> approverCapabilities, String nonce, String pendingChange) throws IOException {
         Map<String, Object> doc = new LinkedHashMap<>();
         doc.put("job", job);
+        doc.put("nonce", nonce);
+        doc.put("pendingChange", pendingChange);
         doc.put("fingerprints", new TreeMap<>(fingerprints));
         doc.put("approvedBy", approvedBy);
         doc.put("approverCapabilities", new java.util.TreeSet<>(approverCapabilities));
@@ -110,6 +112,41 @@ public final class PublicationApproval {
         Path f = file(configRoot, job);
         Files.createDirectories(f.getParent());
         AtomicFiles.write(f, JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(doc), ".approval-");
+    }
+
+    /** The whole approval record of {@code job}, or empty. */
+    @SuppressWarnings("unchecked")
+    public static Optional<Map<String, Object>> recordOf(Path configRoot, String job) {
+        try {
+            Path f = file(configRoot, job);
+            if (!Files.exists(f)) return Optional.empty();
+            return Optional.of(JSON.readValue(f.toFile(), Map.class));
+        } catch (IOException | RuntimeException unreadable) {
+            return Optional.empty();
+        }
+    }
+
+    /** Remove {@code job}'s approval — every delete path of a Job calls this, so a re-created Job needs a new one. */
+    public static void forget(Path configRoot, String job) {
+        try {
+            Files.deleteIfExists(file(configRoot, job));
+        } catch (IOException | RuntimeException ignored) {
+            // an unsafe name has no record; an undeletable one is refused at run time by its nonce
+        }
+    }
+
+    /** At load: remove every approval whose Job is not among {@code liveJobs}. */
+    public static void sweep(Path configRoot, Set<String> liveJobs) {
+        Path dir = configRoot == null ? null : configRoot.resolve(DIR);
+        if (dir == null || !Files.isDirectory(dir)) return;
+        try (var files = Files.list(dir)) {
+            for (Path f : (Iterable<Path>) files::iterator) {
+                String n = f.getFileName().toString();
+                if (n.endsWith(".json") && !liveJobs.contains(n.substring(0, n.length() - 5))) Files.deleteIfExists(f);
+            }
+        } catch (IOException ignored) {
+            // best effort: a stale record still needs a matching approved Pending Change to be honoured
+        }
     }
 
     /** The recorded fingerprints of {@code job}, or empty when it was never approved (or the record is unreadable). */

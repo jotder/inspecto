@@ -95,6 +95,21 @@ public final class PostgresPublishJobType implements JobTypeProvider {
 
     public static Authority authority() { return authority; }
 
+    /**
+     * Confirms an approval record belongs to a real, still-approved Pending Change (its id + nonce), installed by the
+     * control plane. None installed ⇒ every run is refused: an approval nobody can verify is not one.
+     */
+    @FunctionalInterface
+    public interface ApprovalVerifier {
+        boolean verify(Path configRoot, Map<String, Object> approvalRecord);
+    }
+
+    private static volatile ApprovalVerifier approvalVerifier;
+
+    public static void installApprovalVerifier(ApprovalVerifier v) { approvalVerifier = v; }
+
+    public static ApprovalVerifier approvalVerifier() { return approvalVerifier; }
+
     /** Test seams: the DNS resolver the egress check uses, and how a checked JDBC URL is opened. */
     interface Opener { Connection open(String url, Properties props) throws SQLException; }
     static volatile EgressPolicy.Resolver resolver = EgressPolicy.SYSTEM;
@@ -170,6 +185,10 @@ public final class PostgresPublishJobType implements JobTypeProvider {
             java.util.Optional<Map<String, String>> approved = PublicationApproval.approved(approvalRoot, cfg.name());
             if (approved.isEmpty())
                 return refuse(ctx, "this publication was never approved (four-eyes) — re-approve", t0);
+            ApprovalVerifier verifier = approvalVerifier;
+            Map<String, Object> record = PublicationApproval.recordOf(approvalRoot, cfg.name()).orElse(Map.of());
+            if (verifier == null || !verifier.verify(approvalRoot, record))
+                return refuse(ctx, "the approval record is not bound to an approved Pending Change (id + nonce) — re-approve", t0);
             List<String> changed = PublicationApproval.changed(approved.get(), now);
             if (!changed.isEmpty())
                 return refuse(ctx, "the approved publication changed (" + String.join(" | ", changed) + "); re-approve", t0);

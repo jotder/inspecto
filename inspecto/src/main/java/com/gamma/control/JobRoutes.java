@@ -401,6 +401,7 @@ final class JobRoutes implements RouteModule {
                 svc.jobConfig(name).map(JobConfig::toMap).orElse(null));   // maker-checker (operator, 2026-09-28)
         boolean removed = Files.deleteIfExists(jobFile(api, name));
         svc.removeJob(name);
+        com.gamma.job.PublicationApproval.forget(api.writeRoot(), name);   // a re-created publication needs a new approval
         return Map.of("name", name, "deleted", true, "fileRemoved", removed);
     }
 

@@ -292,7 +292,20 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         com.gamma.job.JobService.installRunAuthority(runAuthority);
         // ASSURE-BI-PUBLICATION-1: publish.postgres runs as its author — Dataset sharing and canAdminister NOW.
         com.gamma.job.PostgresPublishJobType.installAuthority(publishAuthority);
+        com.gamma.job.PostgresPublishJobType.installApprovalVerifier(publishVerifier);
+        // ...and at load, an approval whose Job file is gone is dropped, so a re-created Job needs a new approval.
+        for (SpaceContext sc : spaces.all()) {
+            Path root = sc.root().config() != null ? sc.root().config() : this.writeRoot;
+            if (root == null) continue;
+            java.util.Set<String> live = sc.service().jobService()
+                    .map(js -> js.jobs().stream().map(j -> j.name()).collect(java.util.stream.Collectors.toSet()))
+                    .orElse(java.util.Set.of());
+            com.gamma.job.PublicationApproval.sweep(root, live);
+        }
     }
+
+    private final com.gamma.job.PostgresPublishJobType.ApprovalVerifier publishVerifier =
+            PendingChangeRoutes::verifyPublicationApproval;
 
     private final com.gamma.job.JobService.RunAuthority runAuthority = JobAuthority.runAuthority(this::writeRoot);
     private final com.gamma.job.PostgresPublishJobType.Authority publishAuthority = JobAuthority.publishAuthority(this::writeRoot);
@@ -436,6 +449,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         if (com.gamma.job.JobService.runAuthority() == runAuthority) com.gamma.job.JobService.installRunAuthority(null);
         if (com.gamma.job.PostgresPublishJobType.authority() == publishAuthority)
             com.gamma.job.PostgresPublishJobType.installAuthority(null);
+        if (com.gamma.job.PostgresPublishJobType.approvalVerifier() == publishVerifier)
+            com.gamma.job.PostgresPublishJobType.installApprovalVerifier(null);
         // Only clear the loopback URL if it still points at us (a later ControlApi in the same JVM may
         // have re-published its own — don't strip a live one out from under it).
         String mine = "http://127.0.0.1:" + port();

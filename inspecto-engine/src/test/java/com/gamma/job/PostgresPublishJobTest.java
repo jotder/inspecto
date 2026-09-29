@@ -52,6 +52,7 @@ class PostgresPublishJobTest {
         PostgresPublishJobType.resolver = h -> new InetAddress[] {InetAddress.getByName("203.0.113.10")};
         PostgresPublishJobType.opener = (url, props) -> { dialed.set(url); dialedProps.set(props); return target.duplicate(); };
         register("BI", "jdbc:postgresql://bi.example.test:5432/bi");
+        PostgresPublishJobType.installApprovalVerifier((root, rec) -> "nonce-1".equals(rec.get("nonce")) && "pc-1".equals(rec.get("pendingChange")));
         plant("subs", "SELECT * FROM (VALUES ('m1','gold',10.5,DATE '2026-09-01'),('m2','silver',3.0,DATE '2026-09-01'),"
                 + "('m3','gold',7.25,DATE '2026-09-02')) t(msisdn, plan, amount, day)", Map.of());
     }
@@ -63,6 +64,7 @@ class PostgresPublishJobTest {
         PostgresPublishJobType.opener = DriverManager::getConnection;
         PostgresPublishJobType.beforeCommit = () -> {};
         PostgresPublishJobType.installAuthority(null);
+        PostgresPublishJobType.installApprovalVerifier(null);
         ConnectionRegistry.remove("BI");
         target.close();
     }
@@ -96,7 +98,7 @@ class PostgresPublishJobTest {
 
     void approve(JobConfig job) throws Exception {
         PublicationApproval.record(cfg, job.name(), PublicationApproval.fingerprints(job.toMap(), cfg, ConnectionRegistry::find),
-                "checker-1", Set.of("canApproveChanges"));
+                "checker-1", Set.of("canApproveChanges"), "nonce-1", "pc-1");
     }
 
     JobRun run(Map<String, String> params) throws Exception {
@@ -349,6 +351,33 @@ class PostgresPublishJobTest {
         JobRun r = run(Map.of());
         assertEquals("FAILED", r.status());
         assertTrue(r.message().contains("the approved publication changed (dataset subs)"), r.message());
+    }
+
+    @Test
+    void anApprovalNotBoundToAnApprovedPendingChangeIsRefused() throws Exception {
+        PostgresPublishJobType.installApprovalVerifier(null);
+        JobRun none = run(Map.of());
+        assertEquals("FAILED", none.status(), "no verifier installed: nothing can vouch for the approval");
+        assertTrue(none.message().contains("not bound to an approved Pending Change"), none.message());
+        PostgresPublishJobType.installApprovalVerifier((root, rec) -> false);
+        assertEquals("FAILED", run(Map.of()).status());
+        assertNull(dialed.get());
+    }
+
+    @Test
+    void forgetAndTheLoadSweepRemoveApprovals() throws Exception {
+        assertEquals("SUCCESS", run(Map.of()).status());
+        assertTrue(PublicationApproval.approved(cfg, "pub").isPresent());
+        PublicationApproval.sweep(cfg, Set.of("pub"));
+        assertTrue(PublicationApproval.approved(cfg, "pub").isPresent(), "a live Job keeps its approval");
+        PublicationApproval.sweep(cfg, Set.of());
+        assertTrue(PublicationApproval.approved(cfg, "pub").isEmpty(), "a Job gone at load loses it");
+        approve = false;
+        assertEquals("FAILED", run(Map.of()).status(), "so an identical re-created Job needs a new approval");
+        approve = true;
+        run(Map.of());
+        PublicationApproval.forget(cfg, "pub");
+        assertTrue(PublicationApproval.approved(cfg, "pub").isEmpty());
     }
 
     @Test

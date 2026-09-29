@@ -82,6 +82,7 @@ class PostgresPublishPgTest {
             PostgresPublishJobType.beforeCommit = () -> {};
             PostgresPublishJobType.resolver = com.gamma.pipeline.exec.EgressPolicy.SYSTEM;
             PostgresPublishJobType.opener = DriverManager::getConnection;
+            PostgresPublishJobType.installApprovalVerifier(null);
             ConnectionRegistry.remove("PG");
             System.clearProperty("assist.write.root");
             try (Connection pg = DriverManager.getConnection(pgUrl); Statement st = pg.createStatement()) {
@@ -140,6 +141,7 @@ class PostgresPublishPgTest {
         } finally {
             PostgresPublishJobType.resolver = com.gamma.pipeline.exec.EgressPolicy.SYSTEM;
             PostgresPublishJobType.opener = DriverManager::getConnection;
+            PostgresPublishJobType.installApprovalVerifier(null);
             ConnectionRegistry.remove("PGTLS");
             System.clearProperty("assist.write.root");
             System.clearProperty("pg.tls.ca");
@@ -153,7 +155,8 @@ class PostgresPublishPgTest {
     private static JobRun run(Path dir, Path data, JobConfig job) throws Exception {
         Path cfgRoot = Path.of(System.getProperty("assist.write.root"));   // the four-eyes approval the route records
         PublicationApproval.record(cfgRoot, job.name(), PublicationApproval.fingerprints(job.toMap(), cfgRoot,
-                ConnectionRegistry::find), "checker-1", java.util.Set.of("canApproveChanges"));
+                ConnectionRegistry::find), "checker-1", java.util.Set.of("canApproveChanges"), "n", "pc");
+        PostgresPublishJobType.installApprovalVerifier((root, rec) -> "n".equals(rec.get("nonce")));
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(job), new ConsignmentEventBus(), s, null,
                      dir.resolve("audit").toString(), null, null, data.toString())) {

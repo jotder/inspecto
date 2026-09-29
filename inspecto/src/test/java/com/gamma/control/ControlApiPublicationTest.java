@@ -197,6 +197,63 @@ class ControlApiPublicationTest {
     }
 
     @Test
+    void theApprovalIsBoundToItsPendingChangeByNonce(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            approvedPublication(c);
+            Map<String, Object> rec = new java.util.LinkedHashMap<>(PublicationApproval.recordOf(c.root(), "to-bi").orElseThrow());
+            assertTrue(PendingChangeRoutes.verifyPublicationApproval(c.root(), rec), rec.toString());
+            rec.put("nonce", "forged");
+            assertFalse(PendingChangeRoutes.verifyPublicationApproval(c.root(), rec), "a copied or forged record fails");
+            rec.put("nonce", PublicationApproval.recordOf(c.root(), "to-bi").orElseThrow().get("nonce"));
+            rec.put("job", "someone-else");
+            assertFalse(PendingChangeRoutes.verifyPublicationApproval(c.root(), rec), "bound to that Job");
+        }
+    }
+
+    @Test
+    void deletingThePublicationThroughJobsRemovesItsApproval(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            approvedPublication(c);
+            data(send(c, "DELETE", "/jobs/to-bi", "", "Bearer author"), 200);
+            assertTrue(PublicationApproval.approved(c.root(), "to-bi").isEmpty(), "the approval went with the Job");
+            held(send(c, "POST", "/jobs", PUBLISH, "Bearer author"));   // an identical re-create needs a new approval
+        }
+    }
+
+    @Test
+    void deletingThePublicationThroughConfigRemovesItsApproval(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            approvedPublication(c);
+            HttpResponse<String> r = send(c, "DELETE", "/config/job/to-bi_job?subdir=jobs", "", "Bearer author");
+            assertEquals(200, r.statusCode(), r.body());
+            assertTrue(PublicationApproval.approved(c.root(), "to-bi").isEmpty(), "the approval went with the Job file");
+        }
+    }
+
+    @Test
+    void anApprovalRefusesWhenTheConnectionOrADatasetChangedSinceTheProposal(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String id = held(send(c, "POST", "/jobs", PUBLISH, "Bearer author"));
+            data(send(c, "POST", "/connections", "{\"id\":\"BI\",\"connector\":\"db\",\"options\":{\"jdbc_url\":"
+                    + "\"jdbc:postgresql://elsewhere.example.com:5432/bi\"}}", "Bearer checker"), 200);
+            HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", "Bearer checker");
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(r.body().contains("changed since it was proposed (connection)"), r.body());
+            assertTrue(PublicationApproval.approved(c.root(), "to-bi").isEmpty(), "nothing approved");
+            assertTrue(c.svc().jobService().flatMap(s -> s.jobConfig("to-bi")).isEmpty(), "nothing applied");
+            data(send(c, "POST", "/pending-changes/" + id + "/decline", "{\"reason\":\"moved\"}", "Bearer checker"), 200);
+
+            String id2 = held(send(c, "POST", "/jobs", PUBLISH, "Bearer author"));
+            new com.gamma.pipeline.ComponentStore(c.root().resolve("registry")).write("dataset", "subs",
+                    Map.of("physicalRef", "subs"));
+            HttpResponse<String> d = send(c, "POST", "/pending-changes/" + id2 + "/approve", "{}", "Bearer checker");
+            assertEquals(409, d.statusCode(), d.body());
+            assertTrue(d.body().contains("dataset subs"), d.body());
+            assertTrue(PublicationApproval.approved(c.root(), "to-bi").isEmpty());
+        }
+    }
+
+    @Test
     void noImportMayCarryAPublishJob() {
         byte[] job = ("job:\n  name: to-bi\n  type: publish.postgres\n  connection: BI\n  datasets: subs\n  schema: bi\n")
                 .getBytes(StandardCharsets.UTF_8);
