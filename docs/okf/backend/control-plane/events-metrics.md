@@ -646,6 +646,27 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
   path. As defence in depth an import refuses a `*_job_template.toon` whose report block carries any
   `attach` but a literal false (a `${placeholder}` included).
   ⚠ Someone with shell access to the config root can still forge `attach-approvals.json`, as they could any file.
+  🔴 **Round 4: the approval is pinned to content fixed at HOLD time** (the `publish.postgres` lane's
+  `PublicationApproval` shape; a P2 row will merge the two into one mechanism once both lanes land).
+  `AttachApprovals.fingerprint` hashes ONLY what decides what is sent and to whom:
+  - the `SENSITIVE` keys (`type attach recipients dataset scope measures group_by format out_dir limit
+    connection use`), template-EXPANDED against the Space's `*_job_template.toon`;
+  - the Dataset definition;
+  - its resolved relation SQL (`DatasetRelation.relationSql`), so a view's SQL is inside it. Cron and `enabled`
+    are not.
+
+  `PendingChanges.hold` computes it from the PROPOSED write and stores it on the Pending Change as
+  `attachFingerprint`, but only when the attachment rule itself raised the hold. So approving a policy-held
+  cron edit blesses nothing.
+
+  Approve (`PendingChangeRoutes.requireAttachUnchanged`) re-hashes the proposal against today's Dataset,
+  view and templates, and refuses 409 if anything moved. It then records the STORED fingerprint, never the
+  live Job, bound to the Pending Change id plus a nonce. Any write whose fingerprint is not the approved
+  one is held whatever the policy, so re-saving the Job is the re-approve path. A delete through any
+  holding route revokes the approval (`JobWriteGuard.revokeOnDelete`).
+
+  The import guard judges a carried job AFTER expanding its template, against the templates the import
+  carries and the Space's own, so a plain report template plus `attach: "true"` in the job file is refused.
   ⚠ **With no authenticator (a Personal / no-auth build) four-eyes cannot tell the author from the approver**:
   every request is the same anonymous actor, so the hold only delays the write. In that build the recipient
   domain allowlist above is the ONLY real control on where an attachment can go.

@@ -290,6 +290,7 @@ final class PendingChangeRoutes implements RouteModule {
                             + ") — nothing was applied; propose it again");
                 if (PendingChanges.insecureTls(api, proposedJob)) ApiContext.requireCapability(ex, Roles.CAN_ADMINISTER);
             }
+            requireAttachUnchanged(root, rec);
             Map<String, Object> marker = new LinkedHashMap<>(rec);
             marker.put("approvedBy", by);   // AuditTrail stamps it on the replayed write beside the author (actor)
             Map<String, String> headers = new LinkedHashMap<>();
@@ -322,7 +323,7 @@ final class PendingChangeRoutes implements RouteModule {
                 rec.put("decidedAt", at);
                 rec.put("decisionReason", reason);
                 rec.put("appliedStatus", r.status());
-                recordAttachApproval(api, root, rec);
+                recordAttachApproval(root, rec, by);
                 PendingChanges.save(root, rec);
                 PendingChanges.audit(ex, "pending-change.approved", rec.get("kind") + " '" + rec.get("name")
                         + "' — " + id + " approved by " + by + " and applied", rec, b -> b.attr("reason", reason));
@@ -407,18 +408,24 @@ final class PendingChangeRoutes implements RouteModule {
     }
 
     /**
-     * ASSURE-XLSX-ATTACHMENTS-1 round 3: an approved change to an attaching report Job records the approval
-     * fingerprint of the Job AS NOW LOADED (template-expanded) — the version {@code ReportJob}'s run-time lock
-     * will send. Stamped on the Pending Change record too, so the approval names what it approved.
+     * ASSURE-XLSX-ATTACHMENTS-1 round 4: an attachment approval approves the fingerprint FIXED AT HOLD TIME. Before the
+     * replay, the live content (the proposed Job expanded against today's templates, today's Dataset and view SQL)
+     * must still hash to it, else 409 and nothing is applied.
      */
-    private static void recordAttachApproval(ApiContext api, java.nio.file.Path root, Map<String, Object> rec)
+    private static void requireAttachUnchanged(java.nio.file.Path root, Map<String, Object> rec) {
+        if (!(rec.get("attachFingerprint") instanceof String then)) return;
+        @SuppressWarnings("unchecked") Map<String, Object> proposed = (Map<String, Object>) rec.get("proposed");
+        String now = JobWriteGuard.fingerprint(String.valueOf(rec.get("kind")), proposed, root);
+        if (!then.equals(now))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "what this report Job would attach, or to whom, changed "
+                    + "since it was proposed (its Dataset, view or template) — nothing was applied; propose it again");
+    }
+
+    /** After a successful replay: record the hold-time fingerprint, bound to this Pending Change (never the live Job). */
+    private static void recordAttachApproval(java.nio.file.Path root, Map<String, Object> rec, String by)
             throws java.io.IOException {
-        if (!"job".equals(rec.get("kind"))) return;
-        String name = String.valueOf(rec.get("name")).replaceFirst("(_job)?\\.toon$", "");
-        java.util.Optional<com.gamma.job.JobConfig> job = api.service().jobServiceOrCreate().jobConfig(name);
-        if (job.isEmpty() || !com.gamma.job.AttachApprovals.attaches(job.get())) return;
-        String fp = com.gamma.job.AttachApprovals.fingerprint(job.get(), root);
-        com.gamma.job.AttachApprovals.record(root, job.get().name(), fp);
-        rec.put("attachFingerprint", fp);
+        if (!(rec.get("attachFingerprint") instanceof String fp)) return;
+        com.gamma.job.AttachApprovals.record(root, JobWriteGuard.name((Map<?, ?>) rec.get("proposed")), fp,
+                String.valueOf(rec.get("id")), by);
     }
 }

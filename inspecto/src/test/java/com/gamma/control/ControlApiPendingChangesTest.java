@@ -766,6 +766,106 @@ class ControlApiPendingChangesTest {
         }
     }
 
+    // ── round 4: the attachment approval is pinned to the content fixed at HOLD time ─────────────────
+
+    private static final String DS_REPORT = "{\"name\":\"mailer\",\"type\":\"report\",\"cron\":\"0 3 * * *\","
+            + "\"scope\":\"dataset\",\"dataset\":\"sales_ds\",\"recipients\":\"ops@example.com\",\"attach\":\"true\"}";
+
+    private static void seedDataset(Path root, String sql) throws Exception {
+        new com.gamma.pipeline.ViewStore(root.resolve("views")).write(new com.gamma.pipeline.ViewDefinition(
+                "sales_view", "flow-x", List.of(), sql, "2026-07-08T00:00:00Z"));
+        new ComponentStore(root.resolve("registry")).write("dataset", "sales_ds", Map.of("view", "sales_view"));
+    }
+
+    private static Map<String, Object> approvalOf(Ctx c) {
+        return com.gamma.job.AttachApprovals.approval(c.root, "mailer").orElse(null);
+    }
+
+    private static boolean liveApproved(Ctx c) {
+        com.gamma.job.JobConfig loaded = c.svc.jobServiceOrCreate().jobConfig("mailer").orElseThrow();
+        return com.gamma.job.AttachApprovals.approved(c.root, "mailer", com.gamma.job.AttachApprovals.fingerprint(loaded, c.root));
+    }
+
+    private String proposeAndApprove(Ctx c, String method, String path, String body) throws Exception {
+        String id = data(send(c, method, path, body, AUTHOR), 202).at("/pendingChange/id").asText();
+        assertTrue(data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER), 200).get("applied").asBoolean());
+        return id;
+    }
+
+    /** Finding 1: a write landing between proposal and approve (here, the view's SQL) is never blessed — 409. */
+    @Test
+    void aRaceWriteBetweenProposalAndApproveIsNotBlessed(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        try (Ctx c = open(cfg, root)) {
+            seedDataset(root, "SELECT 1 AS n");
+            String id = data(send(c, "POST", "/jobs", DS_REPORT, AUTHOR), 202).at("/pendingChange/id").asText();
+            seedDataset(root, "SELECT secret FROM everything");   // the race
+            HttpResponse<String> r = send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER);
+            assertEquals(409, r.statusCode(), r.body());
+            assertEquals(null, approvalOf(c), "nothing was blessed");
+            assertEquals(404, send(c, "GET", "/jobs/mailer", null, AUTHOR).statusCode(), "nothing was applied");
+        } finally {
+            System.clearProperty("jobs.audit.dir");
+        }
+    }
+
+    /** Finding 2: approving a cron-only edit (held by the policy, not by the attachment rule) blesses nothing. */
+    @Test
+    void aCronOnlyApprovalDoesNotReBlessTheAttachment(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        try (Ctx c = open(cfg, root)) {
+            seedDataset(root, "SELECT 1 AS n");
+            policy(c, JOB_POLICY);
+            String first = proposeAndApprove(c, "POST", "/jobs", DS_REPORT);
+            assertEquals(first, approvalOf(c).get("pendingChange"));
+            JsonNode held = data(send(c, "PUT", "/jobs/mailer", DS_REPORT.replace("0 3", "0 5"), AUTHOR), 202);
+            assertTrue(held.at("/pendingChange/attachFingerprint").isMissingNode(), "a cron edit carries no attach approval");
+            data(send(c, "POST", "/pending-changes/" + held.at("/pendingChange/id").asText() + "/approve", "{}", CHECKER), 200);
+            assertEquals(first, approvalOf(c).get("pendingChange"), "the attachment approval is the ORIGINAL one");
+            assertTrue(liveApproved(c));
+        } finally {
+            System.clearProperty("jobs.audit.dir");
+        }
+    }
+
+    /** Findings 4 + 5: a view SQL change un-approves the live Job; re-saving it is the re-approve path. */
+    @Test
+    void aViewChangeUnapprovesAndReSavingReApproves(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        try (Ctx c = open(cfg, root)) {
+            seedDataset(root, "SELECT 1 AS n");
+            String first = proposeAndApprove(c, "POST", "/jobs", DS_REPORT);
+            assertTrue(liveApproved(c));
+            seedDataset(root, "SELECT 2 AS n");
+            assertFalse(liveApproved(c), "the view's SQL is inside the fingerprint");
+            String again = proposeAndApprove(c, "PUT", "/jobs/mailer", DS_REPORT);   // re-save = re-approve
+            assertTrue(liveApproved(c));
+            assertEquals(again, approvalOf(c).get("pendingChange"));
+            assertFalse(first.equals(again));
+        } finally {
+            System.clearProperty("jobs.audit.dir");
+        }
+    }
+
+    /** Deleting a Job revokes its approval: an identical re-create is held again. */
+    @Test
+    void deletingAJobRevokesItsAttachmentApproval(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        try (Ctx c = open(cfg, root)) {
+            seedDataset(root, "SELECT 1 AS n");
+            proposeAndApprove(c, "POST", "/jobs", DS_REPORT);
+            assertTrue(send(c, "DELETE", "/jobs/mailer", null, AUTHOR).statusCode() < 300);
+            assertEquals(null, approvalOf(c), "revoked");
+            data(send(c, "POST", "/jobs", DS_REPORT, AUTHOR), 202);
+        } finally {
+            System.clearProperty("jobs.audit.dir");
+        }
+    }
+
     /** Re-verification finding 2: /config/write and /config/patch reach the SAME mandatory hold (via PendingChanges.hold). */
     @Test
     void configWriteAndPatchCannotTurnAttachOnWithoutFourEyes(@TempDir Path cfg, @TempDir Path tmp) throws Exception {

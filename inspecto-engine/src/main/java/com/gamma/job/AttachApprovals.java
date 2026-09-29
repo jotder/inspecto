@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.pipeline.ViewStore;
+import com.gamma.query.DatasetRelation;
 import com.gamma.util.AtomicFiles;
 
 import java.io.IOException;
@@ -12,88 +14,179 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.TreeMap;
+import java.util.stream.Stream;
 
 /**
- * The RUN-TIME lock on report attachments (ASSURE-XLSX-ATTACHMENTS-1 round 3, operator 2026-09-29). Write-time
- * holds are the friendly path. This class is the one that cannot be walked around, because it checks at send time
- * what the Job actually IS, whoever wrote it: a template expansion, a hand edit, an import, a recovery create, or
- * any future writer.
+ * The approval of a report Job's ATTACHMENTS, pinned to CONTENT (ASSURE-XLSX-ATTACHMENTS-1 rounds 3–4; the same
+ * shape the {@code publish.postgres} lane's {@code PublicationApproval} uses — one P2 row merges the two).
  *
- * <p>When a four-eyes approval applies a change to an attaching report Job, the control plane records an
- * <b>approval fingerprint</b> ({@link #record}). This is a SHA-256 over the Job exactly as the scheduler holds it
- * ({@link JobConfig}, i.e. template-EXPANDED): its name, type and every param except the server-stamped author
- * keys, plus the definition of the Dataset it reads. {@code ReportJob} with {@code attach: true} sends only when
- * the current fingerprint equals the approved one ({@link #approved}). Anything else fails the Run, with an audit
- * row and a Signal saying "attach not approved for this job version; re-approve".
- *
- * <p>Stored as {@value #FILE} in the Space config root and reserved from every import ({@code ReservedConfigPaths}).
- * ⚠ Someone with shell access to the config root can still forge it; they could equally edit anything. The threat
- * this closes is the product's own writers.
+ * <ul>
+ *   <li><b>What is hashed</b> — {@link #fingerprint}: ONLY what decides what is sent and to whom — the Job's
+ *       {@link #SENSITIVE} keys, template-EXPANDED, plus for its Dataset the definition AND the resolved relation
+ *       SQL ({@link DatasetRelation#relationSql}, so a view's SQL is inside). Schedule and {@code enabled} are not.</li>
+ *   <li><b>When it is fixed</b> — at HOLD time, from the PROPOSED content; stored on the Pending Change. Approve
+ *       refuses (409) unless the live content still hashes to it, and then records THAT fingerprint, bound to the
+ *       Pending Change id and a nonce ({@link #record}). Nothing written between proposal and replay is blessed.</li>
+ *   <li><b>When it is required</b> — every write whose fingerprint is not the approved one is held, whatever the
+ *       policy; so re-saving the Job is the re-approve path, and a cron-only edit never touches the approval.</li>
+ *   <li><b>At run time</b> — {@code ReportJob} sends only when the running Job hashes to the approved fingerprint.</li>
+ *   <li><b>Delete</b> revokes ({@link #revoke}): a re-created identical Job needs a new approval.</li>
+ * </ul>
+ * Stored as {@value #FILE} in the Space config root, reserved from every import.
  */
 public final class AttachApprovals {
 
     private AttachApprovals() {}
 
     public static final String FILE = "attach-approvals.json";
+    /** The Job keys that decide what data leaves and to whom. */
+    public static final List<String> SENSITIVE = List.of("type", "attach", "recipients", "dataset", "scope",
+            "measures", "group_by", "format", "out_dir", "limit", "connection", "use");
     private static final ObjectMapper JSON = new ObjectMapper().configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
+    private static final SecureRandom RANDOM = new SecureRandom();
     private static final Object LOCK = new Object();
 
-    /** THE predicate for "this Job attaches data", shared by the write-time guard and {@code ReportJob}. */
+    /** THE predicate for "this Job attaches data", shared by the write-time guards and {@code ReportJob}. */
     public static boolean attaches(Map<?, ?> job) {
         if (job == null) return false;
-        Map<?, ?> j = job.get("job") instanceof Map<?, ?> inner ? inner : job;
+        Map<?, ?> j = section(job);
         return "report".equalsIgnoreCase(str(j.get("type"))) && "true".equalsIgnoreCase(str(j.get("attach")));
     }
 
     /** {@link #attaches(Map)} over a loaded Job. */
     public static boolean attaches(JobConfig cfg) {
-        Map<String, Object> m = new LinkedHashMap<>(cfg.params());
-        m.put("type", cfg.type());
-        return attaches(m);
+        return attaches(asSection(cfg));
     }
 
-    /** The approval fingerprint of {@code cfg} as it would run in the Space whose config root is {@code root}. */
-    public static String fingerprint(JobConfig cfg, Path root) throws IOException {
-        Map<String, Object> canon = new TreeMap<>();
-        canon.put("name", cfg.name());
-        canon.put("type", cfg.type());
-        Map<String, Object> params = new TreeMap<>();
-        cfg.params().forEach((k, v) -> { if (!JobConfig.AUTHOR_KEYS.contains(k)) params.put(k, v); });
-        canon.put("params", params);
-        String dataset = cfg.params().get("dataset");
-        if (dataset != null && !dataset.isBlank() && root != null)
-            canon.put("dataset", new ComponentStore(root.resolve("registry")).get("dataset", dataset.trim())
-                    .map(ComponentRegistry.Component::content).orElse(null));
+    /** A loaded Job as the flat section shape the fingerprint reads. */
+    public static Map<String, Object> asSection(JobConfig cfg) {
+        Map<String, Object> m = new LinkedHashMap<>(cfg.params());
+        m.put("name", cfg.name());
+        m.put("type", cfg.type());
+        return m;
+    }
+
+    /** A Job section with its {@code template:} expanded against {@code templates} (by name); unchanged without one. */
+    @SuppressWarnings("unchecked")
+    public static Map<String, Object> expand(Map<?, ?> job, Map<String, JobTemplate> templates) {
+        Map<String, Object> j = new LinkedHashMap<>((Map<String, Object>) section(job));
+        Object ref = j.get("template");
+        if (ref == null) return j;
+        JobTemplate t = templates.get(String.valueOf(ref).trim());
+        if (t == null) return j;
         try {
-            byte[] digest = MessageDigest.getInstance("SHA-256")
-                    .digest(JSON.writeValueAsString(canon).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(digest);
-        } catch (NoSuchAlgorithmException impossible) {
+            return t.instantiate(j);
+        } catch (IllegalArgumentException unresolvable) {
+            return j;   // the loader refuses it; nothing loads, nothing runs
+        }
+    }
+
+    /** Every {@code *_job_template.toon} under {@code root} (depth 4), by name. */
+    public static Map<String, JobTemplate> templates(Path root) {
+        Map<String, JobTemplate> out = new LinkedHashMap<>();
+        if (root == null || !Files.isDirectory(root)) return out;
+        try (Stream<Path> files = Files.walk(root, 4)) {
+            for (Path p : files.filter(f -> f.getFileName().toString().endsWith("_job_template.toon")).toList()) {
+                try {
+                    JobTemplate t = JobTemplate.load(p.toString());
+                    out.putIfAbsent(t.name(), t);
+                } catch (Exception bad) {
+                    // the loader skips a bad template too
+                }
+            }
+        } catch (IOException unreadable) {
+            // no templates readable ⇒ none expand
+        }
+        return out;
+    }
+
+    /** The fingerprint of an (expanded) Job section, against the Space whose config root is {@code root} now. */
+    public static String fingerprint(Map<?, ?> job, Path root) {
+        Map<?, ?> j = section(job);
+        Map<String, Object> canon = new TreeMap<>();
+        canon.put("name", str(j.get("name")));
+        Map<String, Object> keys = new TreeMap<>();
+        for (String k : SENSITIVE) keys.put(k, str(j.get(k)));
+        canon.put("job", keys);
+        String dataset = str(j.get("dataset"));
+        if (dataset != null && !dataset.isEmpty() && root != null) {
+            Map<String, Object> ds = new ComponentStore(root.resolve("registry")).get("dataset", dataset)
+                    .map(ComponentRegistry.Component::content).orElse(null);
+            canon.put("datasetDefinition", ds);
+            String sql;
+            try {
+                sql = ds == null ? null : DatasetRelation.relationSql(ds, null, new ViewStore(root.resolve("views")));
+            } catch (RuntimeException unresolvable) {
+                sql = "unresolvable: " + unresolvable.getMessage();
+            }
+            canon.put("datasetSql", sql);
+        }
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256")
+                    .digest(JSON.writeValueAsString(canon).getBytes(StandardCharsets.UTF_8)));
+        } catch (NoSuchAlgorithmException | IOException impossible) {
             throw new IllegalStateException(impossible);
         }
     }
 
-    /** Record {@code fingerprint} as the approved version of Job {@code name} (replaces any earlier one). */
-    public static void record(Path root, String name, String fingerprint) throws IOException {
+    /** {@link #fingerprint(Map, Path)} of a loaded (already expanded) Job. */
+    public static String fingerprint(JobConfig cfg, Path root) {
+        return fingerprint(asSection(cfg), root);
+    }
+
+    /** Record {@code fingerprint} as Job {@code name}'s approved attachment version, bound to its Pending Change. */
+    public static void record(Path root, String name, String fingerprint, String pendingChangeId, String approvedBy)
+            throws IOException {
         synchronized (LOCK) {
             Map<String, Object> all = read(root);
-            all.put(name, fingerprint);
-            AtomicFiles.write(root.resolve(FILE), JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(all), ".attach-");
+            Map<String, Object> entry = new LinkedHashMap<>();
+            entry.put("fingerprint", fingerprint);
+            entry.put("pendingChange", pendingChangeId);
+            entry.put("nonce", HexFormat.of().formatHex(nonce()));
+            entry.put("approvedBy", approvedBy);
+            entry.put("approvedAt", Instant.now().toString());
+            all.put(name, entry);
+            write(root, all);
         }
     }
 
-    /** Whether {@code fingerprint} is the approved version of Job {@code name}; false with no root or no record. */
-    public static boolean approved(Path root, String name, String fingerprint) {
-        if (root == null) return false;
-        try {
-            return fingerprint.equals(read(root).get(name));
-        } catch (IOException unreadable) {
-            return false;   // fail closed
+    /** Drop Job {@code name}'s approval (a delete revokes it). */
+    public static void revoke(Path root, String name) throws IOException {
+        if (root == null || name == null) return;
+        synchronized (LOCK) {
+            Map<String, Object> all = read(root);
+            if (all.remove(name) != null) write(root, all);
         }
+    }
+
+    /** Job {@code name}'s approval record, if any. */
+    @SuppressWarnings("unchecked")
+    public static Optional<Map<String, Object>> approval(Path root, String name) {
+        if (root == null || name == null) return Optional.empty();
+        try {
+            return read(root).get(name) instanceof Map<?, ?> m ? Optional.of((Map<String, Object>) m) : Optional.empty();
+        } catch (IOException unreadable) {
+            return Optional.empty();   // fail closed
+        }
+    }
+
+    /** Whether {@code fingerprint} is Job {@code name}'s approved attachment version. */
+    public static boolean approved(Path root, String name, String fingerprint) {
+        return approval(root, name).map(a -> fingerprint.equals(a.get("fingerprint"))).orElse(false);
+    }
+
+    private static byte[] nonce() {
+        byte[] b = new byte[16];
+        RANDOM.nextBytes(b);
+        return b;
     }
 
     @SuppressWarnings("unchecked")
@@ -101,6 +194,15 @@ public final class AttachApprovals {
         Path f = root.resolve(FILE);
         if (!Files.isRegularFile(f)) return new TreeMap<>();
         return new TreeMap<>(JSON.readValue(f.toFile(), Map.class));
+    }
+
+    private static void write(Path root, Map<String, Object> all) throws IOException {
+        AtomicFiles.write(root.resolve(FILE), JSON.writerWithDefaultPrettyPrinter().writeValueAsBytes(all), ".attach-");
+    }
+
+    private static Map<?, ?> section(Map<?, ?> m) {
+        if (m == null) return Map.of();
+        return m.get("job") instanceof Map<?, ?> inner ? inner : m;
     }
 
     private static String str(Object o) {

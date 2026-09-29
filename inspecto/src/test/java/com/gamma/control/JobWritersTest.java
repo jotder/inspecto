@@ -84,6 +84,17 @@ class JobWritersTest {
         assertTrue(stale.isEmpty(), () -> "NOT_A_JOB_WRITER rows naming no writer route: " + stale);
     }
 
+    /** Round 4 finding 3: a plain report template plus {@code attach: "true"} in the job file is judged EXPANDED. */
+    @Test
+    void aTemplatePlusAttachOverrideImportIsRefused() {
+        String template = "job_template:\n  name: plain\n  job:\n    type: report\n    cron: \"0 3 * * *\"\n";
+        String job = "job:\n  name: sneaky\n  template: plain\n  recipients: a@example.com\n  attach: \"true\"\n";
+        ApiException e = org.junit.jupiter.api.Assertions.assertThrows(ApiException.class, () -> ImportCapabilityGuard.checkFiles(
+                null, Map.of("jobs/plain_job_template.toon", template.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                        "jobs/sneaky_job.toon", job.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+        assertTrue(e.getMessage().contains("attaches data needs approval"), e.getMessage());
+    }
+
     /** Round 3 (a), defence in depth: an import carrying an attaching report TEMPLATE is refused before any write. */
     @Test
     void anImportedJobTemplateThatAttachesIsRefused() {

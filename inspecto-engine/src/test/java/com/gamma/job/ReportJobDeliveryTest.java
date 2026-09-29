@@ -226,7 +226,7 @@ class ReportJobDeliveryTest {
 
     /** What the approve path records: the fingerprint of the Job as loaded. */
     private static void approve(JobConfig cfg, Path writeRoot) throws Exception {
-        AttachApprovals.record(writeRoot, cfg.name(), AttachApprovals.fingerprint(cfg, writeRoot));
+        AttachApprovals.record(writeRoot, cfg.name(), AttachApprovals.fingerprint(cfg, writeRoot), "pc-test", "checker-1");
     }
 
     @Test
@@ -279,6 +279,20 @@ class ReportJobDeliveryTest {
         new ComponentStore(writeRoot.resolve("registry")).write("dataset", "sales_ds",
                 Map.of("view", "sales_view", "description", "now reads something else"));
         assertThrows(IllegalStateException.class, () -> new ReportJob(job(attachParams(outDir)), null).run(ctxWith(mail)));
+        assertNull(mail.to);
+    }
+
+    /** Round 4 finding 4: the view's SQL is inside the approved version — changing it refuses the run. */
+    @Test
+    void aViewSqlChangeRefusesTheRun(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        JobConfig cfg = job(attachParams(outDir));
+        approve(cfg, writeRoot);
+        new ViewStore(writeRoot.resolve("views")).write(new ViewDefinition("sales_view", "flow-x", List.of(),
+                "SELECT * FROM (VALUES ('EU',10.0)) AS t(region,amount)", "2026-07-08T00:00:00Z"));
+        RecordingMail mail = new RecordingMail();
+        assertThrows(IllegalStateException.class, () -> new ReportJob(cfg, null).run(ctxWith(mail)));
         assertNull(mail.to);
     }
 

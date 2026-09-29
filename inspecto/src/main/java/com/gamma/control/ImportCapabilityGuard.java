@@ -122,6 +122,43 @@ final class ImportCapabilityGuard {
      * ({@link #normalizedPath}), and a file under {@code registry/} whose kind cannot be told is refused.
      */
     static void checkFiles(HttpExchange ex, Map<String, byte[]> entries, boolean newSpace) {
+        // ASSURE-XLSX-ATTACHMENTS-1 round 4: a carried *_job.toon is judged AFTER its template is expanded — against
+        // the templates this import carries AND the Space's own — so `template:` + `attach: "true"` cannot slip by.
+        Map<String, com.gamma.job.JobTemplate> templates = new java.util.LinkedHashMap<>(
+                com.gamma.job.AttachApprovals.templates(ex == null ? null : Roles.configRoot(ex)));
+        for (Map.Entry<String, byte[]> e : entries.entrySet())
+            if (normalizedPath(e.getKey()).endsWith("_job_template.toon")) {
+                com.gamma.job.JobTemplate t = templateOf(e.getValue());
+                if (t != null) templates.put(t.name(), t);
+            }
+        IMPORT_TEMPLATES.set(templates);
+        try {
+            checkEachFile(ex, entries, newSpace);
+        } finally {
+            IMPORT_TEMPLATES.remove();
+        }
+    }
+
+    /** The templates the import in progress resolves against (set by {@link #checkFiles}); unset for item imports. */
+    private static final ThreadLocal<Map<String, com.gamma.job.JobTemplate>> IMPORT_TEMPLATES = new ThreadLocal<>();
+
+    /** A carried {@code *_job_template.toon}, parsed as {@code JobTemplate.load} parses a file; {@code null} if malformed. */
+    private static com.gamma.job.JobTemplate templateOf(byte[] bytes) {
+        try {
+            Map<String, Object> m = ConfigCodec.toMap(new String(bytes, StandardCharsets.UTF_8));
+            if (!(m.get("job_template") instanceof Map<?, ?> t) || !(t.get("job") instanceof Map<?, ?> job)) return null;
+            Map<String, String> defaults = new LinkedHashMap<>();
+            if (t.get("params") instanceof Map<?, ?> p)
+                p.forEach((k, v) -> defaults.put(String.valueOf(k),
+                        (v == null || (v instanceof Map<?, ?> mm && mm.isEmpty())) ? "" : String.valueOf(v)));
+            @SuppressWarnings("unchecked") Map<String, Object> block = (Map<String, Object>) job;
+            return new com.gamma.job.JobTemplate(String.valueOf(t.get("name")), defaults, block);
+        } catch (RuntimeException malformed) {
+            return null;
+        }
+    }
+
+    private static void checkEachFile(HttpExchange ex, Map<String, byte[]> entries, boolean newSpace) {
         for (Map.Entry<String, byte[]> e : entries.entrySet()) {
             String rel = normalizedPath(e.getKey());
             String file = rel.substring(rel.lastIndexOf('/') + 1);
@@ -205,7 +242,8 @@ final class ImportCapabilityGuard {
                     + "create it with POST /jobs so it can be approved (four-eyes); nothing was written");
         // ASSURE-XLSX-ATTACHMENTS-1: an attaching report Job needs four-eyes approval, which N imported items cannot
         // get — refused outright (403), whatever the policy, before anything is written.
-        JobWriteGuard.refuseImport(job);
+        JobWriteGuard.refuseImport(job, IMPORT_TEMPLATES.get() != null ? IMPORT_TEMPLATES.get()
+                : com.gamma.job.AttachApprovals.templates(ex == null ? null : Roles.configRoot(ex)));
         Map<String, Object> j = new LinkedHashMap<>((Map<String, Object>) job);
         j.putIfAbsent("name", "import");
         try {

@@ -101,6 +101,7 @@ public final class PendingChanges {
         if (ApiContext.attr(ex, ApiContext.ATTR_APPROVED_CHANGE) instanceof Map<?, ?> approved) {
             @SuppressWarnings("unchecked") Map<String, Object> pc = (Map<String, Object>) approved;
             verifyApproved(pc, kind, name, proposed, current);
+            JobWriteGuard.revokeOnDelete(kind, proposed, current, api.writeRoot());
             return;
         }
         Path root = api.writeRoot();
@@ -112,13 +113,18 @@ public final class PendingChanges {
             rule = mandatoryRule(root, publicationName(proposed), current, publication, insecureTls(api, proposed));
         }
         // An APPROVAL-REQUIRED write is held even with no policy for its kind, because a policy is opt-in and the
-        // risk is not — today one case: a report Job that attaches data (JobWriteGuard, ASSURE-XLSX-ATTACHMENTS-1).
+        // risk is not — today one case: a report Job that attaches data (JobWriteGuard, ASSURE-XLSX-ATTACHMENTS-1),
+        // held whenever its CONTENT fingerprint (computed HERE, from the proposed write) is not the approved one.
         // Here, inside the hold, so EVERY route that holds a job write gets it. With a policy rule too, the
         // stricter reading wins: the policy's approver, and four eyes always.
-        ApprovalPolicy.Rule mandatory = JobWriteGuard.mandatory(kind, proposed, current);
+        String attachFingerprint = JobWriteGuard.fingerprint(kind, proposed, root);
+        ApprovalPolicy.Rule mandatory = JobWriteGuard.mandatory(proposed, attachFingerprint, root);
         if (mandatory != null)
             rule = rule == null ? mandatory : new ApprovalPolicy.Rule(true, rule.approverCapability(), true);
-        if (rule == null) return;
+        if (rule == null) {
+            JobWriteGuard.revokeOnDelete(kind, proposed, current, root);
+            return;
+        }
 
         String reason = ex.getRequestHeaders().getFirst(HEADER_REASON);
         if (reason != null && reason.length() > MAX_REASON)
@@ -149,6 +155,9 @@ public final class PendingChanges {
         rec.put("current", current);
         rec.put("proposed", proposed);
         if (publication != null) rec.put("publicationFingerprints", publication);   // what the approver approves
+        // What an attachment approval approves: fixed NOW, from the proposed content — never the live Job later.
+        // Only a hold the attachment rule itself raised carries it, so approving a cron-only edit blesses nothing.
+        if (mandatory != null) rec.put("attachFingerprint", attachFingerprint);
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("method", ex.getRequestMethod());
         String query = ex.getRequestURI().getRawQuery();
