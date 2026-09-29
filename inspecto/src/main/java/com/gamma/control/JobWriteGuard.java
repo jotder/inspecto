@@ -27,10 +27,20 @@ final class JobWriteGuard {
     private JobWriteGuard() {}
 
     /** The attachment fingerprint a job write proposes (template-expanded), or {@code null} when it does not attach. */
-    static String fingerprint(String kind, Map<String, Object> proposed, Path root) {
+    static String fingerprint(String kind, Map<String, Object> proposed, Path root, String dataDir) {
         if (!JobRoutes.KIND.equals(kind) || proposed == null) return null;
         Map<String, Object> expanded = AttachApprovals.expand(proposed, AttachApprovals.templates(root));
-        return AttachApprovals.attaches(expanded) ? AttachApprovals.fingerprint(expanded, root) : null;
+        if (!AttachApprovals.attaches(expanded)) return null;
+        try {
+            return AttachApprovals.fingerprint(expanded, root, dataDir);
+        } catch (IllegalArgumentException notApprovable) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, notApprovable.getMessage());
+        }
+    }
+
+    /** The data root the report Job reads with (so hold, approve and run hash the same relation). */
+    static String dataDir(ApiContext api) {
+        return api.service().jobServiceOrCreate().dataDir();
     }
 
     /** The mandatory four-eyes rule when {@code fingerprint} is not the approved version of Job {@code proposed}. */

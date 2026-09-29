@@ -108,8 +108,15 @@ public final class AttachApprovals {
         return out;
     }
 
-    /** The fingerprint of an (expanded) Job section, against the Space whose config root is {@code root} now. */
-    public static String fingerprint(Map<?, ?> job, Path root) {
+    /**
+     * The fingerprint of an (expanded) Job section, against the Space whose config root is {@code root} and whose
+     * data root is {@code dataDir} NOW — the same data root {@code ReportJob} reads with, so a {@code physicalRef}
+     * Dataset hashes its real resolved relation (its glob), not a placeholder.
+     *
+     * @throws IllegalArgumentException when the Job names a Dataset whose relation cannot be resolved: such a Job is
+     *         NOT approvable (and cannot run), rather than approvable over a hashed error string
+     */
+    public static String fingerprint(Map<?, ?> job, Path root, String dataDir) {
         Map<?, ?> j = section(job);
         Map<String, Object> canon = new TreeMap<>();
         canon.put("name", str(j.get("name")));
@@ -119,13 +126,16 @@ public final class AttachApprovals {
         String dataset = str(j.get("dataset"));
         if (dataset != null && !dataset.isEmpty() && root != null) {
             Map<String, Object> ds = new ComponentStore(root.resolve("registry")).get("dataset", dataset)
-                    .map(ComponentRegistry.Component::content).orElse(null);
+                    .map(ComponentRegistry.Component::content).orElseThrow(() -> new IllegalArgumentException(
+                            "the Dataset '" + dataset + "' this report attaches does not exist — not approvable"));
             canon.put("datasetDefinition", ds);
             String sql;
             try {
-                sql = ds == null ? null : DatasetRelation.relationSql(ds, null, new ViewStore(root.resolve("views")));
+                sql = DatasetRelation.relationSql(ds, dataDir == null || dataDir.isBlank() ? null : Path.of(dataDir),
+                        new ViewStore(root.resolve("views")));
             } catch (RuntimeException unresolvable) {
-                sql = "unresolvable: " + unresolvable.getMessage();
+                throw new IllegalArgumentException("the Dataset '" + dataset + "' this report attaches cannot be "
+                        + "resolved (" + unresolvable.getMessage() + ") — not approvable until it can", unresolvable);
             }
             canon.put("datasetSql", sql);
         }
@@ -137,9 +147,9 @@ public final class AttachApprovals {
         }
     }
 
-    /** {@link #fingerprint(Map, Path)} of a loaded (already expanded) Job. */
-    public static String fingerprint(JobConfig cfg, Path root) {
-        return fingerprint(asSection(cfg), root);
+    /** {@link #fingerprint(Map, Path, String)} of a loaded (already expanded) Job. */
+    public static String fingerprint(JobConfig cfg, Path root, String dataDir) {
+        return fingerprint(asSection(cfg), root, dataDir);
     }
 
     /** Record {@code fingerprint} as Job {@code name}'s approved attachment version, bound to its Pending Change. */

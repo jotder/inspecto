@@ -125,6 +125,9 @@ public final class JobService implements AutoCloseable {
     private volatile java.util.function.Supplier<List<com.gamma.etl.PipelineConfig>> pipelineConfigs;
     /** Data root under which each store is a sub-directory — a pipeline job reads/writes {@code <dataDir>/<store>} (T32). */
     private final String dataDir;
+
+    /** The data root the built-in report Job reads with — the one an attachment approval must hash against. */
+    public String dataDir() { return dataDir; }
     /** Optional deletion fence (T25): consulted before a {@code maintenance} job that declares a {@code store:}
      *  deletes, to surface a conflict when the delete races an active reader/writer. {@code null} = no fence. */
     private volatile DeletionFence.Guard deletionGuard;

@@ -117,7 +117,7 @@ public final class PendingChanges {
         // held whenever its CONTENT fingerprint (computed HERE, from the proposed write) is not the approved one.
         // Here, inside the hold, so EVERY route that holds a job write gets it. With a policy rule too, the
         // stricter reading wins: the policy's approver, and four eyes always.
-        String attachFingerprint = JobWriteGuard.fingerprint(kind, proposed, root);
+        String attachFingerprint = JobWriteGuard.fingerprint(kind, proposed, root, JobWriteGuard.dataDir(api));
         ApprovalPolicy.Rule mandatory = JobWriteGuard.mandatory(proposed, attachFingerprint, root);
         if (mandatory != null)
             rule = rule == null ? mandatory : new ApprovalPolicy.Rule(true, rule.approverCapability(), true);

@@ -656,6 +656,12 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
   - carries the same nonce;
   - fixed the same `attachFingerprint`.
 
+  **Round 5 item 2:** the fingerprint resolves the Dataset relation under the report Job's OWN data root. At
+  hold and approve it takes `JobService.dataDir()`, and at run time the `dataDir` `ReportJob` holds. So a
+  `physicalRef` Dataset hashes its real glob. A Dataset that is missing or cannot be resolved is NOT
+  approvable: 422 at the hold, 409 at approve, and a refused run, never a hashed error string.
+  ⚠ The resolved relation can list files when the Consignment catalog marks some unreadable, so such a change
+  un-approves the Job until it is re-saved.
   With no verifier installed, i.e. no control plane, nothing attaches (fail closed). A copied record, a forged
   nonce, a fingerprint edited to match, an edited Pending Change (its MAC fails) and a withdrawn one all
   refuse (`ControlApiPendingChangesTest.aCopiedForgedOrUnbackedApprovalRecordIsNeverHonoured`).

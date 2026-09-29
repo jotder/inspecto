@@ -231,7 +231,7 @@ class ReportJobDeliveryTest {
 
     /** What the approve path records: the fingerprint of the Job as loaded. */
     private static void approve(JobConfig cfg, Path writeRoot) throws Exception {
-        AttachApprovals.record(writeRoot, cfg.name(), AttachApprovals.fingerprint(cfg, writeRoot), "pc-test", "checker-1", "n-test");
+        AttachApprovals.record(writeRoot, cfg.name(), AttachApprovals.fingerprint(cfg, writeRoot, null), "pc-test", "checker-1", "n-test");
         AttachApprovals.installVerifier(STUB);
     }
 
@@ -308,7 +308,7 @@ class ReportJobDeliveryTest {
         System.setProperty("assist.write.root", writeRoot.toString());
         JobConfig cfg = job(attachParams(outDir));
         approve(cfg, writeRoot);
-        AttachApprovals.record(writeRoot, cfg.name(), AttachApprovals.fingerprint(cfg, writeRoot), "pc-test", "x", "forged");
+        AttachApprovals.record(writeRoot, cfg.name(), AttachApprovals.fingerprint(cfg, writeRoot, null), "pc-test", "x", "forged");
         RecordingMail mail = new RecordingMail();
         assertThrows(IllegalStateException.class, () -> new ReportJob(cfg, null).run(ctxWith(mail)));
         assertNull(mail.to);

@@ -214,9 +214,15 @@ final class ReportJob implements Job {
      */
     private void requireApprovedVersion(JobContext ctx) throws Exception {
         Path root = SpaceConfigRoot.current();
-        String fp = AttachApprovals.fingerprint(cfg, root);
-        if (AttachApprovals.approved(root, cfg.name(), fp)) return;
-        String why = "attach not approved for this job version; re-approve";
+        String fp, why;
+        try {
+            fp = AttachApprovals.fingerprint(cfg, root, dataDir);
+            if (AttachApprovals.approved(root, cfg.name(), fp)) return;
+            why = "attach not approved for this job version; re-approve";
+        } catch (IllegalArgumentException unresolvable) {
+            fp = "unresolvable";
+            why = unresolvable.getMessage();
+        }
         EventLog.current().emit(Event.builder(EventType.AUDIT).source("audit")
                 .message("Report '" + cfg.name() + "' refused to send its attachment: " + why)
                 .action("report.attach.refused").actionCategory("security")

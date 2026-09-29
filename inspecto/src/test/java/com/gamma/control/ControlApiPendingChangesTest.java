@@ -54,6 +54,15 @@ class ControlApiPendingChangesTest {
      * canAuthorWorkbench — a checker need not be a builder); SELF is the author's own id holding admin.
      * {@code Bearer noroles} is an Authenticator that stamps NO roles.
      */
+    /** Every test's Job audit goes under a temp dir, never the CWD (CwdJobsAuditLeakDetector). */
+    @org.junit.jupiter.api.io.TempDir
+    static Path auditDir;
+
+    @BeforeEach
+    void auditUnderTemp() {
+        System.setProperty("jobs.audit.dir", auditDir.resolve("jobs_audit").toString());
+    }
+
     @BeforeEach
     void armAuthenticator() {
         Authenticators.forTest(ex -> {
@@ -739,13 +748,15 @@ class ControlApiPendingChangesTest {
             // round 3: the approval recorded the fingerprint of the Job AS LOADED — the version the run-time lock sends
             com.gamma.job.JobConfig loaded = c.svc.jobServiceOrCreate().jobConfig("mailer").orElseThrow();
             assertTrue(com.gamma.job.AttachApprovals.approved(root, "mailer",
-                    com.gamma.job.AttachApprovals.fingerprint(loaded, root)), "approval fingerprint recorded");
+                    com.gamma.job.AttachApprovals.fingerprint(loaded, root, c.svc.jobServiceOrCreate().dataDir())), "approval fingerprint recorded");
 
             // an already-approved attach Job: a schedule edit goes under the normal (here: no) policy...
             HttpResponse<String> edit = send(c, "PUT", "/jobs/mailer",
                     REPORT.replace("\"false\"", "\"true\"").replace("0 3", "0 4"), AUTHOR);
             assertTrue(edit.statusCode() < 300 && edit.statusCode() != 202, edit.body());
             // ...but changing WHO gets it or WHAT is attached re-opens the four-eyes hold (finding 4)
+            seedDataset(root, "SELECT 1 AS n");
+            new ComponentStore(root.resolve("registry")).write("dataset", "other_ds", Map.of("view", "sales_view"));
             String approved = REPORT.replace("\"false\"", "\"true\"").replace("0 3", "0 4");
             for (String change : List.of(
                     approved.replace("ops@example.com", "ops@example.com,leak@example.com"),
@@ -783,7 +794,7 @@ class ControlApiPendingChangesTest {
 
     private static boolean liveApproved(Ctx c) {
         com.gamma.job.JobConfig loaded = c.svc.jobServiceOrCreate().jobConfig("mailer").orElseThrow();
-        return com.gamma.job.AttachApprovals.approved(c.root, "mailer", com.gamma.job.AttachApprovals.fingerprint(loaded, c.root));
+        return com.gamma.job.AttachApprovals.approved(c.root, "mailer", com.gamma.job.AttachApprovals.fingerprint(loaded, c.root, c.svc.jobServiceOrCreate().dataDir()));
     }
 
     private String proposeAndApprove(Ctx c, String method, String path, String body) throws Exception {
@@ -821,7 +832,7 @@ class ControlApiPendingChangesTest {
             // (2) a record whose fingerprint was edited to match content nobody approved
             seedDataset(root, "SELECT secret FROM everything");
             com.gamma.job.JobConfig loaded = c.svc.jobServiceOrCreate().jobConfig("mailer").orElseThrow();
-            String now = com.gamma.job.AttachApprovals.fingerprint(loaded, root);
+            String now = com.gamma.job.AttachApprovals.fingerprint(loaded, root, c.svc.jobServiceOrCreate().dataDir());
             editApproval(c, "mailer", all -> ((Map<String, Object>) all.get("mailer")).put("fingerprint", now));
             assertFalse(liveApproved(c), "the signed Pending Change fixed a different fingerprint");
             seedDataset(root, "SELECT 1 AS n");
@@ -830,7 +841,7 @@ class ControlApiPendingChangesTest {
             // (3) a record copied onto another Job, fingerprint recomputed for it
             Map<String, Object> other = new java.util.LinkedHashMap<>(com.gamma.job.AttachApprovals.asSection(loaded));
             other.put("name", "mailer2");
-            String otherFp = com.gamma.job.AttachApprovals.fingerprint(other, root);
+            String otherFp = com.gamma.job.AttachApprovals.fingerprint(other, root, c.svc.jobServiceOrCreate().dataDir());
             editApproval(c, "mailer2", all -> {
                 Map<String, Object> copy = new java.util.LinkedHashMap<>(genuine);
                 copy.put("fingerprint", otherFp);
@@ -854,6 +865,22 @@ class ControlApiPendingChangesTest {
             pc.put("status", "withdrawn");
             PendingChanges.save(root, pc);   // a genuinely signed record, but not approved
             assertFalse(liveApproved(c), "a withdrawn Pending Change");
+        } finally {
+            System.clearProperty("jobs.audit.dir");
+        }
+    }
+
+    /** Round 5 item 2: an attaching report over a Dataset that cannot be resolved is refused, never held. */
+    @Test
+    void anAttachingReportOverAnUnresolvableDatasetIsNotApprovable(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        try (Ctx c = open(cfg, root)) {
+            new ComponentStore(root.resolve("registry")).write("dataset", "sales_ds", Map.of("view", "no_such_view"));
+            HttpResponse<String> r = send(c, "POST", "/jobs", DS_REPORT, AUTHOR);
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("not approvable"), r.body());
+            assertEquals(0, data(send(c, "GET", "/pending-changes?status=pending", null, AUTHOR), 200).get("total").asInt());
         } finally {
             System.clearProperty("jobs.audit.dir");
         }
