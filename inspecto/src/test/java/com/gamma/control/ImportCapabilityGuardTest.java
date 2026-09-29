@@ -80,6 +80,7 @@ class ImportCapabilityGuardTest {
                 String route = e.method() + " " + e.pattern();
                 if (ACTS.containsKey(route)) { actsSeen.add(route); continue; }
                 boolean covered = ImportCapabilityGuard.DEDICATED_ONLY.containsKey(kind)
+                        || ImportCapabilityGuard.GOVERNANCE_ONLY.containsKey(kind)   // refused on every door but its own
                         || e.capability().equals(ImportCapabilityGuard.KIND_CAPABILITY.get(kind));
                 if (!covered) uncovered.add(kind + " ← " + route + " needs " + e.capability());
             }
@@ -99,6 +100,7 @@ class ImportCapabilityGuardTest {
         }
         assertTrue(kinds().containsAll(ImportCapabilityGuard.KIND_CAPABILITY.keySet()), "a table kind no store writes");
         assertTrue(kinds().containsAll(ImportCapabilityGuard.DEDICATED_ONLY.keySet()), "a dedicated-only kind no store writes");
+        assertTrue(kinds().containsAll(ImportCapabilityGuard.GOVERNANCE_ONLY.keySet()), "a governance kind no store writes");
         assertTrue(kinds().containsAll(ALIASES.keySet()), "an alias for a kind that no longer exists");
     }
 
@@ -130,5 +132,19 @@ class ImportCapabilityGuardTest {
         assertEquals(403, assertThrows(ApiException.class, () -> ImportCapabilityGuard.requireKind(null,
                 "access-profile")).status);
         ImportCapabilityGuard.requireKind(null, "dataset");
+    }
+
+    /** ASSURE-WORKFLOW-SLA-1: a Workflow / SLA policy / Escalation Rule rides NO import — not even a new Space's. */
+    @Test
+    void aGovernanceKindIsRefusedOnEveryImportANewSpacesIncluded() {
+        for (String[] k : List.of(new String[]{"workflow", "workflows"}, new String[]{"sla-policy", "sla-policies"},
+                new String[]{"escalation-rule", "escalation-rules"})) {
+            Map<String, byte[]> file = Map.of("Registry/" + k[1] + "./incident.toon", new byte[0]);
+            assertEquals(403, assertThrows(ApiException.class, () -> ImportCapabilityGuard.checkFiles(null, file)).status, k[0]);
+            assertEquals(403, assertThrows(ApiException.class, () -> ImportCapabilityGuard.checkFiles(null, file, true)).status, k[0]);
+            assertEquals(403, assertThrows(ApiException.class, () -> ImportCapabilityGuard.checkItems(null,
+                    List.of(Map.of("kind", k[0].toUpperCase(java.util.Locale.ROOT), "id", "incident")))).status, k[0]);
+            assertEquals(403, assertThrows(ApiException.class, () -> ImportCapabilityGuard.requireKind(null, k[0])).status, k[0]);
+        }
     }
 }

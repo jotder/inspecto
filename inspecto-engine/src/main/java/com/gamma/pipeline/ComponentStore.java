@@ -102,7 +102,12 @@ public final class ComponentStore {
                     // KPI definition (ASSURE-KPI-DEFINITIONS-1, WS-20): a Measure + target + good direction + RAG
                     // bands + period grain + comparison period, which the KPI tile reads instead of hand-set Widget
                     // inputs. Validated by com.gamma.query.KpiDefinition; evaluated by GET /kpis/{id}/value.
-                    "kpi");
+                    "kpi",
+                    // ASSURE-WORKFLOW-SLA-1: the object lifecycle, its SLA policy and its Escalation Rules — governance
+                    // changes, so written only through their canAdminister literal routes (ComponentRoutes) and refused
+                    // by every import (ImportPaths.REGISTRY_DIRS / ImportCapabilityGuard.DEDICATED_ONLY). inspecto-ops
+                    // re-reads them on change (GovernanceRegistry) — no restart.
+                    "workflow", "sla-policy", "escalation-rule");
 
     private static final String TOON = ".toon";
     private static final Pattern SAFE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._-]*");

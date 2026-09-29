@@ -126,6 +126,9 @@ public final class ImportPaths {
             if (!ReservedConfigPaths.KINDS.contains(kind)) ComponentRegistry.dirForType(kind).ifPresent(dirs::add);
         dirs.add("connections");
         dirs.removeAll(Set.of("access-catalog", "access-profiles"));
+        // ASSURE-WORKFLOW-SLA-1: governance kinds, written only through their canAdminister routes — like the
+        // *_workflow / *_escalation suffixes, no import lands them.
+        dirs.removeAll(Set.of("workflows", "sla-policies", "escalation-rules"));
         return dirs;
     }
 

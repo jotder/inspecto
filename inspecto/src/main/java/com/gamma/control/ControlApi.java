@@ -259,6 +259,12 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         this.uiDir   = blank(ui) ? null : Path.of(ui.trim()).toAbsolutePath().normalize();
         String wr    = System.getProperty("assist.write.root");
         this.writeRoot = blank(wr) ? null : Path.of(wr.trim()).toAbsolutePath().normalize();
+        // ASSURE-WORKFLOW-SLA-1: the legacy single-tenant Space has no config dir, so its authored Workflows, SLA
+        // policies and Escalation Rules live under THIS write root — where /components/workflow writes them. A Space
+        // with a config dir wired its own at engine open (OpsEngineProvider).
+        if (this.writeRoot != null)
+            for (SpaceContext sc : spaces.all())
+                if (sc.root().config() == null) sc.service().useGovernanceRoot(this.writeRoot.resolve("registry"));
         this.http    = createServer(port);
         this.http.setExecutor(Executors.newVirtualThreadPerTaskExecutor());
         // ⚠ SharedRefResolver.install(new ExchangeRefResolver(spaces)) used to sit here. It moved into

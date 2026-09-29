@@ -20,7 +20,9 @@ import com.gamma.objects.RcaTemplate;
 import com.gamma.ops.tag.CaseRule;
 import com.gamma.ops.tag.Tag;
 import com.gamma.ops.tag.TagRule;
-import com.gamma.ops.workflow.Workflow;
+import com.gamma.objects.EscalationRule;
+import com.gamma.objects.SlaPolicy;
+import com.gamma.objects.Workflow;
 import com.gamma.util.JsonAttributes;
 import com.gamma.util.Values;
 
@@ -61,6 +63,21 @@ public final class ObjectService {
     public static final String ATTR_DUE_AT = "dueAt";
     /** Attribute key stamped (epoch millis) when an SLA breach has been emitted — makes {@link #sweepIncidentSla} idempotent. */
     public static final String ATTR_SLA_BREACHED_AT = "slaBreachedAt";
+    /** Attribute key: the response deadline (epoch millis) an {@link SlaPolicy} stamped — met by leaving the initial state. */
+    public static final String ATTR_RESPONSE_DUE_AT = "responseDueAt";
+    /** Attribute key stamped (epoch millis) when a response breach has been emitted. */
+    public static final String ATTR_SLA_RESPONSE_BREACHED_AT = "slaResponseBreachedAt";
+    /** Attribute key: the priority the policy-stamped deadlines were computed for — a changed priority recomputes them. */
+    public static final String ATTR_SLA_PRIORITY = "slaPriority";
+    /** Attribute key: the {@link SlaPolicy} object type whose targets set this object's deadlines. */
+    public static final String ATTR_SLA_POLICY = "slaPolicy";
+    /**
+     * Attribute key: every Escalation Rule firing on this object, comma-separated {@code <rule>@<breach>} — the
+     * idempotency record. A rule fires for a breach only when its entry is absent, so a later sweep never repeats it.
+     */
+    public static final String ATTR_ESCALATIONS = "escalations";
+    /** Most escalations one sweep performs; the rest wait for the next sweep. */
+    static final int MAX_ESCALATIONS_PER_SWEEP = 500;
     /**
      * Epoch-millis of the most recent transition into {@code RESOLVED} ({@code INCIDENT-KPI-MTTR-1},
      * 2026-09-11) — the only record of WHEN an object was resolved, and therefore the whole basis of MTTR.
@@ -140,6 +157,7 @@ public final class ObjectService {
     private final com.gamma.ops.tag.TagAssignmentStore tagAssignments;
     private final NoteService noteService;                          // D10: kind-agnostic note path
     private final Map<ObjectType, Workflow> workflows = new EnumMap<>(ObjectType.class);
+    private volatile GovernanceRegistry governance;                  // authored, hot-reloaded (ASSURE-WORKFLOW-SLA-1)
     private final Map<String, Tag> tags = new ConcurrentHashMap<>();          // user-created tag registry
     private final Map<String, TagRule> tagRules = new ConcurrentHashMap<>();  // Gmail-filter Tag Rules, by name
     private final Map<String, CaseRule> caseRules = new ConcurrentHashMap<>(); // rule-raised-case rules, by name (C5)
@@ -198,9 +216,27 @@ public final class ObjectService {
         }
     }
 
-    /** The effective workflow for {@code type}. */
+    /**
+     * The effective workflow for {@code type}: the Space's authored {@code workflow} component when one is installed
+     * and valid ({@link #useGovernance}, re-read on change), else a {@code *_workflow.toon} override, else the built-in.
+     */
     public Workflow workflow(ObjectType type) {
-        return workflows.get(type);
+        GovernanceRegistry g = governance;
+        Workflow authored = g == null ? null : g.snapshot().workflows().get(type);
+        return authored != null ? authored : workflows.get(type);
+    }
+
+    /**
+     * Read this Space's authored Workflows, SLA policies and Escalation Rules from {@code registryRoot}
+     * ({@code <config>/registry}), re-reading them whenever they change (ASSURE-WORKFLOW-SLA-1). {@code null} = none.
+     */
+    public void useGovernance(java.nio.file.Path registryRoot) {
+        this.governance = registryRoot == null ? null : new GovernanceRegistry(registryRoot);
+    }
+
+    private GovernanceRegistry.Snapshot governance() {
+        GovernanceRegistry g = governance;
+        return g == null ? GovernanceRegistry.Snapshot.EMPTY : g.snapshot();
     }
 
     /**
@@ -1030,6 +1066,12 @@ public final class ObjectService {
      * never re-fire) and emits an {@link EventType#OBJECT_SLA_BREACH} event onto {@link EventLog#global()},
      * so the breach surfaces in the Event Viewer next to the incident's {@code OBJECT_ACTIVITY} history.
      *
+     * <p><b>Authored governance (ASSURE-WORKFLOW-SLA-1).</b> Every object type with an {@link SlaPolicy} is swept too.
+     * The policy stamps {@code dueAt} (resolution) and {@link #ATTR_RESPONSE_DUE_AT} from the priority's targets in its
+     * business calendar — never over an operator-set {@code dueAt} — and a response deadline passed while the object
+     * still sits in its workflow's initial state is a {@code target: response} breach, once. Each matching
+     * {@link EscalationRule} then fires at most once per breach ({@link #escalate}).
+     *
      * <p>Intended to be driven by {@link com.gamma.util.Scheduler} (see {@code CollectorService}); {@code now}
      * is injected so the schedule and tests evaluate against the same clock. Safe to call with no incidents.
      *
@@ -1037,40 +1079,159 @@ public final class ObjectService {
      * @return the number of incidents newly breached by this sweep
      */
     public int sweepIncidentSla(long now) {
-        Workflow wf = workflow(ObjectType.INCIDENT);
+        GovernanceRegistry.Snapshot gov = governance();
+        java.util.Set<ObjectType> types = java.util.EnumSet.of(ObjectType.INCIDENT);
+        types.addAll(gov.slaPolicies().keySet());
+        for (EscalationRule r : gov.escalationRules()) types.add(r.objectType());
         int breached = 0;
-        // Every Incident, a page at a time — one newest-first MAX_LIMIT page never reached the oldest overdue ones.
-        for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(ObjectType.INCIDENT).build())) {
-            if (o.isClosed()) continue;                                      // closedAt stamped — settled
-            if (wf.isTerminal(o.status())) continue;                         // any workflow terminal state
-            if ("RESOLVED".equalsIgnoreCase(o.status())) continue;           // fixed — SLA clock stopped
-            if ("ARCHIVED".equalsIgnoreCase(o.status())) continue;           // dismissed, even where not terminal
-            if (o.attributes().containsKey(ATTR_SLA_BREACHED_AT)) continue;  // already breached — idempotent
-            long dueAt = parseEpoch(o.attributes().get(ATTR_DUE_AT));
-            if (dueAt <= 0 || dueAt > now) continue;                         // no SLA set, or not yet due
-            // Write against the CURRENT stored object, not the page's copy: a stale copy would re-emit a breach
-            // already stamped, and its update would overwrite a status change made since the page was read.
-            OperationalObject current = store.get(o.id()).orElse(null);
-            if (current == null || current.isClosed() || current.attributes().containsKey(ATTR_SLA_BREACHED_AT)
-                    || !o.status().equalsIgnoreCase(current.status())) continue;
-            OperationalObject marked = store.update(
-                    current.withAttributes(Map.of(ATTR_SLA_BREACHED_AT, Long.toString(now)), now));
-            EventLog.current().emit(Event.builder(EventType.OBJECT_SLA_BREACH)
-                    .level(EventLevel.WARN)
-                    .source(SOURCE)
-                    .correlationId(marked.correlationId())
-                    .message("INCIDENT " + marked.id() + " breached SLA: due " + dueAt
-                            + ", overdue " + (now - dueAt) + "ms")
-                    .attr("objectId", marked.id())
-                    .attr("objectType", marked.objectType().name())
-                    .attr("status", marked.status())
-                    .attr("severity", marked.severity())
-                    .attr("assignee", marked.assignee())
-                    .attr("dueAt", dueAt)
-                    .attr("overdueMs", now - dueAt));
-            breached++;
+        int[] escalations = {0};
+        for (ObjectType type : types) {
+            Workflow wf = workflow(type);
+            SlaPolicy policy = gov.slaPolicies().get(type);
+            List<EscalationRule> rules = gov.escalationRules().stream().filter(r -> r.objectType() == type).toList();
+            // Every object of the type, a page at a time — one newest-first MAX_LIMIT page never reached the oldest overdue ones.
+            for (OperationalObject o : allMatching(ObjectQuery.builder().objectType(type).build())) {
+                if (stopped(o, wf)) continue;
+                // Write against the CURRENT stored object, not the page's copy: a stale copy would re-emit a breach
+                // already stamped, and its update would overwrite a status change made since the page was read.
+                OperationalObject current = store.get(o.id()).orElse(null);
+                if (current == null || stopped(current, wf) || !o.status().equalsIgnoreCase(current.status())) continue;
+                if (policy != null) current = stampPolicy(current, policy, now);
+                OperationalObject after = breachResponse(current, wf, now);
+                long dueAt = parseEpoch(after.attributes().get(ATTR_DUE_AT));
+                if (dueAt > 0 && dueAt <= now && !after.attributes().containsKey(ATTR_SLA_BREACHED_AT)) {
+                    after = store.update(after.withAttributes(Map.of(ATTR_SLA_BREACHED_AT, Long.toString(now)), now));
+                    emitBreach(after, "resolution", dueAt, now);
+                    breached++;
+                }
+                if (!rules.isEmpty()) escalate(after, rules, now, escalations);
+            }
         }
         return breached;
+    }
+
+    /**
+     * The sweep's stop set: settled ({@code closedAt}), any terminal state of the registered workflow, {@code RESOLVED}
+     * (the resolution clock stops) and {@code ARCHIVED} (dismissed, even where not terminal).
+     */
+    private static boolean stopped(OperationalObject o, Workflow wf) {
+        return o.isClosed() || wf.isTerminal(o.status())
+                || "RESOLVED".equalsIgnoreCase(o.status()) || "ARCHIVED".equalsIgnoreCase(o.status());
+    }
+
+    /**
+     * Stamp the deadlines {@code policy} sets for the object's priority, counted in the policy's business calendar
+     * from {@code createdAt}. An operator-set {@code dueAt} (one no policy stamped) is left alone; policy-stamped ones
+     * are recomputed when the priority changes, until a breach has been recorded.
+     */
+    private OperationalObject stampPolicy(OperationalObject o, SlaPolicy policy, long now) {
+        Map<String, String> a = o.attributes();
+        boolean operatorSet = a.get(ATTR_DUE_AT) != null && !a.get(ATTR_DUE_AT).isBlank() && a.get(ATTR_SLA_POLICY) == null;
+        if (operatorSet || a.containsKey(ATTR_SLA_BREACHED_AT)) return o;
+        String priority = o.priority() == null ? "" : o.priority().trim().toUpperCase(java.util.Locale.ROOT);
+        if (a.get(ATTR_SLA_POLICY) != null && priority.equals(a.get(ATTR_SLA_PRIORITY))) return o;
+        SlaPolicy.Target t = policy.targetFor(priority).orElse(null);
+        if (t == null) return o;
+        Map<String, String> stamp = new java.util.LinkedHashMap<>();
+        stamp.put(ATTR_SLA_POLICY, policy.objectType().name());
+        stamp.put(ATTR_SLA_PRIORITY, priority);
+        if (t.resolutionMinutes() != null)
+            stamp.put(ATTR_DUE_AT, Long.toString(policy.calendar().addWorkingMinutes(o.createdAt(), t.resolutionMinutes())));
+        if (t.responseMinutes() != null && !a.containsKey(ATTR_SLA_RESPONSE_BREACHED_AT))
+            stamp.put(ATTR_RESPONSE_DUE_AT, Long.toString(policy.calendar().addWorkingMinutes(o.createdAt(), t.responseMinutes())));
+        return store.update(o.withAttributes(stamp, now));
+    }
+
+    /** A response breach: the response deadline passed while the object still sits in its workflow's initial state. */
+    private OperationalObject breachResponse(OperationalObject o, Workflow wf, long now) {
+        long due = parseEpoch(o.attributes().get(ATTR_RESPONSE_DUE_AT));
+        if (due <= 0 || due > now || o.attributes().containsKey(ATTR_SLA_RESPONSE_BREACHED_AT)
+                || !wf.initialState().equalsIgnoreCase(o.status())) return o;
+        OperationalObject marked = store.update(o.withAttributes(Map.of(ATTR_SLA_RESPONSE_BREACHED_AT, Long.toString(now)), now));
+        emitBreach(marked, "response", due, now);
+        return marked;
+    }
+
+    private void emitBreach(OperationalObject o, String target, long dueAt, long now) {
+        EventLog.current().emit(Event.builder(EventType.OBJECT_SLA_BREACH)
+                .level(EventLevel.WARN)
+                .source(SOURCE)
+                .correlationId(o.correlationId())
+                .message(o.objectType() + " " + o.id() + " breached " + ("response".equals(target) ? "response " : "")
+                        + "SLA: due " + dueAt + ", overdue " + (now - dueAt) + "ms")
+                .attr("objectId", o.id())
+                .attr("objectType", o.objectType().name())
+                .attr("status", o.status())
+                .attr("severity", o.severity())
+                .attr("assignee", o.assignee())
+                .attr("target", target)
+                .attr("dueAt", dueAt)
+                .attr("overdueMs", now - dueAt));
+    }
+
+    /**
+     * Apply every matching Escalation Rule that has not yet fired for this breach. The firing is recorded on the
+     * object ({@link #ATTR_ESCALATIONS}, {@code <rule>@<breach stamp>}) in the SAME write as the rule's effect, so a
+     * later sweep — or a crash between two sweeps — never repeats it; each firing is audited as one
+     * {@link EventType#OBJECT_ESCALATED} event (WARN when the rule notifies, which the built-in notification rule
+     * picks up; INFO otherwise). Bounded by {@link #MAX_ESCALATIONS_PER_SWEEP}.
+     */
+    private void escalate(OperationalObject o, List<EscalationRule> rules, long now, int[] done) {
+        OperationalObject cur = o;
+        for (EscalationRule r : rules) {
+            if (done[0] >= MAX_ESCALATIONS_PER_SWEEP) return;
+            if (r.priority() != null && (cur.priority() == null || !r.priority().equalsIgnoreCase(cur.priority().trim()))) continue;
+            String marker = switch (r.on()) {
+                case BREACH -> cur.attributes().get("response".equals(r.target()) ? ATTR_SLA_RESPONSE_BREACHED_AT : ATTR_SLA_BREACHED_AT);
+                case AGE -> now - cur.createdAt() >= r.afterMinutes() * 60_000L ? "age" : null;
+            };
+            if (marker == null || marker.isBlank()) continue;
+            String entry = r.id() + "@" + marker;
+            List<String> fired = new ArrayList<>(csv(cur.attributes().get(ATTR_ESCALATIONS)));
+            if (fired.contains(entry)) continue;                               // this rule already fired for this breach
+            fired.add(entry);
+            String fromAssignee = cur.assignee();
+            String fromPriority = cur.priority();
+            OperationalObject next = cur.withAttributes(Map.of(ATTR_ESCALATIONS, String.join(",", fired), "escalated", "true"), now);
+            if (r.raisePriority()) {
+                String raised = EscalationRule.raised(fromPriority);
+                if (raised != null && !raised.equals(fromPriority)) next = next.withPriority(raised, now);
+            }
+            if (r.reassign() != null) next = next.withAssignee(r.reassign(), now);
+            cur = store.update(next);
+            done[0]++;
+            String actor = "escalation-rule:" + r.id();
+            if (r.reassign() != null && !r.reassign().equals(fromAssignee))
+                EventLog.current().emit(Event.builder(EventType.OBJECT_ASSIGNED)
+                        .level(EventLevel.INFO).source(SOURCE).correlationId(cur.correlationId())
+                        .message(cur.objectType() + " " + cur.id() + " assigned to " + r.reassign() + " by " + actor)
+                        .attr("objectId", cur.id()).attr("objectType", cur.objectType().name())
+                        .attr("from", fromAssignee).attr("to", r.reassign()).attr("actor", actor));
+            EventLog.current().emit(Event.builder(EventType.OBJECT_ESCALATED)
+                    .level(r.notifies() ? EventLevel.WARN : EventLevel.INFO)
+                    .source(SOURCE)
+                    .correlationId(cur.correlationId())
+                    .message(cur.objectType() + " " + cur.id() + " escalated by " + actor
+                            + (r.on() == EscalationRule.Trigger.BREACH ? " on its " + r.target() + " SLA breach" : " at age " + r.afterMinutes() + "m"))
+                    .attr("objectId", cur.id())
+                    .attr("objectType", cur.objectType().name())
+                    .attr("rule", r.id())
+                    .attr("trigger", r.on().name().toLowerCase(java.util.Locale.ROOT))
+                    .attr("breach", marker)
+                    .attr("actor", actor)
+                    .attr("notify", r.notifies())
+                    .attr("fromPriority", fromPriority)
+                    .attr("toPriority", cur.priority())
+                    .attr("fromAssignee", fromAssignee)
+                    .attr("toAssignee", cur.assignee()));
+        }
+    }
+
+    private static List<String> csv(String s) {
+        if (s == null || s.isBlank()) return List.of();
+        List<String> out = new ArrayList<>();
+        for (String p : s.split(",")) if (!p.isBlank()) out.add(p.trim());
+        return out;
     }
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ObjectService.class);

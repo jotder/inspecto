@@ -17,6 +17,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -236,6 +237,21 @@ class ImportLoaderInventoryTest {
         for (String s : SUFFIX_ALLOWED.keySet())
             if (DATA_SHAPE.equals(SUFFIX_ALLOWED.get(s)))
                 assertTrue(ImportPaths.shapeRefusal("orders/x" + s, false) == null, s + " is allowed but refused in a subdirectory");
+    }
+
+    /**
+     * ASSURE-WORKFLOW-SLA-1: the governance registry dirs are read by {@code GovernanceRegistry} (inspecto-ops) on
+     * every change, exactly as the {@code *_workflow.toon} suffix scan reads a workflow — so, like that suffix, no
+     * import may land a file in them, referenced or not, whatever the case of the path.
+     */
+    @Test
+    void theGovernanceRegistryDirsAreRefusedToEveryImport() {
+        for (String kind : List.of("workflow", "sla-policy", "escalation-rule")) {
+            String dir = com.gamma.pipeline.ComponentRegistry.dirForType(kind).orElseThrow();
+            assertFalse(ImportPaths.REGISTRY_DIRS.contains(dir), dir);
+            for (boolean referenced : List.of(false, true))
+                assertTrue(ImportPaths.shapeRefusal("registry/" + dir + "/incident.toon", referenced) != null, dir);
+        }
     }
 
     @Test

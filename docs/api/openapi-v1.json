@@ -8493,6 +8493,294 @@
         "x-generated" : true
       }
     },
+    "/components/escalation-rule" : {
+      "post" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "POST /components/escalation-rule",
+        "operationId" : "postComponentsEscalationRule",
+        "description" : "Writes an escalation-rule component - on an SLA breach or at an age, reassign / notify / raise priority, at most once per breach (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; applied by the SLA sweep. The generic /components door and every import refuse this kind.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/components/escalation-rule/{escalationruleId}" : {
+      "put" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "PUT /components/escalation-rule/{escalationruleId}",
+        "operationId" : "putComponentsEscalationRuleByEscalationruleId",
+        "description" : "Writes an escalation-rule component - on an SLA breach or at an age, reassign / notify / raise priority, at most once per breach (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; applied by the SLA sweep. The generic /components door and every import refuse this kind.",
+        "parameters" : [
+          {
+            "name" : "escalationruleId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "DELETE /components/escalation-rule/{escalationruleId}",
+        "operationId" : "deleteComponentsEscalationRuleByEscalationruleId",
+        "description" : "Writes an escalation-rule component - on an SLA breach or at an age, reassign / notify / raise priority, at most once per breach (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; applied by the SLA sweep. The generic /components door and every import refuse this kind.",
+        "parameters" : [
+          {
+            "name" : "escalationruleId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/components/escalation-rule/{escalationruleId}/versions/{versionId}/restore" : {
+      "post" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "POST /components/escalation-rule/{escalationruleId}/versions/{versionId}/restore",
+        "operationId" : "postComponentsEscalationRuleByEscalationruleIdVersionsByVersionIdRestore",
+        "description" : "Writes an escalation-rule component - on an SLA breach or at an age, reassign / notify / raise priority, at most once per breach (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; applied by the SLA sweep. The generic /components door and every import refuse this kind.",
+        "parameters" : [
+          {
+            "name" : "escalationruleId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "versionId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/components/sla-policy" : {
+      "post" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "POST /components/sla-policy",
+        "operationId" : "postComponentsSlaPolicy",
+        "description" : "Writes an sla-policy component - per-priority response and resolution targets of one ObjectType, counted in a business calendar with an explicit IANA zone (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; hot-reloaded by the SLA sweep. The generic /components door and every import refuse this kind.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/components/sla-policy/{slapolicyId}" : {
+      "put" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "PUT /components/sla-policy/{slapolicyId}",
+        "operationId" : "putComponentsSlaPolicyBySlapolicyId",
+        "description" : "Writes an sla-policy component - per-priority response and resolution targets of one ObjectType, counted in a business calendar with an explicit IANA zone (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; hot-reloaded by the SLA sweep. The generic /components door and every import refuse this kind.",
+        "parameters" : [
+          {
+            "name" : "slapolicyId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "DELETE /components/sla-policy/{slapolicyId}",
+        "operationId" : "deleteComponentsSlaPolicyBySlapolicyId",
+        "description" : "Writes an sla-policy component - per-priority response and resolution targets of one ObjectType, counted in a business calendar with an explicit IANA zone (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; hot-reloaded by the SLA sweep. The generic /components door and every import refuse this kind.",
+        "parameters" : [
+          {
+            "name" : "slapolicyId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/components/sla-policy/{slapolicyId}/versions/{versionId}/restore" : {
+      "post" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "POST /components/sla-policy/{slapolicyId}/versions/{versionId}/restore",
+        "operationId" : "postComponentsSlaPolicyBySlapolicyIdVersionsByVersionIdRestore",
+        "description" : "Writes an sla-policy component - per-priority response and resolution targets of one ObjectType, counted in a business calendar with an explicit IANA zone (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister. Validated fail-closed (422). Held for approval; hot-reloaded by the SLA sweep. The generic /components door and every import refuse this kind.",
+        "parameters" : [
+          {
+            "name" : "slapolicyId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "versionId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/components/workflow" : {
+      "post" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "POST /components/workflow",
+        "operationId" : "postComponentsWorkflow",
+        "description" : "Writes a workflow component - the states and transitions of one ObjectType (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister: a governance change. Validated fail-closed (422): exactly one initial state, a declared terminal state, every state reachable and every non-terminal state with a way out, no ambiguous action, and for INCIDENT a RESOLVED state with no terminal move around it. Held for approval like every governable kind; hot-reloaded by inspecto-ops. The generic /components door and every import refuse this kind.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/components/workflow/{workflowId}" : {
+      "put" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "PUT /components/workflow/{workflowId}",
+        "operationId" : "putComponentsWorkflowByWorkflowId",
+        "description" : "Writes a workflow component - the states and transitions of one ObjectType (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister: a governance change. Validated fail-closed (422): exactly one initial state, a declared terminal state, every state reachable and every non-terminal state with a way out, no ambiguous action, and for INCIDENT a RESOLVED state with no terminal move around it. Held for approval like every governable kind; hot-reloaded by inspecto-ops. The generic /components door and every import refuse this kind.",
+        "parameters" : [
+          {
+            "name" : "workflowId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      },
+      "delete" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "DELETE /components/workflow/{workflowId}",
+        "operationId" : "deleteComponentsWorkflowByWorkflowId",
+        "description" : "Writes a workflow component - the states and transitions of one ObjectType (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister: a governance change. Validated fail-closed (422): exactly one initial state, a declared terminal state, every state reachable and every non-terminal state with a way out, no ambiguous action, and for INCIDENT a RESOLVED state with no terminal move around it. Held for approval like every governable kind; hot-reloaded by inspecto-ops. The generic /components door and every import refuse this kind.",
+        "parameters" : [
+          {
+            "name" : "workflowId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
+    "/components/workflow/{workflowId}/versions/{versionId}/restore" : {
+      "post" : {
+        "tags" : [
+          "components"
+        ],
+        "summary" : "POST /components/workflow/{workflowId}/versions/{versionId}/restore",
+        "operationId" : "postComponentsWorkflowByWorkflowIdVersionsByVersionIdRestore",
+        "description" : "Writes a workflow component - the states and transitions of one ObjectType (ASSURE-WORKFLOW-SLA-1). Gated on canAdminister: a governance change. Validated fail-closed (422): exactly one initial state, a declared terminal state, every state reachable and every non-terminal state with a way out, no ambiguous action, and for INCIDENT a RESOLVED state with no terminal move around it. Held for approval like every governable kind; hot-reloaded by inspecto-ops. The generic /components door and every import refuse this kind.",
+        "parameters" : [
+          {
+            "name" : "workflowId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "versionId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        }
+      }
+    },
     "/components/findings-spec" : {
       "post" : {
         "tags" : [ "components" ],

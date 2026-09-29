@@ -72,6 +72,12 @@ public final class NotificationRules {
                         "SLA breach",
                         "{{message}}",
                         "sla:{{correlationId}}", true),
+                // ASSURE-WORKFLOW-SLA-1: an Escalation Rule with notify: true emits OBJECT_ESCALATED at WARN; one
+                // without it emits INFO, which this rule's minLevel leaves out of the feed. One notice per firing.
+                new NotificationRule("builtin-escalation", EventType.OBJECT_ESCALATED, EventLevel.WARN, "ops",
+                        "Escalated: {{attributes.objectId}}",
+                        "{{message}}",
+                        "escalation:{{attributes.objectId}}:{{attributes.rule}}:{{attributes.breach}}", true),
                 // A provenance conservation breach already opens an ALERT object (both kinds); surface it
                 // to the operator's feed too. minLevel WARN catches AMPLIFICATION (WARN) as well as LOSS
                 // (ERROR) — matching that the ALERT bridge fires for both.

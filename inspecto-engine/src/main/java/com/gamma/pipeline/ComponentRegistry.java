@@ -77,7 +77,11 @@ public final class ComponentRegistry {
             Map.entry("findings-specs", "findings-spec"),             // C3/D6: configurable Findings sections — GET /findings/{type}
             Map.entry("pattern-packs", "pattern-pack"),               // V2 (c)/D16: Link-Analysis pattern packs
             Map.entry("rule-templates", "rule-template"),             // Pro Max saved query templates — RulesService
-            Map.entry("kpis", "kpi"));                                // ASSURE-KPI-DEFINITIONS-1: KPI definitions — KpiRoutes
+            Map.entry("kpis", "kpi"),                                 // ASSURE-KPI-DEFINITIONS-1: KPI definitions — KpiRoutes
+            // ASSURE-WORKFLOW-SLA-1: governance kinds, hot-reloaded by inspecto-ops (canAdminister, never importable)
+            Map.entry("workflows", "workflow"),
+            Map.entry("sla-policies", "sla-policy"),
+            Map.entry("escalation-rules", "escalation-rule"));
 
     /** The on-disk sub-directory (plural) for a component {@code type} (e.g. {@code grammar} → {@code grammars}). */
     public static Optional<String> dirForType(String type) {

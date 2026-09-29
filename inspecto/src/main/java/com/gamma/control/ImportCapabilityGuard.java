@@ -62,14 +62,33 @@ final class ImportCapabilityGuard {
             "access-catalog", "/access/catalog",
             "requirement", "/requirements (submit) and /requirements/{id}/decision|deliver (triage)");
 
+    /**
+     * ASSURE-WORKFLOW-SLA-1: governance kinds written ONLY through their {@code canAdminister} literal routes — refused
+     * on the generic {@code /components} door and on EVERY import, a new Space's included (unlike
+     * {@link #DEDICATED_ONLY}). A Workflow decides how an Incident may finish; like the {@code *_workflow.toon} suffix
+     * ({@code ImportPaths.REFUSED_SUFFIXES}) it never rides a bundle.
+     */
+    static final Map<String, String> GOVERNANCE_ONLY = Map.of(
+            "workflow", "/components/workflow",
+            "sla-policy", "/components/sla-policy",
+            "escalation-rule", "/components/escalation-rule");
+
     /** The generic {@code /components/{kind}} write door: a dedicated-only kind is refused for any caller, a stricter
      *  kind needs its own route's capability (on top of the door's {@code canAuthorWorkbench}). */
     static void requireKind(HttpExchange ex, String kind) {
         if (kind == null) return;
         String k = kind.toLowerCase(Locale.ROOT);
         refuseDedicated(k, "kind '" + k + "'");
+        refuseGovernance(k, "kind '" + k + "'");
         String capability = KIND_CAPABILITY.get(k);
         if (capability != null) ApiContext.requireCapability(ex, capability);
+    }
+
+    private static void refuseGovernance(String kind, String what) {
+        String route = GOVERNANCE_ONLY.get(kind);
+        if (route != null)
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, what + " is a governance change written through "
+                    + route + " only (canAdminister) — no import carries it; nothing was written");
     }
 
     private static void refuseDedicated(String kind, String what) {
@@ -86,6 +105,7 @@ final class ImportCapabilityGuard {
             if (kind == null) continue;
             kind = kind.toLowerCase(Locale.ROOT);
             refuseDedicated(kind, "an import carrying a '" + kind + "' item");
+            refuseGovernance(kind, "an import carrying a '" + kind + "' item");
             if (KIND_CAPABILITY.containsKey(kind)) require(ex, kind, KIND_CAPABILITY.get(kind));
             if ("job".equals(kind) && item.get("content") instanceof Map<?, ?> c) requireIfAdministerOnly(ex, c);
         }
@@ -115,6 +135,7 @@ final class ImportCapabilityGuard {
                     throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "an import carrying '" + e.getKey()
                             + "' under registry/, whose kind cannot be told — nothing was written");
                 if (!newSpace) refuseDedicated(kind, "an import carrying a '" + kind + "' item");
+                refuseGovernance(kind, "an import carrying a '" + kind + "' item");   // a new Space's too
                 if (KIND_CAPABILITY.containsKey(kind)) require(ex, kind, KIND_CAPABILITY.get(kind));
             }
         }

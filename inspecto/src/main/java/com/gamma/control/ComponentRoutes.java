@@ -42,6 +42,9 @@ final class ComponentRoutes implements RouteModule {
     private static final Logger log = LoggerFactory.getLogger(ComponentRoutes.class);
 
     private static final String FINDINGS_SPEC = "findings-spec";
+    static final String WORKFLOW = "workflow";
+    static final String SLA_POLICY = "sla-policy";
+    static final String ESCALATION_RULE = "escalation-rule";
 
     /**
      * The decoded kind of a GENERIC write route. That segment is URL-decoded a second time
@@ -71,6 +74,24 @@ final class ComponentRoutes implements RouteModule {
         api.delete("/components/findings-spec/([^/]+)", ApiContext.withCapability("canManageIncidents", (e, m) -> deleteComponent(api, e, FINDINGS_SPEC, ApiContext.name(m))));
         api.post("/components/findings-spec/([^/]+)/versions/([^/]+)/restore", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> restoreVersion(api, e, FINDINGS_SPEC, ApiContext.name(m), ApiContext.param(m, 2))));
+        // ASSURE-WORKFLOW-SLA-1: the Workflow, SLA policy and Escalation Rule kinds are GOVERNANCE — they decide how an
+        // Incident may finish and who is paged when it does not — so their writes need canAdminister. Literal routes,
+        // before the generic ones; the generic door refuses these kinds outright (ImportCapabilityGuard.DEDICATED_ONLY).
+        api.post("/components/workflow", ApiContext.withCapability("canAdminister", (e, m) -> createComponent(api, e, WORKFLOW, api.body(e))));
+        api.put("/components/workflow/([^/]+)", ApiContext.withCapability("canAdminister", (e, m) -> updateComponent(api, e, WORKFLOW, ApiContext.name(m), api.body(e))));
+        api.delete("/components/workflow/([^/]+)", ApiContext.withCapability("canAdminister", (e, m) -> deleteComponent(api, e, WORKFLOW, ApiContext.name(m))));
+        api.post("/components/workflow/([^/]+)/versions/([^/]+)/restore", ApiContext.withCapability("canAdminister",
+                (e, m) -> restoreVersion(api, e, WORKFLOW, ApiContext.name(m), ApiContext.param(m, 2))));
+        api.post("/components/sla-policy", ApiContext.withCapability("canAdminister", (e, m) -> createComponent(api, e, SLA_POLICY, api.body(e))));
+        api.put("/components/sla-policy/([^/]+)", ApiContext.withCapability("canAdminister", (e, m) -> updateComponent(api, e, SLA_POLICY, ApiContext.name(m), api.body(e))));
+        api.delete("/components/sla-policy/([^/]+)", ApiContext.withCapability("canAdminister", (e, m) -> deleteComponent(api, e, SLA_POLICY, ApiContext.name(m))));
+        api.post("/components/sla-policy/([^/]+)/versions/([^/]+)/restore", ApiContext.withCapability("canAdminister",
+                (e, m) -> restoreVersion(api, e, SLA_POLICY, ApiContext.name(m), ApiContext.param(m, 2))));
+        api.post("/components/escalation-rule", ApiContext.withCapability("canAdminister", (e, m) -> createComponent(api, e, ESCALATION_RULE, api.body(e))));
+        api.put("/components/escalation-rule/([^/]+)", ApiContext.withCapability("canAdminister", (e, m) -> updateComponent(api, e, ESCALATION_RULE, ApiContext.name(m), api.body(e))));
+        api.delete("/components/escalation-rule/([^/]+)", ApiContext.withCapability("canAdminister", (e, m) -> deleteComponent(api, e, ESCALATION_RULE, ApiContext.name(m))));
+        api.post("/components/escalation-rule/([^/]+)/versions/([^/]+)/restore", ApiContext.withCapability("canAdminister",
+                (e, m) -> restoreVersion(api, e, ESCALATION_RULE, ApiContext.name(m), ApiContext.param(m, 2))));
         // Writes require canAuthorWorkbench (W6; a no-op on Personal — no Subject is ever attached there).
         api.post("/components/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> createComponent(api, e, genericKind(e, m), api.body(e))));
         api.put("/components/([^/]+)/([^/]+)", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> updateComponent(api, e, genericKind(e, m), ApiContext.param(m, 2), api.body(e))));
@@ -800,6 +821,12 @@ final class ComponentRoutes implements RouteModule {
         // ASSURE-KPI-DEFINITIONS-1: the structural half of a KPI (grain, ordered bands, known keys) — every door,
         // bulk writers included. Whether its Dataset exists is KpiRoutes.requireMeasure, which needs the caller.
         if ("kpi".equals(type)) com.gamma.query.KpiDefinition.fromMap(id, content);
+
+        // ASSURE-WORKFLOW-SLA-1: reachability, one initial state, declared terminals, no path around the resolution
+        // gate (Workflow.problems); an explicit IANA zone and sane targets; an Escalation Rule that does something.
+        if (WORKFLOW.equals(type)) com.gamma.objects.Workflow.fromComponent(id, content);
+        if (SLA_POLICY.equals(type)) com.gamma.objects.SlaPolicy.fromComponent(id, content);
+        if (ESCALATION_RULE.equals(type)) com.gamma.objects.EscalationRule.fromComponent(id, content);
 
         if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
     }

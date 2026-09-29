@@ -13,7 +13,7 @@ import com.gamma.ops.tag.InMemoryTagAssignmentStore;
 import com.gamma.ops.tag.Tag;
 import com.gamma.ops.tag.TagAssignmentStore;
 import com.gamma.ops.tag.TagRule;
-import com.gamma.ops.workflow.Workflow;
+import com.gamma.objects.Workflow;
 import com.gamma.service.ObjectEngineProvider;
 import com.gamma.service.OperationalDb;
 import com.gamma.service.SpaceRoot;
@@ -75,6 +75,9 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
         NoteStore noteStore = openNoteStore(root);
         TagAssignmentStore tagStore = openTagAssignmentStore(root);
         ObjectService service = new ObjectService(objectStore, Map.of(), linkStore, noteStore, tagStore);
+        // ASSURE-WORKFLOW-SLA-1: the Space's authored Workflows / SLA policies / Escalation Rules, re-read on change.
+        // ⚠ The legacy single-tenant root has no config dir, so it runs on *_workflow.toon and the built-ins only.
+        if (root.config() != null) service.useGovernance(root.config().resolve("registry"));
         // D7 phase 2: adopt tags that exist only in the legacy attributes CSV into the assignment store so
         // the two cannot disagree. Idempotent, and a no-op on a fresh Space; core logs the count.
         int adopted = service.backfillTagAssignments();
@@ -224,6 +227,11 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
         }
 
         @Override
+        public void useGovernance(Path registryRoot) {
+            service.useGovernance(registryRoot);
+        }
+
+        @Override
         public List<BrowsableStore> browsableStores() {
             List<BrowsableStore> out = new ArrayList<>();
             for (Object s : stores) if (s instanceof BrowsableStore b) out.add(b);
@@ -238,7 +246,8 @@ public final class OpsEngineProvider implements ObjectEngineProvider {
             for (TagRule r : load(configPaths, "_tagrule.toon", TagRule::load, "tag rule")) service.registerTagRule(r);
             for (CaseRule r : load(configPaths, "_caserule.toon", CaseRule::load, "case rule")) service.registerCaseRule(r);
             // Last file wins per object type — registerWorkflow overwrites, as before the move.
-            for (Workflow w : load(configPaths, "_workflow.toon", Workflow::load, "workflow")) service.registerWorkflow(w);
+            // Validated like an authored workflow component (Workflow.problems) — an invalid file is skipped, not served.
+            for (Workflow w : load(configPaths, "_workflow.toon", p -> Workflow.load(p).validated(), "workflow")) service.registerWorkflow(w);
         }
 
         /**

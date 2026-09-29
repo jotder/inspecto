@@ -101,6 +101,13 @@ public interface ObjectEngineProvider {
         void sweepIncidentSla(long now);
 
         /**
+         * Read authored Workflows, SLA policies and Escalation Rules from {@code registryRoot} ({@code <config>/registry}),
+         * re-reading on change (ASSURE-WORKFLOW-SLA-1). The engine wires a Space's own at {@link #open}; this is for the
+         * legacy root, whose registry is the control plane's write root.
+         */
+        default void useGovernance(Path registryRoot) {}
+
+        /**
          * The engine's stores as browsable ones, for the DB-browser surface. Empty for an in-memory
          * backend. {@code BrowsableStore} is a core type, so this crosses the boundary cleanly.
          */

@@ -1,7 +1,6 @@
-package com.gamma.ops.workflow;
+package com.gamma.objects;
 
 import com.gamma.util.ToonHelper;
-import com.gamma.objects.ObjectType;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -193,6 +192,80 @@ public record Workflow(ObjectType objectType, String initialState, Set<Transitio
         }
         return new Workflow(type, "OPEN",
                 Set.of(new Transition("OPEN", "CLOSED", "close")), Set.of("CLOSED"));
+    }
+
+    // ── authored-workflow validation (ASSURE-WORKFLOW-SLA-1) ──────────────────────────
+
+    /**
+     * Every reason this workflow must not be installed; empty = valid. Run at save (the {@code workflow} component
+     * kind, every writer) and again at load, so a hand-edited file that fails is skipped rather than served.
+     * <ol>
+     *   <li>At least one terminal state is declared.</li>
+     *   <li>Every state is reachable from the initial state.</li>
+     *   <li>Every non-terminal state has a way out — a dead end nobody declared terminal is a silent finish line.</li>
+     *   <li>No two transitions leave one state by the same action ({@link #apply} would pick one arbitrarily).</li>
+     *   <li>For an {@link ObjectType#INCIDENT}: {@code RESOLVED} exists; {@code ARCHIVED}, if present, is terminal;
+     *       and every move into a terminal state other than {@code ARCHIVED} leaves from {@code RESOLVED} — so a
+     *       decided outcome is only ever recorded where the Disposition and postmortem gate runs. The gate itself
+     *       ({@code ObjectService.decidesIncident}) also covers every custom terminal state at runtime; this rule
+     *       keeps a workflow from even describing a path around it.</li>
+     * </ol>
+     */
+    public List<String> problems() {
+        List<String> out = new ArrayList<>();
+        if (terminalStates.isEmpty()) out.add("declare at least one terminal state");
+        Set<String> reachable = new LinkedHashSet<>();
+        Deque<String> frontier = new ArrayDeque<>(List.of(initialState));
+        reachable.add(initialState);
+        while (!frontier.isEmpty()) {
+            String cur = frontier.poll();
+            for (Transition t : transitions) if (t.from().equals(cur) && reachable.add(t.to())) frontier.add(t.to());
+        }
+        for (String s : states()) {
+            if (!reachable.contains(s)) out.add("state " + s + " is unreachable from the initial state " + initialState);
+            if (!terminalStates.contains(s) && transitions.stream().noneMatch(t -> t.from().equals(s)))
+                out.add("state " + s + " has no way out and is not declared terminal");
+        }
+        Set<String> moves = new LinkedHashSet<>();
+        for (Transition t : transitions)
+            if (!moves.add(t.from() + " " + t.action()))
+                out.add("two transitions leave " + t.from() + " by action '" + t.action() + "'");
+        if (objectType == ObjectType.INCIDENT) {
+            if (!states().contains("RESOLVED"))
+                out.add("an Incident workflow needs a RESOLVED state — it is where the resolution gate records the outcome");
+            if (states().contains("ARCHIVED") && !terminalStates.contains("ARCHIVED"))
+                out.add("ARCHIVED must be terminal in an Incident workflow");
+            for (Transition t : transitions)
+                if (terminalStates.contains(t.to()) && !"ARCHIVED".equals(t.to()) && !"RESOLVED".equals(t.to())
+                        && !"RESOLVED".equals(t.from()))
+                    out.add("transition " + t.from() + " -" + t.action() + "-> " + t.to()
+                            + " finishes an Incident around RESOLVED, skipping the Disposition and postmortem gate");
+        }
+        return out;
+    }
+
+    /** {@code this}, or {@link IllegalArgumentException} naming every {@link #problems() problem}. */
+    public Workflow validated() {
+        List<String> p = problems();
+        if (!p.isEmpty()) throw new IllegalArgumentException("workflow for " + objectType + " is invalid: " + String.join("; ", p));
+        return this;
+    }
+
+    /**
+     * Parse + validate a {@code workflow} component ({@code registry/workflows/<type>.toon}): the {@link #fromMap}
+     * shape, exactly one initial state (a string, never a list), the component id equal to the object type, then
+     * {@link #validated()}.
+     */
+    public static Workflow fromComponent(String id, Map<String, Object> content) {
+        if (content == null) throw new IllegalArgumentException("workflow content is required");
+        Object initial = content.getOrDefault("initial", content.get("initial_state"));
+        if (!(initial instanceof String))
+            throw new IllegalArgumentException("workflow.initial must be exactly one state name");
+        Workflow wf = fromMap(content);
+        if (id != null && !wf.objectType().name().equalsIgnoreCase(id))
+            throw new IllegalArgumentException("workflow objectType '" + wf.objectType()
+                    + "' must match the component id '" + id + "' (one workflow per object type)");
+        return wf.validated();
     }
 
     // ── .toon authoring ─────────────────────────────────────────────────────────────

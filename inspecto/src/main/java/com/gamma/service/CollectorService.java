@@ -872,6 +872,15 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     }
 
     /** The engine itself, for the two things the seam deliberately does not cover (config loading, close). */
+    /**
+     * Point this Space's object engine at the registry holding its authored Workflows, SLA policies and Escalation
+     * Rules (ASSURE-WORKFLOW-SLA-1) — for the legacy root, whose registry is the control plane's write root. A no-op
+     * without the ops module.
+     */
+    public void useGovernanceRoot(java.nio.file.Path registryRoot) {
+        objectEngine.ifPresent(e -> e.useGovernance(registryRoot));
+    }
+
     java.util.Optional<ObjectEngineProvider.ObjectEngine> objectEngine() {
         return objectEngine;
     }
