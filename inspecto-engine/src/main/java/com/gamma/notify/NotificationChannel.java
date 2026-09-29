@@ -34,6 +34,17 @@ public interface NotificationChannel {
     default void deliver(Notification n, String target) throws Exception { deliver(n); }
 
     /**
+     * Deliver to {@code target} carrying {@code attachments} (ASSURE-XLSX-ATTACHMENTS-1). A channel that cannot
+     * carry files keeps this default, which delivers normally when there are none and REFUSES when there are —
+     * silently dropping a report the author asked to attach would be a delivery that reads as a success.
+     */
+    default void deliver(Notification n, String target, java.util.List<MailAttachment> attachments) throws Exception {
+        if (attachments != null && !attachments.isEmpty())
+            throw new UnsupportedOperationException("channel '" + id() + "' cannot carry attachments");
+        deliver(n, target);
+    }
+
+    /**
      * Deliver to {@code target}, embedding {@code deliveryId} in the outbound message so a provider
      * callback can be correlated back to a {@link DeliveryReceipt} (BACKLOG D8) — an SMTP
      * {@code Message-ID} of {@code <inspecto.{deliveryId}@{domain}>}, or an

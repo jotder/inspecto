@@ -6,6 +6,9 @@ import com.gamma.config.safety.PathJail;
 import com.gamma.event.Event;
 import com.gamma.event.EventLog;
 import com.gamma.event.EventType;
+import com.gamma.notify.MailAccess;
+import com.gamma.notify.MailAttachment;
+import com.gamma.notify.MailAttachments;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
@@ -33,7 +36,9 @@ import java.util.Set;
  * {@code out_dir} the report is rendered to a timestamped artifact file (a directory being the first
  * delivery destination — point it at a mounted share to hand off) and a {@link EventType#REPORT_READY}
  * event is emitted, which the notification layer routes to the configured external channels (webhook
- * POST; SMTP text with the artifact path — attachments are a known SMTP-channel limitation).
+ * POST; SMTP text with the artifact path). Since ASSURE-XLSX-ATTACHMENTS-1 a {@code recipients} list is also
+ * mailed directly through the {@code mail} Platform Service, and {@code attach: true} carries the delivered
+ * artifact itself — the Job's OWN Run Artifact, re-jailed by {@link MailAttachments#fromRunArtifact}.
  *
  * <h3>Scopes</h3>
  * <ul>
@@ -42,14 +47,18 @@ import java.util.Set;
  *   <li>{@code dataset} (BI-4 export) — a headless BI query over a Dataset: params {@code dataset}
  *       (component id, required), {@code measures} (comma-separated {@code agg(field)}/{@code count};
  *       absent = raw rows), {@code group_by} (comma-separated columns), {@code limit} (default 10000).
- *       Renders CSV by default ({@code format: png}/{@code pdf} render a table-image snapshot, capped
+ *       Renders CSV by default ({@code format: xlsx} a workbook via DuckDB's {@code excel} extension on a
+ *       sealed connection, {@link ReportXlsx}; {@code format: png}/{@code pdf} render a table-image snapshot, capped
  *       at {@link TablePngRenderer#MAX_ROWS} rows — {@code pdf} is the same snapshot wrapped in a
  *       minimal hand-written PDF via {@link PdfRenderer}, no PDF library on the classpath); reports
  *       render JSON.</li>
  * </ul>
  *
  * <p>Params: {@code scope}, {@code out_dir}, {@code format}
- * ({@code json} | {@code csv} | {@code png} | {@code pdf}), and the dataset-scope params above.
+ * ({@code json} | {@code csv} | {@code xlsx} | {@code png} | {@code pdf}), {@code recipients} (comma-separated
+ * addresses mailed once the artifact is delivered), {@code attach} ({@code true} attaches it), and the
+ * dataset-scope params above. Text cells in {@code csv} and {@code xlsx} are formula-neutralised
+ * ({@link ReportXlsx#neutralise}).
  */
 final class ReportJob implements Job {
 
@@ -77,15 +86,16 @@ final class ReportJob implements Job {
 
     @Override
     public JobResult run() throws Exception {
-        return execute(null);   // legacy no-ctx path — no Run Artifact recorder available
+        return execute(null);   // legacy no-ctx path — no Run Artifact recorder, no mail service
     }
 
     @Override
     public JobResult run(JobContext ctx) throws Exception {
-        return execute(ctx.artifacts());   // JobService invokes this — records the delivered file (R7)
+        return execute(ctx);   // JobService invokes this — records the delivered file (R7)
     }
 
-    private JobResult execute(ArtifactRecorder artifacts) throws Exception {
+    private JobResult execute(JobContext ctx) throws Exception {
+        ArtifactRecorder artifacts = ctx == null ? null : ctx.artifacts();
         String scope = cfg.opt("scope", "status").toLowerCase();
         long t0 = System.nanoTime();
 
@@ -108,9 +118,39 @@ final class ReportJob implements Job {
         events.info(JSON.writeValueAsString(line));
 
         String delivered = deliver(scope, report, rows, artifacts);
+        String mailed = mail(ctx, delivered);
         long ms = (System.nanoTime() - t0) / 1_000_000L;
         return JobResult.ok("report '" + scope + "' emitted to inspecto.events"
-                + (delivered != null ? " and delivered to " + delivered : ""), ms);
+                + (delivered != null ? " and delivered to " + delivered : "")
+                + (mailed != null ? "; " + mailed : ""), ms);
+    }
+
+    /**
+     * Mail the delivered report to {@code recipients}, attaching it when {@code attach: true}. The attachment
+     * is ONLY the artifact this Run just wrote and recorded — there is no parameter naming a path — and it is
+     * re-jailed (allowed roots, {@code *.secrets} refused), type-allowlisted and size-capped on the way in.
+     * Returns a summary for the result message, or {@code null} when nothing was asked for.
+     */
+    private String mail(JobContext ctx, String delivered) throws Exception {
+        List<String> to = split(cfg.opt("recipients", ""));
+        boolean attach = "true".equalsIgnoreCase(cfg.opt("attach", "false"));
+        if (to.isEmpty()) {
+            if (attach) throw new IllegalArgumentException("attach: true needs recipients to mail the report to");
+            return null;
+        }
+        if (delivered == null)
+            throw new IllegalArgumentException("recipients needs out_dir: only a delivered report can be mailed");
+        MailAccess mail = ctx == null ? null : ctx.services().find(MailAccess.class).orElse(null);
+        if (mail == null) return "not mailed (no mail service granted to this Run)";
+        List<MailAttachment> files = attach
+                ? List.of(MailAttachments.fromRunArtifact(Path.of(delivered), PathJail.allowedRoots(),
+                        SpaceConfigRoot.current()))
+                : List.of();
+        boolean sent = mail.send(to, List.of(), "Report '" + cfg.name() + "' ready",
+                "Report '" + cfg.name() + "' was delivered to " + delivered
+                        + (attach ? " and is attached." : "."), files);
+        return sent ? "mailed to " + to.size() + " recipient(s)" + (attach ? " with attachment" : "")
+                : "not mailed (no email channel configured)";
     }
 
     /**
@@ -132,9 +172,13 @@ final class ReportJob implements Job {
                 PathJail.allowedRoots(), SpaceConfigRoot.current(), outDir, "out_dir");
         Files.createDirectories(dir);
         Path artifact = dir.resolve(cfg.name() + "_" + TS.format(LocalDateTime.now())
-                + ("csv".equals(format) ? ".csv" : "png".equals(format) ? ".png"
+                + ("csv".equals(format) ? ".csv" : "xlsx".equals(format) ? ".xlsx" : "png".equals(format) ? ".png"
                         : "pdf".equals(format) ? ".pdf" : ".json"));
-        if ("csv".equals(format)) {
+        if ("xlsx".equals(format)) {
+            if (rows == null) throw new IllegalArgumentException(
+                    "format xlsx requires scope dataset (rollup reports render as json)");
+            ReportXlsx.write(cfg.name(), rows, artifact);
+        } else if ("csv".equals(format)) {
             if (rows == null) throw new IllegalArgumentException(
                     "format csv requires scope dataset (rollup reports render as json)");
             Files.writeString(artifact, toCsv(rows));
@@ -205,13 +249,18 @@ final class ReportJob implements Job {
         sb.append(String.join(",", header.stream().map(ReportJob::csv).toList())).append('\n');
         for (Map<String, Object> r : rows) {
             List<String> cells = new ArrayList<>(header.size());
-            for (String h : header) cells.add(csv(r.get(h) == null ? "" : String.valueOf(r.get(h))));
+            for (String h : header) {
+                Object v = r.get(h);
+                // A NUMBER cannot be a formula, so -3 stays -3; only text is neutralised (CSV injection).
+                cells.add(v instanceof Number ? String.valueOf(v) : csv(v == null ? "" : String.valueOf(v)));
+            }
             sb.append(String.join(",", cells)).append('\n');
         }
         return sb.toString();
     }
 
-    private static String csv(String s) {
+    private static String csv(String raw) {
+        String s = ReportXlsx.neutralise(raw);   // CSV injection: the same rule as the workbook
         return (s.contains(",") || s.contains("\"") || s.contains("\n"))
                 ? "\"" + s.replace("\"", "\"\"") + "\"" : s;
     }

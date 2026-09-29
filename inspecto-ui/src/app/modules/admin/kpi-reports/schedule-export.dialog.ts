@@ -36,6 +36,18 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
             : null;
 }
 
+/** A stored `recipients` param: a comma string (current) or a string[] (schedules saved before 2026-09-29). */
+function recipientsText(raw: unknown): string {
+    if (Array.isArray(raw)) return raw.join(', ');
+    return typeof raw === 'string'
+        ? raw
+              .split(',')
+              .map((r) => r.trim())
+              .filter(Boolean)
+              .join(', ')
+        : '';
+}
+
 /**
  * Schedule a Dashboard export (C6) — no new entity: a scheduled export IS a Job with
  * `type: 'report'` and `params: {dashboardId, format, recipients}`; the existing scheduler
@@ -94,7 +106,8 @@ export class ScheduleExportDialog implements AfterViewInit {
               format: (this.data.job.params?.['format'] as string) ?? 'csv',
               scheduleMode: this.data.job.cron ? 'cron' : 'manual',
               cron: this.data.job.cron ?? '0 0 6 * * *',
-              recipients: ((this.data.job.params?.['recipients'] as string[]) ?? []).join(', '),
+              recipients: recipientsText(this.data.job.params?.['recipients']),
+              attach: this.data.job.params?.['attach'] === 'true' || this.data.job.params?.['attach'] === true,
               enabled: this.data.job.enabled,
           }
         : undefined;
@@ -115,10 +128,11 @@ export class ScheduleExportDialog implements AfterViewInit {
         if (!this.schemaForm.validate()) return;
         const v = this.schemaForm.value() as {
             name?: string;
-            format: 'csv' | 'pdf' | 'png';
+            format: 'csv' | 'xlsx' | 'pdf' | 'png';
             scheduleMode: 'cron' | 'manual';
             cron?: string;
             recipients?: string;
+            attach?: boolean;
             enabled?: boolean;
         };
         const recipients = String(v.recipients ?? '')
@@ -131,7 +145,14 @@ export class ScheduleExportDialog implements AfterViewInit {
             cron: v.scheduleMode === 'cron' ? String(v.cron ?? '').trim() : null,
             onPipeline: null,
             enabled: v.enabled !== false,
-            params: { reportKind: 'dashboard', dashboardId: this.data.dashboardId, format: v.format, recipients },
+            // The report Job reads `recipients` as ONE comma-separated string and `attach` as 'true'/'false'.
+            params: {
+                reportKind: 'dashboard',
+                dashboardId: this.data.dashboardId,
+                format: v.format,
+                recipients: recipients.join(','),
+                attach: v.attach === true ? 'true' : 'false',
+            },
         };
         this.saving.set(true);
         const call = this.isEdit ? this.api.update(body.name, body) : this.api.create(body);

@@ -23,6 +23,7 @@ export const SCHEDULE_EXPORT_ATTRIBUTES: AttributeSpec[] = [
         default: 'csv',
         options: [
             { value: 'csv', label: 'CSV (tile data)' },
+            { value: 'xlsx', label: 'Excel workbook (tile data)' },
             { value: 'pdf', label: 'PDF (snapshot)' },
             { value: 'png', label: 'PNG (snapshot)' },
         ],
@@ -56,6 +57,14 @@ export const SCHEDULE_EXPORT_ATTRIBUTES: AttributeSpec[] = [
         required: false,
         placeholder: 'ops@example.com, finance@example.com',
         help: 'Who is notified when the export completes.',
+    },
+    {
+        key: 'attach',
+        label: 'Attach the export to the email',
+        type: 'boolean',
+        tier: 'optional',
+        default: false,
+        help: 'Sends the file itself, not only its location. Needs at least one recipient; large files are refused.',
     },
     { key: 'enabled', label: 'Enabled (armed)', type: 'boolean', tier: 'optional', default: true },
 ];

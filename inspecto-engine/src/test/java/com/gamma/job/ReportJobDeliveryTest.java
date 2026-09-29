@@ -168,6 +168,116 @@ class ReportJobDeliveryTest {
         assertTrue(ImageIO.read(uncapped.toFile()).getHeight() < ImageIO.read(capped.toFile()).getHeight());
     }
 
+    // ── ASSURE-XLSX-ATTACHMENTS-1 ─────────────────────────────────────────────
+
+    /** Records what the Job asked the mail service to send. */
+    private static final class RecordingMail implements com.gamma.notify.MailAccess {
+        List<String> to;
+        List<com.gamma.notify.MailAttachment> attachments;
+        @Override public boolean send(List<String> to, List<String> cc, String subject, String body,
+                                      List<com.gamma.notify.MailAttachment> attachments) {
+            this.to = to;
+            this.attachments = attachments;
+            return true;
+        }
+    }
+
+    private static JobContext ctxWith(com.gamma.notify.MailAccess mail) {
+        return new JobContext() {
+            @Override public String runId() { return "run-1"; }
+            @Override public String spaceId() { return "default"; }
+            @Override public TriggerInfo trigger() { return null; }
+            @Override public Map<String, String> config() { return Map.of(); }
+            @Override public Map<String, String> params() { return Map.of(); }
+            @Override public ArtifactRecorder artifacts() { return null; }
+            @Override public com.gamma.util.RunLog log() {
+                return new com.gamma.util.RunLog() {
+                    @Override public void info(String m, Object... kv) { }
+                    @Override public void warn(String m, Object... kv) { }
+                    @Override public void error(String m, Throwable t, Object... kv) { }
+                };
+            }
+            @Override public com.gamma.signal.SignalEmitter signals() { return (type, severity, payload) -> { }; }
+            @Override public PlatformServices services() {
+                return new PlatformServices() {
+                    @Override public <T> java.util.Optional<T> find(Class<T> type) {
+                        return type == com.gamma.notify.MailAccess.class
+                                ? java.util.Optional.of(type.cast(mail)) : java.util.Optional.empty();
+                    }
+                    @Override public java.util.Set<Class<?>> granted() {
+                        return java.util.Set.of(com.gamma.notify.MailAccess.class);
+                    }
+                };
+            }
+        };
+    }
+
+    @Test
+    void attachMailsTheJobsOwnDeliveredArtifact(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        RecordingMail mail = new RecordingMail();
+
+        JobResult r = new ReportJob(job(Map.of(
+                "scope", "dataset", "dataset", "sales_ds", "out_dir", outDir.toString(),
+                "recipients", "ops@example.com, finance@example.com", "attach", "true")), null)
+                .run(ctxWith(mail));
+
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertTrue(r.message().contains("mailed to 2 recipient(s) with attachment"), r.message());
+        assertEquals(List.of("ops@example.com", "finance@example.com"), mail.to);
+        assertEquals(1, mail.attachments.size());
+        Path artifact;
+        try (Stream<Path> files = Files.list(outDir)) { artifact = files.findFirst().orElseThrow(); }
+        assertEquals(artifact.getFileName().toString(), mail.attachments.get(0).filename());
+        assertEquals("text/csv", mail.attachments.get(0).contentType());
+        assertArrayEquals(Files.readAllBytes(artifact), mail.attachments.get(0).content());
+    }
+
+    @Test
+    void anOverCapAttachmentFailsTheRunWithTheReason(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        System.setProperty(com.gamma.notify.MailAttachments.MAX_ATTACHMENT_PROPERTY, "8");
+        try {
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> new ReportJob(job(Map.of(
+                    "scope", "dataset", "dataset", "sales_ds", "out_dir", outDir.toString(),
+                    "recipients", "ops@example.com", "attach", "true")), null).run(ctxWith(new RecordingMail())));
+            assertTrue(e.getMessage().contains("over the 8-byte cap"), e.getMessage());
+        } finally {
+            System.clearProperty(com.gamma.notify.MailAttachments.MAX_ATTACHMENT_PROPERTY);
+        }
+    }
+
+    @Test
+    void attachWithoutRecipientsIsRefused(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        assertThrows(IllegalArgumentException.class, () -> new ReportJob(job(Map.of(
+                "scope", "dataset", "dataset", "sales_ds", "out_dir", outDir.toString(), "attach", "true")), null)
+                .run(ctxWith(new RecordingMail())));
+    }
+
+    @Test
+    void csvTextCellsAreFormulaNeutralised(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        new ViewStore(writeRoot.resolve("views")).write(new ViewDefinition("notes_view", "flow-x", List.of(),
+                "SELECT * FROM (VALUES ('=HYPERLINK(1)', 1), ('@x', 2), ('ok', -3)) AS t(note, n)",
+                "2026-07-08T00:00:00Z"));
+        new ComponentStore(writeRoot.resolve("registry")).write("dataset", "notes_ds", Map.of("view", "notes_view"));
+        System.setProperty("assist.write.root", writeRoot.toString());
+
+        JobResult r = new ReportJob(job(Map.of(
+                "scope", "dataset", "dataset", "notes_ds", "out_dir", outDir.toString())), null).run();
+
+        assertEquals("SUCCESS", r.status(), r.message());
+        Path artifact;
+        try (Stream<Path> files = Files.list(outDir)) { artifact = files.findFirst().orElseThrow(); }
+        String csv = Files.readString(artifact);
+        assertTrue(csv.contains("'=HYPERLINK(1),1") && csv.contains("'@x,2"), csv);
+        // a NUMBER is never prefixed — -3 is a value, and prefixing it would break every numeric reader
+        assertTrue(csv.contains("ok,-3"), csv);
+    }
+
     @Test
     void datasetScopeWithoutWriteRootFails(@TempDir Path outDir) {
         assertThrows(IllegalStateException.class, () -> new ReportJob(job(Map.of(

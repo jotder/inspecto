@@ -98,7 +98,7 @@ class MailSendJobTypeTest {
     @Test
     void itRegistersWhereTheMailServiceIsWired() {
         PlatformServiceRegistry platform = new PlatformServiceRegistry();
-        platform.register("mail", com.gamma.notify.MailAccess.class, (to, cc, subject, body) -> true);
+        platform.register("mail", com.gamma.notify.MailAccess.class, (to, cc, subject, body, attachments) -> true);
 
         JobTypeRegistry wired = new JobTypeRegistry(platform);
         wired.register(new MailSendJobType());

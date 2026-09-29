@@ -43,7 +43,18 @@ public interface MailAccess {
      *         failing every Run, matching how {@link NotificationService} skips unconfigured channels
      * @throws Exception whatever the transport throws; the caller decides whether that fails the Run
      */
-    boolean send(List<String> to, List<String> cc, String subject, String body) throws Exception;
+    default boolean send(List<String> to, List<String> cc, String subject, String body) throws Exception {
+        return send(to, cc, subject, body, List.of());
+    }
+
+    /**
+     * As {@link #send(List, List, String, String)}, carrying {@code attachments} (ASSURE-XLSX-ATTACHMENTS-1).
+     * The per-file and per-message caps and the type allowlist ({@link MailAttachments#check}) are applied
+     * before anything is handed to a channel, so an over-cap message fails the Run with a clear reason rather
+     * than being refused by the relay.
+     */
+    boolean send(List<String> to, List<String> cc, String subject, String body,
+                 List<MailAttachment> attachments) throws Exception;
 
     /**
      * The default binding: the first configured {@code email} {@link NotificationChannel} on the
@@ -54,13 +65,15 @@ public interface MailAccess {
      * {@link ServiceLoader} pass per send, which is nothing against an SMTP round-trip.
      */
     static MailAccess overChannels() {
-        return (to, cc, subject, body) -> {
+        return (to, cc, subject, body, attachments) -> {
             String target = recipients(to, cc);
             if (target.isEmpty()) return false;
+            List<MailAttachment> files = attachments == null ? List.of() : attachments;
+            MailAttachments.check(files);
             for (NotificationChannel channel : ServiceLoader.load(NotificationChannel.class)) {
                 if (!"email".equals(channel.id()) || !channel.configured()) continue;
                 channel.deliver(Notification.create("job", "JOB_RUN", null,
-                        subject == null ? "" : subject, body == null ? "" : body, null), target);
+                        subject == null ? "" : subject, body == null ? "" : body, null), target, files);
                 return true;
             }
             return false;

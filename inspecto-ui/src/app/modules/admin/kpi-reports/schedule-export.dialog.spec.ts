@@ -3,18 +3,20 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { ToastrService } from 'ngx-toastr';
 import { describe, expect, it } from 'vitest';
-import { JobsService } from 'app/inspecto/api';
+import { of } from 'rxjs';
+import { JobsService, JobUpsert } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ScheduleExportData, ScheduleExportDialog } from './schedule-export.dialog';
+import { SCHEDULE_EXPORT_ATTRIBUTES } from './schedule-export-attributes';
 
-function create(data: ScheduleExportData) {
+function create(data: ScheduleExportData, jobs: object = {}) {
     TestBed.configureTestingModule({
         imports: [ScheduleExportDialog],
         providers: [
             provideNoopAnimations(),
             { provide: MatDialogRef, useValue: { close: () => {} } },
             { provide: MAT_DIALOG_DATA, useValue: data },
-            { provide: JobsService, useValue: {} },
+            { provide: JobsService, useValue: jobs },
             { provide: ToastrService, useValue: {} },
         ],
     });
@@ -55,5 +57,42 @@ describe('ScheduleExportDialog', () => {
         expect(c.schemaForm.form.get('name')!.disabled).toBe(true);
         expect(c.schemaForm.form.get('format')!.value).toBe('pdf');
         expect(c.schemaForm.form.get('recipients')!.value).toBe('ops@x.com, fin@x.com');
+    });
+
+    it('offers xlsx and sends attach + recipients in the shape the report Job reads', () => {
+        let sent: JobUpsert | undefined;
+        const fixture = create(
+            { dashboardId: 'cdr_overview', dashboardName: 'CDR Overview' },
+            { create: (b: JobUpsert) => ((sent = b), of(b)) },
+        );
+        const c = fixture.componentInstance;
+        const format = SCHEDULE_EXPORT_ATTRIBUTES.find((a) => a.key === 'format')!;
+        expect(format.options!.map((o) => o.value)).toContain('xlsx');
+        c.schemaForm.form.patchValue({
+            name: 'weekly_xlsx',
+            format: 'xlsx',
+            recipients: 'ops@x.com, fin@x.com',
+            attach: true,
+        });
+        c.save();
+        expect(sent!.params).toMatchObject({ format: 'xlsx', recipients: 'ops@x.com,fin@x.com', attach: 'true' });
+    });
+
+    it('edit mode prefills attach and a comma-string recipients param', () => {
+        const fixture = create({
+            dashboardId: 'cdr_overview',
+            dashboardName: 'CDR Overview',
+            job: {
+                name: 'daily_cdr_export',
+                type: 'report',
+                cron: null,
+                onPipeline: null,
+                enabled: true,
+                params: { format: 'xlsx', recipients: 'ops@x.com,fin@x.com', attach: 'true' },
+            },
+        });
+        const f = fixture.componentInstance.schemaForm.form;
+        expect(f.get('recipients')!.value).toBe('ops@x.com, fin@x.com');
+        expect(f.get('attach')!.value).toBe(true);
     });
 });

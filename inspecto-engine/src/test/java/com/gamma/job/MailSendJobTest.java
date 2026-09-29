@@ -33,7 +33,8 @@ class MailSendJobTest {
         RuntimeException blowUp;
 
         @Override
-        public boolean send(List<String> to, List<String> cc, String subject, String body) {
+        public boolean send(List<String> to, List<String> cc, String subject, String body,
+                            List<com.gamma.notify.MailAttachment> attachments) {
             if (blowUp != null) throw blowUp;
             this.to = to;
             this.cc = cc;

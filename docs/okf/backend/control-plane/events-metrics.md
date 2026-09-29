@@ -585,6 +585,29 @@ oldest-first eviction at 5000 is an **unconditional backstop on `add()`, not a r
 receipts by age still requires scheduling the task, and receipts accrue per *external delivery*, i.e.
 faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
 
+### Mail attachments (`ASSURE-XLSX-ATTACHMENTS-1`, built 2026-09-29 — reverses `BI-4`'s "path, not attachment")
+
+* `MailAccess.send(to, cc, subject, body, attachments)` is the abstract method; the four-argument form is a
+  default that sends none. `MailAccess.overChannels()` hands attachments to the new
+  `NotificationChannel.deliver(n, target, List<MailAttachment>)`. Its **default refuses** a non-empty list
+  (`UnsupportedOperationException`): a channel that cannot carry files must not silently drop a report the
+  author asked to attach. `SmtpEmailChannel` overrides it and builds `multipart/mixed` (text first, then
+  one base64 part per file).
+* **One policy home: `com.gamma.notify.MailAttachments`** (`inspecto-engine`). Caps: `notify.mail.attachment.max.bytes`
+  (default 10 MiB) per file and `notify.mail.message.max.bytes` (default 20 MiB) per message, checked by
+  `MailAccess` AND again inside the channel. Content types: allowlist keyed by extension, `csv json pdf png xlsx`
+  only. Filenames: `sanitizeFilename` keeps `[A-Za-z0-9._-]`, takes the last path segment, drops leading dots and
+  caps at 100 chars; the `MailAttachment` record applies it in its constructor, so no caller can hand a raw
+  name (CR/LF = header injection) to a channel.
+* ⛔ **Attachments come only from the sending Job's own Run Artifact.** `MailAttachments.fromRunArtifact` re-jails
+  the file through `PathJail.requireJobPathUnderAny` (allowed roots, `*.secrets` refused on the spelling and the
+  real path) and checks the size before reading. No parameter anywhere names a path to attach. The one caller is
+  `ReportJob` (`recipients` + `attach: true`); `mail.send` does not attach, because it has no Run Artifacts of its own.
+* Tests: `MailAttachmentsTest` (jail, `config.secrets`, allowlist, both caps, filename), `SmtpEmailChannelAttachmentTest`
+  (MIME structure after serialise-and-reparse, header injection, the channel's own cap check), `ReportJobDeliveryTest`
+  (the Job attaches its own artifact; an over-cap file fails the Run with the reason). ⚠ No live-SMTP round trip: the
+  only SMTP stub in the tests (`SmtpEmailChannelStarttlsRequiredTest`) is a STARTTLS-refusal relay, not a mail sink.
+
 ## Alert-rule authoring (shipped 2026-07-09)
 
 * `AlertRoutes` — `POST/PUT/DELETE /alerts/rules[/{name}]` per the `endpoint` skill's fail-closed

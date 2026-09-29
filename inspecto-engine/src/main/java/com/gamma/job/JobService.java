@@ -443,9 +443,11 @@ public final class JobService implements AutoCloseable {
                 "Computes a report (status / batch / dataset export) and optionally delivers it.",
                 List.of(ParameterDecl.optional("scope", ParamType.STRING, "status", "status | batch | dataset"),
                         ParameterDecl.optional("out_dir", ParamType.STRING, null, "Delivery directory (enables artifact + REPORT_READY)"),
-                        ParameterDecl.optional("format", ParamType.STRING, null, "json | csv"),
-                        ParameterDecl.optional("dataset", ParamType.DATASET_REF, null, "Dataset id (scope=dataset)")),
-                List.of(EventType.REPORT_READY), List.of(ArtifactDecl.report("report"))),
+                        ParameterDecl.optional("format", ParamType.STRING, null, "json | csv | xlsx | png | pdf"),
+                        ParameterDecl.optional("dataset", ParamType.DATASET_REF, null, "Dataset id (scope=dataset)"),
+                        ParameterDecl.optional("recipients", ParamType.STRING, null, "Comma-separated addresses mailed when the report is delivered"),
+                        ParameterDecl.optional("attach", ParamType.STRING, "false", "true attaches the delivered report to that mail")),
+                List.of(EventType.REPORT_READY), List.of(ArtifactDecl.report("report")), List.of("mail")),
                 c -> new ReportJob(c, reports, dataDir)));
         registry.register(JobTypeProvider.of(new JobTypeDescriptor("maintenance", "Maintenance",
                 // DERIVED, never hand-written (2026-09-09). This description drives the Jobs authoring

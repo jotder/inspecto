@@ -5,6 +5,8 @@ package com.gamma.notify.channel;
 // SPLIT that package across two jars, because DeliveryIds and the two DeliveryStatusAdapters stay in
 // inspecto-connectors. Not a @PublicApi type, and the only reference to its old name was one doc path.
 
+import com.gamma.notify.MailAttachment;
+import com.gamma.notify.MailAttachments;
 import com.gamma.notify.Notification;
 import com.gamma.notify.NotificationChannel;
 
@@ -14,6 +16,7 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import java.util.Date;
+import java.util.List;
 import java.util.Properties;
 import static com.gamma.util.Values.trimToNull;
 
@@ -139,6 +142,16 @@ public final class SmtpEmailChannel implements NotificationChannel {
         Transport.send(message(n, target));
     }
 
+    /**
+     * Deliver to {@code target} with {@code attachments} as a {@code multipart/mixed} message
+     * (ASSURE-XLSX-ATTACHMENTS-1). The caps and allowlist are re-checked here, so a caller that reached the
+     * channel without going through {@code MailAccess} is held to them too.
+     */
+    @Override
+    public void deliver(Notification n, String target, List<MailAttachment> attachments) throws Exception {
+        Transport.send(message(n, target, null, attachments));
+    }
+
     /** Builds the outgoing mail — separated so tests can assert the message without a live SMTP server. */
     MimeMessage message(Notification n) throws Exception {
         return message(n, to);
@@ -151,7 +164,14 @@ public final class SmtpEmailChannel implements NotificationChannel {
 
     /** As {@link #message(Notification, String)} plus a D8 correlation id stamped into {@code Message-ID}. */
     MimeMessage message(Notification n, String target, String deliveryId) throws Exception {
+        return message(n, target, deliveryId, List.of());
+    }
+
+    /** As {@link #message(Notification, String, String)}, carrying {@code attachments} (none means plain text). */
+    MimeMessage message(Notification n, String target, String deliveryId, List<MailAttachment> attachments)
+            throws Exception {
         MimeMessage msg = buildMessage(n, target != null && !target.isBlank() ? target : to);
+        if (attachments != null && !attachments.isEmpty()) attach(msg, attachments);
         if (deliveryId != null && !deliveryId.isBlank()) {
             // We mint the Message-ID so bounce/complaint callbacks echo it back to us (D8 §2). It must be
             // set AFTER buildMessage and survive the send: JavaMail generates its own during
@@ -160,6 +180,31 @@ public final class SmtpEmailChannel implements NotificationChannel {
             msg.setHeader("Message-ID", "<inspecto." + deliveryId + "@" + messageIdDomain() + ">");
         }
         return msg;
+    }
+
+    /**
+     * Re-shape {@code msg} into {@code multipart/mixed}: the text body as the first part, then one base64 part
+     * per file. The filename is sanitised again at this boundary ({@link MailAttachments#sanitizeFilename}) —
+     * a CR/LF in it would otherwise be a header injection into the part's {@code Content-Disposition}.
+     */
+    private static void attach(MimeMessage msg, List<MailAttachment> attachments) throws Exception {
+        MailAttachments.check(attachments);
+        String text = (String) msg.getContent();
+        javax.mail.internet.MimeMultipart mixed = new javax.mail.internet.MimeMultipart("mixed");
+        javax.mail.internet.MimeBodyPart body = new javax.mail.internet.MimeBodyPart();
+        body.setText(text, "UTF-8");
+        mixed.addBodyPart(body);
+        for (MailAttachment a : attachments) {
+            javax.mail.internet.MimeBodyPart part = new javax.mail.internet.MimeBodyPart();
+            part.setDataHandler(new javax.activation.DataHandler(
+                    new javax.mail.util.ByteArrayDataSource(a.content(), a.contentType())));
+            part.setFileName(MailAttachments.sanitizeFilename(a.filename()));
+            part.setDisposition(javax.mail.Part.ATTACHMENT);
+            part.setHeader("Content-Transfer-Encoding", "base64");
+            mixed.addBodyPart(part);
+        }
+        msg.setContent(mixed);
+        msg.saveChanges();
     }
 
     /** The right-hand side of our {@code Message-ID}, derived from the sender address. */
