@@ -617,14 +617,27 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
   commented local parts, source routes, and `%` / `!` routing in the local part are all refused, not parsed. Tests:
   `MailAttachDomainsTest`, `ControlApiActionRequestsTest.theMailAttachmentDomainAllowlistIsEmptyByDefaultAdminOnlyAndValidated`.
 * 🔴 **Turning `attach: true` on is APPROVAL-REQUIRED — four-eyes, with or without a policy** (operator 2026-09-29).
-  `JobRoutes.attachApproval`: a `POST /jobs` of a report Job with `attach: true`, or a `PUT /jobs/{name}` that
-  flips an existing report Job to it, reaches `PendingChanges.hold(…, mandatory)` with a
-  `canApproveChanges` four-eyes rule even when `approval.toon` names no `job` rule (a policy is opt-in; this
-  risk is not). With a job policy too, the policy's approver applies and four-eyes is forced on. Editing an
-  already-approved attach Job falls back to the normal policy. This fits the Pending Change design unchanged: the
-  approve path reads the approver and four-eyes flag from the RECORD, never from the live policy. Test:
-  `ControlApiPendingChangesTest.turningAttachOnIsHeldForFourEyesEvenWithNoPolicy` (author proposes, self-approve
-  403, a second admin applies; mutation to "no mandatory rule" turns it red).
+  ONE gate, `JobWriteGuard` (`inspecto/src/main/java/com/gamma/control/JobWriteGuard.java`):
+  `JobWriteGuard.mandatory` runs INSIDE `PendingChanges.hold` for `kind = job`, so every route that holds a
+  job write gets it with no call site to forget (`/jobs` POST/PUT/enable/disable/reschedule, `/config/write`,
+  `/config/patch`). It returns a `canApproveChanges` four-eyes rule when the proposed Job is a report with
+  `attach: true` and either the current one is not, or any of `type attach recipients dataset scope measures
+  group_by format out_dir limit connection use` changed. That set decides what data leaves and to whom, so an
+  approved attach Job cannot be quietly re-pointed. A schedule-only edit falls back to the normal policy. With a
+  job policy too, its approver applies and four-eyes is forced on. This fits the Pending Change design unchanged:
+  approve reads the approver and four-eyes flag from the RECORD, never the live policy.
+  **Imports cannot be one Pending Change**, so `ImportCapabilityGuard.requireIfAdministerOnly` (the one path every
+  imported job takes: `/bundle/import` items, pipeline closures, the `/import` zip, a new Space's bundle) calls
+  `JobWriteGuard.refuseImport`: the whole import is refused 403 *"a report job that attaches data needs
+  approval; create it through /jobs"* before any item is written. `JobWritersTest` enumerates
+  `ConfigWriteFunnelTest`'s route inventory and fails on a config-writing route that neither holds, calls
+  the guard or the import gate, nor is listed with a reason.
+  ⚠ **With no authenticator (a Personal / no-auth build) four-eyes cannot tell the author from the approver**:
+  every request is the same anonymous actor, so the hold only delays the write. In that build the recipient
+  domain allowlist above is the ONLY real control on where an attachment can go.
+  Tests: `ControlApiPendingChangesTest.turningAttachOnIsHeldForFourEyesEvenWithNoPolicy`,
+  `…configWriteAndPatchCannotTurnAttachOnWithoutFourEyes`,
+  `ControlApiBundleNewKindsTest.aBundleCarryingAnAttachingReportJobIsRefusedBeforeAnyWrite`, `JobWritersTest`.
 * Tests: `MailAttachmentsTest` (jail, `config.secrets`, allowlist, both caps, filename), `SmtpEmailChannelAttachmentTest`
   (MIME structure after serialise-and-reparse, header injection, the channel's own cap check), `ReportJobDeliveryTest`
   (the Job attaches its own artifact; an over-cap file fails the Run with the reason). ⚠ No live-SMTP round trip: the
