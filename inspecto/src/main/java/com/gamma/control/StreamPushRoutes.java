@@ -53,11 +53,12 @@ import java.util.regex.Pattern;
  * the Pipeline config and the file name is server-minted, so there is no caller-supplied path to jail.
  *
  * <h3>Idempotency</h3>
- * The generic W5 store replays a finished keyed response ({@code Idempotency-Replayed: true}, the first
- * {@code file} name). It does not reserve a key while the first request is still running, and for this route a
- * concurrent duplicate would land the batch twice — so a key is reserved here for the life of the request and
- * a second arrival with the same key gets 409 (retry → replay). ⚠ The store is per process and in memory
- * (10 min TTL): a replay after a restart re-lands the batch. Row-level dedup, when a Dataset needs it, keys on
+ * The W5 stage (after auth, SEC-IDEMPOTENCY-REPLAY-1) replays a finished keyed response to the SAME caller
+ * ({@code Idempotency-Replayed: true}, the first {@code file} name); its key is Space + principal + path, with a
+ * body hash. It does not reserve a key while the first request runs, and here a concurrent duplicate would land
+ * twice — so this route reserves that caller-scoped key for the life of the request (409 to a duplicate; retry →
+ * replay). A keyed body over the stage's hash window runs un-keyed there, so this route refuses it (413). ⚠ The
+ * store is per process and in memory: a replay after a restart re-lands the batch. Row-level dedup, when a Dataset needs it, keys on
  * the payload downstream — the same contract the Kafka lane states.
  *
  * <p><b>Audit:</b> one AUDIT row, {@code stream.records_pushed}, carrying {@code records}, {@code bytes} and the
