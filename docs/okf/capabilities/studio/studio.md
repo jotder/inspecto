@@ -420,61 +420,145 @@ The artifact is registered on the run and a `REPORT_READY` event is emitted carr
 each say "CSV / PDF / PNG", and `json` is the *default*. ⚠ **SMTP delivers that path, not an attachment** — a stated channel limitation, confirmed in the
 job's own contract.
 
-#### Publishing to Postgres for BI tools — `publish.postgres` (ASSURE-BI-PUBLICATION-1, built 2026-09-29)
+#### Publishing to Postgres for BI tools — `publish.postgres` (ASSURE-BI-PUBLICATION-1, built 2026-09-29, security-fixed the same day)
 
-A **Job**, not a Step Processor (the hold on new Step Processors stands): `PostgresPublishJobType` +
-`PostgresPublishSql` in `inspecto-engine` (`com.gamma.job`), registered in `JobService` beside
-`objectstore.export`. Parameters: `connection` (a `connector: db` Connection whose `options.jdbc_url` is
-`jdbc:postgresql://host[:port]/database`; the password is a `${…}` reference resolved by `SecretResolver`,
-keystore included), `datasets` (each lands in a table named after its id, lower-cased, other characters → `_`),
-`schema` (created if absent), `mode` (`full-refresh` default | `partition-incremental` + `partition_column`),
-`columns` (optional allowlist, `column` or `dataset.column`), `include_sensitive`, `timeout_seconds` (300),
-`retries` (2).
+A **Job**, not a Step Processor (the hold on new Step Processors stands). The code is `PostgresPublishJobType`,
+`PostgresPublishSql`, `PublishPinnedSocketFactory`, `PublishSslFactory` and `PublicationDestinations` in
+`inspecto-engine` (`com.gamma.job`). It is registered in `JobService` beside `objectstore.export`.
 
-- **Full refresh** fills `<table>__inspecto_stage`, drops the old table and renames the stage — every Dataset
-  of the run in **one** transaction, so any failure (including one after the rename) leaves every old table and
+Parameters:
+- `connection`: a `connector: db` Connection whose `options.jdbc_url` is `jdbc:postgresql://host[:port]/database`.
+  The password is a `${…}` reference resolved by `SecretResolver`, keystore included.
+- `datasets`: each lands in a table named after its id, lower-cased, with other characters → `_`.
+- `schema`: created if absent.
+- `mode`: `full-refresh` (the default) or `partition-incremental` with `partition_column`.
+- `columns`: an optional allowlist of `column` or `dataset.column`.
+- `include_sensitive`: `dataset.column`, or `dataset.*` for a whole view or virtual Dataset.
+- `timeout_seconds` (300) and `retries` (2).
+
+⚠ `connection`, `datasets`, `include_sensitive`, `schema` and `columns` are read from the **saved** Job only. A
+trigger arg, a Signal binding or a run-time override of any of them refuses the run, because those are the values
+four-eyes approved (below).
+
+**Writing**
+- **Full refresh** fills `<table>__inspecto_stage`, drops the old table and renames the stage. Every Dataset of
+  the run shares **one** transaction, so any failure, including one after the rename, leaves every old table and
   its rows intact. Postgres DDL is transactional; that is what makes the swap atomic.
-- **Partition-incremental** fingerprints each partition in DuckDB (`count(*)` + a HUGEINT sum of
-  `hash(<published columns>)`), compares with `<schema>._inspecto_publication (tbl, part, fingerprint, run_id)`
-  — written in the same transaction as the data — and deletes + re-inserts only changed partitions, and deletes
-  vanished ones. The partition column must be text / integer / boolean / date (types whose text form is the same
-  in DuckDB and Postgres). A target whose column **names** differ from the Dataset's refuses the run ("run a
-  full-refresh first"). ⚠ A column **type** change is not detected as drift; it only changes every fingerprint,
-  so the next run re-sends every partition into the old column types.
+- **Partition-incremental** fingerprints each partition in DuckDB: `count(*)` plus a HUGEINT sum of
+  `hash(<published columns>)`. It compares them with `<schema>._inspecto_publication (tbl, part, fingerprint,
+  run_id)`, which is written in the same transaction as the data, then deletes and re-inserts only the changed
+  partitions and deletes the vanished ones.
+  - The partition column must be text, integer, boolean or date: types whose text form is the same in DuckDB and
+    Postgres.
+  - A target whose column **names** differ from the Dataset's refuses the run ("run a full-refresh first").
+  - ⚠ A column **type** change is not detected as drift. It only changes every fingerprint, so the next run
+    re-sends every partition into the old column types.
 - **Identifiers**: schema, table and column names must match `[A-Za-z_][A-Za-z0-9_]{0,39}` and are always
-  double-quoted; a Dataset column that does not match refuses the run (not quoted around). Comments are
-  single-quoted literals with `'` doubled, under `SET LOCAL standard_conforming_strings = on`.
-- **Column comments** are the Catalog descriptions: the Dataset's `description` → `COMMENT ON TABLE`, each
+  double-quoted. A Dataset column that does not match refuses the run; it is not quoted around.
+- **Comments**: single-quoted literals with `'` doubled, under `SET LOCAL standard_conforming_strings = on`. They
+  are the Catalog descriptions: the Dataset's `description` → `COMMENT ON TABLE`, and each
   `columns[].description` → `COMMENT ON COLUMN`.
-- **Runs as its author.** `JobAuthority.publishAuthority` (installed by `ControlApi`) re-resolves the last
-  editor's recorded roles (`updatedByRoles`) against the role table as it is at run time (Access Profile denies
-  applied). A Dataset whose sharing envelope (`owner` / `shares`, the `ComponentAccess` rule) would hide it
-  from that author refuses the run. With no Authenticator the author is `OPEN`: envelopes are not enforced,
-  exactly as the read routes.
-- **Data egress — refused by default (decision, 2026-09-29).** A column classified `MSISDN`, `IMSI`, `ACCOUNT`
-  or `PII` (`EvidenceMasker.SENSITIVE`) is **left out** when no `columns` allowlist is given; an allowlist that
-  names one refuses the run. It is published only when `include_sensitive` names it as `dataset.column` **and**
-  the author holds `canAdminister` at run time. With no Authenticator no one holds `canAdminister`, so on an
-  open server a sensitive column is never published.
-- **Egress policy**: the JDBC host passes `EgressPolicy.checkHost` and `EgressPolicy.resolve` against this
-  Space's Egress Allowlist (the one Action Requests use), and the driver dials the **checked address**
-  (the URL is rewritten to the IP). ⚠ So `sslmode=verify-full` checks the certificate against the IP and fails
-  closed. Only one host is accepted, and only `sslmode`, `ssl`, `ApplicationName` URL parameters (no socket
-  factory). A tunnel or proxy on the Connection refuses the run.
-- **Timeouts / retries / failure**: `connectTimeout`, `socketTimeout`, `loginTimeout`, `SET LOCAL
-  statement_timeout` and a per-statement query timeout all use `timeout_seconds`. The whole transaction is retried
-  on SQLState `08*`, `40*`, `53*` or `57P*` with 1 s, 2 s, 4 s … backoff. A failed run is `FAILED` with
-  "nothing published (rolled back)" and the cause.
+
+**Who a run acts as**
+- `JobAuthority.publishAuthority`, installed by `ControlApi`, re-resolves the last editor's recorded roles
+  (`updatedByRoles`) against the role table as it is at run time, with Access Profile denies applied.
+- A Dataset whose sharing envelope would hide it from that author refuses the run. This is the `ComponentAccess`
+  rule, and ⚠ that rule means a Dataset with **no `shares` key is viewable by everyone**: only a Dataset that
+  declares `shares` (even an empty list) is restricted to its owner, its shares and `canConfigureAccess` holders.
+- ⚠ **A Job saved by an administrator runs with `canAdminister`** (its last editor's roles) until that role loses
+  it or someone else re-saves the Job. The four-eyes hold below is what stops an administrator from silently
+  widening a publication.
+- With no Authenticator the author is `OPEN`: envelopes are not enforced, as with the read routes.
+
+**Data egress: sensitive columns are refused by default (decision, 2026-09-29)**
+- A column classified `MSISDN`, `IMSI`, `ACCOUNT` or `PII` (`EvidenceMasker.SENSITIVE`) is **left out** when no
+  `columns` allowlist is given, and an allowlist that names one refuses the run.
+- It is published only when `include_sensitive` names it as `dataset.column` **and** the author holds
+  `canAdminister` at run time.
+- The column name and the class match case-insensitively (`MSISDN` = `msisdn`, class ` pii ` = `PII`).
+- **Static lineage:**
+  - A same-named column inherits the classification that any other Dataset declares over the same store
+    (`physicalRef`, a virtual Dataset's `sourceName`, or a view's store and its `source_store` lineage).
+  - A **view or virtual** Dataset over a store with classified columns is refused outright unless
+    `include_sensitive` names `<dataset>.*` and the author holds `canAdminister`, because a rename or computation
+    (`msisdn AS m`) cannot be traced statically.
+- ⚠ **Residual:** classification is only as good as the registry.
+  - A store that no Dataset classifies publishes unmasked through any unclassified Dataset over it: the pipeline
+    schema's own `classification` fields are not consulted.
+  - A same-store Dataset that **renames** a column (a physical Dataset has no SQL to rename with, but a new
+    pipeline output can) is not caught.
+  - Propagating classification through lineage is P3 `ASSURE-CLASSIFICATION-PROPAGATION-1`.
+
+**Destination and TLS**
+- **Destination allowlist (operator 2026-09-29).** A per-Space `publication-destinations.toon` (`hosts: [...]`)
+  lists the exact hosts a publication may write to.
+  - It is EMPTY by default, so a new Space publishes nowhere.
+  - `PUT /settings/publication-destinations` is `canAdminister`, validated and audited
+    (`publication-destinations.changed`), and the file is reserved from every import.
+  - ⚠ Passing the **egress policy** (`EgressPolicy.checkHost`/`resolve` with the Space Egress Allowlist, the one
+    Action Requests use) is necessary but NOT sufficient: the egress policy only rules out address classes, and
+    the destination must also be on this list.
+- **Pinned dial, verified TLS.** The JDBC URL keeps the **authored** host, and `PublishPinnedSocketFactory`
+  connects to the address the egress check resolved.
+  - `PublishSslFactory` does TLS for the authored host (SNI + `HTTPS` endpoint identification), and pgjdbc's
+    `verify-full` hostname check runs on top.
+  - Both factories are set by the Job as driver properties; a `socketFactory`, `sslfactory`, `service` or any other
+    URL parameter outside `sslmode`, `sslrootcert` and `ApplicationName` refuses the run. Only one host is
+    accepted, and a tunnel or proxy on the Connection refuses the run.
+- `sslmode` **defaults to `verify-full`**. `disable`, `allow`, `prefer`, `require` and `verify-ca` are refused
+  unless the Connection sets `insecure_tls: true` **and** the Job's author holds `canAdminister` at run time. Such
+  a run is audited (`publish.postgres.insecure-tls`).
+  - ⚠ The Connection routes do not themselves gate `insecure_tls`; it has no effect for a non-administrator
+    author.
+- `sslrootcert` must be a secret reference (`${KEYSTORE:…}`, `${ENV:…}`, …), resolved in-process into a trust
+  store. A file path is refused, and the JDK roots are used when it is unset.
+- Verified against a TLS-enabled local Postgres with a CA-signed certificate: the authored host passes
+  `verify-full`, and a host the certificate does not name fails.
+- **No ambient credentials.**
+  - The `password` property is always set (empty when the Connection has none), so pgjdbc never reads
+    `~/.pgpass` / `PGPASSFILE`.
+  - No `service` parameter is accepted, so `pg_service.conf` is never read.
+  - Our own `sslfactory` means `LibPQFactory` never reads `~/.postgresql/root.crt` or a client key.
+  - `gssEncMode=disable` and `jaasLogin=false`.
+
+**Approval**
+- **Four-eyes is mandatory (operator 2026-09-29).** `PendingChanges.hold` always holds creating a
+  `publish.postgres` Job, or changing its `connection`, `datasets` or `include_sensitive`: a `canApproveChanges`
+  holder other than the author must approve, whatever `approval.toon` says.
+- A schedule change or a delete is not held by this rule.
+- No import (bundle, zip, Space import, Space Template) may carry a `publish.postgres` Job, because a bulk import
+  cannot be approved (`ImportCapabilityGuard`, 409).
+- ⚠ On a server with no Authenticator every caller is the same anonymous actor, so four-eyes can never be met and
+  such a Job cannot be created through the API.
+- ⚠ The zero-Space recovery create (`TemplateSeedGate` with `checkCapability` false) skips the import gate.
+
+**Run behaviour and editions**
+- **Timeouts / retries / failure**:
+  - `connectTimeout`, `socketTimeout`, `loginTimeout`, `SET LOCAL statement_timeout` and a per-statement query
+    timeout all use `timeout_seconds`.
+  - The whole transaction is retried on SQLState `08*`, `40*`, `53*` or `57P*`, with 1 s, 2 s, 4 s … backoff.
+  - A failed run is `FAILED` with "nothing published (rolled back)" and the cause.
 - **Audit**: every run emits an `AUDIT` event `publish.postgres.run` (`outcome`, `schema`, `tables`, `rows`,
-  `error`), plus the `publish.postgres.completed` Signal on success. A dry run resolves the plan and the egress
-  check and sends nothing.
-- **Edition**: the Job Type registers everywhere; the driver is the Professional/Enterprise `postgresql.jar`
+  `error`), plus the `publish.postgres.completed` Signal on success. A dry run resolves the plan, the destination
+  and the egress check, and sends nothing.
+- **Edition**: the Job Type registers everywhere, but the driver is the Professional/Enterprise `postgresql.jar`
   sidecar (PG-1), so a Personal run fails with `No suitable driver` (`EDITIONS.md` JOB-06).
-- **Tests**: `PostgresPublishJobTest` (10, DuckDB standing in for the target, real egress check with a stubbed
-  DNS answer) covers injection, the sensitive-column refusal, the sharing refusal, loopback egress, URL
-  parameters, the atomic swap on failure and incremental replacement. `PostgresPublishPgTest` repeats the
-  happy path and the failed-refresh case against a real Postgres when `INSPECTO_TEST_PG_URL` is set, and skips
-  otherwise. `PublishAuthorityTest` covers the author seam.
+
+**Tests**
+- `PostgresPublishJobTest` (17, with DuckDB standing in for the target) covers:
+  - injection;
+  - the sensitive-column rules, including case, inheritance and views;
+  - sharing;
+  - loopback egress and the destination allowlist;
+  - URL parameters, `sslmode` and `sslrootcert`;
+  - locked parameters;
+  - the atomic swap on failure;
+  - incremental replacement.
+- `PublishTlsTest` runs a keytool-certified loopback TLS server to check the pinned dial and the hostname binding.
+- `PostgresPublishPgTest` has two tests against a real Postgres, one of them TLS `verify-full`. They are enabled
+  by `INSPECTO_TEST_PG_URL` and `INSPECTO_TEST_PG_TLS_*`, and skip otherwise.
+- `ControlApiPublicationTest` covers the allowlist route, the mandatory hold and the import refusal.
+- `PublishAuthorityTest` covers the author seam.
 
 ### 3.7 Curated templates
 
