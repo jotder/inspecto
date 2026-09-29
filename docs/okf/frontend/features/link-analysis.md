@@ -788,6 +788,14 @@ tracked in ONE place: [`link-analysis-backlog-plan.md`](../../../superpower/link
   Writes are gated on `LensService.canManageIncidents()` (the rest of the panel still has no client gate — a 403 is
   surfaced); the section renders nothing when `SessionService.geoLinkEnabled` is off (a deep link reaches the page
   even though the nav hides it). A 503 is an explained info notice.
+* **Identity resolution section** (LA-17 slice 2, SPA half, 2026-09-30; `link-analysis-identities.component`, below
+  the Entity Lists section) over `/inv/entity-identities*`: assert that two typed identifiers are one entity
+  (option-picker per Entity Type in force, cross-type allowed, required reason), *Find group* for one key, the Space's
+  groups with members and the assertions that joined them, and *Retract* per assertion (the shared reason dialog,
+  warn-coloured). ⚠ Keys go out NORMALISED through `identityKeyOf` (`typedEntityKey`) — the group read is exact.
+  ⚠ The `key` query param uses `STRICT_QUERY_CODEC` (`inv.service.ts`): Angular's default codec sends `+` raw and the
+  server decodes it as a space. Members are rendered verbatim — masked tokens stay tokens. Reads need
+  `canManageIncidents` too (no call without it); 403 shows the server's message; 503 is an info alert.
 * **Typed node ids (LA-17 D-M6, as built 2026-09-27).** A projection column whose Dataset registry
   `columns[].classification` is claimed (trimmed, case-insensitive) by an in-force Entity Type mints
   `<type>:<key>` — `typedEntityKey`, the type's normaliser (`msisdn` `0044 78` → `msisdn:+4478`); every other column

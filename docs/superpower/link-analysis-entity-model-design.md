@@ -336,6 +336,15 @@ append time and replay never re-reads the list:
 - ⚠ Known limit (D-M9): a list created before D-M9 has no `normaliser` on its `list.created` fact and folds to
   `default`, whatever its Entity Type's rule. Dev data only; there is deliberately no compat path (breaking changes
   are free).
+- **SPA half (2026-09-30)** — `InvService.listIdentityGroups / identityGroup / assertIdentity / retractIdentity` and
+  `link-analysis-identities.component` (the *Identity resolution* section at the foot of the Investigation panel):
+  assert two typed identifiers (cross-type allowed) with a required reason, look up one key's group, list every group
+  with its members and joining assertions, retract one (reason dialog). Keys are sent NORMALISED
+  (`identityKeyOf` → `typedEntityKey`; empty after normalising or `a == b` is refused client-side too). ⚠ The group
+  read's `key` is encoded with `STRICT_QUERY_CODEC` (`encodeURIComponent`): Angular's default codec leaves `+` raw,
+  which the server decodes as a space. Members render as the server returns them (masked tokens verbatim). Reads are
+  gated on `canManageIncidents` client-side as server-side (no call without it); a 403 shows the server's message, a
+  503 is an info alert and hides the forms. Investigation-side merged nodes are not in this cut.
 - **Review fixes (2026-09-27)**: (1) an empty typed key (`N/A` under `digits`/`e164`) mints no node and no edge in the
   SPA (`typedOrEntityId` returns `null`, every mint site skips it like a blank value) — the server already refuses
   empty keys, and its projection routes only ship `columnTypes` (they mint no ids), while the evaluator/masking only

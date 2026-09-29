@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { EntityProjection, EntityTypeRef, G6Node } from 'app/inspecto/graph';
+import { EntityProjection, EntityTypeRef, G6Node, typedEntityKey } from 'app/inspecto/graph';
 import { InvestigationLogEntry, WorkingSet, apiErrorMessage } from 'app/inspecto/api';
 import { ProjectedGraph, projectTriples, resolveEntityId } from './entity-projection';
 
@@ -167,6 +167,39 @@ export function entityListErrorMessage(err: unknown, fallback: string, onInvesti
             return 'The server refused this: ' + server;
         case 503:
             return 'Entity Lists are not available here — the link-analysis module or a write root is missing.';
+        default:
+            return server;
+    }
+}
+
+/**
+ * LA-17 slice 2 — the typed key the identity routes are sent: `<type>:<value normalised by the type's rule>`. The
+ * group read matches EXACTLY, so the SPA must send the key as the server stores it. `null` when the type is unknown
+ * or the value is empty after normalising (the server would 422 it; the group read would find nothing).
+ */
+export function identityKeyOf(type: EntityTypeRef | undefined, value: string): string | null {
+    if (!type) return null;
+    const key = typedEntityKey(type.id, value, type.normaliser);
+    return key.length > type.id.length + 1 ? key : null;
+}
+
+/**
+ * LA-17 slice 2 — a readable message for an `/inv/entity-identities*` failure. Reads need the Incident-management
+ * capability too (under masking the group read is a membership oracle), so a 403 may come from a read. 409 is a
+ * retract of an unknown or already-retracted assertion; 422 carries the server's reason. 503 is a deployment state.
+ */
+export function identityErrorMessage(err: unknown, fallback: string): string {
+    const status = err instanceof HttpErrorResponse ? err.status : (err as { status?: number } | null)?.status;
+    const server = apiErrorMessage(err, fallback);
+    switch (status) {
+        case 403:
+            return 'Identity resolution needs the Incident-management capability. Server: ' + server;
+        case 409:
+            return 'Refused — ' + server;
+        case 422:
+            return 'The server refused this: ' + server;
+        case 503:
+            return 'Identity resolution is not available here — the link-analysis module or a write root is missing.';
         default:
             return server;
     }

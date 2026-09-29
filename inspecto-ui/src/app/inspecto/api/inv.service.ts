@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParameterCodec, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from './api-base';
 import type { ConditionGroup } from '../query/query-types';
@@ -732,6 +732,75 @@ export interface EntityListMembersResult extends EntityListDetail {
     changed: number;
 }
 
+// ── LA-17 slice 2: analyst identity resolution (`EntityIdentityRoutes`, entity-model design §8.2) ───────
+
+/** One `identity.asserted` fact. `a`/`b` are typed keys `<type>:<value>` as the server rendered them — MASKED
+ *  per the Space's `maskingMode` (a `masked:<hex>` token); never unmask or send them back as keys. */
+export interface IdentityAssertion {
+    seq: number;
+    a: string;
+    b: string;
+    /** `analyst` in this cut (`dataset:<id>@<fingerprint>` is reserved for the import cut). */
+    via: string;
+    actor: string | null;
+    at: string;
+    reason: string;
+}
+
+/** A resolved group: `id` = the smallest member key; every joining assertion is listed. Keys masked as above. */
+export interface IdentityGroup {
+    id: string;
+    members: string[];
+    assertions: IdentityAssertion[];
+}
+
+export interface IdentityGroupIndex {
+    groups: IdentityGroup[];
+    atSeq: number;
+    headSeq: number;
+    headHash: string;
+}
+
+export interface IdentityGroupRead {
+    group: IdentityGroup;
+    atSeq: number;
+    headHash: string;
+}
+
+/** `POST /inv/entity-identities` — typed keys; the server normalises each with its type's rule and seals it. */
+export interface IdentityAssertRequest {
+    a: string;
+    b: string;
+    reason: string;
+}
+
+export interface IdentityAssertResult {
+    assertion: IdentityAssertion;
+    group: IdentityGroup;
+    atSeq: number;
+    headHash: string;
+}
+
+/** `groups` = the groups of the retracted assertion's two keys afterwards (two when it split). */
+export interface IdentityRetractResult {
+    retracted: number;
+    groups: IdentityGroup[];
+    atSeq: number;
+    headHash: string;
+}
+
+/**
+ * Encodes a query value with `encodeURIComponent`. ⚠ Angular's default `HttpUrlEncodingCodec` leaves `+` raw, and
+ * the server decodes the raw query ONCE with `URLDecoder`, where a raw `+` is a space — so `msisdn:+4477…` would be
+ * looked up as `msisdn: 4477…` and resolve to nothing.
+ */
+export const STRICT_QUERY_CODEC: HttpParameterCodec = {
+    encodeKey: (k) => encodeURIComponent(k),
+    encodeValue: (v) => encodeURIComponent(v),
+    decodeKey: (k) => decodeURIComponent(k),
+    decodeValue: (v) => decodeURIComponent(v),
+};
+
 /**
  * Investigation-studio backend (INV-1): the real DuckDB-side Entity Projection over a Dataset —
  * the server half of the Link Analysis studio's `entity-projection` GraphSource. Offline/mock mode
@@ -885,6 +954,31 @@ export class InvService {
     /** Already retired → 409. */
     retireEntityList(id: string, reason: string): Observable<EntityListDetail> {
         return this.http.post<EntityListDetail>(entityListPath(id, '/retire'), { reason });
+    }
+
+    // ── LA-17 slice 2 identity resolution. Reads AND writes need `canManageIncidents`; no write root → 503. ──
+
+    /** Every resolved group as of `at` (default: the head). */
+    listIdentityGroups(at?: number): Observable<IdentityGroupIndex> {
+        return this.http.get<IdentityGroupIndex>(apiUrl('/inv/entity-identities'), { params: toParams({ at }) });
+    }
+
+    /** The group holding `key` — EXACT match, so pass the normalised typed key (`typedEntityKey`). A key in no
+     *  live assertion resolves to itself. */
+    identityGroup(key: string, at?: number): Observable<IdentityGroupRead> {
+        let params = new HttpParams({ encoder: STRICT_QUERY_CODEC }).set('key', key);
+        if (at !== undefined) params = params.set('at', String(at));
+        return this.http.get<IdentityGroupRead>(apiUrl('/inv/entity-identities/group'), { params });
+    }
+
+    /** → 201. Self-assertion / untyped key / type not in force → 422. */
+    assertIdentity(req: IdentityAssertRequest): Observable<IdentityAssertResult> {
+        return this.http.post<IdentityAssertResult>(apiUrl('/inv/entity-identities'), req);
+    }
+
+    /** Unknown or already-retracted assertion → 409. */
+    retractIdentity(seq: number, reason: string): Observable<IdentityRetractResult> {
+        return this.http.post<IdentityRetractResult>(apiUrl(`/inv/entity-identities/${seq}/retract`), { reason });
     }
 }
 

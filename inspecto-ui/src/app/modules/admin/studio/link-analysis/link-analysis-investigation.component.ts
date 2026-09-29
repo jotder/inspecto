@@ -34,6 +34,7 @@ import { buildWidget } from '../widgets/widget-types';
 import { WidgetsService } from '../widgets/widgets.service';
 import { LinkAnalysisDossierComponent } from './link-analysis-dossier.component';
 import { LinkAnalysisEntityListsComponent } from './link-analysis-entity-lists.component';
+import { LinkAnalysisIdentitiesComponent } from './link-analysis-identities.component';
 import { LinkAnalysisTemplateMeasuresComponent } from './link-analysis-template-measures.component';
 import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set-rows.component';
 
@@ -62,6 +63,7 @@ import { LinkAnalysisWorkingSetRowsComponent } from './link-analysis-working-set
         InspectoOptionPickerComponent,
         LinkAnalysisDossierComponent,
         LinkAnalysisEntityListsComponent,
+        LinkAnalysisIdentitiesComponent,
         LinkAnalysisTemplateMeasuresComponent,
         LinkAnalysisWorkingSetRowsComponent,
     ],
