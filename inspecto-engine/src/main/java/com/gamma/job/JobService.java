@@ -561,6 +561,9 @@ public final class JobService implements AutoCloseable {
         // objectstore.export (EXPORT-1): the push post-action — on_pipeline delivers a committed store's
         // files to an S3-compatible Connection. The transport is ServiceLoader-found (inspecto-connectors).
         registry.register(new ObjectStoreExportJobType(dataDir));
+        // publish.postgres (ASSURE-BI-PUBLICATION-1): publish curated Datasets to a Postgres schema for BI tools,
+        // full-refresh (atomic swap) or partition-incremental; runs as its author, sensitive columns refused by default.
+        registry.register(new PostgresPublishJobType(dataDir));
         // recon.run (DAT-7 Ops): schedule a saved Reconciliation; emits recon.run.completed with the Break
         // counts (WARNING when any break exists) — the ledger fact a future Alert Rule watches. Reads the
         // component registry from -Dassist.write.root at run time, like the maintenance/report jobs.

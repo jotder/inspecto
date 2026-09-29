@@ -146,6 +146,30 @@ final class JobAuthority {
         };
     }
 
+    /**
+     * ASSURE-BI-PUBLICATION-1: who a {@code publish.postgres} run acts as — its last editor, with the capabilities
+     * their recorded roles grant under the role table as it is NOW (deny grants applied). No Authenticator ⇒
+     * {@link com.gamma.job.PostgresPublishJobType.Author#OPEN}; an unauthored Job ⇒ an author with no roles and no
+     * capabilities, so it can read only unshared Datasets and never publishes a sensitive column.
+     */
+    static com.gamma.job.PostgresPublishJobType.Authority publishAuthority(Supplier<Path> configRoot) {
+        return cfg -> {
+            if (Authenticators.active().isEmpty()) return com.gamma.job.PostgresPublishJobType.Author.OPEN;
+            Path root;
+            try {
+                root = configRoot.get();
+            } catch (RuntimeException noSpace) {
+                root = null;
+            }
+            List<String> roles = new ArrayList<>();
+            for (String r : cfg.opt(JobConfig.UPDATED_BY_ROLES, "").split(","))
+                if (!r.isBlank()) roles.add(r.trim().toLowerCase(Locale.ROOT));
+            String by = cfg.params().get(JobConfig.UPDATED_BY);
+            return new com.gamma.job.PostgresPublishJobType.Author(by == null || by.isBlank() ? null : by,
+                    Set.copyOf(roles), Set.copyOf(capabilitiesNow(roles, root)), false);
+        };
+    }
+
     /** Why an administrator-only {@code cfg} may not run now, or null when its last editor still may. */
     static String refusal(JobConfig cfg, Path root) {
         String what = "'" + cfg.name() + "' (maintenance task '" + cfg.opt("task", "cleanup").toLowerCase(Locale.ROOT) + "')";
