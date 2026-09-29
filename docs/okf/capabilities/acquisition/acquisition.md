@@ -501,7 +501,8 @@ change**. Kafka offsets are **not** a broker consumer group: the connector `assi
 consumed frontier rides the ledger watermark, persisted only after the batch commits (at-least-once; a crash
 mid-ingest re-drains the slice rather than skipping it). Broker consumer groups stay out by operator decision
 (STREAM-CONSUMER-1 Q4, 2026-09-24): one offset store, fewer ACLs, no broker-visible lag. The loop is the
-Collector scan; no continuous `trigger: stream` lane exists (Q2 — no latency target was named).
+Collector scan, plus — since ASSURE-PUSH-INGEST-1 (2026-09-29) — the continuous lane below for a Pipeline that
+opts in with `trigger: {type: stream}`.
 
 **One uncommitted slice per partition — the in-flight fence (STREAM-CONSUMER-1, 2026-09-24).** With split
 acquire and ingest timers, a second acquisition cycle before the commit read the same stored frontier and
@@ -534,6 +535,27 @@ latency target the cadence cannot meet (Q2 named none). It is A plus a different
 above still applies; its cost is new lifecycle wiring (space close, and the run lease under Enterprise
 scale-out). (C) a long-running Job — **refused**, see §6.8. The at-least-once fixes (§3.7 and the fence)
 were needed under every option, so they landed inside the row rather than as a separate P1 (Q1).
+
+**The continuous lane — option B, built (ASSURE-PUSH-INGEST-1, 2026-09-29).** D-P7 named the target the
+deferral waited for (p95 ≤ 30 s event → Incident), so B shipped as designed: *A plus a different trigger*.
+`trigger: {type: stream, records: N, max_wait: T}` (defaults 1000 records, 5 s) gives an active remote
+Pipeline one `StreamLane` (`inspecto-acquire`): a virtual thread that holds the Collector's connector OPEN (for
+Kafka, one consumer for the lane's life) and every 200 ms asks `CollectorConnector.pendingRecords()`. It drains
+when the backlog reaches N, or when a non-empty backlog has waited T. The drain is option A's path unchanged —
+`CollectorProcessor.acquire` under the same `acquireGuard` claim the tick takes, then the ordinary
+`runPipeline` — so the fence, the durable frontier and slice-level at-least-once all carry over, and a crash
+mid-slice re-delivers that one slice. Kafka's probe skips fenced partitions, so an uncommitted slice cannot make
+the lane spin. A connector that cannot count (`-1`, every non-Kafka one) drains on T alone. Wiring:
+`PipelineScheduler.reconcileStreamLanes` runs on every acquisition tick (so hot-reload, pause and activation
+start or stop lanes), `forget` closes a lane, and `CollectorService.close` closes them all. `STREAM` stays
+LOOP-scheduled: the ordinary ticks keep running as the floor, and a lane only makes drains happen sooner.
+⚠ The lane is per process: under Enterprise scale-out every pod runs one, and the `acquireGuard`/run lease
+make the extra ones no-ops rather than duplicates. **Measured** (MockConsumer, N=200, T=1 s, 569 events in 20
+random bursts): event → committed slice frontier p50 563 ms, **p95 1030 ms**. Through a real `CollectorService`
+with real ingest (`faketest` connector, T=1 s): file arrival → committed batch 1.6 s. ⛔ **Not measured: the
+Incident hop.** Alert evaluation after the commit is outside the lane and has no harness here, so D-P7 is
+*not yet proven end to end*. `KafkaRealBrokerTest` runs against a real broker at `-Dkafka.it.bootstrap`
+(default `localhost:9092`) and SKIPS with that message when none answers — no broker ships with the build.
 
 ### 3.10 Connection profiles, secrets, and the SEC-07 gate
 
@@ -645,6 +667,7 @@ tunnel's local endpoint, which a proxy must not carry, and the SSH hop itself is
 |---|---|
 | `GET /collectors` | flat view of every pipeline's acquisition config (`AcquisitionRoutes.java:23`); since 2026-09-15 each row also carries the pipeline's **polling session** — `lastPollAt`, `pollCount`, `lastPollError`, `lastPollErrorAt` (`PipelineScheduler.pollStates`, `DUCKLE-C9-WATCHER-NOT-A-RUN-1`). ⚠ IN-MEMORY and lossy across restart by design: this is liveness ("is this collector alive, when did it last look, what did it last say?"), not an audit trail — the durable record of work is the Run/Consignment ledger. ⛔ It corrects no miscount: a quiet poll never minted a Run (`CollectorProcessor.ingest` returns before `RunIds.next()`, fixed `1fda46d5`), which is why the row was rescoped to observability before it was built. `lastError` is a message, not a metric, because a Prometheus gauge cannot say *what* failed. 🔴 Since `POLL-STATE-BLIND-TO-CONNECTOR-FAILURE-1` (closed 2026-09-15) an **acquisition that throws before landing anything** — a connector that cannot be built (unknown dataset, unreachable host) — is recorded as a poll that happened and failed (`lastPollError: "acquisition failed: …"`); before that the row stayed all-null while the log carried the ERROR. ⚠ Still NOT a poll: an event-triggered run (`on: dataset` / `on: commit`) — those are Runs, and `pollCount` counts scheduler polls only, by design. |
 | `POST /collectors/{id}/notify` | ACQ-6 push discovery; `canOperateRuns`; `202`+`Location` under v1; audited `collector.notified` |
+| `POST /streams/{id}/records` | **push ingest** (ASSURE-PUSH-INGEST-1). `{id}` is the Collector id (`GET /catalog/streams`). NDJSON (`application/x-ndjson`) or CSV (`text/csv`), validated WHOLE before anything lands; one server-named file `push-<utc>-<8 hex>.<ext>` moved atomically into `dirs.poll`, so the ordinary Collector path ingests it. Gates: `canOperateRuns` · `429` per-caller push bucket (burst 60, 10/s) · `404` unknown Stream · `501` Dataset-fed · `409` template, or the same `Idempotency-Key` still in flight · `415` other types · `413` over `-Dstreams.push.max_bytes` (8 MiB) or `-Dstreams.push.max_records` (100 000) · `422` not UTF-8, a malformed line (named), no records, or a `file_pattern` that would never pick the file up. A keyed replay returns the first `{file}`. One AUDIT row `stream.records_pushed` with `records`, `bytes`, `file` — never the payload. ⛔ **Not a config write**: data arriving at a Stream is what a Collector landing a fetched file does, so no write-root gate and no approval hold. ⚠ The idempotency store is in-memory per process (10 min): a replay after a restart lands the batch again; row-level dedup is downstream, as for Kafka. |
 | `GET /metrics/acquisition` | JSON snapshot of the nine acquisition metrics, complementing the text-only Prometheus `/metrics` |
 | `GET /connections`, `GET /connections/{id}` | profiles, **secret-masked** |
 | `POST`/`PUT`/`DELETE /connections[/{id}]` | ⚠ writes require **`canOnboardConnections`** — its own Admin-only grant, deliberately *not* `canAuthorWorkbench`, because Connections are the credential/egress surface (`ConnectionRoutes.java:35-55`). None of the six sources documents these three write routes. |
@@ -753,6 +776,7 @@ Only decisions that still bind are listed; where one reversed an earlier one, bo
 | 2026-07-08 | Every remote connector is **SDK-free** — SigV4 for `s3`, SharedKey for `azure`, and (2026-07-22) a native JSON API + RS256 service-account JWT for `gcs` | A small SBOM is a FedRAMP asset; three cloud SDKs would have dwarfed the whole artifact |
 | 2026-07-08 | `kafka` uses `assign()`+`seek()` with **no consumer group** | The consumed frontier rides the acquisition ledger watermark instead, so replay and crash-recovery reuse machinery that already exists and is already tested |
 | 2026-09-24 | The stream consumer loop **stays in the Collector scan**; broker consumer groups stay out (STREAM-CONSUMER-1 Q2, Q4) | No latency target was named, so a continuous lane buys nothing yet; one offset store and fewer ACLs outweigh broker-visible lag (§3.9) |
+| 2026-09-29 | The continuous `trigger: stream` lane is **built** (option B), reversing the 2026-09-24 deferral; push ingest is a DATA write, not a config write (ASSURE-PUSH-INGEST-1) | D-P7 named the latency target the deferral waited for; a push is data arriving at a Stream, so the write-root and approval gates (config) do not apply — it is gated as an operation, capped, rate-limited and audited (§3.9, §3.13) |
 | 2026-09-24 | A remote slice's frontier must **survive a restart**, for `kafka` AND `db` (STREAM-CONSUMER-1 Q3) | A restart must never re-ingest; built as a durable per-slice record, not a name-derived frontier (§3.7) |
 | 2026-08-13 | HTTP `CONNECT` proxy dial-through **shipped, reversing an earlier fail-closed rejection** | The rejection assumed a JDK socket could tunnel transparently. It cannot, so the tunnel had to be explicit — the earlier "no" was based on a wrong premise, not a policy |
 | 2026-09-06 | JDBC dial-through is **PostgreSQL only**, fail-closed elsewhere | Each driver's socket-factory hook differs; a generic claim would have been untestable |
@@ -786,7 +810,7 @@ priority. A row with no id is flagged `UNTRACKED` and needs filing before it can
 |---|---|---|
 | S3 / GCS object ingest | `SP-ACQ-06`, `SP-ACQ-08` | The connectors ship and are tested; there is **no proven end-to-end acquisition-node run**. ⚠ This is not a contradiction of `ACQ-4` — *a connector is not a Step* (§6.7) |
 | Azure ADLS Gen2 | `SP-ACQ-07` | Blob works; the Gen2 hierarchical namespace is unproven |
-| Kafka consumer as a Collector | `SP-ACQ-09` | The per-scan drain ships, hardened to slice-level at-least-once (§3.7, §3.9). What keeps the cell 🟡: it is proven only against `MockConsumer` and a fake offset-tail connector, never a real broker. Consumer-group semantics stay out by design (§4) |
+| Kafka consumer as a Collector | `SP-ACQ-09` | The per-scan drain ships, hardened to slice-level at-least-once (§3.7, §3.9). What keeps the cell 🟡: it is proven only against `MockConsumer` and a fake offset-tail connector; the real-broker test (`KafkaRealBrokerTest`, 2026-09-29) exists but SKIPS where no broker runs, which is every build so far. Consumer-group semantics stay out by design (§4) |
 | Excel workbook fan-out | `SP-ACQ-05` | One sheet per file today; multi-sheet fan-out unbuilt |
 
 ### Planned — declared, unstarted
