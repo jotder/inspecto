@@ -202,7 +202,9 @@ public record Workflow(ObjectType objectType, String initialState, Set<Transitio
      * <ol>
      *   <li>At least one terminal state is declared.</li>
      *   <li>Every state is reachable from the initial state.</li>
-     *   <li>Every non-terminal state has a way out — a dead end nobody declared terminal is a silent finish line.</li>
+     *   <li>Every non-terminal state has a way out — a dead end nobody declared terminal is a silent finish line — and
+ *       a path that FINISHES: to RESOLVED or ARCHIVED for an Incident, to a terminal state otherwise (a self-loop
+ *       is not a way out).</li>
      *   <li>No two transitions leave one state by the same action ({@link #apply} would pick one arbitrarily).</li>
      *   <li>For an {@link ObjectType#INCIDENT}: {@code RESOLVED} exists; {@code ARCHIVED}, if present, is terminal;
      *       and every move into a terminal state other than {@code ARCHIVED} leaves from {@code RESOLVED} — so a
@@ -226,6 +228,18 @@ public record Workflow(ObjectType objectType, String initialState, Set<Transitio
             if (!terminalStates.contains(s) && transitions.stream().noneMatch(t -> t.from().equals(s)))
                 out.add("state " + s + " has no way out and is not declared terminal");
         }
+        // Every state must be able to FINISH: reach RESOLVED or ARCHIVED (an Incident), or a terminal state (any other
+        // type). A state whose only way out is a self-loop, or a cycle of such states, is a trap with no end.
+        Set<String> canFinish = new LinkedHashSet<>(
+                objectType == ObjectType.INCIDENT ? Set.of("RESOLVED", "ARCHIVED") : terminalStates);
+        for (boolean grew = true; grew; ) {
+            grew = false;
+            for (Transition t : transitions) if (canFinish.contains(t.to()) && canFinish.add(t.from())) grew = true;
+        }
+        for (String s : states())
+            if (!terminalStates.contains(s) && !canFinish.contains(s))
+                out.add("state " + s + " can never finish: no path from it reaches "
+                        + (objectType == ObjectType.INCIDENT ? "RESOLVED or ARCHIVED" : "a terminal state"));
         Set<String> moves = new LinkedHashSet<>();
         for (Transition t : transitions)
             if (!moves.add(t.from() + " " + t.action()))

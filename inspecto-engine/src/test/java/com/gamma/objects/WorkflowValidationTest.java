@@ -58,6 +58,17 @@ class WorkflowValidationTest {
     }
 
     @Test
+    void aStateWhoseOnlyWayOutIsASelfLoopIsRefused() {
+        String why = refusal("incident", wf("INCIDENT", "IDENTIFIED", List.of("ARCHIVED"), List.of(
+                t("IDENTIFIED", "RESOLVED", "resolve"), t("RESOLVED", "ARCHIVED", "archive"),
+                t("IDENTIFIED", "LIMBO", "park"), t("LIMBO", "LIMBO", "wait"))));
+        assertTrue(why.contains("LIMBO can never finish"), why);
+        String cycle = refusal("case", wf("CASE", "OPEN", List.of("CLOSED"), List.of(
+                t("OPEN", "CLOSED", "close"), t("OPEN", "A", "a"), t("A", "B", "b"), t("B", "A", "a"))));
+        assertTrue(cycle.contains("A can never finish") && cycle.contains("B can never finish"), cycle);
+    }
+
+    @Test
     void aWorkflowWithNoTerminalStateIsRefused() {
         String why = refusal("case", wf("CASE", "OPEN", List.of(), List.of(t("OPEN", "WORK", "go"), t("WORK", "OPEN", "back"))));
         assertTrue(why.contains("at least one terminal"), why);
