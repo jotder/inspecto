@@ -345,4 +345,41 @@ class PostgresPublishJobTest {
         assertNull(dialed.get());
         assertEquals("SUCCESS", run(Map.of(), Map.of("retries", "0")).status(), "an unlocked parameter may still be given");
     }
+
+    @Test
+    void classificationMatchesCaseInsensitivelyOnTheNameAndTheClass() throws Exception {
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "subs", Map.of("physicalRef", "subs",
+                "columns", List.of(Map.of("name", "MSISDN", "classification", " msisdn "))));
+        assertEquals("SUCCESS", run(Map.of()).status());
+        assertEquals(List.of("plan", "amount", "day"), columnsOf("subs"), "MSISDN/msisdn is the same column");
+        JobRun r = run(Map.of("columns", "msisdn,plan"));
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("classified MSISDN"), r.message());
+    }
+
+    @Test
+    void aSecondUnclassifiedDatasetOverTheSameStoreInheritsTheClassificationByName() throws Exception {
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "subs2", Map.of("physicalRef", "subs"));
+        JobRun r = run(Map.of("datasets", "subs2"));
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertEquals(List.of("plan", "amount", "day"), columnsOf("subs2"), "msisdn stays out through the sibling's catalog");
+    }
+
+    @Test
+    void aViewOrVirtualDatasetOverAClassifiedStoreNeedsTheWholeDatasetReleased() throws Exception {
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "renamed", Map.of("sourceName", "subs",
+                "sql", "SELECT msisdn AS m, plan FROM subs"));
+        PostgresPublishJobType.installAuthority(c -> author("bob"));
+        JobRun r = run(Map.of("datasets", "renamed"));
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("cannot be traced"), r.message());
+        assertTrue(columnsOf("renamed").isEmpty(), "msisdn AS m was not published");
+
+        assertEquals("FAILED", run(Map.of("datasets", "renamed", "include_sensitive", "renamed.*")).status(),
+                "releasing the whole Dataset still needs canAdminister");
+        PostgresPublishJobType.installAuthority(c -> author("root", "canAdminister"));
+        JobRun ok = run(Map.of("datasets", "renamed", "include_sensitive", "renamed.*"));
+        assertEquals("SUCCESS", ok.status(), ok.message());
+        assertEquals(List.of("m", "plan"), columnsOf("renamed"));
+    }
 }

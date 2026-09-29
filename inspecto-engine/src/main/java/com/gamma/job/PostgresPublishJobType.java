@@ -227,7 +227,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                     if (!tables.add(table)) throw new IllegalArgumentException("two datasets publish to table '" + table + "'");
                     String rel = DatasetRelation.relationSql(ds, Path.of(dataDir), views);
                     plans.add(new Plan(id, table, rel, str(ds.get("description")),
-                            columns(duck, id, rel, ds, allow, sensitiveListed, author)));
+                            columns(duck, id, rel, ds, allow, sensitiveListed, author, store, views)));
                 }
                 if (mode.equals(INCREMENTAL))
                     for (Plan pl : plans) {
@@ -324,17 +324,32 @@ public final class PostgresPublishJobType implements JobTypeProvider {
 
     /** The columns of {@code datasetId} this run publishes, after the allowlist and the sensitive-column rule. */
     static List<Col> columns(Connection duck, String datasetId, String relation, Map<String, Object> ds,
-                             Set<String> allow, Set<String> sensitiveListed, Author author) throws SQLException {
+                             Set<String> allow, Set<String> sensitiveListed, Author author,
+                             ComponentStore store, ViewStore views) throws SQLException {
         Map<String, String> classification = new HashMap<>(), description = new HashMap<>();
         if (ds.get("columns") instanceof List<?> cols)
             for (Object o : cols)
                 if (o instanceof Map<?, ?> c && c.get("name") != null) {
                     String n = String.valueOf(c.get("name"));
                     String cl = str(c.get("classification"));
-                    if (cl != null) classification.put(n, cl.toUpperCase(Locale.ROOT));
+                    if (cl != null) classification.put(n.toLowerCase(Locale.ROOT), cl.trim().toUpperCase(Locale.ROOT));
                     String d = str(c.get("description"));
-                    if (d != null) description.put(n, d);
+                    if (d != null) description.put(n.toLowerCase(Locale.ROOT), d);
                 }
+        // Lineage (static only): the classified columns every OTHER Dataset over the same store declares.
+        Map<String, String> inherited = lineageClassification(datasetId, ds, store, views);
+        boolean derived = str(ds.get("view")) != null || str(ds.get("sql")) != null;
+        boolean wholeDataset = sensitiveListed.contains(datasetId + ".*");
+        if (derived && !inherited.isEmpty()) {
+            // a view or virtual Dataset may rename or compute over a classified column (msisdn AS m), which cannot
+            // be traced statically, so it publishes only when the whole Dataset is explicitly released
+            if (!wholeDataset || !author.capabilities().contains(CAN_ADMINISTER))
+                throw new SecurityException("dataset '" + datasetId + "' is a view/virtual Dataset over a store whose "
+                        + "columns " + inherited.keySet() + " are classified; its columns cannot be traced to them, so "
+                        + "publishing it needs '" + datasetId + ".*' in " + P_SENSITIVE + " and an author holding "
+                        + "canAdminister — refused");
+        }
+        inherited.forEach(classification::putIfAbsent);   // same-name columns inherit the classification
         List<Col> out = new ArrayList<>();
         Set<String> seenAllow = new HashSet<>();
         try (Statement st = duck.createStatement(); ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM (" + relation + ") t")) {
@@ -343,18 +358,19 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                 boolean listed = allow.isEmpty() || allow.contains(name) || allow.contains(datasetId + "." + name);
                 if (!allow.isEmpty() && listed) seenAllow.add(name);
                 if (!listed) continue;
-                boolean sensitive = EvidenceMasker.SENSITIVE.contains(classification.getOrDefault(name, ""));
+                String lc = name.toLowerCase(Locale.ROOT);
+                boolean sensitive = EvidenceMasker.SENSITIVE.contains(classification.getOrDefault(lc, ""));
                 if (sensitive) {
-                    boolean named = sensitiveListed.contains(datasetId + "." + name);
+                    boolean named = wholeDataset || sensitiveListed.contains(datasetId + "." + name);
                     if (!named) {
                         if (allow.isEmpty()) continue;   // default: a sensitive column is simply not published
                         throw new SecurityException("column '" + datasetId + "." + name + "' is classified "
-                                + classification.get(name) + "; publishing it needs it in " + P_SENSITIVE
+                                + classification.get(lc) + "; publishing it needs it in " + P_SENSITIVE
                                 + " and an author holding canAdminister — refused");
                     }
                     if (!author.capabilities().contains(CAN_ADMINISTER))
                         throw new SecurityException("column '" + datasetId + "." + name + "' is classified "
-                                + classification.get(name) + " and listed in " + P_SENSITIVE + ", but the Job's "
+                                + classification.get(lc) + " and listed in " + P_SENSITIVE + ", but the Job's "
                                 + "author " + (author.id() == null ? "(none — no authenticator)" : "'" + author.id() + "'")
                                 + " does not hold canAdminister — refused");
                 }
@@ -363,13 +379,48 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                 if (pg == null)
                     throw new IllegalArgumentException("column '" + datasetId + "." + name + "' has type " + type
                             + ", which the publisher does not carry — leave it out with " + P_COLUMNS);
-                out.add(new Col(name, type, pg, description.get(name)));
+                out.add(new Col(name, type, pg, description.get(lc)));
             }
         }
         for (String a : allow)
             if (a.startsWith(datasetId + ".") && !seenAllow.contains(a.substring(datasetId.length() + 1)))
                 throw new IllegalArgumentException(P_COLUMNS + " names '" + a + "', which the dataset does not have");
         if (out.isEmpty()) throw new IllegalArgumentException("dataset '" + datasetId + "' publishes no columns");
+        return out;
+    }
+
+    /**
+     * The classified columns (lower-cased name to class) other Datasets declare over the stores {@code ds} reads: its
+     * {@code physicalRef}, a virtual Dataset's {@code sourceName}, or a view's store and its {@code source_store}
+     * lineage. Only what the registry states; a pipeline schema's own classification is not consulted.
+     */
+    static Map<String, String> lineageClassification(String datasetId, Map<String, Object> ds, ComponentStore store,
+                                                     ViewStore views) {
+        Set<String> stores = new HashSet<>();
+        String ref = str(ds.get("physicalRef")), source = str(ds.get("sourceName")), view = str(ds.get("view"));
+        if (ref != null) stores.add(ref);
+        if (source != null) stores.add(source);
+        if (view != null) {
+            stores.add(view);
+            views.get(view).ifPresent(v -> {
+                if (v.store() != null) stores.add(v.store());
+                if (v.sourceStores() != null) stores.addAll(v.sourceStores());
+            });
+        }
+        Map<String, String> out = new java.util.TreeMap<>();
+        for (ComponentRegistry.Component c : store.list("dataset")) {
+            if (c.name().equals(datasetId)) continue;
+            Map<String, Object> other = c.content();
+            String otherRef = str(other.get("physicalRef"));
+            if (otherRef == null || !stores.contains(otherRef)) continue;
+            if (other.get("columns") instanceof List<?> cols)
+                for (Object o : cols)
+                    if (o instanceof Map<?, ?> col && col.get("name") != null && col.get("classification") != null) {
+                        String cl = String.valueOf(col.get("classification")).trim().toUpperCase(Locale.ROOT);
+                        if (EvidenceMasker.SENSITIVE.contains(cl))
+                            out.putIfAbsent(String.valueOf(col.get("name")).toLowerCase(Locale.ROOT), cl);
+                    }
+        }
         return out;
     }
 
