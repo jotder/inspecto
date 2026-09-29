@@ -275,10 +275,10 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         registerRoutes();
         // S6 — compose the request pipeline once (outermost first): correlation and CORS wrap the error
         // boundary so error/preflight responses still carry the Correlation-ID + CORS headers; path
-        // normalization → idempotency replay → space binding then feed the terminal route dispatch.
+        // normalization → space binding then feed the terminal route dispatch.
         this.pipeline = compose(this::routeDispatch,
                 this::correlation, this::cors, this::errorBoundary,
-                this::normalizePath, this::idempotency, this::bindSpace);
+                this::normalizePath, this::bindSpace);
         this.http.createContext("/", this::dispatch);
         // Fail-closed at the edge (W6): resolve the edition's Authenticator now, not on the first
         // request, so a misconfigured Standard deployment (e.g. missing -Dauth.oidc.jwksUri, which the
@@ -639,7 +639,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
      *  Completeness is enforced by {@code ExchangeAttributeScopeTest} against ApiContext's ATTR_* roster. */
     static final String[] REQUEST_SCOPED_ATTRS = {
             ApiContext.ATTR_CORRELATION_ID, ApiContext.ATTR_START_NANOS, ApiContext.ATTR_SELF_PATH,
-            ApiContext.ATTR_ERROR_CODE, ApiContext.ATTR_IDEMPOTENCY_STORE, ApiContext.ATTR_IDEMPOTENCY_KEY,
+            ApiContext.ATTR_ERROR_CODE, ApiContext.ATTR_IDEMPOTENCY_KEY,
             ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_CLIENT_IP, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_CAPABILITY,
             ApiContext.ATTR_RESOURCE_PERMISSIONS,
             ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ApiContext.ATTR_APPROVED_CHANGE, ATTR_EFFECTIVE_PATH,
@@ -823,40 +823,37 @@ public final class ControlApi implements AutoCloseable, ApiContext {
         next.proceed(ex);
     }
 
-    /** Idempotency-Key (W5): a keyed write whose response is already cached replays it verbatim, skipping the
-     *  handler — so a retried trigger/create does not run twice. Keyed on the raw request path so /api/v1 and
-     *  legacy surfaces don't share entries. A miss marks the exchange so ApiContext.respondJson captures the
-     *  first response. */
-    private void idempotency(HttpExchange ex, Chain next) throws Exception {
-        String method = ex.getRequestMethod();
-        String idemKey = Idempotency.keyFor(ex, method, ex.getRequestURI().getPath());
-        if (idemKey != null) {
-            Idempotency.Entry hit = idempotency.get(idemKey);
-            if (hit != null) {
-                Idempotency.replay(ex, hit);
-                auditReplay(ex, method, hit.status());
-                return;
+    /** Idempotency-Key (W5): a keyed write whose response is already cached FOR THIS CALLER replays it verbatim,
+     *  skipping the handler — so a retried trigger/create does not run twice. Runs inside {@link #routeDispatch}
+     *  after authenticate → rate limit → authorize (SEC-IDEMPOTENCY-REPLAY-1): a replay is refused, throttled and
+     *  authorized exactly like the live request, and the key is scoped to the caller + Space + body hash
+     *  ({@link Idempotency}). Returns {@code true} when it answered (a replay or a 422 body mismatch). A miss marks
+     *  the exchange so ApiContext.respondJson captures the first cacheable response. */
+    private boolean idempotency(HttpExchange ex, String method, String path) throws IOException {
+        String header = Idempotency.headerKey(ex, method);
+        if (header == null) return false;
+        String bodyHash = Idempotency.bodyHash(ex);
+        if (bodyHash == null) {   // too large to hash → run un-keyed, and say so
+            ex.getResponseHeaders().set(Idempotency.HEADER_CACHED, "false");
+            return false;
+        }
+        String principal = Idempotency.principal(ex);
+        String space = MDC.get(EventLog.SPACE_MDC_KEY);
+        String key = Idempotency.keyFor(method, ex.getRequestURI().getPath(),
+                space == null ? EventLog.DEFAULT_SPACE_ID : space, principal, header);
+        Idempotency.Entry hit = idempotency.get(key);
+        if (hit != null) {
+            if (!hit.bodyHash().equals(bodyHash)) {
+                respond(ex, 422, Map.of("error", "Idempotency-Key reused with a different request"));
+                AuditTrail.record(ex, method, path, 422);
+                return true;
             }
-            ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_STORE, idempotency);
-            ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_KEY, idemKey);
+            Idempotency.replay(ex, hit);
+            AuditTrail.record(ex, method, path, hit.status());
+            return true;
         }
-        next.proceed(ex);
-    }
-
-    /** Audit a replayed response as the original request was audited. A replay answers BEFORE {@link #bindSpace}
-     *  runs, so the "/spaces/{id}" prefix is still on the path: classified raw, a replayed mutation filed as
-     *  {@code space.*} under the prefixed path, and a replayed read-shaped POST (R2-12) as a mutation. Strip the
-     *  prefix and bind the Space's MDC for the one record call, exactly as bindSpace does for the live request. */
-    private static void auditReplay(HttpExchange ex, String method, int status) {
-        String path = path(ex);
-        Matcher sp = SPACE_PREFIX.matcher(path);
-        boolean bound = sp.matches() && !EventLog.DEFAULT_SPACE_ID.equals(sp.group(1));
-        if (bound) MDC.put(EventLog.SPACE_MDC_KEY, sp.group(1));
-        try {
-            AuditTrail.record(ex, method, sp.matches() ? sp.group(2) : path, status);
-        } finally {
-            if (bound) MDC.remove(EventLog.SPACE_MDC_KEY);
-        }
+        ApiContext.attr(ex, ApiContext.ATTR_IDEMPOTENCY_KEY, new Idempotency.Pending(idempotency, key, principal, bodyHash));
+        return false;
     }
 
     /** Per-space request seam: a "/spaces/{id}/<rest>" path binds this request to that space and is then
@@ -934,6 +931,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 throw ae;
             }
             authorize(ex, method, path);
+            if (idempotency(ex, method, path)) return;   // after every gate, before the handler's side effects
             try {
                 Object result = r.handler.handle(ex, m);
                 if (result != HANDLED) respond(ex, 200, result);

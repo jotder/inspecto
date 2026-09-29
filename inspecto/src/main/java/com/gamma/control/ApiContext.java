@@ -65,9 +65,7 @@ public interface ApiContext {
     String ATTR_SELF_PATH      = "inspecto.selfPath";
     /** A specific {@link ErrorCodes} value chosen by the throwing site (else derived from status). */
     String ATTR_ERROR_CODE     = "inspecto.errorCode";
-    /** The active {@link Idempotency.Store} for this exchange (present only for a keyed write). */
-    String ATTR_IDEMPOTENCY_STORE = "inspecto.idempotency.store";
-    /** The idempotency cache key for this exchange (present only for a keyed write). */
+    /** The {@link Idempotency.Pending} marker for this exchange (present only for a keyed write that missed). */
     String ATTR_IDEMPOTENCY_KEY   = "inspecto.idempotency.key";
     /** The request body's raw bytes, cached because {@code ex.getRequestBody()} is single-read (D8). */
     String ATTR_RAW_BODY          = "inspecto.rawBody";

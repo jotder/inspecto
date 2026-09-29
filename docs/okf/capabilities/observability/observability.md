@@ -292,7 +292,10 @@ deleting the clause.
 filed as `space.*` under the prefixed path (and outside the Space's own event store, because the MDC was
 not bound yet), and a replayed read-shaped POST was audited as a mutation. `ControlApi.auditReplay` now
 strips the prefix and binds the Space for the one record call, exactly as `bindSpace` does for a live
-request. The SPA never sends the header, so no demo showed it. Pinned by
+request. The SPA never sends the header, so no demo showed it. ⚠ **Superseded 2026-09-29
+(`SEC-IDEMPOTENCY-REPLAY-1`):** the replay now answers inside `routeDispatch`, after `bindSpace` and every
+gate, so it records through the ordinary `AuditTrail.record` on the already-stripped path and
+`auditReplay` is gone; the test below still pins the outcome. Pinned by
 `ControlApiAuditTest.idempotencyReplayOfASpacePrefixedRequestIsAuditedLikeTheOriginal`, red before the fix
 (`space.paused /spaces/default/runs/…`, `space.created /spaces/default/bi/query`).
 
