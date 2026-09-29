@@ -83,4 +83,15 @@ class JobWritersTest {
         stale.removeAll(writers);
         assertTrue(stale.isEmpty(), () -> "NOT_A_JOB_WRITER rows naming no writer route: " + stale);
     }
+
+    /** Round 3 (a), defence in depth: an import carrying an attaching report TEMPLATE is refused before any write. */
+    @Test
+    void anImportedJobTemplateThatAttachesIsRefused() {
+        String attaching = "job_template:\n  name: mailer\n  job:\n    type: report\n    attach: \"${a}\"\n";
+        ApiException e = org.junit.jupiter.api.Assertions.assertThrows(ApiException.class, () -> ImportCapabilityGuard.checkFiles(
+                null, Map.of("jobs/mailer_job_template.toon", attaching.getBytes(java.nio.charset.StandardCharsets.UTF_8))));
+        assertTrue(e.getMessage().contains("attaches data needs approval"), e.getMessage());
+        ImportCapabilityGuard.checkFiles(null, Map.of("jobs/plain_job_template.toon",
+                attaching.replace("\"${a}\"", "false").getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+    }
 }

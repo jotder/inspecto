@@ -127,6 +127,7 @@ final class ImportCapabilityGuard {
             String file = rel.substring(rel.lastIndexOf('/') + 1);
             if (file.endsWith("_connection.toon")) require(ex, "connection", Roles.CAN_ONBOARD_CONNECTIONS);
             else if (file.endsWith("_job.toon")) requireIfAdministerOnly(ex, jobSection(e.getValue()));
+            else if (file.endsWith("_job_template.toon")) refuseAttachingTemplate(e.getKey(), e.getValue());
             else if (rel.startsWith("registry/") || rel.contains("/registry/")) {
                 String[] parts = rel.substring(rel.startsWith("registry/") ? 0 : rel.indexOf("/registry/") + 1).split("/");
                 String kind = parts.length < 3 ? null : kindOfRegistryDir(parts[1]);
@@ -162,6 +163,26 @@ final class ImportCapabilityGuard {
             if (end > 0) out.add(s.substring(0, end));
         }
         return String.join("/", out);
+    }
+
+    /**
+     * ASSURE-XLSX-ATTACHMENTS-1 round 3 (defence in depth; the real lock is run-time, {@code AttachApprovals}): a
+     * {@code *_job_template.toon} whose report job block carries any {@code attach} other than a literal false (a
+     * {@code ${placeholder}} included) would expand into attaching Jobs at load with no Pending Change — refused.
+     */
+    private static void refuseAttachingTemplate(String path, byte[] bytes) {
+        Map<?, ?> job;
+        try {
+            Map<String, Object> m = ConfigCodec.toMap(new String(bytes, StandardCharsets.UTF_8));
+            job = m.get("job_template") instanceof Map<?, ?> t && t.get("job") instanceof Map<?, ?> j ? j : Map.of();
+        } catch (RuntimeException unparseable) {
+            return;   // the template loader refuses a malformed file
+        }
+        Object attach = job.get("attach");
+        if ("report".equalsIgnoreCase(String.valueOf(job.get("type")).trim()) && attach != null
+                && !"false".equalsIgnoreCase(String.valueOf(attach).trim()))
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "'" + path + "': a report job that attaches "
+                    + "data needs approval; create it through /jobs");
     }
 
     private static Map<?, ?> jobSection(byte[] bytes) {
