@@ -45,6 +45,7 @@ import com.gamma.intelligence.action.ControlPlaneClient;
 import com.gamma.intelligence.store.AgentWriteRoot;
 import com.gamma.intelligence.pack.ArgumentDeriver;
 import com.gamma.intelligence.pack.InspectoPack;
+import com.gamma.intelligence.pack.ToolCaller;
 import com.gamma.intelligence.pack.Investigator;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.intelligence.spi.IntelligenceAgent;
@@ -76,6 +77,7 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
             com.gamma.intelligence.pack.DraftArtifacts.KIND);
 
     private final Map<String, AgentSession> sessions = new ConcurrentHashMap<>();
+    private final Map<String, ToolCaller> sessionCallers = new ConcurrentHashMap<>();
     // P5: durable so the investigation corpus survives a restart and backs triage-run similarity recall;
     // start() replaces this with a write-root-backed instance (in-memory until then / without a root).
     private TriageRunStore triageRunStore = new TriageRunStore();
@@ -230,6 +232,9 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         AgentSession session = platform.agentService().open(sessionRequest);
         String sessionId = UUID.randomUUID().toString();
         sessions.put(sessionId, session);
+        // 2026-09-29: the caller's capabilities ride with the session; every turn binds them, so a model-driven
+        // tool call meets the same gate as POST /agent/tools/{name} (ToolCapabilities.enforcing).
+        sessionCallers.put(sessionId, ToolCaller.of(request.capabilities()));
         return new AgentSessionResult(sessionId, Instant.now().toString());
     }
 
@@ -250,7 +255,8 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
         if (session == null) {
             throw new IllegalArgumentException("unknown intelligence session: '" + sessionId + "'");
         }
-        AgentAnswer answer = session.ask(new UserMessage(request.question(), toPageContext(request.page()), Instant.now()));
+        AgentAnswer answer = ToolCaller.with(callerOf(sessionId),
+                () -> session.ask(new UserMessage(request.question(), toPageContext(request.page()), Instant.now())));
         return toResult(answer);
     }
 
@@ -264,6 +270,11 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
      * that keeps the surface draft-only: the act belt stays reachable only through the approval spine,
      * so an inline box can never become a second, ungated way to mutate state.
      */
+    /** The caller bound to {@code sessionId}; a session opened without one (never, via the route) fails closed. */
+    private ToolCaller callerOf(String sessionId) {
+        return sessionCallers.getOrDefault(sessionId, ToolCaller.of(java.util.Set.of()));
+    }
+
     @Override
     public Optional<String> toolCapability(String name) {
         Tool tool = belt.get(name);
@@ -278,8 +289,12 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
             throw new IllegalStateException("tool '" + name + "' is mutating and is not invocable directly"
                     + " — mutating tools run only through the approval spine");
         }
-        ToolResult result = tool.invoke(new ToolCall(name, args == null ? Map.of() : args,
-                new RunId(session == null || session.isBlank() ? "inline-" + UUID.randomUUID() : session)));
+        // The dispatch route already enforced toolCapability(name) against the caller, which is the same
+        // ToolCapabilities check the enforcing wrapper makes. So a direct dispatch binds UNRESTRICTED unless
+        // a caller is already bound (for example a derive hop running inside a session turn).
+        ToolCall call = new ToolCall(name, args == null ? Map.of() : args,
+                new RunId(session == null || session.isBlank() ? "inline-" + UUID.randomUUID() : session));
+        ToolResult result = ToolCaller.with(ToolCaller.currentOr(ToolCaller.UNRESTRICTED), () -> tool.invoke(call));
         Map<String, Object> view = new HashMap<>();
         view.put("ok", result.ok());
         if (result.ok()) {
@@ -443,6 +458,10 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
             return;
         }
         UserMessage msg = new UserMessage(request.question(), toPageContext(request.page()), Instant.now());
+        ToolCaller.with(callerOf(sessionId), () -> { askStreamBound(session, msg, sink); return null; });
+    }
+
+    private void askStreamBound(AgentSession session, UserMessage msg, AgentAnswerSink sink) {
         session.askStream(msg, new AnswerSink() {
             @Override public void onToken(String token) { sink.onToken(token); }
             @Override public void onArtifact(InlineArtifact artifact) {

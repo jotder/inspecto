@@ -35,7 +35,10 @@ final class AgentRoutes implements RouteModule {
             Object page = body.get("page");
             String goalKind = ApiContext.str(body, "goalKind");
             try {
-                return agentOr503(api).openSession(new AgentSessionRequest(role, mapField(page), goalKind));
+                // The caller's capabilities ride with the session, so a tool the model calls meets the same gate as
+                // POST /agent/tools/{name}. null (no Subject, Personal) checks nothing, like every gate.
+                java.util.Set<String> capabilities = ApiContext.subject(e).map(Subject::capabilities).orElse(null);
+                return agentOr503(api).openSession(new AgentSessionRequest(role, mapField(page), goalKind, capabilities));
             } catch (IllegalArgumentException ex) {   // unknown goalKind → reject at the edge
                 throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, ex.getMessage());
             }

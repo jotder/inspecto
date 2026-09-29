@@ -19,7 +19,9 @@ final class InspectoToolProvider implements ToolProvider {
     @Override
     public List<Tool> tools() {
         // AGT-ARTIFACT-1: the draft skills are wrapped so their result reaches the answer as an artifact.
-        return InspectoTools.tools(service).stream().map(DraftArtifacts::recording).toList();
+        // 2026-09-29: every gated tool enforces the caller's capability itself (ToolCapabilities.enforcing), so
+        // a model-driven call from a session meets the same check as POST /agent/tools/{name}.
+        return InspectoTools.tools(service).stream().map(ToolCapabilities::enforcing).map(DraftArtifacts::recording).toList();
     }
 
     @Override

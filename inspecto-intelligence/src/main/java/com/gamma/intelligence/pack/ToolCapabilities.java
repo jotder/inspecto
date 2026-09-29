@@ -1,7 +1,11 @@
 package com.gamma.intelligence.pack;
 
+import com.eoiagent.core.ToolCall;
+import com.eoiagent.core.ToolResult;
 import com.eoiagent.core.ToolSpec;
+import com.eoiagent.tool.Tool;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -27,6 +31,30 @@ public final class ToolCapabilities {
     static final Set<String> ROW_READERS = Set.of("anomaly_scan", "suggest_expectations");
 
     private ToolCapabilities() {
+    }
+
+    /**
+     * {@code tool}, enforcing {@link #of} against the bound {@link ToolCaller} before it executes. This is the
+     * SAME check the dispatch route makes, applied inside the tool so that a model-driven call from a session
+     * cannot bypass it. A refusal is an {@code ok=false} result that carries no rows. With no caller bound it
+     * refuses (fails closed). An ungated tool is returned unwrapped.
+     */
+    public static Tool enforcing(Tool tool) {
+        Optional<String> required = of(tool.spec());
+        if (required.isEmpty()) return tool;
+        String capability = required.get();
+        return new Tool() {
+            @Override public ToolSpec spec() { return tool.spec(); }
+            @Override public ToolResult invoke(ToolCall call) {
+                Optional<ToolCaller> caller = ToolCaller.current();
+                if (caller.isEmpty())
+                    return new ToolResult(false, null, "tool '" + tool.spec().name() + "' refused: no caller is bound", Map.of());
+                if (!caller.get().holds(capability))
+                    return new ToolResult(false, null, "tool '" + tool.spec().name() + "' refused: missing capability '"
+                            + capability + "'", Map.of());
+                return tool.invoke(call);
+            }
+        };
     }
 
     /** The control-plane capability for {@code spec}, or empty when an authenticated caller is enough. */
