@@ -1820,6 +1820,59 @@ if (-not $SkipBootCheck) {
         throw "PACKAGING SMOKE FAILED: $($providerHits.Count) jars on the bundle classpath carry META-INF/services/org.slf4j.spi.SLF4JServiceProvider ($($providerHits -join ', ')) -- exactly one SLF4J binding may exist on the assembled classpath. Check the shade excludes in the listed sidecars' pom.xml (see inspecto-agent/pom.xml for the reference exclude block)."
     }
     Write-Host "  verified: $($providerHits.Count) SLF4JServiceProvider registration(s) on the bundle classpath" -ForegroundColor DarkGray
+    # ASSURE-INTELLIGENCE-BUNDLE-1: a VERSION SPLIT between the core jar and a sidecar for the libraries both
+    # shade (jackson, commons-*, gson, slf4j) is a classpath conflict that only fails at run time, on whichever
+    # copy loads first. Read each jar's META-INF/maven/<g>/<a>/pom.properties and compare against inspecto.jar.
+    # ⚠ pom.properties alone over-reports: Nimbus (inspecto-security) RELOCATES its gson to
+    # com/nimbusds/jose/shaded/gson but keeps gson's pom.properties, so a version counts only when the jar
+    # also carries a class under the artifact's own, unrelocated package.
+    $sharedFamily = '^META-INF/maven/(com\.fasterxml\.jackson[^/]*|tools\.jackson[^/]*|org\.apache\.commons|commons-[^/]+|com\.google\.code\.gson|org\.slf4j)/([^/]+)/pom\.properties$'
+    # artifact -> its unrelocated package; an artifact not listed here is compared on pom.properties alone.
+    $sharedPackage = @{
+        'com.google.code.gson:gson' = 'com/google/gson/'
+        'org.slf4j:slf4j-api' = 'org/slf4j/'
+        'com.fasterxml.jackson.core:jackson-core' = 'com/fasterxml/jackson/core/'
+        'com.fasterxml.jackson.core:jackson-databind' = 'com/fasterxml/jackson/databind/'
+        'com.fasterxml.jackson.core:jackson-annotations' = 'com/fasterxml/jackson/annotation/'
+        'tools.jackson.core:jackson-core' = 'tools/jackson/core/'
+        'tools.jackson.core:jackson-databind' = 'tools/jackson/databind/'
+        'org.apache.commons:commons-lang3' = 'org/apache/commons/lang3/'
+        'org.apache.commons:commons-compress' = 'org/apache/commons/compress/'
+        'org.apache.commons:commons-text' = 'org/apache/commons/text/'
+        'commons-codec:commons-codec' = 'org/apache/commons/codec/'
+        'commons-io:commons-io' = 'org/apache/commons/io/'
+    }
+    function Get-ShadedVersions([string]$jarPath) {
+        $found = @{}
+        $z = [System.IO.Compression.ZipFile]::OpenRead($jarPath)
+        try {
+            foreach ($entry in $z.Entries) {
+                if ($entry.FullName -match $sharedFamily) {
+                    $ga = "$($Matches[1]):$($Matches[2])"
+                    $pkg = $sharedPackage[$ga]
+                    if ($pkg -and -not ($z.Entries | Where-Object { $_.FullName.StartsWith($pkg) -and $_.FullName.EndsWith('.class') } | Select-Object -First 1)) { continue }
+                    $reader = New-Object System.IO.StreamReader($entry.Open())
+                    try { $props = $reader.ReadToEnd() } finally { $reader.Dispose() }
+                    if ($props -match '(?m)^version=(.+)$') { $found[$ga] = $Matches[1].Trim() }
+                }
+            }
+        } finally { $z.Dispose() }
+        return $found
+    }
+    $coreVersions = Get-ShadedVersions (Join-Path $bundleDir 'inspecto.jar')
+    $splits = @()
+    foreach ($jarName in ($cp | Where-Object { $_ -ne 'inspecto.jar' })) {
+        $side = Get-ShadedVersions (Join-Path $bundleDir $jarName)
+        foreach ($ga in $side.Keys) {
+            if ($coreVersions.ContainsKey($ga) -and $coreVersions[$ga] -ne $side[$ga]) {
+                $splits += "$ga $($coreVersions[$ga]) (inspecto.jar) vs $($side[$ga]) ($jarName)"
+            }
+        }
+    }
+    if ($splits.Count -gt 0) {
+        throw "PACKAGING SMOKE FAILED: $($splits.Count) shared-library version split(s) between the core jar and a sidecar -- one copy wins at run time, nondeterministically by classpath order:`n  $($splits -join "`n  ")`nAlign the version in the parent pom's dependencyManagement, or exclude the library from the sidecar's shade."
+    }
+    Write-Host "  verified: no jackson/commons/gson/slf4j version split between inspecto.jar and the sidecars ($($coreVersions.Count) shared artifacts checked)" -ForegroundColor DarkGray
     $sep = if ($IsWindows -or $env:OS -eq 'Windows_NT') { ';' } else { ':' }
     $listener = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
     $listener.Start(); $port = $listener.LocalEndpoint.Port; $listener.Stop()
