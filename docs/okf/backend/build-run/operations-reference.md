@@ -1097,8 +1097,17 @@ As-built decisions:
   `linux_amd64` bundle**; it asserts this with a `runtime/bin/java -version` at build time rather than
   failing at container start.
   🔴 **This bullet was ahead of the code until 2026-09-29:** `package.ps1` still emitted
-  `eclipse-temurin:24-jre` and excluded `runtime/`; fixed then (`ASSURE-OPERABILITY-1`). The fixed Dockerfile
-  has not yet been built — the 2026-08-28 verification below is of the old temurin image.
+  `eclipse-temurin:24-jre` and excluded `runtime/`; fixed then (`ASSURE-OPERABILITY-1`).
+- **Verified 2026-09-29 on the fixed Dockerfile** (Docker 29.5.3, Professional bundle packaged with
+  `package.ps1 -Edition Professional -NoUi`, `inspecto-deploy-linux_amd64.zip`, `docker build` exit 0):
+  `runtime/bin/java -version` in the image → `java version "27" 2026-09-15` (build 27+35-2325); `id` →
+  `uid=10001(inspecto) gid=10001(inspecto)`; `docker top` on the running container shows the java process at
+  UID/GID **10001**; `GET /health` → 200 `{"status":"UP"}`, `GET /ready` → 200, `HEALTHCHECK` → `healthy`.
+  A second run with `--read-only --tmpfs /tmp:exec --cap-drop ALL --security-opt no-new-privileges` and
+  `spaces/demo` mounted booted the Space (13 Pipelines) and answered `/health` + `/ready` 200. ⚠ Professional
+  refuses to start without `AUTH_OIDC_ISSUER` / `AUTH_OIDC_JWKS_URI` (fail-closed); the run passed placeholder
+  values — `/health` is public, so no token was validated. Containers were stopped and removed. The
+  2026-08-28 line below is the old temurin image.
 - **Base pinned by digest, and non-root** (operator 2026-09-29): `FROM debian@sha256:520c7157…8e2d` (the
   linux/amd64 manifest of `debian:stable-slim`; bump it deliberately), and a dedicated `inspecto` user/group
   with fixed uid/gid **10001** (`USER 10001:10001`). `/app` and `spaces/` are chowned to it; the jars, the
