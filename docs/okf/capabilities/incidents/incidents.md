@@ -68,7 +68,7 @@ out of Personal (2026-09-08) and amended two neighbouring `EDITIONS.md` rows but
 | `INC-1` | **Alert Rules** watch Metrics (and, since 2026-09-06, Measures); fired **Alerts** with severity | Must | ✅ SHIPPED — ⚠ the authoring form cannot express a Measure rule (§5). **+ 2026-09-23 (LA-23):** a fourth rule kind watches a Measure over a Link Analysis Investigation's Working Set (`investigation:` + `relation:` + `measure:`), authored ONLY through the owner-gated `POST /inv/investigations/{id}/alert-rules` (the generic `/alerts/rules` refuses it) and evaluated only while the owner's binding matches; fires through the same ALERT → CRITICAL Incident path, scoped to the Investigation. Reads the SEALED Working Set, not current data — [`link-analysis-backlog-plan.md`](../../../superpower/link-analysis-backlog-plan.md) §5.8 | All (the *feed*); ALERT **objects** S/E; Investigation rules P/E (need `inspecto-geo-link`) |
 | `INC-2` | **Alert → Incident → Case** lifecycle, object-link graph, SLA, comments | Must | ✅ SHIPPED | **S/E** — was `All`; `inspecto-ops` since 2026-09-08 (CP-11) |
 | `INC-3` | **Notification** delivery channels (email / webhook) + per-user preferences | Must | 🟡 PARTIAL — feed + rules + receipts shipped; channels S/E; **preferences are one global set**; ~~`mail.send` reports success when no channel exists~~ ✅ returns **SKIPPED** since `ad29e683` (§5) | Feed All (CP-12) · channels **S/E** (CP-15) |
-| `INC-4` | Incident workflow depth: queues, escalation, watchers | ⛔ **WITHDRAWN** | ⛔ **RETIRED 2026-09-14 (`RETIRE-HALVES-1`)** — the queue family, the three watcher routes and the escalation engine are **deleted from the code**, not merely undocumented. Assignment is now person-only (`POST /objects/{id}/assign` takes `assignee`); the Incident object, the SLA breach sweep and triage stay. ⚠ `watchers` survives as an object **attribute** (the merge union feeds it) with no route. Re-file when a customer names on-call escalation | **n/a** — withdrawn, not gated |
+| `INC-4` | Incident workflow depth: queues, escalation, watchers | ⛔ **WITHDRAWN** | ⛔ **RETIRED 2026-09-14 (`RETIRE-HALVES-1`)** — the queue family, the three watcher routes and the escalation engine are **deleted from the code**, not merely undocumented. Assignment is now person-only (`POST /objects/{id}/assign` takes `assignee`); the Incident object, the SLA breach sweep and triage stay. ⚠ `watchers` survives as an object **attribute** (the merge union feeds it) with no route. Re-file when a customer names on-call escalation. 🔁 **Escalation REVERSED 2026-09-29 (D-P4, `ASSURE-WORKFLOW-SLA-1`)**: authored Escalation Rules + SLA policy + Workflow are back with an authoring UI (see *Incident governance* below); queues and watcher routes stay retired | **n/a** — withdrawn, not gated |
 | `INC-5` | **Diagnosis**: AI-assisted RCA of a failing Run/Collector **producing an Incident** | Should | 🟡 **PARTIAL** — the RCA ships (`FailureReactor` → `DiagnosisStore`, `GET /assist/diagnoses`); **nothing creates an Incident from a Diagnosis** — the only bridge is a drafted Alert Rule (§3.9) | All |
 
 **Corrections this table makes to its predecessor**, each verified against source:
@@ -347,7 +347,7 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
 `ObjectType` = `ALERT | INCIDENT | CASE | TASK`, one table `inspecto_ops_objects` when durable, else
 `InMemoryObjectStore` (`OpsEngineProvider.java:94-124` picks per store on `durable()`).
 
-- **Workflows** (`inspecto-ops/src/main/java/com/gamma/ops/workflow/Workflow.java:150-192`): ALERT
+- **Workflows** (`inspecto-engine/src/main/java/com/gamma/objects/Workflow.java:150-192`): ALERT
   `OPEN → ACKNOWLEDGED → RESOLVED`; **INCIDENT `IDENTIFIED → DIAGNOSING → RESOLVED → ARCHIVED`**, `reopen`
   from `RESOLVED|ARCHIVED → DIAGNOSING`, only `ARCHIVED` terminal; CASE `OPEN → INVESTIGATING → ESCALATED →
   RESOLVED → CLOSED`. `GET /workflows/{type}` serves the BFS-ordered states so a TOON-overridden workflow
@@ -398,6 +398,59 @@ Incidents (`GET /objects?type=INCIDENT`, correlation id = the reconciliation).
   is RETIRED (`RETIRE-HALVES-1`, 2026-09-14)** — a breach now emits its event and nothing else; no severity
   bump, no re-routing, and `OBJECT_ESCALATED` is emitted by nothing (the `@PublicApi` constant stays for
   stored events). The Case `targetDate` is a **loose** SLA — overdue hint only, no sweep.
+- **Incident governance — authored Workflow, SLA policy, Escalation Rules** (`ASSURE-WORKFLOW-SLA-1`, 2026-09-29).
+  🔁 **This REVERSES part of `RETIRE-HALVES-1`.** INC-4's retirement deleted the escalation engine because it was a
+  backend nobody could see or author ("re-file when a customer names on-call escalation"). D-P4 (operator) named it:
+  **escalation comes back, with its authoring UI; queues and watcher routes stay deleted.** Three component kinds,
+  all written only through their literal `canAdminister` routes (`/components/workflow|sla-policy|escalation-rule`,
+  a governance change), versioned by `ComponentStore` (`.history/`, restore), held by the maker-checker policy like
+  every governable kind (`ApprovalPolicy.GOVERNABLE` derives from `WRITABLE_TYPES`), and **refused by every import**
+  — the generic `/components` door, `/bundle/import` items and a new Space's files included
+  (`ImportCapabilityGuard.GOVERNANCE_ONLY`; the dirs are out of `ImportPaths.REGISTRY_DIRS`, pinned by
+  `ImportLoaderInventoryTest.theGovernanceRegistryDirsAreRefusedToEveryImport`). The `*_workflow.toon` /
+  `*_escalation.toon` suffix refusals are unchanged.
+  - **Workflow** (`Workflow.fromComponent` / `problems()`, moved to `inspecto-engine` `com.gamma.objects` so core can
+    validate at save): exactly one initial state, ≥ 1 terminal state, every state reachable, every non-terminal
+    state has a way out, no two transitions leave a state by one action; for an Incident a `RESOLVED` state,
+    `ARCHIVED` (if present) terminal, and **no transition into a terminal state other than `ARCHIVED` except from
+    `RESOLVED`**. That is defence in depth: the runtime gate (`decidesIncident`) already gates every custom terminal
+    state, so a workflow cannot describe a path around the Disposition / postmortem gate AND could not use one. The
+    same validation now runs on `*_workflow.toon` at boot. Precedence: authored component > `*_workflow.toon` >
+    built-in. **Hot reload:** `GovernanceRegistry` (`inspecto-ops`) checksums the three registry dirs on every
+    read and re-parses on change — whichever door wrote the file (route, approval replay, restore, hand edit); a
+    file that fails validation at load is skipped and the lower layer serves. ⚠ The legacy single-tenant root has
+    no config dir, so `ControlApi` points its engine at `<assist.write.root>/registry`.
+    ⚠ Not done: a Workflow that drops a state live objects occupy is accepted; those objects then have no legal
+    move until the state returns.
+  - **SLA policy** (`SlaPolicy`): per object type, targets per priority (`responseMinutes`, `resolutionMinutes`,
+    `*` = fallback) in a business calendar — working days, a same-day `start`–`end` window (no overnight
+    windows), ISO-date holidays, and an **IANA zone id, required** (`ZoneId.getAvailableZoneIds()`; an offset or
+    the host zone is refused). Windows are wall-clock, so a DST day keeps 09:00–17:00 and a 24x7 day loses its hour
+    (`SlaPolicyTest`). The sweep stamps `dueAt` / `responseDueAt` from `createdAt` (plus `slaPolicy`, `slaPriority`);
+    an operator-set `dueAt` (no `slaPolicy`) is left alone; a priority change recomputes until a breach is
+    recorded. A **response breach** = `responseDueAt` passed while the object is still in its workflow's initial
+    state — stamped `slaResponseBreachedAt`, emitted as `OBJECT_SLA_BREACH` with `target: response`, once. Every
+    object type with a policy (or an Escalation Rule) is swept, not only Incidents.
+  - **Escalation Rules** (`EscalationRule`, GLOSSARY §9): `on: breach` (`target: resolution|response`) or
+    `on: age` (`afterMinutes` since open), optional `priority` filter; actions `reassign`, `notify`,
+    `raisePriority`. Idempotent: the firing `<rule>@<breach stamp>` is written to `attributes.escalations` in the
+    same store write as the effect, so a rule never repeats for one breach. Audited: one `OBJECT_ESCALATED` per
+    firing (actor `escalation-rule:<id>`, WARN iff `notify`, which `builtin-escalation` turns into a
+    notification) plus `OBJECT_ASSIGNED` on a reassign; `escalated=true` is set, so the Incident shows in the
+    Escalated folder. Bounded: ≤ 50 rules loaded (`GovernanceRegistry.MAX_RULES`), ≤ 500 firings per sweep.
+    Resolved / archived / terminal objects are never escalated.
+  - **UI:** Settings ▸ *Incident governance* (`settings/incident-governance.component.ts`, model
+    `inspecto/governance/governance-model.ts`): the effective workflow as a list editor (initial, terminal,
+    transition rows), the SLA policy form and the Escalation Rules list; read-only without `canAdminister`; a 422
+    refusal is shown inline, a held write says it was submitted for approval.
+  - **Tests:** `WorkflowValidationTest`, `SlaPolicyTest` (engine) · `GovernanceSweepTest` (ops: hot reload, a
+    hand-planted bypass file is not served, the gate still holds on a custom terminal state, policy stamping,
+    response breach, escalation once per breach, age + priority cap, the 50-rule bound) ·
+    `ControlApiGovernanceComponentsTest` (armed Subject: 401 / 403 `developer`+`operations` / 200 `admin` on all
+    twelve routes, the generic door refused even to `super`, 422s, history + restore, a held write approved by a
+    second administrator) · `ImportCapabilityGuardTest.aGovernanceKindIsRefusedOnEveryImportANewSpacesIncluded`.
+    Mutations run: dropping the "around RESOLVED" clause, the idempotency check, or the change detection each turn
+    the named tests red.
 - ⛔ **Queues and watcher routes are RETIRED** (`RETIRE-HALVES-1`, 2026-09-14). `*_queue.toon`,
   `POST /queues`, `QueueRouter` and the three `watch|unwatch|watchers` routes are deleted; nothing had ever
   called them. `POST /objects/{id}/assign` survives **person-only** (body `{assignee, actor?}`) and still

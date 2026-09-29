@@ -791,6 +791,17 @@ to the rule's still-open Case). The mechanical tail of the **Alert → Incident 
 ⛔ never bare "Rule" (§0 — Rule is always qualified: Expectation / Alert Rule / Decision Rule /
 Tag Rule / Case Rule).
 
+**Escalation Rule** *(added 2026-09-29, ASSURE-WORKFLOW-SLA-1)* — What the SLA sweep does to an operational object
+that **breaches** an SLA target (response or resolution) or reaches an **age**: reassign it, notify (an
+`OBJECT_ESCALATED` event at WARN, picked up by the built-in `builtin-escalation` notification rule) and/or raise its
+priority one step (LOW → MINOR → MAJOR → CRITICAL, never past CRITICAL). Fires **at most once per breach** of each
+object, recorded on the object (`attributes.escalations`) and audited. The `escalation-rule` component kind
+(`registry/escalation-rules/`), written only with `canAdminister`. ⛔ never bare "Rule"; ⛔ not the retired
+`EscalationPolicy` (`RETIRE-HALVES-1`) and not a **Queue** — queues stay deleted (D-P4). Its companions: the
+**SLA policy** (`sla-policy`, per object type: response + resolution targets per priority in a **business
+calendar** — working days, hours, holidays, an explicit IANA zone) and the authored **Workflow** (`workflow`, one
+per object type: states + transitions).
+
 **Triage** / **Triage Run** *(renamed from "Investigation Case" 2026-09-24 — `GLOSSARY-CASE-1`, decision `D-E1`)* —
 A **Triage** is the Assistant's **RCA playbook** (the Type: root-cause or impact, `pack.Playbooks`, run by
 `pack.Investigator`); a **Triage Run** is **one run of a Triage against a single Incident** (the Instance): trigger
