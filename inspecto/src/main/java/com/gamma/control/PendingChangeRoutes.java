@@ -322,6 +322,7 @@ final class PendingChangeRoutes implements RouteModule {
                 rec.put("decidedAt", at);
                 rec.put("decisionReason", reason);
                 rec.put("appliedStatus", r.status());
+                recordAttachApproval(api, root, rec);
                 PendingChanges.save(root, rec);
                 PendingChanges.audit(ex, "pending-change.approved", rec.get("kind") + " '" + rec.get("name")
                         + "' — " + id + " approved by " + by + " and applied", rec, b -> b.attr("reason", reason));
@@ -403,5 +404,21 @@ final class PendingChangeRoutes implements RouteModule {
     private static String errorField(String body, String field) {
         if (!(parse(body) instanceof Map<?, ?> m) || !(m.get("error") instanceof Map<?, ?> e)) return null;
         return e.get(field) == null ? null : String.valueOf(e.get(field));
+    }
+
+    /**
+     * ASSURE-XLSX-ATTACHMENTS-1 round 3: an approved change to an attaching report Job records the approval
+     * fingerprint of the Job AS NOW LOADED (template-expanded) — the version {@code ReportJob}'s run-time lock
+     * will send. Stamped on the Pending Change record too, so the approval names what it approved.
+     */
+    private static void recordAttachApproval(ApiContext api, java.nio.file.Path root, Map<String, Object> rec)
+            throws java.io.IOException {
+        if (!"job".equals(rec.get("kind"))) return;
+        String name = String.valueOf(rec.get("name")).replaceFirst("(_job)?\\.toon$", "");
+        java.util.Optional<com.gamma.job.JobConfig> job = api.service().jobServiceOrCreate().jobConfig(name);
+        if (job.isEmpty() || !com.gamma.job.AttachApprovals.attaches(job.get())) return;
+        String fp = com.gamma.job.AttachApprovals.fingerprint(job.get(), root);
+        com.gamma.job.AttachApprovals.record(root, job.get().name(), fp);
+        rec.put("attachFingerprint", fp);
     }
 }

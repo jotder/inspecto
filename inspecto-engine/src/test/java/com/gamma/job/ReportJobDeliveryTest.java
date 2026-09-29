@@ -183,12 +183,17 @@ class ReportJobDeliveryTest {
     }
 
     private static JobContext ctxWith(com.gamma.notify.MailAccess mail) {
+        return ctxWith(mail, Map.of(), new java.util.ArrayList<>());
+    }
+
+    /** A context whose Run PARAMS (trigger args / bound Signal values) are {@code params}; signals are captured. */
+    private static JobContext ctxWith(com.gamma.notify.MailAccess mail, Map<String, String> params, List<String> signals) {
         return new JobContext() {
             @Override public String runId() { return "run-1"; }
             @Override public String spaceId() { return "default"; }
             @Override public TriggerInfo trigger() { return null; }
-            @Override public Map<String, String> config() { return Map.of(); }
-            @Override public Map<String, String> params() { return Map.of(); }
+            @Override public Map<String, String> config() { return params; }
+            @Override public Map<String, String> params() { return params; }
             @Override public ArtifactRecorder artifacts() { return null; }
             @Override public com.gamma.util.RunLog log() {
                 return new com.gamma.util.RunLog() {
@@ -197,7 +202,9 @@ class ReportJobDeliveryTest {
                     @Override public void error(String m, Throwable t, Object... kv) { }
                 };
             }
-            @Override public com.gamma.signal.SignalEmitter signals() { return (type, severity, payload) -> { }; }
+            @Override public com.gamma.signal.SignalEmitter signals() {
+                return (type, severity, payload) -> signals.add(type + " " + payload.get("reason"));
+            }
             @Override public PlatformServices services() {
                 return new PlatformServices() {
                     @Override public <T> java.util.Optional<T> find(Class<T> type) {
@@ -212,16 +219,25 @@ class ReportJobDeliveryTest {
         };
     }
 
+    private static Map<String, String> attachParams(Path outDir) {
+        return Map.of("scope", "dataset", "dataset", "sales_ds", "out_dir", outDir.toString(),
+                "recipients", "ops@example.com, finance@example.com", "attach", "true");
+    }
+
+    /** What the approve path records: the fingerprint of the Job as loaded. */
+    private static void approve(JobConfig cfg, Path writeRoot) throws Exception {
+        AttachApprovals.record(writeRoot, cfg.name(), AttachApprovals.fingerprint(cfg, writeRoot));
+    }
+
     @Test
-    void attachMailsTheJobsOwnDeliveredArtifact(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+    void anApprovedUnchangedJobMailsItsOwnDeliveredArtifact(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
         seedSales(writeRoot);
         System.setProperty("assist.write.root", writeRoot.toString());
         RecordingMail mail = new RecordingMail();
+        JobConfig cfg = job(attachParams(outDir));
+        approve(cfg, writeRoot);
 
-        JobResult r = new ReportJob(job(Map.of(
-                "scope", "dataset", "dataset", "sales_ds", "out_dir", outDir.toString(),
-                "recipients", "ops@example.com, finance@example.com", "attach", "true")), null)
-                .run(ctxWith(mail));
+        JobResult r = new ReportJob(cfg, null).run(ctxWith(mail));
 
         assertEquals("SUCCESS", r.status(), r.message());
         assertTrue(r.message().contains("mailed to 2 recipient(s) with attachment"), r.message());
@@ -234,15 +250,80 @@ class ReportJobDeliveryTest {
         assertArrayEquals(Files.readAllBytes(artifact), mail.attachments.get(0).content());
     }
 
+    /** Round 3: a hand-edited (never approved) attach Job refuses at RUN time — audit + Signal, nothing sent. */
+    @Test
+    void aHandEditedAttachJobRefusesToSend(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        RecordingMail mail = new RecordingMail();
+        List<String> signals = new java.util.ArrayList<>();
+        IllegalStateException e = assertThrows(IllegalStateException.class, () ->
+                new ReportJob(job(attachParams(outDir)), null).run(ctxWith(mail, Map.of(), signals)));
+        assertTrue(e.getMessage().contains("attach not approved for this job version; re-approve"), e.getMessage());
+        assertNull(mail.to, "nothing was sent");
+        assertEquals(List.of("report.attach.refused attach not approved for this job version; re-approve"), signals);
+    }
+
+    @Test
+    void anApprovedJobEditedOnDiskRefuses(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        approve(job(attachParams(outDir)), writeRoot);
+        Map<String, String> edited = new java.util.LinkedHashMap<>(attachParams(outDir));
+        edited.put("recipients", "ops@example.com, leak@example.com");
+        RecordingMail mail = new RecordingMail();
+        assertThrows(IllegalStateException.class, () -> new ReportJob(job(edited), null).run(ctxWith(mail)));
+        assertNull(mail.to);
+
+        // the Dataset it reads is part of the approved version too
+        new ComponentStore(writeRoot.resolve("registry")).write("dataset", "sales_ds",
+                Map.of("view", "sales_view", "description", "now reads something else"));
+        assertThrows(IllegalStateException.class, () -> new ReportJob(job(attachParams(outDir)), null).run(ctxWith(mail)));
+        assertNull(mail.to);
+    }
+
+    /** Round 3: the live bypass — a template-EXPANDED attach Job (no Pending Change ever saw it) refuses. */
+    @Test
+    void aTemplateExpandedAttachJobRefusesAtRunTime(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        JobTemplate t = new JobTemplate("mailer", Map.of("to", ""), Map.of("type", "report", "scope", "dataset",
+                "dataset", "sales_ds", "out_dir", outDir.toString(), "recipients", "${to}", "attach", "true"));
+        Map<String, Object> instance = new java.util.LinkedHashMap<>();
+        instance.put("name", "weekly_sales");
+        instance.put("template", "mailer");
+        instance.put("params", Map.of("to", "ops@example.com"));
+        JobConfig expanded = JobConfig.fromMap(Map.of("job", t.instantiate(instance)));
+        RecordingMail mail = new RecordingMail();
+        assertThrows(IllegalStateException.class, () -> new ReportJob(expanded, null).run(ctxWith(mail)));
+        assertNull(mail.to);
+    }
+
+    /** Round 3 (b): trigger args / a bound Signal can never turn attach on — the AUTHORED config decides. */
+    @Test
+    void triggerArgsCannotTurnAttachOn(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        Map<String, String> cfg = new java.util.LinkedHashMap<>(attachParams(outDir));
+        cfg.put("attach", "false");
+        RecordingMail mail = new RecordingMail();
+        JobResult r = new ReportJob(job(cfg), null).run(ctxWith(mail,
+                Map.of("attach", "true", "signal.attach", "true"), new java.util.ArrayList<>()));
+        assertEquals("SUCCESS", r.status(), r.message());
+        assertEquals(List.of(), mail.attachments, "mailed WITHOUT an attachment");
+    }
+
     @Test
     void anOverCapAttachmentFailsTheRunWithTheReason(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
         seedSales(writeRoot);
         System.setProperty("assist.write.root", writeRoot.toString());
         System.setProperty(com.gamma.notify.MailAttachments.MAX_ATTACHMENT_PROPERTY, "8");
         try {
-            IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> new ReportJob(job(Map.of(
-                    "scope", "dataset", "dataset", "sales_ds", "out_dir", outDir.toString(),
-                    "recipients", "ops@example.com", "attach", "true")), null).run(ctxWith(new RecordingMail())));
+            JobConfig cfg = job(Map.of("scope", "dataset", "dataset", "sales_ds", "out_dir", outDir.toString(),
+                    "recipients", "ops@example.com", "attach", "true"));
+            approve(cfg, writeRoot);
+            IllegalArgumentException e = assertThrows(IllegalArgumentException.class,
+                    () -> new ReportJob(cfg, null).run(ctxWith(new RecordingMail())));
             assertTrue(e.getMessage().contains("over the 8-byte cap"), e.getMessage());
         } finally {
             System.clearProperty(com.gamma.notify.MailAttachments.MAX_ATTACHMENT_PROPERTY);

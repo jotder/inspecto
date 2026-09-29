@@ -632,6 +632,20 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
   approval; create it through /jobs"* before any item is written. `JobWritersTest` enumerates
   `ConfigWriteFunnelTest`'s route inventory and fails on a config-writing route that neither holds, calls
   the guard or the import gate, nor is listed with a reason.
+  🔴 **The real lock is at RUN time** (round 3, operator 2026-09-29). Write paths kept being found:
+  `*_job_template.toon` expansion at load, hand edits, the zero-Space recovery create. So `ReportJob` with
+  `attach: true` sends only the exact Job version a four-eyes approval fingerprinted (`AttachApprovals`,
+  `inspecto-engine/src/main/java/com/gamma/job/AttachApprovals.java`). The fingerprint is a SHA-256 over the
+  Job as the scheduler holds it (template-EXPANDED): its name, type and every param except the
+  server-stamped author keys, plus the Dataset definition it reads. The approve path
+  (`PendingChangeRoutes.recordAttachApproval`) records it in `attach-approvals.json`, which is reserved from
+  every import. Anything else fails the Run with an AUDIT row (`report.attach.refused`) and a
+  `report.attach.refused` Signal: "attach not approved for this job version; re-approve". Whether a Job
+  attaches is decided by ONE predicate, `AttachApprovals.attaches`, which `JobWriteGuard` also uses. It reads
+  the AUTHORED config only, never trigger args or a bound Signal. The write-time holds stay as the friendly
+  path. As defence in depth an import refuses a `*_job_template.toon` whose report block carries any
+  `attach` but a literal false (a `${placeholder}` included).
+  ⚠ Someone with shell access to the config root can still forge `attach-approvals.json`, as they could any file.
   ⚠ **With no authenticator (a Personal / no-auth build) four-eyes cannot tell the author from the approver**:
   every request is the same anonymous actor, so the hold only delays the write. In that build the recipient
   domain allowlist above is the ONLY real control on where an attachment can go.

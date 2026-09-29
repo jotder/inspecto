@@ -133,13 +133,15 @@ final class ReportJob implements Job {
      */
     private String mail(JobContext ctx, String delivered) throws Exception {
         List<String> to = split(cfg.opt("recipients", ""));
-        boolean attach = "true".equalsIgnoreCase(cfg.opt("attach", "false"));
+        // The AUTHORED config decides (never a trigger arg or a bound Signal), through the ONE shared predicate.
+        boolean attach = AttachApprovals.attaches(cfg);
         if (to.isEmpty()) {
             if (attach) throw new IllegalArgumentException("attach: true needs recipients to mail the report to");
             return null;
         }
         if (delivered == null)
             throw new IllegalArgumentException("recipients needs out_dir: only a delivered report can be mailed");
+        if (attach) requireApprovedVersion(ctx);
         MailAccess mail = ctx == null ? null : ctx.services().find(MailAccess.class).orElse(null);
         if (mail == null) return "not mailed (no mail service granted to this Run)";
         List<MailAttachment> files = attach
@@ -203,6 +205,26 @@ final class ReportJob implements Job {
                 .attr("scope", scope)
                 .attr("path", artifact.toString()));
         return artifact.toString();
+    }
+
+    /**
+     * The RUN-TIME lock (round 3): an attaching report sends only the exact Job version a four-eyes approval
+     * fingerprinted ({@link AttachApprovals}) — template expansion, hand edits, imports and recovery creates included.
+     * Anything else fails the Run, with an audit row and a Signal, before a byte is mailed.
+     */
+    private void requireApprovedVersion(JobContext ctx) throws Exception {
+        Path root = SpaceConfigRoot.current();
+        String fp = AttachApprovals.fingerprint(cfg, root);
+        if (AttachApprovals.approved(root, cfg.name(), fp)) return;
+        String why = "attach not approved for this job version; re-approve";
+        EventLog.current().emit(Event.builder(EventType.AUDIT).source("audit")
+                .message("Report '" + cfg.name() + "' refused to send its attachment: " + why)
+                .action("report.attach.refused").actionCategory("security")
+                .attr("job", cfg.name()).attr("fingerprint", fp));
+        if (ctx != null)
+            ctx.signals().emit("report.attach.refused", com.gamma.signal.Severity.WARN,
+                    Map.of("job", cfg.name(), "reason", why, "fingerprint", fp));
+        throw new IllegalStateException("report '" + cfg.name() + "': " + why);
     }
 
     /** The dataset-scope export rows: a headless BI query compiled from this job's params (BI-4/BI-7). */

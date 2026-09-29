@@ -736,6 +736,10 @@ class ControlApiPendingChangesTest {
             JsonNode ok = data(send(c, "POST", "/pending-changes/" + id + "/approve", "{}", CHECKER), 200);
             assertTrue(ok.get("applied").asBoolean(), ok.toString());
             assertEquals("true", data(send(c, "GET", "/jobs/mailer", null, AUTHOR), 200).at("/attach").asText());
+            // round 3: the approval recorded the fingerprint of the Job AS LOADED — the version the run-time lock sends
+            com.gamma.job.JobConfig loaded = c.svc.jobServiceOrCreate().jobConfig("mailer").orElseThrow();
+            assertTrue(com.gamma.job.AttachApprovals.approved(root, "mailer",
+                    com.gamma.job.AttachApprovals.fingerprint(loaded, root)), "approval fingerprint recorded");
 
             // an already-approved attach Job: a schedule edit goes under the normal (here: no) policy...
             HttpResponse<String> edit = send(c, "PUT", "/jobs/mailer",

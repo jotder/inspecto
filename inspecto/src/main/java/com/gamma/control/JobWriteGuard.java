@@ -50,9 +50,9 @@ final class JobWriteGuard {
                     "a report job that attaches data needs approval; create it through /jobs");
     }
 
+    /** The ONE predicate, shared with {@code ReportJob}'s run-time lock. */
     static boolean attaches(Map<?, ?> job) {
-        return job != null && "report".equalsIgnoreCase(str(job.get("type")))
-                && "true".equalsIgnoreCase(str(job.get("attach")));
+        return com.gamma.job.AttachApprovals.attaches(job);
     }
 
     @SuppressWarnings("unchecked")
