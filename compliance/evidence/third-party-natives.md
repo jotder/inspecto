@@ -23,7 +23,7 @@ it is used. In a bundle, the launchers point every extraction directory at `./ru
 (owner-only) and set `-Dai.djl.offline=true` (see `inspecto/package.ps1`). Without that pin, onnxruntime
 leaves one `onnxruntime-java*` directory in `%TEMP%` per JVM start, and it never removes them on Windows.
 
-**Open (owed before an external licence review):**
+**Open (owed before an external licence review; tracked as `NATIVE-LICENCE-TEXTS-1`):**
 1. Ship the GPL-3.0 text, the GCC Runtime Library Exception 3.1 text and the winpthreads `COPYING` text next to
    the bundle. They are not in the offline cache, and downloading them is not approved.
 2. Make the shade step merge `META-INF/LICENSE*` / `NOTICE*` (for example with an
