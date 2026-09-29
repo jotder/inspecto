@@ -33,3 +33,30 @@ The living production-investigation guide (process/events/metrics/state/Control 
 `docs/ADVANCED_GUIDE.md`. Observability primitives: [events & metrics](../control-plane/events-metrics.md)
 (`/metrics` Prometheus text, `/events/search` — both OPTIONAL modules since EDG-01, 503 on Personal; the core audit read is `/audit/search`). Performance tuning: [`performance.md`](performance.md);
 the full utilities/batching/output/deployment reference is [`operations-reference.md`](operations-reference.md).
+
+## Offline vulnerability scan (ASSURE-OPERABILITY-1, D-P3)
+
+`tools/vuln-scan.mjs` is a zero-dependency Node matcher — no scanner binary is installed or downloaded. It
+reads `tools/dependencies.lock` (default) or a bundle SBOM (`--sbom <bundle>/sbom/inspecto-<edition>.cdx.json`)
+and matches every Maven coordinate against an **OSV-format snapshot** at `$VULN_DB_DIR` (or `--db`).
+
+- **Verdict:** exit 1 on any unwaived HIGH, CRITICAL or UNKNOWN-severity finding (unknown fails closed);
+  exit 0 otherwise; exit **2 = could not run** (no snapshot, no `snapshot.json`, zero records, empty component
+  list, snapshot older than `--max-age-days`, default 30). ⛔ Exit 2 is never a pass.
+- **Severity** comes from each record's `database_specific.severity` (the GitHub advisory field;
+  `MODERATE` = MEDIUM). Records with none are UNKNOWN.
+- **Waivers:** `compliance/vuln-waivers.json`, an array of `{id, package, reason, expires}`. `id` may be the
+  OSV id or any alias (CVE). Missing a field, or past `expires`, waives nothing.
+- **CI:** the `test` job runs `node --test tools/vuln-scan.test.mjs` always, and the scan when the repository
+  variable `VULN_DB_DIR` names a snapshot on the runner. Without it the step logs a *NOT SCANNED* warning — a
+  hosted runner has no snapshot, so today the scan is wired but has never run against real data.
+
+**Snapshot refresh procedure (on a connected host, then carry the directory in):**
+
+1. Download the OSV Maven ecosystem export: `https://osv-vulnerabilities.storage.googleapis.com/Maven/all.zip`
+   (one JSON record per advisory; size not measured here).
+2. `mkdir -p osv-maven && unzip -q all.zip -d osv-maven`
+3. Write `osv-maven/snapshot.json`: `{"taken":"YYYY-MM-DD","source":"osv.dev Maven all.zip"}`.
+4. Record `sha256sum all.zip` with the transfer, carry `osv-maven/` across the air gap, and verify the hash.
+5. Point `VULN_DB_DIR` at it and run `node tools/vuln-scan.mjs`. Refresh at least every 30 days — older
+   snapshots are refused.

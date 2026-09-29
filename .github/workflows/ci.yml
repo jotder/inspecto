@@ -494,6 +494,25 @@ jobs:
       - name: Guard — dependency review (lockfile diff)
         run: node tools/check-dependencies.mjs
 
+      # Offline vulnerability scan (ASSURE-OPERABILITY-1, D-P3). tools/vuln-scan.mjs matches every coordinate
+      # in tools/dependencies.lock against an OSV-format DB SNAPSHOT supplied at $VULN_DB_DIR — mirrored on a
+      # connected host and carried in (okf/backend/build-run/operations.md, "Offline vulnerability scan"); it
+      # never downloads anything. Fails on an unwaived HIGH/CRITICAL (or UNKNOWN-severity) finding; waivers
+      # live in compliance/vuln-waivers.json with a reason and an expiry. The self-test always runs.
+      # ⚠ A hosted runner carries no snapshot, so without the VULN_DB_DIR repository variable the scan is
+      # reported NOT SCANNED as a warning — that is not a pass, and the release checklist must not treat it
+      # as one. Point VULN_DB_DIR at the snapshot on a self-hosted runner to make it a gate.
+      - name: Guard — offline vulnerability scan (OSV snapshot)
+        env:
+          VULN_DB_DIR: ${{ vars.VULN_DB_DIR }}
+        run: |
+          node --test tools/vuln-scan.test.mjs
+          if [ -n "$VULN_DB_DIR" ]; then
+            node tools/vuln-scan.mjs
+          else
+            echo "::warning::vulnerability scan NOT SCANNED — no VULN_DB_DIR snapshot on this runner"
+          fi
+
       - name: Upload test reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
