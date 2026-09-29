@@ -95,7 +95,7 @@ paid for violating them.
 
 - [`api/`](api/README.md) — **machine-readable v1 HTTP contract**: `openapi-v1.json` + canonical `examples/`,
   enforced by `ApiContractTest`; `schemas/` (metadata-bundle JSON Schema + samples).
-- [`ops/`](ops/) — operational runbooks: backup/restore, UAT seeding, maintenance, secret rotation.
+- [`ops/`](ops/) — operational runbooks: backup/restore, UAT seeding, maintenance, secret rotation, and the T4 [HA/DR drill runbook](ops/ha-dr-drill-runbook.md) (runbook; drill NOT yet run).
 - [`ui/accessibility-audit.md`](ui/accessibility-audit.md) — the **living** inspecto-ui WCAG/a11y findings
   register (referenced by `okf/frontend/conventions/accessibility.md`).
 - [`../compliance/`](../compliance/) — the NFR-7 compliance tree (repo root, shipped in the deploy bundle's
