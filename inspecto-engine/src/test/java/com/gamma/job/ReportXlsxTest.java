@@ -27,9 +27,10 @@ class ReportXlsxTest {
 
     @Test
     void neutralisesEveryFormulaLead() {
-        for (String s : List.of("=1+1", "+1", "-1", "@SUM(A1)", "\tx", "\rx"))
+        for (String s : List.of("=1+1", "+1", "-1", "@SUM(A1)", "\tx", "\rx", "\n=x", "  =x", " \r\n\t@x",
+                "\uFF1D1+1", "\uFF0B1", "\uFF0D1", "\uFF20SUM(A1)", "|calc", "%x", " |calc", "\n\n+1"))
             assertEquals("'" + s, ReportXlsx.neutralise(s), s);
-        for (String s : List.of("plain", "a=b", "1-2", "", "'quoted"))
+        for (String s : List.of("plain", "a=b", "1-2", "", "'quoted", "   ", " a|b", "50%", "\nplain"))
             assertEquals(s, ReportXlsx.neutralise(s), s);
         assertNull(ReportXlsx.neutralise(null));
     }

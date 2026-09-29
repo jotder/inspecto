@@ -38,12 +38,23 @@ final class ReportXlsx {
 
     private ReportXlsx() {}
 
-    /** Prefix a text value a spreadsheet would read as a formula with {@code '}; anything else unchanged. */
+    /**
+     * Prefix a text value a spreadsheet would read as a formula with {@code '}; anything else unchanged. A leading
+     * tab or CR is itself a lead (OWASP), and otherwise the first NON-WHITESPACE character decides, since readers
+     * strip leading spaces, tabs, CR and LF before parsing. The leads are the ASCII {@code = + - @}, their
+     * fullwidth forms {@code ＝ ＋ － ＠} (some readers fold them), and {@code |} / {@code %} (DDE and legacy-macro
+     * leads). A value that is all spaces is left alone.
+     */
     static String neutralise(String s) {
         if (s == null || s.isEmpty()) return s;
-        char c = s.charAt(0);
-        return (c == '=' || c == '+' || c == '-' || c == '@' || c == '\t' || c == '\r') ? "'" + s : s;
+        if (s.charAt(0) == '\t' || s.charAt(0) == '\r') return "'" + s;
+        int i = 0;
+        while (i < s.length() && Character.isWhitespace(s.charAt(i))) i++;
+        if (i == s.length()) return s;
+        return FORMULA_LEADS.indexOf(s.charAt(i)) >= 0 ? "'" + s : s;
     }
+
+    private static final String FORMULA_LEADS = "=+-@|%\uFF1D\uFF0B\uFF0D\uFF20";
 
     /** Write {@code rows} to {@code target} as a one-sheet workbook with a header row. */
     static void write(String sheet, List<Map<String, Object>> rows, Path target) throws Exception {

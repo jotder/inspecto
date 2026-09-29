@@ -261,7 +261,7 @@ class ReportJobDeliveryTest {
     @Test
     void csvTextCellsAreFormulaNeutralised(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
         new ViewStore(writeRoot.resolve("views")).write(new ViewDefinition("notes_view", "flow-x", List.of(),
-                "SELECT * FROM (VALUES ('=HYPERLINK(1)', 1), ('@x', 2), ('ok', -3)) AS t(note, n)",
+                "SELECT * FROM (VALUES ('=HYPERLINK(1)', 1), ('@x', 2), ('ok', -3), ('  |calc', 4), ('＝1', 5)) AS t(note, n)",
                 "2026-07-08T00:00:00Z"));
         new ComponentStore(writeRoot.resolve("registry")).write("dataset", "notes_ds", Map.of("view", "notes_view"));
         System.setProperty("assist.write.root", writeRoot.toString());
@@ -274,6 +274,7 @@ class ReportJobDeliveryTest {
         try (Stream<Path> files = Files.list(outDir)) { artifact = files.findFirst().orElseThrow(); }
         String csv = Files.readString(artifact);
         assertTrue(csv.contains("'=HYPERLINK(1),1") && csv.contains("'@x,2"), csv);
+        assertTrue(csv.contains("'  |calc,4") && csv.contains("'＝1,5"), csv);
         // a NUMBER is never prefixed — -3 is a value, and prefixing it would break every numeric reader
         assertTrue(csv.contains("ok,-3"), csv);
     }
