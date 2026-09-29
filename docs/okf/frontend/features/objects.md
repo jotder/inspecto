@@ -231,8 +231,83 @@ the real ControlApi.
   * 🔴 **ACCEPTANCE OWED (D10) — the BACKLOG row does NOT close on this build.** It closes on ONE think-aloud
     session with a real Case-desk lead doing, unaided: T2 add a "Root cause category" dropdown · T6 show a
     field only when Disposition = Recovered · T7 preview before saving · T5 remove a field. Record pass/fail per
-    task **here**, with the date and the lead's role. Not yet run.
+    task **here**, with the date and the lead's role. A real lead has not run it yet. ✅ **Accepted on PROXY 2026-09-29 (operator)**: see *Proxy acceptance session 2026-09-29* below. The real session is BACKLOG P3 `D6-REAL-USER-SESSION-1`.
 
 As-built designs (archived):
 [`incidents-mail-ui-design.md`](../../../archived-documents/plans-archive/incidents-mail-ui-design.md) ·
 [`case-management-design.md`](../../../archived-documents/plans-archive/case-management-design.md).
+
+## Proxy acceptance session 2026-09-29
+
+> ⚠ **This was a PROXY, not a real user.** An AI agent played a Case-desk lead who is not an engineer. The
+> operator accepted D6 on this basis on 2026-09-29. It does **not** replace the design's D10 criterion, a
+> think-aloud session with a real Case-desk lead, which stays owed as BACKLOG P3 `D6-REAL-USER-SESSION-1`. A proxy
+> already knows what a Findings spec is, so it under-reports confusion. Treat the findings below as a floor.
+
+**Setup.** An `origin/master` `4dbe84d1a` worktree, built with `package.ps1 -Edition Enterprise -DemoAuth`. The
+committed `demo` Space was copied into the bundle, with a bundle-local `demo-users.toon`: *Demo Case Lead*
+(`operations`, which holds `canManageIncidents`) and *Demo Business Viewer* (`business`, which does not). The
+server ran on `:8097`, because `:8080` was held by a process this session did not start. The browser pane stayed
+at desktop size (1280×720).
+
+**Task.** Design a Findings form for a "SIM-box fraud" Case from scratch. It needs a required *Confirmed loss
+(SAR)*, a choice *Recovery route* (bar / refund / write-off), and *Notes* shown only when Recovery route =
+write-off. Then open a Case, fill the form, save it, and check that a missing required field blocks save.
+
+**Think-aloud (the proxy lead's own words, condensed).**
+1. *"I want the form for SIM-box cases. Case Manager has a row of icons, and one is labelled 'Findings fields
+   (what your team records)'. That must be it."* The dialog opened with the badge **Built-in** and the text "A
+   change applies to every Case". *"So I can't make one just for SIM-box. Every Case gets these questions. I'll
+   add mine and accept that."* → `FINDINGS-PER-CASE-TYPE-1`.
+2. *"Add field. It's called 'New field' and I type over it. Kind of answer: Number, since it's money. Is there a
+   currency? No, a number will do."* *Must be filled in* was easy to find, and the preview showed
+   "Confirmed loss (SAR)*" straight away. *"Good. That's what my team will see."*
+3. *"Recovery route: choose one from a list. Add choice. I typed 'bar' and it went into the NAME."* →
+   `FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1`. *"I fixed the name and typed bar, refund, write-off into the three
+   boxes. Now it says '1 problem to fix before saving: Recovery route has a choice with no name'. All three have
+   names, I can see them! Save is greyed out."* Under Technical details the stored values read `BAR, CHOICE,
+   WRITE_OFF`. After clicking another field and coming back, Choice 2 was **empty**. Retyping it fixed the
+   problem. *"I'd have given up, or called IT."* → `FINDINGS-EDITOR-CHOICE-BINDING-1` (**P2**, blocks the task).
+4. *"Notes: long text. 'Show only when another field has an answer': Recovery route, is, write-off."* The field
+   picker lists only fields above, and leaves out the Number field, as designed. The condition word shows as
+   "i.". *"Fine, I can guess."* In the preview, choosing write-off made Notes appear, and choosing another
+   route hid it. *"That's exactly what I wanted."* Save closed the dialog with a "saved" toast.
+5. *"Open a Case. New case needs a Linked entity, and 'no existing objects to link to yet'. I'll make an
+   Incident first. New incident needs a linked entity too."* **Dead end.** → `CASE-FIRST-OBJECT-DEAD-END-1`.
+   *(Proxy deviation: an admin Demo User applied a `create-incident` Decision Rule over the API to seed one
+   Incident. This is the only step not done in the UI.)* After that, New case → link the Incident → Create
+   worked. The toast showed the raw id `Created CASE CASE-85fd…`.
+6. *"In the Case, Findings shows my fields and Save findings is greyed out. I clicked into Confirmed loss and
+   left it: 'Confirmed loss (SAR) is required'. Clear."* Filling in 125000 enabled Save. Choosing write-off made
+   Notes appear. Save findings showed "Findings saved". To reach the form I had to scroll, and the whole page
+   moved, leaving a blank strip at the top. → `CASE-DETAIL-DOCUMENT-SCROLL-1`.
+7. Signed in as *Demo Business Viewer*: the same dialog opened with "View only — Changing the Findings fields
+   needs permission to manage Incidents and Cases". Every editor input was disabled, and only *Close* and the
+   preview remained. *"Makes sense."*
+
+**Verified outside the think-aloud:**
+* The stored spec (`registry/findings-specs`) has `confirmedLossSar` of type `number` with `required: true`, and
+  `recoveryRoute` with values `BAR/REFUND/WRITE_OFF`. `notes` has `dependsOn {key: recoveryRoute, equals:
+  WRITE_OFF}`, and `owner: case.lead`.
+* The Case's `attributes.findings` holds `confirmedLossSar 125000`, `recoveryRoute WRITE_OFF` and the notes.
+* `PUT /objects/{id}/findings` with no `confirmedLossSar` → **422**.
+* Network calls seen: `GET components/findings-spec/case` 404 (built-in), `POST components/findings-spec` 200, and
+  `PUT …/findings` 200.
+
+**Result per step:** design the form: **PASS with help** (the P2 choice defect needed a workaround the
+lead would not find). Conditional Notes: **PASS**. Preview: **PASS**. Open a Case: **FAIL in an empty Space**
+(went through only via an API-seeded Incident). Fill + save: **PASS**. A missing required field blocks save:
+**PASS** (client inline error, and server 422). View-only: **PASS**.
+
+| # | Finding | Severity | Row |
+|---|---|---|---|
+| 1 | Text typed into a choice box that was on screen before a later *Add choice* is silently lost; the dialog reports "a choice with no name" while the box shows text | **P2** (blocks) | `FINDINGS-EDITOR-CHOICE-BINDING-1` |
+| 2 | Neither New case nor New incident can be created in a Space with no objects (mandatory link); the only guidance is "one must exist" | P3 (product decision; blocked the proxy) | `CASE-FIRST-OBJECT-DEAD-END-1` |
+| 3 | One Findings form for every Case, so a "SIM-box" form has no home; loss can only be a plain Number and is separate from *Impact* | P3 (concept / wording) | `FINDINGS-PER-CASE-TYPE-1` |
+| 4 | *Add choice* leaves focus in *Name*, so the next keystrokes rename the field | P3 | `FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1` |
+| 5 | Radios are announced as "required"/"optional"; the condition word is truncated to "i."; *Technical details* (regex) stays open across fields | P3 (wording / a11y) | `FINDINGS-EDITOR-WORDING-1` |
+| 6 | The Case detail panel does not scroll by itself; the whole document scrolls (blank band) and the list is squeezed to about 130 px | P3 | `CASE-DETAIL-DOCUMENT-SCROLL-1` |
+| 7 | The create toast shows the raw id `CASE-<uuid>`; the built-in *Records affected* is Short text, not Number | cosmetic, not filed | — |
+
+Screenshots (session scratchpad, not committed): `d6-01` … `d6-12`. The Case-panel steps were checked
+in the DOM, because the pane's capture drew a blank band once the document had scrolled.
