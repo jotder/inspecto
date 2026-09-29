@@ -254,7 +254,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
 
             List<Plan> plans = new ArrayList<>();
             Set<String> tables = new HashSet<>();
-            try (Connection duck = DriverManager.getConnection("jdbc:duckdb:")) {
+            try (Connection duck = com.gamma.util.DuckDbUtil.openInMemory(com.gamma.util.DuckDbUtil.spillDirUnder(Path.of(dataDir)))) {
                 for (String id : datasets) {
                     Map<String, Object> ds = store.get("dataset", id).map(ComponentRegistry.Component::content)
                             .orElse(null);
