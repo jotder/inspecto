@@ -792,6 +792,73 @@ class ControlApiPendingChangesTest {
         return id;
     }
 
+    // ── round 5: an approval counts only if its HMAC-signed Pending Change agrees ────────────────────
+
+    @SuppressWarnings("unchecked")
+    private static void editApproval(Ctx c, String job, java.util.function.Consumer<Map<String, Object>> edit) throws Exception {
+        Path f = c.root.resolve(com.gamma.job.AttachApprovals.FILE);
+        Map<String, Object> all = JSON.readValue(f.toFile(), Map.class);
+        edit.accept(all);
+        Files.write(f, JSON.writeValueAsBytes(all));
+    }
+
+    @Test
+    void aCopiedForgedOrUnbackedApprovalRecordIsNeverHonoured(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        try (Ctx c = open(cfg, root)) {
+            seedDataset(root, "SELECT 1 AS n");
+            String id = proposeAndApprove(c, "POST", "/jobs", DS_REPORT);
+            assertTrue(liveApproved(c), "the genuine approval verifies");
+            Map<String, Object> genuine = new java.util.LinkedHashMap<>(approvalOf(c));
+
+            // (1) a forged nonce
+            editApproval(c, "mailer", all -> ((Map<String, Object>) all.get("mailer")).put("nonce", "00ff"));
+            assertFalse(liveApproved(c), "forged nonce");
+            editApproval(c, "mailer", all -> all.put("mailer", genuine));
+            assertTrue(liveApproved(c));
+
+            // (2) a record whose fingerprint was edited to match content nobody approved
+            seedDataset(root, "SELECT secret FROM everything");
+            com.gamma.job.JobConfig loaded = c.svc.jobServiceOrCreate().jobConfig("mailer").orElseThrow();
+            String now = com.gamma.job.AttachApprovals.fingerprint(loaded, root);
+            editApproval(c, "mailer", all -> ((Map<String, Object>) all.get("mailer")).put("fingerprint", now));
+            assertFalse(liveApproved(c), "the signed Pending Change fixed a different fingerprint");
+            seedDataset(root, "SELECT 1 AS n");
+            editApproval(c, "mailer", all -> all.put("mailer", genuine));
+
+            // (3) a record copied onto another Job, fingerprint recomputed for it
+            Map<String, Object> other = new java.util.LinkedHashMap<>(com.gamma.job.AttachApprovals.asSection(loaded));
+            other.put("name", "mailer2");
+            String otherFp = com.gamma.job.AttachApprovals.fingerprint(other, root);
+            editApproval(c, "mailer2", all -> {
+                Map<String, Object> copy = new java.util.LinkedHashMap<>(genuine);
+                copy.put("fingerprint", otherFp);
+                all.put("mailer2", copy);
+            });
+            assertFalse(com.gamma.job.AttachApprovals.approved(root, "mailer2", otherFp), "a copied record");
+
+            // (4) the Pending Change edited on disk (it cannot be re-signed): its MAC fails
+            Path pcFile;
+            try (var files = Files.walk(root)) {
+                pcFile = files.filter(p -> p.getFileName().toString().startsWith(id)).findFirst().orElseThrow();
+            }
+            String signed = Files.readString(pcFile);
+            Files.writeString(pcFile, signed.replace("checker-1", "checker-2"));
+            assertFalse(liveApproved(c), "a re-signed (edited) Pending Change fails its MAC");
+            Files.writeString(pcFile, signed);
+            assertTrue(liveApproved(c));
+
+            // (5) a withdrawn / non-approved Pending Change backs nothing
+            Map<String, Object> pc = JSON.readValue(signed, Map.class);
+            pc.put("status", "withdrawn");
+            PendingChanges.save(root, pc);   // a genuinely signed record, but not approved
+            assertFalse(liveApproved(c), "a withdrawn Pending Change");
+        } finally {
+            System.clearProperty("jobs.audit.dir");
+        }
+    }
+
     /** Finding 1: a write landing between proposal and approve (here, the view's SQL) is never blessed — 409. */
     @Test
     void aRaceWriteBetweenProposalAndApproveIsNotBlessed(@TempDir Path cfg, @TempDir Path tmp) throws Exception {

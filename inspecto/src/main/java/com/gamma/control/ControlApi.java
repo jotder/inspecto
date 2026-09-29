@@ -302,10 +302,13 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                     .orElse(java.util.Set.of());
             com.gamma.job.PublicationApproval.sweep(root, live);
         }
+        // ASSURE-XLSX-ATTACHMENTS-1 round 5: an attachment approval counts only if its signed Pending Change agrees.
+        com.gamma.job.AttachApprovals.installVerifier(attachVerifier);
     }
 
     private final com.gamma.job.PostgresPublishJobType.ApprovalVerifier publishVerifier =
             PendingChangeRoutes::verifyPublicationApproval;
+    private final com.gamma.job.AttachApprovals.Verifier attachVerifier = PendingChangeRoutes::verifyAttachApproval;
 
     private final com.gamma.job.JobService.RunAuthority runAuthority = JobAuthority.runAuthority(this::writeRoot);
     private final com.gamma.job.PostgresPublishJobType.Authority publishAuthority = JobAuthority.publishAuthority(this::writeRoot);
@@ -451,6 +454,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             com.gamma.job.PostgresPublishJobType.installAuthority(null);
         if (com.gamma.job.PostgresPublishJobType.approvalVerifier() == publishVerifier)
             com.gamma.job.PostgresPublishJobType.installApprovalVerifier(null);
+        if (com.gamma.job.AttachApprovals.verifier() == attachVerifier) com.gamma.job.AttachApprovals.installVerifier(null);
         // Only clear the loopback URL if it still points at us (a later ControlApi in the same JVM may
         // have re-published its own — don't strip a live one out from under it).
         String mine = "http://127.0.0.1:" + port();

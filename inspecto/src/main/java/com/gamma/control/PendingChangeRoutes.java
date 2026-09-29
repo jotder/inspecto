@@ -425,7 +425,28 @@ final class PendingChangeRoutes implements RouteModule {
     private static void recordAttachApproval(java.nio.file.Path root, Map<String, Object> rec, String by)
             throws java.io.IOException {
         if (!(rec.get("attachFingerprint") instanceof String fp)) return;
+        String nonce = com.gamma.job.AttachApprovals.newNonce();
+        rec.put("attachNonce", nonce);   // saved with the approved record right after (MAC'd)
         com.gamma.job.AttachApprovals.record(root, JobWriteGuard.name((Map<?, ?>) rec.get("proposed")), fp,
-                String.valueOf(rec.get("id")), by);
+                String.valueOf(rec.get("id")), by, nonce);
+    }
+
+    /**
+     * The {@link com.gamma.job.AttachApprovals.Verifier} the control plane installs (round 5): an approval record is
+     * honoured only if the Pending Change it names exists under this config root, passes its MAC check, is
+     * {@code approved}, is for that Job, carries the same {@code attachNonce}, and fixed the same fingerprint.
+     */
+    static boolean verifyAttachApproval(java.nio.file.Path root, String job, Map<String, Object> record) {
+        Object id = record.get("pendingChange"), nonce = record.get("nonce"), fp = record.get("fingerprint");
+        if (id == null || nonce == null || fp == null || job == null) return false;
+        try {
+            Map<String, Object> pc = PendingChanges.read(root, String.valueOf(id));
+            return pc != null && !PendingChanges.invalid(pc) && "approved".equals(pc.get("status"))
+                    && String.valueOf(nonce).equals(String.valueOf(pc.get("attachNonce")))
+                    && String.valueOf(fp).equals(String.valueOf(pc.get("attachFingerprint")))
+                    && pc.get("proposed") instanceof Map<?, ?> proposed && job.equals(JobWriteGuard.name(proposed));
+        } catch (RuntimeException | java.io.IOException unreadable) {
+            return false;
+        }
     }
 }

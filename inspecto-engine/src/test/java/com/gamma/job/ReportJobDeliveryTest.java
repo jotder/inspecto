@@ -24,7 +24,12 @@ class ReportJobDeliveryTest {
     @AfterEach
     void clearRoot() {
         System.clearProperty("assist.write.root");
+        AttachApprovals.installVerifier(null);
     }
+
+    /** Stands in for the control plane's verifier: honours only the Pending Change this test "approved". */
+    private static final AttachApprovals.Verifier STUB = (root, job, rec) ->
+            "pc-test".equals(rec.get("pendingChange")) && "n-test".equals(rec.get("nonce"));
 
     private static void seedSales(Path writeRoot) throws Exception {
         new ViewStore(writeRoot.resolve("views")).write(new ViewDefinition("sales_view", "flow-x", List.of(),
@@ -226,7 +231,8 @@ class ReportJobDeliveryTest {
 
     /** What the approve path records: the fingerprint of the Job as loaded. */
     private static void approve(JobConfig cfg, Path writeRoot) throws Exception {
-        AttachApprovals.record(writeRoot, cfg.name(), AttachApprovals.fingerprint(cfg, writeRoot), "pc-test", "checker-1");
+        AttachApprovals.record(writeRoot, cfg.name(), AttachApprovals.fingerprint(cfg, writeRoot), "pc-test", "checker-1", "n-test");
+        AttachApprovals.installVerifier(STUB);
     }
 
     @Test
@@ -279,6 +285,32 @@ class ReportJobDeliveryTest {
         new ComponentStore(writeRoot.resolve("registry")).write("dataset", "sales_ds",
                 Map.of("view", "sales_view", "description", "now reads something else"));
         assertThrows(IllegalStateException.class, () -> new ReportJob(job(attachParams(outDir)), null).run(ctxWith(mail)));
+        assertNull(mail.to);
+    }
+
+    /** Round 5: with no verifier installed (no control plane), even a matching record attaches nothing. */
+    @Test
+    void withNoVerifierInstalledAnApprovedJobRefuses(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        JobConfig cfg = job(attachParams(outDir));
+        approve(cfg, writeRoot);
+        AttachApprovals.installVerifier(null);
+        RecordingMail mail = new RecordingMail();
+        assertThrows(IllegalStateException.class, () -> new ReportJob(cfg, null).run(ctxWith(mail)));
+        assertNull(mail.to);
+    }
+
+    /** Round 5: a record the verifier rejects (a forged nonce) refuses though its fingerprint matches. */
+    @Test
+    void aForgedNonceRefuses(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
+        seedSales(writeRoot);
+        System.setProperty("assist.write.root", writeRoot.toString());
+        JobConfig cfg = job(attachParams(outDir));
+        approve(cfg, writeRoot);
+        AttachApprovals.record(writeRoot, cfg.name(), AttachApprovals.fingerprint(cfg, writeRoot), "pc-test", "x", "forged");
+        RecordingMail mail = new RecordingMail();
+        assertThrows(IllegalStateException.class, () -> new ReportJob(cfg, null).run(ctxWith(mail)));
         assertNull(mail.to);
     }
 

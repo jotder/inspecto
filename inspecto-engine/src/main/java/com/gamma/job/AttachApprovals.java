@@ -143,14 +143,14 @@ public final class AttachApprovals {
     }
 
     /** Record {@code fingerprint} as Job {@code name}'s approved attachment version, bound to its Pending Change. */
-    public static void record(Path root, String name, String fingerprint, String pendingChangeId, String approvedBy)
-            throws IOException {
+    public static void record(Path root, String name, String fingerprint, String pendingChangeId, String approvedBy,
+                              String nonce) throws IOException {
         synchronized (LOCK) {
             Map<String, Object> all = read(root);
             Map<String, Object> entry = new LinkedHashMap<>();
             entry.put("fingerprint", fingerprint);
             entry.put("pendingChange", pendingChangeId);
-            entry.put("nonce", HexFormat.of().formatHex(nonce()));
+            entry.put("nonce", nonce);
             entry.put("approvedBy", approvedBy);
             entry.put("approvedAt", Instant.now().toString());
             all.put(name, entry);
@@ -180,14 +180,36 @@ public final class AttachApprovals {
 
     /** Whether {@code fingerprint} is Job {@code name}'s approved attachment version. */
     public static boolean approved(Path root, String name, String fingerprint) {
-        return approval(root, name).map(a -> fingerprint.equals(a.get("fingerprint"))).orElse(false);
+        Verifier v = verifier;
+        return approval(root, name)
+                .filter(a -> fingerprint.equals(a.get("fingerprint")))
+                .filter(a -> v != null && v.verify(root, name, a))   // no verifier installed: fail closed
+                .isPresent();
     }
 
-    private static byte[] nonce() {
+    /** A fresh approval nonce (hex), written into BOTH the MAC'd Pending Change and the approval record. */
+    public static String newNonce() {
         byte[] b = new byte[16];
         RANDOM.nextBytes(b);
-        return b;
+        return HexFormat.of().formatHex(b);
     }
+
+    /**
+     * Round 5: the approval file alone proves nothing — it can be copied or computed. An approval record is honoured
+     * only when the installed verifier (the control plane's, over its HMAC-signed Pending Change store) confirms the
+     * Pending Change it names exists, verifies, is approved, is for this Job, carries the same nonce, and fixed the
+     * same fingerprint. With none installed (an engine with no control plane) nothing attaches.
+     */
+    @FunctionalInterface
+    public interface Verifier {
+        boolean verify(Path root, String job, Map<String, Object> record);
+    }
+
+    private static volatile Verifier verifier;
+
+    public static void installVerifier(Verifier v) { verifier = v; }
+
+    public static Verifier verifier() { return verifier; }
 
     @SuppressWarnings("unchecked")
     private static Map<String, Object> read(Path root) throws IOException {

@@ -645,7 +645,20 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
   the AUTHORED config only, never trigger args or a bound Signal. The write-time holds stay as the friendly
   path. As defence in depth an import refuses a `*_job_template.toon` whose report block carries any
   `attach` but a literal false (a `${placeholder}` included).
-  ⚠ Someone with shell access to the config root can still forge `attach-approvals.json`, as they could any file.
+  🔴 **Round 5: the approval file proves nothing on its own.** Approve writes a random `attachNonce` into the
+  approved Pending Change (HMAC-signed by `PendingChanges.save`) AND into the approval record. At run time
+  `AttachApprovals.approved` also asks the installed `AttachApprovals.Verifier`, which the control plane
+  installs as `PendingChangeRoutes.verifyAttachApproval`. It honours the record only if the Pending Change it
+  names:
+  - exists and passes its MAC;
+  - is `approved`;
+  - is for this Job;
+  - carries the same nonce;
+  - fixed the same `attachFingerprint`.
+
+  With no verifier installed, i.e. no control plane, nothing attaches (fail closed). A copied record, a forged
+  nonce, a fingerprint edited to match, an edited Pending Change (its MAC fails) and a withdrawn one all
+  refuse (`ControlApiPendingChangesTest.aCopiedForgedOrUnbackedApprovalRecordIsNeverHonoured`).
   🔴 **Round 4: the approval is pinned to content fixed at HOLD time** (the `publish.postgres` lane's
   `PublicationApproval` shape; a P2 row will merge the two into one mechanism once both lanes land).
   `AttachApprovals.fingerprint` hashes ONLY what decides what is sent and to whom:
