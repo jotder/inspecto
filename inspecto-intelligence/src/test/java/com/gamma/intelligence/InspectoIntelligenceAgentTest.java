@@ -134,6 +134,23 @@ class InspectoIntelligenceAgentTest {
     }
 
     @Test
+    void theRealBeltsAuthoringAndRowReadingToolsRequireCanAuthorWorkbench() {
+        // 2026-09-29: POST /agent/tools/{name} and /derive enforce this per tool. Read off the REAL belt,
+        // so a tool that changes its declared capability (or a new row reader) is caught here.
+        InspectoIntelligenceAgent agent = open(StubLlmGateway.builder().defaultReplyText("unused").build());
+        try {
+            for (String tool : List.of("component_draft", "query_author", "projection_author",
+                    "kpi_report_builder", "pipeline_author", "anomaly_scan", "suggest_expectations")) {
+                assertEquals(java.util.Optional.of("canAuthorWorkbench"), agent.toolCapability(tool), tool);
+            }
+            assertTrue(agent.toolCapability("glossary_lookup").isEmpty(), "a docs read needs no capability");
+            assertTrue(agent.toolCapability("no_such_tool").isEmpty(), "unknown stays empty, so the route 404s");
+        } finally {
+            agent.close();
+        }
+    }
+
+    @Test
     void runToolOnAnUnknownToolIsEmpty() {
         InspectoIntelligenceAgent agent = open(StubLlmGateway.builder().defaultReplyText("unused").build());
         try {

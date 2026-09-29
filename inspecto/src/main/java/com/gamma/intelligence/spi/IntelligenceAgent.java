@@ -102,6 +102,18 @@ public interface IntelligenceAgent extends AutoCloseable {
     }
 
     /**
+     * The control-plane capability (for example {@code canAuthorWorkbench}) a caller must hold to invoke the
+     * named tool through {@code POST /agent/tools/{name}} or its {@code /derive} sibling. The value is
+     * derived from the capability the tool itself DECLARES. The route enforces it before
+     * {@link #runTool} / {@link #deriveTool} run. Empty when the tool is unknown (the route then answers 404)
+     * or needs nothing beyond an authenticated caller. Default empty, matching {@link #runTool}'s default of
+     * exposing no tools.
+     */
+    default Optional<String> toolCapability(String name) {
+        return Optional.empty();
+    }
+
+    /**
      * {@link #runTool}, but the arguments come from <b>one operator sentence</b> (AGT-6a A5.1). The model
      * produces the tool's arguments and nothing else; the tool then runs through the same deterministic
      * path, so every property of {@code runTool} — draft-only, result verbatim, no paraphrase — survives.

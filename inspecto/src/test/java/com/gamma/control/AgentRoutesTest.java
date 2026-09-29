@@ -428,6 +428,45 @@ class AgentRoutesTest {
 
     // ─── AGT-6a A1: POST /agent/tools/{name} — one test per gate, plus the happy path ───
 
+    /**
+     * 2026-09-29 (operator decision): each tool's DECLARED capability is enforced on both dispatch routes. A
+     * read-only Subject is refused every gated tool on /tools and /derive; the gate runs before the tool, so
+     * nothing is invoked. An author passes. Without this, any signed-in caller could author or scan rows.
+     */
+    @Test
+    void aReadOnlySubjectIsRefusedEveryGatedToolOnBothDispatchRoutes(@TempDir Path dir) throws Exception {
+        Authenticator fake = ex -> {
+            String auth = ex.getRequestHeaders().getFirst("Authorization");
+            if ("Bearer reader".equals(auth)) return java.util.Optional.of(new Subject("reader", java.util.Set.of()));
+            if ("Bearer author".equals(auth)) return java.util.Optional.of(new Subject("author", java.util.Set.of("canAuthorWorkbench")));
+            return java.util.Optional.empty();
+        };
+        FakeIntelligenceAgent agent = new FakeIntelligenceAgent();
+        Authenticators.forTest(fake);
+        try (Ctx ctx = open(dir, agent)) {
+            for (String tool : FakeIntelligenceAgent.GATED_TOOLS) {
+                assertEquals(403, sendAs(ctx.port(), "reader", "/agent/tools/" + tool, "{\"args\":{}}").statusCode(),
+                        "reader must be refused " + tool);
+                assertEquals(403, sendAs(ctx.port(), "reader", "/agent/tools/" + tool + "/derive",
+                        "{\"prompt\":\"amount over 100\"}").statusCode(), "reader must be refused " + tool + "/derive");
+            }
+            assertNull(agent.lastToolArgs, "the gate runs BEFORE the tool - nothing was invoked for the reader");
+            assertNull(agent.lastDerivePrompt, "the gate runs BEFORE the derive hop");
+            assertEquals(200, sendAs(ctx.port(), "author", "/agent/tools/component_draft",
+                    "{\"args\":{\"kind\":\"expectation\",\"config\":{}}}").statusCode(), "an author passes");
+            assertEquals(200, sendAs(ctx.port(), "author", "/agent/tools/query_author/derive",
+                    "{\"prompt\":\"amount over 100\"}").statusCode(), "an author passes /derive");
+        } finally {
+            Authenticators.forTest(null);
+        }
+    }
+
+    private HttpResponse<String> sendAs(int port, String who, String path, String body) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Content-Type", "application/json").header("Authorization", "Bearer " + who)
+                .POST(BodyPublishers.ofString(body)).build(), BodyHandlers.ofString());
+    }
+
     @Test
     void toolDispatchIs503WhenTheModuleIsAbsent(@TempDir Path dir) throws Exception {
         try (Ctx ctx = open(dir, null)) {
@@ -689,6 +728,15 @@ class AgentRoutesTest {
             return java.util.Optional.of(Map.of("ok", true,
                     "value", Map.of("type", "sql", "text", "SELECT * FROM orders WHERE amount > 100"),
                     "derivedArgs", derived));
+        }
+
+        // 2026-09-29: the per-tool gate. Mirrors ToolCapabilities for the real belt's authoring + row-reading tools.
+        static final List<String> GATED_TOOLS = List.of("component_draft", "query_author", "projection_author",
+                "kpi_report_builder", "anomaly_scan", "suggest_expectations");
+
+        @Override
+        public java.util.Optional<String> toolCapability(String name) {
+            return GATED_TOOLS.contains(name) ? java.util.Optional.of("canAuthorWorkbench") : java.util.Optional.empty();
         }
 
         @Override

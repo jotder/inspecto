@@ -265,6 +265,12 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
      * so an inline box can never become a second, ungated way to mutate state.
      */
     @Override
+    public Optional<String> toolCapability(String name) {
+        Tool tool = belt.get(name);
+        return tool == null ? Optional.empty() : com.gamma.intelligence.pack.ToolCapabilities.of(tool.spec());
+    }
+
+    @Override
     public Optional<Map<String, Object>> runTool(String name, Map<String, Object> args, String session) {
         Tool tool = belt.get(name);
         if (tool == null) return Optional.empty();

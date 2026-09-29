@@ -449,8 +449,8 @@ final class CapabilityManifest {
             new Exemption("POST", "/agent/sessions", "self-limiting", "opens a conversation; no tool runs without its own gate"),
             new Exemption("POST", "/agent/sessions/(.+)/ask", "self-limiting", "a question to the assistant; tools self-gate"),
             new Exemption("POST", "/agent/sessions/(.+)/ask/stream", "self-limiting", "streaming form of /ask"),
-            new Exemption("POST", "/agent/tools/(.+)", "self-limiting", "a tool call, each tool enforcing its own capability"),
-            new Exemption("POST", "/agent/tools/(.+)/derive", "self-limiting", "derives tool arguments; runs nothing"),
+            new Exemption("POST", "/agent/tools/(.+)", "self-limiting", "a tool call, gated per tool by the capability the tool declares (IntelligenceAgent.toolCapability)"),
+            new Exemption("POST", "/agent/tools/(.+)/derive", "self-limiting", "derives tool arguments, gated per tool like /agent/tools/(.+)"),
             new Exemption("POST", "/assist/(.+)", "self-limiting", "the skill-intent catch-all; dispatch only, the skill's own tools gate"),
             // grounded one at a time 2026-09-15 (audit §5 GROUNDED)
             new Exemption("POST", "/spaces", "recovery-route", "gated IN the handler: canAdminister whenever at least one Space is hosted; a server hosting zero Spaces must still answer it without one or recovery is bricked — pinned by ControlApiSpacesTest.authenticatedCreateSucceedsWhenNoSpaceIsHostedYet (2026-09-17: the unconditional form let any authenticated caller create Spaces on a populated server); a template carrying a KPI pack additionally needs canAuthorWorkbench on the same condition, and each KPI meets the /components/kpi save gate (403/422, nothing created — ControlApiSpaceTemplateKpiTest)"),

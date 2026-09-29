@@ -77,10 +77,10 @@ final class AgentRoutes implements RouteModule {
         // /agent/triage-runs/{id}/similar precedes /agent/triage-runs/(.+)).
         //
         // The model contributes ARGUMENTS ONLY; the tool then runs through the identical deterministic
-        // path, so this route adds a natural-language input, not a new way to act. It stays exactly as
-        // ungated as its A1 sibling — no Role, no Capability. ⚠ Do not add a half-gate here alone: the
-        // authoring gates are the UI's canAuthorWorkbench and the edition's write seam, and a gate on one
-        // of the two routes would be a false sense of security plus an inconsistency to explain.
+        // path, so this route adds a natural-language input, not a new way to act. Both routes enforce the
+        // same per-tool gate (operator decision 2026-09-29): the control-plane capability derived from the
+        // capability the tool DECLARES (IntelligenceAgent.toolCapability), checked before anything runs.
+        // Keep the two routes identical - a gate on only one would be a false sense of security.
         //
         // Three failures, three different answers, because conflating them misleads: no model configured
         // → 503 (a deployment fact, not a bad sentence) · malformed model output or no tool call → 422,
@@ -90,9 +90,11 @@ final class AgentRoutes implements RouteModule {
             Map<String, Object> body = api.body(e);
             String prompt = ApiContext.str(body, "prompt");
             if (prompt == null || prompt.isBlank()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "prompt is required");
+            IntelligenceAgent agent = agentOr503(api);
+            requireToolCapability(agent, tool, e);
             Map<String, Object> result;
             try {
-                result = agentOr503(api).deriveTool(tool, prompt, mapField(body.get("args")), actorOrOperator(e))
+                result = agent.deriveTool(tool, prompt, mapField(body.get("args")), actorOrOperator(e))
                         .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown tool: '" + tool + "'"));
             } catch (IllegalStateException mutating) {
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, mutating.getMessage());
@@ -117,9 +119,11 @@ final class AgentRoutes implements RouteModule {
         });
         api.post("/agent/tools/(.+)", (e, m) -> {
             String tool = ApiContext.name(m);
+            IntelligenceAgent agent = agentOr503(api);
+            requireToolCapability(agent, tool, e);
             Map<String, Object> result;
             try {
-                result = agentOr503(api).runTool(tool, mapField(api.body(e).get("args")), actorOrOperator(e))
+                result = agent.runTool(tool, mapField(api.body(e).get("args")), actorOrOperator(e))
                         .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown tool: '" + tool + "'"));
             } catch (IllegalStateException mutating) {
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, mutating.getMessage());
@@ -320,6 +324,14 @@ final class AgentRoutes implements RouteModule {
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
+    }
+
+    /**
+     * The per-tool gate for {@code /agent/tools/{name}} and {@code /derive}: 403 unless the caller holds the
+     * capability the named tool declares. A no-op without a Subject (Personal), like every capability gate.
+     */
+    private static void requireToolCapability(IntelligenceAgent agent, String tool, HttpExchange e) {
+        agent.toolCapability(tool).ifPresent(capability -> ApiContext.requireCapability(e, capability));
     }
 
     /** The in-process intelligence agent, or 503 when the optional module is absent. */
