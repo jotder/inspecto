@@ -750,6 +750,33 @@ class ControlApiPendingChangesTest {
         }
     }
 
+    /** Re-verification finding 2: /config/write and /config/patch reach the SAME mandatory hold (via PendingChanges.hold). */
+    @Test
+    void configWriteAndPatchCannotTurnAttachOnWithoutFourEyes(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        System.setProperty("jobs.audit.dir", tmp.resolve("jobs_audit").toString());
+        try (Ctx c = open(cfg, root)) {
+            String attaching = REPORT.replace("\"false\"", "\"true\"").replace("mailer", "held1");
+            JsonNode held = data(send(c, "POST", "/config/write", "{\"type\":\"job\",\"config\":{\"job\":" + attaching + "}}",
+                    AUTHOR), 202);
+            assertEquals("job", held.at("/pendingChange/kind").asText(), held.toString());
+            try (var files = Files.walk(root)) {
+                assertFalse(files.anyMatch(x -> x.getFileName().toString().equals("held1_job.toon")), "held: nothing written");
+            }
+
+            HttpResponse<String> plain = send(c, "POST", "/config/write", "{\"type\":\"job\",\"config\":{\"job\":" + REPORT + "}}", AUTHOR);
+            assertTrue(plain.statusCode() < 300 && plain.statusCode() != 202, plain.body());
+            data(send(c, "POST", "/config/patch", "{\"type\":\"job\",\"name\":\"mailer\",\"patch\":{\"job\":{\"attach\":\"true\"}}}",
+                    AUTHOR), 202);
+            try (var files = Files.walk(root)) {
+                for (Path f : files.filter(x -> x.getFileName().toString().equals("mailer_job.toon")).toList())
+                    assertFalse(Files.readString(f).contains("true"), "the held patch wrote nothing: " + Files.readString(f));
+            }
+        } finally {
+            System.clearProperty("jobs.audit.dir");
+        }
+    }
+
     @Test
     void aJobCreateAndUpdateAreHeldAndAppliedOnlyByASecondPerson(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         Path root = Files.createDirectories(tmp.resolve("config"));

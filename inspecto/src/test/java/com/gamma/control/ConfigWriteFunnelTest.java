@@ -132,7 +132,7 @@ class ConfigWriteFunnelTest {
     ));
 
     record Verdict(String route, boolean toon, boolean component, boolean saveGate, boolean hold, Path file,
-                   boolean holdsItself) {}
+                   boolean holdsItself, String closure) {}
 
     /** A real hold — not {@code holdRefusing*}, which refuses instead of recording a replayable request. */
     private static final Pattern REAL_HOLD = Pattern.compile("PendingChanges\\.hold\\(");
@@ -381,7 +381,7 @@ class ConfigWriteFunnelTest {
             out.add(new Verdict(site.group(1).toUpperCase(Locale.ROOT) + " " + site.group(2),
                     TOON_WRITE.matcher(closure).find(), COMPONENT_WRITE.matcher(closure).find(),
                     SAVE_GATE.matcher(closure).find(), HOLD.matcher(closure).find(), f,
-                    REAL_HOLD.matcher(closure).find()));
+                    REAL_HOLD.matcher(closure).find(), closure));
         }
     }
 

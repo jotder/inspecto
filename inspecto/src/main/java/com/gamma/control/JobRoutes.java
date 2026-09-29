@@ -253,23 +253,6 @@ final class JobRoutes implements RouteModule {
         return Map.of("logs", logs, "events", java.util.List.of());
     }
 
-    /**
-     * The mandatory four-eyes rule for a report Job that newly mails its artifact as an ATTACHMENT
-     * (ASSURE-XLSX-ATTACHMENTS-1, operator 2026-09-29): creating one with {@code attach: true}, or flipping an
-     * existing one to it, is always a Pending Change — with or without an approval policy for jobs. {@code null}
-     * when the write does not turn attachments on (an already-approved attach Job may be edited under the
-     * normal policy).
-     */
-    static ApprovalPolicy.Rule attachApproval(JobConfig next, JobConfig existing) {
-        if (!"report".equals(next.type()) || !attaches(next)) return null;
-        if (existing != null && "report".equals(existing.type()) && attaches(existing)) return null;
-        return new ApprovalPolicy.Rule(true, ApprovalPolicy.DEFAULT_APPROVER, true);
-    }
-
-    private static boolean attaches(JobConfig c) {
-        return "true".equalsIgnoreCase(String.valueOf(c.params().get("attach")).trim());
-    }
-
     /** {@code POST /jobs/{name}/enable|disable} — flip the persisted {@code enabled} flag; 404 if unknown. */
     private Object setEnabled(ApiContext api, HttpExchange ex, String name, boolean enabled) throws IOException {
         WriteGates.requireWriteRoot(api, "job write");
@@ -380,7 +363,7 @@ final class JobRoutes implements RouteModule {
         WriteGates.conflictIf(api.service().jobServiceOrCreate().jobs().stream()
                         .anyMatch(v -> v.name().equals(c.name())),
                 "job '" + c.name() + "' already exists (use PUT to update)");
-        PendingChanges.hold(api, ex, KIND, c.name(), c.toMap(), null, attachApproval(c, null));   // maker-checker (operator, 2026-09-28)
+        PendingChanges.hold(api, ex, KIND, c.name(), c.toMap(), null);   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
         return c.toMap();
     }
@@ -401,7 +384,7 @@ final class JobRoutes implements RouteModule {
         requireAdministerForEventPrune(ex, existing);   // turning an event_prune INTO something else, too
         requireAdministerForEventPrune(ex, c);
         if (!name.equals(c.name())) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body 'name' must match the path id");
-        PendingChanges.hold(api, ex, KIND, name, c.toMap(), existing.toMap(), attachApproval(c, existing));   // maker-checker (operator, 2026-09-28)
+        PendingChanges.hold(api, ex, KIND, name, c.toMap(), existing.toMap());   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
         ETags.set(ex, ETags.of(ContentHash.of(c.toMap())));
         return c.toMap();

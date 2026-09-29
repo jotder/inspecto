@@ -98,18 +98,6 @@ public final class PendingChanges {
      */
     public static void hold(ApiContext api, HttpExchange ex, String kind, String name,
                             Map<String, Object> proposed, Map<String, Object> current) throws IOException {
-        hold(api, ex, kind, name, proposed, current, null);
-    }
-
-    /**
-     * As {@link #hold(ApiContext, HttpExchange, String, String, Map, Map)}, with a {@code mandatory} rule for an
-     * APPROVAL-REQUIRED write: one held even when the Space has no policy for {@code kind}, because a policy is
-     * opt-in and the risk is not (a report Job turning {@code attach: true} on, ASSURE-XLSX-ATTACHMENTS-1, operator
-     * 2026-09-29). With a policy rule too, the stricter reading wins: the policy's approver, and four eyes always.
-     * {@code null} is exactly the plain hold.
-     */
-    static void hold(ApiContext api, HttpExchange ex, String kind, String name, Map<String, Object> proposed,
-                     Map<String, Object> current, ApprovalPolicy.Rule mandatory) throws IOException {
         if (ApiContext.attr(ex, ApiContext.ATTR_APPROVED_CHANGE) instanceof Map<?, ?> approved) {
             @SuppressWarnings("unchecked") Map<String, Object> pc = (Map<String, Object>) approved;
             verifyApproved(pc, kind, name, proposed, current);
@@ -123,6 +111,11 @@ public final class PendingChanges {
             publication = publicationFingerprints(api, proposed);
             rule = mandatoryRule(root, publicationName(proposed), current, publication, insecureTls(api, proposed));
         }
+        // An APPROVAL-REQUIRED write is held even with no policy for its kind, because a policy is opt-in and the
+        // risk is not — today one case: a report Job that attaches data (JobWriteGuard, ASSURE-XLSX-ATTACHMENTS-1).
+        // Here, inside the hold, so EVERY route that holds a job write gets it. With a policy rule too, the
+        // stricter reading wins: the policy's approver, and four eyes always.
+        ApprovalPolicy.Rule mandatory = JobWriteGuard.mandatory(kind, proposed, current);
         if (mandatory != null)
             rule = rule == null ? mandatory : new ApprovalPolicy.Rule(true, rule.approverCapability(), true);
         if (rule == null) return;
