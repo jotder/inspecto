@@ -197,8 +197,8 @@ the real ControlApi.
     which the code never did) — and the soft no-disposition prompt on resolve **only fires while
     `disposition` is a configured section**. `CASE_DISPOSITIONS` was removed from `mail-model.ts` — the
     ladder now lives in the backend default, which is its only home *(the offline mock backend was deleted 2026-08-31)*.
-* **Authoring UI — the *Findings fields* dialog (2026-09-25, BUILT; ⚠ ACCEPTANCE OWED).** Design + the ten
-  signed decisions: [`findings-spec-authoring-ui-design.md`](../../../superpower/findings-spec-authoring-ui-design.md).
+* **Authoring UI — the *Findings fields* dialog (2026-09-25, BUILT; accepted on proxy 2026-09-29).** Design + the ten
+  signed decisions (archived 2026-09-29): [`findings-spec-authoring-ui-design.md`](../../../archived-documents/plans-archive/findings-spec-authoring-ui-design.md).
   A toolbar icon in the Cases pane (beside Case rules, D4) opens `FindingsSpecEditorDialog`
   (`objects/findings-spec-editor.dialog.ts`) for the Case spec only (D2 — the dialog takes `data.objectType`, so
   Incident is a one-line entry if a panel ever renders it). All rules live in the framework-free
@@ -226,6 +226,20 @@ the real ControlApi.
   * **Gate:** Save / Add / Restore render only with `LensService.canManageIncidents()` (a new *identity*
     capability, action node `incidents.manage` under Case Manager); everyone else sees the same screen
     read-only. The components pane never lists the kind (D8).
+  * **Option C, not the recommended D (decided at build time).** The field editor is ONE reactive form, not a
+    per-field `<inspecto-schema-form>`: the schema form exposes no value-change output, so mixing it with the
+    bespoke controls would have needed a second sync path. The ten calls, in one line: D1 writes gated on
+    `canManageIncidents` (four literal `/components/findings-spec…` routes ahead of the generic ones,
+    `ControlApiFindingsSpecGateTest`) · D2 Case only · D3 the server validates the `attributes.findings` blob
+    · D4 a Cases-toolbar dialog · D5 no `advanced` · D6 technical properties under a collapsed disclosure ·
+    D7 generic removal warning · D8 off the Components pane · D9 **Findings field** · D10 one think-aloud.
+  * **Choice rows are tracked by their `FormControl` and edited IN PLACE** (2026-09-29,
+    `FINDINGS-EDITOR-CHOICE-BINDING-1`). `select()` still rebuilds `choiceControls` on a field switch, but
+    *Add / move / remove choice* push, splice or `removeAt` the array. ⚠ The old template tracked rows by
+    `$index` with `[formControlName]="i"`, and every choice edit re-ran `select()`: a row that stayed on
+    screen kept its index, so its directive never rebound and stayed wired to the removed control. What the
+    lead typed there went nowhere, and the draft kept an empty label. *Add choice* focuses the new box
+    (`afterNextRender`), not the field's Name (`FINDINGS-EDITOR-ADD-CHOICE-FOCUS-1`).
   * ⚠ **Not driven in a browser preview in the build shift** (`preview_start` serves the main checkout, and
     the routes need a packaged `inspecto-ops`) — unit specs only (`findings-spec-editor.*.spec.ts`).
   * 🔴 **ACCEPTANCE OWED (D10) — the BACKLOG row does NOT close on this build.** It closes on ONE think-aloud

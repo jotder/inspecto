@@ -1,19 +1,21 @@
 # Findings-spec authoring UI — design
 
+> **ARCHIVED 2026-09-29 (operator decision)**: accepted on proxy; the real-lead session is BACKLOG P3 `D6-REAL-USER-SESSION-1`. As-built truth lives in `objects.md` (linked below).
+>
 > **STATUS 2026-09-25: S0–S5 BUILT (Option C, the design's named fallback — see below), S6 docs done except
 > archiving; ⚠ ACCEPTANCE (D10) OWED, so this plan stays in flight.** All ten decisions are signed (§9). As-built
-> facts live in [`objects.md`](../okf/frontend/features/objects.md) (*Authoring UI*). Option D's per-field
+> facts live in [`objects.md`](../../okf/frontend/features/objects.md) (*Authoring UI*). Option D's per-field
 > `<inspecto-schema-form>` was not used: the schema form exposes no value-change output, so merging it with the
 > bespoke controls would have needed a second sync path; the field editor is one reactive form instead (§5
 > allows this fallback). Not yet driven in a browser preview. Archive this file once the think-aloud session is
 > recorded in `objects.md`.
 >
 > *Originally:* DESIGN ONLY, 2026-09-24. BACKLOG §3.9 row *D6 spec-authoring UI (`findings-spec`)*.
-> Owner concept: [`okf/frontend/features/objects.md`](../okf/frontend/features/objects.md) (§ *Configurable
-> Findings sections*). UI work follows the [`angular-ui`](../../.claude/skills/angular-ui/SKILL.md) skill;
-> chrome follows [`okf/frontend/conventions/page-chrome.md`](../okf/frontend/conventions/page-chrome.md).
+> Owner concept: [`okf/frontend/features/objects.md`](../../okf/frontend/features/objects.md) (§ *Configurable
+> Findings sections*). UI work follows the [`angular-ui`](../../../.claude/skills/angular-ui/SKILL.md) skill;
+> chrome follows [`okf/frontend/conventions/page-chrome.md`](../../okf/frontend/conventions/page-chrome.md).
 > The shipped backend half is archived in
-> [`plans-archive/findings-spec-plan.md`](../archived-documents/plans-archive/findings-spec-plan.md), whose
+> [`plans-archive/findings-spec-plan.md`](findings-spec-plan.md), whose
 > §5 put an authoring UI out of scope (lines 165–166, 172). **This design asks for ten operator calls (§9).**
 
 **The test the row sets:** can an analyst use it? Being faster than the generic path does not count. So every
