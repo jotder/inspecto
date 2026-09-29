@@ -35,9 +35,19 @@ import java.util.List;
 public final class InspectoPack implements ApplicationPack {
 
     private final ReadModel service;
+    private final java.util.function.BooleanSupplier killSwitch;
 
     public InspectoPack(ReadModel service) {
+        this(service, () -> false);
+    }
+
+    /**
+     * {@code killSwitch} is read at every mutating tool call: while it is engaged, the act tier refuses to run,
+     * whether the call comes from a session, an approval or anywhere else (2026-09-29).
+     */
+    public InspectoPack(ReadModel service, java.util.function.BooleanSupplier killSwitch) {
         this.service = service;
+        this.killSwitch = java.util.Objects.requireNonNull(killSwitch, "killSwitch");
     }
 
     @Override
@@ -57,7 +67,7 @@ public final class InspectoPack implements ApplicationPack {
 
     @Override
     public ToolProvider toolProvider() {
-        return new InspectoToolProvider(service);
+        return new InspectoToolProvider(service, killSwitch);
     }
 
     @Override

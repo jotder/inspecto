@@ -57,6 +57,23 @@ public final class ToolCapabilities {
         };
     }
 
+    /**
+     * A MUTATING {@code tool} that refuses to execute while {@code killSwitch} reads true. The kill switch
+     * used to reach only the ops_monitor autonomy loop, so an approved in-session act call still ran with it
+     * engaged (round-2 verification, 2026-09-29). A non-mutating tool is returned unwrapped.
+     */
+    public static Tool haltable(Tool tool, java.util.function.BooleanSupplier killSwitch) {
+        if (!tool.spec().mutating()) return tool;
+        return new Tool() {
+            @Override public ToolSpec spec() { return tool.spec(); }
+            @Override public ToolResult invoke(ToolCall call) {
+                if (killSwitch.getAsBoolean())
+                    return new ToolResult(false, null, "tool '" + tool.spec().name() + "' refused: the autonomy kill switch is engaged", Map.of());
+                return tool.invoke(call);
+            }
+        };
+    }
+
     /** The control-plane capability for {@code spec}, or empty when an authenticated caller is enough. */
     public static Optional<String> of(ToolSpec spec) {
         if (ROW_READERS.contains(spec.name())) return Optional.of(AUTHOR);

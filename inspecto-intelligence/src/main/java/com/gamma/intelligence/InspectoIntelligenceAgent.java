@@ -144,7 +144,9 @@ public final class InspectoIntelligenceAgent implements IntelligenceAgent {
 
     @Override
     public void start() {
-        pack = new InspectoPack(service);
+        // The kill switch is read at every mutating tool call (the act tier), not only by ops_monitor.
+        // autonomy is assigned further down; the supplier reads it lazily, and fails closed until it exists.
+        pack = new InspectoPack(service, () -> autonomy == null || autonomy.current().killSwitch());
         contextBroker = new ContextBroker(service);
         if (gatewayOverride != null) {
             gateway = gatewayOverride;                     // modelConfigured came from the test ctor
