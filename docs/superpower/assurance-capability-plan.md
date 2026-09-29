@@ -92,7 +92,9 @@ Turns findings into controlled action. Order is forced: lists need approval, dis
 | 3.2 | ✅ **SHIPPED 2026-09-27** — **WS-22 Explainable Risk Score** — weighted-factor component per entity type; `score = Σ weight × indicator`, 0–100, with `factors[]`; feeds Incident priority and, above a threshold, a watch Entity List through 2.1 | 4–6 | **Job form**, not a Step (Step Processor hold) |
 | 3.3 | ✅ **SHIPPED 2026-09-27** (`ASSURE-AUDIT-CHAIN-1`; residuals `ASSURE-AUDIT-CHAIN-RESIDUALS-1`) — **WS-25 Tamper-evident audit** — `prevHash` / `hash` chained per Space with a daily anchor; `GET /audit/verify` names the first bad record | 3–5 | masking stays out (D-P8) |
 
-### Wave 4 — integration and operability · ≈ 18–30 eng-wk
+### Wave 4 — integration and operability
+
+*Started 2026-09-29; on the board as `ASSURE-PUSH-INGEST-1`, `ASSURE-BI-PUBLICATION-1`, `ASSURE-XLSX-ATTACHMENTS-1`, `ASSURE-WORKFLOW-SLA-1`, `ASSURE-OPERABILITY-1`, `ASSURE-INTELLIGENCE-BUNDLE-1` (P2).* · ≈ 18–30 eng-wk
 
 Order inside the wave is free; these are independent.
 
