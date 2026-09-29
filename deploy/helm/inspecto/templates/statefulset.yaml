@@ -1,0 +1,97 @@
+{{- $scheme := ternary "HTTPS" "HTTP" .Values.tls.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "inspecto.fullname" . }}
+  labels: {{- include "inspecto.labels" . | nindent 4 }}
+  annotations:
+    inspecto/replica-safety: "single replica only - not multi-replica safe"
+spec:
+  # ⛔ Hard-coded, not a value: two pods would each own a private copy of the Spaces volume.
+  replicas: 1
+  serviceName: {{ include "inspecto.fullname" . }}
+  selector:
+    matchLabels: {{- include "inspecto.labels" . | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "inspecto.labels" . | nindent 8 }}
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: inspecto
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.port }}
+          env:
+            - name: PORT
+              value: {{ .Values.port | quote }}
+            - name: SPACES_ROOT
+              value: spaces
+            {{- with .Values.javaOpts }}
+            - name: INSPECTO_JAVA_OPTS
+              value: {{ . | quote }}
+            {{- end }}
+            {{- range $k, $v := .Values.env }}
+            - name: {{ $k }}
+              value: {{ $v | quote }}
+            {{- end }}
+            {{- if .Values.tls.enabled }}
+            - name: HTTPS_KEYSTORE
+              value: /app/tls/{{ .Values.tls.keystoreKey }}
+            - name: HTTPS_KEYSTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.tls.secretName }}
+                  key: {{ .Values.tls.passwordKey }}
+            {{- end }}
+          {{- if or .Values.secrets.existingSecret .Values.secrets.values }}
+          envFrom:
+            - secretRef:
+                name: {{ include "inspecto.secretName" . }}
+          {{- end }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: {{ .Values.port }}
+              scheme: {{ $scheme }}
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: {{ .Values.port }}
+              scheme: {{ $scheme }}
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: spaces
+              mountPath: /app/spaces
+            {{- if .Values.tls.enabled }}
+            - name: tls
+              mountPath: /app/tls
+              readOnly: true
+            {{- end }}
+      {{- if .Values.tls.enabled }}
+      volumes:
+        - name: tls
+          secret:
+            secretName: {{ .Values.tls.secretName }}
+            items:
+              - key: {{ .Values.tls.keystoreKey }}
+                path: {{ .Values.tls.keystoreKey }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: spaces
+      spec:
+        accessModes: [{{ .Values.persistence.accessMode }}]
+        {{- with .Values.persistence.storageClassName }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}

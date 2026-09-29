@@ -1,0 +1,7 @@
+Inspecto is running as ONE replica ({{ include "inspecto.fullname" . }}-0).
+
+NOT MULTI-REPLICA SAFE: do not scale this StatefulSet. Each pod owns a private Spaces volume and, with the
+default in-process run lease, nothing stops two pods from running the same Pipeline.
+
+  kubectl port-forward statefulset/{{ include "inspecto.fullname" . }} {{ .Values.port }}
+  {{ if .Values.tls.enabled }}https{{ else }}http{{ end }}://localhost:{{ .Values.port }}/health

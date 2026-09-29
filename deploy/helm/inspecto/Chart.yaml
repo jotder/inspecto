@@ -1,0 +1,8 @@
+apiVersion: v2
+name: inspecto
+description: >-
+  Single-replica Inspecto control plane (StatefulSet, replicas 1, one PVC).
+  NOT multi-replica safe - see values.yaml.
+type: application
+version: 0.1.0
+appVersion: "latest"

@@ -60,3 +60,27 @@ and matches every Maven coordinate against an **OSV-format snapshot** at `$VULN_
 4. Record `sha256sum all.zip` with the transfer, carry `osv-maven/` across the air gap, and verify the hash.
 5. Point `VULN_DB_DIR` at it and run `node tools/vuln-scan.mjs`. Refresh at least every 30 days — older
    snapshots are refused.
+
+## Kubernetes: single-replica Helm chart (ASSURE-OPERABILITY-1, 2026-09-29)
+
+`deploy/helm/inspecto/` is a StatefulSet pinned to **`replicas: 1`** in the template (no value can change
+it), one `ReadWriteOnce` PVC mounted at `/app/spaces`, liveness on `GET /health` and readiness on
+`GET /ready`, secret-backed environment via `envFrom` (an existing Secret, or one the chart creates from
+`secrets.values` for tests), and JVM-terminated TLS (`tls.enabled` mounts a keystore Secret and sets
+`HTTPS_KEYSTORE` / `HTTPS_KEYSTORE_PASSWORD`; probes switch to HTTPS). The image is the bundle's own
+Dockerfile, built and pushed by the operator.
+
+⛔ **Not multi-replica safe.** Each pod owns a private Spaces volume and the default run lease is
+per-process. Scale-out is the Enterprise partitioned topology, not this chart.
+
+⚠ **Validation was a YAML sanity check only** — `helm` is not installed on the build host. `Chart.yaml`
+and `values.yaml` parse and carry the expected keys; the templates were checked for balanced `{{ }}` and
+`if/with/range/define` … `end` blocks, but **never rendered** by `helm template` or linted by `helm lint`,
+and never installed on a cluster. Run `helm lint deploy/helm/inspecto && helm template t deploy/helm/inspecto`
+on a host that has it before first use.
+
+🔴 **Image blocker found while grounding this:** [operations-reference.md](operations-reference.md) says the
+bundle Dockerfile moved to `debian:stable-slim` + the bundle's own jlinked runtime on 2026-09-17, but
+`inspecto/package.ps1` (step 6b-2) still writes `FROM eclipse-temurin:24-jre` with `runtime/` excluded by
+`.dockerignore` — a Java 24 JRE cannot run the `release=27` JAR. Until that is fixed, the image this chart
+deploys will not start.
