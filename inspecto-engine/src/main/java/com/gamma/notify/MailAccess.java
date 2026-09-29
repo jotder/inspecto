@@ -70,6 +70,8 @@ public interface MailAccess {
             if (target.isEmpty()) return false;
             List<MailAttachment> files = attachments == null ? List.of() : attachments;
             MailAttachments.check(files);
+            // Every To AND Cc must sit in the Space's attachment domain allowlist (EMPTY by default ⇒ refused).
+            if (!files.isEmpty()) MailAttachDomains.requireAllowed(to, cc);
             for (NotificationChannel channel : ServiceLoader.load(NotificationChannel.class)) {
                 if (!"email".equals(channel.id()) || !channel.configured()) continue;
                 channel.deliver(Notification.create("job", "JOB_RUN", null,

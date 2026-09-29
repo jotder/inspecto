@@ -662,6 +662,27 @@ class ControlApiActionRequestsTest {
         }
     }
 
+    /** ASSURE-XLSX-ATTACHMENTS-1: the attachment domain allowlist is EMPTY by default, admin-only, validated fail closed. */
+    @Test
+    void theMailAttachmentDomainAllowlistIsEmptyByDefaultAdminOnlyAndValidated(@TempDir Path cfg, @TempDir Path tmp)
+            throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            assertEquals(0, data(send(c, "GET", "/settings/mail-attachments", null, AUTHOR), 200).get("allow").size(),
+                    "empty by default: attachments are off until an admin names a domain");
+            assertEquals(403, send(c, "PUT", "/settings/mail-attachments", "{\"allow\":[\"example.com\"]}", ANALYST2)
+                    .statusCode());
+            for (String bad : List.of("a@b.example", "*.example.com", "localhost", "http://x.example", "a b.example"))
+                assertEquals(422, send(c, "PUT", "/settings/mail-attachments", "{\"allow\":[\"" + bad + "\"]}", CHECKER)
+                        .statusCode(), bad);
+            assertEquals(422, send(c, "PUT", "/settings/mail-attachments", "{\"deny\":[]}", CHECKER).statusCode());
+            JsonNode put = data(send(c, "PUT", "/settings/mail-attachments",
+                    "{\"allow\":[\"Example.COM\",\"bücher.example\"]}", CHECKER), 200);
+            assertEquals("example.com", put.get("allow").get(0).asText());
+            assertEquals("xn--bcher-kva.example", put.get("allow").get(1).asText(), "stored in punycode");
+            assertEquals(2, data(send(c, "GET", "/settings/mail-attachments", null, AUTHOR), 200).get("allow").size());
+        }
+    }
+
     /** WEBHOOK-EGRESS-POLICY-1: BOOT seeds a pre-existing Space from its webhook Step targets; a removal sticks. */
     @Test
     void bootSeedsTheAllowlistFromWebhookTargetsAndARemovalIsNeverReSeeded(@TempDir Path cfg, @TempDir Path tmp)

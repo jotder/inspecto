@@ -603,6 +603,16 @@ faster than notifications. Test: `MaintenanceLibraryTest` (`receiptPrune…`).
   the file through `PathJail.requireJobPathUnderAny` (allowed roots, `*.secrets` refused on the spelling and the
   real path) and checks the size before reading. No parameter anywhere names a path to attach. The one caller is
   `ReportJob` (`recipients` + `attach: true`); `mail.send` does not attach, because it has no Run Artifacts of its own.
+* 🔴 **Recipient domain allowlist — attachments are OFF until an admin configures it** (operator 2026-09-29).
+  `MailAttachDomains` reads the Space's `mail-attachments.toon` (`allow: [example.com, …]`), stored like the
+  egress allowlist: `GET /settings/mail-attachments`, `PUT /settings/mail-attachments` (canAdminister, 422 on a
+  non-domain, audited `mail-attachment-domains.changed` with before/after, reserved from imports in
+  `ReservedConfigPaths`). It is **EMPTY by default and empty denies**, so a Job with `attach: true` fails its Run
+  with "attachments are off in this Space" until a domain is named. `MailAccess.overChannels()` checks it on
+  EVERY send that carries an attachment, over every To AND Cc: the domain must equal an entry or be a subdomain
+  of one (`notexample.com` does not match `example.com`), compared lower-case on the punycode (IDN) form. One
+  address outside refuses the whole send. A missing or invalid file reads as empty (fail closed). Tests:
+  `MailAttachDomainsTest`, `ControlApiActionRequestsTest.theMailAttachmentDomainAllowlistIsEmptyByDefaultAdminOnlyAndValidated`.
 * Tests: `MailAttachmentsTest` (jail, `config.secrets`, allowlist, both caps, filename), `SmtpEmailChannelAttachmentTest`
   (MIME structure after serialise-and-reparse, header injection, the channel's own cap check), `ReportJobDeliveryTest`
   (the Job attaches its own artifact; an over-cap file fails the Run with the reason). ⚠ No live-SMTP round trip: the

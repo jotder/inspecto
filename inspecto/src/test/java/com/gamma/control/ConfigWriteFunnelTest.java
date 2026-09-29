@@ -71,6 +71,9 @@ class ConfigWriteFunnelTest {
             + "(publication-destinations.toon, ASSURE-BI-PUBLICATION-1): a Space setting validated by "
             + "PublicationDestinations (canAdminister) — like egress.toon, SaveGate has no arm for it and "
             + "ApprovalPolicy.GOVERNABLE excludes Space settings";
+    private static final String MAIL_ATTACH = "the Space mail attachment domain allowlist (mail-attachments.toon, "
+            + "ASSURE-XLSX-ATTACHMENTS-1): a Space setting validated by MailAttachDomains (canAdminister) — the egress "
+            + "allowlist's shape and reason";
     private static final String JOBS = "JobRoutes runs its own job gate (the job spec + ConfigSafetyValidator.checkJob, "
             + "the two checks SaveGate's job arm runs) rather than the whole SaveGate list";
 
@@ -89,7 +92,8 @@ class ConfigWriteFunnelTest {
             Map.entry("POST /jobs/([^/]+)/enable", JOBS), Map.entry("POST /jobs/([^/]+)/disable", JOBS),
             Map.entry("POST /jobs/([^/]+)/reschedule", JOBS),
             Map.entry("PUT /settings/egress", EGRESS),
-            Map.entry("PUT /settings/publication-destinations", PUBLICATION_DESTINATIONS)
+            Map.entry("PUT /settings/publication-destinations", PUBLICATION_DESTINATIONS),
+            Map.entry("PUT /settings/mail-attachments", MAIL_ATTACH)
     ));
 
     private static final String NOT_GOVERNABLE = "writes a kind ApprovalPolicy.GOVERNABLE excludes, so no policy can "
@@ -121,6 +125,7 @@ class ConfigWriteFunnelTest {
             Map.entry("POST /expectations/([^/]+)/evaluate", RESULT_STAMP),
             Map.entry("PUT /settings/egress", EGRESS),
             Map.entry("PUT /settings/publication-destinations", PUBLICATION_DESTINATIONS),
+            Map.entry("PUT /settings/mail-attachments", MAIL_ATTACH),
             Map.entry("POST /pipelines/rename/resume",
                     "finishes a rename that was already let through (held and approved, or ungoverned) — holding "
                             + "the recovery would strand a half-moved identity")

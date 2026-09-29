@@ -40,7 +40,7 @@ public final class ReservedConfigPaths {
 
     /** Reserved files, matched at the config root. */
     static final Set<String> FILES = Set.of(
-            "roles.toon", "demo-users.toon", "access-policies.toon", "approval.toon", "egress.toon", "publication-destinations.toon", "offers.toon", "grants.toon",
+            "roles.toon", "demo-users.toon", "access-policies.toon", "approval.toon", "egress.toon", "publication-destinations.toon", "mail-attachments.toon", "offers.toon", "grants.toon",
             "branding.toon", "geo.toon", "link-analysis.toon", "pipeline-history.toon", "timezone.toon", "icon-map.toon",
             "scheduler.toon", "nav-menus.toon", "notification-preferences.toon", "partition.toon", "space.toon",
             "rename.journal", "dataset-publications.tsv");

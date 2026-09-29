@@ -10006,6 +10006,32 @@
         "x-generated" : true
       }
     },
+    "/settings/mail-attachments" : {
+      "get" : {
+        "tags" : [ "settings" ],
+        "summary" : "GET /settings/mail-attachments (generated skeleton)",
+        "operationId" : "getSettingsMailAttachments",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      },
+      "put" : {
+        "tags" : [ "settings" ],
+        "summary" : "PUT /settings/mail-attachments (generated skeleton)",
+        "operationId" : "putSettingsMailAttachments",
+        "description" : "Generated from the live route table by OpenApiPathsContractTest; request and response schemas are not yet documented — see control-api.md §5 for the exemplar-coverage decision.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/settings/publication-destinations" : {
       "get" : {
         "tags" : [ "settings" ],
