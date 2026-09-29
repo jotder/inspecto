@@ -17,10 +17,26 @@ spec:
       labels: {{- include "inspecto.labels" . | nindent 8 }}
     spec:
       terminationGracePeriodSeconds: 60
+      # Non-root, matching the image's fixed uid/gid 10001; fsGroup makes the PVC writable by it.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
       containers:
         - name: inspecto
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # readOnlyRootFilesystem: proven 2026-09-29 by booting the image with `docker run --read-only`
+          # and the demo Space (13 Pipelines) mounted — the app writes only /app/spaces (the PVC) and /tmp.
+          # /tmp must be an EXEC-able emptyDir: DuckDB extracts its JNI .so there (a noexec tmpfs fails
+          # with "failed to map segment from shared object").
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
           ports:
             - containerPort: {{ .Values.port }}
           env:
@@ -50,6 +66,15 @@ spec:
             - secretRef:
                 name: {{ include "inspecto.secretName" . }}
           {{- end }}
+          # Generous startup window (30 x 10 s = 5 min) so a slow first boot — many Spaces, a cold DuckDB
+          # — is not killed by the liveness probe before it has started.
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path }}
+              port: {{ .Values.port }}
+              scheme: {{ $scheme }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
           livenessProbe:
             httpGet:
               path: {{ .Values.probes.liveness.path }}
@@ -70,13 +95,17 @@ spec:
           volumeMounts:
             - name: spaces
               mountPath: /app/spaces
+            - name: tmp
+              mountPath: /tmp
             {{- if .Values.tls.enabled }}
             - name: tls
               mountPath: /app/tls
               readOnly: true
             {{- end }}
-      {{- if .Values.tls.enabled }}
       volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- if .Values.tls.enabled }}
         - name: tls
           secret:
             secretName: {{ .Values.tls.secretName }}

@@ -5,4 +5,5 @@ description: >-
   NOT multi-replica safe - see values.yaml.
 type: application
 version: 0.1.0
-appVersion: "latest"
+# The image tag the chart deploys (values.image.tag overrides). Tracks the reactor version.
+appVersion: "4.0.0-SNAPSHOT"

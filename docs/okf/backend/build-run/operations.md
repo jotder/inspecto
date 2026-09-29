@@ -76,6 +76,17 @@ it), one `ReadWriteOnce` PVC mounted at `/app/spaces`, liveness on `GET /health`
 `HTTPS_KEYSTORE` / `HTTPS_KEYSTORE_PASSWORD`; probes switch to HTTPS). The image is the bundle's own
 Dockerfile, built and pushed by the operator.
 
+**Security posture (operator 2026-09-29: non-root):** the pod runs as uid/gid **10001** (`runAsNonRoot`,
+`runAsUser`/`runAsGroup`/`fsGroup` 10001, `RuntimeDefault` seccomp), the container drops **ALL** capabilities,
+disallows privilege escalation and sets **`readOnlyRootFilesystem: true`**. That last one is grounded, not
+assumed: the image was booted with `docker run --read-only --cap-drop ALL` and the repo's `spaces/demo` Space
+(13 Pipelines) mounted, and it reached `/health` 200 and `/ready` 200 writing only `/app/spaces` and `/tmp`.
+⚠ `/tmp` is an **exec-able** `emptyDir`: DuckDB extracts its JNI library there, and a `noexec` tmpfs fails the
+boot with *failed to map segment from shared object*. ⚠ Boot only — a full ingest run under a read-only root
+has not been exercised. A **startupProbe** on `/health` (30 × 10 s = 5 min) guards slow first boots; the
+liveness/readiness delays are therefore 0. The image tag defaults to the chart's `appVersion`
+(`4.0.0-SNAPSHOT`, the reactor version), never `latest`.
+
 ⛔ **Not multi-replica safe.** Each pod owns a private Spaces volume and the default run lease is
 per-process. Scale-out is the Enterprise partitioned topology, not this chart.
 

@@ -1212,10 +1212,20 @@ $dockerfileContent = @'
 # All serve.sh env vars pass straight through (-e PORT / SPACES_ROOT /
 # CORS_ORIGIN / AUTH_OIDC_* / INSPECTO_JAVA_OPTS ...). Persist data by mounting the spaces
 # root:  -v /srv/inspecto/spaces:/app/spaces
-FROM debian:stable-slim
+# Pinned by DIGEST (the linux/amd64 manifest of debian:stable-slim, approved by the operator 2026-09-29):
+# a tag moves under a fixed name; bump the digest deliberately.
+FROM debian@sha256:520c7157b4b1c3c46fa56bac0e748ea21d60956c0512b300e3b16d8757f68e2d
 WORKDIR /app
 COPY . /app
-RUN chmod +x serve.sh runtime/bin/* && runtime/bin/java -version
+# Non-root (operator 2026-09-29): a dedicated user/group with a FIXED uid/gid 10001, so a volume's
+# ownership and the Helm chart's runAsUser/fsGroup agree. The app writes under its own root (spaces/ plus
+# the DuckDB/log dirs it creates beside the jar), so /app itself is owned by the user; the jars, the
+# runtime and the launcher stay root-owned and read-only to it.
+RUN groupadd --system --gid 10001 inspecto \
+ && useradd --system --uid 10001 --gid 10001 --home-dir /app --no-create-home --shell /usr/sbin/nologin inspecto \
+ && chmod +x serve.sh runtime/bin/* && runtime/bin/java -version \
+ && mkdir -p spaces && chown 10001:10001 /app && chown -R 10001:10001 spaces
+USER 10001:10001
 ENV PORT=8080
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=15s CMD ["bash", "-c", \

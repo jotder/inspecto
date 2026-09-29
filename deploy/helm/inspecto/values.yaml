@@ -9,7 +9,8 @@
 # (`docker build -t <registry>/inspecto:<tag> .`) and push it to a registry the cluster can reach.
 image:
   repository: inspecto
-  tag: latest
+  # Empty = the chart appVersion. Set appVersion (or this) to the tag you built; never `latest`.
+  tag: ""
   pullPolicy: IfNotPresent
 
 port: 8080
@@ -47,5 +48,6 @@ tls:
   passwordKey: keystore-password
 
 probes:
-  liveness:  { path: /health, initialDelaySeconds: 30, periodSeconds: 20, failureThreshold: 3 }
-  readiness: { path: /ready,  initialDelaySeconds: 15, periodSeconds: 10, failureThreshold: 3 }
+  startup:   { path: /health, periodSeconds: 10, failureThreshold: 30 }
+  liveness:  { path: /health, initialDelaySeconds: 0, periodSeconds: 20, failureThreshold: 3 }
+  readiness: { path: /ready,  initialDelaySeconds: 0, periodSeconds: 10, failureThreshold: 3 }

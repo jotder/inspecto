@@ -1099,6 +1099,10 @@ As-built decisions:
   🔴 **This bullet was ahead of the code until 2026-09-29:** `package.ps1` still emitted
   `eclipse-temurin:24-jre` and excluded `runtime/`; fixed then (`ASSURE-OPERABILITY-1`). The fixed Dockerfile
   has not yet been built — the 2026-08-28 verification below is of the old temurin image.
+- **Base pinned by digest, and non-root** (operator 2026-09-29): `FROM debian@sha256:520c7157…8e2d` (the
+  linux/amd64 manifest of `debian:stable-slim`; bump it deliberately), and a dedicated `inspecto` user/group
+  with fixed uid/gid **10001** (`USER 10001:10001`). `/app` and `spaces/` are chowned to it; the jars, the
+  runtime and `serve.sh` stay root-owned and read-only to the process.
 - **HEALTHCHECK probes `/health` via a bash `/dev/tcp` HTTP GET, not curl** — the temurin JRE image
   ships **no curl or wget** (verified 2026-08-28; the original plan's curl one-liner would have
   reported unhealthy forever). `/health` is tokenless via `PUBLIC_PATHS`, correct for a healthcheck.
