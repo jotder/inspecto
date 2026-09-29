@@ -46,6 +46,27 @@ jobs:
         with:
           node-version: '22'
 
+      # Release gate — vulnerability scan REQUIRED on a tag (ASSURE-OPERABILITY-1, D-P3). ci.yml may log
+      # "NOT SCANNED" on a hosted runner with no OSV snapshot; a RELEASE may not. On `push: tags` this step
+      # fails unless the repository variable VULN_DB_DIR names a snapshot on the runner AND
+      # tools/vuln-scan.mjs exits 0 over tools/dependencies.lock (exit 1 = unwaived HIGH/CRITICAL, exit 2 =
+      # could not run — both stop the release). ⚠ So a tag cannot be released from a hosted runner until a
+      # snapshot is configured (self-hosted runner, or a carried-in snapshot directory). A dispatch dry run
+      # scans when it can and warns when it cannot, because it publishes nothing.
+      - name: Release gate — offline vulnerability scan (required on a tag)
+        env:
+          VULN_DB_DIR: ${{ vars.VULN_DB_DIR }}
+        run: |
+          node --test tools/vuln-scan.test.mjs
+          if [ -n "$VULN_DB_DIR" ]; then
+            node tools/vuln-scan.mjs
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            echo "::error::release refused — no vulnerability scan result: set the VULN_DB_DIR variable to an OSV snapshot on this runner"
+            exit 1
+          else
+            echo "::warning::dry run NOT SCANNED — no VULN_DB_DIR snapshot on this runner"
+          fi
+
       # inspecto-agent depends on the pre-release eoiagent (same arrangement as ci.yml)
       #
       # ⛔ PINNED, and ci.yml deliberately is NOT (operator call, 2026-09-16). A RELEASE built from a

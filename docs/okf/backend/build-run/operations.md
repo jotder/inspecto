@@ -53,6 +53,9 @@ and matches every Maven coordinate against an **OSV-format snapshot** at `$VULN_
 - **CI:** the `test` job runs `node --test tools/vuln-scan.test.mjs` always, and the scan when the repository
   variable `VULN_DB_DIR` names a snapshot on the runner. Without it the step logs a *NOT SCANNED* warning — a
   hosted runner has no snapshot, so today the scan is wired but has never run against real data.
+- **Release gate:** `release.yml` runs the same scan before packaging and, on a `v*` tag push, FAILS the
+  release when `VULN_DB_DIR` is unset or the scan exits non-zero. A dispatch dry run warns instead. ⚠ Until
+  a snapshot is configured, no tag can be released from a hosted runner.
 
 **Snapshot refresh procedure (on a connected host, then carry the directory in):**
 
