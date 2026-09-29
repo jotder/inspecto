@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ResolveDialog, ResolveDialogData } from './resolve.dialog';
+import { dispositionLabel } from './incident-disposition';
 
 function create(data: ResolveDialogData) {
     const ref = { close: vi.fn(), disableClose: false, backdropClick: () => NEVER, keydownEvents: () => NEVER };
@@ -37,6 +38,14 @@ describe('ResolveDialog', () => {
         c.form.controls.disposition.setValue('DUPLICATE');
         c.apply();
         expect(ref.close).toHaveBeenCalledWith({ comment: 'feed restored', disposition: 'DUPLICATE' });
+    });
+
+    it('never offers ARCHIVED_UNDECIDED — the server stamps it on archive and 422s it on resolve (D-A)', () => {
+        const { c } = create({ count: 1, label: 'incident', askDisposition: true });
+        const values = c.dispositions.map((d) => d.value);
+        expect(values).not.toContain('ARCHIVED_UNDECIDED');
+        expect(values).toContain('ACCEPTED_RISK');
+        expect(dispositionLabel('ARCHIVED_UNDECIDED')).toBe('Archived undecided');
     });
 
     it('asks a Case for the comment only — its Disposition lives in its Findings', () => {

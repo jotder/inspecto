@@ -31,6 +31,9 @@ class FindingsSpecTest {
         FindingsSpec.Section disposition = spec.sections().get(0);
         assertEquals("select", disposition.type());
         assertEquals(7, disposition.options().size(), "the GLOSSARY §9 Disposition ladder (+ DUPLICATE, ACCEPTED_RISK, WS-10)");
+        // D-A: ARCHIVED_UNDECIDED is on the ladder but stamped, never chosen — a Findings select does not offer it
+        assertTrue(FindingsSpec.DISPOSITIONS.contains(FindingsSpec.ARCHIVED_UNDECIDED));
+        assertTrue(disposition.options().stream().noneMatch(o -> FindingsSpec.ARCHIVED_UNDECIDED.equals(o.value())));
         assertEquals("CONFIRMED", disposition.options().get(0).value());
         assertEquals("False positive", disposition.options().get(1).label(), "humanized for display");
 

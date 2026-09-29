@@ -780,6 +780,10 @@ the same problem is tracked by another object; *accepted-risk* = real, and knowi
 and Recovered are the same words the SPA's case-state tones use; *Closed – no loss* is a Case state, not a
 Disposition (a false-positive usually ends there). ⛔ never "verdict/outcome" in UI text. *(duplicate and
 accepted-risk added, and required on Incident resolve, 2026-09-26 — `ASSURE-IMPACT-LEDGER-1`.)*
+**Archived undecided** (`ARCHIVED_UNDECIDED`) is the one ladder value nobody chooses: the server stamps it when
+an Incident is archived with no Disposition, so every archived Incident carries one; an Incident archived after
+a resolve keeps its real Disposition, a reopen clears it, and a resolve that sends it is a 422. A Case's
+Findings never offer it. *(added 2026-09-29, operator.)*
 
 **Case Rule** — A saved search that **auto-groups Incidents into a Case** (C5): when ≥ *threshold*
 Incidents match its filter within a *window*, they are grouped under one Case (opened, or attached

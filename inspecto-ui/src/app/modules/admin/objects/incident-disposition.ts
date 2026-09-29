@@ -14,7 +14,12 @@ export const DISPOSITIONS: readonly PickerOption[] = [
     { value: 'INCONCLUSIVE', label: 'Inconclusive', hint: 'The investigation could not decide.' },
     { value: 'DUPLICATE', label: 'Duplicate', hint: 'The same problem is tracked by another Incident or Case.' },
     { value: 'ACCEPTED_RISK', label: 'Accepted risk', hint: 'Real, and knowingly left in place.' },
+    // D-A (operator 2026-09-29): stamped by the server when an undecided Incident is archived — never chosen.
+    { value: 'ARCHIVED_UNDECIDED', label: 'Archived undecided', hint: 'Archived before anyone decided an outcome.' },
 ];
+
+/** What a resolve may send (the server 422s `ARCHIVED_UNDECIDED`) — `FindingsSpec.CHOOSABLE_DISPOSITIONS`. */
+export const CHOOSABLE_DISPOSITIONS: readonly PickerOption[] = DISPOSITIONS.filter((d) => d.value !== 'ARCHIVED_UNDECIDED');
 
 /** The operator-facing label of a stored Disposition; an unknown value is shown verbatim. */
 export function dispositionLabel(value: string | null | undefined): string {

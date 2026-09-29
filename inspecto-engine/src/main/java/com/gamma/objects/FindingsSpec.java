@@ -92,7 +92,18 @@ public record FindingsSpec(String objectType, List<Section> sections) {
      * {@code ACCEPTED_RISK} joined the original five on 2026-09-26 ({@code ASSURE-IMPACT-LEDGER-1}).
      */
     public static final List<String> DISPOSITIONS = List.of("CONFIRMED", "FALSE_POSITIVE", "RECOVERED",
-            "WRITTEN_OFF", "INCONCLUSIVE", "DUPLICATE", "ACCEPTED_RISK");
+            "WRITTEN_OFF", "INCONCLUSIVE", "DUPLICATE", "ACCEPTED_RISK", FindingsSpec.ARCHIVED_UNDECIDED);
+
+    /**
+     * The Disposition {@code ObjectService} stamps on an Incident archived with none (operator 2026-09-29, D-A).
+     * It is on the ladder so every reader can name it, but it is never CHOSEN: a resolve that sends it is a 422
+     * and a Case's Findings do not offer it — see {@link #CHOOSABLE_DISPOSITIONS}.
+     */
+    public static final String ARCHIVED_UNDECIDED = "ARCHIVED_UNDECIDED";
+
+    /** {@link #DISPOSITIONS} minus {@link #ARCHIVED_UNDECIDED}: what a resolve may send and a Findings select offers. */
+    public static final List<String> CHOOSABLE_DISPOSITIONS = DISPOSITIONS.stream()
+            .filter(d -> !ARCHIVED_UNDECIDED.equals(d)).toList();
 
     /**
      * The built-in Findings shape — exactly what the panel renders today, so an unconfigured deployment
@@ -101,7 +112,7 @@ public record FindingsSpec(String objectType, List<Section> sections) {
      * no-disposition prompt on resolve is a <em>soft</em> warning, not a validation error.
      */
     public static FindingsSpec defaultFor(ObjectType type) {
-        List<Option> dispositions = DISPOSITIONS.stream()
+        List<Option> dispositions = CHOOSABLE_DISPOSITIONS.stream()
                 .map(d -> new Option(d, humanize(d))).toList();
         return new FindingsSpec(type == null ? "case" : type.name().toLowerCase(Locale.ROOT), List.of(
                 // WS-10 (ASSURE-IMPACT-LEDGER-1): the Case's money is its typed impact (attributes.impact,

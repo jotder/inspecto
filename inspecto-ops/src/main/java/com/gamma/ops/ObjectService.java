@@ -1583,9 +1583,13 @@ public final class ObjectService {
                 throw new IllegalArgumentException("a disposition is recorded when an Incident is resolved"
                         + (obj.objectType() == ObjectType.CASE ? " — a Case's Disposition is part of its Findings" : ""));
             String d = disposition.trim().toUpperCase(java.util.Locale.ROOT);
-            if (!com.gamma.objects.FindingsSpec.DISPOSITIONS.contains(d))
+            if (com.gamma.objects.FindingsSpec.ARCHIVED_UNDECIDED.equals(d))
+                throw new IllegalArgumentException("disposition " + d + " is stamped when an undecided Incident is "
+                        + "archived and cannot be chosen on resolve — pick one of "
+                        + com.gamma.objects.FindingsSpec.CHOOSABLE_DISPOSITIONS);
+            if (!com.gamma.objects.FindingsSpec.CHOOSABLE_DISPOSITIONS.contains(d))
                 throw new IllegalArgumentException("disposition '" + disposition + "' is not one of "
-                        + com.gamma.objects.FindingsSpec.DISPOSITIONS);
+                        + com.gamma.objects.FindingsSpec.CHOOSABLE_DISPOSITIONS);
             obj = obj.withAttributes(Map.of(ATTR_DISPOSITION, d), obj.updatedAt());
         }
         if (resolvingIncident) {
@@ -1603,6 +1607,13 @@ public final class ObjectService {
                 && !resolvingIncident && !"ARCHIVED".equalsIgnoreCase(target);
         if (reopeningIncident && obj.attributes().get(ATTR_DISPOSITION) != null)
             next = next.withAttributes(Map.of(ATTR_DISPOSITION, ""), now);
+        // D-A (operator 2026-09-29): archiving an undecided Incident stamps ARCHIVED_UNDECIDED, so every archived
+        // Incident carries a Disposition; one archived WITH a Disposition keeps it. A reopen clears it (above).
+        String held = obj.attributes().get(ATTR_DISPOSITION);
+        boolean stampUndecided = obj.objectType() == ObjectType.INCIDENT && "ARCHIVED".equalsIgnoreCase(target)
+                && !"ARCHIVED".equalsIgnoreCase(obj.status()) && (held == null || held.isBlank());
+        if (stampUndecided)
+            next = next.withAttributes(Map.of(ATTR_DISPOSITION, com.gamma.objects.FindingsSpec.ARCHIVED_UNDECIDED), now);
         // INCIDENT-KPI-MTTR-1: commit() is the single place every status change lands, so stamping here
         // cannot be bypassed by transition / transitionTo / resolve. Overwrites on a re-resolve on
         // purpose — see ATTR_RESOLVED_AT.
@@ -1622,6 +1633,7 @@ public final class ObjectService {
                 .attr("actor", actor);
         // WS-10: the outcome is part of the record of the resolve that decided it
         if (resolvingIncident) event.attr("disposition", obj.attributes().get(ATTR_DISPOSITION));
+        if (stampUndecided) event.attr("disposition", com.gamma.objects.FindingsSpec.ARCHIVED_UNDECIDED);
         EventLog.current().emit(event);
         return updated;
     }
@@ -1661,7 +1673,7 @@ public final class ObjectService {
         if (dueAt == null || dueAt.isBlank()) gaps.add("SLA");
         // WS-10: an Incident resolves with a decided outcome from the ladder, never without one.
         String disposition = obj.attributes().get(ATTR_DISPOSITION);   // List.of(...).contains(null) throws
-        if (disposition == null || !com.gamma.objects.FindingsSpec.DISPOSITIONS.contains(disposition))
+        if (disposition == null || !com.gamma.objects.FindingsSpec.CHOOSABLE_DISPOSITIONS.contains(disposition))
             gaps.add("disposition");
         return gaps;
     }

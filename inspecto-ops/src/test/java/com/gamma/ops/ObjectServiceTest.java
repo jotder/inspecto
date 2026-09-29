@@ -186,6 +186,46 @@ class ObjectServiceTest {
                 "archive", "alice", "CONFIRMED"), "a Disposition still rides only a deciding move");
     }
 
+    /** D-A (operator 2026-09-29): archiving an undecided Incident stamps ARCHIVED_UNDECIDED, and says so in the audit event. */
+    @Test
+    void archivingAnUndecidedIncidentStampsArchivedUndecided() {
+        InMemoryEventStore events = new InMemoryEventStore();
+        EventLog.global().installStore(events);
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        OperationalObject o = svc.open(ObjectType.INCIDENT, "noise", "d", "HIGH", "MAJOR", null, null, "c", Map.of());
+        assertEquals("IDENTIFIED", o.status());
+        OperationalObject archived = svc.transition(o.id(), "archive", "alice");
+        assertEquals("ARCHIVED_UNDECIDED", archived.attributes().get(ObjectService.ATTR_DISPOSITION));
+        assertEquals("ARCHIVED_UNDECIDED", activityFor(events, EventType.OBJECT_ACTIVITY, o.id()).get(0)
+                .attributes().get("disposition"), "the stamp is on the transition's audit event");
+
+        // a reopen from ARCHIVED clears it, as a reopen clears any Disposition
+        assertEquals("", svc.transition(o.id(), "reopen", "alice").attributes().get(ObjectService.ATTR_DISPOSITION));
+    }
+
+    /** D-A: an Incident archived after a resolve keeps its real Disposition. */
+    @Test
+    void archivingAResolvedIncidentKeepsItsDisposition() {
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        OperationalObject o = svc.open(ObjectType.INCIDENT, "late feed", "d", "HIGH", "MAJOR", null, null, "c",
+                completePostmortemAttrs(System.currentTimeMillis() + 60_000));
+        svc.transition(o.id(), "resolve", "alice", "RECOVERED");
+        assertEquals("RECOVERED", svc.transition(o.id(), "archive", "alice").attributes().get(ObjectService.ATTR_DISPOSITION));
+    }
+
+    /** D-A: ARCHIVED_UNDECIDED is stamped, never chosen — a resolve that sends it is refused and writes nothing. */
+    @Test
+    void aResolveCannotChooseArchivedUndecided() {
+        ObjectService svc = new ObjectService(new InMemoryObjectStore());
+        Map<String, String> noDisposition = new java.util.HashMap<>(completePostmortemAttrs(System.currentTimeMillis() + 60_000));
+        noDisposition.remove(ObjectService.ATTR_DISPOSITION);
+        OperationalObject o = svc.open(ObjectType.INCIDENT, "x", "d", "HIGH", "MAJOR", null, null, "c", noDisposition);
+        IllegalArgumentException refused = assertThrows(IllegalArgumentException.class,
+                () -> svc.transition(o.id(), "resolve", "alice", "archived_undecided"));
+        assertTrue(refused.getMessage().contains("cannot be chosen"), refused.getMessage());
+        assertEquals("IDENTIFIED", svc.get(o.id()).orElseThrow().status());
+    }
+
     /** A Disposition rides only an Incident's resolve: a Case keeps its Disposition in its Findings. */
     @Test
     void aDispositionIsRefusedOnAnyOtherMove() {

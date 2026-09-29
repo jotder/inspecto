@@ -172,6 +172,11 @@ class ControlApiIncidentFinishGateTest {
                 assertTrue(noDisposition.body().contains("disposition"), noDisposition.body());
                 assertEquals(422, send(c.port, "POST", "/objects/" + id + "/resolve",
                         "{\"disposition\":\"MAYBE\"}", "operations").statusCode(), "off the ladder");
+                // D-A: ARCHIVED_UNDECIDED is stamped by an archive, never chosen on a resolve
+                HttpResponse<String> stamped = send(c.port, "POST", "/objects/" + id + "/resolve",
+                        "{\"disposition\":\"ARCHIVED_UNDECIDED\"}", "operations");
+                assertEquals(422, stamped.statusCode(), stamped.body());
+                assertTrue(stamped.body().contains("cannot be chosen"), stamped.body());
                 HttpResponse<String> resolve = send(c.port, "POST", "/objects/" + id + "/transition",
                         "{\"action\":\"resolve\",\"disposition\":\"FALSE_POSITIVE\"}", "operations");
                 assertEquals(200, resolve.statusCode(), resolve.body());

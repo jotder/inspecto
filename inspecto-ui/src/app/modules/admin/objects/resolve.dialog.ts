@@ -7,7 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { InspectoOptionPickerComponent } from 'app/inspecto/components/option-picker.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
-import { DISPOSITIONS } from './incident-disposition';
+import { CHOOSABLE_DISPOSITIONS } from './incident-disposition';
 
 /** What the dialog was opened for. `askDisposition` is set for Incidents, which cannot resolve without one. */
 export interface ResolveDialogData {
@@ -89,7 +89,7 @@ export class ResolveDialog {
     readonly requestClose = guardDirtyClose(this.ref, () => this.form.dirty, this.confirm);
     private fb = inject(FormBuilder);
     readonly data = inject<ResolveDialogData>(MAT_DIALOG_DATA);
-    readonly dispositions = [...DISPOSITIONS];
+    readonly dispositions = [...CHOOSABLE_DISPOSITIONS];
 
     readonly form = this.fb.group({
         comment: ['', Validators.required],
