@@ -39,6 +39,7 @@ class PostgresPublishJobTest {
     Path cfg, data;
     DuckDBConnection target;
     final AtomicReference<String> dialed = new AtomicReference<>();
+    final AtomicReference<java.util.Properties> dialedProps = new AtomicReference<>();
 
     @BeforeEach
     void setUp() throws Exception {
@@ -48,7 +49,7 @@ class PostgresPublishJobTest {
         System.setProperty("assist.write.root", cfg.toString());
         target = (DuckDBConnection) DriverManager.getConnection("jdbc:duckdb:" + dir.resolve("target.duckdb").toString().replace('\\', '/'));
         PostgresPublishJobType.resolver = h -> new InetAddress[] {InetAddress.getByName("203.0.113.10")};
-        PostgresPublishJobType.opener = (url, props) -> { dialed.set(url); return target.duplicate(); };
+        PostgresPublishJobType.opener = (url, props) -> { dialed.set(url); dialedProps.set(props); return target.duplicate(); };
         register("BI", "jdbc:postgresql://bi.example.test:5432/bi");
         plant("subs", "SELECT * FROM (VALUES ('m1','gold',10.5,DATE '2026-09-01'),('m2','silver',3.0,DATE '2026-09-01'),"
                 + "('m3','gold',7.25,DATE '2026-09-02')) t(msisdn, plan, amount, day)", Map.of());
@@ -132,7 +133,14 @@ class PostgresPublishJobTest {
         assertEquals("SUCCESS", r.status(), r.message());
         assertEquals(List.of("plan", "amount", "day"), columnsOf("subs"), "the MSISDN column is not published");
         assertEquals(3L, ((Number) query("SELECT count(*) FROM bi.subs").get(0).get(0)).longValue());
-        assertEquals("jdbc:postgresql://203.0.113.10:5432/bi", dialed.get(), "the driver dials the checked address");
+        assertEquals("jdbc:postgresql://bi.example.test:5432/bi", dialed.get(), "the URL keeps the authored host for TLS");
+        java.util.Properties props = dialedProps.get();
+        assertEquals("203.0.113.10", props.getProperty(PublishPinnedSocketFactory.PINNED), "the socket dials the checked address");
+        assertEquals(PublishPinnedSocketFactory.class.getName(), props.getProperty("socketFactory"));
+        assertEquals(PublishSslFactory.class.getName(), props.getProperty("sslfactory"));
+        assertEquals("verify-full", props.getProperty("sslmode"), "verify-full by default");
+        assertEquals("", props.getProperty("password"), "a password is always set, so ~/.pgpass is never read");
+        assertEquals("disable", props.getProperty("gssEncMode"));
         assertEquals("Tariff plan (it's the billed one)", query("SELECT comment FROM duckdb_columns() WHERE "
                 + "schema_name='bi' AND table_name='subs' AND column_name='plan'").get(0).get(0));
         assertEquals("Subscribers' daily spend", query("SELECT comment FROM duckdb_tables() WHERE schema_name='bi' "
@@ -271,5 +279,38 @@ class PostgresPublishJobTest {
                 "ALTER TABLE \"bi\".\"t__inspecto_stage\" RENAME TO \"t\""), PostgresPublishSql.swap("bi", "t"));
         assertEquals("numeric(18,2)", PostgresPublishSql.pgType("DECIMAL(18,2)"));
         assertNull(PostgresPublishSql.pgType("STRUCT(a INTEGER)"));
+    }
+
+    @Test
+    void aWeakerSslmodeNeedsInsecureTlsOnTheConnectionAndACanAdministerAuthor() throws Exception {
+        register("BI", "jdbc:postgresql://bi.example.test:5432/bi?sslmode=require");
+        PostgresPublishJobType.installAuthority(c -> author("root", "canAdminister"));
+        JobRun r = run(Map.of());
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("needs verify-full"), r.message());
+        assertNull(dialed.get());
+
+        ConnectionRegistry.register(ConnectionProfile.fromMap(Map.of("id", "BI", "connector", "db", "username", "bi",
+                "options", Map.of("jdbc_url", "jdbc:postgresql://bi.example.test:5432/bi?sslmode=require", "insecure_tls", "true"))));
+        PostgresPublishJobType.installAuthority(c -> author("bob"));
+        JobRun notAdmin = run(Map.of());
+        assertEquals("FAILED", notAdmin.status());
+        assertTrue(notAdmin.message().contains("canAdminister"), notAdmin.message());
+
+        PostgresPublishJobType.installAuthority(c -> author("root", "canAdminister"));
+        assertEquals("SUCCESS", run(Map.of()).status());
+        assertEquals("require", dialedProps.get().getProperty("sslmode"));
+    }
+
+    @Test
+    void anSslrootcertThatIsAFilePathIsRefused() throws Exception {
+        register("BI", "jdbc:postgresql://bi.example.test:5432/bi?sslrootcert=/etc/ssl/ca.pem");
+        JobRun r = run(Map.of());
+        assertEquals("FAILED", r.status());
+        assertTrue(r.message().contains("secret reference"), r.message());
+        register("BI", "jdbc:postgresql://bi.example.test:5432/bi?sslrootcert=%24%7BSYS:pub.ca%7D");
+        assertEquals("SUCCESS", run(Map.of()).status());
+        assertEquals("${SYS:pub.ca}", dialedProps.get().getProperty(PublishSslFactory.ROOT_CERT_REF));
+        assertNull(dialedProps.get().getProperty("sslrootcert"), "pgjdbc never sees a root-cert path");
     }
 }

@@ -19,7 +19,6 @@ import com.gamma.signal.Severity;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -227,7 +226,8 @@ public final class PostgresPublishJobType implements JobTypeProvider {
                                     + c.duckType() + "; partition on a text, integer, boolean or date column");
                     }
 
-                Target target = target(required(p, P_CONNECTION), timeout);
+                Target target = target(required(p, P_CONNECTION), timeout, author);
+                if (target.insecureTls() && !ctx.dryRun()) auditInsecureTls(target, cfg);
                 if (ctx.dryRun())
                     return "dry run: would publish " + plans.size() + " dataset(s) " + mode + " to " + target.display()
                             + "." + schema + "; nothing was sent";
@@ -362,15 +362,26 @@ public final class PostgresPublishJobType implements JobTypeProvider {
 
     // ── target ───────────────────────────────────────────────────────────────────────────────
 
-    record Target(String url, Properties props, String display) {}
+    record Target(String url, Properties props, String display, String sslmode, boolean insecureTls) {}
 
     private static final Pattern PG_URL = Pattern.compile(
             "jdbc:postgresql://(\\[[0-9A-Fa-f:.]+\\]|[^/:?\\[\\],]+)(?::(\\d{1,5}))?/([A-Za-z0-9_.-]+)(?:\\?(.*))?");
-    /** Query parameters a publication URL may carry; anything else (a socket factory, a second host) is refused. */
-    static final Set<String> URL_PARAMS = Set.of("sslmode", "ssl", "ApplicationName");
+    /** Query parameters a publication URL may carry; anything else (a socket factory, a service, a second host) is
+     *  refused. {@code sslrootcert} must be a secret reference. */
+    static final Set<String> URL_PARAMS = Set.of("sslmode", "sslrootcert", "ApplicationName");
+    static final String VERIFY_FULL = "verify-full";
+    static final Set<String> SSL_MODES = Set.of("disable", "allow", "prefer", "require", "verify-ca", VERIFY_FULL);
+    /** The Connection option that permits a weaker {@code sslmode} — effective only for a {@code canAdminister} author. */
+    static final String INSECURE_TLS = "insecure_tls";
 
-    /** Resolve the Connection and pass its host through the egress policy; the URL returned dials the checked address. */
-    static Target target(String connectionId, int timeoutSeconds) throws EgressPolicy.Refused {
+    /**
+     * Resolve the Connection, pass its host through the egress policy, and build the driver properties: the URL keeps
+     * the AUTHORED host (TLS SNI and the {@code verify-full} hostname check use it) while
+     * {@link PublishPinnedSocketFactory} dials the checked address, and {@link PublishSslFactory} does TLS.
+     * {@code sslmode} defaults to {@code verify-full}; anything weaker needs the Connection's {@code insecure_tls: true}
+     * AND an author holding {@code canAdminister} now.
+     */
+    static Target target(String connectionId, int timeoutSeconds, Author author) throws EgressPolicy.Refused {
         ConnectionProfile profile = ConnectionRegistry.find(connectionId).orElseThrow(() ->
                 new IllegalStateException("Connection '" + connectionId + "' is not registered in this space"));
         if (!"db".equalsIgnoreCase(profile.connector()))
@@ -385,30 +396,74 @@ public final class PostgresPublishJobType implements JobTypeProvider {
             throw new IllegalArgumentException("Connection '" + connectionId + "' options.jdbc_url must be "
                     + "jdbc:postgresql://host[:port]/database (one host)");
         String host = m.group(1), port = m.group(2), db = m.group(3), query = m.group(4);
-        Properties props = new Properties();
+        Map<String, String> params = new LinkedHashMap<>();
         if (query != null && !query.isEmpty())
             for (String kv : query.split("&")) {
                 int eq = kv.indexOf('=');
                 String k = eq < 0 ? kv : kv.substring(0, eq);
                 if (!URL_PARAMS.contains(k))
                     throw new IllegalArgumentException("jdbc_url parameter '" + k + "' is not allowed (only " + URL_PARAMS + ")");
-                props.setProperty(k, eq < 0 ? "true" : kv.substring(eq + 1));
+                params.put(k, eq < 0 ? "" : java.net.URLDecoder.decode(kv.substring(eq + 1), java.nio.charset.StandardCharsets.UTF_8));
             }
+        String sslmode = params.getOrDefault("sslmode", VERIFY_FULL).trim().toLowerCase(Locale.ROOT);
+        if (!SSL_MODES.contains(sslmode)) throw new IllegalArgumentException("unknown sslmode '" + sslmode + "'");
+        boolean insecure = !VERIFY_FULL.equals(sslmode);
+        if (insecure) {
+            boolean flagged = "true".equalsIgnoreCase(profile.options().getOrDefault(INSECURE_TLS, "false").trim());
+            if (!flagged)
+                throw new SecurityException("Connection '" + connectionId + "' asks for sslmode=" + sslmode + ", which does "
+                        + "not verify the server's certificate and host name — publish.postgres needs verify-full, or an "
+                        + "explicit " + INSECURE_TLS + ": true on the Connection — refused");
+            if (!author.capabilities().contains(CAN_ADMINISTER))
+                throw new SecurityException("Connection '" + connectionId + "' sets " + INSECURE_TLS + ", which takes "
+                        + "effect only for a Job author holding canAdminister — refused");
+        }
+        String rootCert = params.get("sslrootcert");
+        if (rootCert != null && !SecretResolver.isReference(rootCert))
+            throw new IllegalArgumentException("jdbc_url sslrootcert must be a secret reference such as ${KEYSTORE:name}, "
+                    + "never a file path");
+
         String bare = host.startsWith("[") ? host.substring(1, host.length() - 1) : host;
         EgressPolicy.checkHost(bare);
         InetAddress to = EgressPolicy.resolve(bare, EgressAllowlist.forCurrentSpace(), resolver);
-        String addr = to instanceof Inet6Address ? "[" + to.getHostAddress() + "]" : to.getHostAddress();
+        Properties props = new Properties();
+        props.setProperty("sslmode", sslmode);
+        if (params.containsKey("ApplicationName")) props.setProperty("ApplicationName", params.get("ApplicationName"));
+        props.setProperty("socketFactory", PublishPinnedSocketFactory.class.getName());
+        props.setProperty(PublishPinnedSocketFactory.PINNED, to.getHostAddress());
+        props.setProperty("sslfactory", PublishSslFactory.class.getName());
+        if (rootCert != null) props.setProperty(PublishSslFactory.ROOT_CERT_REF, rootCert);
+        // no ambient credentials: an always-set password keeps pgjdbc from reading ~/.pgpass (PGPASSFILE), no
+        // `service` parameter means no pg_service.conf, and GSS encryption / JAAS stay off
+        props.setProperty("gssEncMode", "disable");
+        props.setProperty("jaasLogin", "false");
         if (profile.username() != null) props.setProperty("user", profile.username());
+        String pw = "";
         if (profile.password() != null) {
-            String pw = SecretResolver.resolve(profile.password());
+            pw = SecretResolver.resolve(profile.password());
             if (pw == null) throw new IllegalStateException("Connection '" + connectionId + "' password reference does not resolve");
-            props.setProperty("password", pw);
         }
+        props.setProperty("password", pw);
         props.setProperty("connectTimeout", String.valueOf(timeoutSeconds));
         props.setProperty("socketTimeout", String.valueOf(timeoutSeconds));
         props.setProperty("loginTimeout", String.valueOf(timeoutSeconds));
-        return new Target("jdbc:postgresql://" + addr + (port == null ? "" : ":" + port) + "/" + db, props,
-                connectionId + " (" + host + ")");
+        return new Target("jdbc:postgresql://" + host + (port == null ? "" : ":" + port) + "/" + db, props,
+                connectionId + " (" + host + ")", sslmode, insecure);
+    }
+
+    /** An insecure-TLS publication is audited on every run (who, which Connection, which sslmode). */
+    static void auditInsecureTls(Target t, JobConfig cfg) {
+        try {
+            EventLog log = EventLog.current();
+            if (log == null) return;
+            log.emit(Event.builder(EventType.AUDIT).source("audit")
+                    .message("publish.postgres runs with sslmode=" + t.sslmode() + " (insecure_tls) to " + t.display())
+                    .actor(cfg.params().getOrDefault(JobConfig.UPDATED_BY, "system")).actorType("system")
+                    .action("publish.postgres.insecure-tls").actionCategory("operation").target("job", cfg.name())
+                    .attr("sslmode", t.sslmode()).attr("connection", t.display()));
+        } catch (RuntimeException ignored) {
+            // best effort, as every audit emit
+        }
     }
 
     // ── writing ──────────────────────────────────────────────────────────────────────────────

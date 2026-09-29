@@ -89,6 +89,65 @@ class PostgresPublishPgTest {
         }
     }
 
+    /**
+     * TLS against a real Postgres (the fix for the pinned-IP verify-full hole): the Connection names the host its
+     * certificate is for, the egress check sees a stubbed public answer, and the socket is pinned to the loopback
+     * server — so pgjdbc runs verify-full through {@link PublishPinnedSocketFactory} + {@link PublishSslFactory} for
+     * the AUTHORED host. A host the certificate does not name fails. Enabled by {@code INSPECTO_TEST_PG_TLS_URL}
+     * (a setup URL with an explicit port), {@code INSPECTO_TEST_PG_TLS_CA} (the CA PEM file),
+     * {@code INSPECTO_TEST_PG_TLS_HOST} (the certificate's DNS name) and {@code INSPECTO_TEST_PG_TLS_PASSWORD}.
+     */
+    @Test
+    void verifyFullAgainstARealTlsPostgresChecksTheAuthoredHost(@TempDir Path dir) throws Exception {
+        String setup = System.getenv("INSPECTO_TEST_PG_TLS_URL"), caFile = System.getenv("INSPECTO_TEST_PG_TLS_CA"),
+                certHost = System.getenv("INSPECTO_TEST_PG_TLS_HOST"), pw = System.getenv("INSPECTO_TEST_PG_TLS_PASSWORD");
+        Assumptions.assumeTrue(setup != null && caFile != null && certHost != null && pw != null,
+                "SKIPPED: no TLS Postgres — set INSPECTO_TEST_PG_TLS_URL, _CA, _HOST and _PASSWORD");
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("jdbc:postgresql://[^:/]+:(\\d+)/.*").matcher(setup);
+        assertTrue(m.matches(), "setup URL needs an explicit port");
+        String port = m.group(1);
+        Path cfg = dir.resolve("config"), data = dir.resolve("data");
+        Files.createDirectories(data.resolve("subs"));
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("COPY (SELECT 'gold' AS plan) TO '" + data.resolve("subs/data.parquet").toString().replace('\\', '/')
+                    + "' (FORMAT PARQUET)");
+        }
+        new ComponentStore(cfg.resolve("registry")).write("dataset", "subs", Map.of("physicalRef", "subs"));
+        System.setProperty("assist.write.root", cfg.toString());
+        System.setProperty("pg.tls.ca", Files.readString(Path.of(caFile)));
+        System.setProperty("pg.tls.pw", pw);
+        PostgresPublishJobType.resolver = h -> new InetAddress[] {InetAddress.getByName("203.0.113.10")};
+        // the only seam: the checked (stubbed) address is swapped for the loopback server; pgjdbc does the rest
+        PostgresPublishJobType.opener = (u, props) -> {
+            java.util.Properties p = (java.util.Properties) props.clone();
+            p.setProperty(PublishPinnedSocketFactory.PINNED, "127.0.0.1");
+            return DriverManager.getConnection(u, p);
+        };
+        String schema = "inspecto_publish_tls_test";
+        try {
+            for (String host : new String[] {certHost, "not-" + certHost}) {
+                ConnectionRegistry.register(ConnectionProfile.fromMap(Map.of("id", "PGTLS", "connector", "db",
+                        "username", "postgres", "password", "${SYS:pg.tls.pw}", "options", Map.of("jdbc_url",
+                                "jdbc:postgresql://" + host + ":" + port + "/postgres?sslrootcert=%24%7BSYS:pg.tls.ca%7D"))));
+                JobConfig job = new JobConfig("pubtls", "publish.postgres", null, null, true, false,
+                        Map.of("connection", "PGTLS", "datasets", "subs", "schema", schema, "retries", "0"), null, null);
+                JobRun r = run(dir, data, job);
+                if (host.equals(certHost)) assertEquals("SUCCESS", r.status(), r.message());
+                else assertEquals("FAILED", r.status(), "a host the certificate does not name must fail: " + r.message());
+            }
+        } finally {
+            PostgresPublishJobType.resolver = com.gamma.pipeline.exec.EgressPolicy.SYSTEM;
+            PostgresPublishJobType.opener = DriverManager::getConnection;
+            ConnectionRegistry.remove("PGTLS");
+            System.clearProperty("assist.write.root");
+            System.clearProperty("pg.tls.ca");
+            System.clearProperty("pg.tls.pw");
+            try (Connection pg = DriverManager.getConnection(setup); Statement st = pg.createStatement()) {
+                st.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE");
+            }
+        }
+    }
+
     private static JobRun run(Path dir, Path data, JobConfig job) throws Exception {
         try (Scheduler s = new Scheduler();
              JobService js = new JobService(List.of(job), new ConsignmentEventBus(), s, null,
