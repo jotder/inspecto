@@ -75,6 +75,9 @@ final class CapabilityManifest {
             new Entry("DELETE", "/access/profiles/([^/]+)", Roles.CAN_CONFIGURE_ACCESS),
             // AcquisitionRoutes
             new Entry("POST", "/collectors/([^/]+)/notify", Roles.CAN_OPERATE_RUNS),
+            // StreamPushRoutes — ASSURE-PUSH-INGEST-1: a push lands DATA in a Stream's inbox and makes a run
+            // happen, like a notify — operation, not authoring (and not a config write: no approval hold).
+            new Entry("POST", "/streams/([^/]+)/records", Roles.CAN_OPERATE_RUNS),
             // AlertRoutes
             new Entry("POST", "/alerts/evaluate", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/alerts/rules", Roles.CAN_AUTHOR_ALERT_RULES),

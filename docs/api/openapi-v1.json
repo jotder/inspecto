@@ -10264,6 +10264,44 @@
         },
         "x-generated" : true
       }
+    },
+    "/streams/{streamId}/records" : {
+      "post" : {
+        "tags" : [ "streams" ],
+        "summary" : "Push NDJSON or CSV records into a Stream's inbox (ASSURE-PUSH-INGEST-1)",
+        "operationId" : "postStreamsByStreamIdRecords",
+        "description" : "Lands the body as ONE server-named file in the inbox of the Pipeline the Stream's Collector feeds; the ordinary Collector path ingests it. Gated canOperateRuns; per-caller rate limit; optional Idempotency-Key (a replay returns the first result, a concurrent duplicate is 409). Byte cap -Dstreams.push.max_bytes (default 8 MiB), record cap -Dstreams.push.max_records (default 100000). A refusal lands nothing. Not a config write: no write-root gate, no approval hold.",
+        "parameters" : [ {
+          "name" : "streamId",
+          "in" : "path",
+          "required" : true,
+          "description" : "The Collector id (the id GET /catalog/streams lists).",
+          "schema" : { "type" : "string" }
+        }, {
+          "name" : "Idempotency-Key",
+          "in" : "header",
+          "required" : false,
+          "schema" : { "type" : "string" }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/x-ndjson" : { "schema" : { "type" : "string", "description" : "One JSON object per line." } },
+            "text/csv" : { "schema" : { "type" : "string", "description" : "RFC 4180 rows, the Pipeline's delimiter; every row the first row's field count." } }
+          }
+        },
+        "responses" : {
+          "201" : { "description" : "Envelope-wrapped: data = {stream, pipeline, file, records, bytes}. A replay carries Idempotency-Replayed: true." },
+          "403" : { "description" : "The caller lacks canOperateRuns." },
+          "404" : { "description" : "No such Stream." },
+          "409" : { "description" : "The Pipeline is an authoring template, or the same Idempotency-Key is still in flight." },
+          "413" : { "description" : "Over the byte or record cap." },
+          "415" : { "description" : "Neither NDJSON nor CSV." },
+          "422" : { "description" : "Not UTF-8, a malformed line (named), no records, or the Pipeline's file_pattern would never ingest the format." },
+          "429" : { "description" : "The caller's push budget is spent." },
+          "501" : { "description" : "A Dataset-fed Pipeline has no inbox." }
+        }
+      }
     }
   },
   "components" : {

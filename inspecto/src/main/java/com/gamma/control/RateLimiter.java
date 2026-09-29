@@ -30,6 +30,11 @@ final class RateLimiter {
      *  batches its events and retries a 429 later, so this bounds abuse without dropping receipts. */
     static RateLimiter callback() { return new RateLimiter(60.0, 5.0); }
 
+    /** The push-ingest budget for {@code POST /streams/{id}/records} (ASSURE-PUSH-INGEST-1): burst 60, then 10
+     *  requests/second per caller. A producer batches records into one request, so this bounds a runaway
+     *  client's file count in the inbox without throttling a sane one. */
+    static RateLimiter push() { return new RateLimiter(60.0, 10.0); }
+
     private final double capacity;
     private final double refillPerSecond;
 

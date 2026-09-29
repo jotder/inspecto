@@ -227,6 +227,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     private final RateLimiter dashboardLimiter = RateLimiter.dashboard();
     /** The unauthenticated D8 delivery-status callback's own bucket, keyed by caller IP (SEC review F1). */
     private final RateLimiter callbackLimiter = RateLimiter.callback();
+    /** {@code POST /streams/{id}/records}'s own per-caller bucket (ASSURE-PUSH-INGEST-1) — see {@link RateLimiter#push()}. */
+    private final RateLimiter pushLimiter = RateLimiter.push();
 
     /**
      * Control plane over a single running service — wrapped as the {@code default} space. The long-standing
@@ -526,7 +528,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
                 new CatalogRoutes(), new ConfigPreviewRoutes(), new ConfigWriteRoutes(), new ConfigReadRoutes(), new ParserRoutes(),   // EventRoutes -> inspecto-events (cell 6); Object/Note/TagRoutes -> inspecto-ops (cell 7; QueueRoutes retired by RETIRE-HALVES-1)
                 new QueryRoutes(), new DatasetRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ReconRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b)
                 new ExpectationRoutes(), new RequirementRoutes(),
-                new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new RiskScoreRoutes(), new AcquisitionRoutes(),
+                new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new RiskScoreRoutes(), new AcquisitionRoutes(), new StreamPushRoutes(),
                 new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new PendingChangeRoutes(), new ActionRequestRoutes(), new EgressRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AuditLogRoutes(),   // the audit projection stays CORE though the /events feed is gated (EDG-01 cell 6)
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new SchedulerRoutes()))
@@ -642,7 +644,7 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             ApiContext.ATTR_ERROR_CODE, ApiContext.ATTR_IDEMPOTENCY_KEY,
             ApiContext.ATTR_RAW_BODY, ApiContext.ATTR_CLIENT_IP, ApiContext.ATTR_SUBJECT, ApiContext.ATTR_SUBJECT_ISSUER, ApiContext.ATTR_CAPABILITY,
             ApiContext.ATTR_RESOURCE_PERMISSIONS,
-            ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ApiContext.ATTR_APPROVED_CHANGE, ATTR_EFFECTIVE_PATH,
+            ApiContext.ATTR_PAGINATION, ApiContext.ATTR_POD_SCOPED, ApiContext.ATTR_APPROVED_CHANGE, ApiContext.ATTR_AUDIT_ATTRS, ATTR_EFFECTIVE_PATH,
             Roles.ATTR_CONFIG_ROOT, AccessDecider.ATTR_MATCHED_POLICY };
 
     /** Drop the request's whole attribute scope — dispatch's first act (see {@link #correlation}).
@@ -1090,7 +1092,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
     private static boolean isRateLimited(String path) {
         return path.equals("/db/query") || path.equals("/bi/query")
                 || path.startsWith("/recon/") || path.startsWith("/agent/")
-                || path.startsWith("/public/delivery-status/");
+                || path.startsWith("/public/delivery-status/")
+                || StreamPushRoutes.isPushPath(path);
     }
 
     /** Per-subject (falling back to the caller's IP when unauthenticated) token-bucket throttle for the
@@ -1104,7 +1107,8 @@ public final class ControlApi implements AutoCloseable, ApiContext {
             return ip == null ? "unknown" : ip;
         });
         RateLimiter bucket = path.equals("/bi/query") ? dashboardLimiter
-                : path.startsWith("/public/delivery-status/") ? callbackLimiter : rateLimiter;
+                : path.startsWith("/public/delivery-status/") ? callbackLimiter
+                : StreamPushRoutes.isPushPath(path) ? pushLimiter : rateLimiter;
         if (!bucket.tryConsume(key))
             throw new ApiException(429, ErrorCodes.RATE_LIMITED, "rate limit exceeded for " + path + " — retry later");
     }

@@ -78,6 +78,8 @@ final class AuditTrail {
                     .attr(AuditAttrs.HTTP_PATH, path)
                     .attr(AuditAttrs.HTTP_STATUS, status);
             if (capability != null) event.attr(AuditAttrs.CAPABILITY, capability);
+            if (ApiContext.attr(ex, ApiContext.ATTR_AUDIT_ATTRS) instanceof java.util.Map<?, ?> extra)
+                extra.forEach((k, v) -> event.attr(String.valueOf(k), v));
             // ASSURE-MAKER-CHECKER-1 (D-P13): an approved Pending Change's write is the author's (the actor
             // above); the approver who let it through rides on the same row.
             if (ApiContext.attr(ex, ApiContext.ATTR_APPROVED_CHANGE) instanceof java.util.Map<?, ?> pc) {
@@ -261,6 +263,7 @@ final class AuditTrail {
                 case "deny" -> "denied";
                 case "revoke" -> "revoked";
                 case "notify" -> "notified";      // POST /collectors/{id}/notify (ACQ-6 push discovery)
+                case "records" -> "records_pushed";   // POST /streams/{id}/records (ASSURE-PUSH-INGEST-1)
                 case "ack" -> "acknowledged";
                 case "resolve" -> "resolved";
                 case "transition" -> "transitioned";

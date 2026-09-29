@@ -96,6 +96,9 @@ public interface ApiContext {
      *  replay {@link #replay} runs, where {@code PendingChanges.hold} reads it as "this write was approved —
      *  verify it is the one that was, then let it through". Absent on every request a client sends. */
     String ATTR_APPROVED_CHANGE = "inspecto.approvedChange";
+    /** Extra {@code Map<String,Object>} attributes a handler adds to its request's AUDIT row (push ingest
+     *  records the record count and byte size here — never the payload). */
+    String ATTR_AUDIT_ATTRS = "inspecto.auditAttrs";
 
     /** JSON bodies at or above this size are gzipped when the client sent {@code Accept-Encoding: gzip}. */
     int GZIP_MIN_BYTES = 1024;
