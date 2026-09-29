@@ -817,7 +817,7 @@ citations elsewhere in this spec still resolve.
     (§3.6). The conclusion survives, the number does not.
 12. ✅ **CLOSED 2026-09-15 — and it had drifted a THIRD way before it was fixed.** This read *"stated as 95
     … by the generated lock and as 94 by four prose locations"*; by the time it was acted on the lock held
-    **96<!--count:locked-dependencies-->**, so every number in circulation — both of them — was wrong. The
+    **97<!--count:locked-dependencies-->**, so every number in circulation — both of them — was wrong. The
     fix is the one this list asked for, applied literally: the count is now **derived from the lock** by a
     `count:locked-dependencies` marker in `tools/check-doc-counts.mjs`, so the three surviving prose sites
     cannot drift again. ⛔ Six hand-edits were the wrong fix and are what produced two wrong numbers from
@@ -905,7 +905,7 @@ this area has three sites whose line citations drifted (§3.2).
 | The profiles | `pom.xml` — two profile identifiers, module lists only | — |
 | The bill of materials | `tools/sbom.mjs`, over the set in `tools/bundle-modules.mjs` | ⚠ Needs the reactor installed to resolve (§5.3 item 1) |
 | Its drift guard | `tools/check-sbom-modules.mjs`, wired into `ci.yml` | — |
-| The dependency lock | `tools/dependencies.lock`, written by `tools/check-dependencies.mjs` | ⚠ **96**<!--count:locked-dependencies--> locked coordinates (this cell read 95 until 2026-09-15 — the lock had moved and nothing derived the prose); originally 95 across 25 modules against four prose sites saying 94 |
+| The dependency lock | `tools/dependencies.lock`, written by `tools/check-dependencies.mjs` | ⚠ **97**<!--count:locked-dependencies--> locked coordinates (this cell read 95 until 2026-09-15 — the lock had moved and nothing derived the prose); originally 95 across 25 modules against four prose sites saying 94 |
 | The release pipeline | `.github/workflows/release.yml` | 🔴 No Professional step; every bundle skips the runtime |
 | The test pipeline | `.github/workflows/ci.yml` | ⚠ One profile pass; no Personal-with-tests, no Professional |
 | The reported edition and feature flags | `BootstrapRoutes` | 🔴 Two-valued edition string; four modules with no flag (§3.5) |

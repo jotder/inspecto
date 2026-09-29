@@ -546,7 +546,7 @@ need for third-party monitoring agents or separate data lineage catalogues:
 * **SOC 2 (Trust Services Criteria) — alignment.** CC6.1: credentials resolve at run time through the
   `SecretsProvider` seam — environment, file, keystore, and vault or cloud key management by edition —
   never plaintext, and a CI guard fails the build if a credential literal appears. CC6.7: zero telemetry,
-  zero tracking, an enforced lean dependency surface. CC8: **96<!--count:locked-dependencies--> locked third-party dependencies**, a
+  zero tracking, an enforced lean dependency surface. CC8: **97<!--count:locked-dependencies--> locked third-party dependencies**, a
   CycloneDX **and** SPDX bill of materials per bundle, SHA-256 checksums and detached GPG signatures on
   every release.
 * **ISO/IEC 27001:2022 — alignment.** A.8.15–8.17: every state-changing API call passes one dispatch seam

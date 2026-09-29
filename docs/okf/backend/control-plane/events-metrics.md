@@ -411,15 +411,27 @@ timestamp: 2026-07-16T00:00:00Z
   `ApiContext.ip` resolves — the F3 trusted-proxy IP, so a spoofed `X-Forwarded-For` cannot choose a country.
   There is **no city key**, and `GeoCountryResolver.Geo` has no city field, so no implementation can supply one.
   The seam is the `@PublicApi` SPI `GeoCountryResolver` (ServiceLoader, via `GeoCountryResolvers.active()`); a
-  resolver that throws costs only the geo attributes, never the row. ⚠ **No resolver ships yet:** the
-  `com.maxmind.db:maxmind-db` reader (Apache 2.0, Standard/Enterprise) is not in the offline Maven cache, so
-  today `-Dgeoip.db` is **inert** (one WARN, no attributes) — the binding is `D8-SES-SNS-1`'s remaining clause.
+  resolver that throws costs only the geo attributes, never the row. ✅ **The MaxMind binding shipped
+  2026-09-29:** `com.gamma.security.MaxMindGeoCountryResolver` in `inspecto-security` (so Standard/Enterprise
+  only; Personal keeps the inert one-WARN path), on `com.maxmind.db:maxmind-db:4.2.0` (Apache 2.0, no runtime
+  dependencies, `java.base` only, so the jlink `$runtimeModules` needed no change), shaded into the security
+  sidecar. It reads `-Dgeoip.db` once, lazily, into memory (`FileMode.MEMORY`: the default memory-mapped mode
+  keeps the file locked on Windows, so the operator could not replace it); takes `country.iso_code` only and
+  never reads a city; `geo_db_build` is the file's `build_epoch`. It parses only IP literals
+  (`InetAddress.ofLiteral`, so no DNS), answers empty for private, loopback, link-local, multicast and
+  not-in-database addresses, and fails soft: a missing or unreadable database logs one WARN and resolves
+  nothing for the rest of the run (a restart picks up a repaired file).
   Location is personal data; it rides on the audit row under the audit trail's retention.
   Tests: `SecurityTriggersTest` (T5 fires once on a new country; repeat and baseline silent; no-geo, refused and
   `unknown` rows skipped), `ControlApiGeoIpTest` (real HTTP with a fake resolver: country + db build on the
   sign-in row and no city key; an untrusted peer's XFF is located as the socket peer; `-Dgeoip.db` set without a
-  reader, and unset, write no geo and no error; T5 fires once over HTTP and cannot be steered by a spoofed XFF).
-* Deferred to editions/follow-ons: time-based retention sweep; the `maxmind-db` `GeoCountryResolver` binding.
+  reader, and unset, write no geo and no error; T5 fires once over HTTP and cannot be steered by a spoofed XFF),
+  `MaxMindGeoCountryResolverTest` (against a real `.mmdb` that the test helper `TestMmdb` writes at test time,
+  because MaxMind's writer is not in the offline cache: country + build epoch; private and not-in-DB addresses
+  empty; hostnames and garbage never throw; missing, unset and corrupt DB soft; concurrent first lookups; the
+  ServiceLoader registration), `MaxMindAuditRowTest` (real HTTP, real SPI discovery, no fake: the sign-in row
+  carries `geo_country` and `geo_db_build` from the file, and no city although the record holds one).
+* Deferred to editions/follow-ons: time-based retention sweep.
 
 ### Inbound delivery-status webhooks (BACKLOG D8, shipped 2026-07-26)
 

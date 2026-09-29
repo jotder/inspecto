@@ -29,6 +29,7 @@
 
     <properties>
         <nimbus-jose-jwt.version>10.9.1</nimbus-jose-jwt.version>
+        <maxmind-db.version>4.2.0</maxmind-db.version>
     </properties>
 
     <dependencies>
@@ -47,6 +48,14 @@
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
             <version>${nimbus-jose-jwt.version}</version>
+        </dependency>
+
+        <!-- MaxMind DB (.mmdb) reader behind the GeoCountryResolver binding (D12). Apache 2.0, no runtime
+             dependencies, needs java.base only. Reads the operator-supplied -Dgeoip.db; never downloads one. -->
+        <dependency>
+            <groupId>com.maxmind.db</groupId>
+            <artifactId>maxmind-db</artifactId>
+            <version>${maxmind-db.version}</version>
         </dependency>
 
         <!-- slf4j-api facade — this module's only logging need is the boot-time posture warning when

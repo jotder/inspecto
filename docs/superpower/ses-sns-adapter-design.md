@@ -404,8 +404,8 @@ body-reading route), so S0 also runs the `inspecto` module suite.
 
 > ✅ **D12 answered (operator, 2026-09-28) and BUILT the same day, except the reader**: operator-supplied,
 > country only. `geo_country` + `geo_db_build` on the audit row through the `GeoCountryResolver` SPI; no
-> `geo_city`. ⚠ `com.maxmind.db:maxmind-db` is not in the offline Maven cache, so no resolver ships and
-> `-Dgeoip.db` is inert until that binding lands (`D8-SES-SNS-1`). As built:
+> `geo_city`. ✅ The reader landed 2026-09-29: `MaxMindGeoCountryResolver` in `inspecto-security` on
+> `com.maxmind.db:maxmind-db:4.2.0` (Standard/Enterprise). As built:
 > [`events-metrics.md`](../okf/backend/control-plane/events-metrics.md) § *GeoIP on the audit trail*.
 
 **What exists.** `AuditAttrs` records only `ip` and leaves location out on purpose: "editions resolve

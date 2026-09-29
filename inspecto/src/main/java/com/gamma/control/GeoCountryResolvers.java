@@ -5,7 +5,7 @@ import java.util.logging.Logger;
 
 /**
  * The active {@link GeoCountryResolver}, or none. GeoIP is OFF unless {@code -Dgeoip.db} is set (D12). With it set
- * and no resolver on the classpath — the state until the {@code maxmind-db} binding lands — the property is inert:
+ * and no resolver on the classpath — the Personal edition, since the {@code maxmind-db} binding ships in inspecto-security — the property is inert:
  * one WARN, no attributes, no error.
  */
 final class GeoCountryResolvers {
