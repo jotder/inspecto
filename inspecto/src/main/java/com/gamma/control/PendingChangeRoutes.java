@@ -290,7 +290,7 @@ final class PendingChangeRoutes implements RouteModule {
                             + ") — nothing was applied; propose it again");
                 if (PendingChanges.insecureTls(api, proposedJob)) ApiContext.requireCapability(ex, Roles.CAN_ADMINISTER);
             }
-            requireAttachUnchanged(root, JobWriteGuard.dataDir(api), rec);
+            requireAttachUnchanged(root, api, rec);
             Map<String, Object> marker = new LinkedHashMap<>(rec);
             marker.put("approvedBy", by);   // AuditTrail stamps it on the replayed write beside the author (actor)
             Map<String, String> headers = new LinkedHashMap<>();
@@ -412,12 +412,12 @@ final class PendingChangeRoutes implements RouteModule {
      * replay, the live content (the proposed Job expanded against today's templates, today's Dataset and view SQL)
      * must still hash to it, else 409 and nothing is applied.
      */
-    private static void requireAttachUnchanged(java.nio.file.Path root, String dataDir, Map<String, Object> rec) {
+    private static void requireAttachUnchanged(java.nio.file.Path root, ApiContext api, Map<String, Object> rec) {
         if (!(rec.get("attachFingerprint") instanceof String then)) return;
         @SuppressWarnings("unchecked") Map<String, Object> proposed = (Map<String, Object>) rec.get("proposed");
         String now;
         try {
-            now = JobWriteGuard.fingerprint(String.valueOf(rec.get("kind")), proposed, root, dataDir);
+            now = JobWriteGuard.fingerprint(String.valueOf(rec.get("kind")), proposed, root, api);
         } catch (ApiException notApprovable) {
             throw new ApiException(409, ErrorCodes.CONFLICT, notApprovable.getMessage() + " — nothing was applied");
         }

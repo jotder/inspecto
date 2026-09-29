@@ -27,20 +27,29 @@ final class JobWriteGuard {
     private JobWriteGuard() {}
 
     /** The attachment fingerprint a job write proposes (template-expanded), or {@code null} when it does not attach. */
-    static String fingerprint(String kind, Map<String, Object> proposed, Path root, String dataDir) {
+    static String fingerprint(String kind, Map<String, Object> proposed, Path root, ApiContext api) {
         if (!JobRoutes.KIND.equals(kind) || proposed == null) return null;
         Map<String, Object> expanded = AttachApprovals.expand(proposed, AttachApprovals.templates(root));
         if (!AttachApprovals.attaches(expanded)) return null;
         try {
-            return AttachApprovals.fingerprint(expanded, root, dataDir);
+            // The data root is read only HERE, for an attaching report Job — never on every hold (see dataDir).
+            return AttachApprovals.fingerprint(expanded, root, dataDir(api));
         } catch (IllegalArgumentException notApprovable) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, notApprovable.getMessage());
         }
     }
 
-    /** The data root the report Job reads with (so hold, approve and run hash the same relation). */
+    /**
+     * The data root the report Job reads with (so hold, approve and run hash the same relation).
+     *
+     * <p>🔴 {@code jobService()}, never {@code jobServiceOrCreate()}: this is reached from {@code PendingChanges.hold},
+     * which every config write passes, and creating a JobService as a side effect of a component write started one
+     * whose run ledger defaults to {@code jobs_audit/} in the process working directory (caught by
+     * {@code CwdJobsAuditLeakDetector} on {@code ControlApiAsyncV1Test}). A write that reaches here is a job write,
+     * whose route already made the JobService; with none, the report Job's own default (no data root) is used.
+     */
     static String dataDir(ApiContext api) {
-        return api.service().jobServiceOrCreate().dataDir();
+        return api.service().jobService().map(com.gamma.job.JobService::dataDir).orElse(null);
     }
 
     /** The mandatory four-eyes rule when {@code fingerprint} is not the approved version of Job {@code proposed}. */
