@@ -105,7 +105,7 @@ Order inside the wave is free; these are independent.
 | 4.3 | **WS-27 Excel export + e-mail attachments** — xlsx server-side, size-capped attachments | 2–3 | needs D-P6 |
 | 4.4 | **WS-23 Workflow editor, SLA per priority, Escalation Rules** | 4–6 | needs D-P4 — it reverses a 2026-09-14 deletion |
 | 4.5 | **Operability, generic half** of WS-01 / 02 / 04 / 26: nightly throughput floor in CI; mixed ingest + dashboard load measured; `PostgresStateStoreTest` run on a real Postgres; a two-node active / passive drill on plain Linux with measured RPO / RTO and a runbook; an offline vulnerability scan over the SBOM; a single-replica Helm chart | 4–8 | needs D-P3 for the scanner |
-| 4.6 | **WS-32 Bundle the intelligence module** | 1–2 | needs D-P2 |
+| 4.6 | ✅ **SHIPPED 2026-09-29** (`ASSURE-INTELLIGENCE-BUNDLE-1`; residuals `ASSIST-MODEL-EGRESS-1`, `NATIVE-LICENCE-TEXTS-1`) — **WS-32 Bundle the intelligence module** | 1–2 | needs D-P2 |
 
 ### Wave 5 — content on the platform (Space Templates) · ≈ 33–51 eng-wk
 
